@@ -609,13 +609,6 @@ bool DurableCatalogImpl::isResumableIndexBuildIdent(StringData ident) const {
     return ident.find(kResumableIndexBuildIdentStem) != std::string::npos;
 }
 
-bool DurableCatalogImpl::isCollectionIdent(StringData ident) const {
-    // Internal idents prefixed "internal-" should not be considered collections, because
-    // they are not eligible for orphan recovery through repair.
-    return ident.find("collection-") != std::string::npos ||
-        ident.find("collection/") != std::string::npos;
-}
-
 StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(
     OperationContext* opCtx, std::string ident, const CollectionOptions& optionsWithUUID) {
     // The collection will be named local.orphan.xxxxx.

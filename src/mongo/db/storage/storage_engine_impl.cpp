@@ -226,7 +226,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
         // 'local.orphan.xxxxx' for it. However, in a nonrepair context, the orphaned idents
         // will be dropped in reconcileCatalogAndIdents().
         for (const auto& ident : identsKnownToStorageEngine) {
-            if (_catalog->isCollectionIdent(ident)) {
+            if (DurableCatalog::isCollectionIdent(ident)) {
                 bool isOrphan = !std::any_of(catalogEntries.begin(),
                                              catalogEntries.end(),
                                              [this, &ident](DurableCatalog::EntryIdentifier entry) {
@@ -656,7 +656,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
 
         // In repair context, any orphaned collection idents from the engine should already be
         // recovered in the catalog in loadCatalog().
-        invariant(!(_catalog->isCollectionIdent(it) && _options.forRepair));
+        invariant(!(DurableCatalog::isCollectionIdent(it) && _options.forRepair));
 
         // Leave drop-pending idents alone.
         // These idents have to be retained as long as the corresponding drops are not part of a

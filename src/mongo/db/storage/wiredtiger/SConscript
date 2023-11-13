@@ -141,6 +141,7 @@ wtEnv.CppUnitTest(
         'wiredtiger_stats_test.cpp',
         'wiredtiger_recovery_unit_test.cpp',
         'wiredtiger_session_cache_test.cpp',
+        'wiredtiger_size_storer_test.cpp',
         'wiredtiger_util_test.cpp',
     ],
     LIBDEPS=[

@@ -96,8 +96,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     rs.reset(nullptr);
 
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto& info = *ss.load(opCtx.get(), uri);
+        auto& info = *ss.load(uri);
         ASSERT_EQUALS(N, info.numRecords.load());
     }
 
@@ -141,9 +140,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     }
 
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         WiredTigerSizeStorer ss2(harnessHelper->conn(), indexUri);
-        auto info = ss2.load(opCtx.get(), uri);
+        auto info = ss2.load(uri);
         ASSERT_EQUALS(N, info->numRecords.load());
     }
 
@@ -170,12 +168,12 @@ private:
     }
 
 protected:
-    long long getNumRecords(OperationContext* opCtx) const {
-        return sizeStorer->load(opCtx, uri)->numRecords.load();
+    long long getNumRecords() const {
+        return sizeStorer->load(uri)->numRecords.load();
     }
 
-    long long getDataSize(OperationContext* opCtx) const {
-        return sizeStorer->load(opCtx, uri)->dataSize.load();
+    long long getDataSize() const {
+        return sizeStorer->load(uri)->dataSize.load();
     }
 
     std::unique_ptr<WiredTigerHarnessHelper> harnessHelper;
@@ -190,8 +188,8 @@ TEST_F(SizeStorerUpdateTest, Basic) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     long long val = 5;
     rs->updateStatsAfterRepair(opCtx.get(), val, val);
-    ASSERT_EQUALS(getNumRecords(opCtx.get()), val);
-    ASSERT_EQUALS(getDataSize(opCtx.get()), val);
+    ASSERT_EQUALS(getNumRecords(), val);
+    ASSERT_EQUALS(getDataSize(), val);
 };
 
 TEST_F(SizeStorerUpdateTest, DataSizeModification) {
@@ -206,19 +204,19 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
         uow.commit();
     }
 
-    ASSERT_EQ(getDataSize(opCtx.get()), 5);
+    ASSERT_EQ(getDataSize(), 5);
     {
         WriteUnitOfWork uow(opCtx.get());
         ASSERT_OK(rs->updateRecord(opCtx.get(), recordId, "54321", 5));
         uow.commit();
     }
-    ASSERT_EQ(getDataSize(opCtx.get()), 5);
+    ASSERT_EQ(getDataSize(), 5);
     {
         WriteUnitOfWork uow(opCtx.get());
         ASSERT_OK(rs->updateRecord(opCtx.get(), recordId, "1234", 4));
         uow.commit();
     }
-    ASSERT_EQ(getDataSize(opCtx.get()), 4);
+    ASSERT_EQ(getDataSize(), 4);
 
     RecordData oldRecordData("1234", 4);
     {
@@ -231,7 +229,7 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
         ASSERT_TRUE(newDoc.isOK());
         oldRecordData = newDoc.getValue().getOwned();
         ASSERT_EQ(std::memcmp(oldRecordData.data(), "234", 3), 0);
-        ASSERT_EQ(getDataSize(opCtx.get()), 3);
+        ASSERT_EQ(getDataSize(), 3);
         uow.commit();
     }
     {
@@ -242,7 +240,7 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
         ASSERT_TRUE(
             rs->updateWithDamages(opCtx.get(), recordId, oldRecordData, damageSource, damageVector)
                 .isOK());
-        ASSERT_EQ(getDataSize(opCtx.get()), 5);
+        ASSERT_EQ(getDataSize(), 5);
         uow.commit();
     }
 }
@@ -267,8 +265,8 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
         auto rId = rs->insertRecord(opCtx.get(), "12345", 5, Timestamp{2});
         ASSERT_TRUE(rId.isOK());
 
-        ASSERT_EQ(getNumRecords(opCtx.get()), 2);
-        ASSERT_EQ(getDataSize(opCtx.get()), 10);
+        ASSERT_EQ(getNumRecords(), 2);
+        ASSERT_EQ(getDataSize(), 10);
         // Mark size info as clean, before rollback is done.
         sizeStorer->flush(false);
     }
@@ -283,8 +281,8 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
     // As the operation was rolled back, numRecords and dataSize should be for the first op only. If
     // rollback does not properly mark the sizeInfo as dirty, on load sizeInfo will account for the
     // two operations, as the rollback sizeInfo update has not been flushed.
-    ASSERT_EQ(getNumRecords(opCtx.get()), 1);
-    ASSERT_EQ(getDataSize(opCtx.get()), 5);
+    ASSERT_EQ(getNumRecords(), 1);
+    ASSERT_EQ(getDataSize(), 5);
 };
 
 }  // namespace

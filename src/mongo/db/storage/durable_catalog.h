@@ -156,7 +156,12 @@ public:
 
     virtual bool isInternalIdent(StringData ident) const = 0;
 
-    virtual bool isCollectionIdent(StringData ident) const = 0;
+    static bool isCollectionIdent(StringData ident) {
+        // Internal idents prefixed "internal-" should not be considered collections, because
+        // they are not eligible for orphan recovery through repair.
+        return ident.find("collection-") != std::string::npos ||
+            ident.find("collection/") != std::string::npos;
+    }
 
 
     virtual RecordStore* getRecordStore() = 0;
