@@ -3589,7 +3589,6 @@ tasks:
       - "--extraction-command=${decompress}"
       - "--change-dir=build/install/"
       - "--move-output=build/install/dist-test/pretty_printer_tests.txt:build/"
-    optional: true
   - func: "run tests"
     vars:
       suite: pretty-printer-tests
