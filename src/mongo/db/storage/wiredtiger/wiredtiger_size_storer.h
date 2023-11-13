@@ -35,7 +35,6 @@
 #include <wiredtiger.h>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -88,7 +87,17 @@ public:
      */
     void store(StringData uri, std::shared_ptr<SizeInfo> sizeInfo);
 
-    std::shared_ptr<SizeInfo> load(OperationContext* opCtx, StringData uri) const;
+    /**
+     * Returns the size info for the given URI. Creates a default-initialized SizeInfo if there is
+     * no existing size info for the given URI. Never returns nullptr.
+     */
+    std::shared_ptr<SizeInfo> load(StringData uri) const;
+
+    /**
+     * Informs the size storer that the size information about the given ident should be removed
+     * upon the next flush.
+     */
+    void remove(StringData uri);
 
     /**
      * Writes all changes to the underlying table.

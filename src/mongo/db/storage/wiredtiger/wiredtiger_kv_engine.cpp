@@ -1889,6 +1889,10 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
                 str::stream() << "Failed to remove drop-pending ident " << ident};
     }
 
+    if (DurableCatalog::isCollectionIdent(ident)) {
+        _sizeStorer->remove(uri);
+    }
+
     if (onDrop) {
         onDrop();
     }

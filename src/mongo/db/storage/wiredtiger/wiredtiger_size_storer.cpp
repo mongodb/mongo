@@ -94,35 +94,46 @@ void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeI
                 "entryUseCount"_attr = entry.use_count());
 }
 
-std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(OperationContext* opCtx,
-                                                                           StringData uri) const {
+std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(StringData uri) const {
     {
         // Check if we can satisfy the read from the buffer.
         stdx::lock_guard<Latch> bufferLock(_bufferMutex);
         Buffer::const_iterator it = _buffer.find(uri);
         if (it != _buffer.end())
-            return it->second;
+            return it->second ? it->second : std::make_shared<SizeInfo>();
     }
 
-    WiredTigerCursor cursor(_storageUri, _tableId, /*allowOverwrite=*/false, opCtx);
+    WiredTigerSession session{_conn};
+    auto cursor = session.getNewCursor(_storageUri);
 
     {
         WT_ITEM key = {uri.rawData(), uri.size()};
-        cursor->set_key(cursor.get(), &key);
-        int ret = cursor->search(cursor.get());
+        cursor->set_key(cursor, &key);
+        int ret = cursor->search(cursor);
         if (ret == WT_NOTFOUND)
             return std::make_shared<SizeInfo>();
         invariantWTOK(ret, cursor->session);
     }
 
     WT_ITEM value;
-    invariantWTOK(cursor->get_value(cursor.get(), &value), cursor->session);
+    invariantWTOK(cursor->get_value(cursor, &value), cursor->session);
     BSONObj data(reinterpret_cast<const char*>(value.data));
 
     LOGV2_DEBUG(
         22424, 2, "WiredTigerSizeStorer::load", "uri"_attr = uri, "data"_attr = redact(data));
     return std::make_shared<SizeInfo>(data["numRecords"].safeNumberLong(),
                                       data["dataSize"].safeNumberLong());
+}
+
+void WiredTigerSizeStorer::remove(StringData uri) {
+    stdx::lock_guard<Latch> bufferLock{_bufferMutex};
+
+    // Insert a new nullptr entry into the buffer, or set the existing one to nullptr if there
+    // already is one.
+    if (auto& sizeInfo = _buffer[uri]) {
+        sizeInfo->_dirty.store(false);
+        sizeInfo.reset();
+    }
 }
 
 void WiredTigerSizeStorer::flush(bool syncToDisk) {
@@ -164,27 +175,38 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
         }
         WiredTigerBeginTxnBlock txnOpen(session.getSession(), txnConfig.c_str());
 
-        for (auto it = buffer.begin(); it != buffer.end(); ++it) {
-
-            // Ordering is important here: when the store method checks if the SizeInfo
-            // is dirty and it returns true, the current values of numRecords and dataSize must
-            // still be written back. So, the required order is to clear the dirty flag first.
-            SizeInfo& sizeInfo = *it->second;
-            sizeInfo._dirty.store(false);
-            BSONObj data = BSON("numRecords" << sizeInfo.numRecords.load() << "dataSize"
-                                             << sizeInfo.dataSize.load());
-
-            auto& uri = it->first;
-            LOGV2_DEBUG(22425,
-                        2,
-                        "WiredTigerSizeStorer::flush",
-                        "uri"_attr = uri,
-                        "data"_attr = redact(data));
+        for (auto&& [uri, sizeInfo] : buffer) {
             WiredTigerItem key(uri.c_str(), uri.size());
-            WiredTigerItem value(data.objdata(), data.objsize());
             cursor->set_key(cursor, key.Get());
-            cursor->set_value(cursor, value.Get());
-            int ret = cursor->insert(cursor);
+
+            int ret = 0;
+            if (!sizeInfo) {
+                LOGV2_DEBUG(
+                    3349400, 2, "WiredTigerSizeStorer::flush removing entry", "uri"_attr = uri);
+
+                ret = cursor->remove(cursor);
+                if (ret == WT_NOTFOUND) {
+                    ret = 0;
+                }
+            } else {
+                // Ordering is important here: when the store method checks if the SizeInfo
+                // is dirty and it returns true, the current values of numRecords and dataSize must
+                // still be written back. So, the required order is to clear the dirty flag first.
+                sizeInfo->_dirty.store(false);
+                auto data = BSON("numRecords" << sizeInfo->numRecords.load() << "dataSize"
+                                              << sizeInfo->dataSize.load());
+
+                LOGV2_DEBUG(22425,
+                            2,
+                            "WiredTigerSizeStorer::flush inserting/updating entry",
+                            "uri"_attr = uri,
+                            "data"_attr = redact(data));
+
+                WiredTigerItem value(data.objdata(), data.objsize());
+                cursor->set_value(cursor, value.Get());
+                ret = cursor->insert(cursor);
+            }
+
             if (ret == WT_ROLLBACK) {
                 // One of the code paths calling this function is when a session is checked back
                 // into the session cache. This could involve read-only operations which don't
