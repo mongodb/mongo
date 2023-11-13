@@ -404,7 +404,8 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
 
     auto opTime = logMutableOplogEntry(opCtx, &oplogEntry, _oplogWriter.get());
 
-    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss) &&
+        !serverGlobalParams.quiet.load()) {
         if (opTime.isNull()) {
             LOGV2(7360100,
                   "Added oplog entry for createIndexes to transaction",
@@ -1149,7 +1150,8 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
         oplogEntry.setOpTime(createOpTime);
     }
     auto opTime = logMutableOplogEntry(opCtx, &oplogEntry, _oplogWriter.get());
-    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName) &&
+        !serverGlobalParams.quiet.load()) {
         if (opTime.isNull()) {
             LOGV2(7360102,
                   "Added oplog entry for create to transaction",
@@ -1208,7 +1210,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         oplogEntry.setObject2(o2Builder.done());
         auto opTime =
             logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
-        if (opCtx->writesAreReplicated()) {
+        if (opCtx->writesAreReplicated() && !serverGlobalParams.quiet.load()) {
             LOGV2(7360104,
                   "Wrote oplog entry for collMod",
                   logAttrs(oplogEntry.getNss()),
@@ -1241,7 +1243,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
     oplogEntry.setObject(BSON("dropDatabase" << 1));
     auto opTime =
         logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
-    if (opCtx->writesAreReplicated()) {
+    if (opCtx->writesAreReplicated() && !serverGlobalParams.quiet.load()) {
         LOGV2(7360105,
               "Wrote oplog entry for dropDatabase",
               logAttrs(oplogEntry.getNss()),
@@ -1271,12 +1273,14 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
         oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
         auto opTime =
             logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
-        LOGV2(7360106,
-              "Wrote oplog entry for drop",
-              logAttrs(oplogEntry.getNss()),
-              "uuid"_attr = oplogEntry.getUuid(),
-              "opTime"_attr = opTime,
-              "object"_attr = oplogEntry.getObject());
+        if (!serverGlobalParams.quiet.load()) {
+            LOGV2(7360106,
+                  "Wrote oplog entry for drop",
+                  logAttrs(oplogEntry.getNss()),
+                  "uuid"_attr = oplogEntry.getUuid(),
+                  "opTime"_attr = opTime,
+                  "object"_attr = oplogEntry.getObject());
+        }
     }
 
     uassert(50715,
@@ -1301,7 +1305,7 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
     oplogEntry.setObject2(indexInfo);
     auto opTime =
         logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
-    if (opCtx->writesAreReplicated()) {
+    if (opCtx->writesAreReplicated() && !serverGlobalParams.quiet.load()) {
         LOGV2(7360107,
               "Wrote oplog entry for dropIndexes",
               logAttrs(oplogEntry.getNss()),
@@ -1343,7 +1347,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
         oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
     auto opTime =
         logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
-    if (opCtx->writesAreReplicated()) {
+    if (opCtx->writesAreReplicated() && !serverGlobalParams.quiet.load()) {
         LOGV2(7360108,
               "Wrote oplog entry for renameCollection",
               logAttrs(oplogEntry.getNss()),

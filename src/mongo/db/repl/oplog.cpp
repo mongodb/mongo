@@ -2195,7 +2195,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 Status applyCommand_inlock(OperationContext* opCtx,
                            const ApplierOperation& op,
                            OplogApplication::Mode mode) {
-    if (op->shouldLogAsDDLOperation()) {
+    if (op->shouldLogAsDDLOperation() && !serverGlobalParams.quiet.load()) {
         LOGV2(7360110,
               "Applying DDL command oplog entry",
               "oplogEntry"_attr = op->toBSONForLogging(),
