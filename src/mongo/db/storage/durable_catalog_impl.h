@@ -92,8 +92,6 @@ public:
 
     bool isResumableIndexBuildIdent(StringData ident) const;
 
-    bool isCollectionIdent(StringData ident) const;
-
     RecordStore* getRecordStore() {
         return _rs;
     }

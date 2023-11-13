@@ -1868,6 +1868,10 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
         return Status::OK();
     }
 
+    if (DurableCatalog::isCollectionIdent(ident)) {
+        _sizeStorer->remove(uri);
+    }
+
     if (onDrop) {
         onDrop();
     }
