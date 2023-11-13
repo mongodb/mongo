@@ -2651,7 +2651,7 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.cursor_sweeps
   - name: disk_wiredtiger
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common !.auth !.feature_flag_guarded
@@ -2703,7 +2703,7 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.cursor_sweeps
   - name: disk_wiredtiger
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common !.auth !.feature_flag_guarded
