@@ -59,7 +59,7 @@ feature_flags:
                     by default"
       cpp_varname: gFeatureFlagSbeFull
       default: false
-      shouldBeFCVGated: true
+      shouldBeFCVGated: false
 
     featureFlagQueryStats:
       description: "Feature flag for enabling full queryStats collection."
