@@ -1562,6 +1562,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),
+                                       nullptr /*pipeline*/,
                                        std::move(solutions[0]),
                                        std::move(roots[0]),
                                        {},
@@ -1712,8 +1713,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
             auto maybeExec = getSBEExecutorViaCascadesOptimizer(
                 collections, std::move(queryHints), canonicalQuery.get());
             if (maybeExec) {
-                auto exec = uassertStatusOK(
-                    makeExecFromParams(std::move(canonicalQuery), std::move(*maybeExec)));
+                auto exec = uassertStatusOK(makeExecFromParams(
+                    std::move(canonicalQuery), nullptr /*pipeline*/, std::move(*maybeExec)));
                 return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
                     std::move(exec));
             } else {
@@ -1878,6 +1879,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
         opCtx, cq, metadataCursorId, remoteCursors.get(), sbeYieldPolicy.get());
     return plan_executor_factory::make(opCtx,
                                        nullptr /* cq */,
+                                       nullptr /*pipeline*/,
                                        nullptr /* solution */,
                                        std::move(root),
                                        nullptr /* optimizerData */,

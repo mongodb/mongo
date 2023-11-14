@@ -1357,8 +1357,13 @@ Status runAggregate(OperationContext* opCtx,
                                                                 request.getHint(),
                                                                 pipeline.get());
             if (maybeExec) {
-                execs.emplace_back(
-                    uassertStatusOK(makeExecFromParams(nullptr, std::move(*maybeExec))));
+                // Pass ownership of the pipeline to the executor. This is done to allow binding of
+                // parameters to use views onto the constants living in the MatchExpression (in the
+                // DocumentSourceMatch in the Pipeline), so we can avoid copying them into the SBE
+                // runtime environment. We must ensure that the MatchExpression lives at least as
+                // long as the executor.
+                execs.emplace_back(uassertStatusOK(
+                    makeExecFromParams(nullptr, std::move(pipeline), std::move(*maybeExec))));
             } else {
                 // If we had an optimization failure, only error if we're not in tryBonsai.
                 bonsaiExecSuccess = false;

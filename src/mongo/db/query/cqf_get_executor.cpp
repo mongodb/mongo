@@ -1023,7 +1023,9 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> makeExecFromParams(
-    std::unique_ptr<CanonicalQuery> cq, ExecParams execArgs) {
+    std::unique_ptr<CanonicalQuery> cq,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    ExecParams execArgs) {
     if (cq) {
         input_params::bind(cq->getPrimaryMatchExpression(), execArgs.root.second, false);
     } else if (execArgs.pipelineMatchExpr != boost::none) {
@@ -1033,6 +1035,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> makeExecFromPar
 
     return plan_executor_factory::make(execArgs.opCtx,
                                        std::move(cq),
+                                       std::move(pipeline),
                                        std::move(execArgs.solution),
                                        std::move(execArgs.root),
                                        std::move(execArgs.optimizerData),

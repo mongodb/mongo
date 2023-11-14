@@ -104,6 +104,8 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
  * Constructs a plan executor with the given CanonicalQuery and ExecParams.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> makeExecFromParams(
-    std::unique_ptr<CanonicalQuery> cq, ExecParams execArgs);
+    std::unique_ptr<CanonicalQuery> cq,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    ExecParams execArgs);
 
 }  // namespace mongo

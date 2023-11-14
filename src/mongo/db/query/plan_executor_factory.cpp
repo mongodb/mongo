@@ -139,6 +139,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
     std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
@@ -159,6 +160,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     return {{new PlanExecutorSBE(
                  opCtx,
                  std::move(cq),
+                 std::move(pipeline),
                  std::move(optimizerData),
                  {makeVector<sbe::plan_ranker::CandidatePlan>(sbe::plan_ranker::CandidatePlan{
                       std::move(solution),
@@ -194,6 +196,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 
     return {{new PlanExecutorSBE(opCtx,
                                  std::move(cq),
+                                 nullptr /*pipeline*/,
                                  {},
                                  std::move(candidates),
                                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
