@@ -589,6 +589,10 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
             return false;
         }
 
+        if (coll->getRequiresTimeseriesExtendedRangeSupport()) {
+            return false;
+        }
+
         ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss->db().toString());
 
         const auto& collection = coll.getCollection();
