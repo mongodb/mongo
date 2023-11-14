@@ -47,7 +47,8 @@ function assertPlanCacheSizeForColl(nss, expectedEntriesCount) {
             if (entry.version == "2")
                 numSBEEntries++;
         });
-        jsTestLog('99999 entries: ' + numSBEEntries);
+        jsTestLog('99999 actual SBE entries: ' + numSBEEntries + ', expected SBE entries: ' +
+                  expectedEntriesCount + ', total entries: ' + entries.length);
 
         return numSBEEntries === expectedEntriesCount;
     });

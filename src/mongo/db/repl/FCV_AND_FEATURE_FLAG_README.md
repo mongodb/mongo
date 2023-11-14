@@ -696,11 +696,7 @@ when testing a specific codepath:
 // featureFlagToaster has the default value.
 ```
 
-In JavaScript, we can use the command getParameter to query the setting for a feature flag:
-```
-const isToasterEnabled = db.adminCommand({getParameter: 1, featureFlagToaster: 1}).featureFlagToaster.value;
-```
-We can also use the FeatureFlagUtil library like so: 
+In JavaScript, we can use the FeatureFlagUtil library to query the setting for a feature flag:
 ```
 if (FeatureFlagUtil.isPresentAndEnabled(db, "Toaster")) {
 }

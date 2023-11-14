@@ -14,6 +14,7 @@ import {
     withTxnAndAutoRetry
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;
@@ -482,16 +483,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
         db.printShardingStatus();
 
-        const parameterRes = db.adminCommand(
-            {getParameter: 1, featureFlagUpdateDocumentShardKeyUsingTransactionApi: 1});
-        if (!parameterRes.ok) {
-            assert.eq(parameterRes.errmsg, "no option found to get", parameterRes);
-            this.updateDocumentShardKeyUsingTransactionApiEnabled = false;
-        } else {
-            assert.commandWorked(parameterRes);
-            this.updateDocumentShardKeyUsingTransactionApiEnabled =
-                parameterRes.featureFlagUpdateDocumentShardKeyUsingTransactionApi.value;
-        }
+        this.updateDocumentShardKeyUsingTransactionApiEnabled =
+            FeatureFlagUtil.isPresentAndEnabled(db, "UpdateDocumentShardKeyUsingTransactionApi");
+
         print("Updating document shard key using transaction api enabled: " +
               this.updateDocumentShardKeyUsingTransactionApiEnabled);
     };

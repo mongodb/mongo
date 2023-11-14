@@ -1,4 +1,5 @@
 import {getAggPlanStage, isAggregationPlan} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 /**
  * Utility for checking if the Cascades optimizer code path is enabled (checks framework control).
@@ -28,9 +29,7 @@ export function checkExperimentalCascadesOptimizerEnabled(theDB) {
  * Utility for checking if the Cascades optimizer feature flag is on.
  */
 export function checkCascadesFeatureFlagEnabled(theDB) {
-    const featureFlag = theDB.adminCommand({getParameter: 1, featureFlagCommonQueryFramework: 1});
-    return featureFlag.hasOwnProperty("featureFlagCommonQueryFramework") &&
-        featureFlag.featureFlagCommonQueryFramework.value;
+    return FeatureFlagUtil.isPresentAndEnabled(theDB, "CommonQueryFramework");
 }
 
 /**

@@ -6,6 +6,7 @@ import {
     ClusteredCollectionUtil
 } from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
@@ -64,10 +65,7 @@ export function safeToCreateColumnStoreIndexInCluster(nodes) {
             return false;
         }
 
-        const getParamFeatureFlagRes = assert.commandWorked(
-            conn.adminCommand({getParameter: 1, featureFlagColumnstoreIndexes: 1}));
-        if (!getParamFeatureFlagRes.featureFlagColumnstoreIndexes ||
-            !getParamFeatureFlagRes.featureFlagColumnstoreIndexes["value"]) {
+        if (!FeatureFlagUtil.isEnabled(conn, "ColumnstoreIndexes")) {
             jsTestLog("Note: declining to create column store index, because " +
                       "featureFlagColumnstoreIndexes is disabled");
             return false;
