@@ -507,6 +507,12 @@ last-continuous:
     ticket: SERVER-82984
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_replace.js
     ticket: SERVER-82984
+  - test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
+    ticket: SERVER-79848
+  - test_file: jstests/core/find_with_resume_after_param.js
+    ticket: SERVER-79848
+  - test_file: jstests/core/timeseries/timeseries_resume_after.js
+    ticket: SERVER-79848
   suites: null
 last-lts:
   all:
@@ -1076,4 +1082,10 @@ last-lts:
     ticket: SERVER-82984
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_replace.js
     ticket: SERVER-82984
+  - test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
+    ticket: SERVER-79848
+  - test_file: jstests/core/find_with_resume_after_param.js
+    ticket: SERVER-79848
+  - test_file: jstests/core/timeseries/timeseries_resume_after.js
+    ticket: SERVER-79848
   suites: null

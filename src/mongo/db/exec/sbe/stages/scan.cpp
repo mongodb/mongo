@@ -549,6 +549,12 @@ PlanState ScanStage::getNext() {
                                                            _seekRecordId,
                                                            *_coll.getCollName());
         }
+
+        // Indicate that the last recordId seen is null once EOF is hit.
+        if (_recordIdSlot) {
+            auto [tag, val] = sbe::value::makeCopyRecordId(RecordId());
+            _recordIdAccessor.reset(true, tag, val);
+        }
         _priority.reset();
         return trackPlanState(PlanState::IS_EOF);
     }

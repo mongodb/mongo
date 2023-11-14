@@ -579,15 +579,25 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
                 "resumeData"_attr = resumeData);
     AsyncRequestsSender::ShardHostMap designatedHostsMap;
     stdx::unordered_map<ShardId, BSONObj> resumeTokenMap;
+    std::set<ShardId> shardsToSkip;
     for (auto&& shardResumeData : resumeData) {
         const auto& shardId = shardResumeData.getId().getShardId();
         const auto& optionalDonorHost = shardResumeData.getDonorHost();
         const auto& optionalResumeToken = shardResumeData.getResumeToken();
+
+        if (optionalResumeToken) {
+            // If we see a null $recordId, this means that there are no more records to read from
+            // this shard. As such, we skip it.
+            if ((*optionalResumeToken)["$recordId"].isNull()) {
+                shardsToSkip.insert(shardId);
+                continue;
+            } else {
+                resumeTokenMap[shardId] = optionalResumeToken->getOwned();
+            }
+        }
+
         if (optionalDonorHost) {
             designatedHostsMap[shardId] = *optionalDonorHost;
-        }
-        if (optionalResumeToken) {
-            resumeTokenMap[shardId] = optionalResumeToken->getOwned();
         }
     }
 
@@ -642,8 +652,15 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
                                                    boost::none /* explain */,
                                                    ShardTargetingPolicy::kAllowed,
                                                    readConcern,
-                                                   designatedHostsMap,
-                                                   resumeTokenMap);
+                                                   std::move(designatedHostsMap),
+                                                   std::move(resumeTokenMap),
+                                                   std::move(shardsToSkip));
+
+    // If we don't establish any cursors, there is no work to do. Return.
+    if (dispatchResults.remoteCursors.empty()) {
+        return;
+    }
+
     bool hasSplitPipeline = !!dispatchResults.splitPipeline;
     std::string shardsPipelineStr;
     std::string mergePipelineStr;
@@ -691,8 +708,10 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
                      batch.emplace_back(obj);
                  }
                  auto resumeToken = cursorResponse.getPostBatchResumeToken();
-                 if (!resumeToken)
+                 if (!resumeToken) {
                      resumeToken = BSONObj();
+                 }
+
                  writeOneBatch(opCtx,
                                txnNumber,
                                batch,
@@ -726,7 +745,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_restartP
         makeRawPipeline(opCtx, MongoProcessInterface::create(opCtx), idToResumeFrom);
 
     auto pipeline = _targetAggregationRequest(rawPipeline, expCtx);
-
 
     if (!idToResumeFrom.missing()) {
         // Skip inserting the first document retrieved after resuming because $gte was used in the

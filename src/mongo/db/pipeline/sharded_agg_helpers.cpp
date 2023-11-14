@@ -1304,11 +1304,22 @@ DispatchShardPipelineResults dispatchShardPipeline(
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     AsyncRequestsSender::ShardHostMap designatedHostsMap,
-    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap) {
+    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap,
+    std::set<ShardId> shardsToSkip) {
     const auto& expCtx = pipeline->getContext();
     auto executionNsRoutingInfo = getCollectionRoutingInfoForTargeting(expCtx, pipelineDataSource);
     TargetingResults targeting = targetPipeline(
         expCtx, pipeline.get(), pipelineDataSource, shardTargetingPolicy, executionNsRoutingInfo);
+    auto& shardIds = targeting.shardIds;
+    for (auto shard : shardsToSkip) {
+        shardIds.erase(shard);
+    }
+
+    // Return if we don't need to establish any cursors.
+    if (shardIds.empty()) {
+        return DispatchShardPipelineResults{
+            false, {}, {}, boost::none, nullptr, BSONObj(), 0, boost::none};
+    }
     return dispatchTargetedShardPipeline(std::move(serializedCommand),
                                          targeting,
                                          pipelineDataSource == PipelineDataSource::kChangeStream,
