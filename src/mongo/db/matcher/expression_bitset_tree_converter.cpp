@@ -56,6 +56,10 @@ namespace {
  * Context class for MatchExpression visitor 'BitsetVisitor'.
  */
 struct Context {
+    // Up to kThreshold number of predicates ExpressionMap is not used 'getOrAssignBitIndex'. This
+    // exact value was selected empirically using benchmarks.
+    static constexpr size_t kThreshold = 8;
+
     // Map between MatchExpression and a bit index assigned to this MatchExpression in the Bitset
     // building by the visitor.
     using ExpressionMap = stdx::
@@ -82,6 +86,25 @@ struct Context {
      * Stores the given MatchExpression and assign a bit index to it. Returns the bit index.
      */
     size_t getOrAssignBitIndex(const MatchExpression* expr) {
+        if (expressions.size() < kThreshold) {
+            auto pos = std::find_if(
+                expressions.begin(), expressions.end(), [expr](const ExpressionBitInfo& info) {
+                    return expr->equivalent(info.expression);
+                });
+            if (pos != expressions.end()) {
+                return std::distance(expressions.begin(), pos);
+            }
+
+            expressions.emplace_back(expr);
+            return expressions.size() - 1;
+        }
+
+        if (_map.empty()) {
+            for (size_t i = 0; i < expressions.size(); ++i) {
+                _map.emplace(expressions[i].expression, i);
+            }
+        }
+
         auto [it, inserted] = _map.try_emplace(expr, expressions.size());
         if (inserted) {
             expressions.emplace_back(expr);

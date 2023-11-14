@@ -41,6 +41,11 @@
 #include "mongo/util/stream_utils.h"
 
 namespace mongo::boolean_simplification {
+void BitsetTerm::flip() {
+    predicates.flip();
+    predicates &= mask;
+}
+
 Maxterm::Maxterm(std::initializer_list<Minterm> init) : minterms(std::move(init)) {
     tassert(7507918, "Maxterm cannot be initilized with empty list of minterms", !minterms.empty());
 }
@@ -164,11 +169,6 @@ Maxterm Minterm::operator~() const {
         }
     }
     return result;
-}
-
-void Minterm::flip() {
-    predicates.flip();
-    predicates &= mask;
 }
 
 bool operator==(const BitsetTerm& lhs, const BitsetTerm& rhs) {

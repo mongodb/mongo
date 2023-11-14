@@ -65,6 +65,11 @@ struct BitsetTerm {
         set(bitIndex, val);
     }
 
+    /**
+     * Flip the value of every predicate in the minterm.
+     */
+    void flip();
+
     void set(size_t bitIndex, bool value) {
         mask.set(bitIndex, true);
         predicates.set(bitIndex, value);
@@ -144,6 +149,7 @@ std::pair<Minterm, Maxterm> extractCommonPredicates(Maxterm maxterm);
  */
 struct Minterm : private BitsetTerm {
     using BitsetTerm::BitsetTerm;
+    using BitsetTerm::flip;
     using BitsetTerm::mask;
     using BitsetTerm::predicates;
     using BitsetTerm::set;
@@ -174,11 +180,6 @@ struct Minterm : private BitsetTerm {
     bool isAlwaysTrue() const {
         return mask.none();
     }
-
-    /**
-     * Flip the value of every predicate in the minterm.
-     */
-    void flip();
 };
 
 inline Maxterm operator&(const Minterm& lhs, const Minterm& rhs) {

@@ -182,9 +182,9 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     _forceClassicEngine = frameworkControl == QueryFrameworkControlEnum::kForceClassicEngine;
 
     // TODO SERVER-76509: Enable Boolean expression simplification in Bonsai.
-    _primaryMatchExpression =
-        MatchExpression::normalize(std::move(parsedFind->filter),
-                                   /* enableSimplification*/ !isBonsaiEnabled(frameworkControl));
+    _primaryMatchExpression = MatchExpression::normalize(
+        std::move(parsedFind->filter),
+        /* enableSimplification*/ !_expCtx->inLookup && !isBonsaiEnabled(frameworkControl));
     if (parsedFind->proj) {
         if (parsedFind->proj->requiresMatchDetails()) {
             // Sadly, in some cases the match details cannot be generated from the unoptimized

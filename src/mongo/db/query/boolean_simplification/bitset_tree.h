@@ -83,6 +83,16 @@ struct BitsetTreeNode {
         }
         return result;
     }
+
+    /**
+     * Apply De Morgan's Law: recursively push down the tree this node's negation.
+     */
+    void applyDeMorgan() {
+        applyDeMorganImpl(false);
+    }
+
+private:
+    void applyDeMorganImpl(bool isParentNegated);
 };
 
 std::ostream& operator<<(std::ostream& os, const BitsetTreeNode& tree);

@@ -192,8 +192,17 @@ boost::optional<BitsetTreeNode> handleRootedAndCase(Maxterm dnfExpression) {
     return {std::move(topBitsetTree)};
 }
 
-boost::optional<BitsetTreeNode> simplifyBitsetTree(const BitsetTreeNode& tree,
+boost::optional<BitsetTreeNode> simplifyBitsetTree(BitsetTreeNode&& tree,
                                                    const ExpressionSimlifierSettings& settings) {
+    // Nothing to simplify since the the expression has only one conjunctive or disjunctive term.
+    if (tree.internalChildren.empty()) {
+        // Since the expression restorer does not accept any BitsetTree nodes with negations,
+        // particularly in the presence of the $nor operator, we apply De Morgan's Law which
+        // effectively push down the negations down the tree to the leaves.
+        tree.applyDeMorgan();
+        return std::move(tree);
+    }
+
     auto maxterm = quineMcCluskey(tree, settings);
     if (!maxterm) {
         return boost::none;
@@ -203,7 +212,7 @@ boost::optional<BitsetTreeNode> simplifyBitsetTree(const BitsetTreeNode& tree,
         return handleRootedAndCase(std::move(*maxterm));
     }
 
-    return {boolean_simplification::convertToBitsetTree(*maxterm)};
+    return boolean_simplification::convertToBitsetTree(*maxterm);
 }
 }  // namespace
 
@@ -236,7 +245,8 @@ boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
 
     auto bitsetAndExpressions = std::move(*result);
 
-    auto bitsetTreeResult = simplifyBitsetTree(bitsetAndExpressions.bitsetTree, settings);
+    auto bitsetTreeResult =
+        simplifyBitsetTree(std::move(bitsetAndExpressions.bitsetTree), settings);
     if (MONGO_unlikely(!bitsetTreeResult.has_value())) {
         return boost::none;
     }
