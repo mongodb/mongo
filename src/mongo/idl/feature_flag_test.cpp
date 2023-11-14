@@ -134,21 +134,21 @@ TEST_F(FeatureFlagTest, IsEnabledTrue) {
     // Test FCV checks with enabled flag
     // Test newest version
     // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
-    ASSERT_TRUE(
-        feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
-    ASSERT_TRUE(
-        feature_flags::gFeatureFlagSpoon.isEnabled(serverGlobalParams.featureCompatibility));
+    ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_TRUE(feature_flags::gFeatureFlagSpoon.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     // Test oldest version
     // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
 
-    ASSERT_FALSE(
-        feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
-    ASSERT_TRUE(
-        feature_flags::gFeatureFlagSpoon.isEnabled(serverGlobalParams.featureCompatibility));
+    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_TRUE(feature_flags::gFeatureFlagSpoon.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 // Test feature flags are disabled regardless of fcv
@@ -159,21 +159,21 @@ TEST_F(FeatureFlagTest, IsEnabledFalse) {
     ASSERT_OK(_featureFlagSpoon->setFromString("false", boost::none));
 
     // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
-    ASSERT_FALSE(
-        feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
-    ASSERT_FALSE(
-        feature_flags::gFeatureFlagSpoon.isEnabled(serverGlobalParams.featureCompatibility));
+    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_FALSE(feature_flags::gFeatureFlagSpoon.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     // Test oldest version
     // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
 
-    ASSERT_FALSE(
-        feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
-    ASSERT_FALSE(
-        feature_flags::gFeatureFlagSpoon.isEnabled(serverGlobalParams.featureCompatibility));
+    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_FALSE(feature_flags::gFeatureFlagSpoon.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 // Test that the RAIIServerParameterControllerForTest works correctly on a feature flag.
@@ -182,21 +182,21 @@ TEST_F(FeatureFlagTest, RAIIFeatureFlagController) {
     ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
     {
         RAIIServerParameterControllerForTest controller("featureFlagBlender", true);
-        ASSERT_TRUE(
-            feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
+        ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     }
-    ASSERT_FALSE(
-        feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
+    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     // Set true feature flag to false
     ASSERT_OK(_featureFlagBlender->setFromString("true", boost::none));
     {
         RAIIServerParameterControllerForTest controller("featureFlagBlender", false);
-        ASSERT_FALSE(
-            feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
+        ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     }
-    ASSERT_TRUE(
-        feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
+    ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 

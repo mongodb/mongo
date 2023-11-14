@@ -59,7 +59,7 @@ namespace {
 
 Status notifyShardsOfSecondShardIfNeeded(OperationContext* opCtx) {
     if (!feature_flags::gClusterCardinalityParameter.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Status::OK();
     }
 

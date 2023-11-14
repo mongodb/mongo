@@ -65,7 +65,8 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(7467201,
                     "The config shard feature is disabled",
-                    gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
+                    gFeatureFlagCatalogShard.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             ConfigsvrTransitionFromDedicatedConfigServer cmdToSend;
             cmdToSend.setDbName(DatabaseName::kAdmin);

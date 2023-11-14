@@ -761,7 +761,7 @@ void deleteDocument(OperationContext* opCtx,
         collection->isChangeStreamPreAndPostImagesEnabled() ||
         (isTimeseriesCollection &&
          feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-             serverGlobalParams.featureCompatibility))) {
+             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))) {
         deletedDoc.emplace(doc.value().getOwned());
     }
     int64_t keysDeleted = 0;

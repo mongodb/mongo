@@ -154,7 +154,8 @@ Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceStri
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-        !gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility)) {
+        !gFeatureFlagCatalogShard.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return {
             ErrorCodes::InvalidOptions,
             "changeStreamPreAndPostImages collection option is not supported on config servers"};
@@ -1468,7 +1469,7 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
 
     if (getTimeseriesOptions() &&
         feature_flags::gTimeseriesMetricIndexes.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         timeseries::doesBucketsIndexIncludeMeasurement(
             opCtx, ns(), *getTimeseriesOptions(), spec->infoObj())) {
         invariant(_metadata->timeseriesBucketsMayHaveMixedSchemaData);

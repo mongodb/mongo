@@ -278,7 +278,8 @@ public:
                         6775220,
                         "Queryable Encryption Range support is only supported when FCV supports "
                         "6.1",
-                        gFeatureFlagFLE2Range.isEnabled(serverGlobalParams.featureCompatibility));
+                        gFeatureFlagFLE2Range.isEnabled(
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
                 }
             }
 

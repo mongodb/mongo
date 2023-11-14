@@ -773,12 +773,12 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         // Prevent the race where an FCV downgrade happens concurrently with the configShard
         // being added and the FCV downgrade finishes before the configShard is added.
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         uassert(
             5563604,
             "Cannot add config shard because it is not supported in featureCompatibilityVersion: {}"_format(
-                multiversion::toString(serverGlobalParams.featureCompatibility.getVersion())),
-            gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) ||
-                !isConfigShard);
+                multiversion::toString(fcvSnapshot.getVersion())),
+            gFeatureFlagCatalogShard.isEnabled(fcvSnapshot) || !isConfigShard);
 
         if (isConfigShard) {
             // TODO SERVER-75391: Remove.
@@ -795,17 +795,19 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
                 opCtx, "w:all write barrier in transitionFromDedicatedConfigServer");
         }
 
+        // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
         uassert(5563603,
                 "Cannot add shard while in upgrading/downgrading FCV state",
-                !fcvRegion->isUpgradingOrDowngrading());
+                !fcvSnapshot.isUpgradingOrDowngrading());
 
+        const auto currentFCV = fcvSnapshot.getVersion();
         // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
-        invariant(fcvRegion == multiversion::GenericFCV::kLatest ||
-                  fcvRegion == multiversion::GenericFCV::kLastContinuous ||
-                  fcvRegion == multiversion::GenericFCV::kLastLTS);
+        invariant(currentFCV == multiversion::GenericFCV::kLatest ||
+                  currentFCV == multiversion::GenericFCV::kLastContinuous ||
+                  currentFCV == multiversion::GenericFCV::kLastLTS);
 
         if (!isConfigShard) {
-            SetFeatureCompatibilityVersion setFcvCmd(fcvRegion->getVersion());
+            SetFeatureCompatibilityVersion setFcvCmd(currentFCV);
             setFcvCmd.setDbName(DatabaseName::kAdmin);
             setFcvCmd.setFromConfigServer(true);
 

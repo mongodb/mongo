@@ -393,8 +393,9 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     const NamespaceString nss(op->getNss());
     auto opType = op->getOpType();
 
-    if ((gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if ((gMultitenancySupport && fcvSnapshot.isVersionInitialized() &&
+         gFeatureFlagRequireTenantID.isEnabled(fcvSnapshot))) {
         invariant(op->getTid() == nss.tenantId());
     } else {
         invariant(op->getTid() == boost::none);

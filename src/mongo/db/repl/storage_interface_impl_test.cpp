@@ -2780,7 +2780,7 @@ TEST_F(StorageInterfaceImplTest,
     // namespaces.
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("local.system.rollback.docs");
-    ASSERT_FALSE(nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility));
+    ASSERT_FALSE(nss.isLegalClientSystemNS());
 
     auto opCtx = getOperationContext();
     auto options = generateOptionsWithUuid();
@@ -3073,7 +3073,7 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterRemovesDocumentsInIllegalClientSy
     // client system" namespaces.
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("local.system.rollback.docs");
-    ASSERT_FALSE(nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility));
+    ASSERT_FALSE(nss.isLegalClientSystemNS());
 
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;

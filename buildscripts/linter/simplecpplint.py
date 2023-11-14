@@ -68,6 +68,7 @@ GENERIC_FCV = [
     r'::kDowngradingFromLatestToLastLTS',
     r'::kDowngradingFromLatestToLastContinuous',
     r'\.isUpgradingOrDowngrading',
+    r'->isUpgradingOrDowngrading',
     r'::kDowngradingFromLatestToLastContinuous',
     r'::kUpgradingFromLastLTSToLastContinuous',
 ]

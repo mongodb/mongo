@@ -281,9 +281,10 @@ void ExpressionContext::setUserRoles() {
     // fail in the case where the shards are running different binVersions and one of them does not
     // have a notion of this variable. This FCV check prevents this from happening, as the value of
     // the variable is not set (and therefore not serialized) if the FCV is too old.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (isSystemVarReferencedInQuery(Variables::kUserRolesId) &&
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gFeatureFlagUserRoles.isEnabled(serverGlobalParams.featureCompatibility) &&
+        fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagUserRoles.isEnabled(fcvSnapshot) &&
         enableAccessToUserRoles.load()) {
         variables.defineUserRoles(opCtx);
     }

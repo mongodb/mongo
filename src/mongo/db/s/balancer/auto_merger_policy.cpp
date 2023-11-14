@@ -68,7 +68,8 @@ bool AutoMergerPolicy::isEnabled() {
 
 void AutoMergerPolicy::checkInternalUpdates() {
     stdx::lock_guard<Latch> lk(_mutex);
-    if (!feature_flags::gAutoMerger.isEnabled(serverGlobalParams.featureCompatibility) ||
+    if (!feature_flags::gAutoMerger.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         !_enabled) {
         return;
     }
@@ -83,7 +84,8 @@ boost::optional<BalancerStreamAction> AutoMergerPolicy::getNextStreamingAction(
     OperationContext* opCtx) {
     stdx::unique_lock<Latch> lk(_mutex);
 
-    if (!feature_flags::gAutoMerger.isEnabled(serverGlobalParams.featureCompatibility) ||
+    if (!feature_flags::gAutoMerger.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         !_enabled) {
         return boost::none;
     }

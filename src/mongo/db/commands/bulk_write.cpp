@@ -608,10 +608,10 @@ public:
         }
 
         Reply typedRun(OperationContext* opCtx) final {
-            uassert(
-                ErrorCodes::CommandNotSupported,
-                "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
-                gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
+            uassert(ErrorCodes::CommandNotSupported,
+                    "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
+                    gFeatureFlagBulkWriteCommand.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             auto& req = request();
             const auto& ops = req.getOps();

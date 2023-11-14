@@ -103,7 +103,7 @@ void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBui
     }
 
     ImpersonatedUserMetadata metadata;
-    if (serverGlobalParams.featureCompatibility.isLessThanOrEqualTo(
+    if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isLessThanOrEqualTo(
             multiversion::FeatureCompatibilityVersion::kVersion_6_2)) {
         if (userName) {
             metadata.setUsers({{userName.value()}});

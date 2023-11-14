@@ -236,7 +236,7 @@ public:
         const bool checkBSONConformance = rawcheckBSONConformance.trueValue();
         if (rawcheckBSONConformance &&
             !feature_flags::gExtendValidateCommand.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream() << "The 'checkBSONConformance' option is not supported by the "
                                        "validate command.");

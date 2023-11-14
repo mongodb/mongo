@@ -3173,7 +3173,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientServiceRecor
 
     auto doc = getStateDoc(instance.get());
     auto docFCV = doc.getRecipientPrimaryStartingFCV();
-    auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+    auto currentFCV = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     LOGV2(5356202, "FCV in doc vs current", "docFCV"_attr = docFCV, "currentFCV"_attr = currentFCV);
     ASSERT(currentFCV == docFCV);
     checkStateDocPersisted(opCtx.get(), instance.get());
@@ -3201,7 +3201,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Add an FCV value as if it was from a previous attempt.
-    auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+    auto currentFCV = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     initialStateDocument.setRecipientPrimaryStartingFCV(currentFCV);
 
     // Create and start the instance.

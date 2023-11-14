@@ -113,7 +113,7 @@ intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
     uassert(ErrorCodes::QueryFeatureNotAllowed,
             fmt::format("The {} aggregation stage is not enabled", kStageName),
             feature_flags::gDocumentSourceListCatalog.isEnabled(
-                serverGlobalParams.featureCompatibility));
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     return new DocumentSourceListCatalog(pExpCtx);
 }

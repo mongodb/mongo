@@ -62,7 +62,7 @@ void translateToTimeseriesCollection(OperationContext* opCtx,
         uassert(5731502,
                 "Sharding a timeseries collection feature is not enabled",
                 feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
         if (bucketsColl) {
             uassert(6235600,
@@ -151,7 +151,7 @@ public:
                 auto requestToForward = request().getCreateCollectionRequest();
                 auto coordinatorType = DDLCoordinatorTypeEnum::kCreateCollection;
                 if (!feature_flags::gCreateCollectionCoordinatorV3.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     translateToTimeseriesCollection(opCtx, &nssToForward, &requestToForward);
                     coordinatorType = DDLCoordinatorTypeEnum::kCreateCollectionPre61Compatible;
                 }

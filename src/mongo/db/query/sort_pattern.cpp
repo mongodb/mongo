@@ -61,7 +61,7 @@ SortPattern::SortPattern(const BSONObj& obj,
                 // Valid meta sort. Just fall through.
             } else if (metaElem.valueStringDataSafe() == "geoNearDistance"_sd) {
                 if (!feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     uasserted(5917100,
                               "$meta sort by 'geoNearDistance' is allowed only with "
                               "featureFlagTimeseriesMetricIndexes flag");

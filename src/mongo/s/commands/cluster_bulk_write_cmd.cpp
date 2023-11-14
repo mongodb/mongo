@@ -98,10 +98,10 @@ public:
                     "BulkWrite on mongos is not currently supported.",
                     false);
 
-            uassert(
-                ErrorCodes::CommandNotSupported,
-                "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
-                gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
+            uassert(ErrorCodes::CommandNotSupported,
+                    "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
+                    gFeatureFlagBulkWriteCommand.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             auto replyItems = cluster::bulkWrite(opCtx, request());
 

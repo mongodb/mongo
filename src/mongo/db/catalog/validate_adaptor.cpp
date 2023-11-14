@@ -540,8 +540,9 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        size_t* dataSize,
                                        ValidateResults* results) {
     auto validateBSONMode = BSONValidateMode::kDefault;
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gExtendValidateCommand.isEnabled(serverGlobalParams.featureCompatibility)) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gExtendValidateCommand.isEnabled(fcvSnapshot)) {
         validateBSONMode = _validateState->getBSONValidateMode();
     }
     const Status status = validateBSON(record.data(), record.size(), validateBSONMode);
@@ -702,7 +703,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             // schema validator. Don't treat invalid documents as errors since documents can bypass
             // document validation when being inserted or updated.
             auto result = coll->checkValidation(opCtx, record->data.toBson());
-
+            const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
             if (result.first != Collection::SchemaValidationResult::kPass) {
                 LOGV2_WARNING(5363500,
                               "Document is not compliant with the collection's schema",
@@ -712,9 +713,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
                 nNonCompliantDocuments++;
                 schemaValidationFailed(_validateState, result.first, results);
-            } else if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                       feature_flags::gExtendValidateCommand.isEnabled(
-                           serverGlobalParams.featureCompatibility) &&
+            } else if (fcvSnapshot.isVersionInitialized() &&
+                       feature_flags::gExtendValidateCommand.isEnabled(fcvSnapshot) &&
                        coll->getTimeseriesOptions()) {
                 // Checks for time-series collection consistency.
                 Status bucketStatus =

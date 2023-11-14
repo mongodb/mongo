@@ -283,7 +283,8 @@ public:
         Lock::ExclusiveLock setFCVCommandLock(opCtx, commandMutex);
 
         const auto requestedVersion = request.getCommandParameter();
-        const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
+        const auto actualVersion =
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
 
         auto isConfirmed = request.getConfirm().value_or(false);
         // TODO (SERVER-74398): Remove this flag once 7.0 is last LTS.
@@ -475,7 +476,8 @@ public:
             }
         }
 
-        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+        invariant(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                      .isUpgradingOrDowngrading());
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kPrepare) {
             if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
@@ -525,7 +527,8 @@ public:
             }
         }
 
-        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+        invariant(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                      .isUpgradingOrDowngrading());
         invariant(!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kComplete);
 
         // All feature-specific FCV upgrade or downgrade code should go into the respective
@@ -551,7 +554,7 @@ public:
 
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                 opCtx,
-                serverGlobalParams.featureCompatibility.getVersion(),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion(),
                 requestedVersion,
                 isFromConfigServer,
                 changeTimestamp,
@@ -617,9 +620,9 @@ private:
     // We do not expect any other feature-specific work to be done in the 'start' phase.
     void _shardServerPhase1Tasks(OperationContext* opCtx,
                                  multiversion::FeatureCompatibilityVersion requestedVersion) {
-        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
-        const auto& [originalVersion, _] =
-            getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        invariant(fcvSnapshot.isUpgradingOrDowngrading());
+        const auto& [originalVersion, _] = getTransitionFCVFromAndTo(fcvSnapshot.getVersion());
         const auto isDowngrading = originalVersion > requestedVersion;
         const auto isUpgrading = originalVersion < requestedVersion;
         // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
@@ -714,7 +717,8 @@ private:
     void _completeUpgrade(OperationContext* opCtx,
                           const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-            const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
+            const auto actualVersion =
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion, actualVersion);
             _createSchemaOnConfigSettings(opCtx, requestedVersion, actualVersion);
             _setOnCurrentShardSinceFieldOnChunks(opCtx, requestedVersion, actualVersion);
@@ -814,7 +818,8 @@ private:
     void _createShardingIndexCatalogIndexes(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         // TODO SERVER-67392: Remove once gGlobalIndexesShardingCatalog is enabled.
-        const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
+        const auto actualVersion =
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
         if (feature_flags::gGlobalIndexesShardingCatalog
                 .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
             uassertStatusOK(sharding_util::createShardingIndexCatalogIndexes(opCtx));
@@ -1055,9 +1060,9 @@ private:
     // manually clean up some user data in order to retry the FCV downgrade.
     void _userCollectionsUassertsForDowngrade(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
-        const auto& [originalVersion, _] =
-            getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        invariant(fcvSnapshot.isUpgradingOrDowngrading());
+        const auto& [originalVersion, _] = getTransitionFCVFromAndTo(fcvSnapshot.getVersion());
 
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
@@ -1217,9 +1222,9 @@ private:
     // requestedVersion.
     void _cleanUpClusterParameters(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
-        const auto& [fromVersion, _] =
-            getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        invariant(fcvSnapshot.isUpgradingOrDowngrading());
+        const auto& [fromVersion, _] = getTransitionFCVFromAndTo(fcvSnapshot.getVersion());
 
         auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
         std::vector<write_ops::DeleteOpEntry> deletes;
@@ -1258,9 +1263,9 @@ private:
     // they would turn into a Support case.
     void _internalServerCleanupForDowngrade(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
-        const auto& [originalVersion, _] =
-            getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        invariant(fcvSnapshot.isUpgradingOrDowngrading());
+        const auto& [originalVersion, _] = getTransitionFCVFromAndTo(fcvSnapshot.getVersion());
         _cleanUpClusterParameters(opCtx, requestedVersion);
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
@@ -1454,7 +1459,8 @@ private:
                        const SetFeatureCompatibilityVersion& request,
                        boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
-        const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
+        const auto actualVersion =
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
         auto isFromConfigServer = request.getFromConfigServer().value_or(false);
 
         hangDowngradingBeforeIsCleaningServerMetadata.pauseWhileSet(opCtx);
@@ -1516,7 +1522,8 @@ private:
      * Called after reaching an upgrading or downgrading state.
      */
     void _cancelServerlessMigrations(OperationContext* opCtx) {
-        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+        invariant(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                      .isUpgradingOrDowngrading());
         if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
             auto donorService = checked_cast<TenantMigrationDonorService*>(
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())

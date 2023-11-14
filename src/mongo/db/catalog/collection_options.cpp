@@ -51,9 +51,9 @@
 namespace mongo {
 namespace {
 long long adjustCappedSize(long long cappedSize) {
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        !feature_flags::gfeatureFlagCappedCollectionsRelaxedSize.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized() &&
+        !feature_flags::gfeatureFlagCappedCollectionsRelaxedSize.isEnabled(fcvSnapshot)) {
         auto originalCappedSize = cappedSize;
         cappedSize += 0xff;
         cappedSize &= 0xffffffffffffff00LL;

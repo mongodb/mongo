@@ -218,7 +218,7 @@ Status _createView(OperationContext* opCtx,
 
 Status _createDefaultTimeseriesIndex(OperationContext* opCtx, CollectionWriter& collection) {
     if (!feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Status::OK();
     }
 

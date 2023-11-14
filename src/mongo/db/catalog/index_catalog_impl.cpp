@@ -966,7 +966,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
         }
     } else if (pluginName == IndexNames::COLUMN) {
         // Be careful to only read the FCV one time to avoid race conditions.
-        auto fcv = serverGlobalParams.featureCompatibility.getVersionMustVerifyInitialized();
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         uassert(ErrorCodes::NotImplemented,
                 str::stream() << pluginName
                               << " indexes are under development and cannot be used without "
@@ -975,8 +975,8 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
                 // the FCV. We also relax this check when a secondary is initial syncing, which may
                 // temporarily unset the FCV. In this case, the primary should have already checked
                 // that the feature flag is enabled.
-                fcv == multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior ||
-                    feature_flags::gFeatureFlagColumnstoreIndexes.isEnabledOnVersion(fcv));
+                !fcvSnapshot.isVersionInitialized() ||
+                    feature_flags::gFeatureFlagColumnstoreIndexes.isEnabled(fcvSnapshot));
         if (auto columnSpecStatus = validateColumnStoreSpec(collection, spec, indexVersion);
             !columnSpecStatus.isOK()) {
             return columnSpecStatus;
@@ -1013,11 +1013,11 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
         }
         const std::unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         Status status = _checkValidFilterExpressions(
             filterExpr.get(),
-            !serverGlobalParams.featureCompatibility.isVersionInitialized() ||
-                feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+            !fcvSnapshot.isVersionInitialized() ||
+                feature_flags::gTimeseriesMetricIndexes.isEnabled(fcvSnapshot));
         if (!status.isOK()) {
             return status;
         }

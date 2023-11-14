@@ -76,7 +76,7 @@ public:
             uassert(ErrorCodes::CommandNotSupported,
                     format(FMT_STRING("{} command not enabled"), definition()->getName()),
                     resharding::gFeatureFlagResharding.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             uassert(
                 ErrorCodes::IllegalOperation,

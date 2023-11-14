@@ -263,7 +263,8 @@ TEST(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
 }
 
 TEST(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
-    if (feature_flags::gCollModIndexUnique.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (feature_flags::gCollModIndexUnique.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         ServiceContext::UniqueOperationContext opCtxRaii = cc().makeOperationContext();
         OperationContext* opCtx = opCtxRaii.get();
         NamespaceString nss =
@@ -301,7 +302,8 @@ TEST(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
 }
 
 TEST(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
-    if (feature_flags::gCollModIndexUnique.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (feature_flags::gCollModIndexUnique.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         ServiceContext::UniqueOperationContext opCtxRaii = cc().makeOperationContext();
         OperationContext* opCtx = opCtxRaii.get();
         NamespaceString nss =

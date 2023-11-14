@@ -306,7 +306,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             if (!_firstExecution ||
                 // The Feature flag is disabled
                 !feature_flags::gImplicitDDLTimeseriesNssTranslation.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 // this DDL operation operates on a DB
                 originalNss().coll().empty() ||
                 // this DDL operation operates directly on a bucket nss

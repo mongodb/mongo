@@ -668,7 +668,8 @@ Status ShardingCatalogManager::initializeConfigDatabaseIfNeeded(OperationContext
         return status;
     }
 
-    if (feature_flags::gConfigSettingsSchema.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (feature_flags::gConfigSettingsSchema.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         status = _initConfigSettings(opCtx);
         if (!status.isOK()) {
             return status;
@@ -719,7 +720,7 @@ Status ShardingCatalogManager::_initConfigVersion(OperationContext* opCtx) {
     newVersion.setClusterId(OID::gen());
 
     if (!feature_flags::gStopUsingConfigVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         newVersion.setCurrentVersion(VersionType::CURRENT_CONFIG_VERSION);
         newVersion.setMinCompatibleVersion(VersionType::MIN_COMPATIBLE_CONFIG_VERSION);
     }
@@ -755,7 +756,7 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     }
 
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         result = sharding_util::createShardingIndexCatalogIndexes(opCtx);
         if (!result.isOK()) {
             return result;

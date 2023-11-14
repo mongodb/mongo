@@ -807,7 +807,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "can't shard time-series collection " << nss(),
                     feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
-                        serverGlobalParams.featureCompatibility) ||
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                         !timeseries::getTimeseriesOptions(opCtx, nss(), false));
         }
     }
@@ -888,7 +888,7 @@ TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters
     uassert(ErrorCodes::IllegalOperation,
             "Sharding a timeseries collection feature is not enabled",
             feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
-                serverGlobalParams.featureCompatibility));
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Namespace too long. Namespace: " << resolvedNamespace

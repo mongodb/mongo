@@ -70,11 +70,11 @@ public:
         }
 
         void typedRun(OperationContext* opCtx) {
+            const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
             uassert(6765500,
                     "Analyze command requires common query framework feature flag to be enabled",
-                    serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                        feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
-                            serverGlobalParams.featureCompatibility));
+                    fcvSnapshot.isVersionInitialized() &&
+                        feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(fcvSnapshot));
 
             const NamespaceString& nss = ns();
 

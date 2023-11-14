@@ -82,9 +82,9 @@ public:
     }
 
     BSONValidateMode getBSONValidateMode() const {
-        return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                feature_flags::gExtendValidateCommand.isEnabled(
-                    serverGlobalParams.featureCompatibility) &&
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        return fcvSnapshot.isVersionInitialized() &&
+                feature_flags::gExtendValidateCommand.isEnabled(fcvSnapshot) &&
                 (_mode == ValidateMode::kForegroundCheckBSON ||
                  _mode == ValidateMode::kBackgroundCheckBSON || isFullValidation())
             ? BSONValidateMode::kFull

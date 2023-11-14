@@ -74,7 +74,7 @@ public:
             GetClusterParameterInvocation invocation;
 
             if (gFeatureFlagClusterWideConfigM2.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 // Refresh cached cluster server parameters via a majority read from the config
                 // servers.
                 uassertStatusOK(

@@ -81,7 +81,7 @@ public:
             uassert(ErrorCodes::CommandNotSupported,
                     "cleanupReshardCollection command not enabled",
                     resharding::gFeatureFlagResharding.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrCleanupReshardCollection can only be run on config servers",

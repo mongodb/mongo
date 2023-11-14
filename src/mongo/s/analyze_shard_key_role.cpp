@@ -56,8 +56,8 @@ bool isFeatureFlagEnabled(bool ignoreFCV) {
         // 2. We want to stop QueryAnalysisSampler regardless of FCV.
         return gFeatureFlagAnalyzeShardKey.isEnabledAndIgnoreFCVUnsafe();
     }
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        gFeatureFlagAnalyzeShardKey.isEnabled(serverGlobalParams.featureCompatibility);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return fcvSnapshot.isVersionInitialized() && gFeatureFlagAnalyzeShardKey.isEnabled(fcvSnapshot);
 }
 
 bool supportsCoordinatingQueryAnalysis(bool isReplEnabled, bool ignoreFCV) {

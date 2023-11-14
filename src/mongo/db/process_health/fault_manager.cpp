@@ -409,7 +409,7 @@ void FaultManager::setInitialHealthCheckComplete(FaultState,
 
 void FaultManager::schedulePeriodicHealthCheckThread() {
     if (!feature_flags::gFeatureFlagHealthMonitoring.isEnabled(
-            serverGlobalParams.featureCompatibility) ||
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         _config->periodicChecksDisabledForTests()) {
         return;
     }
@@ -478,7 +478,7 @@ FaultManager::~FaultManager() {
 
 SharedSemiFuture<void> FaultManager::startPeriodicHealthChecks() {
     if (!feature_flags::gFeatureFlagHealthMonitoring.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         LOGV2_DEBUG(6187201, 1, "Health checks disabled by feature flag");
         return Future<void>::makeReady();
     }

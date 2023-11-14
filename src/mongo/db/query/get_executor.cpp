@@ -1713,9 +1713,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     const NamespaceString& nss(request->getNsString());
     if (!request->getGod()) {
         if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-            uassert(12050,
-                    "cannot delete from system namespace",
-                    nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility));
+            uassert(12050, "cannot delete from system namespace", nss.isLegalClientSystemNS());
         }
     }
 
@@ -1869,8 +1867,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     // TODO (SERVER-64506): support change streams' pre- and post-images.
     // TODO (SERVER-66079): allow batched deletions in the config.* namespace.
-    const bool batchDelete =
-        feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility) &&
+    const bool batchDelete = feature_flags::gBatchMultiDeletes.isEnabled(
+                                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         gBatchUserMultiDeletes.load() &&
         (opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kInactive ||
          opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kActiveNotInUnitOfWork) &&
@@ -1944,7 +1942,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         uassert(10156,
                 str::stream() << "cannot update a system namespace: " << nss.ns(),
-                nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility));
+                nss.isLegalClientSystemNS());
     }
 
     // If there is no collection and this is an upsert, callers are supposed to create

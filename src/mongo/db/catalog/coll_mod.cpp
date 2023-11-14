@@ -232,7 +232,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
 
         if ((cmdIndex.getUnique() || cmdIndex.getPrepareUnique()) &&
             !feature_flags::gCollModIndexUnique.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             return {ErrorCodes::InvalidOptions,
                     "collMod does not support converting an index to 'unique' or to "
                     "'prepareUnique' mode in this FCV."};
@@ -454,8 +454,8 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
         // (Generic FCV reference): This FCV check should exist across LTS binary versions.
         multiversion::FeatureCompatibilityVersion fcv;
         if (serverGlobalParams.validateFeaturesAsPrimary.load() &&
-            serverGlobalParams.featureCompatibility.isLessThan(multiversion::GenericFCV::kLatest,
-                                                               &fcv)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isLessThan(
+                multiversion::GenericFCV::kLatest, &fcv)) {
             maxFeatureCompatibilityVersion = fcv;
         }
         auto validatorObj = *validator;

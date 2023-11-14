@@ -825,7 +825,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
         WriteBlockBypass::get(opCtx.get()).set(true);
 
         if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             dropCollectionShardingIndexCatalog(opCtx.get(), _metadata.getSourceNss());
         }
         resharding::data_copy::ensureCollectionDropped(

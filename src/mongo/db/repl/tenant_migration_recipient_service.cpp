@@ -2625,7 +2625,7 @@ TenantMigrationRecipientService::Instance::_checkIfFcvHasChangedSinceLastAttempt
     // subsequent attempt. Fail if there is any mismatch in FCV or
     // upgrade/downgrade state. (Generic FCV reference): This FCV check should
     // exist across LTS binary versions.
-    auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+    auto currentFCV = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     auto startingFCV = _stateDoc.getRecipientPrimaryStartingFCV();
 
     if (!startingFCV) {
@@ -2906,7 +2906,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         // We defer this until after the state doc is persisted in a started so as to make sure it
         // it safe to abort and forget the migration. (Generic FCV reference): This FCV check should
         // exist across LTS binary versions.
-        if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+        if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                .isUpgradingOrDowngrading()) {
             LOGV2(5356304, "Must abort tenant migration as recipient is upgrading or downgrading");
             return true;
         }

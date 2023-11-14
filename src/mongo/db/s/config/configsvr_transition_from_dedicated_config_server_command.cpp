@@ -74,7 +74,8 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(7467202,
                     "The config shard feature is disabled",
-                    gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
+                    gFeatureFlagCatalogShard.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             uassert(
                 ErrorCodes::IllegalOperation,

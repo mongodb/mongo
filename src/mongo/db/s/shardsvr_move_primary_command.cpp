@@ -123,7 +123,7 @@ public:
 
             // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
             if (!feature_flags::gResilientMovePrimary.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 const auto coordinatorDoc = [&] {
                     MovePrimaryCoordinatorDocument doc;
                     doc.setShardingDDLCoordinatorMetadata(

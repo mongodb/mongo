@@ -341,7 +341,7 @@ void directWriteFinish(BucketStateRegistry& registry, const NamespaceString& ns,
 
 void clear(BucketCatalog& catalog, ShouldClearFn&& shouldClear) {
     if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         clearSetOfBuckets(catalog.bucketStateRegistry, std::move(shouldClear));
         return;
     }

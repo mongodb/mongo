@@ -180,7 +180,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                          const BSONObj& query,
                          const BSONObj& collation) {
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return false;
     }
 

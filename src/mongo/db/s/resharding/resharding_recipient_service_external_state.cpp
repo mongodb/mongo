@@ -91,7 +91,7 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
                                     std::move(collOptions)});
 
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         auto optSii = getCollectionIndexInfoWithRefresh(opCtx, metadata.getTempReshardingNss());
 
         if (optSii) {

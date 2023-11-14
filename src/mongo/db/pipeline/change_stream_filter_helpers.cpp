@@ -310,7 +310,7 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     }
 
     if (feature_flags::gFeatureFlagChangeStreamsFurtherEnrichedEvents.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         internalOpTypes.push_back("refineCollectionShardKey"_sd);
         internalOpTypes.push_back("reshardCollection"_sd);
     }

@@ -340,7 +340,8 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
         uassert(5563601,
                 "Cannot transition to fully upgraded or fully downgraded state if the shard is not "
                 "in kUpgrading or kDowngrading state",
-                serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                    .isUpgradingOrDowngrading());
 
         tassert(5563502,
                 "Shard received a request for phase 2 of the 'setFeatureCompatibilityVersion' "
@@ -376,7 +377,8 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     // (Ignore FCV check): This is intentional because we want to use this feature even if we are in
     // downgrading fcv state.
     auto transitioningVersion = setTargetVersion &&
-            serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading(fromVersion) &&
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isUpgradingOrDowngrading(
+                fromVersion) &&
             !(repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCVUnsafe() &&
               (fromVersion == GenericFCV::kDowngradingFromLatestToLastLTS &&
                newVersion == GenericFCV::kLatest))
@@ -513,9 +515,10 @@ bool FeatureCompatibilityVersion::hasNoReplicatedCollections(OperationContext* o
 
 void FeatureCompatibilityVersion::updateMinWireVersion() {
     WireSpec& wireSpec = WireSpec::instance();
-    const auto currentFcv = serverGlobalParams.featureCompatibility.getVersion();
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const auto currentFcv = fcvSnapshot.getVersion();
     if (currentFcv == GenericFCV::kLatest ||
-        (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading() &&
+        (fcvSnapshot.isUpgradingOrDowngrading() &&
          currentFcv != GenericFCV::kUpgradingFromLastLTSToLastContinuous)) {
         // FCV == kLatest or FCV is upgrading/downgrading to or from kLatest.
         WireSpec::Specification newSpec = *wireSpec.get();
@@ -543,7 +546,8 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     invariant(opCtx->lockState()->isW());
     auto featureCompatibilityVersion = findFeatureCompatibilityVersionDocument(opCtx);
     if (!featureCompatibilityVersion) {
-        serverGlobalParams.featureCompatibility.logFCVWithContext("startup"_sd);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
+            "startup"_sd);
         return;
     }
 
@@ -567,13 +571,14 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     }
 
     auto version = swVersion.getValue();
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(version);
+    serverGlobalParams.mutableFCV.setVersion(version);
     FeatureCompatibilityVersion::updateMinWireVersion();
 
-    serverGlobalParams.featureCompatibility.logFCVWithContext("startup"_sd);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    fcvSnapshot.logFCVWithContext("startup"_sd);
 
     // On startup, if the version is in an upgrading or downgrading state, print a warning.
-    if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+    if (fcvSnapshot.isUpgradingOrDowngrading()) {
         LOGV2_WARNING_OPTIONS(
             4978301,
             {logv2::LogTag::kStartupWarnings},
@@ -625,7 +630,8 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
     // startup. In standalone mode, FCV is initialized during startup, even in read-only mode.
     bool isWriteableStorageEngine = storageGlobalParams.engine != "devnull";
     if (isWriteableStorageEngine && (!usingReplication || nonLocalDatabases)) {
-        invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
+        invariant(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isVersionInitialized());
     }
 }
 
@@ -655,12 +661,13 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
                                                   BSONObjBuilder* b,
                                                   StringData name,
                                                   const boost::optional<TenantId>&) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     uassert(ErrorCodes::UnknownFeatureCompatibilityVersion,
             str::stream() << name << " is not yet known.",
-            serverGlobalParams.featureCompatibility.isVersionInitialized());
+            fcvSnapshot.isVersionInitialized());
 
     BSONObjBuilder featureCompatibilityVersionBuilder(b->subobjStart(name));
-    auto version = serverGlobalParams.featureCompatibility.getVersion();
+    auto version = fcvSnapshot.getVersion();
     FeatureCompatibilityVersionDocument fcvDoc = fcvTransitions.getFCVDocument(version);
     featureCompatibilityVersionBuilder.appendElements(fcvDoc.toBSON().removeField("_id"));
     if (!fcvDoc.getTargetVersion()) {
@@ -707,16 +714,21 @@ FixedFCVRegion::FixedFCVRegion(OperationContext* opCtx)
 
 FixedFCVRegion::~FixedFCVRegion() = default;
 
-const ServerGlobalParams::FeatureCompatibility& FixedFCVRegion::operator*() const {
+// Note that the FixedFCVRegion only prevents the on-disk FCV from changing, not
+// the in-memory FCV. (which for example could be reset during initial sync). The operator* and
+// operator-> functions return a MutableFCV, which could change at different points in time. If you
+// wanted to get a consistent snapshot of the in-memory FCV, you should still use the
+// ServerGlobalParams::MutableFCV's acquireFCVSnapshot() function to get a FCVSnapshot.
+const ServerGlobalParams::MutableFCV& FixedFCVRegion::operator*() const {
     return serverGlobalParams.featureCompatibility;
 }
 
-const ServerGlobalParams::FeatureCompatibility* FixedFCVRegion::operator->() const {
+const ServerGlobalParams::MutableFCV* FixedFCVRegion::operator->() const {
     return &serverGlobalParams.featureCompatibility;
 }
 
 bool FixedFCVRegion::operator==(const FCV& other) const {
-    return serverGlobalParams.featureCompatibility.getVersion() == other;
+    return serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion() == other;
 }
 
 bool FixedFCVRegion::operator!=(const FCV& other) const {

@@ -95,9 +95,11 @@ public:
 
             auto dropCollCoordinator = [&] {
                 FixedFCVRegion fixedFcvRegion{opCtx};
+                const auto fcvSnapshot =
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
                 const auto targetNss = [&] {
                     if (!feature_flags::gImplicitDDLTimeseriesNssTranslation.isEnabled(
-                            *fixedFcvRegion)) {
+                            fcvSnapshot)) {
                         // If 'ns()' is a sharded time-series view collection, 'targetNs' is a
                         // namespace for time-series buckets collection. For all other collections,
                         // 'targetNs' is equal to 'ns()'.
@@ -107,7 +109,7 @@ public:
                 }();
                 // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
                 const DDLCoordinatorTypeEnum coordType =
-                    feature_flags::gDropCollectionHoldingCriticalSection.isEnabled(*fixedFcvRegion)
+                    feature_flags::gDropCollectionHoldingCriticalSection.isEnabled(fcvSnapshot)
                     ? DDLCoordinatorTypeEnum::kDropCollection
                     : DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible;
 

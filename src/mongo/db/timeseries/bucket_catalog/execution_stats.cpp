@@ -186,7 +186,7 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     }
 
     if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         builder.appendNumber("numBucketsClosedDueToReopening",
                              stats.numBucketsClosedDueToReopening.load());
         builder.appendNumber("numBucketsArchivedDueToMemoryThreshold",

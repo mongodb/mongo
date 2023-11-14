@@ -106,7 +106,7 @@ public:
             FixedFCVRegion fcvRegion(opCtx);
             auto coordinatorType = DDLCoordinatorTypeEnum::kCollMod;
             if (!feature_flags::gCollModCoordinatorV3.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 // TODO SERVER-68008 Remove once 7.0 becomes last LTS
                 coordinatorType = DDLCoordinatorTypeEnum::kCollModPre61Compatible;
             }

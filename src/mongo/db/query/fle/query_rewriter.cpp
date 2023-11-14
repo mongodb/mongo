@@ -71,7 +71,8 @@ std::unique_ptr<Expression> QueryRewriter::rewriteExpression(Expression* express
 boost::optional<BSONObj> QueryRewriter::rewriteMatchExpression(const BSONObj& filter) {
     auto expr = uassertStatusOK(MatchExpressionParser::parse(filter, _expCtx));
 
-    if (gFeatureFlagFLE2Range.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (gFeatureFlagFLE2Range.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         validateRanges(*expr.get());
     }
 

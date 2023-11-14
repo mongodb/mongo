@@ -210,7 +210,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 } else {
                     const auto showDisambiguatedPaths = _changeStreamSpec.getShowExpandedEvents() &&
                         feature_flags::gFeatureFlagChangeStreamsFurtherEnrichedEvents.isEnabled(
-                            serverGlobalParams.featureCompatibility);
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
                     const auto& deltaDesc = change_stream_document_diff_parser::parseDiff(
                         diffObj.getDocument().toBson());
 

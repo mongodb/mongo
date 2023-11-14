@@ -569,7 +569,7 @@ void writeToConfigIndexesForTempNss(OperationContext* opCtx,
                                     const ReshardingCoordinatorDocument& coordinatorDoc,
                                     TxnNumber txnNumber) {
     if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return;
     }
     auto nextState = coordinatorDoc.getState();
@@ -1834,7 +1834,7 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                // Ensure indexes are loaded in the catalog cache, along with the collection
                // placement.
                if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-                       serverGlobalParams.featureCompatibility)) {
+                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                    auto cri = uassertStatusOK(
                        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
                            opCtx, _coordinatorDoc.getSourceNss()));

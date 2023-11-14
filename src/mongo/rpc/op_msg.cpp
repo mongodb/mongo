@@ -277,9 +277,10 @@ bool appendDollarTenant(BSONObjBuilder& builder,
         return true;
     }
 
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (gMultitenancySupport) {
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+        if (fcvSnapshot.isVersionInitialized() &&
+            gFeatureFlagRequireTenantID.isEnabled(fcvSnapshot)) {
             tenant.serializeToBSON("$tenant", &builder);
             return true;
         }

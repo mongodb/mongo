@@ -227,7 +227,7 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
     }
 
     if (!feature_flags::gTimeseriesDeletesSupport.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Translate the delete query into a query on the time-series collection's underlying
         // buckets collection.
         return timeseries::translateQuery(originalQuery, *metaField);

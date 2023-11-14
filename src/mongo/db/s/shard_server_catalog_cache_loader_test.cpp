@@ -527,16 +527,17 @@ TEST_F(ShardServerCatalogCacheLoaderTest, CollAndChunkTasksConsistency) {
 
 TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetChunks) {
     const auto kOriginalRole = serverGlobalParams.clusterRole;
-    const auto kOriginalFCV = serverGlobalParams.featureCompatibility.getVersion();
+    const auto kOriginalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
 
     ON_BLOCK_EXIT([&] {
         serverGlobalParams.clusterRole = kOriginalRole;
-        serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+        serverGlobalParams.mutableFCV.setVersion(kOriginalFCV);
     });
 
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     // (Generic FCV reference): for testing only. This comment is required by linter.
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
 
     const ChunkVersion collectionPlacementVersion({OID::gen(), Timestamp(1, 1)}, {1, 2});
     const auto collectionType = makeCollectionType(collectionPlacementVersion);
@@ -577,7 +578,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetChunks) {
     cachedDoc = client.findOne(persistedCacheQuery);
     ASSERT_TRUE(cachedDoc.isEmpty()) << cachedDoc;
 
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+    serverGlobalParams.mutableFCV.setVersion(kOriginalFCV);
 
     setRemoteLoaderMockResponse();
     auto chunkVersionFrom = newChunks[2].getVersion();
@@ -593,16 +594,17 @@ TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetChunks) {
 
 TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetDatabase) {
     const auto kOriginalRole = serverGlobalParams.clusterRole;
-    const auto kOriginalFCV = serverGlobalParams.featureCompatibility.getVersion();
+    const auto kOriginalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
 
     ON_BLOCK_EXIT([&] {
         serverGlobalParams.clusterRole = kOriginalRole;
-        serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+        serverGlobalParams.mutableFCV.setVersion(kOriginalFCV);
     });
 
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     // (Generic FCV reference): for testing only. This comment is required by linter.
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
 
     refreshDatabaseOnRemoteLoader();
 
@@ -636,7 +638,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetDatabase) {
     cachedDoc = client.findOne(persistedCacheQuery);
     ASSERT_TRUE(cachedDoc.isEmpty()) << cachedDoc;
 
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+    serverGlobalParams.mutableFCV.setVersion(kOriginalFCV);
 
     getDbFuture = _shardLoader->getDatabase(kDb);
     getDbFuture.wait();
@@ -647,15 +649,16 @@ TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetDatabase) {
 
 TEST_F(ShardServerCatalogCacheLoaderTest, getChunksWithUninitializedFCV) {
     const auto kOriginalRole = serverGlobalParams.clusterRole;
-    const auto kOriginalFCV = serverGlobalParams.featureCompatibility.getVersion();
+    const auto kOriginalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
 
     ON_BLOCK_EXIT([&] {
         serverGlobalParams.clusterRole = kOriginalRole;
-        serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+        serverGlobalParams.mutableFCV.setVersion(kOriginalFCV);
     });
 
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-    serverGlobalParams.mutableFeatureCompatibility.reset();
+    serverGlobalParams.mutableFCV.reset();
 
     const ChunkVersion collectionPlacementVersion({OID::gen(), Timestamp(1, 1)}, {1, 2});
     const auto collectionType = makeCollectionType(collectionPlacementVersion);
@@ -666,15 +669,16 @@ TEST_F(ShardServerCatalogCacheLoaderTest, getChunksWithUninitializedFCV) {
 
 TEST_F(ShardServerCatalogCacheLoaderTest, getChunksWithUninitializedFCVWhileSecondary) {
     const auto kOriginalRole = serverGlobalParams.clusterRole;
-    const auto kOriginalFCV = serverGlobalParams.featureCompatibility.getVersion();
+    const auto kOriginalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
 
     ON_BLOCK_EXIT([&] {
         serverGlobalParams.clusterRole = kOriginalRole;
-        serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+        serverGlobalParams.mutableFCV.setVersion(kOriginalFCV);
     });
 
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-    serverGlobalParams.mutableFeatureCompatibility.reset();
+    serverGlobalParams.mutableFCV.reset();
 
     const ChunkVersion collectionPlacementVersion({OID::gen(), Timestamp(1, 1)}, {1, 2});
     const auto collectionType = makeCollectionType(collectionPlacementVersion);

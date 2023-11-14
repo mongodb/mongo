@@ -76,7 +76,8 @@ namespace {
 const auto getTTLMonitor = ServiceContext::declareDecoration<std::unique_ptr<TTLMonitor>>();
 
 bool isBatchingEnabled(const CollectionPtr& collectionPtr) {
-    return feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility) &&
+    return feature_flags::gBatchMultiDeletes.isEnabled(
+               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         ttlMonitorBatchDeletes.load() && !collectionPtr->isChangeStreamPreAndPostImagesEnabled();
 }
 

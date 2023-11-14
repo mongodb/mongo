@@ -480,8 +480,9 @@ bool isTelemetryEnabled(const ServiceContext* serviceCtx) {
     // During initialization FCV may not yet be setup but queries could be run. We can't
     // check whether telemetry should be enabled without FCV, so default to not recording
     // those queries.
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gFeatureFlagTelemetry.isEnabled(serverGlobalParams.featureCompatibility) &&
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagTelemetry.isEnabled(fcvSnapshot) &&
         telemetryStoreDecoration(serviceCtx)->getMaxSize() > 0;
 }
 

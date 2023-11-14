@@ -496,7 +496,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     const auto& currentMetadata = optCurrentMetadata->get();
 
     const auto indexFeatureFlag = feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-        serverGlobalParams.featureCompatibility);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     const auto wantedPlacementVersion = currentMetadata.getShardPlacementVersion();
     const auto wantedCollectionIndexes =
         indexFeatureFlag ? getCollectionIndexes(opCtx) : boost::none;

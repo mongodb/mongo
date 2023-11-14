@@ -59,7 +59,7 @@ ParsedDelete::ParsedDelete(OperationContext* opCtx,
                            boost::optional<TimeseriesOptions> timeseriesOptions)
     : _opCtx(opCtx), _request(request) {
     if (feature_flags::gTimeseriesDeletesSupport.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         timeseriesOptions) {
         _timeseriesDeleteDetails = std::make_unique<TimeseriesDeleteDetails>(*timeseriesOptions);
     }

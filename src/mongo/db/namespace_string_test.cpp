@@ -158,12 +158,11 @@ TEST(NamespaceStringTest, IsCollectionlessCursorNamespace) {
 }
 
 TEST(NamespaceStringTest, IsLegalClientSystemNamespace) {
-    const auto& currentFCV = serverGlobalParams.featureCompatibility;
-    ASSERT_TRUE(NamespaceString{"test.system.buckets.1234"}.isLegalClientSystemNS(currentFCV));
-    ASSERT_TRUE(NamespaceString{"test.system.buckets.abcde"}.isLegalClientSystemNS(currentFCV));
-    ASSERT_FALSE(NamespaceString{"test.system.buckets..1234"}.isLegalClientSystemNS(currentFCV));
-    ASSERT_FALSE(NamespaceString{"test.system.buckets.a234$"}.isLegalClientSystemNS(currentFCV));
-    ASSERT_FALSE(NamespaceString{"test.system.buckets."}.isLegalClientSystemNS(currentFCV));
+    ASSERT_TRUE(NamespaceString{"test.system.buckets.1234"}.isLegalClientSystemNS());
+    ASSERT_TRUE(NamespaceString{"test.system.buckets.abcde"}.isLegalClientSystemNS());
+    ASSERT_FALSE(NamespaceString{"test.system.buckets..1234"}.isLegalClientSystemNS());
+    ASSERT_FALSE(NamespaceString{"test.system.buckets.a234$"}.isLegalClientSystemNS());
+    ASSERT_FALSE(NamespaceString{"test.system.buckets."}.isLegalClientSystemNS());
 }
 
 TEST(NamespaceStringTest, IsDropPendingNamespace) {

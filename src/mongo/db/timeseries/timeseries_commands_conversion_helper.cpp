@@ -114,7 +114,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
         for (const auto& elem : origIndex) {
             if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
                 if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     includeOriginalSpec = true;
                 } else {
                     uasserted(ErrorCodes::InvalidOptions,
@@ -124,7 +124,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                 uassert(ErrorCodes::CannotCreateIndex,
                         "Partial indexes on time-series collections require FCV 5.3",
                         feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                            serverGlobalParams.featureCompatibility));
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
                 BSONObj pred = elem.Obj();
 
                 // If the createIndexes command specifies a collation for this index, then that
@@ -247,7 +247,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
             uassert(ErrorCodes::InvalidOptions,
                     "TTL indexes are not supported on time-series collections",
                     feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             uassert(ErrorCodes::InvalidOptions,
                     "TTL indexes on time-series collections require a partialFilterExpression on "
                     "the metaField",
@@ -257,7 +257,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
         builder.append(NewIndexSpec::kKeyFieldName, std::move(keyField));
 
         if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                serverGlobalParams.featureCompatibility) &&
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
             includeOriginalSpec) {
             // Store the original user index definition on the transformed index definition for the
             // time-series buckets collection.

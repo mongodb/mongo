@@ -85,7 +85,8 @@ public:
                 gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
         uassert(7467200,
                 "The config shard feature is disabled",
-                gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
+                gFeatureFlagCatalogShard.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 

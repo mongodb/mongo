@@ -95,7 +95,8 @@ public:
                 gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
         uassert(7467203,
                 "The config shard feature is disabled",
-                gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
+                gFeatureFlagCatalogShard.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrTransitionToDedicatedConfigServer can only be run on config servers",

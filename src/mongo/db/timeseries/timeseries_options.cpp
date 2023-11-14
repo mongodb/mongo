@@ -57,7 +57,7 @@ Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& current
     auto currentGranularity = currentOptions.getGranularity();
     auto targetGranularity = targetOptions.getGranularity();
     bool allowSecondsParameters = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-        serverGlobalParams.featureCompatibility);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     // If the timeseries options are completely empty, we can skip updating them.
     if (!targetGranularity.has_value() && !targetOptions.getBucketMaxSpanSeconds().has_value() &&
@@ -316,7 +316,7 @@ Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions) {
     auto granularity = timeseriesOptions.getGranularity();
 
     bool allowSecondsParameters = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-        serverGlobalParams.featureCompatibility);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     auto maxSpanSecondsFromGranularity =
         getMaxSpanSecondsFromGranularity(granularity.get_value_or(BucketGranularityEnum::Seconds));
 

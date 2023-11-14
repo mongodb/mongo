@@ -96,8 +96,7 @@ public:
                         "The preview version of compactStructuredEncryptionData is no longer "
                         "supported in this binary version",
                         gFeatureFlagFLE2CompactForProtocolV2.isEnabled(
-                            serverGlobalParams.featureCompatibility));
-
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
                 auto compact = makeRequest(opCtx);
                 return ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(

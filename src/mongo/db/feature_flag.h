@@ -57,22 +57,20 @@ public:
     /**
      * Returns true if the flag is set to true and enabled for this FCV version.
      */
-    bool isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv) const;
+    bool isEnabled(ServerGlobalParams::FCVSnapshot fcv) const;
 
     /**
      * Returns true if the flag is set to true and enabled for this FCV version. If the FCV version
      * is unset, instead checks against the default last LTS FCV version.
      */
-    bool isEnabledUseLastLTSFCVWhenUninitialized(
-        const ServerGlobalParams::FeatureCompatibility& fcv) const;
+    bool isEnabledUseLastLTSFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const;
 
 
     /**
      * Returns true if the flag is set to true and enabled for this FCV version. If the FCV version
      * is unset, instead checks against the latest FCV version.
      */
-    bool isEnabledUseLatestFCVWhenUninitialized(
-        const ServerGlobalParams::FeatureCompatibility& fcv) const;
+    bool isEnabledUseLatestFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const;
 
     /**
      * Returns true if this flag is enabled regardless of the current FCV version. When using this

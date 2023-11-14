@@ -81,9 +81,9 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     builder.append(OplogEntryBase::kTermFieldName, opTime.getTerm());
     builder.append(OplogEntryBase::kVersionFieldName, version);
     builder.append(OplogEntryBase::kOpTypeFieldName, OpType_serializer(opType));
-    if (nss.tenantId() && gMultitenancySupport &&
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (nss.tenantId() && gMultitenancySupport && fcvSnapshot.isVersionInitialized() &&
+        gFeatureFlagRequireTenantID.isEnabled(fcvSnapshot)) {
         nss.tenantId()->serializeToBSON(OplogEntryBase::kTidFieldName, &builder);
     }
     builder.append(OplogEntryBase::kNssFieldName, NamespaceStringUtil::serialize(nss));
@@ -216,8 +216,9 @@ void ReplOperation::extractPrePostImageForTransaction(boost::optional<ImageBundl
 }
 
 void ReplOperation::setTid(boost::optional<mongo::TenantId> value) & {
-    if (gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (gMultitenancySupport && fcvSnapshot.isVersionInitialized() &&
+        gFeatureFlagRequireTenantID.isEnabled(fcvSnapshot))
         DurableReplOperation::setTid(value);
 }
 
@@ -361,8 +362,9 @@ ReplOperation MutableOplogEntry::toReplOperation() const noexcept {
 }
 
 void MutableOplogEntry::setTid(boost::optional<mongo::TenantId> value) & {
-    if (gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (gMultitenancySupport && fcvSnapshot.isVersionInitialized() &&
+        gFeatureFlagRequireTenantID.isEnabled(fcvSnapshot))
         getDurableReplOperation().setTid(std::move(value));
 }
 

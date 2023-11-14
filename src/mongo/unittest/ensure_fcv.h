@@ -42,11 +42,11 @@ class EnsureFCV {
 public:
     using Version = multiversion::FeatureCompatibilityVersion;
     EnsureFCV(Version version)
-        : _origVersion(serverGlobalParams.featureCompatibility.getVersion()) {
-        serverGlobalParams.mutableFeatureCompatibility.setVersion(version);
+        : _origVersion(serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion()) {
+        serverGlobalParams.mutableFCV.setVersion(version);
     }
     ~EnsureFCV() {
-        serverGlobalParams.mutableFeatureCompatibility.setVersion(_origVersion);
+        serverGlobalParams.mutableFCV.setVersion(_origVersion);
     }
 
 private:

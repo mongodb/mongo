@@ -83,7 +83,7 @@ public:
 
             if (!feature_flags::gFeatureFlagAuditConfigClusterParameter
                      .isEnabledUseLastLTSFCVWhenUninitialized(
-                         serverGlobalParams.featureCompatibility)) {
+                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 uassert(ErrorCodes::IllegalOperation,
                         str::stream() << Request::kCommandName << " cannot be run on standalones",
                         repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=

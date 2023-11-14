@@ -570,7 +570,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
             // request without a shard key or _id. We will use a two phase protocol to apply the
             // write.
             if (feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-                    serverGlobalParams.featureCompatibility) &&
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                 targetStatus.getValue()) {
                 tassert(
                     6992000, "Executing write batches with a size of 0", childBatches.size() > 0u);

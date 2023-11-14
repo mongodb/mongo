@@ -152,7 +152,7 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
         // Indexes on measurement fields are only supported when the 'gTimeseriesMetricIndexes'
         // feature flag is enabled.
         if (!feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             auto reason = str::stream();
             reason << "Invalid index spec for time-series collection: "
                    << redact(timeseriesIndexSpecBSON) << ". ";
@@ -369,7 +369,8 @@ StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
 boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndex) {
     bool timeseriesMetricIndexesFeatureFlagEnabled =
-        feature_flags::gTimeseriesMetricIndexes.isEnabled(serverGlobalParams.featureCompatibility);
+        feature_flags::gTimeseriesMetricIndexes.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     if (bucketsIndex.hasField(kOriginalSpecFieldName) &&
         timeseriesMetricIndexesFeatureFlagEnabled) {

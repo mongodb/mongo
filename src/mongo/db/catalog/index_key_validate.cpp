@@ -162,10 +162,10 @@ Status validateKeyPattern(const BSONObj& key,
     // still be able to use the feature even if the FCV is downgraded.
     auto compoundWildcardIndexesAllowed =
         feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe();
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() && checkFCV) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized() && checkFCV) {
         compoundWildcardIndexesAllowed =
-            feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
-                serverGlobalParams.featureCompatibility);
+            feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(fcvSnapshot);
     }
 
     if (pluginName == IndexNames::WILDCARD && compoundWildcardIndexesAllowed) {

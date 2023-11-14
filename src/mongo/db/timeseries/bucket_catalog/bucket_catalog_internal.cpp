@@ -344,7 +344,7 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(
     const uint64_t catalogEra,
     const BucketKey* expectedKey) {
     invariant(feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-        serverGlobalParams.featureCompatibility));
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     const auto& [bucketDoc, validator] = bucketToReopen;
     if (catalogEra < getCurrentEra(registry)) {
         return {ErrorCodes::WriteConflict, "Bucket is from an earlier era, may be outdated"};
@@ -1125,7 +1125,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
     int32_t numExpired = 0;
 
     const bool canArchive = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-        serverGlobalParams.featureCompatibility);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     while (!stripe.idleBuckets.empty() &&
            catalog.memoryUsage.load() > getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() &&
@@ -1323,7 +1323,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     }
     if (info.time < bucketTime) {
         const bool canArchive = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility);
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         if (shouldUpdateStats) {
             if (canArchive) {
                 info.stats.incNumBucketsArchivedDueToTimeBackward();
@@ -1362,7 +1362,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
         bool keepBucketOpenForLargeMeasurements =
             bucket.numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount) &&
             feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility);
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         if (keepBucketOpenForLargeMeasurements) {
             if (bucket.size + sizeToBeAdded > absoluteMaxSize) {
                 if (absoluteMaxSize != largeMeasurementsMaxBucketSize) {

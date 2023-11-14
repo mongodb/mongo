@@ -94,7 +94,7 @@ public:
                     DropDatabaseCoordinatorDocument coordinatorDoc;
                     const DDLCoordinatorTypeEnum coordType =
                         feature_flags::gDropCollectionHoldingCriticalSection.isEnabled(
-                            **fixedFcvRegion)
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
                         ? DDLCoordinatorTypeEnum::kDropDatabase
                         : DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible;
 

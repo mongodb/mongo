@@ -131,11 +131,11 @@ public:
             auto instance =
                 ([&]() -> boost::optional<std::shared_ptr<const ReshardingCoordinator>> {
                     FixedFCVRegion fixedFcv(opCtx);
-
+                    const auto fcvSnapshot =
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
                     uassert(ErrorCodes::CommandNotSupported,
                             "reshardCollection command not enabled",
-                            resharding::gFeatureFlagResharding.isEnabled(
-                                serverGlobalParams.featureCompatibility));
+                            resharding::gFeatureFlagResharding.isEnabled(fcvSnapshot));
 
                     // (Generic FCV reference): To run this command and ensure the consistency of
                     // the metadata we need to make sure we are on a stable state.
@@ -143,7 +143,7 @@ public:
                         ErrorCodes::CommandNotSupported,
                         "Resharding is not supported for this version, please update the FCV to "
                         "latest.",
-                        !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+                        !fcvSnapshot.isUpgradingOrDowngrading());
 
                     const auto [cm, _] = uassertStatusOK(
                         Grid::get(opCtx)

@@ -152,7 +152,8 @@ inline Status validateProtocolFCVCompatibility(
         return Status::OK();
 
     if (*protocol == MigrationProtocolEnum::kShardMerge &&
-        !repl::feature_flags::gShardMerge.isEnabled(serverGlobalParams.featureCompatibility)) {
+        !repl::feature_flags::gShardMerge.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Status(ErrorCodes::IllegalOperation,
                       str::stream() << "protocol '" << MigrationProtocol_serializer(*protocol)
                                     << "' not supported");
@@ -250,7 +251,7 @@ inline void protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum proto
 
 inline void protocolTenantIdsCompatibilityCheck(
     const MigrationProtocolEnum protocol, const boost::optional<std::vector<TenantId>>& tenantIds) {
-    if (serverGlobalParams.featureCompatibility.isLessThan(
+    if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isLessThan(
             multiversion::FeatureCompatibilityVersion::kVersion_6_3)) {
         uassert(ErrorCodes::InvalidOptions,
                 "'tenantIds' is not supported for FCV below 6.3'",

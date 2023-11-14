@@ -102,7 +102,7 @@ public:
             uassert(ErrorCodes::CommandNotSupported,
                     "abortReshardCollection command not enabled",
                     resharding::gFeatureFlagResharding.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 

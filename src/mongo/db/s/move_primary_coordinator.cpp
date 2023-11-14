@@ -394,8 +394,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
 
             const NamespaceString nss(
                 NamespaceStringUtil::parseNamespaceFromDoc(_dbName, collName));
-            if (!nss.isSystem() ||
-                nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility)) {
+            if (!nss.isSystem() || nss.isLegalClientSystemNS()) {
                 colls.push_back(nss);
             }
         }

@@ -852,7 +852,7 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
 
     if (aborted) {
         if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             dropCollectionShardingIndexCatalog(opCtx.get(), _metadata.getTempReshardingNss());
         }
 

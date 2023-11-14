@@ -56,7 +56,7 @@ FeatureFlag::FeatureFlag(bool enabled, StringData versionString)
     }
 }
 
-bool FeatureFlag::isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv) const {
+bool FeatureFlag::isEnabled(const ServerGlobalParams::FCVSnapshot fcv) const {
     if (!_enabled) {
         return false;
     }
@@ -65,8 +65,8 @@ bool FeatureFlag::isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv)
 }
 
 bool FeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
-    const ServerGlobalParams::FeatureCompatibility& fcv) const {
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+    const ServerGlobalParams::FCVSnapshot fcv) const {
+    if (fcv.isVersionInitialized()) {
         return isEnabled(fcv);
     } else {
         // (Generic FCV reference): This reference is needed for the feature flag check API.
@@ -75,8 +75,8 @@ bool FeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
 }
 
 bool FeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
-    const ServerGlobalParams::FeatureCompatibility& fcv) const {
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+    const ServerGlobalParams::FCVSnapshot fcv) const {
+    if (fcv.isVersionInitialized()) {
         return isEnabled(fcv);
     } else {
         // (Generic FCV reference): This reference is needed for the feature flag check API.

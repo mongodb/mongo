@@ -70,7 +70,8 @@ public:
             uassert(
                 5356100,
                 "donorStartMigration not available while upgrading or downgrading the donor FCV",
-                !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+                !serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                     .isUpgradingOrDowngrading());
 
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);

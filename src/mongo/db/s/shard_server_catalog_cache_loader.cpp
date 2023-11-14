@@ -362,14 +362,14 @@ bool shouldSkipStoringLocally() {
         return false;
     }
 
-    const auto fcv = serverGlobalParams.featureCompatibility.getVersionMustVerifyInitialized();
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
 
     // Note: it is possible for fcv to become uninitialized temporarily during initial sync.
     uassert(7918300,
             "feature compatibility version is not initialized",
-            fcv != multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
+            fcvSnapshot.isVersionInitialized());
 
-    return !gFeatureFlagCatalogShard.isEnabledOnVersion(fcv);
+    return !gFeatureFlagCatalogShard.isEnabled(fcvSnapshot);
 }
 
 void performNoopMajorityWriteLocally(OperationContext* opCtx, StringData msg) {

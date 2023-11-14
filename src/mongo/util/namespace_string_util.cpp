@@ -39,8 +39,9 @@ namespace mongo {
 std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
                                            const SerializationContext& context) {
     if (gMultitenancySupport) {
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        if (fcvSnapshot.isVersionInitialized() &&
+            gFeatureFlagRequireTenantID.isEnabled(fcvSnapshot)) {
             return ns.toString();
         }
         return ns.toStringWithTenantId();
@@ -62,8 +63,8 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
         return NamespaceString(boost::none, ns);
     }
 
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized() && gFeatureFlagRequireTenantID.isEnabled(fcvSnapshot)) {
         StringData dbName = ns.substr(0, ns.find('.'));
         if (!(dbName == DatabaseName::kAdmin.db()) && !(dbName == DatabaseName::kLocal.db()) &&
             !(dbName == DatabaseName::kConfig.db())) {

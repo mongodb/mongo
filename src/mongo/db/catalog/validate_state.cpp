@@ -98,7 +98,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
             // Uses the bucket collection in place of the time-series collection view.
             if (!view->timeseries() ||
                 !feature_flags::gExtendValidateCommand.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 uasserted(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
             }
             _nss = _nss.makeTimeseriesBucketsNamespace();

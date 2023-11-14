@@ -61,7 +61,7 @@ public:
             const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
             if (!feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 auto shardsWithOpTime = uassertStatusOK(catalogClient->getAllShards(
                     opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
                 std::vector<ShardId> shardIds;

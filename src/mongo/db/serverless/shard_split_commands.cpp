@@ -53,7 +53,7 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "Feature 'shard split' not supported",
                     repl::feature_flags::gShardSplit.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             uassert(ErrorCodes::IllegalOperation,
                     "Shard split is not available on config servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::None) ||
@@ -135,7 +135,7 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "Feature 'shard split' not supported",
                     repl::feature_flags::gShardSplit.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             uassert(ErrorCodes::CommandNotSupported,
                     "Shard split is only supported in serverless mode",
                     getGlobalReplSettings().isServerless());
@@ -213,7 +213,7 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "Feature 'shard split' not supported",
                     repl::feature_flags::gShardSplit.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             uassert(ErrorCodes::CommandNotSupported,
                     "Shard split is only supported in serverless mode",
                     getGlobalReplSettings().isServerless());

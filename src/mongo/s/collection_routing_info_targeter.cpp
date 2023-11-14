@@ -419,7 +419,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         uassert(ErrorCodes::NotImplemented,
                 str::stream() << "Updates are disallowed on sharded timeseries collections.",
                 feature_flags::gFeatureFlagShardedTimeSeriesUpdateDelete.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "A {multi:false} update on a sharded timeseries collection is disallowed.",
@@ -462,7 +462,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // on the shard key. If we were to target based on the replacement doc, it could result in an
     // insertion even if a document matching the query exists on another shard.
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         isUpsert) {
         return targetByShardKey(
             extractShardKeyFromBasicQueryWithContext(expCtx, shardKeyPattern, query),
@@ -480,7 +480,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // is allowed, since we're able to decisively select a document to modify with the two phase
     // write without shard key protocol.
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility) ||
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         isExactIdQuery(opCtx, _nss, query, collation, _cri.cm)) {
         // Replacement-style updates must always target a single shard. If we were unable to do so
         // using the query, we attempt to extract the shard key from the replacement and target
@@ -505,7 +505,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                 << ", shard key pattern: " << shardKeyPattern.toString(),
             updateOp.getMulti() || isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) ||
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     // If the request is {multi:false}, then this is a single op-style update which we are
     // broadcasting to multiple shards by exact _id. Record this event in our serverStatus metrics.
@@ -539,12 +539,12 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
             uassert(ErrorCodes::NotImplemented,
                     "Deletes on sharded time-series collections feature is not enabled",
                     feature_flags::gFeatureFlagShardedTimeSeriesUpdateDelete.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot perform a non-multi delete on a time-series collection",
                     feature_flags::gTimeseriesDeletesSupport.isEnabled(
-                        serverGlobalParams.featureCompatibility) ||
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                         deleteOp.getMulti());
 
             auto tsFields = _cri.cm.getTimeseriesFields();
@@ -599,7 +599,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
             !_cri.cm.isSharded() || deleteOp.getMulti() ||
                 (isExactIdQuery(opCtx, *cq, _cri.cm) && !_isRequestOnTimeseriesViewNamespace) ||
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     return endPoints;
 }
