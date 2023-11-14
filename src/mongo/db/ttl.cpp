@@ -337,6 +337,10 @@ private:
             return;
         }
 
+        if (coll->getRequiresTimeseriesExtendedRangeSupport()) {
+            return;
+        }
+
         ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss.db().toString());
 
         const auto& collection = coll.getCollection();
