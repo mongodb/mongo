@@ -185,10 +185,10 @@ WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(Operatio
                                                                         WiredTigerRecordStore* rs,
                                                                         const NamespaceString& ns) {
 
+    long long maxSize = rs->_oplogMaxSize.load();
     invariant(rs->_isCapped && rs->_isOplog);
-    invariant(rs->_oplogMaxSize && *rs->_oplogMaxSize > 0);
+    invariant(maxSize > 0);
     invariant(rs->keyFormat() == KeyFormat::Long);
-    long long maxSize = *rs->_oplogMaxSize;
 
     // The minimum oplog truncate marker size should be BSONObjMaxInternalSize.
     const unsigned int oplogTruncateMarkerSize =
@@ -335,7 +335,7 @@ bool WiredTigerRecordStore::OplogTruncateMarkers::_hasExcessMarkers(OperationCon
     }
 
     // check that oplog truncate markers is at capacity
-    if (totalBytes <= *_rs->_oplogMaxSize) {
+    if (totalBytes <= _rs->_oplogMaxSize.load()) {
         return false;
     }
 
@@ -637,7 +637,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
         invariant(wtTableConfigMatchesStringKeyFormat);
     }
 
-    if (_oplogMaxSize) {
+    if (_oplogMaxSize.load()) {
         invariant(_isOplog, str::stream() << "Namespace " << params.nss.toStringForErrorMsg());
     }
 
@@ -2471,13 +2471,13 @@ RecordId WiredTigerRecordStoreStandardCursor::getKey(WT_CURSOR* cursor) const {
 }
 
 Status WiredTigerRecordStore::updateOplogSize(OperationContext* opCtx, long long newOplogSize) {
-    invariant(_isOplog && _oplogMaxSize);
+    invariant(_isOplog && _oplogMaxSize.load());
 
-    if (*_oplogMaxSize == newOplogSize) {
+    if (_oplogMaxSize.load() == newOplogSize) {
         return Status::OK();
     }
 
-    _oplogMaxSize = newOplogSize;
+    _oplogMaxSize.store(newOplogSize);
 
     invariant(_oplogTruncateMarkers);
     _oplogTruncateMarkers->adjust(opCtx, newOplogSize);

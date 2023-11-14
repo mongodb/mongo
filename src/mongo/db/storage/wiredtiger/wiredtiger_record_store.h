@@ -136,7 +136,7 @@ public:
         bool overwrite;
         bool isEphemeral;
         bool isLogged;
-        boost::optional<int64_t> oplogMaxSize;
+        int64_t oplogMaxSize = 0;
         WiredTigerSizeStorer* sizeStorer;
         bool tracksSizeAdjustments;
         bool forceUpdateWithFullDocument;
@@ -375,7 +375,7 @@ private:
     // TODO (SERVER-57482): Remove special handling of skipping "wiredtiger_calc_modify()".
     // True if force to update with the full document, and false otherwise.
     const bool _forceUpdateWithFullDocument;
-    boost::optional<int64_t> _oplogMaxSize;
+    AtomicWord<int64_t> _oplogMaxSize;
     AtomicWord<Timestamp> _oplogFirstRecordTimestamp{Timestamp()};
 
     // Protects initialization of the _nextIdNum.
