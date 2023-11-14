@@ -362,13 +362,6 @@ struct QueryHints {
     // Rather than sampling a fully random set of documents, sample N documents (5 by default)
     // randomly and scan sequentially from each of them for the rest.
     int32_t _numSamplingChunks = 5;
-
-    // If the collection size falls within this range, sampling is a valid estimation method.
-    size_t _samplingCollectionSizeMin = 100;
-    size_t _samplingCollectionSizeMax = 10000;
-
-    // If enabled, take the square root of numDocs for sample size.
-    bool _sqrtSampleSizeEnabled = true;
 };
 
 }  // namespace mongo::optimizer

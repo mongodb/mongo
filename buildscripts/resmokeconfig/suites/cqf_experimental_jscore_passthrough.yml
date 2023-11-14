@@ -40,5 +40,3 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        internalCascadesOptimizerSampleMin: 1
-        internalCascadesOptimizerEnableSqrtSampleSize: false
