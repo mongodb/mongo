@@ -2913,6 +2913,38 @@ buildvariants:
       - name: genny_query_TenMDocCollection_IntId_IdentityView
       - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
+  # Variant which runs a single shard cluster with a config
+  # shard and mongos process processes co-located on the
+  # same machine as the mongod.
+  # This variant is a performance comparison point between
+  # a traditional single node replica set as defined in the
+  # 'Linux 1-Node ReplSet 2022-11' variant and fully embedded
+  # single shard clusters.
+  - name: linux-1-node-replSet-default-sharding.2022-11
+    display_name: Linux 1-Node ReplSet Default Sharding 2022-11
+    cron: *linux-1-node-repl-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-one-node-default-sharding
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      # TODO PERF-4868 run same set of workloads as Linux 1-Node ReplSet
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: smoke_test
+
   - name: perf-1-node-replSet.arm.aws.2023-09
     display_name: PERF 1-Node ReplSet ARM AWS 2023-09
     # Leave off for now
@@ -3646,6 +3678,39 @@ buildvariants:
       - name: genny_query_TenMDocCollection_IntId_IdentityView
       - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
+  # Variant which runs a single shard cluster with a config
+  # shard and mongos processes processes co-located on the
+  # same machine as the mongods.
+  # This variant is a performance comparison point between
+  # a traditional replica set as defined in the
+  # 'Linux 3-Node ReplSet 2022-11' variant and fully embedded
+  # single shard clusters.
+  - name: linux-3-node-replSet-default-sharding.2022-11
+    display_name: Linux 3-Node ReplSet Default Sharding 2022-11
+    cron: "0 0 * * *"  # Everyday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-default-sharding
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      # TODO PERF-4868 run same set of workloads as Linux 3-Node ReplSet
+      - name: industry_benchmarks
+      - name: industry_benchmarks_w1
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: industry_benchmarks_secondary_reads
+      - name: smoke_test
 
   - name: linux-3-node-replSet-intel.2022-11
     display_name: Linux 3-Node ReplSet Intel 2022-11
