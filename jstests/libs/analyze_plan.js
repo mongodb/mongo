@@ -64,6 +64,18 @@ export function getWinningPlanFromExplain(explain) {
         }
     }
 
+    if (explain.hasOwnProperty("pipeline")) {
+        const pipeline = explain.pipeline;
+        // Pipeline stages' explain output come in two shapes:
+        // 1. When in single node, as a single object array
+        // 2. When in sharded, as an object.
+        if (pipeline.constructor === Array) {
+            return getWinningPlanFromExplain(pipeline[0].$cursor);
+        } else {
+            return getWinningPlanFromExplain(pipeline);
+        }
+    }
+
     let queryPlanner = getQueryPlanner(explain);
     return getWinningPlan(queryPlanner);
 }
@@ -443,6 +455,13 @@ export function isIndexOnly(db, root) {
  */
 export function isIxscan(db, root) {
     return planHasStage(db, root, "IXSCAN");
+}
+
+/**
+ * Returns true if the plan is formed of a single EOF stage. False otherwise.
+ */
+export function isEofPlan(db, root) {
+    return planHasStage(db, root, "EOF");
 }
 
 /**

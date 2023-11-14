@@ -89,6 +89,8 @@ selector:
   # Exclude tests incompatible with CQF
   - cqf_incompatible
   - cqf_experimental_incompatible
+  # Capped collections cannot be sharded
+  - requires_capped
 
 executor:
   archive:

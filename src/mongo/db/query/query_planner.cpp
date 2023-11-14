@@ -501,8 +501,18 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
     return heuristicsStatus;
 }
 
-bool collscanIsBounded(const CollectionScanNode* collscan) {
-    return collscan->minRecord || collscan->maxRecord;
+bool isSolutionBoundedCollscan(const QuerySolution* querySoln) {
+    auto [node, count] = querySoln->getFirstNodeByType(StageType::STAGE_COLLSCAN);
+    if (node) {
+        const unsigned long numCollscanNodes = count;
+        tassert(8186301,
+                str::stream() << "Unexpected number of collscan nodes found. Expected: 1. Found: "
+                              << numCollscanNodes,
+                count == 1);
+        auto collscan = static_cast<const CollectionScanNode*>(node);
+        return collscan->minRecord || collscan->maxRecord;
+    }
+    return false;
 }
 
 bool canUseClusteredCollScan(QuerySolutionNode* node,
@@ -784,24 +794,33 @@ int determineCollscanDirection(const CanonicalQuery& query, const QueryPlannerPa
     return QueryPlannerCommon::determineClusteredScanDirection(query, params).value_or(1);
 }
 
-std::pair<std::unique_ptr<QuerySolution>, const CollectionScanNode*> buildCollscanSolnWithNode(
-    const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params, int direction) {
-    std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::makeCollectionScan(
-        query, tailable, params, direction, query.getPrimaryMatchExpression()));
-    const auto* collscanNode = checked_cast<const CollectionScanNode*>(solnRoot.get());
-    return std::make_pair(
-        QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot)), collscanNode);
-}
+std::unique_ptr<QuerySolution> buildEofOrCollscanSoln(
+    const CanonicalQuery& query,
+    bool tailable,
+    const QueryPlannerParams& params,
+    boost::optional<int> direction = boost::none) {
+    if (query.getPrimaryMatchExpression()->isTriviallyFalse()) {
+        const mongo::NamespaceString nss = query.nss();
+        const bool isOplog = nss.isOplog();
+        const bool isChangeCollection = nss.isChangeCollection();
 
-std::unique_ptr<QuerySolution> buildCollscanSoln(const CanonicalQuery& query,
-                                                 bool tailable,
-                                                 const QueryPlannerParams& params,
-                                                 boost::optional<int> direction = boost::none) {
-    return buildCollscanSolnWithNode(query,
-                                     tailable,
-                                     params,
-                                     direction.value_or(determineCollscanDirection(query, params)))
-        .first;
+        if (!isOplog && !isChangeCollection) {
+            // Return EOF solution for trivially false expressions.
+            // Unless the query is against Oplog (change streams) or change collections (serverless
+            // change streams) because in such cases we still need the scan to happen to advance the
+            // visibility timestamp and resume token.
+            auto soln = std::make_unique<QuerySolution>();
+            soln->setRoot(std::make_unique<EofNode>());
+            return soln;
+        }
+    }
+    std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::makeCollectionScan(
+        query,
+        tailable,
+        params,
+        direction.value_or(determineCollscanDirection(query, params)),
+        query.getPrimaryMatchExpression()));
+    return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
 }
 
 std::unique_ptr<QuerySolution> buildWholeIXSoln(
@@ -982,7 +1001,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     } else if (SolutionCacheData::COLLSCAN_SOLN == winnerCacheData.solnType) {
         // The cached solution is a collection scan. We don't cache collscans
         // with tailable==true, hence the false below.
-        auto soln = buildCollscanSoln(query, false, params, winnerCacheData.wholeIXSolnDir);
+        auto soln = buildEofOrCollscanSoln(query, false, params, winnerCacheData.wholeIXSolnDir);
         if (!soln) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "plan cache error: collection scan soln");
@@ -1080,7 +1099,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> attemptCollectionScan(
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "not allowed to output a collection scan because 'notablescan' is enabled");
     }
-    if (auto soln = buildCollscanSoln(query, isTailable, params)) {
+    if (auto soln = buildEofOrCollscanSoln(query, isTailable, params)) {
         return singleSolution(std::move(soln));
     }
     return Status(ErrorCodes::NoQueryExecutionPlans, "Failed to build collection scan soln");
@@ -1698,8 +1717,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         boost::optional<int> clusteredScanDirection =
             QueryPlannerCommon::determineClusteredScanDirection(query, params);
         int direction = clusteredScanDirection.value_or(1);
-        auto [collscanSoln, collscanNode] =
-            buildCollscanSolnWithNode(query, isTailable, params, direction);
+        auto collscanSoln = buildEofOrCollscanSoln(query, isTailable, params, direction);
         if (!collscanSoln && collScanRequired) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "Failed to build collection scan soln");
@@ -1712,8 +1730,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         // 4. clusteredScanDirection - collection is clustered and sort, provided by clustered
         // index, is used
         if (collscanSoln &&
-            (collscanRequested || collScanRequired || collscanIsBounded(collscanNode) ||
-             clusteredScanDirection)) {
+            (collscanRequested || collScanRequired ||
+             isSolutionBoundedCollscan(collscanSoln.get()) || clusteredScanDirection)) {
             LOGV2_DEBUG(20984,
                         5,
                         "Planner: outputting a collection scan",

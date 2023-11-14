@@ -112,6 +112,7 @@ selector:
   - requires_profiling
   - uses_transactions
   - uses_parallel_shell
+  - requires_capped
   roots:
   - jstests/core/**/*.js
   - jstests/fle2/**/*.js

@@ -1571,6 +1571,14 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
         return solutionMatches(child.Obj(), actualEqLookupNode->children[0].get(), relaxBoundsCheck)
             .withContext("mismatch below eq_lookup stage");
+    } else if (STAGE_EOF == trueSoln->getType()) {
+        auto eofElement = testSoln["eof"];
+        if (eofElement.eoo()) {
+            return {ErrorCodes::Error{8186300},
+                    "found an 'eof' object in the test solution but no corresponding "
+                    "'eof' object in the expected JSON"};
+        }
+        return Status::OK();
     }
     return {ErrorCodes::Error{5698301},
             str::stream() << "Unknown query solution node found: " << trueSoln->toString()};

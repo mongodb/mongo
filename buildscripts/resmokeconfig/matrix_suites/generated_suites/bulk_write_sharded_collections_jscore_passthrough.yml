@@ -108,6 +108,7 @@ selector:
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
   - requires_profiling
+  - requires_capped
   roots:
   - jstests/core/**/*.js
   - jstests/fle2/**/*.js

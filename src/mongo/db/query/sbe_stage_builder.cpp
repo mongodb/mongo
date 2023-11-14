@@ -398,32 +398,6 @@ std::vector<const QuerySolutionNode*> getAllNodesByType(const QuerySolutionNode*
     return results;
 }
 
-/**
- * Returns pair consisting of:
- *  - First node of the specified type found by pre-order traversal. If node was not found, this
- *    pair element is nullptr.
- *  - Total number of nodes with the specified type in tree.
- */
-std::pair<const QuerySolutionNode*, size_t> getFirstNodeByType(const QuerySolutionNode* root,
-                                                               StageType type) {
-    const QuerySolutionNode* result = nullptr;
-    size_t count = 0;
-    if (root->getType() == type) {
-        result = root;
-        count++;
-    }
-
-    for (auto&& child : root->children) {
-        auto [subTreeResult, subTreeCount] = getFirstNodeByType(child.get(), type);
-        if (!result) {
-            result = subTreeResult;
-        }
-        count += subTreeCount;
-    }
-
-    return {result, count};
-}
-
 std::unique_ptr<fts::FTSMatcher> makeFtsMatcher(OperationContext* opCtx,
                                                 const CollectionPtr& collection,
                                                 const std::string& indexName,
@@ -763,8 +737,8 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
     // analysis pass here.
     // Currently, we assume that each query operates on at most one collection, but a rooted $or
     // queries can have more than one collscan stages with clustered collections.
-    auto [node, ct] = getFirstNodeByType(solution.root(), STAGE_COLLSCAN);
-    auto [_, orCt] = getFirstNodeByType(solution.root(), STAGE_OR);
+    auto [node, ct] = solution.getFirstNodeByType(STAGE_COLLSCAN);
+    auto [_, orCt] = solution.getFirstNodeByType(STAGE_OR);
     const unsigned long numCollscanStages = ct;
     const unsigned long numOrStages = orCt;
     tassert(7182000,
@@ -1838,7 +1812,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto child = sn->children[0].get();
 
-    if (auto [ixn, ct] = getFirstNodeByType(root, STAGE_IXSCAN);
+    if (auto [ixn, ct] = root->getFirstNodeByType(STAGE_IXSCAN);
         !sn->fetched() && !reqs.hasResultOrMRInfo() && ixn && ct >= 1) {
         return buildSortCovered(root, reqs);
     }

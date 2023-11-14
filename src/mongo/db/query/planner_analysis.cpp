@@ -1284,6 +1284,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     const QueryPlannerParams& params,
     std::unique_ptr<QuerySolutionNode> solnRoot) {
     auto soln = std::make_unique<QuerySolution>();
+
     soln->indexFilterApplied = params.indexFiltersApplied;
 
     solnRoot->computeProperties();

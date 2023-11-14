@@ -1414,4 +1414,57 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNod
     std::vector<NamespaceStringOrUUID> expectedNssVector{foreignColl};
     assertNamespaceVectorsAreEqual(qs.getAllSecondaryNamespaces(mainNss), expectedNssVector);
 }
+
+TEST(QuerySolutionTest, GetFirstNodeByTypeFindsFirstNodeWhenNested) {
+    auto collScanNode = std::make_unique<CollectionScanNode>();
+    auto limitNode = std::make_unique<LimitNode>(std::move(collScanNode), 10ll);
+
+    QuerySolution qs;
+    qs.setRoot(std::move(limitNode));
+
+    auto [foundNode, foundCount] = qs.getFirstNodeByType(StageType::STAGE_COLLSCAN);
+    ASSERT_EQ(qs.root()->children.at(0).get(), foundNode);
+    ASSERT_EQ(1, foundCount);
+}
+
+TEST(QuerySolutionTest, GetFirstNodeByTypeFindsFirstNodeWhenInRoot) {
+    auto collScanNode = std::make_unique<CollectionScanNode>();
+
+    QuerySolution qs;
+    qs.setRoot(std::move(collScanNode));
+
+    auto [foundNode, foundCount] = qs.getFirstNodeByType(StageType::STAGE_COLLSCAN);
+    ASSERT_EQ(qs.root(), foundNode);
+    ASSERT_EQ(1, foundCount);
+}
+
+TEST(QuerySolutionTest, GetFirstNodeByTypeReturnsNullIfNotFound) {
+    auto collScanNode = std::make_unique<CollectionScanNode>();
+
+    QuerySolution qs;
+    qs.setRoot(std::move(collScanNode));
+
+    auto [foundNode, foundCount] = qs.getFirstNodeByType(StageType::STAGE_IXSCAN);
+    ASSERT_EQ(nullptr, foundNode);
+    ASSERT_EQ(0, foundCount);
+}
+
+TEST(QuerySolutionTest, GetFirstNodeByTypeFindsFirstAndCountsWhenSeveral) {
+    auto collScanNode = std::make_unique<CollectionScanNode>();
+    auto firstLimitNode = std::make_unique<LimitNode>(std::move(collScanNode), 10ll);
+    auto firstLimitNodeLimitValue = firstLimitNode->limit;
+    auto secondLimitNode = std::make_unique<LimitNode>(std::move(firstLimitNode), 8ll);
+    // We use its 'limit' value to assert the first one was retrieved below hence cannot be equals
+    ASSERT(firstLimitNodeLimitValue != secondLimitNode->limit);
+    auto skipNode = std::make_unique<SkipNode>(std::move(secondLimitNode), 9ll);
+
+    QuerySolution qs;
+    qs.setRoot(std::move(skipNode));
+
+    auto [foundNode, foundCount] = qs.getFirstNodeByType(StageType::STAGE_LIMIT);
+    const LimitNode* foundLimitNode = dynamic_cast<const LimitNode*>(foundNode);
+    ASSERT(foundLimitNode);
+    ASSERT_EQ(foundLimitNode->limit, 8ll);  // 8 is the value we assign to the first limit node
+    ASSERT_EQ(2, foundCount);
+}
 }  // namespace

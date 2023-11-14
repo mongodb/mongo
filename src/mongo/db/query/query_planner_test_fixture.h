@@ -277,8 +277,7 @@ protected:
     // Data members.
     //
 
-    static const NamespaceString nss;
-
+    NamespaceString nss;
     QueryTestServiceContext serviceContext;
     ServiceContext::UniqueOperationContext opCtx;
     boost::intrusive_ptr<ExpressionContext> expCtx;

@@ -105,6 +105,9 @@ selector:
   # The following test fails because configureQueryAnalyzer is not allowed on QE collections
   - jstests/core/queryable_encryption/**/*.js
 
+  # The following test doesn't support $lookup where one collection is sharded and the other is unsharded
+  - jstests/core/query/explain/explain_find_trivially_false_predicates_in_agg_pipelines.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - assumes_standalone_mongod
