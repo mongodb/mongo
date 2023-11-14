@@ -1311,7 +1311,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     TargetingResults targeting = targetPipeline(
         expCtx, pipeline.get(), pipelineDataSource, shardTargetingPolicy, executionNsRoutingInfo);
     auto& shardIds = targeting.shardIds;
-    for (auto shard : shardsToSkip) {
+    for (const auto& shard : shardsToSkip) {
         shardIds.erase(shard);
     }
 
