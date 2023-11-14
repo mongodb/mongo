@@ -1638,7 +1638,6 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
     DocumentSource* searchStage = pipeline->peekFront();
     auto yieldPolicy = PlanYieldPolicyRemoteCursor::make(
         expCtx->opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, collections, nss);
-    auto yieldPolicyPtr = yieldPolicy.get();
 
     if (!expCtx->explain) {
         if (searchHelper->isSearchPipeline(pipeline)) {
@@ -1653,7 +1652,6 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
     auto [executor, callback, additionalExecutors] =
         buildInnerQueryExecutorGeneric(collections, nss, aggRequest, pipeline);
 
-    yieldPolicyPtr->registerPlanExecutor(executor.get());
     const CanonicalQuery* cq = executor->getCanonicalQuery();
 
     if (!cq->cqPipeline().empty() &&
@@ -1663,12 +1661,10 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
             // Create a yield policy for metadata cursor.
             auto metadataYieldPolicy = PlanYieldPolicyRemoteCursor::make(
                 expCtx->opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, collections, nss);
-            auto metadataYieldPolicyPtr = metadataYieldPolicy.get();
             cursor->updateYieldPolicy(std::move(metadataYieldPolicy));
 
             additionalExecutors.push_back(uassertStatusOK(getSearchMetadataExecutorSBE(
                 expCtx->opCtx, collections, nss, *cq, std::move(*cursor))));
-            metadataYieldPolicyPtr->registerPlanExecutor(additionalExecutors.back().get());
         }
     }
     return {std::move(executor), callback, std::move(additionalExecutors)};

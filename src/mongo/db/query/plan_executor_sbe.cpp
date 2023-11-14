@@ -168,6 +168,14 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   _rootData.debugInfo,
                                                   _remoteExplains.get());
     _cursorType = _rootData.staticData->cursorType;
+
+    if (_remoteCursors) {
+        for (auto& it : *_remoteCursors) {
+            if (auto yieldPolicy = it.second->getYieldPolicy()) {
+                yieldPolicy->registerPlanExecutor(this);
+            }
+        }
+    }
 }
 
 void PlanExecutorSBE::saveState() {

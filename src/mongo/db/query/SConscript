@@ -460,6 +460,28 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='plan_executor',
+    source=[
+        'plan_executor.cpp',
+        'plan_yield_policy_remote_cursor.cpp',
+        'yield_policy_callbacks_impl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_query_info',
+        '$BUILD_DIR/mongo/db/shard_filterer',
+        '$BUILD_DIR/mongo/db/shard_role',
+        'plan_yield_policy',
+        'query_common',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
+        '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/executor/task_executor_cursor',
+    ],
+)
+
 env.CppUnitTest(
     target="db_query_test",
     source=[
