@@ -35,5 +35,7 @@ executor:
         featureFlagCommonQueryFramework: true
         internalQueryCardinalityEstimatorMode: "sampling"
         internalQueryFrameworkControl: "forceBonsai"
+        internalCascadesOptimizerSampleSizeMin: 1
+        internalCascadesOptimizerEnableSqrtSampleSize: false
         failpoint.disablePipelineOptimization:
           mode: alwaysOn

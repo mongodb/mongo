@@ -366,6 +366,9 @@ QueryHints getHintsFromQueryKnobs() {
     hints._enableNotPushdown = internalCascadesOptimizerEnableNotPushdown.load();
     hints._forceSamplingCEFallBackForFilterNode =
         internalCascadesOptimizerSamplingCEFallBackForFilterNode.load();
+    hints._samplingCollectionSizeMin = internalCascadesOptimizerSampleSizeMin.load();
+    hints._samplingCollectionSizeMax = internalCascadesOptimizerSampleSizeMax.load();
+    hints._sqrtSampleSizeEnabled = internalCascadesOptimizerEnableSqrtSampleSize.load();
 
     return hints;
 }
@@ -764,7 +767,10 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                 defaultConvertPathToInterval,
                 constFold,
                 DebugInfo::kDefaultForProd,
-                {._numSamplingChunks = hints._numSamplingChunks} /*hints*/};
+                {._numSamplingChunks = hints._numSamplingChunks,
+                 ._samplingCollectionSizeMin = hints._samplingCollectionSizeMin,
+                 ._samplingCollectionSizeMax = hints._samplingCollectionSizeMax,
+                 ._sqrtSampleSizeEnabled = hints._sqrtSampleSizeEnabled} /*hints*/};
 
             auto samplingEstimator = std::make_unique<SamplingEstimator>(
                 std::move(phaseManagerForSampling),
@@ -928,7 +934,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 
     // TODO: SERVER-70241: Handle "auto" estimation mode.
     if (internalQueryCardinalityEstimatorMode == ce::kSampling) {
-        if (collectionExists && numRecords > 0) {
+        if (collectionExists && numRecords > internalCascadesOptimizerSampleSizeMin.load()) {
             mode = CEMode::kSampling;
         }
     } else if (internalQueryCardinalityEstimatorMode == ce::kHistogram) {
