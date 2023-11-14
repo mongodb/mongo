@@ -90,8 +90,8 @@ void BM_GetDurableReplOperationSize(benchmark::State& state) {
     }
 }
 
-BENCHMARK(BM_ParseOplogEntryWithNStatementIds)->Range(0, 1024);
-BENCHMARK(BM_AccessStatementIdsForOplogEntry)->Range(0, 1024);
+BENCHMARK(BM_ParseOplogEntryWithNStatementIds)->Arg(0)->Range(1, 1024);
+BENCHMARK(BM_AccessStatementIdsForOplogEntry)->Arg(0)->Range(1, 1024);
 // Since 1024 should be as fast as 0, we don't need to benchmark the intermediate values to see if
 // something is wrong.  We just benchmark the three different cases of none, one, and many.
 BENCHMARK(BM_GetDurableReplOperationSize)->Arg(0)->Arg(1)->Arg(1024);
