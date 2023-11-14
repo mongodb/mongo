@@ -189,9 +189,14 @@ MallocFreeOStream mallocFreeOStream;
  */
 class MallocFreeOStreamGuard {
 public:
-    explicit MallocFreeOStreamGuard() : _lk(_streamMutex, stdx::defer_lock) {
+    /**
+     * If we detect that we've been signaled while handling another signal, we'll fall back to
+     * the default handler for the given signum. In that case, it's important that we kill
+     * the process in a timely manner so the user has a chance to detect that and restart it.
+     */
+    explicit MallocFreeOStreamGuard(int signum) : _lk(_streamMutex, stdx::defer_lock) {
         if (terminateDepth++) {
-            quickExit(ExitCode::abrupt);
+            endProcessWithSignal(signum);
         }
         _lk.lock();
     }
@@ -255,7 +260,7 @@ void dumpScopedDebugInfo(std::ostream& os) {
 // this will be called in certain c++ error cases, for example if there are two active
 // exceptions
 void myTerminate() {
-    MallocFreeOStreamGuard lk{};
+    MallocFreeOStreamGuard lk(SIGABRT);
     mallocFreeOStream << "terminate() called.";
     if (std::current_exception()) {
         mallocFreeOStream << " An exception is active; attempting to gather more information";
@@ -273,7 +278,7 @@ void myTerminate() {
 }
 
 extern "C" void abruptQuit(int signalNum) {
-    MallocFreeOStreamGuard lk{};
+    MallocFreeOStreamGuard lk(signalNum);
     dumpScopedDebugInfo(mallocFreeOStream);
     writeMallocFreeStreamToLog();
     printSignalAndBacktrace(signalNum);
@@ -323,7 +328,7 @@ extern "C" void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void
     // For convenient debugger access.
     [[maybe_unused]] auto ucontext = static_cast<const ucontext_t*>(ucontext_erased);
 
-    MallocFreeOStreamGuard lk{};
+    MallocFreeOStreamGuard lk(signalNum);
 
     const char* action = (signalNum == SIGSEGV || signalNum == SIGBUS) ? "access" : "operation";
     mallocFreeOStream << "Invalid " << action << " at address: " << siginfo->si_addr;
@@ -398,7 +403,7 @@ void setupSynchronousSignalHandlers() {
 }
 
 void reportOutOfMemoryErrorAndExit() {
-    MallocFreeOStreamGuard lk{};
+    MallocFreeOStreamGuard lk(SIGABRT);
     mallocFreeOStream << "out of memory.";
     writeMallocFreeStreamToLog();
     printStackTraceNoRecursion();
