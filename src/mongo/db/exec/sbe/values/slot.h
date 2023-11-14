@@ -209,7 +209,7 @@ private:
     bool _owned{false};
     TypeTags _tag{TypeTags::Nothing};
     Value _val{0};
-};
+};  // class OwnedValueAccessor
 
 /**
  * An accessor for a slot which must hold an array-like type (e.g. 'TypeTags::Array' or
@@ -246,15 +246,17 @@ public:
     }
 
     void refresh() {
-        auto [tag, val] = _input->getViewOfValue();
-        _enumerator.reset(tag, val, _currentIndex);
+        if (_input) {
+            auto [tag, val] = _input->getViewOfValue();
+            _enumerator.reset(tag, val, _currentIndex);
+        }
     }
 
 private:
     size_t _currentIndex = 0;
     SlotAccessor* _input{nullptr};
     ArrayEnumerator _enumerator;
-};
+};  // class ArrayAccessor
 
 /**
  * This is a switched accessor - it holds a vector of accessors and operates on an accessor selected

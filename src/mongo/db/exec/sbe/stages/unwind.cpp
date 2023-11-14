@@ -185,6 +185,8 @@ void UnwindStage::close() {
 
     trackClose();
     _children[0]->close();
+    _index = 0;
+    _inArray = false;
 }
 
 std::unique_ptr<PlanStageStats> UnwindStage::getStats(bool includeDebugInfo) const {
@@ -221,8 +223,8 @@ std::vector<DebugPrinter::Block> UnwindStage::debugPrint() const {
     return ret;
 }
 
-void UnwindStage::doSaveState(bool fullSave) {
-    if (!fullSave) {
+void UnwindStage::doSaveState(bool relinquishCursor) {
+    if (!relinquishCursor) {
         return;
     }
     if (_outFieldOutputAccessor) {
@@ -233,12 +235,19 @@ void UnwindStage::doSaveState(bool fullSave) {
     }
 }
 
-void UnwindStage::doRestoreState(bool fullSave) {
-    if (!slotsAccessible()) {
+void UnwindStage::doRestoreState(bool relinquishCursor) {
+    if (!_inArray) {
+        // If we were once in an array but no longer are, this saves us from doing a refresh() on
+        // obsolete slot contents.
         return;
     }
 
-    _inArrayAccessor.refresh();
+    if (relinquishCursor) {
+        // The child stage will have copied the in-flight contents of this slot because WiredTiger
+        // will free the memory owned by the cursor it points to, so on restore we must update the
+        // embedded array iterator to point to the new memory location.
+        _inArrayAccessor.refresh();
+    }
 }
 
 size_t UnwindStage::estimateCompileTimeSize() const {
