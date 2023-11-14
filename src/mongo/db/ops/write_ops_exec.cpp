@@ -2813,22 +2813,26 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
                             // collection before performing the query. Without the index we
                             // will perform a full collection scan which could cause us to
                             // take a performance hit.
-                            if (timeseries::collectionHasIndexSupportingReopeningQuery(
+                            if (auto index = timeseries::getIndexSupportingReopeningQuery(
                                     opCtx, bucketsColl->getIndexCatalog(), timeSeriesOptions)) {
                                 hangTimeseriesInsertBeforeReopeningQuery.pauseWhileSet();
 
                                 // Run an aggregation to find a suitable bucket to reopen.
                                 AggregateCommandRequest aggRequest(bucketsColl->ns(), *pipeline);
+                                aggRequest.setHint(index);
 
-                                auto cursor = uassertStatusOK(
+                                auto swCursor =
                                     DBClientCursor::fromAggregationRequest(&client,
                                                                            aggRequest,
                                                                            false /* secondaryOk
                                                                            */, false /*
-                                                                           useExhaust*/));
+                                                                           useExhaust*/);
 
-                                if (cursor->more()) {
-                                    suitableBucket = cursor->next();
+                                if (swCursor.isOK()) {
+                                    auto& cursor = swCursor.getValue();
+                                    if (cursor->more()) {
+                                        suitableBucket = cursor->next();
+                                    }
                                 }
                                 reopeningContext->queriedBucket = true;
                             }
