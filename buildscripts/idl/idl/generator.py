@@ -1434,14 +1434,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         self._writer.write_line('switch (variantType) {')
         if array_types:
             self._writer.write_line('case Array:')
-            self._writer.indent()
-            with self._predicate('%s.Obj().isEmpty()' % (bson_element, )):
-                # Can't determine element type of an empty array, use the first array type.
-                self._gen_array_deserializer(field, bson_element, array_types[0], tenant)
-
-            with self._block('else {', '}'):
+            with self._block('{', '}'):
+                # If the array is empty, we can't infer its element type. Use the first
+                # array type as a fallback to cover that case.
+                fallback_type = array_types[0].bson_serialization_type[0]
+                fallback_bson_cpp_type = bson.cpp_bson_type_name(fallback_type)
+                condition = '%s.Obj().isEmpty()' % (bson_element, )
                 self._writer.write_line(
-                    'const BSONType elemType = %s.Obj().firstElement().type();' % (bson_element, ))
+                    'const BSONType elemType = %s ? %s : %s.Obj().firstElement().type();' %
+                    (condition, fallback_bson_cpp_type, bson_element))
 
                 # Start inner switch statement, for each type the first element could be.
                 self._writer.write_line('switch (elemType) {')
@@ -1465,9 +1466,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 # End of inner switch.
                 self._writer.write_line('}')
 
-            # End of "case Array:".
-            self._writer.write_line('break;')
-            self._writer.unindent()
+                # End of "case Array:".
+                self._writer.write_line('break;')
 
         for scalar_type in scalar_types:
             for bson_type in scalar_type.bson_serialization_type:
