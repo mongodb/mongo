@@ -10,7 +10,6 @@
 
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const clustered = db.clusteredColl;
 const nonClustered = db.normalColl;
@@ -27,6 +26,23 @@ db.createCollection(nonClusteredName);
 const docs = [{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 3}];
 assert.commandWorked(clustered.insertMany(docs));
 assert.commandWorked(nonClustered.insertMany(docs));
+
+// When given the recordId of the last record in the collection, we should receive a null
+// resumeToken.
+const res = assert.commandWorked(db.runCommand({
+    find: nonClusteredName,
+    filter: {},
+    $_requestResumeToken: true,
+    $_resumeAfter: {'$recordId': NumberLong(3)},
+    hint: {$natural: 1}
+}));
+assert(res.hasOwnProperty('cursor'), res);
+const cursor = res['cursor'];
+assert(cursor.hasOwnProperty('postBatchResumeToken'), res);
+
+// Note that we don't perform an exact equality on 'postBatchResumeToken' because depending on
+// the configuration, it may contain additional fields (such as '$initialSyncId').
+assert.eq(cursor.postBatchResumeToken.$recordId, null, res);
 
 function validateFailedResumeAfterInFind({collName, resumeAfterSpec, errorCode, explainFail}) {
     const spec = {
@@ -94,23 +110,12 @@ function testResumeAfter(validateFunction) {
         errorCode: ErrorCodes.KeyNotFound
     });
 
-    if (checkSBEEnabled(db)) {
-        // This case really means that 'forceClassicEngine' has not been set. It does not mean any
-        // SBE-specific feature flags are turned on.
-        validateFunction({
-            collName: nonClusteredName,
-            resumeAfterSpec: {'$recordId': null},
-            errorCode: ErrorCodes.KeyNotFound
-        });
-    } else {
-        assert.commandWorked(db.runCommand({
-            find: nonClusteredName,
-            filter: {},
-            $_requestResumeToken: true,
-            $_resumeAfter: {'$recordId': null},
-            hint: {$natural: 1}
-        }));
-    }
+    // Confirm $_resumeAfter token will fail with 'KeyNotFound' if given a null recordId.
+    validateFunction({
+        collName: nonClusteredName,
+        resumeAfterSpec: {'$recordId': null},
+        errorCode: ErrorCodes.KeyNotFound
+    });
 
     // Confirm $_resumeAfter will fail to parse if collection does not exist.
     validateFunction({

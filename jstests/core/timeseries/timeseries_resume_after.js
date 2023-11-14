@@ -16,7 +16,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 TimeseriesTest.run((insert) => {
     const timeFieldName = "time";
@@ -79,36 +78,18 @@ TimeseriesTest.run((insert) => {
     assert.hasFields(res.cursor, ["postBatchResumeToken"]);
     resumeToken = res.cursor.postBatchResumeToken;
 
-    // TODO SERVER-79848: the behavior of the two engines should match, but it doesn't. We might
-    // also get null record id in the resume token during FCV upgrade/downgrade.
-    if (!checkSBEEnabled(db, ["featureFlagTimeSeriesInSbe"])) {
-        // In the classic engine, after a collection is exhausted, the record id in the resume token
-        // is set to null.
-        assert.eq(null, resumeToken.$recordId, "Got resume token " + tojson(resumeToken));
+    // After a collection is exhausted, the record id in the resume token is set to null.
+    assert.eq(null, resumeToken.$recordId, "Got resume token " + tojson(resumeToken));
 
-        // Try to resume from a null '$recordId'. It should reset to the start of the collection.
-        res = assert.commandWorked(db.runCommand({
-            find: bucketsColl.getName(),
-            hint: {$natural: 1},
-            batchSize: 1,
-            $_requestResumeToken: true,
-            $_resumeAfter: resumeToken
-        }));
-        assert.neq([], res.cursor.firstBatch, "Expect some data to be returned");
-        assert.hasFields(res.cursor, ["postBatchResumeToken"]);
-        resumeToken = res.cursor.postBatchResumeToken;
-        assert.neq(null, resumeToken.$recordId, "Got resume token " + tojson(resumeToken));
-    } else {
-        // In SBE we might get the last token back or we might get null. Don't check _what_ we get,
-        // just check that we can use it.
-        assert.commandWorked(db.runCommand({
-            find: bucketsColl.getName(),
-            hint: {$natural: 1},
-            batchSize: 1,
-            $_requestResumeToken: true,
-            $_resumeAfter: resumeToken
-        }));
-    }
+    // Try to resume from a null '$recordId'. It should fail with a 'KeyNotFound' error.
+    assert.commandFailedWithCode(db.runCommand({
+        find: bucketsColl.getName(),
+        hint: {$natural: 1},
+        batchSize: 1,
+        $_requestResumeToken: true,
+        $_resumeAfter: resumeToken
+    }),
+                                 ErrorCodes.KeyNotFound);
 
     // Test that '$_resumeAfter' fails if the recordId is Long.
     assert.commandFailedWithCode(db.runCommand({
