@@ -170,6 +170,7 @@ functions:
     - command: git.get_project
       params:
         directory: *src_dir
+        clone_depth: 1000
         revisions:
           dsi: ${dsi_rev}
           genny: ${genny_rev}
@@ -509,6 +510,7 @@ functions:
     - command: git.get_project
       params:
         directory: *src_dir
+        clone_depth: 1000
         revisions:
           dsi: ${dsi_rev}
           genny: ${genny_rev}
