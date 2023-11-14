@@ -462,5 +462,73 @@ private:
 inline BSONColumn::Iterator::DecodingState::DecodingState() = default;
 inline BSONColumn::Iterator::DecodingState::Decoder64::Decoder64() = default;
 
+/**
+ * Work in progress, do not use.
+ */
+class BSONColumnBlockBased {
+
+public:
+    BSONColumnBlockBased(const char* buffer, size_t size);
+
+    /**
+     * Decompress entire BSONColumn
+     *
+     * TODO: change signature from function to buffer
+     */
+    void decompress(std::function<void(BSONElement, int)> callback) const;
+
+    /**
+     * Return first non-missing element stored in this BSONColumn
+     */
+    BSONElement first() const;
+
+    /**
+     * Return last non-missing element stored in this BSONColumn
+     */
+    BSONElement last() const;
+
+    /**
+     * Return 'min' element in this BSONColumn.
+     *
+     * TODO: Do we need to specify ComparisonRulesSet here?
+     */
+    BSONElement min(const StringDataComparator* comparator = nullptr) const;
+
+    /**
+     * Return 'max' element in this BSONColumn.
+     *
+     * TODO: Do we need to specify ComparisonRulesSet here?
+     */
+    BSONElement max(const StringDataComparator* comparator = nullptr) const;
+
+    /**
+     * Return sum of all elements stored in this BSONColumn.
+     *
+     * The BSONColumn must only contain NumberInt, NumberLong, NumberDouble, NumberDecimal types,
+     * throws otherwise.
+     */
+    BSONElement sum() const;
+
+    /**
+     * Element lookup by index
+     *
+     * Returns EOO if index represent skipped element.
+     * Returns boost::none if index is out of bounds.
+     */
+    boost::optional<BSONElement> operator[](size_t index) const;
+
+    /**
+     * Number of elements stored (including 'missing') in this BSONColumn
+     */
+    size_t size() const;
+
+    /**
+     * Returns true if 'type' is stored within the BSONColumn. Traverses any internal objects if
+     * 'type' is a scalar.
+     */
+    bool contains(BSONType type) const;
+
+private:
+};
 
 }  // namespace mongo

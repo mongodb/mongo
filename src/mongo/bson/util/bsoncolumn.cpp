@@ -872,4 +872,50 @@ boost::intrusive_ptr<BSONColumn::ElementStorage> BSONColumn::release() {
     return previous;
 }
 
+BSONColumnBlockBased::BSONColumnBlockBased(const char* buffer, size_t size) {}
+
+void BSONColumnBlockBased::decompress(std::function<void(BSONElement, int)> callback) const {
+    invariant(false, "not implemented");
+}
+
+BSONElement BSONColumnBlockBased::first() const {
+    invariant(false, "not implemented");
+    return BSONElement();
+}
+
+BSONElement BSONColumnBlockBased::last() const {
+    invariant(false, "not implemented");
+    return BSONElement();
+}
+
+BSONElement BSONColumnBlockBased::min(const StringDataComparator* comparator) const {
+    invariant(false, "not implemented");
+    return BSONElement();
+}
+
+BSONElement BSONColumnBlockBased::max(const StringDataComparator* comparator) const {
+    invariant(false, "not implemented");
+    return BSONElement();
+}
+
+BSONElement BSONColumnBlockBased::sum() const {
+    invariant(false, "not implemented");
+    return BSONElement();
+}
+
+boost::optional<BSONElement> BSONColumnBlockBased::operator[](size_t index) const {
+    invariant(false, "not implemented");
+    return boost::none;
+}
+
+size_t BSONColumnBlockBased::size() const {
+    invariant(false, "not implemented");
+    return 0;
+}
+
+bool BSONColumnBlockBased::contains(BSONType type) const {
+    invariant(false, "not implemented");
+    return false;
+}
+
 }  // namespace mongo
