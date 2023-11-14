@@ -102,14 +102,55 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
 }
 
 /**
- * Clears the SBE plan cache if 'querySettingsPlanCacheInvalidation' failpoint is set.
- * Used when setting index filters via query settings interface. See query_settings_passthrough
- * suite.
+ * Reads (from the in-memory 'storage' = cache), modifies, and updates the 'querySettings' cluster
+ * parameter.
  */
-void testOnlyClearPlanCache(OperationContext* opCtx) {
+void readModifyWrite(OperationContext* opCtx,
+                     const mongo::DatabaseName& dbName,
+                     std::function<void(std::vector<QueryShapeConfiguration>&)> modify) {
+    auto& querySettingsManager = QuerySettingsManager::get(opCtx);
+
+    // Read the query settings array from the cache.
+    auto settingsArray =
+        querySettingsManager.getAllQueryShapeConfigurations(opCtx, dbName.tenantId());
+
+    // Modify the query settings array (append, replace, or remove).
+    modify(settingsArray);
+
+    // Run SetClusterParameter command with the new value of the 'querySettings' cluster
+    // parameter.
+    setClusterParameter(opCtx,
+                        makeSetClusterParameterRequest(settingsArray, dbName),
+                        boost::none,
+                        querySettingsManager.getClusterParameterTime(opCtx, dbName.tenantId()));
+
+    /**
+     * Clears the SBE plan cache if 'querySettingsPlanCacheInvalidation' failpoint is set.
+     * Used in tests when setting index filters via query settings interface.
+     */
     if (MONGO_unlikely(querySettingsPlanCacheInvalidation.shouldFail())) {
         sbe::getPlanCache(opCtx).clear();
     }
+}
+
+/**
+ * Finds a query shape configuration by the given query shape hash in the given vector. Returns an
+ * iterator (non-const) in cases of success or throws otherwise.
+ */
+std::vector<QueryShapeConfiguration>::iterator findByHash(
+    std::vector<QueryShapeConfiguration>& settingsArray,
+    const query_shape::QueryShapeHash& queryShapeHash) {
+    auto matchingQueryShapeConfigurationIt =
+        std::find_if(settingsArray.begin(),
+                     settingsArray.end(),
+                     [&](const QueryShapeConfiguration& configuration) {
+                         return configuration.getQueryShapeHash() == queryShapeHash;
+                     });
+    // Ensure the 'queryShapeHash' is present in the 'settingsArray'.
+    uassert(7746701,
+            "A matching query settings entry does not exist",
+            matchingQueryShapeConfigurationIt != settingsArray.end());
+    return matchingQueryShapeConfigurationIt;
 }
 
 class SetQuerySettingsCommand final : public TypedCommand<SetQuerySettingsCommand> {
@@ -138,29 +179,21 @@ public:
 
         SetQuerySettingsCommandReply insertQuerySettings(
             OperationContext* opCtx,
-            QueryShapeConfiguration queryShapeConfiguration,
+            QueryShapeConfiguration newQueryShapeConfiguration,
             const RepresentativeQueryInfo& representativeQueryInfo) {
             // Assert querySettings command is valid.
-            utils::validateQuerySettings(
-                queryShapeConfiguration, representativeQueryInfo, request().getDbName().tenantId());
+            utils::validateQuerySettings(newQueryShapeConfiguration,
+                                         representativeQueryInfo,
+                                         request().getDbName().tenantId());
 
-            // Build the new 'settingsArray' by appending 'newConfig' to the list of all
-            // QueryShapeConfigurations for the given tenant.
-            auto& querySettingsManager = QuerySettingsManager::get(opCtx);
-            auto settingsArray = querySettingsManager.getAllQueryShapeConfigurations(
-                opCtx, request().getDbName().tenantId());
-            settingsArray.push_back(queryShapeConfiguration);
+            // Append 'newQueryShapeConfiguration' to the list of all 'QueryShapeConfigurations' for
+            // the given database / tenant.
+            readModifyWrite(opCtx, request().getDbName(), [&](auto& settingsArray) {
+                settingsArray.push_back(newQueryShapeConfiguration);
+            });
 
-            // Run SetClusterParameter command with the new value of the 'querySettings' cluster
-            // parameter.
-            setClusterParameter(
-                opCtx,
-                makeSetClusterParameterRequest(settingsArray, request().getDbName()),
-                boost::none,
-                querySettingsManager.getClusterParameterTime(opCtx,
-                                                             request().getDbName().tenantId()));
             SetQuerySettingsCommandReply reply;
-            reply.setQueryShapeConfiguration(std::move(queryShapeConfiguration));
+            reply.setQueryShapeConfiguration(std::move(newQueryShapeConfiguration));
             return reply;
         }
 
@@ -174,34 +207,16 @@ public:
 
             // Build the new 'settingsArray' by updating the existing QueryShapeConfiguration with
             // the 'mergedQuerySettings'.
-            auto& querySettingsManager = QuerySettingsManager::get(opCtx);
-            auto settingsArray = querySettingsManager.getAllQueryShapeConfigurations(
-                opCtx, request().getDbName().tenantId());
+            readModifyWrite(opCtx, request().getDbName(), [&](auto& settingsArray) {
+                findByHash(settingsArray, currentQueryShapeConfiguration.getQueryShapeHash())
+                    ->setSettings(mergedQuerySettings);
+            });
 
-            // Ensure the to be updated QueryShapeConfiguration is present in the 'settingsArray'.
-            auto updatedQueryShapeConfigurationIt =
-                std::find_if(settingsArray.begin(),
-                             settingsArray.end(),
-                             [&](const QueryShapeConfiguration& queryShapeConfiguration) {
-                                 return queryShapeConfiguration.getQueryShapeHash() ==
-                                     currentQueryShapeConfiguration.getQueryShapeHash();
-                             });
-            tassert(7746500,
-                    "In order to perform an update, QueryShapeConfiguration must be present in "
-                    "QuerySettingsManager",
-                    updatedQueryShapeConfigurationIt != settingsArray.end());
-            updatedQueryShapeConfigurationIt->setSettings(mergedQuerySettings);
-
-            // Run SetClusterParameter command with the new value of the 'querySettings' cluster
-            // parameter.
-            setClusterParameter(
-                opCtx,
-                makeSetClusterParameterRequest(settingsArray, request().getDbName()),
-                boost::none,
-                querySettingsManager.getClusterParameterTime(opCtx,
-                                                             request().getDbName().tenantId()));
             SetQuerySettingsCommandReply reply;
-            reply.setQueryShapeConfiguration(*updatedQueryShapeConfigurationIt);
+            reply.setQueryShapeConfiguration(
+                QueryShapeConfiguration(currentQueryShapeConfiguration.getQueryShapeHash(),
+                                        mergedQuerySettings,
+                                        currentQueryShapeConfiguration.getRepresentativeQuery()));
             return reply;
         }
 
@@ -217,8 +232,6 @@ public:
                     "hash was given.",
                     querySettings.has_value());
 
-            auto representativeQueryInfo =
-                createRepresentativeInfo(querySettings->second, opCtx, tenantId);
             return updateQuerySettings(opCtx,
                                        request().getSettings(),
                                        QueryShapeConfiguration(queryShapeHash,
@@ -270,7 +283,6 @@ public:
                                 },
                             },
                             request().getCommandParameter());
-            testOnlyClearPlanCache(opCtx);
             return response;
         }
 
@@ -341,33 +353,12 @@ public:
                                 },
                             },
                             request().getCommandParameter());
-            auto& querySettingsManager = QuerySettingsManager::get(opCtx);
 
             // Build the new 'settingsArray' by removing the QueryShapeConfiguration with a matching
             // QueryShapeHash.
-            auto settingsArray =
-                querySettingsManager.getAllQueryShapeConfigurations(opCtx, tenantId);
-            auto matchingQueryShapeConfigurationIt =
-                std::find_if(settingsArray.begin(),
-                             settingsArray.end(),
-                             [&](const QueryShapeConfiguration& configuration) {
-                                 return configuration.getQueryShapeHash() == queryShapeHash;
-                             });
-            uassert(7746701,
-                    "A matching query settings entry does not exist",
-                    matchingQueryShapeConfigurationIt != settingsArray.end());
-            settingsArray.erase(matchingQueryShapeConfigurationIt);
-
-            // Run SetClusterParameter command with the new value of the 'querySettings' cluster
-            // parameter.
-            setClusterParameter(
-                opCtx,
-                makeSetClusterParameterRequest(settingsArray, request().getDbName()),
-                boost::none,
-                querySettingsManager.getClusterParameterTime(opCtx,
-                                                             request().getDbName().tenantId()));
-
-            testOnlyClearPlanCache(opCtx);
+            readModifyWrite(opCtx, request().getDbName(), [&](auto& settingsArray) {
+                settingsArray.erase(findByHash(settingsArray, queryShapeHash));
+            });
         }
 
     private:
