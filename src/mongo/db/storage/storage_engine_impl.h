@@ -315,13 +315,19 @@ public:
         return _engine.get();
     }
 
-    void addDropPendingIdent(const Timestamp& dropTimestamp,
-                             std::shared_ptr<Ident> ident,
-                             DropIdentCallback&& onDrop) override;
+    void addDropPendingIdent(
+        const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
+        std::shared_ptr<Ident> ident,
+        DropIdentCallback&& onDrop) override;
 
     void startTimestampMonitor() override;
 
     void checkpoint() override;
+
+    StorageEngine::CheckpointIteration getCheckpointIteration() const override;
+
+    virtual bool hasDataBeenCheckpointed(
+        StorageEngine::CheckpointIteration checkpointIteration) const override;
 
     StatusWith<ReconcileResult> reconcileCatalogAndIdents(
         OperationContext* opCtx, LastShutdownState lastShutdownState) override;
@@ -412,7 +418,8 @@ private:
      * Called when the min of checkpoint timestamp (if exists) and oldest timestamp advances in the
      * KVEngine.
      */
-    void _onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp);
+    void _onMinOfCheckpointAndOldestTimestampChanged(OperationContext* opCtx,
+                                                     const Timestamp& timestamp);
 
     /**
      * Returns whether the given ident is an internal ident and if it should be dropped or used to

@@ -114,7 +114,6 @@ const checkLogs = function() {
     checkLog.containsJson(primary(), 22206, {
         index: "a_1",
         namespace: coll().getFullName(),
-        commitTimestamp: {$timestamp: {t: 0, i: 0}},
     });
 
     // Index build restarting.

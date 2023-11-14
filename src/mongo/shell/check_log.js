@@ -96,26 +96,9 @@ checkLog = (function() {
                                                         return actual === expected;
                                                     },
                                                 context = null) {
-        const logMessages = getGlobalLog(conn);
-        if (logMessages === null) {
-            return false;
-        }
+        const messages = getFilteredLogMessages(conn, id, attrsDict, severity, isRelaxed, context);
 
-        let count = 0;
-        for (let logMsg of logMessages) {
-            let obj;
-            try {
-                obj = JSON.parse(logMsg);
-            } catch (ex) {
-                print('checkLog.checkContainsOnce: JsonJSON.parse() failed: ' + tojson(ex) + ': ' +
-                      logMsg);
-                throw ex;
-            }
-
-            if (_compareLogs(obj, id, severity, context, attrsDict, isRelaxed)) {
-                count++;
-            }
-        }
+        const count = messages.length;
 
         return comparator(count, expectedCount);
     };
@@ -153,6 +136,36 @@ checkLog = (function() {
         }
 
         return false;
+    };
+
+    /*
+     * See checkContainsWithCountJson comment.
+     */
+    const getFilteredLogMessages = function(
+        conn, id, attrsDict, severity = null, isRelaxed = false, context = null) {
+        const logMessages = getGlobalLog(conn);
+        if (logMessages === null) {
+            return false;
+        }
+
+        let messages = [];
+
+        for (let logMsg of logMessages) {
+            let obj;
+            try {
+                obj = JSON.parse(logMsg);
+            } catch (ex) {
+                print('checkLog.checkContainsOnce: JsonJSON.parse() failed: ' + tojson(ex) + ': ' +
+                      logMsg);
+                throw ex;
+            }
+
+            if (_compareLogs(obj, id, severity, context, attrsDict, isRelaxed)) {
+                messages.push(obj);
+            }
+        }
+
+        return messages;
     };
 
     /*
@@ -421,7 +434,8 @@ checkLog = (function() {
         containsWithCount: containsWithCount,
         containsWithAtLeastCount: containsWithAtLeastCount,
         formatAsLogLine: formatAsLogLine,
-        formatAsJsonLogLine: formatAsJsonLogLine
+        formatAsJsonLogLine: formatAsJsonLogLine,
+        getFilteredLogMessages: getFilteredLogMessages,
     };
 })();
 })();
