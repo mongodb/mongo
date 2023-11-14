@@ -647,6 +647,10 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
             return false;
         }
 
+        if (collectionPtr->getRequiresTimeseriesExtendedRangeSupport()) {
+            return false;
+        }
+
         ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss->dbName());
 
         if (info.isClustered()) {
