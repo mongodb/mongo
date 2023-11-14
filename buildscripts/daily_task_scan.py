@@ -135,11 +135,12 @@ def main(expansions_file: str, output_file: str) -> int:
 
     if not is_patch:
         evg_api.send_slack_message(
-            target="#sdp-triager",
+            target="#sdp-test-alerts",  #TODO SERVER-83205: change to #sdp-triager
             msg="\n".join(msg),
         )
 
-    return 1
+    #TODO SERVER-83205: change to return 1
+    return 0
 
 
 if __name__ == "__main__":
