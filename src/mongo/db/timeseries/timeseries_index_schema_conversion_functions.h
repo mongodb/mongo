@@ -119,11 +119,11 @@ bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
 bool isHintIndexKey(const BSONObj& obj);
 
 /**
- * Returns true if the IndexCatalog contains an index for a time-series collection which we can use
- * for query based reopening.
+ * Returns an index hint which we can use for query based reopening, if a suitable index exists for
+ * the collection.
  */
-bool collectionHasIndexSupportingReopeningQuery(OperationContext* opCtx,
-                                                const IndexCatalog* indexCatalog,
-                                                const TimeseriesOptions& tsOptions);
+boost::optional<BSONObj> getIndexSupportingReopeningQuery(OperationContext* opCtx,
+                                                          const IndexCatalog* indexCatalog,
+                                                          const TimeseriesOptions& tsOptions);
 
 }  // namespace mongo::timeseries
