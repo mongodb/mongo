@@ -269,6 +269,38 @@ typedef struct {
     testutil_check(__wt_snprintf_len_set(out, size, retsizep, __VA_ARGS__))
 
 /*
+ * Quiet compiler warnings about unused function parameters and variables, and unused function
+ * return values. The equivalent of WT_ macros.
+ */
+#define testutil_unused(var) (void)(var)
+#define testutil_not_read(v, val) \
+    do {                          \
+        (v) = (val);              \
+        (void)(v);                \
+    } while (0);
+#define testutil_ignore_ret(call)          \
+    do {                                   \
+        uintmax_t __ignored_ret;           \
+        __ignored_ret = (uintmax_t)(call); \
+        testutil_unused(__ignored_ret);    \
+    } while (0)
+#define testutil_ignore_ret_bool(call)  \
+    do {                                \
+        bool __ignored_ret;             \
+        __ignored_ret = (call);         \
+        testutil_unused(__ignored_ret); \
+    } while (0)
+#define testutil_ignore_ret_ptr(call)   \
+    do {                                \
+        const void *__ignored_ret;      \
+        __ignored_ret = (call);         \
+        testutil_unused(__ignored_ret); \
+    } while (0)
+
+/* Basic constants. */
+#define testutil_billion (1000000000)
+
+/*
  * WT_OP_CHECKPOINT_WAIT --
  *	If an operation returns EBUSY checkpoint and retry.
  */

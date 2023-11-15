@@ -87,7 +87,7 @@ transaction::try_begin(const std::string &config)
 bool
 transaction::commit(const std::string &config)
 {
-    WT_DECL_RET;
+    int ret = 0;
     testutil_assert(_in_txn && !_needs_rollback);
 
     ret = _session->commit_transaction(_session, config.empty() ? nullptr : config.c_str());
