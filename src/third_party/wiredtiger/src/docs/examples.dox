@@ -28,6 +28,9 @@ extractors and cursor types.
 @example ex_extractor.c
 Shows how to extend WiredTiger with a more complex custom extractor.
 
+@example ex_extra_diagnostics.c
+This is an example demonstrating how to enable and update extra diagnostic code at runtime.
+
 @example ex_file_system.c
 Shows how to extend WiredTiger with a custom file-system implementation.
 
