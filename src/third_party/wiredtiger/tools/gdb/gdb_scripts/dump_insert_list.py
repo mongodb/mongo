@@ -28,7 +28,7 @@ class dump_insert_list(gdb.Command):
     def usage(self):
         print("usage:")
         print("dump_insert_list WT_INSERT_HEAD,key_format")
-        exit(1)
+        sys.exit(1)
 
     def decode_key(self, key):
         if self.key_format == 'S':

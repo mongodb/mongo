@@ -39,6 +39,8 @@ if [[ -n $GDB_CORE_DUMP ]]; then
 set solib-search-path ${HOME}/wiredtiger/cmake_build/lang/python:${HOME}/wiredtiger/cmake_build:${HOME}/wiredtiger/TCMALLOC_LIB/lib
 set substitute-path ${OLD_WT_PATH} ${HOME}/wiredtiger
 set print pretty on
+# Allows for autoloading of gdb scripts inside this directory
+add-auto-load-safe-path /data/wiredtiger/cmake_build/
 EOF
 
 fi
@@ -55,7 +57,10 @@ EOF
 
 echo 'if [ -f ~/.profile ]; then
 . ~/.profile
-fi' >> ~/.bash_profile
+fi
+
+alias ll="ls -lrt --color=auto"
+' >> ~/.bash_profile
 
 # Send a Slack notification as the very last thing the setup_spawn_host script does.
 ssh_user=$(whoami)
