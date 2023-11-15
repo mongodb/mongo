@@ -120,9 +120,11 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         // It is possible that this is called before FCV is properly set up. Setting up the store if
         // the flag is enabled but FCV is incorrect is safe, and guards against the FCV being
         // changed to a supported version later.
-        if (!feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        if (!feature_flags::gFeatureFlagQueryStats.isEnabledUseLatestFCVWhenUninitialized(
+                fcvSnapshot) &&
             !feature_flags::gFeatureFlagQueryStatsFindCommand
-                 .isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+                 .isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot)) {
             // featureFlags are not allowed to be changed at runtime. Therefore it's not an issue
             // to not create a queryStats store in ConstructorActionRegisterer at start up with the
             // flag off - because the flag can not be turned on at any point afterwards.

@@ -127,14 +127,6 @@ bool FeatureFlag::isEnabledAndIgnoreFCVUnsafe() const {
     return _enabled;
 }
 
-// TODO SERVER-82270: Remove isEnabledAndIgnoreFCVUnsafeAtStartup and replace use cases with
-// isEnabledUseLatestFCVWhenUninitialized.
-// Please do not add new use cases of this function. Instead, use
-// isEnabledUseLatestFCVWhenUninitialized.
-bool FeatureFlag::isEnabledAndIgnoreFCVUnsafeAtStartup() const {
-    return _enabled;
-}
-
 bool FeatureFlag::isEnabledOnVersion(multiversion::FeatureCompatibilityVersion targetFCV) const {
     if (!_enabled) {
         return false;

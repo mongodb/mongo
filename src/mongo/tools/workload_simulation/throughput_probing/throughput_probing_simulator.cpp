@@ -53,8 +53,8 @@ void ThroughputProbing::setup() {
     Milliseconds probingInterval{gStorageEngineConcurrencyAdjustmentIntervalMillis};
 
 #ifdef __linux__
-    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
-            .isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         auto lowPriorityBypassThreshold = gLowPriorityAdmissionBypassThreshold.load();
         _readTicketHolder = std::make_unique<PriorityTicketHolder>(
             initialTickets, lowPriorityBypassThreshold, svcCtx());

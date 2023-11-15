@@ -143,18 +143,20 @@ class DocumentSource;
  * parser and enforce the 'sometimes' behavior during that invocation. No extra validation will be
  * done here.
  */
-#define REGISTER_EXPRESSION_WITH_FEATURE_FLAG(                                                    \
-    key, parser, allowedWithApiStrict, allowedClientType, featureFlag)                            \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                                     \
-                              ("BeginExpressionRegistration"),                                    \
-                              ("EndExpressionRegistration"))                                      \
-    (InitializerContext*) {                                                                       \
-        if (boost::optional<FeatureFlag>(featureFlag) != boost::none &&                           \
-            !boost::optional<FeatureFlag>(featureFlag)->isEnabledAndIgnoreFCVUnsafeAtStartup()) { \
-            return;                                                                               \
-        }                                                                                         \
-        Expression::registerExpression(                                                           \
-            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (featureFlag));      \
+#define REGISTER_EXPRESSION_WITH_FEATURE_FLAG(                                               \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag)                       \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                                \
+                              ("BeginExpressionRegistration"),                               \
+                              ("EndExpressionRegistration"))                                 \
+    (InitializerContext*) {                                                                  \
+        if (boost::optional<FeatureFlag>(featureFlag) != boost::none &&                      \
+            !boost::optional<FeatureFlag>(featureFlag)                                       \
+                 ->isEnabledUseLatestFCVWhenUninitialized(                                   \
+                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {        \
+            return;                                                                          \
+        }                                                                                    \
+        Expression::registerExpression(                                                      \
+            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (featureFlag)); \
     }
 
 /**
@@ -193,7 +195,8 @@ class DocumentSource;
         if (!__VA_ARGS__ ||                                                                  \
             (boost::optional<FeatureFlag>(featureFlag) != boost::none &&                     \
              !boost::optional<FeatureFlag>(featureFlag)                                      \
-                  ->isEnabledAndIgnoreFCVUnsafeAtStartup())) {                               \
+                  ->isEnabledUseLatestFCVWhenUninitialized(                                  \
+                      serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))) {      \
             return;                                                                          \
         }                                                                                    \
         Expression::registerExpression(                                                      \

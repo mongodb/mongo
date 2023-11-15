@@ -193,8 +193,8 @@ StorageEngine::LastShutdownState initializeStorageEngine(
         }
 
         auto svcCtx = opCtx->getServiceContext();
-        if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
-                .isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             std::unique_ptr<TicketHolderManager> ticketHolderManager;
 #ifdef __linux__
             LOGV2_DEBUG(6902900, 1, "Using Priority Queue-based ticketing scheduler");

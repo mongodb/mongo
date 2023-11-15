@@ -405,8 +405,10 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                       "one non-arbiter member with priority > 0");
     }
 
+    // (Ignore FCV check): If gFeatureFlagAllMongodsAreSharded is on, we want to allow reconfig-ing
+    // the replset even if it doesn't have configsvr: true in the config, regardless of the FCV.
     if (getConfigServer_deprecated() ||
-        (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
+        (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafe() &&
          serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer))) {
         if (arbiterCount > 0) {
             return Status(ErrorCodes::BadValue,
@@ -449,7 +451,8 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
         // that all nodes in the replica set eventually have the same cluster role, the server
         // fasserts (on startup or replication) if the shard identity document matches the server's
         // cluster role. For why this is correct and for more context see: SERVER-80249
-        if (!gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        if (!gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             return Status(ErrorCodes::BadValue,
                           "Nodes started with the --configsvr flag must have configsvr:true in "
                           "their config");

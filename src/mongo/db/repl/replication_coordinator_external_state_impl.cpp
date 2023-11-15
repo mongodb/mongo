@@ -1103,7 +1103,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // initialization which will transition some components into the "primary" state, like
         // the TransactionCoordinatorService, and they would fail if the onStepUp logic
         // attempted the same transition.
-
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         // TODO: SERVER-82965 Remove condition after v8.0 becomes last-lts.
         if (!serverGlobalParams.doAutoBootstrapSharding ||

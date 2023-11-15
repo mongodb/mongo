@@ -197,7 +197,8 @@ Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
     }
 
     if (oldConfig.getConfigServer_deprecated() && !newConfig.getConfigServer_deprecated() &&
-        !gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        !gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                       str::stream()
                           << "Cannot remove \"" << ReplSetConfig::kConfigServer_deprecatedFieldName

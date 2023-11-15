@@ -1221,7 +1221,9 @@ void CommandConstructionPlan::execute(CommandRegistry* registry,
             LOGV2_DEBUG(8043401, 3, "Skipping test-only command", "entry"_attr = *entry);
             continue;
         }
-        if (entry->featureFlag && !entry->featureFlag->isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        if (entry->featureFlag &&
+            !entry->featureFlag->isEnabledUseLatestFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             LOGV2_DEBUG(8043402, 3, "Skipping FeatureFlag gated command", "entry"_attr = *entry);
             continue;
         }

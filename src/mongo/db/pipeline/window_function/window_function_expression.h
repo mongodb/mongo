@@ -109,7 +109,8 @@ class PartitionIterator;
         if (!__VA_ARGS__ ||                                                                    \
             (boost::optional<FeatureFlag>(featureFlag) != boost::none &&                       \
              !boost::optional<FeatureFlag>(featureFlag)                                        \
-                  ->isEnabledAndIgnoreFCVUnsafeAtStartup())) {                                 \
+                  ->isEnabledUseLatestFCVWhenUninitialized(                                    \
+                      serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))) {        \
             return;                                                                            \
         }                                                                                      \
         ::mongo::window_function::Expression::registerParser(                                  \

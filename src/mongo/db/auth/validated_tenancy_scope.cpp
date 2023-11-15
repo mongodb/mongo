@@ -97,7 +97,8 @@ MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
         });
     }
 
-    if (gFeatureFlagSecurityToken.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+    if (gFeatureFlagSecurityToken.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         LOGV2_WARNING(
             7539600,
             "featureFlagSecurityToken is enabled.  This flag MUST NOT be enabled in production");
@@ -194,7 +195,8 @@ ValidatedTenancyScope::ValidatedTenancyScope(Client* client, StringData security
     // Else, we expect this to be an HS256 token using a preshared secret.
     uassert(ErrorCodes::Unauthorized,
             "Signed authentication tokens are not accepted without feature flag opt-in",
-            gFeatureFlagSecurityToken.isEnabledAndIgnoreFCVUnsafeAtStartup());
+            gFeatureFlagSecurityToken.isEnabledUseLatestFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     uassert(ErrorCodes::OperationFailed,
             "Unable to validate test tokens when testOnlyValidatedTenancyScopeKey is not provided",
