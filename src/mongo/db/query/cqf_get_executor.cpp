@@ -401,7 +401,6 @@ static ExecParams createExecutor(
     const NamespaceString& nss,
     const MultipleCollectionAccessor& collections,
     const bool requireRID,
-    const ScanOrder scanOrder,
     const boost::optional<MatchExpression*> pipelineMatchExpr,
     PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
     auto env = VariableEnvironment::build(planAndProps._node);
@@ -426,7 +425,6 @@ static ExecParams createExecutor(
                       staticData->inputParamToSlotMap,
                       phaseManager.getMetadata(),
                       planAndProps._map,
-                      scanOrder,
                       sbeYieldPolicy.get()};
     auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
     tassert(6624262, "Unexpected rid slot", !requireRID || ridSlot);
@@ -552,7 +550,9 @@ static void populateAdditionalScanDefs(
             collectionCE = collection->numRecords(opCtx);
         }
 
-
+        // We use a forward scan order below by default since these collections are not the main
+        // collection of the query (and currently, the scan order can only be non-forward for the
+        // main collection).
         scanDefs.emplace(
             scanDefName,
             createScanDef(involvedNss.dbName(),
@@ -697,6 +697,12 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
     ShardingMetadata shardingMetadata(shardKey, isSharded);
 
+    auto scanOrder = ScanOrder::Forward;
+    if (indexHint && indexHint->firstElementFieldNameStringData() == "$natural"_sd &&
+        indexHint->firstElement().safeNumberInt() < 0) {
+        scanOrder = ScanOrder::Reverse;
+    }
+
     scanDefs.emplace(
         scanDefName,
         createScanDef(
@@ -709,7 +715,9 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
             std::move(distribution),
             collectionExists,
             numRecords,
-            std::move(shardingMetadata)));
+            std::move(shardingMetadata),
+            {} /* indexedFieldPaths*/,
+            scanOrder));
 
     // Add a scan definition for all involved collections. Note that the base namespace has already
     // been accounted for above and isn't included here.
@@ -745,6 +753,13 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
             for (auto& entry : metadataForSampling._scanDefs) {
                 // Do not use indexes for sampling.
                 entry.second.getIndexDefs().clear();
+
+                // Setting the scan order for all scan definitions will cause any PhysicalScanNodes
+                // in the tree for that scan to have the appropriate scan order.
+                entry.second.setScanOrder(internalCascadesOptimizerSamplingCEScanStartOfColl.load()
+                                              ? ScanOrder::Forward
+                                              : ScanOrder::Random);
+
                 // Do not perform shard filtering for sampling.
                 entry.second.shardingMetadata().setMayContainOrphans(false);
             }
@@ -874,11 +889,6 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                      constFold,
                                      queryHints,
                                      prefixId);
-    auto scanOrder = ScanOrder::Forward;
-    if (indexHint && indexHint->firstElementFieldNameStringData() == "$natural"_sd &&
-        indexHint->firstElement().safeNumberInt() < 0) {
-        scanOrder = ScanOrder::Reverse;
-    }
 
     ABT abt = collectionExists
         ? make<ScanNode>(scanProjName, scanDefName)
@@ -1001,7 +1011,6 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                           nss,
                           collections,
                           requireRID,
-                          scanOrder,
                           pipelineMatchExpr);
 }
 

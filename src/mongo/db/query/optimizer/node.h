@@ -135,7 +135,8 @@ class PhysicalScanNode final : public ABTOpFixedArity<1>, public ExclusivelyPhys
 public:
     PhysicalScanNode(FieldProjectionMap fieldProjectionMap,
                      std::string scanDefName,
-                     bool useParallelScan);
+                     bool useParallelScan,
+                     ScanOrder scanOrder = ScanOrder::Forward);
 
     bool operator==(const PhysicalScanNode& other) const;
 
@@ -151,10 +152,13 @@ public:
 
     bool useParallelScan() const;
 
+    ScanOrder getScanOrder() const;
+
 private:
     const FieldProjectionMap _fieldProjectionMap;
     const std::string _scanDefName;
     const bool _useParallelScan;
+    const ScanOrder _scanOrder;
 };
 
 /**

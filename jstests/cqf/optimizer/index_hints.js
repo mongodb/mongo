@@ -106,7 +106,7 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [2]
-PhysicalScan [{'<root>': scan_0, 'a': evalTemp_0}, cqf_index_hints_]
+PhysicalScan [{'<root>': scan_0, 'a': evalTemp_0}, cqf_index_hints_, Reverse]
 `;
 
     const actualStr = removeUUIDsFromExplain(db, res);
@@ -130,7 +130,7 @@ Filter []
 |   |   Variable [evalTemp_0]
 |   PathCompare [Eq]
 |   Const [2]
-PhysicalScan [{'<root>': scan_0, 'b': evalTemp_0}, cqf_index_hints_]
+PhysicalScan [{'<root>': scan_0, 'b': evalTemp_0}, cqf_index_hints_, Reverse]
 `;
 
     const actualStr = removeUUIDsFromExplain(db, res);
@@ -188,7 +188,7 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [2]
-PhysicalScan [{'<root>': scan_0, 'b': evalTemp_0}, cqf_index_hints_]
+PhysicalScan [{'<root>': scan_0, 'b': evalTemp_0}, cqf_index_hints_, Reverse]
 `;
 
     const actualStr = removeUUIDsFromExplain(db, res);

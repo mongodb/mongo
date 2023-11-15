@@ -106,11 +106,13 @@ static ProjectionNameVector extractProjectionNamesForScan(
 
 PhysicalScanNode::PhysicalScanNode(FieldProjectionMap fieldProjectionMap,
                                    std::string scanDefName,
-                                   bool useParallelScan)
+                                   bool useParallelScan,
+                                   ScanOrder scanOrder)
     : Base(buildSimpleBinder(extractProjectionNamesForScan(fieldProjectionMap))),
       _fieldProjectionMap(std::move(fieldProjectionMap)),
       _scanDefName(std::move(scanDefName)),
-      _useParallelScan(useParallelScan) {}
+      _useParallelScan(useParallelScan),
+      _scanOrder(scanOrder) {}
 
 bool PhysicalScanNode::operator==(const PhysicalScanNode& other) const {
     return _fieldProjectionMap == other._fieldProjectionMap && _scanDefName == other._scanDefName &&
@@ -127,6 +129,10 @@ const std::string& PhysicalScanNode::getScanDefName() const {
 
 bool PhysicalScanNode::useParallelScan() const {
     return _useParallelScan;
+}
+
+ScanOrder PhysicalScanNode::getScanOrder() const {
+    return _scanOrder;
 }
 
 ValueScanNode::ValueScanNode(ProjectionNameVector projections,

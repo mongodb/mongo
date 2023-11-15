@@ -175,12 +175,6 @@ private:
     ComparisonOpSemantics _comparisonOpSemantics{ComparisonOpSemantics::kTotalOrder};
 };
 
-enum class ScanOrder {
-    Forward,
-    Reverse,
-    Random  // Uses a random cursor.
-};
-
 class SBENodeLowering {
 public:
     SBENodeLowering(const VariableEnvironment& env,
@@ -189,7 +183,6 @@ public:
                     sbe::InputParamToSlotMap& inputParamToSlotMap,
                     const Metadata& metadata,
                     const NodeToGroupPropsMap& nodeToGroupPropsMap,
-                    const ScanOrder scanOrder,
                     PlanYieldPolicy* yieldPolicy = nullptr)
         : _env(env),
           _providedSlots(providedSlots),
@@ -197,7 +190,6 @@ public:
           _inputParamToSlotMap(inputParamToSlotMap),
           _metadata(metadata),
           _nodeToGroupPropsMap(nodeToGroupPropsMap),
-          _scanOrder(scanOrder),
           _yieldPolicy(yieldPolicy) {}
 
     // The default noop transport.
@@ -425,11 +417,6 @@ private:
 
     const Metadata& _metadata;
     const NodeToGroupPropsMap& _nodeToGroupPropsMap;
-
-    // Specifies the order for any ScanStages. Currently only supported for single-threaded
-    // (non parallel-scanned) mongod collections.
-    // TODO SERVER-73010: handle cases where we have more than one collection scan.
-    const ScanOrder _scanOrder;
 
     // Specifies the yielding policy to initialize the corresponding PlanStages with.
     PlanYieldPolicy* _yieldPolicy;

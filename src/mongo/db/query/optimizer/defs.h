@@ -371,4 +371,12 @@ struct QueryHints {
     bool _sqrtSampleSizeEnabled = true;
 };
 
+#define SCAN_ORDER(F) \
+    F(Forward)        \
+    F(Reverse)        \
+    F(Random)  // Uses a random cursor.
+
+QUERY_UTIL_NAMED_ENUM_DEFINE(ScanOrder, SCAN_ORDER);
+#undef SCAN_ORDER
+
 }  // namespace mongo::optimizer

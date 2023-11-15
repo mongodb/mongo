@@ -505,13 +505,8 @@ TEST_F(NodeSBE, Lower1) {
     sbe::value::SlotIdGenerator ids;
     sbe::InputParamToSlotMap inputParamToSlotMap;
 
-    SBENodeLowering g{env,
-                      *runtimeEnv,
-                      ids,
-                      inputParamToSlotMap,
-                      phaseManager.getMetadata(),
-                      planAndProps._map,
-                      ScanOrder::Forward};
+    SBENodeLowering g{
+        env, *runtimeEnv, ids, inputParamToSlotMap, phaseManager.getMetadata(), planAndProps._map};
     auto sbePlan = g.optimize(planAndProps._node, map, ridSlot);
     ASSERT_EQ(1, map.size());
     ASSERT_FALSE(ridSlot);
@@ -671,13 +666,8 @@ TEST_F(NodeSBE, RequireRID) {
     sbe::value::SlotIdGenerator ids;
     sbe::InputParamToSlotMap inputParamToSlotMap;
 
-    SBENodeLowering g{env,
-                      *runtimeEnv,
-                      ids,
-                      inputParamToSlotMap,
-                      phaseManager.getMetadata(),
-                      planAndProps._map,
-                      ScanOrder::Forward};
+    SBENodeLowering g{
+        env, *runtimeEnv, ids, inputParamToSlotMap, phaseManager.getMetadata(), planAndProps._map};
     auto sbePlan = g.optimize(planAndProps._node, map, ridSlot);
     ASSERT_EQ(1, map.size());
     ASSERT_TRUE(ridSlot);
@@ -896,8 +886,7 @@ TEST_F(NodeSBE, SpoolFibonacci) {
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
     sbe::InputParamToSlotMap inputParamToSlotMap;
-    SBENodeLowering g{
-        env, *runtimeEnv, ids, inputParamToSlotMap, metadata, props, ScanOrder::Forward};
+    SBENodeLowering g{env, *runtimeEnv, ids, inputParamToSlotMap, metadata, props};
     auto sbePlan = g.optimize(tree, map, ridSlot);
     ASSERT_EQ(1, map.size());
 

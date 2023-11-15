@@ -160,7 +160,8 @@ public:
         ABT newPhysicalScan =
             make<PhysicalScanNode>(FieldProjectionMap{._ridProjection = ProjectionName{ridProj}},
                                    physicalScan.getScanDefName(),
-                                   physicalScan.useParallelScan());
+                                   physicalScan.useParallelScan(),
+                                   physicalScan.getScanOrder());
 
         NodeProps props = _propsMap.at(&physicalScan);
         properties::getProperty<properties::ProjectionRequirement>(props._physicalProps)

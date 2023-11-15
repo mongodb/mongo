@@ -190,7 +190,8 @@ ScanDefinition::ScanDefinition()
                      true /*exists*/,
                      boost::none /*ce*/,
                      {} /*shardingMetadata*/,
-                     {} /*indexPathOccurrences*/) {}
+                     {} /*indexPathOccurrences*/,
+                     ScanOrder::Forward /* scanOrder */) {}
 
 ScanDefinition::ScanDefinition(DatabaseName dbName,
                                boost::optional<UUID> uuid,
@@ -201,7 +202,8 @@ ScanDefinition::ScanDefinition(DatabaseName dbName,
                                const bool exists,
                                boost::optional<CEType> ce,
                                ShardingMetadata shardingMetadata,
-                               IndexPathOccurrences indexPathOccurrences)
+                               IndexPathOccurrences indexPathOccurrences,
+                               ScanOrder scanOrder)
     : _options(std::move(options)),
       _distributionAndPaths(std::move(distributionAndPaths)),
       _dbName(std::move(dbName)),
@@ -211,7 +213,8 @@ ScanDefinition::ScanDefinition(DatabaseName dbName,
       _indexPathOccurrences(std::move(indexPathOccurrences)),
       _exists(exists),
       _ce(std::move(ce)),
-      _shardingMetadata(std::move(shardingMetadata)) {}
+      _shardingMetadata(std::move(shardingMetadata)),
+      _scanOrder(scanOrder) {}
 
 const ScanDefOptions& ScanDefinition::getOptionsMap() const {
     return _options;
@@ -243,6 +246,14 @@ const MultikeynessTrie& ScanDefinition::getMultikeynessTrie() const {
 
 const IndexPathOccurrences& ScanDefinition::getIndexPathOccurrences() const {
     return _indexPathOccurrences;
+}
+
+ScanOrder ScanDefinition::getScanOrder() const {
+    return _scanOrder;
+}
+
+void ScanDefinition::setScanOrder(ScanOrder newScanOrder) {
+    _scanOrder = newScanOrder;
 }
 
 bool ScanDefinition::exists() const {

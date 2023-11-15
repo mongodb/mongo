@@ -89,7 +89,8 @@ void ProjNormalize::transport(ABT& n, const ExpressionBinder& binders, ABTVector
 void ProjNormalize::transport(ABT& n, const PhysicalScanNode& node, ABT& bind) {
     n = make<PhysicalScanNode>(renameFieldProjectionMap(node.getFieldProjectionMap()),
                                node.getScanDefName(),
-                               node.useParallelScan());
+                               node.useParallelScan(),
+                               node.getScanOrder());
 }
 
 void ProjNormalize::transport(ABT& n, const IndexScanNode& node, ABT& bind) {

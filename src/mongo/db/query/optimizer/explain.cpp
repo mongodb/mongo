@@ -947,6 +947,14 @@ public:
             .fieldName("scanDefName", ExplainVersion::V3)
             .print(node.getScanDefName());
         printBooleanFlag(printer, "parallel", node.useParallelScan());
+
+        // If the scan order is forward, only print it for V3. Otherwise, print for all versions.
+        if (version >= ExplainVersion::V3 || node.getScanOrder() != ScanOrder::Forward) {
+            printer.separator(", ");
+            printer.fieldName("direction", ExplainVersion::V3)
+                .print(toStringData(node.getScanOrder()));
+        }
+
         printer.separator("]");
         nodeCEPropsPrint(printer, n, node);
         printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
