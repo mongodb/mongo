@@ -76,6 +76,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/stale_exception.h"
@@ -639,16 +640,19 @@ void BulkWriteOp::noteBatchResponse(
 
         // On most errors (for example, a DuplicateKeyError) unordered bulkWrite on a shard attempts
         // to execute following operations even if a preceding operation errored. This isn't true
-        // for StaleConfig or StaleDbVersion errors. On these errors, since the shard knows that it
-        // following operations will also be stale, it stops right away.
-        // For that reason, although typically we can expect the size of replyItems to match the
-        // size of the number of operations sent (even in the case of errors), when a staleness
-        // error is received the size of replyItems will be <= the size of the number of operations.
-        // When this is the case, we treat all the remaining operations which may not have a
-        // replyItem as having failed with a staleness error.
+        // for StaleConfig, StaleDbVersion of ShardCannotRefreshDueToLocksHeld errors. On these
+        // errors, since the shard knows that following operations will fail for the same reason, it
+        // stops right away.
+        // As a consequence, although typically we can expect the size of replyItems to match the
+        // size of the number of operations sent (even in the case of errors), when a
+        // staleness/cache busy error is received the size of replyItems will be <= the size of the
+        // number of operations. When this is the case, we treat all the remaining operations which
+        // may not have a replyItem as having failed due to the same cause.
         if (!ordered && lastError &&
             (lastError->getStatus().code() == ErrorCodes::StaleDbVersion ||
-             ErrorCodes::isStaleShardVersionError(lastError->getStatus()))) {
+             ErrorCodes::isStaleShardVersionError(lastError->getStatus()) ||
+             lastError->getStatus().code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld) &&
+            (index == (int)replyItems.size())) {
             // Decrement the index so it keeps pointing to the same error (i.e. the
             // last error, which is a staleness error).
             LOGV2_DEBUG(7695304,
@@ -672,6 +676,11 @@ void BulkWriteOp::noteBatchResponse(
 
             if (errorsPerNamespace.find(nss) == errorsPerNamespace.end()) {
                 TrackedErrors trackedErrors;
+                // Stale routing info errors need to be tracked in order to trigger a refresh of
+                // the targeter. On the other hand, errors caused by the catalog cache being
+                // temporarily unavailable (such as ShardCannotRefreshDueToLocksHeld) are
+                // ignored in this context, since no deduction can be made around possible
+                // placement changes.
                 trackedErrors.startTracking(ErrorCodes::StaleConfig);
                 trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
                 errorsPerNamespace.emplace(nss, trackedErrors);

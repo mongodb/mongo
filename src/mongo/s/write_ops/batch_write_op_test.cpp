@@ -62,6 +62,7 @@
 #include "mongo/s/index_version.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
@@ -365,12 +366,22 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
+    // Respond with a ShardCannotRefreshDueToLocksHeld error; the batch should still be retriable.
+    targeted.clear();
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
+    buildResponse(0, &response);
+    response.addToErrDetails(write_ops::WriteError(
+        0, Status{ShardCannotRefreshDueToLocksHeldInfo(nss), "mock cache busy error"}));
+
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
+    ASSERT(!batchOp.isFinished());
+
+    // Respond with an 'ok' response
     targeted.clear();
     ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     buildResponse(1, &response);
 
-    // Respond with an 'ok' response
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
