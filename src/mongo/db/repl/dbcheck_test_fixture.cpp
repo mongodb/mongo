@@ -197,11 +197,14 @@ void DbCheckTest::runHashForCollectionCheck(
     int64_t maxBytes) {
     AutoGetCollection coll(opCtx, kNss, MODE_IS);
     const auto& collection = coll.getCollection();
+    // Disable throttling for testing.
+    DataThrottle dataThrottle(opCtx, []() { return 0; });
     auto hasher = DbCheckHasher(opCtx,
                                 collection,
                                 start,
                                 end,
                                 secondaryIndexCheckParams,
+                                &dataThrottle,
                                 boost::none /* indexName */,
                                 maxCount,
                                 maxBytes);
@@ -242,6 +245,7 @@ DbCheckCollectionInfo DbCheckTest::createDbCheckCollectionInfo(
         .maxBatchTimeMillis = kDefaultMaxBatchTimeMillis,
         .writeConcern = WriteConcernOptions(),
         .secondaryIndexCheckParameters = params,
+        .dataThrottle = DataThrottle(opCtx, []() { return 0; }),
     };
     return info;
 }

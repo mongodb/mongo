@@ -49,6 +49,16 @@ server_parameters:
           gte: 1
           lte: 10000
 
+    maxDbCheckMBperSec:
+        description: "Max MB per second that a single dbCheck process running in the background will
+                      process in order to limit I/O and CPU usage.
+                      Setting it to 0 turns off throttling."
+        set_at: [ startup, runtime ]
+        cpp_varname: gMaxDbCheckMBperSec
+        cpp_vartype: AtomicWord<int>
+        validator: { gte: 0 }
+        default: 1
+
 # TODO SERVER-78399: Remove once secondaryIndexChecksInDbCheck feature flag is removed.
 types:
   _id_key:

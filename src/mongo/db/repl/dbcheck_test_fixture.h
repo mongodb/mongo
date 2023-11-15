@@ -32,6 +32,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/commands/dbcheck_command.h"
 #include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/dbcheck_gen.h"

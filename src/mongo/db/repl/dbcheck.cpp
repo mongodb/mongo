@@ -306,6 +306,7 @@ DbCheckHasher::DbCheckHasher(
     const BSONObj& start,
     const BSONObj& end,
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters,
+    DataThrottle* dataThrottle,
     boost::optional<StringData> indexName,
     int64_t maxCount,
     int64_t maxBytes)
@@ -316,7 +317,8 @@ DbCheckHasher::DbCheckHasher(
       _maxBytes(maxBytes),
       _previousDataCorruptionMode(opCtx->recoveryUnit()->getDataCorruptionDetectionMode()),
       _previousPrepareConflictBehavior(opCtx->recoveryUnit()->getPrepareConflictBehavior()),
-      _secondaryIndexCheckParameters(secondaryIndexCheckParameters) {
+      _secondaryIndexCheckParameters(secondaryIndexCheckParameters),
+      _dataThrottle(dataThrottle) {
 
     // Get the MD5 hasher set up.
     md5_init(&_state);
@@ -450,12 +452,12 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
             keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
         _last = currBSON;
         _bytesSeen += sizeWithoutRecordId;
-        _countSeen += 1;
+        _countKeysSeen += 1;
         md5_append(&_state, md5Cast(keyString.getBuffer()), sizeWithoutRecordId);
     }
 
     // If we got to the end of the index batch without seeing any keys, set the last key to MaxKey.
-    if (_countSeen == 0) {
+    if (_countKeysSeen == 0) {
         _last = _maxKey;
     }
 
@@ -464,7 +466,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                 "Finished hashing one batch in hasher",
                 "firstKeyString"_attr = firstBson,
                 "lastKeyString"_attr = lastBson,
-                "keysHashed"_attr = _countSeen,
+                "keysHashed"_attr = _countKeysSeen,
                 "bytesHashed"_attr = _bytesSeen,
                 "indexName"_attr = indexName);
 
@@ -504,14 +506,18 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
                      &multikeyPaths,
                      currentRecordId);
 
-        auto cursor = iam->newCursor(opCtx);
+        auto cursor =
+            std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, _dataThrottle);
         for (const auto& key : keyStrings) {
             // TODO: SERVER-79866 increment _bytesSeen by appropriate amount
             // _bytesSeen += key.getSize();
 
             // seekForKeyString returns the closest key string if the exact keystring does not
             // exist.
-            auto ksEntry = cursor->seekForKeyString(key);
+            auto ksEntry = cursor->seekForKeyString(opCtx, key);
+            // Dbcheck will access every index for each document, and we aim for the count to
+            // represent the storage accesses. Therefore, we increment the number of keys seen.
+            _countKeysSeen++;
             if (!ksEntry) {
                 _missingIndexKeys.push_back(BSON(descriptor->indexName() << key.toString()));
                 continue;
@@ -635,11 +641,12 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
         // _id and proceed with dbCheck even if the previous record had corruption in its _id
         // field.
         _last = key_string::rehydrateKey(BSON("_id" << 1), currentObjId);
-        _countSeen += 1;
+        _countDocsSeen += 1;
         _bytesSeen += currentObj.objsize();
 
         md5_append(&_state, md5Cast(currentObjData), currentObjSize);
 
+        _dataThrottle->awaitIfNeeded(opCtx, record.size());
         if (Date_t::now() > deadline) {
             break;
         }
@@ -669,12 +676,20 @@ int64_t DbCheckHasher::bytesSeen(void) const {
 }
 
 int64_t DbCheckHasher::docsSeen(void) const {
-    return _countSeen;
+    return _countDocsSeen;
+}
+
+int64_t DbCheckHasher::keysSeen(void) const {
+    return _countKeysSeen;
+}
+
+int64_t DbCheckHasher::countSeen(void) const {
+    return docsSeen() + keysSeen();
 }
 
 bool DbCheckHasher::_canHash(const BSONObj& obj) {
     // Make sure we hash at least one document.
-    if (_countSeen == 0) {
+    if (countSeen() == 0) {
         return true;
     }
 
@@ -683,8 +698,8 @@ bool DbCheckHasher::_canHash(const BSONObj& obj) {
         return false;
     }
 
-    // or our document limit.
-    if (_countSeen + 1 > _maxCount) {
+    // or our count limit.
+    if (countSeen() + 1 > _maxCount) {
         return false;
     }
 
@@ -705,6 +720,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
 
     // Set up the hasher,
     boost::optional<DbCheckHasher> hasher;
+    // Disable throttling for secondaries.
+    DataThrottle dataThrottle(opCtx, []() { return 0; });
 
     try {
         opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
@@ -759,6 +776,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                    batchStart,
                                    batchEnd,
                                    entry.getSecondaryIndexCheckParameters(),
+                                   &dataThrottle,
                                    indexName);
 
                     const IndexDescriptor* indexDescriptor =
@@ -801,15 +819,20 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                    collection,
                                    batchStart,
                                    batchEnd,
-                                   entry.getSecondaryIndexCheckParameters());
+                                   entry.getSecondaryIndexCheckParameters(),
+                                   &dataThrottle);
                     uassertStatusOK(hasher->hashForCollectionCheck(opCtx, collection));
                     break;
                 }
                     MONGO_UNREACHABLE;
             }
         } else {
-            hasher.emplace(
-                opCtx, collection, batchStart, batchEnd, entry.getSecondaryIndexCheckParameters());
+            hasher.emplace(opCtx,
+                           collection,
+                           batchStart,
+                           batchEnd,
+                           entry.getSecondaryIndexCheckParameters(),
+                           &dataThrottle);
             const auto status = hasher->hashForCollectionCheck(opCtx, collection);
             if (!status.isOK() && status.code() == ErrorCodes::KeyNotFound) {
                 std::unique_ptr<HealthLogEntry> healthLogEntry =
@@ -838,7 +861,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         auto logEntry = dbCheckBatchEntry(entry.getBatchId(),
                                           entry.getNss(),
                                           collection->uuid(),
-                                          hasher->docsSeen(),
+                                          hasher->countSeen(),
                                           hasher->bytesSeen(),
                                           expected,
                                           found,

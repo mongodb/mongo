@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/dbcheck_gen.h"
 #include "mongo/db/repl/dbcheck_idl.h"
@@ -57,6 +58,7 @@ struct DbCheckCollectionInfo {
     int64_t maxBatchTimeMillis;
     WriteConcernOptions writeConcern;
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters;
+    DataThrottle dataThrottle;
 };
 
 /**

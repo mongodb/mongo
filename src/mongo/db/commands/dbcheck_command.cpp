@@ -345,7 +345,10 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                             maxBytesPerSec,
                                             maxBatchTimeMillis,
                                             invocation.getBatchWriteConcern(),
-                                            secondaryIndexCheckParameters};
+                                            secondaryIndexCheckParameters,
+                                            {opCtx, [&]() {
+                                                 return gMaxDbCheckMBperSec.load();
+                                             }}};
     auto result = std::make_unique<DbCheckRun>();
     result->push_back(info);
     return result;
@@ -389,7 +392,10 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                    maxBytesPerSec,
                                    maxBatchTimeMillis,
                                    invocation.getBatchWriteConcern(),
-                                   boost::none};
+                                   boost::none,
+                                   {opCtx, [&]() {
+                                        return gMaxDbCheckMBperSec.load();
+                                    }}};
         result->push_back(info);
         return true;
     };
@@ -852,9 +858,10 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
                        firstBson,
                        lastBson,
                        _info.secondaryIndexCheckParameters,
+                       &_info.dataThrottle,
                        indexName,
                        std::min(_info.maxDocsPerBatch, _info.maxCount),
-                       std::min(_info.maxBytesPerBatch, _info.maxSize));
+                       _info.maxSize);
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -892,7 +899,7 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
                 "firstKeyString"_attr = firstBson,
                 "lastKeyString"_attr = lastBson,
                 "md5"_attr = md5,
-                "keysHashed"_attr = hasher->docsSeen(),
+                "keysHashed"_attr = hasher->keysSeen(),
                 "bytesHashed"_attr = hasher->bytesSeen(),
                 "readTimestamp"_attr = readTimestamp,
                 "indexName"_attr = indexName,
@@ -901,7 +908,7 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
 
     BSONObjBuilder builder;
     builder.append("success", true);
-    builder.append("count", hasher->docsSeen());
+    builder.append("count", hasher->keysSeen());
     builder.append("bytes", hasher->bytesSeen());
     builder.append("md5", batchStats->md5);
     builder.append("minKey", firstBson);
@@ -1364,20 +1371,7 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
     int64_t totalBytesSeen = 0;
     int64_t totalDocsSeen = 0;
 
-    // Limit the rate of the check.
-    using Clock = stdx::chrono::system_clock;
-    using TimePoint = stdx::chrono::time_point<Clock>;
-    TimePoint lastStart = Clock::now();
-    int64_t docsInCurrentInterval = 0;
-
     do {
-        using namespace std::literals::chrono_literals;
-
-        if (Clock::now() - lastStart > 1s) {
-            lastStart = Clock::now();
-            docsInCurrentInterval = 0;
-        }
-
         auto result = _runBatch(opCtx, start);
 
         if (_done) {
@@ -1497,7 +1491,6 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         // Update our running totals.
         totalDocsSeen += stats.nDocs;
         totalBytesSeen += stats.nBytes;
-        docsInCurrentInterval += stats.nDocs;
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());
             progress.get(lk)->hit(stats.nDocs);
@@ -1508,14 +1501,6 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         bool tooManyDocs = totalDocsSeen >= _info.maxCount;
         bool tooManyBytes = totalBytesSeen >= _info.maxSize;
         reachedEnd = reachedLast || tooManyDocs || tooManyBytes;
-
-        if (docsInCurrentInterval > _info.maxRate && _info.maxRate > 0) {
-            // If an extremely low max rate has been set (substantially smaller than the
-            // batch size) we might want to sleep for multiple seconds between batches.
-            int64_t timesExceeded = docsInCurrentInterval / _info.maxRate;
-
-            stdx::this_thread::sleep_for(timesExceeded * 1s - (Clock::now() - lastStart));
-        }
     } while (!reachedEnd);
 
     {
@@ -1571,9 +1556,10 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
                        first,
                        _info.end,
                        _info.secondaryIndexCheckParameters,
+                       &_info.dataThrottle,
                        boost::none,
                        std::min(_info.maxDocsPerBatch, _info.maxCount),
-                       std::min(_info.maxBytesPerBatch, _info.maxSize));
+                       _info.maxSize);
 
         const auto batchDeadline = Date_t::now() + Milliseconds(_info.maxBatchTimeMillis);
         status = hasher->hashForCollectionCheck(opCtx, collectionPtr, batchDeadline);

@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/health_log_gen.h"
+#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -152,6 +153,7 @@ public:
                   const BSONObj& start,
                   const BSONObj& end,
                   boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters,
+                  DataThrottle* dataThrottle,
                   boost::optional<StringData> indexName = boost::none,
                   int64_t maxCount = std::numeric_limits<int64_t>::max(),
                   int64_t maxBytes = std::numeric_limits<int64_t>::max());
@@ -199,6 +201,10 @@ public:
 
     int64_t docsSeen(void) const;
 
+    int64_t keysSeen(void) const;
+
+    int64_t countSeen(void) const;
+
 private:
     /**
      * Checks if we can hash `obj` without going over our limits.
@@ -214,8 +220,13 @@ private:
 
     boost::optional<StringData> _indexName;
 
+    // Represents the max number of docs or keys seen, which varies based on the validation mode:
+    //  - "dataConsistency": _countDocsSeen <= _maxCount
+    //  - "dataConsistencyAndMissingIndexKeysCheck": (_countDocsSeen + _countKeysSeen) <= _maxCount
+    //  - "extraIndexKeysCheck": _countKeysSeen <= _maxCount
     int64_t _maxCount = 0;
-    int64_t _countSeen = 0;
+    int64_t _countDocsSeen = 0;
+    int64_t _countKeysSeen = 0;
 
     int64_t _maxBytes = 0;
     int64_t _bytesSeen = 0;
@@ -227,6 +238,7 @@ private:
     std::vector<BSONObj> _missingIndexKeys;
 
     boost::optional<SecondaryIndexCheckParameters> _secondaryIndexCheckParameters;
+    DataThrottle* _dataThrottle;
 };
 
 namespace repl {

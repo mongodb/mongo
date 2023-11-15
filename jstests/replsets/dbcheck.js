@@ -301,27 +301,30 @@ function testDbCheckParameters() {
         checkHealthLog(healthlog, query, multiBatchSimpleCollSize / maxDocsPerBatch);
     }
     {
-        // Validate custom maxBytesPerBatch
+        // Validate maxDbCheckMBperSec.
         clearHealthLog(replSet);
-        const coll = db.getSiblingDB("maxBytesPerBatch").maxBytesPerBatch;
+        const coll = db.getSiblingDB("maxDbCheckMBperSec").maxDbCheckMBperSec;
 
-        // Insert nDocs, each of which being slightly larger than 1MB, and then run dbCheck with
-        // maxBytesPerBatch := 1MB
+        // Insert nDocs, each slightly larger than the maxDbCheckMBperSec value (1MB), which is the
+        // default value, while maxBatchTimeMillis is defaulted to 1 second. Consequently, we will
+        // have only 1MB per batch.
         const nDocs = 5;
-        coll.insertMany([...Array(nDocs).keys()].map(x => ({a: 'a'.repeat(1024 * 1024)})),
+        coll.insertMany([...Array(nDocs).keys()].map(x => ({a: 'a'.repeat(1024 * 1024 * 2)})),
                         {ordered: false});
-        const maxBytesPerBatch = 1024 * 1024;
 
-        runDbCheck(replSet, db.getSiblingDB("maxBytesPerBatch"), coll.getName(), {
-            maxBytesPerBatch: maxBytesPerBatch
-        });
+        runDbCheck(replSet, db.getSiblingDB("maxDbCheckMBperSec"), coll.getName(), {});
 
-        // Confirm dbCheck logs nDocs batches.
+        // DbCheck logs (nDocs + 1) batches to account for each batch hitting the time deadline
+        // after processing only one document. Then, DbCheck will run an additional empty batch at
+        // the end to confirm that there are no more documents.
         let query = {"operation": "dbCheckBatch"};
-        checkHealthLog(healthlog, query, nDocs);
+        checkHealthLog(healthlog, query, nDocs + 1);
 
         query = {"operation": "dbCheckBatch", "data.count": 1};
         checkHealthLog(healthlog, query, nDocs);
+
+        query = {"operation": "dbCheckBatch", "data.count": 0};
+        checkHealthLog(healthlog, query, 1);
     }
 }
 
