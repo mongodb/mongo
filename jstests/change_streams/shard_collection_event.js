@@ -1,7 +1,6 @@
 /**
  * Test that change streams returns shardCollection events with the options specified on the
  * original user command.
- * TODO SERVER-81138 remove multiversion_incompatible and fix comparison with 7.0 binaries
  *  @tags: [
  *    requires_fcv_60,
  *    requires_sharding,
@@ -9,7 +8,6 @@
  *    change_stream_does_not_expect_txns,
  *    assumes_unsharded_collection,
  *    assumes_read_preference_unchanged,
- *    multiversion_incompatible,
  * ]
  */
 
@@ -42,6 +40,19 @@ function getCollectionUuid(coll) {
     return collInfo.info.uuid;
 }
 
+function assertChangeStreamEventEqMultiversionCompatible(actualEvent, expectedEvent) {
+    // SERVER-83104: Remove 'numInitialChunks' check once 8.0 becomes last LTS.
+    if ('numInitialChunks' in actualEvent.operationDescription) {
+        delete actualEvent.operationDescription.numInitialChunks;
+    }
+
+    // SERVER-83104: Remove 'capped' check once 8.0 becomes last LTS.
+    if (!('capped' in actualEvent.operationDescription)) {
+        delete expectedEvent.operationDescription.capped;
+    }
+    return assertChangeStreamEventEq(actualEvent, expectedEvent);
+}
+
 function assertNextChangeEvent(cursor, expectedEvent) {
     let events = test.getNextChanges(cursor, 1);
     while (events.length > 0) {
@@ -60,7 +71,7 @@ function assertNextChangeEvent(cursor, expectedEvent) {
     assert(event.wallTime instanceof Date);
     delete event.wallTime;
     expectedEvent.collectionUUID = getCollectionUuid(collName);
-    assertChangeStreamEventEq(event, expectedEvent);
+    assertChangeStreamEventEqMultiversionCompatible(event, expectedEvent);
 }
 
 function runTest(startChangeStream) {
@@ -92,7 +103,7 @@ function runTest(startChangeStream) {
         }
 
         const shardEvent = events[0];
-        assertChangeStreamEventEq(shardEvent, expectedOutput);
+        assertChangeStreamEventEqMultiversionCompatible(shardEvent, expectedOutput);
 
         // Insert a document before starting the next change stream so that we can validate the
         // resuming behavior.
@@ -181,16 +192,7 @@ function runTest(startChangeStream) {
                 "unique": false,
                 "presplitHashedZones": false,
                 "capped": false,
-                "collation": {
-                    "locale": "simple",
-                    "caseLevel": false,
-                    "caseFirst": "off",
-                    "strength": 3,
-                    "numericOrdering": false,
-                    "alternate": "non-ignorable",
-                    "maxVariable": "punct",
-                    "normalization": false
-                }
+                "collation": {"locale": "simple"}
             }
         })
 }
