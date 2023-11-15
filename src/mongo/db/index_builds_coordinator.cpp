@@ -3456,6 +3456,10 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         throw;
     }
 
+    // At this point, the commitIndexBuild entry has already been written and replicated. For
+    // correctness, we must perform these final writes. Temporarily disable interrupts.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+
     removeIndexBuildEntryAfterCommitOrAbort(opCtx, dbAndUUID, *indexBuildEntryColl, *replState);
     replState->stats.numIndexesAfter = getNumIndexesTotal(opCtx, collection.get());
     LOGV2(20663,
