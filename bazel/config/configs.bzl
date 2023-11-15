@@ -123,16 +123,30 @@ use_wait_for_debugger = rule(
 )
 
 # =========
+# ocsp-stapling
+# =========
+
+use_ocsp_stapling_provider = provider(
+    doc = "Enable OCSP Stapling on servers",
+    fields = ["enabled"],
+)
+
+use_ocsp_stapling = rule(
+    implementation = lambda ctx: use_ocsp_stapling_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # disable-ref-track
 # =========
 
 use_disable_ref_track_provider = provider(
-    doc = "Disables runtime tracking of REF state changes for pages within wiredtiger. " + 
-    "Tracking the REF state changes is useful for debugging but there is a small performance cost.",
+    doc = """Disables runtime tracking of REF state changes for pages within wiredtiger. 
+    Tracking the REF state changes is useful for debugging but there is a small performance cost.""",
     fields = ["enabled"],
 )
 
 use_disable_ref_track = rule(
     implementation = lambda ctx: use_disable_ref_track_provider(enabled = ctx.build_setting_value),
-    build_setting = config.bool(flag = True)
+    build_setting = config.bool(flag = True),
 )
