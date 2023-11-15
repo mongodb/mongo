@@ -240,10 +240,20 @@ void registerRequest(OperationContext* opCtx,
         return;
     }
 
-    if (!shouldCollect(opCtx->getServiceContext())) {
+    auto& opDebug = CurOp::get(opCtx)->debug();
+
+    if (opDebug.queryStatsRateLimited) {
+        LOGV2_DEBUG(
+            8288900,
+            4,
+            "Query stats request was previously rate limited. We expect this is a query on a view");
         return;
     }
-    auto& opDebug = CurOp::get(opCtx)->debug();
+
+    if (!shouldCollect(opCtx->getServiceContext())) {
+        opDebug.queryStatsRateLimited = true;
+        return;
+    }
 
     if (opDebug.queryStatsKey) {
         // A find() request may have already registered the shapifier. Ie, it's a find command over

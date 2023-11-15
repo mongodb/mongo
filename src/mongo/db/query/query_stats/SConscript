@@ -55,6 +55,7 @@ env.Library(
 env.CppUnitTest(
     target="db_query_query_stats_test",
     source=[
+        "query_stats_test.cpp",
         "query_stats_store_test.cpp",
         "rate_limiting_test.cpp",
     ],
