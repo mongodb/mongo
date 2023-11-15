@@ -441,16 +441,17 @@ void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args
             swapAndUpdate(n, Constant::boolean(v));
         }
     }
-    // The isInListData check only pertains to parameterized InMatchExpressions, whose equalities
-    // list is bound into the SBE runtime environment as InListData. In this case, no constant
-    // folding will be performed for op.name() == "isInListData" because InListData is never used in
-    // the optimizer; it is generated in a later phase in SBE.
+    // The isInListData check currently only pertains to parameterized InMatchExpressions, whose
+    // equalities list is bound into the SBE runtime environment as InListData. In this case, no
+    // constant folding will be performed for op.name() == "isInListData" because InListData is
+    // never used in the optimizer; it is generated in a later phase in SBE.
     //
-    // If the child node is a Constant (not FunctionCall [getParam]), the check can be ignored and
+    // If the child node is a Constant that's not of type inListData, the check can be ignored and
     // set directly to false.
     else if (op.name() == "isInListData") {
         if (args.size() == 1 && args[0].is<Constant>()) {
-            swapAndUpdate(n, Constant::boolean(false));
+            const auto tag = args[0].cast<Constant>()->get().first;
+            swapAndUpdate(n, Constant::boolean(tag == sbe::value::TypeTags::inListData));
         }
     }
 }
