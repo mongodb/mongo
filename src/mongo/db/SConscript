@@ -916,6 +916,7 @@ env.Library(
     target='shard_role_api',
     source=[
         'catalog/collection_operation_source.cpp',
+        'direct_shard_client_tracker.cpp',
         'replica_set_endpoint_sharding_state.cpp',
         'replica_set_endpoint_util.cpp',
         's/collection_metadata.cpp',
@@ -981,6 +982,7 @@ env.Library(
 env.CppUnitTest(
     target='replica_set_endpoint_test',
     source=[
+        'direct_shard_client_tracker_test.cpp',
         'replica_set_endpoint_sharding_state_test.cpp',
         'replica_set_endpoint_test_fixture.cpp',
         'replica_set_endpoint_util_test.cpp',

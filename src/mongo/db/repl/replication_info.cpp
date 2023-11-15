@@ -65,6 +65,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/direct_shard_client_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
@@ -424,7 +425,6 @@ public:
 
         Client::TagMask connectionTagsToSet = 0;
         Client::TagMask connectionTagsToUnset = 0;
-        bool isInternalClient = false;
 
         // Tag connections to avoid closing them on stepdown.
         if (!cmd.getHangUpOnStepDown()) {
@@ -440,19 +440,25 @@ public:
         }
 
         auto client = opCtx->getClient();
-        if (ClientMetadata::tryFinalize(client)) {
-            audit::logClientMetadata(client);
+        const auto internalClient = cmd.getInternalClient();
+        const bool isInternalClient = internalClient.has_value();
 
-            // If we are the first hello, then set split horizon parameters.
+        if (ClientMetadata::tryFinalize(client)) {
+            // This is the first hello for this client.
+            audit::logClientMetadata(client);
+            if (!isInternalClient) {
+                DirectShardClientTracker::trackClient(client);
+            }
+
+            // Set split horizon parameters.
             auto sniName = client->getSniNameForSession();
             SplitHorizon::setParameters(client, std::move(sniName));
         }
 
         // Parse the optional 'internalClient' field. This is provided by incoming connections from
         // mongod and mongos.
-        if (auto internalClient = cmd.getInternalClient()) {
+        if (internalClient) {
             connectionTagsToUnset |= Client::kExternalClientKeepOpen;
-            isInternalClient = true;
 
             // All incoming connections from mongod/mongos of earlier versions should be
             // closed if the featureCompatibilityVersion is bumped to 3.6.
