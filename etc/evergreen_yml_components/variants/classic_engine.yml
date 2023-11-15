@@ -33,6 +33,7 @@ variables:
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
     large_distro_name: rhel80-medium
+    core_analyzer_distro_name: rhel80-large
     burn_in_tag_buildvariants: >-
       enterprise-rhel-80-64-bit-inmem
       enterprise-rhel-80-64-bit-multiversion
