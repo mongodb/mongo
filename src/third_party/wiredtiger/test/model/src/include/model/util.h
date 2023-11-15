@@ -29,12 +29,50 @@
 #ifndef MODEL_UTIL_H
 #define MODEL_UTIL_H
 
+#include <cstring>
+#include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <unordered_map>
+#include <variant>
+#include <vector>
 #include "model/core.h"
+#include "model/data_value.h"
 #include "wiredtiger.h"
 
 namespace model {
+
+/*
+ * wiredtiger_connection_guard --
+ *     Automatically close the connection on delete.
+ */
+class wiredtiger_connection_guard {
+
+public:
+    /*
+     * wiredtiger_connection_guard::wiredtiger_connection_guard --
+     *     Create a new instance of the guard.
+     */
+    inline wiredtiger_connection_guard(
+      WT_CONNECTION *connection, const char *close_config = nullptr) noexcept
+        : _connection(connection), _close_config(close_config == nullptr ? "" : close_config){};
+
+    /*
+     * wiredtiger_connection_guard::~wiredtiger_connection_guard --
+     *     Destroy the guard.
+     */
+    inline ~wiredtiger_connection_guard()
+    {
+        if (_connection != nullptr)
+            (void)_connection->close(_connection, _close_config.c_str());
+    }
+
+private:
+    WT_CONNECTION *_connection;
+    std::string _close_config;
+};
 
 /*
  * wiredtiger_cursor_guard --
@@ -91,28 +129,91 @@ private:
 };
 
 /*
- * wt_cursor_get_string --
- *     Search in WiredTiger using the provided cursor. Return a string result, or NONE if not found.
- *     Throw an exception on error.
+ * config_map --
+ *     A configuration map.
  */
-inline data_value
-wt_cursor_get_string(WT_CURSOR *cursor, const data_value &key)
-{
-    const char *s;
-    int ret;
+class config_map {
+    using value_t = std::variant<std::string, std::shared_ptr<config_map>>;
 
-    set_wt_cursor_key(cursor, key);
-    ret = cursor->search(cursor);
-    if (ret != 0) {
-        if (ret == WT_NOTFOUND)
-            return NONE;
-        throw wiredtiger_exception(cursor->session, ret);
+public:
+    /*
+     * config_map::from_string --
+     *     Parse config map from a string.
+     */
+    static config_map from_string(const char *str, const char **end = NULL);
+
+    /*
+     * config_map::from_string --
+     *     Parse config map from a string.
+     */
+    static inline config_map
+    from_string(const std::string &str)
+    {
+        return from_string(str.c_str());
     }
 
-    ret = cursor->get_value(cursor, &s);
-    if (ret != 0)
-        throw wiredtiger_exception(cursor->session, ret);
-    return data_value(s);
+    /*
+     * config_map::contains --
+     *     Check whether the config map contains the given key.
+     */
+    inline bool
+    contains(const char *key) const noexcept
+    {
+        return _map.find(key) != _map.end();
+    }
+
+    /*
+     * config_map::get_map --
+     *     Get the corresponding config map value. Throw an exception on error.
+     */
+    inline std::shared_ptr<config_map> const
+    get_map(const char *key)
+    {
+        return std::get<std::shared_ptr<config_map>>(_map.find(key)->second);
+    }
+
+    /*
+     * config_map::get_string --
+     *     Get the corresponding string value. Throw an exception on error.
+     */
+    inline std::string
+    get_string(const char *key) const
+    {
+        return std::get<std::string>(_map.find(key)->second);
+    }
+
+    /*
+     * config_map::get_uint64 --
+     *     Get the corresponding integer value. Throw an exception on error.
+     */
+    inline uint64_t
+    get_uint64(const char *key) const
+    {
+        std::istringstream stream(std::get<std::string>(_map.find(key)->second));
+        uint64_t v;
+        stream >> v;
+        return v;
+    }
+
+private:
+    /*
+     * config_map::config_map --
+     *     Create a new instance of the config map.
+     */
+    inline config_map() noexcept {};
+
+private:
+    std::unordered_map<std::string, value_t> _map;
+};
+
+/*
+ * starts_with --
+ *     Check whether the string has the given prefix. (C++ does not have this until C++20.)
+ */
+inline bool
+starts_with(std::string_view str, const char *prefix)
+{
+    return str.compare(0, std::strlen(prefix), prefix) == 0;
 }
 
 /*
@@ -160,6 +261,12 @@ wt_cursor_update(WT_CURSOR *cursor, const data_value &key, const data_value &val
     set_wt_cursor_value(cursor, value);
     return cursor->update(cursor);
 }
+
+/*
+ * wt_list_tables --
+ *     Get the list of WiredTiger tables.
+ */
+std::vector<std::string> wt_list_tables(WT_CONNECTION *conn);
 
 } /* namespace model */
 #endif

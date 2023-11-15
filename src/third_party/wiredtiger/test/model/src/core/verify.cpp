@@ -93,7 +93,7 @@ kv_table_verifier::verify(WT_CONNECTION *connection)
     WT_SESSION *session = nullptr;
     WT_CURSOR *wt_cursor = nullptr;
     int ret;
-    const char *key, *value;
+    data_value key, value;
 
     if (_verbose)
         std::cout << "Verification: Verify " << _table.name() << std::endl;
@@ -120,15 +120,11 @@ kv_table_verifier::verify(WT_CONNECTION *connection)
 
         /* Verify each key-value pair. */
         while ((ret = wt_cursor->next(wt_cursor)) == 0) {
-            ret = wt_cursor->get_key(wt_cursor, &key);
-            if (ret != 0)
-                throw wiredtiger_exception(session, ret);
-            ret = wt_cursor->get_value(wt_cursor, &value);
-            if (ret != 0)
-                throw wiredtiger_exception(session, ret);
+            key = get_wt_cursor_key(wt_cursor);
+            value = get_wt_cursor_value(wt_cursor);
             if (_verbose)
                 std::cout << "Verification: key = " << key << ", value = " << value << std::endl;
-            if (!model_cursor.verify_next(data_value(key), data_value(value))) {
+            if (!model_cursor.verify_next(key, value)) {
                 std::ostringstream ss;
                 ss << "\"" << key << "=" << value
                    << "\" is not the next key-value pair in the model.";

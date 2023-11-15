@@ -44,10 +44,8 @@ wt_get(
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    const char *value;
     char cfg[64];
-
-    value = nullptr;
+    model::data_value out;
 
     if (timestamp == 0)
         testutil_check(session->begin_transaction(session, nullptr));
@@ -62,11 +60,11 @@ wt_get(
     if (ret != WT_NOTFOUND && ret != WT_ROLLBACK)
         testutil_check(ret);
     if (ret == 0)
-        testutil_check(cursor->get_value(cursor, &value));
+        out = model::get_wt_cursor_value(cursor);
 
     testutil_check(cursor->close(cursor));
     testutil_check(session->commit_transaction(session, nullptr));
-    return ret == 0 ? model::data_value(value) : model::NONE;
+    return ret == 0 ? out : model::NONE;
 }
 
 /*
@@ -79,10 +77,7 @@ wt_get_ext(WT_SESSION *session, const char *uri, const model::data_value &key,
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    const char *value;
     char cfg[64];
-
-    value = nullptr;
 
     if (timestamp == 0)
         testutil_check(session->begin_transaction(session, nullptr));
@@ -96,10 +91,9 @@ wt_get_ext(WT_SESSION *session, const char *uri, const model::data_value &key,
     ret = cursor->search(cursor);
     if (ret != WT_NOTFOUND && ret != WT_ROLLBACK && ret != WT_PREPARE_CONFLICT)
         testutil_check(ret);
-    if (ret == 0) {
-        testutil_check(cursor->get_value(cursor, &value));
-        out = model::data_value(value);
-    } else
+    if (ret == 0)
+        out = model::get_wt_cursor_value(cursor);
+    else
         out = model::NONE;
 
     testutil_check(cursor->close(cursor));
@@ -323,4 +317,25 @@ wt_txn_insert(WT_SESSION *session, const char *uri, const model::data_value &key
     ret = model::wt_cursor_insert(cursor, key, value);
     testutil_check(cursor->close(cursor));
     return ret;
+}
+
+/*
+ * wt_print_debug_log --
+ *     Print the contents of a debug log to a file.
+ */
+void
+wt_print_debug_log(WT_CONNECTION *conn, const char *file)
+{
+    int ret;
+    WT_SESSION *session;
+    ret = conn->open_session(conn, nullptr, nullptr, &session);
+    if (ret != 0)
+        throw model::wiredtiger_exception("Cannot open a session: ", ret);
+    model::wiredtiger_session_guard session_guard(session);
+
+    WT_LSN start_lsn;
+    WT_ASSIGN_LSN(&start_lsn, &((WT_CONNECTION_IMPL *)conn)->log->first_lsn);
+    ret = __wt_txn_printlog(session, file, WT_TXN_PRINTLOG_UNREDACT, &start_lsn, nullptr);
+    if (ret != 0)
+        throw model::wiredtiger_exception("Cannot print the debug log: ", ret);
 }

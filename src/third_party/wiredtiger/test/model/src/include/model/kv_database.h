@@ -56,7 +56,29 @@ public:
      * kv_database::create_table --
      *     Create and return a new table. Throw an exception if the name is not unique.
      */
+    inline kv_table_ptr
+    create_table(const std::string &name)
+    {
+        return create_table(name.c_str());
+    }
+
+    /*
+     * kv_database::create_table --
+     *     Create and return a new table. Throw an exception if the name is not unique.
+     */
     kv_table_ptr create_table(const char *name);
+
+    /*
+     * kv_database::contains_table --
+     *     Check whether the database contains the given table.
+     */
+    inline bool
+    contains_table(const std::string &name) const
+    {
+        std::lock_guard lock_guard(_tables_lock);
+        auto i = _tables.find(name);
+        return i != _tables.end();
+    }
 
     /*
      * kv_database::table --
@@ -110,10 +132,10 @@ protected:
     kv_transaction_snapshot txn_snapshot_nolock(txn_id_t do_not_exclude = k_txn_none);
 
 private:
-    std::mutex _tables_lock;
+    mutable std::mutex _tables_lock;
     std::unordered_map<std::string, kv_table_ptr> _tables;
 
-    std::mutex _transactions_lock;
+    mutable std::mutex _transactions_lock;
     txn_id_t _last_transaction_id;
     std::unordered_map<txn_id_t, kv_transaction_ptr> _active_transactions;
 };

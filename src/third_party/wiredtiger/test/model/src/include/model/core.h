@@ -157,6 +157,15 @@ public:
      * wiredtiger_exception::wiredtiger_exception --
      *     Create a new instance of the exception. This constructor is not thread-safe.
      */
+    inline wiredtiger_exception(const char *message, int error) noexcept
+        : std::runtime_error(std::string(message) + wiredtiger_strerror(error)), _error(error)
+    {
+    }
+
+    /*
+     * wiredtiger_exception::wiredtiger_exception --
+     *     Create a new instance of the exception. This constructor is not thread-safe.
+     */
     inline wiredtiger_exception(int error) noexcept
         : std::runtime_error(wiredtiger_strerror(error)), _error(error)
     {
