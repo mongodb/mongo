@@ -109,6 +109,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeExtraIndexKeysHashing);
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeDbCheckLogOp);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingDbCheckRun);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingFirstBatch);
 
@@ -784,19 +785,17 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
     // longer than the time it takes between starting and replicating a batch on the
     // primary. Otherwise, the readTimestamp will not be available on a secondary by the
     // time it processes the oplog entry.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+    const auto readSource = ReadSourceWithTimestamp{RecoveryUnit::ReadSource::kNoOverlap};
 
-    // dbCheck writes to the oplog, so we need to take an IX global lock. We don't need to write
-    // to the collection, however, so we use acquireCollectionMaybeLockFree with a read
-    // acquisition request.
-    Lock::GlobalLock glob(opCtx, MODE_IX);
-
-    const CollectionAcquisition collAcquisition = acquireCollectionMaybeLockFree(
+    const DbCheckAcquisition acquisition(
         opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, _info.nss, AcquisitionPrerequisites::OperationType::kRead));
-    if (!collAcquisition.exists() ||
-        collAcquisition.getCollectionPtr().get()->uuid() != _info.uuid) {
+        _info.nss,
+        readSource,
+        // On the primary we must always block on prepared updates to guarantee snapshot isolation.
+        PrepareConflictBehavior::kEnforce);
+
+    if (!acquisition.coll.exists() ||
+        acquisition.coll.getCollectionPtr().get()->uuid() != _info.uuid) {
         Status status = Status(ErrorCodes::IndexNotFound,
                                str::stream() << "cannot find collection for ns "
                                              << _info.nss.toStringForErrorMsg() << " and uuid "
@@ -814,7 +813,7 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
 
         return status;
     }
-    const CollectionPtr& collection = collAcquisition.getCollectionPtr();
+    const CollectionPtr& collection = acquisition.coll.getCollectionPtr();
 
     // TODO SERVER-80347: Add check for stepdown here.
     auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
@@ -854,7 +853,7 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
     boost::optional<DbCheckHasher> hasher;
     try {
         hasher.emplace(opCtx,
-                       collection,
+                       acquisition,
                        firstBson,
                        lastBson,
                        _info.secondaryIndexCheckParameters,
@@ -1516,29 +1515,27 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
     // longer than the time it takes between starting and replicating a batch on the
     // primary. Otherwise, the readTimestamp will not be available on a secondary by the
     // time it processes the oplog entry.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+    const auto readSource = ReadSourceWithTimestamp{RecoveryUnit::ReadSource::kNoOverlap};
 
-    // dbCheck writes to the oplog, so we need to take an IX global lock. We don't need to
-    // write to the collection, however, so we use acquireCollectionMaybeLockFree with a
-    // read acquisition request.
-    Lock::GlobalLock glob(opCtx, MODE_IX);
-
-    const CollectionAcquisition collAcquisition = acquireCollectionMaybeLockFree(
+    // Acquires locks and sets appropriate state on the RecoveryUnit.
+    const DbCheckAcquisition acquisition(
         opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, _info.nss, AcquisitionPrerequisites::OperationType::kRead));
+        _info.nss,
+        readSource,
+        // On the primary we must always block on prepared updates to guarantee snapshot isolation.
+        PrepareConflictBehavior::kEnforce);
 
     if (_stepdownHasOccurred(opCtx, _info.nss)) {
         _done = true;
         return Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated due to stepdown");
     }
 
-    if (!collAcquisition.exists()) {
+    if (!acquisition.coll.exists()) {
         const auto msg = "Collection under dbCheck no longer exists";
         return {ErrorCodes::NamespaceNotFound, msg};
     }
     // The CollectionPtr needs to outlive the DbCheckHasher as it's used internally.
-    const CollectionPtr& collectionPtr = collAcquisition.getCollectionPtr();
+    const CollectionPtr& collectionPtr = acquisition.coll.getCollectionPtr();
     if (collectionPtr.get()->uuid() != _info.uuid) {
         const auto msg = "Collection under dbCheck no longer exists";
         return {ErrorCodes::NamespaceNotFound, msg};
@@ -1552,7 +1549,7 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
     Status status = Status::OK();
     try {
         hasher.emplace(opCtx,
-                       collectionPtr,
+                       acquisition,
                        first,
                        _info.end,
                        _info.secondaryIndexCheckParameters,
@@ -1603,6 +1600,11 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
         // Otherwise set minKey/maxKey in BSONKey format.
         batch.setMinKey(BSONKey::parseFromBSON(first.firstElement()));
         batch.setMaxKey(BSONKey::parseFromBSON(hasher->lastKey().firstElement()));
+    }
+
+    if (MONGO_unlikely(hangBeforeDbCheckLogOp.shouldFail())) {
+        LOGV2(8230500, "Hanging dbcheck due to failpoint 'hangBeforeDbCheckLogOp'");
+        hangBeforeDbCheckLogOp.pauseWhileSet();
     }
 
     // Send information on this batch over the oplog.

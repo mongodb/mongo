@@ -125,6 +125,35 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     const boost::optional<CollectionOptions>& options = boost::none);
 
 
+struct ReadSourceWithTimestamp {
+    RecoveryUnit::ReadSource readSource;
+    boost::optional<Timestamp> timestamp = boost::none;
+};
+
+/**
+ * DbCheckAcquisition is a helper class to acquire locks and set RecoveryUnit state for the dbCheck
+ * operation.
+ */
+class DbCheckAcquisition {
+public:
+    explicit DbCheckAcquisition(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                ReadSourceWithTimestamp readSource,
+                                PrepareConflictBehavior prepareConflictBehavior);
+
+    ~DbCheckAcquisition();
+
+private:
+    OperationContext* _opCtx;
+
+public:
+    const Lock::GlobalLock globalLock;
+    const ReadSourceScope readSourceScope;
+    const PrepareConflictBehavior prevPrepareConflictBehavior;
+    const DataCorruptionDetectionMode prevDataCorruptionMode;
+    const CollectionAcquisition coll;
+};
+
 /**
  * Hashing collections or indexes.
  *
@@ -149,7 +178,7 @@ public:
      * @param maxBytes The maximum number of bytes to hash.
      */
     DbCheckHasher(OperationContext* opCtx,
-                  const CollectionPtr& collection,
+                  const DbCheckAcquisition& acquisition,
                   const BSONObj& start,
                   const BSONObj& end,
                   boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters,
@@ -158,7 +187,7 @@ public:
                   int64_t maxCount = std::numeric_limits<int64_t>::max(),
                   int64_t maxBytes = std::numeric_limits<int64_t>::max());
 
-    ~DbCheckHasher();
+    ~DbCheckHasher() = default;
 
     /**
      * Hashes all documents up to the deadline.
@@ -230,9 +259,6 @@ private:
 
     int64_t _maxBytes = 0;
     int64_t _bytesSeen = 0;
-
-    DataCorruptionDetectionMode _previousDataCorruptionMode;
-    PrepareConflictBehavior _previousPrepareConflictBehavior;
 
     std::vector<const IndexCatalogEntry*> _indexes;
     std::vector<BSONObj> _missingIndexKeys;

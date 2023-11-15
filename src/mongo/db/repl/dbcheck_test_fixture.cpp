@@ -195,12 +195,13 @@ void DbCheckTest::runHashForCollectionCheck(
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParams,
     int64_t maxCount,
     int64_t maxBytes) {
-    AutoGetCollection coll(opCtx, kNss, MODE_IS);
-    const auto& collection = coll.getCollection();
+    const DbCheckAcquisition acquisition(
+        opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::kEnforce);
+    const auto& collection = acquisition.coll.getCollectionPtr();
     // Disable throttling for testing.
     DataThrottle dataThrottle(opCtx, []() { return 0; });
     auto hasher = DbCheckHasher(opCtx,
-                                collection,
+                                acquisition,
                                 start,
                                 end,
                                 secondaryIndexCheckParams,

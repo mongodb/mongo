@@ -300,9 +300,53 @@ const md5_byte_t* md5Cast(const T* ptr) {
     return reinterpret_cast<const md5_byte_t*>(ptr);
 }
 
+PrepareConflictBehavior swapPrepareConflictBehavior(
+    OperationContext* opCtx, PrepareConflictBehavior prepareConflictBehavior) {
+    auto ru = opCtx->recoveryUnit();
+    auto prevBehavior = ru->getPrepareConflictBehavior();
+    ru->setPrepareConflictBehavior(prepareConflictBehavior);
+    return prevBehavior;
+}
+
+DataCorruptionDetectionMode swapDataCorruptionMode(OperationContext* opCtx,
+                                                   DataCorruptionDetectionMode dataCorruptionMode) {
+    auto ru = opCtx->recoveryUnit();
+    auto prevMode = ru->getDataCorruptionDetectionMode();
+    ru->setDataCorruptionDetectionMode(dataCorruptionMode);
+    return prevMode;
+}
+
+DbCheckAcquisition::DbCheckAcquisition(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       ReadSourceWithTimestamp readSource,
+                                       PrepareConflictBehavior prepareConflictBehavior)
+    : _opCtx(opCtx),
+      // dbCheck writes to the oplog, so we need to take an IX global lock.
+      globalLock(opCtx, MODE_IX),
+      // Set all of the RecoveryUnit parameters before the colleciton acquisition, which opens a
+      // storage snapshot.
+      readSourceScope(opCtx, readSource.readSource, readSource.timestamp),
+      prevPrepareConflictBehavior(swapPrepareConflictBehavior(opCtx, prepareConflictBehavior)),
+      // We don't want detected data corruption to prevent us from finishing our scan. Locations
+      // where we throw these errors should already be writing to the health log anyway.
+      prevDataCorruptionMode(
+          swapDataCorruptionMode(opCtx, DataCorruptionDetectionMode::kLogAndContinue)),
+      // We don't need to write to the collection, so we use acquireCollectionMaybeLockFree with a
+      // read acquisition request.
+      coll(acquireCollectionMaybeLockFree(
+          opCtx,
+          CollectionAcquisitionRequest::fromOpCtx(
+              opCtx, nss, AcquisitionPrerequisites::OperationType::kRead))) {}
+
+DbCheckAcquisition::~DbCheckAcquisition() {
+    _opCtx->recoveryUnit()->abandonSnapshot();
+    swapDataCorruptionMode(_opCtx, prevDataCorruptionMode);
+    swapPrepareConflictBehavior(_opCtx, prevPrepareConflictBehavior);
+}
+
 DbCheckHasher::DbCheckHasher(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const DbCheckAcquisition& acquisition,
     const BSONObj& start,
     const BSONObj& end,
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters,
@@ -315,24 +359,13 @@ DbCheckHasher::DbCheckHasher(
       _indexName(indexName),
       _maxCount(maxCount),
       _maxBytes(maxBytes),
-      _previousDataCorruptionMode(opCtx->recoveryUnit()->getDataCorruptionDetectionMode()),
-      _previousPrepareConflictBehavior(opCtx->recoveryUnit()->getPrepareConflictBehavior()),
       _secondaryIndexCheckParameters(secondaryIndexCheckParameters),
       _dataThrottle(dataThrottle) {
 
     // Get the MD5 hasher set up.
     md5_init(&_state);
 
-    // We don't want detected data corruption to prevent us from finishing our scan. Locations where
-    // we throw these errors should already be writing to the health log anyways.
-    opCtx->recoveryUnit()->setDataCorruptionDetectionMode(
-        DataCorruptionDetectionMode::kLogAndContinue);
-
-    // We need to enforce prepare conflicts in order to return correct results. This can't be done
-    // while a snapshot is already open.
-    if (_previousPrepareConflictBehavior != PrepareConflictBehavior::kEnforce) {
-        opCtx->recoveryUnit()->setPrepareConflictBehavior(PrepareConflictBehavior::kEnforce);
-    }
+    auto& collection = acquisition.coll.getCollectionPtr();
 
     if (!indexName) {
         if (!collection->isClustered()) {
@@ -383,14 +416,6 @@ DbCheckHasher::DbCheckHasher(
         }
     }
 }
-
-DbCheckHasher::~DbCheckHasher() {
-    _opCtx->recoveryUnit()->setDataCorruptionDetectionMode(_previousDataCorruptionMode);
-    if (_previousPrepareConflictBehavior != PrepareConflictBehavior::kEnforce) {
-        _opCtx->recoveryUnit()->setPrepareConflictBehavior(_previousPrepareConflictBehavior);
-    }
-}
-
 
 void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
     if (uuid) {
@@ -707,7 +732,6 @@ bool DbCheckHasher::_canHash(const BSONObj& obj) {
 }
 
 namespace {
-
 // Cumulative number of batches processed. Can wrap around; it's not guaranteed to be in lockstep
 // with other replica set members.
 // TODO(SERVER-78399): Remove 'batchesProcessed'.
@@ -724,13 +748,19 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
     DataThrottle dataThrottle(opCtx, []() { return 0; });
 
     try {
-        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                      entry.getReadTimestamp());
+        const DbCheckAcquisition acquisition(
+            opCtx,
+            entry.getNss(),
+            {RecoveryUnit::ReadSource::kProvided, entry.getReadTimestamp()},
+            // We must ignore prepare conflicts on secondaries. Primaries will block on prepare
+            // conflicts, which guarantees that the range we scan does not have any prepared
+            // updates. Secondaries can encounter prepared updates in normal operation if a document
+            // is prepared after it has been scanned on the primary, and before the dbCheck oplog
+            // entry is replicated.
+            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
-        AutoGetCollection coll(opCtx, entry.getNss(), MODE_IS);
-        const auto& collection = coll.getCollection();
 
-        if (!collection) {
+        if (!acquisition.coll.exists()) {
             const auto msg = "Collection under dbCheck no longer exists";
             auto logEntry = dbCheckHealthLogEntry(entry.getNss(),
                                                   boost::none,
@@ -742,6 +772,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             HealthLogInterface::get(opCtx)->log(*logEntry);
             return Status::OK();
         }
+
+        const auto& collection = acquisition.coll.getCollectionPtr();
 
         // TODO SERVER-78399: Clean up handling minKey/maxKey once feature flag is removed.
         // If the dbcheck oplog entry doesn't contain batchStart, convert minKey to a BSONObj to
@@ -770,9 +802,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                 case mongo::DbCheckValidationModeEnum::extraIndexKeysCheck: {
                     StringData indexName = secondaryIndexCheckParameters.get().getSecondaryIndex();
 
-                    // Create hasher with indexName.
                     hasher.emplace(opCtx,
-                                   collection,
+                                   acquisition,
                                    batchStart,
                                    batchEnd,
                                    entry.getSecondaryIndexCheckParameters(),
@@ -816,7 +847,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                 case mongo::DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck:
                 case mongo::DbCheckValidationModeEnum::dataConsistency: {
                     hasher.emplace(opCtx,
-                                   collection,
+                                   acquisition,
                                    batchStart,
                                    batchEnd,
                                    entry.getSecondaryIndexCheckParameters(),
@@ -828,7 +859,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             }
         } else {
             hasher.emplace(opCtx,
-                           collection,
+                           acquisition,
                            batchStart,
                            batchEnd,
                            entry.getSecondaryIndexCheckParameters(),
