@@ -2367,16 +2367,14 @@ buildvariants:
   stepback: false
   expansions:
     <<: *enterprise-rhel80-debug-tsan-expansions-template
+    large_distro_name: rhel80-large
     compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
   - name: compile_test_serial_TG
   - name: .auth
   - name: unittest_shell_hang_analyzer_gen
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns !.compute_mode
-  - name: .concurrency .large !.ubsan !.no_txns !.compute_mode
-    distros:
-    - rhel80-large
+  - name: .concurrency !.ubsan !.no_txns !.compute_mode
   - name: .config_fuzzer
   - name: .encrypt
   - name: .jscore .common !jsCore
