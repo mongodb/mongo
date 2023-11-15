@@ -129,7 +129,7 @@
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/uuid.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryOptimizer
 
 MONGO_FAIL_POINT_DEFINE(failConstructingBonsaiExecutor);
 

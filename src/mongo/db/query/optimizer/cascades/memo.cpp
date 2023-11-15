@@ -59,6 +59,7 @@
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/util/assert_util.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryOptimizer
 
 namespace mongo::optimizer::cascades {
 
@@ -506,13 +507,19 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
     props.merge(logicalProps);
 
     const bool simpleIdLookup = isSimpleIdLookup(nodeRef);
-    const CEType estimate = simpleIdLookup
-        ? CEType{1.0}
-        : ctx._cardinalityEstimator
-              ->deriveCE(*ctx._metadata, *this, props, *ctx._queryParameters, nodeRef)
-              ._ce;
+    const CERecord estimate = simpleIdLookup
+        ? CERecord{1.0, "simpleIdLookup"}
+        : ctx._cardinalityEstimator->deriveCE(
+              *ctx._metadata, *this, props, *ctx._queryParameters, nodeRef);
+    LOGV2_DEBUG_OPTIONS(8324800,
+                        5,
+                        {logv2::LogComponent::kQueryCE},
+                        "Estimated node cardinality",
+                        "mode"_attr = estimate._mode,
+                        "ce"_attr = estimate._ce._value,
+                        "explain"_attr = ExplainGenerator::explainV2(nodeRef));
 
-    auto ceProp = properties::CardinalityEstimate(estimate);
+    auto ceProp = properties::CardinalityEstimate(estimate._ce);
 
     if (auto sargablePtr = nodeRef.cast<SargableNode>()) {
         auto& partialSchemaKeyCE = ceProp.getPartialSchemaKeyCE();
@@ -540,6 +547,13 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
                     ? CERecord{1.0, "simpleIdLookup"}
                     : ctx._cardinalityEstimator->deriveCE(
                           *ctx._metadata, *this, props, *ctx._queryParameters, singularReq.ref());
+                LOGV2_DEBUG_OPTIONS(8324801,
+                                    5,
+                                    {logv2::LogComponent::kQueryCE},
+                                    "Estimated single-predicate cardinality",
+                                    "mode"_attr = singularEst._mode,
+                                    "ce"_attr = singularEst._ce._value,
+                                    "explain"_attr = ExplainGenerator::explainV2(singularReq));
                 partialSchemaKeyCE.emplace_back(e.first, singularEst);
                 _estimatesCache.emplace(cacheKey, singularEst);
             });
