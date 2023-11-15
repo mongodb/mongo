@@ -220,6 +220,10 @@ bool processResponseFromRemote(OperationContext* opCtx,
                                BatchWriteOp& batchOp,
                                TargetedWriteBatch* batch,
                                BatchWriteExecStats* stats) {
+    // Stale routing info errors need to be tracked in order to trigger a refresh of the targeter.
+    // On the other hand, errors caused by the catalog cache being temporarily unavailable (such as
+    // ShardCannotRefreshDueToLocksHeld) are ignored in this context, since no deduction can be made
+    // around possible placement changes.
     TrackedErrors trackedErrors;
     trackedErrors.startTracking(ErrorCodes::StaleConfig);
     trackedErrors.startTracking(ErrorCodes::StaleDbVersion);

@@ -510,6 +510,7 @@ bool handleError(OperationContext* opCtx,
     }
 
     if (ex.code() == ErrorCodes::StaleDbVersion || ErrorCodes::isStaleShardVersionError(ex) ||
+        ex.code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
         ex.code() == ErrorCodes::CannotImplicitlyCreateCollection) {
         if (!opCtx->getClient()->isInDirectClient() &&
             ex.code() != ErrorCodes::CannotImplicitlyCreateCollection) {
@@ -517,9 +518,13 @@ bool handleError(OperationContext* opCtx,
             oss.setShardingOperationFailedStatus(ex.toStatus());
         }
 
-        // Since this is a routing error, it is guaranteed that all subsequent operations will fail
+        // For routing errors, it is guaranteed that all subsequent operations will fail
         // with the same cause, so don't try doing any more operations. The command reply serializer
         // will handle repeating this error for unordered writes.
+        // (On the other hand, ShardCannotRefreshDueToLocksHeld is caused by a temporary inability
+        // to access a stable version of the cache during the execution of the batch; the error is
+        // returned back to the router to leverage its capability of selectively retrying
+        // operations).
         out->results.emplace_back(ex.toStatus());
         return false;
     }
@@ -547,10 +552,6 @@ bool handleError(OperationContext* opCtx,
         // migration blocking, committing, or aborting.
         out->results.emplace_back(ex.toStatus());
         return false;
-    }
-
-    if (ex.code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
-        throw;
     }
 
     out->results.emplace_back(ex.toStatus());

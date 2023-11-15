@@ -172,6 +172,7 @@ void populateReply(OperationContext* opCtx,
         const auto& lastResult = result.results.back();
 
         if (lastResult == ErrorCodes::StaleDbVersion ||
+            lastResult == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
             ErrorCodes::isStaleShardVersionError(lastResult.getStatus()) ||
             ErrorCodes::isTenantMigrationError(lastResult.getStatus()) ||
             lastResult == ErrorCodes::CannotImplicitlyCreateCollection) {
