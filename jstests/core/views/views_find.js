@@ -6,6 +6,7 @@
  *   requires_getmore,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
+ *   requires_fcv_73,
  * ]
  */
 import {arrayEq, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -110,8 +111,15 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidPipelineOperator);
 
 // Views can support a "findOne" if singleBatch: true and limit: 1.
-assertFindResultEq({find: "identityView", filter: {state: "NY"}, singleBatch: true, limit: 1},
-                   [{_id: "New York", state: "NY", pop: 7}]);
+let res = assert.commandWorked(
+    viewsDB.runCommand({find: "identityView", filter: {state: "NY"}, singleBatch: true, limit: 1}));
+assert.eq(res.cursor.firstBatch, [{_id: "New York", state: "NY", pop: 7}]);
+// singleBatch: true should ensure no cursor is returned.
+assert.eq(res.cursor.id, 0);
+// The behavior should be the same with batchSize: 1.
+res = assert.commandWorked(viewsDB.runCommand(
+    {find: "identityView", filter: {}, singleBatch: true, limit: 1, batchSize: 1}));
+assert.eq(res.cursor.id, 0);
 assert.eq(viewsDB.identityView.findOne({_id: "San Francisco"}),
           {_id: "San Francisco", state: "CA", pop: 4});
 
