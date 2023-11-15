@@ -335,20 +335,23 @@ export function removeUUIDsFromExplain(db, explain) {
 }
 
 export function navigateToPath(doc, path) {
-    let result;
-    let field;
-
+    let result = doc;
+    let components = path.split(".");
     try {
-        result = doc;
-        for (field of path.split(".")) {
-            assert(result.hasOwnProperty(field));
-            result = result[field];
+        for (; components.length > 0; components = components.slice(1)) {
+            assert(result.hasOwnProperty(components[0]));
+            result = result[components[0]];
         }
         return result;
     } catch (e) {
-        jsTestLog("Error navigating to path '" + path + "'");
-        jsTestLog("Missing field: " + field);
+        const field = components[0];
+        const suffix = components.join('.');
+        jsTestLog(`Error navigating to path '${path}'\n` +
+                  `because the suffix '${suffix}' does not exist,\n` +
+                  `because the field '${field}' does not exist in this subtree:`);
         printjson(result);
+        jsTestLog("The entire tree was: ");
+        printjson(doc);
         throw e;
     }
 }

@@ -47,12 +47,15 @@ let docs = [];
             }
         }
     }
-    let newDocs = Array.from({length: 1000}, () => ({a: 10}));
-    // Distribute interesting documents to encourage IndexScan when sampling in chunks.
+    // Insert documents that match 'a' but not 'b'--this makes filtering on 'b' more
+    // beneficial, and more likely to happen before the fetch. This also discourages
+    // collection-scan plans since 'b' is indexed.
+    let newDocs = Array.from({length: 1000}, () => ({a: 10, b: 0}));
+    // Spread the interesting documents evenly, to encourage IndexScan when sampling in chunks.
     for (let i = 0; i < docs.length; i++) {
         const idx = Math.floor(i * (newDocs.length / docs.length));
+        newDocs.push(newDocs[idx]);
         newDocs[idx] = docs[i];
-        newDocs.push({a: 10})
     }
     assert.commandWorked(coll.insertMany(newDocs));
     const indexKey = {a: 1, b: -1};
