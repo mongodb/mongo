@@ -3388,7 +3388,7 @@ boost::optional<MemberConfig> ReplicationCoordinatorImpl::findConfigMemberByHost
     const HostAndPort& hap) const {
     stdx::lock_guard<Latch> lock(_mutex);
     const MemberConfig* result = _rsConfig.findMemberByHostAndPort(hap);
-    return boost::make_optional(result, *result);
+    return result ? boost::make_optional(*result) : boost::none;
 }
 
 bool ReplicationCoordinatorImpl::isConfigLocalHostAllowed() const {
