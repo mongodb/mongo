@@ -605,6 +605,18 @@ boost::optional<key_string::Value> DbChecker::getExtraIndexKeysCheckLookupStart(
         return boost::none;
     }
 
+    // TODO (SERVER-83074): Enable special indexes in dbcheck.
+    if (index->getAccessMethodName() != IndexNames::BTREE &&
+        index->getAccessMethodName() != IndexNames::HASHED) {
+        LOGV2_DEBUG(8033901,
+                    3,
+                    "Skip checking unsupported index.",
+                    "collection"_attr = _info.nss,
+                    "uuid"_attr = _info.uuid,
+                    "indexName"_attr = index->indexName());
+        return boost::none;
+    }
+
     // TODO SERVER-79846: Add testing for progress meter
     // {
     //     const std::string curOpMessage = "Scanning index " + indexName +

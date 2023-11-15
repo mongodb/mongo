@@ -504,9 +504,21 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
                                           const CollectionPtr& collPtr) {
     for (auto entry : _indexes) {
         const auto descriptor = entry->descriptor();
-        if (descriptor->isPartial() && !entry->getFilterExpression()->matchesBSON(currentObj)) {
+        if ((descriptor->isPartial() && !entry->getFilterExpression()->matchesBSON(currentObj))) {
             // The index is partial and the document does not match the index filter expression, so
-            // skip checking this document.
+            // skip checking this index.
+            continue;
+        }
+
+        // TODO (SERVER-83074): Enable special indexes in dbcheck.
+        if (descriptor->getAccessMethodName() != IndexNames::BTREE &&
+            descriptor->getAccessMethodName() != IndexNames::HASHED) {
+            LOGV2_DEBUG(8033900,
+                        3,
+                        "Skip checking unsupported index.",
+                        "collection"_attr = collPtr->ns(),
+                        "uuid"_attr = collPtr->uuid(),
+                        "indexName"_attr = descriptor->indexName());
             continue;
         }
 
