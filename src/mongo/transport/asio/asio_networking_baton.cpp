@@ -28,15 +28,16 @@
  */
 
 
-#include <sys/eventfd.h>
-
 #include "mongo/transport/asio/asio_networking_baton.h"
+
+#include <sys/eventfd.h>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler_gcc.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/fail_point.h"
@@ -160,7 +161,9 @@ void AsioNetworkingBaton::schedule(Task func) noexcept {
 }
 
 void AsioNetworkingBaton::notify() noexcept {
-    efd(_opCtx).notify();
+    NotificationState old = _notificationState.swap(kNotificationPending);
+    if (old == kInPoll)
+        efd(_opCtx).notify();
 }
 
 Waitable::TimeoutState AsioNetworkingBaton::run_until(ClockSource* clkSource,
@@ -357,6 +360,17 @@ std::list<Promise<void>> AsioNetworkingBaton::_poll(stdx::unique_lock<Mutex>& lk
         deadline.reset();
     }
 
+    if (_sessions.empty()) {
+        // There's a pending notification and there are no sessions. We should just return
+        // rather than calling poll().
+        if (_notificationState.load() == kNotificationPending) {
+            // Stores of kNone can use relaxed memory order because the notifying thread only needs
+            // to see the write of kNone; unrelated writes can safely be reordered around it.
+            _notificationState.storeRelaxed(kNone);
+            return {};
+        }
+    }
+
     _pollSet.clear();
     _pollSet.reserve(_sessions.size() + 1);
     _pollSet.push_back({efd(_opCtx).fd, POLLIN, 0});
@@ -373,13 +387,24 @@ std::list<Promise<void>> AsioNetworkingBaton::_poll(stdx::unique_lock<Mutex>& lk
         _inPoll = true;
         lk.unlock();
 
+        const NotificationState oldState = _notificationState.swap(kInPoll);
+        invariant(oldState != kInPoll);
+
         const ScopeGuard guard([&] {
+            // Both consumes a notification (if-any) and mark us as no-longer in poll.
+            _notificationState.storeRelaxed(kNone);
+
             lk.lock();
             _inPoll = false;
         });
 
         blockAsioNetworkingBatonBeforePoll.pauseWhileSet();
-        int timeout = deadline ? Milliseconds(*deadline - now).count() : -1;
+
+        int timeout = oldState == kNotificationPending
+            ? 0  // Don't wait if there is a notification pending.
+            : deadline ? Milliseconds(*deadline - now).count()
+                       : -1;
+
         int events = ::poll(_pollSet.data(), _pollSet.size(), timeout);
         if (events < 0) {
             auto ec = lastSystemError();
@@ -429,23 +454,26 @@ Future<void> AsioNetworkingBaton::_addSession(Session& session, short events) tr
 }
 
 void AsioNetworkingBaton::detachImpl() noexcept {
+
+    stdx::unique_lock lk(_mutex);
+
+    invariant(_opCtx->getBaton().get() == this);
+    _opCtx->setBaton(nullptr);
+
+    _opCtx = nullptr;
+
+    if (MONGO_likely(_scheduled.empty() && _sessions.empty() && _timers.empty()))
+        return;
+
+    using std::swap;
     decltype(_scheduled) scheduled;
+    swap(_scheduled, scheduled);
     decltype(_sessions) sessions;
+    swap(_sessions, sessions);
     decltype(_timers) timers;
+    swap(_timers, timers);
 
-    {
-        stdx::lock_guard lk(_mutex);
-
-        invariant(_opCtx->getBaton().get() == this);
-        _opCtx->setBaton(nullptr);
-
-        _opCtx = nullptr;
-
-        using std::swap;
-        swap(_scheduled, scheduled);
-        swap(_sessions, sessions);
-        swap(_timers, timers);
-    }
+    lk.unlock();
 
     for (auto& job : scheduled) {
         job(stdx::unique_lock(_mutex));

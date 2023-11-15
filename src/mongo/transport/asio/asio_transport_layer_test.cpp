@@ -1201,6 +1201,42 @@ TEST_F(IngressAsioNetworkingBatonTest, WaitAndNotify) {
     notification.get(opCtx.get());
 }
 
+TEST_F(IngressAsioNetworkingBatonTest, NotifyDuringPoll) {
+    // Exercises the interaction between `notify()` and polling, specifically in the case where the
+    // notification occurs during polling. `thread` waits until polling has begun and then sends
+    // a notification, while the main thread verifies that `run_until()` is interrupted.
+    auto opCtx = client().makeOperationContext();
+    auto baton = opCtx->getBaton()->networking();
+    auto clkSource = getServiceContext()->getPreciseClockSource();
+
+    MilestoneThread thread([&](Notification<void>& isReady) {
+        FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
+        isReady.set();
+        waitForTimesEntered(fp, 1);
+        baton->notify();
+    });
+
+    const auto state = baton->run_until(clkSource, Date_t::max());
+    ASSERT_EQ(state, Waitable::TimeoutState::NoTimeout);
+}
+
+TEST_F(IngressAsioNetworkingBatonTest, NotifyBeforePoll) {
+    // Exercises the interaction between `notify()` and polling in the case where the notification
+    // occurs outside of polling.
+    auto opCtx = client().makeOperationContext();
+    auto baton = opCtx->getBaton()->networking();
+    auto clkSource = getServiceContext()->getPreciseClockSource();
+
+    // Notification prevents timeout
+    baton->notify();
+    auto state = baton->run_until(clkSource, Date_t::max());
+    ASSERT_EQ(state, Waitable::TimeoutState::NoTimeout);
+
+    // No pre-existing notification yields a timeout
+    state = baton->run_until(clkSource, clkSource->now() + Milliseconds(1));
+    ASSERT_EQ(state, Waitable::TimeoutState::Timeout);
+}
+
 void blockIfBatonPolls(Client& client,
                        std::function<void(const BatonHandle&, Notification<void>&)> modifyBaton) {
     Notification<void> notification;

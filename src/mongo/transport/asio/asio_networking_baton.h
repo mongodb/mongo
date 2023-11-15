@@ -36,6 +36,7 @@
 
 #include <poll.h>
 
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/asio/asio_session.h"
@@ -152,6 +153,42 @@ private:
     OperationContext* _opCtx;
 
     bool _inPoll = false;
+
+    /**
+     * We use `_notificationState` to send a notification without going through the eventfd
+     * where possible. If we're in the middle of polling, we must use the eventfd so as
+     * to wake up the polling thread. Otherwise, we just transition to the `kNotificationPending`
+     * state, which is seen in the next call to `_poll()`.
+     *
+     * In `notify()`, a thread sending a notification can cause a transition from any state to
+     * `kNotificationPending`. Graphically:
+     *
+     * kNone ----1----> kNotificationPending <----2---- kInPoll
+     * (1) The polling thread is not blocked in `::poll()` - don't call `notify()`
+     * (2) The polling thread may be blocked in `::poll()` - call `notify()`
+     *
+     * In `_poll()`, the polling thread transitions to `kInPoll` (from any other state) before
+     * calling `::poll()`, and transitions to `kNone` after `::poll()` returns.
+     * There is also a fast path from `kNotificationPending` to `kNone` when a notification is
+     * pending and there are no sessions to poll on.
+     *
+     * +-------+ -----2-----> +---------+            +----------------------+
+     * | kNone |              | kInPoll | <----3---- | kNotificationPending |
+     * +-------+ <----1------ +---------+            +----------------------+
+     *    ^                                               |
+     *    +---------------------4-------------------------+
+     *
+     * (1) Return from `::poll()`
+     * (2) Start polling with no notification pending - use blocking call to `::poll()`
+     * (3) Start polling with a pending notification - use non-blocking call to `::poll()`
+     * (4) Start polling with a pending notification and no active sessions - skip `::poll()`
+     *
+     * Notice that only notifying threads transition to `kNotificationPending` and only the polling
+     * thread transitions out of `kNotificationPending`. This gives the polling thread exclusive
+     * ownership over `_notificationState` in that state (i.e., no one else will write to it).
+     */
+    enum NotificationState { kNone, kNotificationPending, kInPoll };
+    AtomicWord<NotificationState> _notificationState;
 
     // Stores the sessions we need to poll on.
     stdx::unordered_map<SessionId, TransportSession> _sessions;
