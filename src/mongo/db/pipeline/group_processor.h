@@ -109,7 +109,8 @@ private:
      */
     void spill();
 
-    // Only used when '_spilled' is false.
+    // Only used when '_spilled' is false and `_areGroupsReady` is true.
+    bool _areGroupsReady = false;
     GroupProcessorBase::GroupsMap::iterator _groupsIterator;
 
     // Tracks the size of the spill file.

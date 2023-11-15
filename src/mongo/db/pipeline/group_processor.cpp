@@ -118,7 +118,7 @@ boost::optional<Document> GroupProcessor::getNextSpilled() {
 
 boost::optional<Document> GroupProcessor::getNextStandard() {
     // Not spilled, and not streaming.
-    if (_groupsIterator == _groups.end())
+    if (!_areGroupsReady || _groupsIterator == _groups.end())
         return boost::none;
 
     Document out =
@@ -198,6 +198,7 @@ void GroupProcessor::readyGroups() {
     } else {
         // start the group iterator
         _groupsIterator = _groups.begin();
+        _areGroupsReady = true;
     }
 }
 
@@ -209,6 +210,7 @@ void GroupProcessor::reset() {
     _sortedFiles.clear();
     // Make us look done.
     _groupsIterator = _groups.end();
+    _areGroupsReady = false;
 }
 
 bool GroupProcessor::shouldSpillWithAttemptToSaveMemory() {
