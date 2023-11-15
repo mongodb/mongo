@@ -1154,6 +1154,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/s/replica_set_endpoint_feature_flag',
+        '$BUILD_DIR/mongo/s/startup_initialization',
         'auth/auth',
         'command_can_run_here',
         'commands/fsync_locked',

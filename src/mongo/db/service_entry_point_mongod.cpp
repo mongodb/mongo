@@ -56,6 +56,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
@@ -68,12 +69,16 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/rpc/check_allowed_op_query_cmd.h"
+#include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
@@ -296,8 +301,37 @@ public:
     }
 };
 
+Future<DbResponse> ServiceEntryPointMongod::_replicaSetEndpointHandleRequest(
+    OperationContext* opCtx, const Message& m) noexcept try {
+    // TODO (SERVER-81551): Move the OpMsgRequest parsing above ServiceEntryPoint::handleRequest().
+    auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(m, opCtx->getClient());
+    if (m.operation() == dbQuery) {
+        checkAllowedOpQueryCommand(*opCtx->getClient(), opMsgReq.getCommandName());
+    }
+
+    return replica_set_endpoint::shouldRouteRequest(opCtx, opMsgReq)
+        ? ServiceEntryPointMongos::handleRequestImpl(opCtx, m)
+        : ServiceEntryPointCommon::handleRequest(opCtx, m, std::make_unique<Hooks>());
+} catch (const DBException& ex) {
+    // Try to generate a response based on the status. If encounter another error (e.g.
+    // UnsupportedFormat) while trying to generate the response, just return the status.
+    try {
+        auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(m));
+        replyBuilder->setCommandReply(ex.toStatus(), {});
+        DbResponse dbResponse;
+        dbResponse.response = replyBuilder->done();
+        return dbResponse;
+    } catch (...) {
+    }
+    return ex.toStatus();
+}
+
 Future<DbResponse> ServiceEntryPointMongod::handleRequest(OperationContext* opCtx,
                                                           const Message& m) noexcept {
+    // TODO (SERVER-77921): Support for different ServiceEntryPoints based on role.
+    if (replica_set_endpoint::isReplicaSetEndpointClient(opCtx->getClient())) {
+        return _replicaSetEndpointHandleRequest(opCtx, m);
+    }
     return ServiceEntryPointCommon::handleRequest(opCtx, m, std::make_unique<Hooks>());
 }
 

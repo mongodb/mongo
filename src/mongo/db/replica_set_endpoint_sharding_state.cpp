@@ -85,5 +85,11 @@ bool isFeatureFlagEnabled() {
         feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabled(fcvSnapshot);
 }
 
+bool isFeatureFlagEnabledIgnoreFCV() {
+    // (Ignore FCV check): The ReplicaSetEndpointShardingState needs to be maintained even before
+    // the FCV is fully upgraded.
+    return feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabledAndIgnoreFCVUnsafe();
+}
+
 }  // namespace replica_set_endpoint
 }  // namespace mongo

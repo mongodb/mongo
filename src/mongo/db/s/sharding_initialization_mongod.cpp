@@ -718,8 +718,11 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         1,
         initKeysClient));
 
-    if (replica_set_endpoint::isFeatureFlagEnabled() &&
+    if (replica_set_endpoint::isFeatureFlagEnabledIgnoreFCV() &&
         serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+        // The feature flag check here needs to ignore the FCV since the
+        // ReplicaSetEndpointShardingState needs to be maintained even before the FCV is fully
+        // upgraded.
         DBDirectClient client(opCtx);
         FindCommandRequest request(NamespaceString::kConfigsvrShardsNamespace);
         request.setFilter(BSON("_id" << ShardId::kConfigServerId));

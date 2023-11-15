@@ -224,9 +224,12 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             }
         }
 
-        if (replica_set_endpoint::isFeatureFlagEnabled() &&
+        if (replica_set_endpoint::isFeatureFlagEnabledIgnoreFCV() &&
             serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
             nss == NamespaceString::kConfigsvrShardsNamespace) {
+            // The feature flag check here needs to ignore the FCV since the
+            // ReplicaSetEndpointShardingState needs to be maintained even before the FCV is fully
+            // upgraded.
             if (auto shardId = insertedDoc["_id"].str(); shardId == ShardId::kConfigServerId) {
                 opCtx->recoveryUnit()->onCommit(
                     [](OperationContext* opCtx, boost::optional<Timestamp>) {
@@ -632,9 +635,12 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         }
     }
 
-    if (replica_set_endpoint::isFeatureFlagEnabled() &&
+    if (replica_set_endpoint::isFeatureFlagEnabledIgnoreFCV() &&
         serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
         nss == NamespaceString::kConfigsvrShardsNamespace) {
+        // The feature flag check here needs to ignore the FCV since the
+        // ReplicaSetEndpointShardingState needs to be maintained even before the FCV is fully
+        // upgraded.
         if (auto shardId = documentId["_id"].str(); shardId == ShardId::kConfigServerId) {
             opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx,
                                                boost::optional<Timestamp>) {
