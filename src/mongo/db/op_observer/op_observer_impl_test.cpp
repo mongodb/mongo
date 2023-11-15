@@ -1982,7 +1982,6 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTestIncludesTenantId) {
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
     auto o = oplogEntry.getObject();
 
-    // TODO SERVER-69288: disallow more than one tenant on a single transaction
     auto oExpected =
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
@@ -2121,7 +2120,6 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
     auto o = oplogEntry.getObject();
 
-    // TODO SERVER-69288: disallow more than one tenant on a single transaction
     auto oExpected =
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "u"
@@ -2214,7 +2212,6 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
     auto o = oplogEntry.getObject();
 
-    // TODO SERVER-69288: disallow more than one tenant on a single transaction
     auto oExpected =
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "d"
