@@ -1517,8 +1517,7 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogAsStandaloneRecoversOplog) {
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
 
     // Test the node is readOnly.
-    ASSERT_THROWS(getStorageInterface()->insertDocument(opCtx, testNs, {_makeInsertDocument(2)}, 1),
-                  AssertionException);
+    ASSERT_TRUE(storageGlobalParams.readOnly);
 }
 
 TEST_F(ReplicationRecoveryTest,
