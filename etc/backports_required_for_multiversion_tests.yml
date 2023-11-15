@@ -515,6 +515,8 @@ last-continuous:
     ticket: SERVER-79848
   - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-83247
+  - test_file: jstests/core/timeseries/timeseries_project_pushdown.js
+    ticket: SERVER-82447
   suites: null
 last-lts:
   all:
@@ -1092,4 +1094,6 @@ last-lts:
     ticket: SERVER-79848
   - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-83247
+  - test_file: jstests/core/timeseries/timeseries_project_pushdown.js
+    ticket: SERVER-82447
   suites: null
