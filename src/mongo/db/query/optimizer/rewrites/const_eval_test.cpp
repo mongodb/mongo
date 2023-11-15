@@ -253,5 +253,48 @@ TEST(ConstEvalTest, GetParamTwoParams) {
         abt);
 }
 
+TEST(ConstEvalTest, GetParamNaN) {
+    ABT abt = _binary("Eq", _cNaN(), getParam(TypeTags::NumberInt32))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    abt = _binary("Lt", _cNaN(), getParam(TypeTags::StringSmall))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    abt = _binary("Lte", _cNaN(), getParam(TypeTags::NumberDouble))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    abt = _binary("Gt", _cNaN(), getParam(TypeTags::ObjectId))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    abt = _binary("Gte", _cNaN(), getParam(TypeTags::MinKey))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    abt = _binary("Cmp3w", getParam(TypeTags::Boolean), _cNaN())._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [1]\n",
+        abt);
+
+    abt = _binary("Cmp3w", getParam(TypeTags::NumberDecimal), _cNaN())._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [1]\n",
+        abt);
+}
 }  // namespace
 }  // namespace mongo::optimizer

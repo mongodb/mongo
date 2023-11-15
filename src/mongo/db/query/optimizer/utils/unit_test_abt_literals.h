@@ -123,6 +123,11 @@ inline auto _cnothing() {
     return ExprHolder{Constant::nothing()};
 }
 
+// NaN constant
+inline auto _cNaN() {
+    return ExprHolder{Constant::fromDouble(std::numeric_limits<double>::quiet_NaN())};
+}
+
 // Boolean constant.
 inline auto _cbool(const bool val) {
     return ExprHolder{Constant::boolean(val)};
