@@ -269,69 +269,76 @@ __sweep_server_run_chk(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __sweep_check_session_callback --
+ *     Check if a given session hasn't swept. Callback from the session array walk.
+ */
+static int
+__sweep_check_session_callback(
+  WT_SESSION_IMPL *session, WT_SESSION_IMPL *array_session, bool *exit_walkp, void *cookiep)
+{
+    WT_SWEEP_COOKIE *cookie;
+    uint64_t last, last_sweep;
+
+    cookie = (WT_SWEEP_COOKIE *)cookiep;
+    WT_UNUSED(exit_walkp);
+
+    last = array_session->last_cursor_big_sweep;
+    last_sweep = array_session->last_sweep;
+
+    /*
+     * Get the earlier of the two timestamps, as they refer to sweeps of two different data
+     * structures that reference data handles
+     */
+    if (last_sweep != 0 && (last == 0 || last_sweep < last))
+        last = last_sweep;
+    if (last == 0)
+        return (0);
+
+    /*
+     * Check if the session did not run a sweep in 5 minutes. Handle the issue only once per
+     * violation.
+     */
+    if (last + 5 * 60 < cookie->now) {
+        if (!array_session->sweep_warning_5min) {
+            array_session->sweep_warning_5min = 1;
+            WT_STAT_CONN_INCR(session, no_session_sweep_5min);
+        }
+    } else {
+        array_session->sweep_warning_5min = 0;
+    }
+
+    /*
+     * The same for 60 minutes.
+     */
+    if (last + 60 * 60 < cookie->now) {
+        if (!array_session->sweep_warning_60min) {
+            array_session->sweep_warning_60min = 1;
+            WT_STAT_CONN_INCR(session, no_session_sweep_60min);
+            __wt_verbose_warning(session, WT_VERB_DEFAULT,
+              "Session %" PRIu32 " (@: 0x%p name: %s) did not run a sweep for 60 minutes.",
+              array_session->id, (void *)array_session,
+              array_session->name == NULL ? "EMPTY" : array_session->name);
+        }
+    } else {
+        array_session->sweep_warning_60min = 0;
+    }
+
+    return (0);
+}
+
+/*
  * __sweep_check_session_sweep --
  *     Check for any "rogue" sessions, which did not run a session sweep in a long time.
  */
 static void
 __sweep_check_session_sweep(WT_SESSION_IMPL *session, uint64_t now)
 {
-    WT_CONNECTION_IMPL *conn;
-    WT_SESSION_IMPL *s;
-    uint64_t last, last_cursor_big_sweep, last_sweep;
-    uint32_t i;
+    WT_SWEEP_COOKIE cookie;
 
-    conn = S2C(session);
+    WT_CLEAR(cookie);
+    cookie.now = now;
 
-    for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i) {
-        /*
-         * Ignore inactive and internal sessions.
-         */
-        if (!s->active)
-            continue;
-        if (F_ISSET(s, WT_SESSION_INTERNAL))
-            continue;
-
-        last_cursor_big_sweep = s->last_cursor_big_sweep;
-        last_sweep = s->last_sweep;
-
-        /*
-         * Get the earlier of the two timestamps, as they refer to sweeps of two different data
-         * structures that reference data handles
-         */
-        last = last_cursor_big_sweep;
-        if (last_sweep != 0 && (last == 0 || last_sweep < last))
-            last = last_sweep;
-        if (last == 0)
-            continue;
-
-        /*
-         * Check if the session did not run a sweep in 5 minutes. Handle the issue only once per
-         * violation.
-         */
-        if (last + 5 * 60 < now) {
-            if (!s->sweep_warning_5min) {
-                s->sweep_warning_5min = 1;
-                WT_STAT_CONN_INCR(session, no_session_sweep_5min);
-            }
-        } else {
-            s->sweep_warning_5min = 0;
-        }
-
-        /*
-         * The same for 60 minutes.
-         */
-        if (last + 60 * 60 < now) {
-            if (!s->sweep_warning_60min) {
-                s->sweep_warning_60min = 1;
-                WT_STAT_CONN_INCR(session, no_session_sweep_60min);
-                __wt_verbose_warning(session, WT_VERB_DEFAULT,
-                  "Session %" PRIu32 " (@: 0x%p name: %s) did not run a sweep for 60 minutes.", i,
-                  (void *)s, s->name == NULL ? "EMPTY" : s->name);
-            }
-        } else {
-            s->sweep_warning_60min = 0;
-        }
-    }
+    WT_IGNORE_RET(__wt_session_array_walk(session, __sweep_check_session_callback, true, &cookie));
 }
 
 /*

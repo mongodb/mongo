@@ -298,68 +298,80 @@ hazard_get_reference(WT_SESSION_IMPL *session, WT_HAZARD **hazardp, uint32_t *ha
 }
 
 /*
+ * __hazard_check_callback --
+ *     Check if a session holds a hazard pointer on a given ref. If it does return both the session
+ *     and the hazard pointer. Callback from the session array walk.
+ */
+static int
+__hazard_check_callback(
+  WT_SESSION_IMPL *session, WT_SESSION_IMPL *array_session, bool *exit_walkp, void *cookiep)
+{
+    WT_HAZARD_COOKIE *cookie;
+    uint32_t i, hazard_inuse;
+
+    cookie = (WT_HAZARD_COOKIE *)cookiep;
+    hazard_get_reference(array_session, &cookie->ret_hp, &hazard_inuse);
+
+    if (hazard_inuse > cookie->max) {
+        cookie->max = hazard_inuse;
+        WT_STAT_CONN_SET(session, cache_hazard_max, cookie->max);
+    }
+
+    for (i = 0; i < hazard_inuse; ++cookie->ret_hp, ++i) {
+        ++cookie->walk_cnt;
+        if (cookie->ret_hp->ref == cookie->search_ref) {
+            WT_STAT_CONN_INCRV(session, cache_hazard_walks, cookie->walk_cnt);
+            if (cookie->ret_session != NULL)
+                *cookie->ret_session = array_session;
+            *exit_walkp = true;
+            return (0);
+        }
+    }
+
+    /*
+     * We didn't find a hazard pointer. Clear this field so we don't accidentally report the last
+     * iterated hazard pointer
+     */
+    cookie->ret_hp = NULL;
+    return (0);
+}
+
+/*
  * __wt_hazard_check --
  *     Return if there's a hazard pointer to the page in the system.
  */
 WT_HAZARD *
 __wt_hazard_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_SESSION_IMPL **sessionp)
 {
-    WT_CONNECTION_IMPL *conn;
-    WT_HAZARD *hp;
-    WT_SESSION_IMPL *s;
-    uint32_t i, j, hazard_inuse, max, session_cnt, walk_cnt;
+    WT_HAZARD_COOKIE cookie;
+
+    WT_CLEAR(cookie);
+    cookie.ret_session = sessionp;
+    cookie.search_ref = ref;
 
     /* If a file can never be evicted, hazard pointers aren't required. */
     if (F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY))
         return (NULL);
 
-    conn = S2C(session);
-
     WT_STAT_CONN_INCR(session, cache_hazard_checks);
-
     /*
      * Hazard pointer arrays might grow and be freed underneath us; enter the current hazard
      * resource generation for the duration of the walk to ensure that doesn't happen.
      */
     __wt_session_gen_enter(session, WT_GEN_HAZARD);
+    WT_IGNORE_RET(__wt_session_array_walk(session, __hazard_check_callback, false, &cookie));
 
-    /*
-     * No lock is required because the session array is fixed size, but it may contain inactive
-     * entries. We must review any active session that might contain a hazard pointer, so insert a
-     * read barrier after reading the active session count. That way, no matter what sessions come
-     * or go, we'll check the slots for all of the sessions that could have been active when we
-     * started our check.
-     */
-    WT_ORDERED_READ(session_cnt, conn->session_cnt);
-    for (s = conn->sessions, i = max = walk_cnt = 0; i < session_cnt; ++s, ++i) {
-        if (!s->active)
-            continue;
+    if (cookie.ret_hp == NULL)
+        /*
+         * We increment this stat inside the walk logic when we find a hazard pointer. Since we
+         * didn't find one increment here instead.
+         */
+        WT_STAT_CONN_INCRV(session, cache_hazard_walks, cookie.walk_cnt);
 
-        hazard_get_reference(s, &hp, &hazard_inuse);
-
-        if (hazard_inuse > max) {
-            max = hazard_inuse;
-            WT_STAT_CONN_SET(session, cache_hazard_max, max);
-        }
-
-        for (j = 0; j < hazard_inuse; ++hp, ++j) {
-            ++walk_cnt;
-            if (hp->ref == ref) {
-                WT_STAT_CONN_INCRV(session, cache_hazard_walks, walk_cnt);
-                if (sessionp != NULL)
-                    *sessionp = s;
-                goto done;
-            }
-        }
-    }
-    WT_STAT_CONN_INCRV(session, cache_hazard_walks, walk_cnt);
-    hp = NULL;
-
-done:
     /* Leave the current resource generation. */
     __wt_session_gen_leave(session, WT_GEN_HAZARD);
 
-    return (hp);
+    return (cookie.ret_hp);
 }
 
 /*

@@ -94,3 +94,13 @@ struct __wt_rollback_to_stable {
     /* Configuration. */
     bool dryrun;
 };
+
+/*
+ * WT_RTS_COOKIE --
+ *   State passed through to callbacks during the session walk logic when checking for active
+ *   transactions or open cursors before an RTS.
+ */
+struct __wt_rts_cookie {
+    bool ret_txn_active;
+    bool ret_cursor_active;
+};

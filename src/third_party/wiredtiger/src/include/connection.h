@@ -301,6 +301,13 @@ typedef TAILQ_HEAD(__wt_backuphash, __wt_backup_target) WT_BACKUPHASH;
 extern const WT_NAME_FLAG __wt_stress_types[];
 
 /*
+ * Access the array of all sessions. This field uses the Slotted Array pattern to managed shared
+ * accesses, if you are looking to walk all sessions please consider using the existing session walk
+ * logic. FIXME-WT-10946 - Add link to Slotted Array docs.
+ */
+#define WT_CONN_SESSIONS_GET(conn) ((conn)->session_array.__array)
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -422,9 +429,11 @@ struct __wt_connection_impl {
      * that way because we want an easy way for the server thread code to avoid walking the entire
      * array when only a few threads are running.
      */
-    WT_SESSION_IMPL *sessions;      /* Session reference */
-    uint32_t session_size;          /* Session array size */
-    wt_shared uint32_t session_cnt; /* Session count */
+    struct {
+        WT_SESSION_IMPL *__array; /* Session reference. Do not use this field directly. */
+        uint32_t size;            /* Session array size */
+        wt_shared uint32_t cnt;   /* Session count */
+    } session_array;
 
     size_t session_scratch_max; /* Max scratch memory per session */
 
@@ -817,4 +826,22 @@ struct __wt_connection_impl {
 #define WT_CONN_WAS_BACKUP 0x20000000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags;
+};
+
+/*
+ * WT_VERBOSE_DUMP_COOKIE --
+ *   State passed through to callbacks during the session walk logic when dumping all sessions.
+ */
+struct __wt_verbose_dump_cookie {
+    uint32_t internal_session_count;
+    bool show_cursors;
+};
+
+/*
+ * WT_SWEEP_COOKIE --
+ *   State passed through to callbacks during the session walk logic when checking for sessions that
+ *   haven't performed a sweep in a long time.
+ */
+struct __wt_sweep_cookie {
+    uint64_t now;
 };

@@ -22,7 +22,8 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
     WT_ASSERT(session, session->iface.connection == &conn->iface);
 
     /* WT_SESSION_IMPL array. */
-    WT_RET(__wt_calloc(session, conn->session_size, sizeof(WT_SESSION_IMPL), &conn->sessions));
+    WT_RET(__wt_calloc(
+      session, conn->session_array.size, sizeof(WT_SESSION_IMPL), &WT_CONN_SESSIONS_GET(conn)));
 
     /*
      * Open the default session. We open this before starting service threads because those may
@@ -177,8 +178,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
      * session close, they persist past the life of the session. Discard them now.
      */
     if (!F_ISSET(conn, WT_CONN_LEAK_MEMORY))
-        if ((s = conn->sessions) != NULL)
-            for (i = 0; i < conn->session_size; ++s, ++i) {
+        if ((s = WT_CONN_SESSIONS_GET(conn)) != NULL)
+            for (i = 0; i < conn->session_array.size; ++s, ++i) {
                 __wt_free(session, s->cursor_cache);
                 __wt_free(session, s->dhhash);
                 __wt_stash_discard_all(session, s);
