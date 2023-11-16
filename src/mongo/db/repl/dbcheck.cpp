@@ -529,6 +529,7 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
         }
 
         const auto iam = entry->accessMethod()->asSortedData();
+        const bool isUnique = descriptor->unique();
 
         SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
         KeyStringSet keyStrings;
@@ -536,7 +537,10 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
         KeyStringSet multikeyMetadataKeys;
         MultikeyPaths multikeyPaths;
 
-        // Set keyStrings to the expected index keys for currentObj.
+        // Set keyStrings to the expected index keys for currentObj. If this is a unique index, do
+        // not append the recordId at the end, since there should only be one index key per value
+        // and old format unique index keys did not have recordId appended. Otherwise, append the
+        // recordId to the search keystrings.
         iam->getKeys(opCtx,
                      collPtr,
                      entry,
@@ -547,7 +551,7 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
                      &keyStrings,
                      &multikeyMetadataKeys,
                      &multikeyPaths,
-                     currentRecordId);
+                     (isUnique ? boost::none : boost::optional<RecordId>(currentRecordId)));
 
         auto cursor =
             std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, _dataThrottle);
@@ -561,22 +565,17 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
             // Dbcheck will access every index for each document, and we aim for the count to
             // represent the storage accesses. Therefore, we increment the number of keys seen.
             _countKeysSeen++;
-            if (!ksEntry) {
-                _missingIndexKeys.push_back(BSON(descriptor->indexName()
-                                                 << key.toString() << "indexSpec"
-                                                 << descriptor->infoObj()));
-                continue;
-            }
-
-            // TODO (SERVER-80960): Handle the old keystring format without appended RecordId
-            // if this is a unique index.
-            auto foundRecordId = ksEntry.get().loc;
-            if (foundRecordId != currentRecordId) {
-                _missingIndexKeys.push_back(BSON(descriptor->indexName()
-                                                 << key.toString() << "foundRecordId"
-                                                 << foundRecordId.toString() << "expectedRecordId"
-                                                 << currentRecordId.toString() << "indexSpec"
-                                                 << descriptor->infoObj()));
+            if (!ksEntry || ksEntry.get().loc != currentRecordId) {
+                auto keyRehydrated = key_string::rehydrateKey(
+                    descriptor->keyPattern(),
+                    key_string::toBsonSafe(key.getBuffer(),
+                                           key.getSize(),
+                                           iam->getSortedDataInterface()->getOrdering(),
+                                           key.getTypeBits()));
+                _missingIndexKeys.push_back(BSON(
+                    "indexName" << descriptor->indexName() << "keyString" << keyRehydrated
+                                << "expectedRecordId" << currentRecordId.toStringHumanReadable()
+                                << "indexSpec" << descriptor->infoObj()));
             }
         }
     }

@@ -1556,9 +1556,12 @@ function appendSetParameterArgs(argArray) {
 
             // Increase the default value for `receiveChunkWaitForRangeDeleterTimeoutMS` to 90
             // seconds to prevent failures due to occasional slow range deletions
-            if (!argArrayContainsSetParameterValue('receiveChunkWaitForRangeDeleterTimeoutMS=')) {
-                argArray.push(
-                    ...['--setParameter', 'receiveChunkWaitForRangeDeleterTimeoutMS=90000']);
+            if (programMajorMinorVersion >= 420) {
+                if (!argArrayContainsSetParameterValue(
+                        'receiveChunkWaitForRangeDeleterTimeoutMS=')) {
+                    argArray.push(
+                        ...['--setParameter', 'receiveChunkWaitForRangeDeleterTimeoutMS=90000']);
+                }
             }
 
             if (programMajorMinorVersion >= 360) {

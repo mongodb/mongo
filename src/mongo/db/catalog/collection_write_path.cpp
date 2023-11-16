@@ -117,6 +117,10 @@ MONGO_FAIL_POINT_DEFINE(corruptDocumentOnInsert);
 // This fail point manually forces the RecordId to be of a given value during insert.
 MONGO_FAIL_POINT_DEFINE(explicitlySetRecordIdOnInsert);
 
+// This fail point skips deletion of the record, so that the deletion call would only delete the
+// index keys.
+MONGO_FAIL_POINT_DEFINE(skipDeleteRecord);
+
 bool compareSafeContentElem(const BSONObj& oldDoc, const BSONObj& newDoc) {
     if (newDoc.hasField(kSafeContent) != oldDoc.hasField(kSafeContent)) {
         return false;
@@ -863,7 +867,16 @@ void deleteDocument(OperationContext* opCtx,
     int64_t keysDeleted = 0;
     collection->getIndexCatalog()->unindexRecord(
         opCtx, collection, doc.value(), loc, noWarn, &keysDeleted, checkRecordId);
-    collection->getRecordStore()->deleteRecord(opCtx, loc);
+
+    if (MONGO_unlikely(skipDeleteRecord.shouldFail())) {
+        LOGV2_DEBUG(8096000,
+                    3,
+                    "Skipping deleting record in deleteDocument",
+                    "recordId"_attr = loc,
+                    "doc"_attr = doc.value().toString());
+    } else {
+        collection->getRecordStore()->deleteRecord(opCtx, loc);
+    }
 
     opCtx->getServiceContext()->getOpObserver()->onDelete(
         opCtx, collection, stmtId, doc.value(), deleteArgs);
