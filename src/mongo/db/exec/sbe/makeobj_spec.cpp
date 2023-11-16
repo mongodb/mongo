@@ -139,7 +139,7 @@ StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names,
     for (size_t i = 0; i < names.size(); ++i) {
         size_t pos = fieldDict.findPos(names[i]);
         if (pos != StringListSet::npos) {
-            auto& action = actions[pos];
+            auto& action = actions[i];
 
             if (isClosed ? action.isKeep() : action.isDrop()) {
                 displayOrderSet.emplace(pos);
