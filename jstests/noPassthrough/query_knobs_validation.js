@@ -35,7 +35,7 @@ const expectedParamDefaults = {
     internalQueryExecYieldPeriodMS: 10,
     internalQueryFacetBufferSizeBytes: 100 * 1024 * 1024,
     internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024,
-    internalDocumentSourceCursorInitialBatchSize: 4,
+    internalDocumentSourceCursorInitialBatchSize: 32,
     internalDocumentSourceLookupCacheSizeBytes: 100 * 1024 * 1024,
     internalLookupStageIntermediateDocumentMaxSizeBytes: 100 * 1024 * 1024,
     internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024,
