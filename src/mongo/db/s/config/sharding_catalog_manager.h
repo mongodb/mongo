@@ -657,6 +657,12 @@ public:
      */
     int deleteMaxSizeMbFromShardEntries(OperationContext* opCtx);
 
+    /**
+     * Updates the config.settings schema for FCV upgrade and downgrade.
+     * TODO (SERVER-83264): Remove once 8.0 becomes last LTS.
+     */
+    Status upgradeDowngradeConfigSettings(OperationContext* opCtx);
+
 private:
     /**
      * Performs the necessary checks for version compatibility and creates a new config.version

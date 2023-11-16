@@ -67,6 +67,7 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -106,10 +107,39 @@ const char kAttemptToBalanceJumboChunks[] = "attemptToBalanceJumboChunks";
 }  // namespace
 
 const char BalancerSettingsType::kKey[] = "balancer";
-const char* BalancerSettingsType::kBalancerModes[] = {"full", "off"};
+const std::vector<std::string> BalancerSettingsType::kBalancerModes = {"full", "off"};
+const BSONObj BalancerSettingsType::kSchema =
+    BSON("properties" << BSON("_id" << BSON("enum" << BSON_ARRAY(BalancerSettingsType::kKey))
+                                    << kMode << BSON("enum" << kBalancerModes) << kStopped
+                                    << BSON("bsonType"
+                                            << "bool")
+                                    << kActiveWindow
+                                    << BSON("bsonType"
+                                            << "object"
+                                            << "required"
+                                            << BSON_ARRAY("start"
+                                                          << "stop"))
+                                    << "_secondaryThrottle"
+                                    << BSON("oneOf" << BSON_ARRAY(BSON("bsonType"
+                                                                       << "bool")
+                                                                  << BSON("bsonType"
+                                                                          << "object")))
+                                    << kWaitForDelete
+                                    << BSON("bsonType"
+                                            << "bool")
+                                    << kAttemptToBalanceJumboChunks
+                                    << BSON("bsonType"
+                                            << "bool"))
+                      << "additionalProperties" << false);
 
 const char ChunkSizeSettingsType::kKey[] = "chunksize";
 const uint64_t ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes{128 * 1024 * 1024};
+const BSONObj ChunkSizeSettingsType::kSchema = BSON(
+    "properties" << BSON("_id" << BSON("enum" << BSON_ARRAY(ChunkSizeSettingsType::kKey)) << kValue
+                               << BSON("bsonType"
+                                       << "number"
+                                       << "minimum" << 1 << "maximum" << 1024))
+                 << "additionalProperties" << false);
 
 const char AutoMergeSettingsType::kKey[] = "automerge";
 
@@ -327,18 +357,11 @@ StatusWith<BalancerSettingsType> BalancerSettingsType::fromBSON(const BSONObj& o
                 return status;
             auto it = std::find(std::begin(kBalancerModes), std::end(kBalancerModes), modeStr);
             if (it == std::end(kBalancerModes)) {
-                std::vector<std::string> supportedModes;
-                std::transform(std::begin(kBalancerModes),
-                               std::end(kBalancerModes),
-                               std::back_inserter(supportedModes),
-                               [](const char* supportedMode) -> std::string {
-                                   return std::string(supportedMode);
-                               });
                 LOGV2_WARNING(
                     7575700,
                     "Balancer turned off because currently set balancing mode is not valid",
                     "currentMode"_attr = modeStr,
-                    "supportedModes"_attr = supportedModes);
+                    "supportedModes"_attr = kBalancerModes);
                 settings._mode = kOff;
             } else {
                 settings._mode = static_cast<BalancerMode>(it - std::begin(kBalancerModes));

@@ -845,39 +845,35 @@ Status ShardingCatalogManager::_initConfigCollections(OperationContext* opCtx) {
     return Status::OK();
 }
 
+// TODO (SERVER-83264): Move new validator to _initConfigSettings and remove old validator once 8.0
+// becomes last LTS.
+BSONObj createConfigSettingsValidator() {
+    if (feature_flags::gBalancerSettingsSchema.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        const auto noopValidator = BSON(
+            "properties" << BSON(
+                "_id" << BSON("enum" << BSON_ARRAY(AutoMergeSettingsType::kKey
+                                                   << ReadWriteConcernDefaults::kPersistedDocumentId
+                                                   << "audit"))));
+        return BSON("$jsonSchema" << BSON("oneOf" << BSON_ARRAY(BalancerSettingsType::kSchema
+                                                                << ChunkSizeSettingsType::kSchema
+                                                                << noopValidator)));
+    } else {
+        const auto noopValidator = BSON(
+            "properties" << BSON(
+                "_id" << BSON("enum" << BSON_ARRAY(BalancerSettingsType::kKey
+                                                   << AutoMergeSettingsType::kKey
+                                                   << ReadWriteConcernDefaults::kPersistedDocumentId
+                                                   << "audit"))));
+        return BSON("$jsonSchema" << BSON(
+                        "oneOf" << BSON_ARRAY(ChunkSizeSettingsType::kSchema << noopValidator)));
+    }
+}
+
 Status ShardingCatalogManager::_initConfigSettings(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
 
-    /**
-     * $jsonSchema: {
-     *   oneOf: [
-     *       {"properties": {_id: {enum: ["chunksize"]}},
-     *                      {value: {bsonType: "number", minimum: 1, maximum: 1024}}},
-     *       {"properties": {_id: {enum: ["balancer", "automerge" "ReadWriteConcernDefaults",
-     * "audit"]}}}
-     *   ]
-     * }
-     *
-     * Note: the schema uses "number" for the chunksize instead of "int" because "int" requires the
-     * user to pass NumberInt(x) as the value rather than x (as all of our docs recommend). Non-
-     * integer values will be handled as they were before the schema, by the balancer failing until
-     * a new value is set.
-     */
-    const auto chunkSizeValidator =
-        BSON("properties" << BSON("_id" << BSON("enum" << BSON_ARRAY(ChunkSizeSettingsType::kKey))
-                                        << "value"
-                                        << BSON("bsonType"
-                                                << "number"
-                                                << "minimum" << 1 << "maximum" << 1024))
-                          << "additionalProperties" << false);
-    const auto noopValidator =
-        BSON("properties" << BSON(
-                 "_id" << BSON("enum" << BSON_ARRAY(
-                                   BalancerSettingsType::kKey
-                                   << AutoMergeSettingsType::kKey
-                                   << ReadWriteConcernDefaults::kPersistedDocumentId << "audit"))));
-    const auto fullValidator =
-        BSON("$jsonSchema" << BSON("oneOf" << BSON_ARRAY(chunkSizeValidator << noopValidator)));
+    const auto fullValidator = createConfigSettingsValidator();
 
     BSONObj cmd = BSON("create" << NamespaceString::kConfigSettingsNamespace.coll());
     BSONObj result;
@@ -1568,5 +1564,10 @@ int ShardingCatalogManager::deleteMaxSizeMbFromShardEntries(OperationContext* op
     write_ops::checkWriteErrors(updateReply);
     return updateReply.getN();
 }
+
+Status ShardingCatalogManager::upgradeDowngradeConfigSettings(OperationContext* opCtx) {
+    return _initConfigSettings(opCtx);
+}
+
 
 }  // namespace mongo

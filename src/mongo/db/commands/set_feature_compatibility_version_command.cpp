@@ -736,12 +736,23 @@ private:
 
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             _setShardedClusterCardinalityParameter(opCtx, requestedVersion);
+            // TODO (SERVER-83264): Remove once 8.0 becomes last LTS.
+            _upgradeConfigSettingsSchema(opCtx, requestedVersion);
         }
 
         // TODO SERVER-80490: Remove this once 8.0 is released.
         // Sanitizes the wiredTiger.creationString option from the durable catalog. Removes the
         // encryption config options since they are ephemeral in nature.
         _sanitizeCreationConfigString(opCtx, requestedVersion);
+    }
+
+    void _upgradeConfigSettingsSchema(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (feature_flags::gBalancerSettingsSchema.isEnabledOnVersion(requestedVersion)) {
+            LOGV2(8260900, "Updating schema on config.settings");
+            uassertStatusOK(
+                ShardingCatalogManager::get(opCtx)->upgradeDowngradeConfigSettings(opCtx));
+        }
     }
 
     // TODO SERVER-80490: Remove this method once 8.0 is released.
@@ -853,6 +864,18 @@ private:
                     }
                     wunit.commit();
                 });
+        }
+    }
+
+    void _downgradeConfigSettingsSchema(
+        OperationContext* opCtx,
+        const multiversion::FeatureCompatibilityVersion requestedVersion,
+        const multiversion::FeatureCompatibilityVersion originalVersion) {
+        if (feature_flags::gBalancerSettingsSchema.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+                requestedVersion, originalVersion)) {
+            LOGV2(8260901, "Updating schema on config.settings");
+            uassertStatusOK(
+                ShardingCatalogManager::get(opCtx)->upgradeDowngradeConfigSettings(opCtx));
         }
     }
 
@@ -1203,6 +1226,8 @@ private:
             // be able to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
             _createReshardingCoordinatorUniqueIndex(opCtx, requestedVersion, originalVersion);
+            // TODO (SERVER-83264): Remove once 8.0 becomes last LTS.
+            _downgradeConfigSettingsSchema(opCtx, requestedVersion, originalVersion);
         }
 
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
