@@ -97,6 +97,7 @@ public:
             svrRequest.setShardKey(BSON("_id" << 1));
             svrRequest.setUnsplittable(true);
             svrRequest.setDataShard(req.getDataShard());
+            svrRequest.setTimeseries(req.getTimeseries());
             svrRequest.setIsFromCreateUnsplittableCollectionTestCommand(true);
             shardsvrCollRequest.setDbName(nss.dbName());
             shardsvrCollRequest.setShardsvrCreateCollectionRequest(svrRequest);

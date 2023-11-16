@@ -847,6 +847,13 @@ TranslatedRequestParams translateRequestParameters(OperationContext* opCtx,
         request.setTimeseries(existingTimeseriesOptions);
     }
 
+    if (request.getUnsplittable()) {
+        return TranslatedRequestParams(
+            resolvedNamespace,
+            request.getShardKey().value(),
+            resolveCollationForUserQueries(opCtx, resolvedNamespace, request.getCollation()));
+    }
+
     // check that they are consistent with the requested shard key before creating the key pattern
     // object.
     auto timeFieldName = request.getTimeseries()->getTimeField();
