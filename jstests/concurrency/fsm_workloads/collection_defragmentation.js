@@ -119,11 +119,8 @@ export const $config = (function() {
 
             // Choose a random starting point to look for mergeable chunks to make it less likely
             // that each thread tries to move the same chunk.
-            let index = Random.randInt(chunks.length);
-            for (let i = 0; i < chunks.length; i++) {
-                if (index === chunks.length - 1) {
-                    index = 0;
-                }
+            let index = Random.randInt(chunks.length - 1);
+            for (let i = 0; i < chunks.length - 1; i++) {
                 if (chunks[index].shard === chunks[index + 1].shard &&
                     defragmentationUtil.getZoneForRange(connCache.mongos[0],
                                                         randomColl.getFullName(),
@@ -142,6 +139,10 @@ export const $config = (function() {
                         jsTest.log("Ignoring manual merge chunks error: " + tojson(e));
                     }
                     return;
+                }
+                index++;
+                if (index >= chunks.length - 1) {
+                    index = 0;
                 }
             }
         },
