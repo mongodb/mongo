@@ -824,9 +824,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     try {
-        if ((serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
-             serverGlobalParams.clusterRole.has(ClusterRole::None)) &&
-            replSettings.isReplSet()) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::None) && replSettings.isReplSet()) {
             ReadWriteConcernDefaults::get(startupOpCtx.get()->getServiceContext())
                 .refreshIfNecessary(startupOpCtx.get());
         }
@@ -836,6 +834,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                       "error"_attr = redact(ex));
     }
     readWriteConcernDefaultsMongodStartupChecks(startupOpCtx.get());
+
+    MirrorMaestro::init(serviceContext);
 
     // Perform replication recovery for queryable backup mode if needed.
     if (storageGlobalParams.queryableBackupMode) {
@@ -861,11 +861,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             "Start up the replication coordinator for queryable backup mode",
             &startupTimeElapsedBuilder);
         replCoord->startup(startupOpCtx.get(), lastShutdownState);
-    }
-
-    MirrorMaestro::init(serviceContext);
-
-    if (!storageGlobalParams.queryableBackupMode) {
+    } else {
         if (storageEngine->supportsCappedCollections()) {
             logStartup(startupOpCtx.get());
         }
@@ -1074,16 +1070,18 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     // Set up the logical session cache
-    LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        kind = LogicalSessionCacheServer::kConfigServer;
-    } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-        kind = LogicalSessionCacheServer::kSharded;
-    } else if (replSettings.isReplSet()) {
-        kind = LogicalSessionCacheServer::kReplicaSet;
-    }
-
-    LogicalSessionCache::set(serviceContext, makeLogicalSessionCacheD(kind));
+    auto logicalSessionCache = [&] {
+        LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            kind = LogicalSessionCacheServer::kConfigServer;
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+            kind = LogicalSessionCacheServer::kSharded;
+        } else if (replSettings.isReplSet()) {
+            kind = LogicalSessionCacheServer::kReplicaSet;
+        }
+        return makeLogicalSessionCacheD(kind);
+    }();
+    LogicalSessionCache::set(serviceContext, std::move(logicalSessionCache));
 
     if (analyze_shard_key::supportsSamplingQueries(serviceContext) &&
         serverGlobalParams.clusterRole.has(ClusterRole::None)) {
