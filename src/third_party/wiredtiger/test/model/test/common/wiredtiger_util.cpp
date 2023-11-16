@@ -26,6 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <iomanip>
+#include <sstream>
+
 #include "wiredtiger.h"
 extern "C" {
 #include "test_util.h"
@@ -317,6 +320,88 @@ wt_txn_insert(WT_SESSION *session, const char *uri, const model::data_value &key
     ret = model::wt_cursor_insert(cursor, key, value);
     testutil_check(cursor->close(cursor));
     return ret;
+}
+
+/*
+ * wt_ckpt_get --
+ *     Read from WiredTiger.
+ */
+model::data_value
+wt_ckpt_get(WT_SESSION *session, const char *uri, const model::data_value &key,
+  const char *ckpt_name, model::timestamp_t debug_read_timestamp)
+{
+    if (ckpt_name == nullptr)
+        ckpt_name = WT_CHECKPOINT;
+
+    /* Set the checkpoint name. */
+    std::ostringstream config_stream;
+    config_stream << "checkpoint=" << ckpt_name;
+
+    /* Set the checkpoint debug read timestamp, if set. */
+    if (debug_read_timestamp != model::k_timestamp_none)
+        config_stream << ",debug=(checkpoint_read_timestamp=" << std::hex << debug_read_timestamp
+                      << ")";
+
+    /* Open the cursor. */
+    std::string config = config_stream.str();
+    WT_CURSOR *cursor;
+    testutil_check(session->open_cursor(session, uri, nullptr, config.c_str(), &cursor));
+
+    /* Do the read. */
+    model::set_wt_cursor_key(cursor, key);
+    int ret = cursor->search(cursor);
+    if (ret != WT_NOTFOUND && ret != WT_ROLLBACK)
+        testutil_check(ret);
+    model::data_value out = ret == 0 ? model::get_wt_cursor_value(cursor) : model::NONE;
+
+    /* Clean up. */
+    testutil_check(cursor->close(cursor));
+    return out;
+}
+
+/*
+ * wt_ckpt_create --
+ *     Create a WiredTiger checkpoint.
+ */
+void
+wt_ckpt_create(WT_SESSION *session, const char *ckpt_name)
+{
+    std::ostringstream config_stream;
+
+    if (ckpt_name != nullptr)
+        config_stream << "name=" << ckpt_name;
+
+    std::string config = config_stream.str();
+    testutil_check(session->checkpoint(session, config.c_str()));
+}
+
+/*
+ * wt_get_stable_timestamp --
+ *     Get the stable timestamp in WiredTiger.
+ */
+model::timestamp_t
+wt_get_stable_timestamp(WT_CONNECTION *conn)
+{
+    char buf[64];
+    testutil_check(conn->query_timestamp(conn, buf, "get=stable_timestamp"));
+
+    std::istringstream ss(buf);
+    model::timestamp_t t;
+    ss >> std::hex >> t;
+    return t;
+}
+
+/*
+ * wt_set_stable_timestamp --
+ *     Set the stable timestamp in WiredTiger.
+ */
+void
+wt_set_stable_timestamp(WT_CONNECTION *conn, model::timestamp_t timestamp)
+{
+    char buf[64];
+
+    testutil_snprintf(buf, sizeof(buf), "stable_timestamp=%" PRIx64, timestamp);
+    testutil_check(conn->set_timestamp(conn, buf));
 }
 
 /*

@@ -29,6 +29,7 @@
 #ifndef MODEL_KV_TRANSACTION_SNAPSHOT_H
 #define MODEL_KV_TRANSACTION_SNAPSHOT_H
 
+#include <memory>
 #include <unordered_set>
 
 #include "model/core.h"
@@ -68,6 +69,12 @@ private:
     txn_id_t _exclude_after;
     std::unordered_set<txn_id_t> _exclude_ids;
 };
+
+/*
+ * kv_transaction_snapshot_ptr --
+ *     A shared pointer to the transaction snapshot.
+ */
+using kv_transaction_snapshot_ptr = std::shared_ptr<kv_transaction_snapshot>;
 
 } /* namespace model */
 #endif

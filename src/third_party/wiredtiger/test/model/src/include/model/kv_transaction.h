@@ -76,7 +76,7 @@ public:
      * kv_transaction::kv_transaction --
      *     Create a new instance of the transaction.
      */
-    inline kv_transaction(kv_database &database, txn_id_t id, kv_transaction_snapshot &&snapshot,
+    inline kv_transaction(kv_database &database, txn_id_t id, kv_transaction_snapshot_ptr snapshot,
       timestamp_t read_timestamp = k_timestamp_latest) noexcept
         : _database(database), _id(id), _commit_timestamp(k_initial_commit_timestamp),
           _durable_timestamp(k_timestamp_none), _prepare_timestamp(k_timestamp_none),
@@ -156,13 +156,23 @@ public:
     }
 
     /*
+     * kv_transaction::snapshot --
+     *     Get the transaction snapshot.
+     */
+    inline kv_transaction_snapshot_ptr
+    snapshot() const noexcept
+    {
+        return _snapshot;
+    }
+
+    /*
      * kv_transaction::visible_txn --
      *     Check whether the given transaction ID is visible for this transaction.
      */
     inline bool
     visible_txn(txn_id_t id) const noexcept
     {
-        return _snapshot.contains(id);
+        return _snapshot->contains(id);
     }
 
     /*
@@ -228,7 +238,7 @@ private:
     timestamp_t _durable_timestamp;
     timestamp_t _prepare_timestamp;
     timestamp_t _read_timestamp;
-    kv_transaction_snapshot _snapshot;
+    kv_transaction_snapshot_ptr _snapshot;
 
     /* The lifetime of the transaction must not exceed the lifetime of the database. */
     kv_database &_database;
