@@ -494,7 +494,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpoints(
 }
 
 void PartitionIterator::updateNextPartitionStateSize() {
-    _memoryToken = MemoryToken{getNextPartitionStateSize(), _memoryToken.tracker()};
+    _memoryToken = MemoryUsageToken{getNextPartitionStateSize(), _memoryToken.tracker()};
 }
 
 void PartitionIterator::getNextDocument() {

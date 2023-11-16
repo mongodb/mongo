@@ -64,12 +64,12 @@ void GroupProcessorBase::freeMemory() {
     for (auto& group : _groups) {
         for (size_t i = 0; i < group.second.size(); ++i) {
             // Subtract the current usage.
-            _accumulatedFieldMemoryTrackers[i]->update(-1 * group.second[i]->getMemUsage());
+            _accumulatedFieldMemoryTrackers[i]->add(-1 * group.second[i]->getMemUsage());
 
             group.second[i]->reduceMemoryConsumptionIfAble();
 
             // Update the memory usage for this AccumulationStatement.
-            _accumulatedFieldMemoryTrackers[i]->update(group.second[i]->getMemUsage());
+            _accumulatedFieldMemoryTrackers[i]->add(group.second[i]->getMemUsage());
         }
     }
 }
@@ -144,7 +144,7 @@ std::pair<GroupProcessorBase::GroupsMap::iterator, bool> GroupProcessorBase::fin
 
     const size_t numAccumulators = _accumulatedFields.size();
     if (emplaceResult.second) {
-        _memoryTracker.update(key.getApproximateSize());
+        _memoryTracker.add(key.getApproximateSize());
 
         // Initialize and add the accumulators
         Value expandedId = expandId(key);
@@ -157,7 +157,7 @@ std::pair<GroupProcessorBase::GroupsMap::iterator, bool> GroupProcessorBase::fin
             Value initializerValue =
                 accumulatedField.expr.initializer->evaluate(idDoc, &_expCtx->variables);
             accum->startNewGroup(initializerValue);
-            _accumulatedFieldMemoryTrackers[i]->update(accum->getMemUsage());
+            _accumulatedFieldMemoryTrackers[i]->add(accum->getMemUsage());
             group.push_back(std::move(accum));
         }
     }
@@ -177,8 +177,7 @@ void GroupProcessorBase::accumulate(GroupsMap::iterator groupIter,
     auto& accumulator = groupIter->second[accumulatorIdx];
     const auto prevMemUsage = accumulator->getMemUsage();
     accumulator->process(accumulatorArg, _doingMerge);
-    _accumulatedFieldMemoryTrackers[accumulatorIdx]->update(accumulator->getMemUsage() -
-                                                            prevMemUsage);
+    _accumulatedFieldMemoryTrackers[accumulatorIdx]->add(accumulator->getMemUsage() - prevMemUsage);
 }
 
 Value GroupProcessorBase::expandId(const Value& val) {

@@ -56,7 +56,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/group_from_first_document_transformation.h"
 #include "mongo/db/pipeline/group_processor.h"
-#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
@@ -64,6 +63,7 @@
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/logv2/log_attr.h"
+#include "mongo/util/memory_usage_tracker.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

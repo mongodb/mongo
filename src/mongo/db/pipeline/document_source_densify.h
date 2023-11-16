@@ -59,7 +59,6 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
@@ -70,6 +69,7 @@
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/memory_usage_tracker.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -344,7 +344,7 @@ public:
           _partitions(std::move(partitions)),
           _range(std::move(range)),
           _partitionTable(pExpCtx->getValueComparator()
-                              .makeUnorderedValueMap<SimpleMemoryTokenWith<DensifyValue>>()) {
+                              .makeUnorderedValueMap<SimpleMemoryUsageTokenWith<DensifyValue>>()) {
         _maxDocs = internalQueryMaxAllowedDensifyDocs.load();
     };
 
@@ -544,9 +544,9 @@ private:
         if (_partitionExpr) {
             auto partitionKey = getDensifyPartition(doc);
             auto partitionVal = getDensifyValue(doc);
-            SimpleMemoryToken memoryToken{partitionKey.getApproximateSize() +
-                                              partitionVal.getApproximateSize(),
-                                          &_memTracker};
+            SimpleMemoryUsageToken memoryToken{partitionKey.getApproximateSize() +
+                                                   partitionVal.getApproximateSize(),
+                                               &_memTracker};
             _partitionTable[partitionKey] = {std::move(memoryToken), std::move(partitionVal)};
             uassert(6007200,
                     str::stream() << "$densify exceeded memory limit of "
@@ -616,6 +616,6 @@ private:
     std::list<FieldPath> _partitions;
     RangeStatement _range;
     // Store of the value we've seen for each partition.
-    ValueUnorderedMap<SimpleMemoryTokenWith<DensifyValue>> _partitionTable;
+    ValueUnorderedMap<SimpleMemoryUsageTokenWith<DensifyValue>> _partitionTable;
 };
 }  // namespace mongo

@@ -99,7 +99,7 @@ void WindowFunctionIntegral::add(Value value) {
     if (!_values.empty() && isNonremovable) {
         _values.pop_front();
     }
-    _values.emplace_back(SimpleMemoryToken{value.getApproximateSize(), &_memUsageTracker},
+    _values.emplace_back(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
                          std::move(value));
 }
 

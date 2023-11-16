@@ -31,7 +31,7 @@
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/pipeline/memory_usage_tracker.h"
+#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 
@@ -53,7 +53,7 @@ private:
     }
 
     template <typename Tracker>
-    const Value& _getValue(const MemoryTokenWithImpl<Tracker, Value>& v) const {
+    const Value& _getValue(const MemoryUsageTokenWithImpl<Tracker, Value>& v) const {
         return v.value();
     }
 
@@ -61,8 +61,8 @@ private:
 };
 
 /**
- * Helper function to convert container of MemoryTokenWith<Value> to a Value, containing an array of
- * Values.
+ * Helper function to convert container of MemoryUsageTokenWith<Value> to a Value, containing an
+ * array of Values.
  */
 template <typename Iterator>
 Value convertToValueFromMemoryTokenWithValue(Iterator begin, Iterator end, size_t size) {

@@ -53,7 +53,7 @@ public:
     explicit WindowFunctionAvg(ExpressionContext* const expCtx) : RemovableSum(expCtx), _count(0) {
         // Note that RemovableSum manages the memory usage tracker directly for calls to add/remove.
         // Here we only add the members that this class holds.
-        _memUsageTracker.update(sizeof(long long));
+        _memUsageTracker.add(sizeof(long long));
     }
 
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
@@ -108,7 +108,7 @@ public:
     void reset() {
         RemovableSum::reset();
         _count = 0;
-        _memUsageTracker.update(sizeof(long long));
+        _memUsageTracker.add(sizeof(long long));
     }
 
 private:

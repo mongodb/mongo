@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/memory_usage_tracker.h"
+#include "mongo/util/memory_usage_tracker.h"
 
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
@@ -48,7 +48,7 @@ public:
 };
 
 TEST_F(MemoryUsageTrackerTest, SetFunctionUsageUpdatesGlobal) {
-    _tracker.update(50LL);
+    _tracker.add(50LL);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
@@ -71,22 +71,22 @@ TEST_F(MemoryUsageTrackerTest, SetFunctionUsageUpdatesGlobal) {
 }
 
 TEST_F(MemoryUsageTrackerTest, UpdateUsageUpdatesGlobal) {
-    _tracker.update(50LL);
+    _tracker.add(50LL);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
     // Add another 50 to the global, 100 total.
-    _tracker.update(50);
+    _tracker.add(50);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 100LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 100LL);
 
     // Function tracker adds another 50, 150 total.
-    _funcTracker.update(50);
+    _funcTracker.add(50);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 150LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
 
     // Lower usage of function tracker is reflected in global.
-    _funcTracker.update(-25);
+    _funcTracker.add(-25);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 125LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
 }
@@ -95,23 +95,23 @@ DEATH_TEST_F(MemoryUsageTrackerTest,
              UpdateFunctionUsageToNegativeIsDisallowed,
              "Underflow in memory tracking") {
     _funcTracker.set(50LL);
-    _funcTracker.update(-100LL);
+    _funcTracker.add(-100LL);
 }
 
 DEATH_TEST_F(MemoryUsageTrackerTest,
              UpdateMemUsageToNegativeIsDisallowed,
              "Underflow in memory tracking") {
-    _tracker.update(50LL);
-    _tracker.update(-100LL);
+    _tracker.add(50LL);
+    _tracker.add(-100LL);
 }
 
-TEST_F(MemoryUsageTrackerTest, MemoryTokenUpdatesCurrentAndMax) {
+TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenUpdatesCurrentAndMax) {
     {
-        MemoryToken token{50LL, &_tracker["subTracker"]};
+        MemoryUsageToken token{50LL, &_tracker["subTracker"]};
         ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
         ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
         {
-            MemoryToken funcToken{100LL, &_funcTracker};
+            MemoryUsageToken funcToken{100LL, &_funcTracker};
             ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
             ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
 
@@ -128,13 +128,13 @@ TEST_F(MemoryUsageTrackerTest, MemoryTokenUpdatesCurrentAndMax) {
     ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
 }
 
-TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeMoved) {
+TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenCanBeMoved) {
     {
-        MemoryToken token{50LL, &_tracker["subTracker"]};
+        MemoryUsageToken token{50LL, &_tracker["subTracker"]};
         ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
         ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
-        MemoryToken token2(std::move(token));
+        MemoryUsageToken token2(std::move(token));
         ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
         ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
     }
@@ -142,13 +142,13 @@ TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeMoved) {
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 }
 
-TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeMoveAssigned) {
+TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenCanBeMoveAssigned) {
     {
-        MemoryToken token{50LL, &_tracker["subTracker"]};
+        MemoryUsageToken token{50LL, &_tracker["subTracker"]};
         ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
         ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
         {
-            MemoryToken token2{100LL, &_funcTracker};
+            MemoryUsageToken token2{100LL, &_funcTracker};
             ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
             ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
 
@@ -175,7 +175,7 @@ TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeMoveAssigned) {
     ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
 }
 
-TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeStoredInVector) {
+TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenCanBeStoredInVector) {
     auto assertMemory = [this]() {
         ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
         ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
@@ -193,11 +193,11 @@ TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeStoredInVector) {
     };
 
     {
-        std::vector<MemoryToken> tokens;
+        std::vector<MemoryUsageToken> tokens;
         // Use default constructor
         tokens.resize(10);
         {
-            std::vector<MemoryToken> tokens2;
+            std::vector<MemoryUsageToken> tokens2;
             tokens2.emplace_back(50LL, &_tracker["subTracker"]);
             tokens2.emplace_back(100LL, &_funcTracker);
             assertMemory();
@@ -217,13 +217,14 @@ TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeStoredInVector) {
     assertZeroMemory();
 }
 
-TEST_F(MemoryUsageTrackerTest, MemoryTokenWith) {
+TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenWith) {
     static const std::vector<std::string> kLines = {"a", "bb", "ccc", "dddd"};
 
     int64_t total_size = 0;
-    std::vector<MemoryTokenWith<std::string>> memory_tracked_vector;
+    std::vector<MemoryUsageTokenWith<std::string>> memory_tracked_vector;
     for (const auto& line : kLines) {
-        memory_tracked_vector.emplace_back(MemoryToken{line.size(), &_tracker["subTracker"]}, line);
+        memory_tracked_vector.emplace_back(MemoryUsageToken{line.size(), &_tracker["subTracker"]},
+                                           line);
         total_size += line.size();
         ASSERT_EQ(total_size, _tracker.currentMemoryBytes());
         ASSERT_EQ(total_size, _tracker.maxMemoryBytes());

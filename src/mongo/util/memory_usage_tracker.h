@@ -33,6 +33,7 @@
 #include <absl/meta/type_traits.h>
 #include <absl/strings/string_view.h>
 #include <algorithm>
+#include <boost/noncopyable.hpp>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -50,7 +51,7 @@ namespace mongo {
  * functions, which are identified by their string names. Tracks both current and highest
  * encountered memory consumption,
  *
- * It can be used directly by calling MemoryUsageTracker::update(int64_t diff), or by creating a
+ * It can be used directly by calling MemoryUsageTracker::add(int64_t diff), or by creating a
  * dependent tracker via MemoryUsageTracker::operator[].
  *
  * Dependent tracker will update both it's own memory and the total. It is used to tracker the
@@ -70,7 +71,7 @@ public:
         Impl(Impl* base, int64_t maxAllowedMemoryUsageBytes)
             : _base(base), _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes){};
 
-        void update(int64_t diff) {
+        void add(int64_t diff) {
             _currentMemoryBytes += diff;
             tassert(6128100,
                     str::stream() << "Underflow in memory tracking, attempting to add " << diff
@@ -80,12 +81,12 @@ public:
                 _maxMemoryBytes = _currentMemoryBytes;
             }
             if (_base) {
-                _base->update(diff);
+                _base->add(diff);
             }
         }
 
         void set(int64_t total) {
-            update(total - _currentMemoryBytes);
+            add(total - _currentMemoryBytes);
         }
 
         int64_t currentMemoryBytes() const {
@@ -161,15 +162,15 @@ public:
      * Updates the memory usage for 'name' by adding 'diff' to the current memory usage for
      * that function. Also updates the total memory usage.
      */
-    void update(StringData name, int64_t diff) {
-        (*this)[name].update(diff);
+    void add(StringData name, int64_t diff) {
+        (*this)[name].add(diff);
     }
 
     /**
      * Updates total memory usage.
      */
-    void update(int64_t diff) {
-        _baseTracker.update(diff);
+    void add(int64_t diff) {
+        _baseTracker.add(diff);
     }
 
     auto currentMemoryBytes() const {
@@ -218,7 +219,7 @@ public:
         _currentMemoryBytes = value;
     }
 
-    void update(int64_t diff) {
+    void add(int64_t diff) {
         _currentMemoryBytes += diff;
         tassert(6128101,
                 str::stream() << "Underflow in memory tracking, attempting to add " << diff
@@ -245,79 +246,93 @@ private:
 
 /**
  * An RAII utility class which can make it easy to account for some new allocation in a given
- * 'MemoryUsageTracker' for the entire lifetime of the object.
+ * 'MemoryUsageTracker' for the entire lifetime of the object. This is meant to be a static
+ * allocation that is released when it goes out of scope, for a dynamic instance use
+ * `MemoryUsageHandle`
  */
 template <typename Tracker>
-class MemoryTokenImpl {
+class MemoryUsageTokenImpl : private boost::noncopyable {
 public:
     // Default constructor is only present to support ease of use for some containers.
-    MemoryTokenImpl() : _size(0), _tracker(nullptr) {}
+    MemoryUsageTokenImpl() {}
 
-    MemoryTokenImpl(size_t size, Tracker* tracker) : _size(size), _tracker(tracker) {
-        _tracker->update(_size);
+    MemoryUsageTokenImpl(size_t initial, Tracker* tracker)
+        : _tracker(tracker), _curMemoryUsageBytes(initial) {
+        tassert(817700, "tracker must be set", _tracker != nullptr);
+        dassert(initial <= static_cast<size_t>(std::numeric_limits<int64_t>::max()));
+        if (initial != 0) {
+            _tracker->add(initial);
+        }
     }
 
-    MemoryTokenImpl(const MemoryTokenImpl&) = delete;
-    MemoryTokenImpl& operator=(const MemoryTokenImpl&) = delete;
-
-    MemoryTokenImpl(MemoryTokenImpl&& other) : _size(other._size), _tracker(other._tracker) {
+    MemoryUsageTokenImpl(MemoryUsageTokenImpl&& other)
+        : _tracker(other._tracker), _curMemoryUsageBytes(other._curMemoryUsageBytes) {
         other._tracker = nullptr;
+        other._curMemoryUsageBytes = 0;
     }
 
-    MemoryTokenImpl& operator=(MemoryTokenImpl&& other) {
+    MemoryUsageTokenImpl& operator=(MemoryUsageTokenImpl&& other) {
         if (this == &other) {
             return *this;
         }
+
         releaseMemory();
-        _size = other._size;
         _tracker = other._tracker;
+        _curMemoryUsageBytes = other._curMemoryUsageBytes;
         other._tracker = nullptr;
+        other._curMemoryUsageBytes = 0;
         return *this;
+    }
+
+    ~MemoryUsageTokenImpl() {
+        releaseMemory();
+    }
+
+    int64_t getCurrentMemoryUsageBytes() const {
+        return _curMemoryUsageBytes;
     }
 
     const Tracker* tracker() const {
         return _tracker;
     }
+
     Tracker* tracker() {
         return _tracker;
     }
 
-    ~MemoryTokenImpl() {
-        releaseMemory();
-    }
-
-private:
+protected:
     void releaseMemory() {
         if (_tracker) {
-            _tracker->update(-static_cast<int64_t>(_size));
+            _tracker->add(-_curMemoryUsageBytes);
         }
+        _curMemoryUsageBytes = 0;
     }
 
-    size_t _size;
-    Tracker* _tracker;
+    Tracker* _tracker{nullptr};
+    int64_t _curMemoryUsageBytes{0};
 };
 
-using MemoryToken = MemoryTokenImpl<MemoryUsageTracker::Impl>;
-using SimpleMemoryToken = MemoryTokenImpl<SimpleMemoryUsageTracker>;
+using MemoryUsageToken = MemoryUsageTokenImpl<MemoryUsageTracker::Impl>;
+using SimpleMemoryUsageToken = MemoryUsageTokenImpl<SimpleMemoryUsageTracker>;
 
 /**
  * Template to easy couple MemoryTokens with stored data.
  */
 template <typename Tracker, typename T>
-class MemoryTokenWithImpl {
+class MemoryUsageTokenWithImpl {
 public:
     template <std::enable_if_t<std::is_default_constructible_v<T>, bool> = true>
-    MemoryTokenWithImpl() : _token(), _value() {}
+    MemoryUsageTokenWithImpl() : _token(), _value() {}
 
     template <typename... Args>
-    MemoryTokenWithImpl(MemoryTokenImpl<Tracker> token, Args&&... args)
+    MemoryUsageTokenWithImpl(MemoryUsageTokenImpl<Tracker> token, Args&&... args)
         : _token(std::move(token)), _value(std::forward<Args>(args)...) {}
 
-    MemoryTokenWithImpl(const MemoryTokenWithImpl&) = delete;
-    MemoryTokenWithImpl& operator=(const MemoryTokenWithImpl&) = delete;
+    MemoryUsageTokenWithImpl(const MemoryUsageTokenWithImpl&) = delete;
+    MemoryUsageTokenWithImpl& operator=(const MemoryUsageTokenWithImpl&) = delete;
 
-    MemoryTokenWithImpl(MemoryTokenWithImpl&& other) = default;
-    MemoryTokenWithImpl& operator=(MemoryTokenWithImpl&& other) = default;
+    MemoryUsageTokenWithImpl(MemoryUsageTokenWithImpl&& other) = default;
+    MemoryUsageTokenWithImpl& operator=(MemoryUsageTokenWithImpl&& other) = default;
 
     const T& value() const {
         return _value;
@@ -327,14 +342,34 @@ public:
     }
 
 private:
-    MemoryTokenImpl<Tracker> _token;
+    MemoryUsageTokenImpl<Tracker> _token;
     T _value;
 };
 
 template <typename T>
-using MemoryTokenWith = MemoryTokenWithImpl<MemoryUsageTracker::Impl, T>;
+using MemoryUsageTokenWith = MemoryUsageTokenWithImpl<MemoryUsageTracker::Impl, T>;
 
 template <typename T>
-using SimpleMemoryTokenWith = MemoryTokenWithImpl<SimpleMemoryUsageTracker, T>;
+using SimpleMemoryUsageTokenWith = MemoryUsageTokenWithImpl<SimpleMemoryUsageTracker, T>;
+
+// Updatable version of `MemoryUsageTokenImpl`.
+template <typename Tracker>
+class MemoryUsageHandleImpl : public MemoryUsageTokenImpl<Tracker> {
+public:
+    MemoryUsageHandleImpl(Tracker* tracker = nullptr) : MemoryUsageTokenImpl<Tracker>(0, tracker) {}
+    MemoryUsageHandleImpl(int64_t initial, Tracker* tracker = nullptr)
+        : MemoryUsageTokenImpl<Tracker>(initial, tracker) {}
+
+    void add(int64_t diff) {
+        this->_curMemoryUsageBytes += diff;
+        this->_tracker->add(diff);
+    }
+
+    void set(int64_t total) {
+        add(total - this->_curMemoryUsageBytes);
+    }
+};  // class MemoryUsageHandleImpl
+
+using SimpleMemoryUsageHandle = MemoryUsageHandleImpl<SimpleMemoryUsageTracker>;
 
 }  // namespace mongo

@@ -60,7 +60,8 @@ void SpillableCache::verifyInCache(int id) {
             isIdInCache(id));
 }
 void SpillableCache::addDocument(Document input) {
-    _memCache.emplace_back(MemoryToken{input.getApproximateSize(), &_memTracker}, std::move(input));
+    _memCache.emplace_back(MemoryUsageToken{input.getApproximateSize(), &_memTracker},
+                           std::move(input));
     if (!_memTracker.withinMemoryLimit() && _expCtx->allowDiskUse) {
         spillToDisk();
     }

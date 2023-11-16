@@ -46,7 +46,7 @@ public:
             return;
         }
         _values.insert(value.coerceToDouble());
-        _memUsageTracker.update(sizeof(double));
+        _memUsageTracker.add(sizeof(double));
     }
 
     void remove(Value value) override {
@@ -59,7 +59,7 @@ public:
         tassert(7455904,
                 "Cannot remove a value not tracked by WindowFunctionPercentile",
                 iter != _values.end());
-        _memUsageTracker.update(-static_cast<int64_t>(sizeof(double)));
+        _memUsageTracker.add(-static_cast<int64_t>(sizeof(double)));
         _values.erase(iter);
     }
 
