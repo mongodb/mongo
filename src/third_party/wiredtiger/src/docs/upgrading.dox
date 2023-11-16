@@ -1,5 +1,57 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_1120 Upgrading to Version 11.2.0
+<dl>
+
+<dt>Connection configuration "operation_timeout_ms"</dt>
+<dd>
+The connection configuration "operation_timeout_ms" is now deprecated. The option is
+still accepted in this version but will have no effect when set.
+</dd>
+
+<dt>Connection configuration "failpoint_eviction_fail_after_reconciliation"</dt>
+<dd>
+The connection configuration "failpoint_eviction_fail_after_reconciliation" has been
+replaced by "failpoint_eviction_split".
+</dd>
+
+<dt>Cursor configuration "prefix_search"</dt>
+<dd>
+The cursor configuration "prefix_search" is now deprecated. The option is still accepted
+in this version but will have no effect when set. Users should look into the new bound
+cursor interface.
+</dd>
+
+<dt>Session API "flush_tier" function</dt>
+<dd>
+The session API "flush_tier" function is removed. Users of this function should move to
+calling "checkpoint" with the "flush_tier" configuration specified.
+</dd>
+
+</dl> <hr>
+@section version_1110 Upgrading to Version 11.1.0
+<dl>
+
+<dt>Connection configuration "debug mode"</dt>
+<dd>
+The connection configuration "debug_mode" (only used for testing) has had its
+"flush_checkpoint" option removed.
+</dd>
+
+<dt>Connection configuration "timing_stress_for_test"</dt>
+<dd>
+The connection configuration "timing_stress_for_test" (only used for testing) has had
+its "checkpoint_evict_page" option removed.
+</dd>
+
+<dt>Connection configuration "verbose"</dt>
+<dd>
+The verbose messaging system has had its range of debug options extended. The previous
+"DEBUG" level now maps to "DEBUG_1", and will output significantly fewer messages. If you
+want all of the same messages as the old "DEBUG" level, you'll need to use "DEBUG_5".
+</dd>
+
+</dl> <hr>
 @section version_1100 Upgrading to Version 11.0.0
 
 The WiredTiger 11.0 release is a complete refresh of the WiredTiger storage engine.
@@ -8,5 +60,11 @@ Applications written to earlier versions of the WiredTiger API will require revi
 using row-store data objects can use those objects without change. Applications using
 fixed- or variable-length column-store data objects will require a dump and reload cycle
 to import those objects into a 11.0 release environment.
+
+</dl> <hr>
+@section pre_1100 Upgrading to Version older than 11.0.0
+
+Please refer to the following link for upgrade suggestions for version older than 11.0.0.
+https://source.wiredtiger.com/10.0.0/upgrading.html
 
 */

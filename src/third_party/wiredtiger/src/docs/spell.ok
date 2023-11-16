@@ -335,6 +335,7 @@ exe
 extensibility
 fadvise
 failchk
+failpoint
 fallocate
 fcoverage
 fd's
