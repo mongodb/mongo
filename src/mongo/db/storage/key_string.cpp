@@ -2506,11 +2506,16 @@ BSONObj toBson(StringData data, Ordering ord, const TypeBits& typeBits) {
 }
 
 RecordId decodeRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
-    invariant(bufSize >= 2);  // smallest possible encoding of a RecordId.
+    keyStringAssert(8273006,
+                    fmt::format("Input too short to encode RecordId. bufSize: {}", bufSize),
+                    bufSize >= 2);  // smallest possible encoding of a RecordId.
     const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
     const unsigned char lastByte = *(buffer + bufSize - 1);
     const size_t ridSize = 2 + (lastByte & 0x7);  // stored in low 3 bits.
-    invariant(bufSize >= ridSize);
+    keyStringAssert(
+        8273001,
+        fmt::format("Encoded RecordId size is too big. bufSize: {}, ridSize: {}", bufSize, ridSize),
+        bufSize >= ridSize);
     const unsigned char* firstBytePtr = buffer + bufSize - ridSize;
     BufReader reader(firstBytePtr, ridSize);
     return decodeRecordId(&reader);
@@ -2534,7 +2539,12 @@ RecordId decodeRecordId(BufReader* reader) {
     }
 
     const uint8_t lastByte = readType<uint8_t>(reader, false);
-    invariant((lastByte & 0x7) == numExtraBytes);
+    keyStringAssert(8273000,
+                    fmt::format("Number of extra bytes for RecordId is not encoded correctly. Low "
+                                "3 bits of lastByte: {}, high 3 bits of firstByte: {}",
+                                lastByte & 0x7,
+                                numExtraBytes),
+                    (lastByte & 0x7) == numExtraBytes);
     repr = (repr << 5) | (lastByte >> 3);  // fold in high 5 bits of last byte
     return RecordId(repr);
 }
