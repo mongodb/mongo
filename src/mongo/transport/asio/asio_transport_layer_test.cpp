@@ -62,6 +62,7 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
@@ -1165,6 +1166,17 @@ TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveSession) {
     auto future = baton->addSession(*session, NetworkingBaton::Type::In);
     ASSERT_TRUE(baton->cancelSession(*session));
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
+
+    // Canceling the same session again should not succeed
+    ASSERT_FALSE(baton->cancelSession(*session));
+}
+
+TEST_F(IngressAsioNetworkingBatonTest, CancelUnknownSession) {
+    auto opCtx = client().makeOperationContext();
+    auto baton = opCtx->getBaton()->networking();
+
+    auto session = client().session();
+    ASSERT_FALSE(baton->cancelSession(*session));
 }
 
 TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveSessionWhileInPoll) {
@@ -1174,6 +1186,7 @@ TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveSessionWhileInPoll) {
     // returns from polling.
     auto opCtx = client().makeOperationContext();
     Notification<bool> cancelSessionResult;
+    Notification<bool> cancelSessionAgainResult;
 
     MilestoneThread thread([&](Notification<void>& isReady) {
         auto baton = opCtx->getBaton()->networking();
@@ -1187,10 +1200,61 @@ TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveSessionWhileInPoll) {
         // `cancelSession` to happen after `addSession`, and thus it must return `true`.
         baton->addSession(*session, NetworkingBaton::Type::In).getAsync([](Status) {});
         cancelSessionResult.set(baton->cancelSession(*session));
+        // A second cancel should return false
+        cancelSessionAgainResult.set(baton->cancelSession(*session));
     });
 
-    // TODO SERVER-64174 Change the following to `ASSERT_TRUE` once the underlying issue is fixed.
-    ASSERT_FALSE(cancelSessionResult.get(opCtx.get()));
+    ASSERT_TRUE(cancelSessionResult.get(opCtx.get()));
+    ASSERT_FALSE(cancelSessionAgainResult.get(opCtx.get()));
+}
+
+TEST_F(IngressAsioNetworkingBatonTest, CancelSessionTwiceWhileInPoll) {
+    // Exercises the case where we cancel the same session twice while blocked polling,
+    // specifically in the case where we can't run any scheduled tasks in between the two
+    // cancellations.
+    unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
+        auto opCtx = client().makeOperationContext();
+        auto baton = opCtx->getBaton()->networking();
+        auto session = client().session();
+
+        std::vector<Future<void>> futures;
+        futures.push_back(baton->addSession(*session, NetworkingBaton::Type::In));
+
+        stdx::thread thread;
+        {
+            FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
+
+            thread = monitor.spawn([&] {
+                auto clkSource = getServiceContext()->getPreciseClockSource();
+                auto state = baton->run_until(clkSource, Date_t::max());
+                ASSERT_EQ(state, Waitable::TimeoutState::NoTimeout);
+            });
+
+            waitForTimesEntered(fp, 1);
+
+            // We should be able to cancel the session, but the second attempt should return false.
+            ASSERT_TRUE(baton->cancelSession(*session));
+            ASSERT_FALSE(baton->cancelSession(*session));
+
+            // Try to cancel again after re-adding the timer.
+            futures.push_back(baton->addSession(*session, NetworkingBaton::Type::In));
+            ASSERT_TRUE(baton->cancelSession(*session));
+            ASSERT_FALSE(baton->cancelSession(*session));
+        }
+
+        // Let the polling thread finish polling
+        baton->notify();
+
+        thread.join();
+
+        // Cancel should still return false.
+        ASSERT_FALSE(baton->cancelSession(*session));
+
+        // Check the futures all resolved to cancellation errors
+        for (auto& future : futures) {
+            ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
+        }
+    });
 }
 
 TEST_F(IngressAsioNetworkingBatonTest, WaitAndNotify) {
@@ -1337,6 +1401,27 @@ TEST_F(IngressAsioNetworkingBatonTest, RunUntilProperlyTimesout) {
     ASSERT(state == Waitable::TimeoutState::Timeout);
 }
 
+TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveTimer) {
+    auto opCtx = client().makeOperationContext();
+    auto baton = opCtx->getBaton()->networking();
+
+    auto timer = makeDummyTimer();
+    baton->waitUntil(*timer, Date_t::max()).getAsync([](Status) {});
+
+    ASSERT_TRUE(baton->cancelTimer(*timer));
+
+    // Canceling the same timer again should not succeed
+    ASSERT_FALSE(baton->cancelTimer(*timer));
+}
+
+TEST_F(IngressAsioNetworkingBatonTest, CancelUnknownTimer) {
+    auto opCtx = client().makeOperationContext();
+    auto baton = opCtx->getBaton()->networking();
+
+    auto timer = makeDummyTimer();
+    ASSERT_FALSE(baton->cancelTimer(*timer));
+}
+
 TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveTimerWhileInPoll) {
     auto opCtx = client().makeOperationContext();
     Notification<bool> cancelTimerResult;
@@ -1355,8 +1440,56 @@ TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveTimerWhileInPoll) {
         cancelTimerResult.set(baton->cancelTimer(*timer));
     });
 
-    // TODO SERVER-64174 Change the following to `ASSERT_TRUE` once the underlying issue is fixed.
-    ASSERT_FALSE(cancelTimerResult.get(opCtx.get()));
+    ASSERT_TRUE(cancelTimerResult.get(opCtx.get()));
+}
+
+TEST_F(IngressAsioNetworkingBatonTest, CancelTimerTwiceWhileInPoll) {
+    // Exercises the case where we cancel the same timer twice while blocked polling,
+    // specifically in the case where we can't run any scheduled tasks in between the two
+    // cancellations.
+    unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
+        auto opCtx = client().makeOperationContext();
+        auto baton = opCtx->getBaton()->networking();
+        auto timer = makeDummyTimer();
+
+        std::vector<Future<void>> futures;
+        futures.push_back(baton->waitUntil(*timer, Date_t::max()));
+
+        stdx::thread thread;
+        {
+            FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
+
+            thread = monitor.spawn([&] {
+                auto clkSource = getServiceContext()->getPreciseClockSource();
+                auto state = baton->run_until(clkSource, Date_t::max());
+                ASSERT_EQ(state, Waitable::TimeoutState::NoTimeout);
+            });
+
+            waitForTimesEntered(fp, 1);
+
+            // We should be able to cancel the timer. A second attempt should return false
+            ASSERT_TRUE(baton->cancelTimer(*timer));
+            ASSERT_FALSE(baton->cancelTimer(*timer));
+
+            // Try to cancel again after re-adding the timer
+            futures.push_back(baton->waitUntil(*timer, Date_t::max()));
+            ASSERT_TRUE(baton->cancelTimer(*timer));
+            ASSERT_FALSE(baton->cancelTimer(*timer));
+        }
+
+        // Let the polling thread finish polling
+        baton->notify();
+
+        thread.join();
+
+        // We should still get false from cancel
+        ASSERT_FALSE(baton->cancelTimer(*timer));
+
+        // Check the futures resolved to cancellation errors
+        for (auto& future : futures) {
+            ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
+        }
+    });
 }
 
 DEATH_TEST_F(IngressAsioNetworkingBatonTest, AddAnAlreadyAddedSession, "invariant") {
