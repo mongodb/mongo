@@ -30,6 +30,15 @@ platform(
     ]
 )
 
+platform(
+    name = "macos_arm64_clang",
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:macos",
+        "@bazel_tools//tools/cpp:clang",
+    ]
+)
+
 # Helper target for the toolchain (see below):
 filegroup(
     name = "all",

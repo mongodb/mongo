@@ -20,9 +20,10 @@ import mongo.platform as mongo_platform
 import mongo.generators as mongo_generators
 
 _SUPPORTED_PLATFORM_MATRIX = [
-    "windows:amd64:msvc",
     "linux:arm64:gcc",
     "linux:arm64:clang",
+    "windows:amd64:msvc",
+    "macos:arm64:clang",
 ]
 
 
@@ -366,7 +367,7 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         # Bail if current architecture not supported for Bazel:
         normalized_arch = platform.machine().lower().replace("aarch64", "arm64")
-        normalized_os = sys.platform.replace("win32", "windows")
+        normalized_os = sys.platform.replace("win32", "windows").replace("darwin", "macos")
         current_platform = f"{normalized_os}:{normalized_arch}:{env.ToolchainName()}"
         if current_platform not in _SUPPORTED_PLATFORM_MATRIX:
             raise Exception(
@@ -378,8 +379,9 @@ def generate(env: SCons.Environment.Environment) -> None:
         # TODO(SERVER-81038): remove once bazel/bazelisk is self-hosted.
         if not os.path.exists("bazelisk"):
             ext = ".exe" if normalized_os == "windows" else ""
+            os_str = normalized_os.replace("macos", "darwin")
             urllib.request.urlretrieve(
-                f"https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-{normalized_os}-{normalized_arch}{ext}",
+                f"https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-{os_str}-{normalized_arch}{ext}",
                 "bazelisk")
             os.chmod("bazelisk", stat.S_IXUSR)
 
@@ -425,7 +427,11 @@ def generate(env: SCons.Environment.Environment) -> None:
         env['BAZEL_FLAGS_STR'] = str(bazel_internal_flags) + env.get("BAZEL_FLAGS", "")
 
         # We always use --compilation_mode debug for now as we always want -g, so assume -dbg location
-        out_dir_platform = "x64_windows" if normalized_os == "windows" else "$TARGET_ARCH"
+        out_dir_platform = "$TARGET_ARCH"
+        if normalized_os == "macos":
+            out_dir_platform = "darwin_arm64"
+        elif normalized_os == "windows":
+            out_dir_platform = "x64_windows"
         env["BAZEL_OUT_DIR"] = env.Dir(f"#/bazel-out/{out_dir_platform}-dbg/bin/")
 
         # === Builders ===

@@ -294,6 +294,31 @@ buildvariants:
   tasks:
     - name: compile_bazel_windows_TG
 
+# Note that this task is currently optional;
+# This will eventually become suggested, then required.
+- name: &macos-bazel-compile macos-bazel-compile
+  display_name: "MacOS ARM64 Bazel Compile"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - macos-1100-arm64
+  expansions:
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
+    push_path: osx
+    push_bucket: downloads.mongodb.org
+    push_name: macos
+    push_arch: arm64
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_flags: >-
+      --ssl
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --variables-files=etc/scons/xcode_macosx_arm.vars
+      --use-diagnostic-latches=off
+    resmoke_jobs_max: 6
+    compile_variant: *macos-bazel-compile
+  tasks:
+  - name: compile_bazel_macos_TG
+
 - <<: *generic_linux_compile_params
   name: &linux-x86-dynamic-grpc-suggested linux-x86-dynamic-grpc-suggested
   display_name: "* Linux x86 Shared Library with GRPC"
