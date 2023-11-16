@@ -890,8 +890,15 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
             // Called earlier for config servers.
             TransactionCoordinatorService::get(_service)->onStepDown();
         }
+    } else if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+        // If this mongod has a router service, it needs to run stepdown
+        // hooks even if the shard-role isn't initialized yet.
+        // TODO SERVER-82588: Update this code once CatalogCacheLoader is split between
+        // router and shard roles.
+        if (Grid::get(_service)->isShardingInitialized()) {
+            CatalogCacheLoader::get(_service).onStepDown();
+        }
     }
-
     if (auto validator = LogicalTimeValidator::get(_service)) {
         auto opCtx = cc().getOperationContext();
 
@@ -1019,6 +1026,14 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             // Schedule a drop of the temporary collections used by aggregations ($out
             // specifically).
             dropAggTempCollections(opCtx);
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+            // If this mongod has a router service, it needs to run stepdown
+            // hooks even if the shard-role isn't initialized yet.
+            // TODO SERVER-82588: Update this code once CatalogCacheLoader is split between
+            // router and shard roles.
+            if (Grid::get(_service)->isShardingInitialized()) {
+                CatalogCacheLoader::get(_service).onStepUp();
+            }
         }
         // The code above will only be executed after a stepdown happens, however the code below
         // needs to be executed also on startup, and the enabled check might fail in shards during

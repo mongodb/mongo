@@ -257,6 +257,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
+#include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
@@ -882,6 +883,17 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             // Sharding is always ready when there is at least one shard at startup (either the
             // config shard or a dedicated shard server).
             ShardingReady::get(startupOpCtx.get())->setIsReadyIfShardExists(startupOpCtx.get());
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+            // TODO SERVER-83135: Replace this 'else if' with an 'if' once we support
+            // config shard + embedded router.
+            initializeGlobalShardingStateForEmbeddedRouterIfNeeded(startupOpCtx.get());
+
+            // Router role should use SEPMongos
+            serviceContext->getService(ClusterRole::RouterServer)
+                ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
+
+            // This function may take the global lock.
+            initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get());
         } else {
             // On a dedicated shard server, ShardingReady is always set because there is guaranteed
             // to be at least one shard in the sharded cluster (either the config shard or a

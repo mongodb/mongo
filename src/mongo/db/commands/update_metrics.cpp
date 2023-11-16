@@ -38,39 +38,54 @@
 #include "mongo/db/ops/write_ops_parsers.h"
 
 namespace mongo {
+// We instantiate the UpdateMetrics once for a particular command name once per-process. This means
+// that router-role and shard-role commands have the same name and use UpdateMetrics, they will
+// share a single UpdateMetrics. So long as router-role and shard-role commands aren't running in
+// the same process, this has no affect on the metrics; when they are running in the same process,
+// the metrics are incorrect and will need to be separated based on role.
+// TODO: SERVER-79353 Register the update metrics in a role-aware manner.
+std::shared_ptr<CounterMetric> getSingletonMetricPtr(StringData commandName, StringData stat) {
+    static StaticImmortal cacheStorage = StringMap<std::shared_ptr<CounterMetric>>{};
+    std::string path = "commands.{}.{}"_format(commandName, stat);
+    auto& metric = (*cacheStorage)[path];
+    if (!metric)
+        metric = std::make_shared<CounterMetric>(path);
+    return metric;
+}
+
 UpdateMetrics::UpdateMetrics(StringData commandName)
-    : _commandsWithAggregationPipeline("commands." + commandName + ".pipeline"),
-      _commandsWithArrayFilters("commands." + commandName + ".arrayFilters") {}
+    : _commandsWithAggregationPipeline(getSingletonMetricPtr(commandName, "pipeline")),
+      _commandsWithArrayFilters(getSingletonMetricPtr(commandName, "arrayFilters")) {}
 
 void UpdateMetrics::incrementExecutedWithAggregationPipeline() {
-    _commandsWithAggregationPipeline.increment();
+    _commandsWithAggregationPipeline->increment();
 }
 
 void UpdateMetrics::incrementExecutedWithArrayFilters() {
-    _commandsWithArrayFilters.increment();
+    _commandsWithArrayFilters->increment();
 }
 
 void UpdateMetrics::collectMetrics(const BSONObj& cmdObj) {
     // If this command is a pipeline-style update, record that it was used.
     if (cmdObj.hasField("update") && (cmdObj.getField("update").type() == BSONType::Array)) {
-        _commandsWithAggregationPipeline.increment();
+        _commandsWithAggregationPipeline->increment();
     }
 
     // If this command had arrayFilters option, record that it was used.
     if (cmdObj.hasField("arrayFilters")) {
-        _commandsWithArrayFilters.increment();
+        _commandsWithArrayFilters->increment();
     }
 }
 
 void UpdateMetrics::collectMetrics(const write_ops::FindAndModifyCommandRequest& cmd) {
     if (auto update = cmd.getUpdate()) {
         if (update->type() == write_ops::UpdateModification::Type::kPipeline) {
-            _commandsWithAggregationPipeline.increment();
+            _commandsWithAggregationPipeline->increment();
         }
     }
 
     if (cmd.getArrayFilters()) {
-        _commandsWithArrayFilters.increment();
+        _commandsWithArrayFilters->increment();
     }
 }
 

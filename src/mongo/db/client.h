@@ -399,7 +399,7 @@ private:
         _opCtx = opCtx;
     }
 
-    Service* _service;
+    Service* const _service;
     const std::shared_ptr<transport::Session> _session;
 
     // Description for the client (e.g. conn8)

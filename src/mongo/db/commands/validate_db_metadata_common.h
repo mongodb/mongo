@@ -49,8 +49,8 @@ private:
     size_t currentSize = 0;
 };
 
-void assertUserCanRunValidate(OperationContext* opCtx,
-                              const ValidateDBMetadataCommandRequest& request) {
+inline void assertUserCanRunValidate(OperationContext* opCtx,
+                                     const ValidateDBMetadataCommandRequest& request) {
     const auto tenantId = request.getDbName().tenantId();
     const auto resource = request.getDb()
         ? ResourcePattern::forDatabaseName(DatabaseNameUtil::deserialize(

@@ -73,9 +73,9 @@ public:
 private:
     // A counter for how many times this command has been executed with an aggregation
     // pipeline-style update parameter.
-    CounterMetric _commandsWithAggregationPipeline;
+    std::shared_ptr<CounterMetric> _commandsWithAggregationPipeline;
 
     // A counter for how many times this command has been executed with the arrayFilters option.
-    CounterMetric _commandsWithArrayFilters;
+    std::shared_ptr<CounterMetric> _commandsWithArrayFilters;
 };
 }  // namespace mongo

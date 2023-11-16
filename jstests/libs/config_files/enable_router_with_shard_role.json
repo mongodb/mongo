@@ -1,6 +1,7 @@
 {
     "sharding": {
-        "clusterRole": "shardsvr"
+        "clusterRole": "shardsvr",
+        "configDB": "csrs/fakeHost:1234"
     },
     "replication": {
         "replSetName": "dummy"

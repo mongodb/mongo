@@ -165,6 +165,8 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
  */
 void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCtx);
 
+void initializeGlobalShardingStateForEmbeddedRouterIfNeeded(OperationContext* opCtx);
+
 /**
  * Helper method to initialize sharding awareness from the shard identity document if it can be
  * found and load global sharding settings awareness was initialized. See

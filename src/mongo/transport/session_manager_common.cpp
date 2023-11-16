@@ -36,9 +36,11 @@
 #endif
 
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
@@ -231,7 +233,20 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
         session->shouldOverrideMaxConns(serverGlobalParams.maxConnsOverride);
     const bool verbose = !quiet();
 
-    auto uniqueClient = _svcCtx->getService()->makeClient(getClientThreadName(*session), session);
+    auto service = _svcCtx->getService();
+    // Serverless clusters don't support sharding, so they should only ever use
+    // the Shard service and associated ServiceEntryPoint.
+    if (feature_flags::gEmbeddedRouter.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        !gMultitenancySupport) {
+        bool isEmbeddedRouter = serverGlobalParams.clusterRole.has(ClusterRole::RouterServer) &&
+            serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
+        if (isEmbeddedRouter && session->isFromRouterPort()) {
+            service = _svcCtx->getService(ClusterRole::RouterServer);
+        }
+    }
+
+    auto uniqueClient = service->makeClient(getClientThreadName(*session), session);
     auto client = uniqueClient.get();
 
     std::shared_ptr<transport::SessionWorkflow> workflow;

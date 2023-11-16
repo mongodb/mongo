@@ -60,9 +60,9 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-class AppendOplogNoteCmd : public BasicCommand {
+class ClusterAppendOplogNoteCmd : public BasicCommand {
 public:
-    AppendOplogNoteCmd() : BasicCommand("appendOplogNote") {}
+    ClusterAppendOplogNoteCmd() : BasicCommand("appendOplogNote") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -109,6 +109,6 @@ public:
         return appendRawResponses(opCtx, &errmsg, &result, shardResponses).responseOK;
     }
 };
-MONGO_REGISTER_COMMAND(AppendOplogNoteCmd).forRouter();
+MONGO_REGISTER_COMMAND(ClusterAppendOplogNoteCmd).forRouter();
 
 }  // namespace mongo
