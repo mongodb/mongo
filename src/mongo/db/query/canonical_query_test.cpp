@@ -263,6 +263,8 @@ TEST(CanonicalQueryTest, NormalizeQuerySort) {
 TEST(CanonicalQueryTest, NormalizeQueryTree) {
     // Single-child $or elimination.
     testNormalizeQuery("{$or: [{b: 1}]}", "{b: 1}");
+    // $or deduplication for same-path children.
+    testNormalizeQuery("{$or: [{b: 1}, {b: 1}]}", "{b: 1}");
     // Single-child $and elimination.
     testNormalizeQuery("{$or: [{$and: [{a: 1}]}, {b: 1}]}", "{$or: [{a: 1}, {b: 1}]}");
     // Single-child $_internalSchemaXor elimination.

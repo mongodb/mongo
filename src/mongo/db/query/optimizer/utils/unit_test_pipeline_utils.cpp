@@ -117,6 +117,7 @@ ABT translatePipeline(const Metadata& metadata,
                       pipelineStr,
                       *opCtx,
                       involvedNss);
+    pipeline->optimizePipeline();
     if (parameterized)
         MatchExpression::parameterize(
             dynamic_cast<DocumentSourceMatch*>(pipeline.get()->peekFront())->getMatchExpression());

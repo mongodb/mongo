@@ -253,38 +253,17 @@ public:
             }
         }
 
-        // If there is only one term in the match expression, we don't need to use EqMember
-        if (arrTraversePtr->size() == 1) {
-            const auto [tagSingle, valSingle] = sbe::value::copyValue(
-                arrTraversePtr->getAt(0).first, arrTraversePtr->getAt(0).second);
-            sbe::value::ValueGuard guard{tagSingle, valSingle};
-
-            if (expr->getInputParamId()) {
-                result =
-                    make<FunctionCall>(kParameterFunctionName,
-                                       makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32,
-                                                              *expr->getInputParamId()),
-                                               make<Constant>(sbe::value::TypeTags::NumberInt32,
-                                                              static_cast<int>(tagSingle))));
-            } else {
-                result = make<Constant>(tagSingle, valSingle);
-                guard.reset();
-            }
-            result = make<PathCompare>(Operations::Eq, std::move(result));
+        if (expr->getInputParamId()) {
+            result = make<FunctionCall>(
+                kParameterFunctionName,
+                makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32, *expr->getInputParamId()),
+                        make<Constant>(sbe::value::TypeTags::NumberInt32,
+                                       static_cast<int>(tagTraverse))));
         } else {
-            if (expr->getInputParamId()) {
-                result =
-                    make<FunctionCall>(kParameterFunctionName,
-                                       makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32,
-                                                              *expr->getInputParamId()),
-                                               make<Constant>(sbe::value::TypeTags::NumberInt32,
-                                                              static_cast<int>(tagTraverse))));
-            } else {
-                result = make<Constant>(tagTraverse, valTraverse);
-                arrGuard.reset();
-            }
-            result = make<PathCompare>(Operations::EqMember, std::move(result));
+            result = make<Constant>(tagTraverse, valTraverse);
+            arrGuard.reset();
         }
+        result = make<PathCompare>(Operations::EqMember, std::move(result));
 
         if (addNullPathDefault) {
             maybeComposePath<PathComposeA>(result, make<PathDefault>(Constant::boolean(true)));
