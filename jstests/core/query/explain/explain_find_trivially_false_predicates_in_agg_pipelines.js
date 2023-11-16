@@ -1,12 +1,14 @@
 /**
  * Tests for optimizations applied to trivially false predicates in aggregate pipelines.
  * @tags: [
- *   requires_fcv_72,
+ *   requires_fcv_73,
  *   # Tests run here require explaining plans on aggregate commands that could be incomplete
  *   # during stepdown
  *   does_not_support_stepdowns,
  *   # Explain for the aggregate command cannot run within a multi-document transaction
- *   does_not_support_transactions
+ *   does_not_support_transactions,
+ *   # Explain command does not support read concerns other than local
+ *   assumes_read_concern_local
  * ]
  */
 

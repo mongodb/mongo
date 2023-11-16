@@ -2,8 +2,10 @@
  * Tests for optimizations applied to trivially false predicates specifically when using tailable
  * cursors over capped collections.
  * @tags: [
- *   requires_fcv_72,
- *   requires_capped
+ *   requires_fcv_73,
+ *   requires_capped,
+ *   # Explain command does not support read concerns other than local
+ *   assumes_read_concern_local
  * ]
  */
 import {getWinningPlanFromExplain, isEofPlan} from "jstests/libs/analyze_plan.js";
