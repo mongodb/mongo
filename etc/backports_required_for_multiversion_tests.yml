@@ -423,6 +423,10 @@ last-continuous:
     ticket: SERVER-81985
   - test_file: jstests/sharding/query/merge_nondefault_read_concern.js
     ticket: SERVER-69244
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
+    ticket: SERVER-82984
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_replace.js
+    ticket: SERVER-82984
   suites: null
 last-lts:
   all:
@@ -892,4 +896,8 @@ last-lts:
     ticket: SERVER-81985
   - test_file: jstests/sharding/query/merge_nondefault_read_concern.js
     ticket: SERVER-69244
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
+    ticket: SERVER-82984
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_replace.js
+    ticket: SERVER-82984
   suites: null
