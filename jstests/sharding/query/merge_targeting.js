@@ -3,7 +3,6 @@
  * unsplittable.
  * @tags: [
  *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
- *   featureFlagUnsplittableCollectionsOnNonPrimaryShard,
  *   multiversion_incompatible,
  *   assumes_balancer_off,
  * ]
@@ -71,20 +70,27 @@ function testMerge(sourceColl, destColl, expectedMergeShardId, expectedShards) {
     ];
     const explain = sourceColl.explain().aggregate(pipeline);
     assert.eq(explain.mergeShardId, expectedMergeShardId, tojson(explain));
-    assert.eq(Object.getOwnPropertyNames(explain.shards).sort(), expectedShards, tojson(explain));
+    assert.eq(
+        Object.getOwnPropertyNames(explain.shards).sort(), expectedShards.sort(), tojson(explain));
 
     sourceColl.aggregate(pipeline);
     const data = destColl.find({}, {_id: 0}).sort({i: 1}).toArray();
     assert.eq(data, getExpectedData(sourceColl.getName()));
 }
 
-testMerge(coll1, coll2, "merge_targeting-rs2", ["merge_targeting-rs1"]);
-testMerge(coll1, coll3, undefined, ["merge_targeting-rs1"]);
-testMerge(shardedColl,
-          coll1,
-          "merge_targeting-rs1",
-          ["merge_targeting-rs0", "merge_targeting-rs1", "merge_targeting-rs2"]);
-testMerge(coll1, shardedColl, undefined, ["merge_targeting-rs1"]);
+// Verify that we merge on the shard which owns the target collection when the collections in our
+// aggregate are unsplittable and live on different shards.
+testMerge(coll1, coll2, shard2, [shard1]);
+
+// Verify that no merging takes place when both collections belong to the same shard.
+testMerge(coll1, coll3, null /* expectedMergeShardId */, [shard1]);
+
+// Verify that all shards are involved when reading from a sharded collection, but that the merge
+// takes place on the shard which owns the unsplittable collection.
+testMerge(shardedColl, coll1, shard1, [shard0, shard1, shard2]);
+
+// Verify that no particular shard is chosen to merge when $merge targets a sharded collection.
+testMerge(coll1, shardedColl, null /* expectedMergeShardId */, [shard1]);
 
 function testDocumentsTargeting() {
     const expectedData = getExpectedData("documents");
@@ -93,7 +99,7 @@ function testDocumentsTargeting() {
         {$merge: {into: coll3.getName(), on: "i", whenMatched: "replace"}}
     ];
     const explain = db.aggregate(pipeline, {explain: true});
-    assert.eq(Object.getOwnPropertyNames(explain.shards), ["merge_targeting-rs1"], tojson(explain));
+    assert.eq(Object.getOwnPropertyNames(explain.shards), [shard1], tojson(explain));
 
     db.aggregate(pipeline);
     const data = coll3.find({}, {_id: 0}).sort({i: 1}).toArray();
