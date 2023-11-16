@@ -35,7 +35,7 @@ assert.commandWorked(coll.createIndex({b: 1}));
 const explain = coll.explain("allPlansExecution").aggregate([{
     $match: {
         $or: [{
-            a: {$in: []},
+            a: {$gte: 0},
             b: 0,
         }]
     }

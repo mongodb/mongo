@@ -517,5 +517,20 @@ TEST(ExpressionOptimizeTest, NorWithAlwaysTrueChildOptimizesToAlwaysFalse) {
     auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
     ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(), fromjson("{$alwaysFalse: 1}"));
 }
+
+TEST(ExpressionOptimizeTest, EmptyInOptimizesToAlwaysFalse) {
+    BSONObj obj = fromjson("{x: {$in: []}}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(), fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST(ExpressionOptimizeTest, InWithJustRegexesIsNotOptimizedToAlwaysFalse) {
+    BSONObj obj = fromjson("{x: {$in: [/foo/, /bar/]}}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(),
+                      fromjson("{x: {$in: [/foo/, /bar/]}}"));
+}
 }  // namespace
 }  // namespace mongo

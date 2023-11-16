@@ -927,13 +927,8 @@ TEST_F(QueryPlannerTest, CantExplodeWithEmptyBounds) {
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuerySortProj(fromjson("{a: {$in: []}}"), BSON("b" << 1), BSONObj());
 
-    assertNumSolutions(2U);
-    assertSolutionExists(
-        "{sort: {pattern: {b:1}, limit: 0, type: 'simple', node: "
-        "{cscan: {dir: 1}}}}");
-    assertSolutionExists(
-        "{fetch: {node: {sort: {pattern: {b:1}, limit: 0, type: 'default', node: "
-        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}");
+    assertNumSolutions(1);
+    assertSolutionExists("{eof: 1}");
 }
 
 // SERVER-13752

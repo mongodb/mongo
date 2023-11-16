@@ -45,6 +45,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -632,6 +633,9 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
             }
 
             return simplifiedExpression;
+        } else if (regexes.empty() && ime._equalities->elementsIsEmpty()) {
+            // Empty IN is always false
+            return std::make_unique<AlwaysFalseMatchExpression>();
         }
 
         return expression;
