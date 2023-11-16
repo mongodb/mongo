@@ -143,5 +143,10 @@ private:
     ProjectionDependencies _deps;
 };
 
+/**
+ * Walks the projection AST and optimizes each node.
+ */
+void optimizeProjection(ProjectionPathASTNode* root);
+
 }  // namespace projection_ast
 }  // namespace mongo

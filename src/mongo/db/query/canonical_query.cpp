@@ -222,7 +222,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
                                                 _findCommand->getProjection(),
                                                 _root.get(),
                                                 _findCommand->getFilter(),
-                                                projectionPolicies));
+                                                projectionPolicies,
+                                                true /* Should optimize? */));
 
             // Fail if any of the projection's dependencies are unavailable.
             DepsTracker{unavailableMetadata}.requestMetadata(_proj->metadataDeps());
