@@ -2,11 +2,13 @@
  * Tests that the cluster parameter "shardedClusterCardinalityForDirectConns" has the correct value
  * after the addShard, removeShard and killOp commands ran concurrently.
  *
+ * This workload can't run in antithesis suites since it uses connCache.
  * @tags: [
  *  requires_sharding,
  *  requires_non_retryable_writes,
  *  catches_command_failures,
- *  uses_curop_agg_stage
+ *  uses_curop_agg_stage,
+ *  antithesis_incompatible,
  * ]
  */
 
