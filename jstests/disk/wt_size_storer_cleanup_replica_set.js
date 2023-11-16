@@ -3,6 +3,7 @@
  * dropped.
  *
  * @tags: [
+ *   incompatible_with_macos,  # TODO (SERVER-83337): Re-enable on macOS.
  *   requires_replication,
  *   requires_wiredtiger,
  * ]
