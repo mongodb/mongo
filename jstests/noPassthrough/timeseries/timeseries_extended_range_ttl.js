@@ -24,7 +24,7 @@ const coll = function() {
 };
 
 const timeFieldName = "t";
-const normalTime = ISODate("2020-01-01T00:00:00.000Z");
+const normalTime = ISODate("2010-01-01T00:00:00.000Z");
 const extendedTime = ISODate("2040-01-01T00:00:00.000Z");
 
 assert.commandWorked(db().createCollection(
