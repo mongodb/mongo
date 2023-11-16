@@ -121,5 +121,17 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         // We need to catch exceptions caused by invalid inputs
     }
 
+    try {
+        mongo::KeyString::decodeRecordIdLongAtEnd(&Data[2 + len], Size - (2 + len));
+    } catch (const mongo::AssertionException&) {
+        // We need to catch exceptions caused by invalid inputs
+    }
+
+    try {
+        mongo::KeyString::decodeRecordIdStrAtEnd(&Data[2 + len], Size - (2 + len));
+    } catch (const mongo::AssertionException&) {
+        // We need to catch exceptions caused by invalid inputs
+    }
+
     return 0;
 }

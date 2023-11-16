@@ -86,7 +86,7 @@ public:
      * may be retrieved using getStr().
      */
     explicit RecordId(const char* str, int32_t size) {
-        invariant(size > 0, "key size must be greater than 0");
+        uassert(8273007, fmt::format("key size must be greater than 0. size: {}", size), size > 0);
         // Must fit into the 16 byte buffer minus 1 byte for size and 1 format byte.
         uassert(ErrorCodes::BadValue,
                 fmt::format("key size {} greater than maximum {}", size, kBufMaxSize - 2),
