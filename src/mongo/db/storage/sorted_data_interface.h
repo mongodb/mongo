@@ -298,6 +298,13 @@ public:
             const key_string::Value& keyString,
             KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
 
+        /**
+         * Seeks to the provided keyString and returns the RecordId of the matching key, or
+         * boost::none if one does not exist.
+         * The provided key must always have a kInclusive discriminator.
+         */
+        virtual boost::optional<RecordId> seekExact(const key_string::Value& keyString) = 0;
+
         //
         // Saving and restoring state
         //

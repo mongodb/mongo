@@ -67,10 +67,11 @@ auto SortedDataInterfaceHarnessHelper::newSortedDataInterface(
 
 void insertToIndex(OperationContext* opCtx,
                    SortedDataInterface* index,
-                   std::initializer_list<IndexKeyEntry> toInsert) {
+                   std::initializer_list<IndexKeyEntry> toInsert,
+                   bool dupsAllowed) {
     WriteUnitOfWork wuow(opCtx);
     for (auto&& entry : toInsert) {
-        ASSERT_OK(index->insert(opCtx, makeKeyString(index, entry.key, entry.loc), true));
+        ASSERT_OK(index->insert(opCtx, makeKeyString(index, entry.key, entry.loc), dupsAllowed));
     }
     wuow.commit();
 }
