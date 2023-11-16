@@ -183,9 +183,8 @@ TEST_F(GRPCTransportLayerTest, RunCommand) {
     ON_BLOCK_EXIT([&] { tl->shutdown(); });
 
 
-    auto session = client->connect(CommandServiceTestFixtures::defaultServerAddress(),
-                                   CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                   {});
+    auto session = client->connect(
+        tl->getListeningAddresses().at(0), CommandServiceTestFixtures::kDefaultConnectTimeout, {});
 
     ASSERT_OK(session->sinkMessage(makeMessage(BSON(kCommandName << 1))));
     auto replyMessage = uassertStatusOK(session->sourceMessage());
