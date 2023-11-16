@@ -547,7 +547,7 @@ private:
         LOGV2_DEBUG(
             5400704, 1, "running TTL job for clustered collection", logAttrs(collection->ns()));
 
-        const auto startId = makeCollScanStartBound(collection, Date_t::min());
+        const auto startId = makeCollScanStartBound(collection, Date_t{});
 
         const auto expirationDate = safeExpirationDate(opCtx, collection, *expireAfterSeconds);
         const auto endId = makeCollScanEndBound(collection, expirationDate);
