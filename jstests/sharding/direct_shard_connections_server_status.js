@@ -59,6 +59,7 @@ const runInsertCommand = (host, dbName, collName) => {
     const conn = new Mongo(host);
     const ns = dbName + "." + collName;
     assert.commandWorked(conn.getCollection(ns).insert({_id: 2}));
+    conn.close();
 };
 
 const fp = configureFailPoint(shard0Primary, "hangInsertBeforeWrite", {ns});
