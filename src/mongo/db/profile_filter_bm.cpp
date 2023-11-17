@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,28 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/db/profile_filter.h"
-#include "mongo/platform/mutex.h"
+#include <benchmark/benchmark.h>
 
-#include <mutex>
-#include <shared_mutex>
-#include <utility>
+#include "mongo/db/profile_filter.h"
+#include "mongo/db/profile_filter_impl.h"
+#include "mongo/util/processinfo.h"
 
 namespace mongo {
+namespace {
 
-// std::atomic<std::shared_ptr> is not supported until GCC 12 and not in clang libc++ as of
-// 9/28/2023
-static std::shared_ptr<ProfileFilter> defaultProfileFilter;
-static std::shared_mutex mutex;  // NOLINT
+static void BM_ProfileFilter_Get_Set_Default(benchmark::State& state) {
+    if (state.thread_index == 0) {
+        ProfileFilter::setDefault(std::shared_ptr<ProfileFilterImpl>(nullptr));
+    }
 
-std::shared_ptr<ProfileFilter> ProfileFilter::getDefault() {
-    std::shared_lock lock(mutex);  // NOLINT
-    return defaultProfileFilter;
+    int i = 0;
+    for (auto keepRunning : state) {
+        if (state.thread_index == i++ % 20) {
+            ProfileFilter::setDefault(std::shared_ptr<ProfileFilterImpl>(nullptr));
+        }
+        benchmark::DoNotOptimize(ProfileFilter::getDefault());
+        benchmark::ClobberMemory();
+    }
 }
 
-void ProfileFilter::setDefault(std::shared_ptr<ProfileFilter> filter) {
-    stdx::unique_lock lock(mutex);  // NOLINT
-    defaultProfileFilter = std::move(filter);
-}
+BENCHMARK(BM_ProfileFilter_Get_Set_Default)->Threads(ProcessInfo::getNumAvailableCores());
 
-};  // namespace mongo
+}  // namespace
+}  // namespace mongo

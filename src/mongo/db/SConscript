@@ -190,6 +190,18 @@ env.Library(
     ],
 )
 
+env.Benchmark(
+    target='profile_filter_bm',
+    source=[
+        'profile_filter_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/profile_common',
+        '$BUILD_DIR/mongo/util/processinfo',
+        'profile_filter',
+    ],
+)
+
 env.Library(
     target='curop_failpoint_helpers',
     source=[

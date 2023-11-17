@@ -9,6 +9,7 @@ selector:
   - build/install/bin/window_function_percentile_bm*
   - build/install/bin/rate_limiting_bm*
   - build/install/bin/shapifying_bm*
+  - build/install/bin/profile_filter_bm*
 
 executor:
   config: {}
