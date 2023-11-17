@@ -140,10 +140,14 @@ function listCollectionsWithoutViews(database) {
 }
 
 // Returns a list of names of all indexes.
-function getIndexNames(db, collName) {
-    return new DBCommandCursor(db, db[collName].runCommand("listIndexes"))
-        .toArray()
-        .map(spec => spec.name);
+function getIndexNames(db, collName, allowedErrorCodes) {
+    var failMsg = "'listIndexes' command failed";
+    let res = assert.commandWorkedOrFailedWithCode(
+        db[collName].runCommand("listIndexes"), allowedErrorCodes, failMsg);
+    if (res.ok) {
+        return new DBCommandCursor(db, res).toArray().map(spec => spec.name);
+    }
+    return [];
 }
 
 // Run dbCheck for all collections in the database with given parameters and potentially wait for
@@ -184,7 +188,7 @@ export const runDbCheckForDatabase = (replSet, db, awaitCompletion = false) => {
             return;
         }
 
-        getIndexNames(db, collName).forEach(indexName => {
+        getIndexNames(db, collName, allowedErrorCodes).forEach(indexName => {
             let extraIndexDbCheckParameters = {
                 validateMode: "extraIndexKeysCheck",
                 secondaryIndex: indexName
