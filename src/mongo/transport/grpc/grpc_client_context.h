@@ -36,6 +36,7 @@
 #include <grpcpp/grpcpp.h>
 
 #include "mongo/transport/grpc/metadata.h"
+#include "mongo/transport/grpc/util.h"
 
 namespace mongo::transport::grpc {
 
@@ -78,7 +79,7 @@ public:
     // not violate const here or require any locking. This too should only need to be called once,
     // so again the performance impact should be negligible.
     HostAndPort getRemote() const override {
-        return _parseURI(_ctx.peer());
+        return util::parseGRPCFormattedURI(_ctx.peer());
     }
 
     void tryCancel() override {
@@ -90,18 +91,6 @@ public:
     }
 
 private:
-    /**
-     * Parses a gRPC-formatted URI to a HostAndPort, throwing an exception on
-     * failure. See: https://grpc.github.io/grpc/cpp/md_doc_naming.html
-     */
-    static HostAndPort _parseURI(const std::string& uri) {
-        StringData sd{uri};
-        if (auto firstColon = sd.find(':'); firstColon != std::string::npos) {
-            sd = sd.substr(firstColon + 1);
-        }
-        return HostAndPort::parseThrowing(sd);
-    }
-
     ::grpc::ClientContext _ctx;
 };
 

@@ -402,7 +402,7 @@ public:
         };
     }
 
-    static Stub makeStub(StringData address, boost::optional<Stub::Options> options = boost::none) {
+    static Stub makeStub(StringData uri, boost::optional<Stub::Options> options = boost::none) {
         if (!options) {
             options.emplace();
             options->tlsCAFile = kCAFile;
@@ -418,9 +418,11 @@ public:
         if (options->tlsCAFile) {
             sslOps.pem_root_certs = ssl_util::readPEMFile(options->tlsCAFile.get()).getValue();
         }
-        auto credentials = ::grpc::SslCredentials(sslOps);
 
-        return Stub{::grpc::CreateChannel(address.toString(), credentials)};
+        auto credentials = util::isUnixSchemeGRPCFormattedURI(uri)
+            ? ::grpc::InsecureChannelCredentials()
+            : ::grpc::SslCredentials(sslOps);
+        return Stub(::grpc::CreateChannel(uri.toString(), credentials));
     }
 
     /**
