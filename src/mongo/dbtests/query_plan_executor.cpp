@@ -182,8 +182,7 @@ private:
         Collection* collection =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
         std::vector<const IndexDescriptor*> indexes;
-        collection->getIndexCatalog()->findIndexesByKeyPattern(
-            &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
+        collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         ASSERT_LTE(indexes.size(), 1U);
         return indexes.size() == 0 ? nullptr : indexes[0];
     }

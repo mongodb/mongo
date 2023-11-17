@@ -615,10 +615,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
     // Copy the index descriptions from the source collection, adjusting the 'ns' field if
     // necessary.
     std::vector<BSONObj> indexesToCopy;
-    for (auto sourceIndIt = sourceColl->getIndexCatalog()->getIndexIterator(
-             opCtx,
-             IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
-                 IndexCatalog::InclusionPolicy::kFrozen);
+    for (auto sourceIndIt = sourceColl->getIndexCatalog()->getIndexIterator(opCtx, true);
          sourceIndIt->more();) {
         auto descriptor = sourceIndIt->next()->descriptor();
         if (descriptor->isIdIndex()) {
