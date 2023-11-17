@@ -137,7 +137,7 @@ export var CheckOrphansAreDeletedHelpers = (function() {
                                                                     $allElementsTrue: [{
                                                                         $map: {
                                                                             input: "$$chunkDoc.max",
-                                                                            in: { $eq: [{ $type: '$$this.max' }, 'MaxKey'] }
+                                                                            in: { $eq: [{ $type: '$$this' }, 'maxKey'] }
                                                                         }
                                                                     }]
                                                                 }
