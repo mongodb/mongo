@@ -115,6 +115,14 @@ public:
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)} {}
 
+    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault) const override {
+        static const Status kDefaultReadConcernNotPermitted{
+            ErrorCodes::InvalidOptions,
+            "Explain does not permit default readConcern to be applied."};
+        return {Status::OK(), {kDefaultReadConcernNotPermitted}};
+    }
+
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
         _innerInvocation->explain(opCtx, _verbosity, result);
