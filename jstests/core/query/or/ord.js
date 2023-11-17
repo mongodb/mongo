@@ -4,8 +4,10 @@
 //   requires_getmore,
 //   # An index drop does not necessarily cause cursors to be killed on the secondary.
 //   does_not_support_causal_consistency,
+//   # TODO SERVER-77719: Enable this check for Bonsai.
+//   cqf_experimental_incompatible
 // ]
-import {getPlanStages, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.jstests_ord;
