@@ -53,6 +53,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
@@ -497,8 +498,24 @@ public:
     }
 
     ExplainPrinterImpl& print(const std::pair<sbe::value::TypeTags, sbe::value::Value> v) {
-        auto [tag, val] = sbe::value::copyValue(v.first, v.second);
-        addValue(tag, val);
+        if (sbe::value::tagToType(v.first) == BSONType::EOO &&
+            v.first != sbe::value::TypeTags::Nothing) {
+            if (v.first == sbe::value::TypeTags::makeObjSpec) {
+                // We want to append a stringified version of MakeObjSpec to explain here.
+                auto [mosTag, mosVal] =
+                    sbe::value::makeNewString(sbe::value::getMakeObjSpecView(v.second)->toString());
+                addValue(mosTag, mosVal);
+            } else {
+                // Extended types need to implement their own explain, since we can't directly
+                // convert them to bson.
+                MONGO_UNREACHABLE_TASSERT(7936708);
+            }
+
+        } else {
+            auto [tag, val] = sbe::value::copyValue(v.first, v.second);
+            addValue(tag, val);
+        }
+
         return *this;
     }
 
