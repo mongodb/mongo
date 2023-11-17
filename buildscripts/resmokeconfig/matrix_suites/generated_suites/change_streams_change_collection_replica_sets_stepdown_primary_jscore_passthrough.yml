@@ -6,6 +6,12 @@
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
+description: 'Run test suites with a replica set and multitenancy enabled. Simulate
+  Atlas Proxy behavior
+
+  by overriding and injecting unsigned security token and tenant prefix.
+
+  '
 executor:
   archive:
     hooks:
@@ -56,6 +62,7 @@ executor:
         enableElectionHandoff: 0
         enableTestCommands: 1
         featureFlagRequireTenantID: true
+        featureFlagSecurityToken: true
         featureFlagServerlessChangeStreams: true
         logComponentVerbosity:
           command: 2
@@ -94,7 +101,11 @@ matrix_suite: true
 selector:
   exclude_files:
   - jstests/core/query/explain/explain_agg_write_concern.js
+  - jstests/aggregation/sources/out/replace_collection.js
+  - jstests/aggregation/explain_writing_aggs.js
   - jstests/core/administrative/builtin_roles_external.js
+  - jstests/aggregation/sources/lookup/lookup_query_stats.js
+  - jstests/aggregation/view_resolution_namespace_collision.js
   - jstests/core/txns/**/*.js
   - jstests/core/**/operation_latency_histogram.js
   - jstests/core/**/profile2.js
@@ -124,6 +135,7 @@ selector:
   - jstests/core/**/startup_log.js
   - jstests/core/**/shell_connection_strings.js
   - jstests/core/**/geo_s2ordering.js
+  - jstests/aggregation/**/*.js
   exclude_with_any_tags:
   - simulate_atlas_proxy_incompatible
   - not_allowed_with_security_token
@@ -148,4 +160,5 @@ selector:
   - uses_parallel_shell
   roots:
   - jstests/core/**/*.js
+  - jstests/aggregation/**/*.js
 test_kind: js_test
