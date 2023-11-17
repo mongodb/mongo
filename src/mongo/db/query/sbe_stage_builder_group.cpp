@@ -30,9 +30,11 @@
 #include "mongo/db/query/sbe_stage_builder.h"
 
 #include "mongo/db/query/expression_walker.h"
+#include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
 #include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/sbe_stage_builder_sbexpr_helpers.h"
 
 namespace mongo::stage_builder {
 namespace {
@@ -87,7 +89,7 @@ void walkAndActOnFieldPaths(Expression* expr, const F& fn) {
 // the group-by key ("_id") and the accumulators.
 MONGO_COMPILER_NOINLINE
 PlanStageReqs computeChildReqsForGroup(const PlanStageReqs& reqs, const GroupNode& groupNode) {
-    auto childReqs = reqs.copy().clearMRInfo().setResult().clearAllFields();
+    auto childReqs = reqs.copyForChild().clearMRInfo().setResult().clearAllFields();
 
     // If the group node references any top level fields, we take all of them and add them to
     // 'childReqs'. Note that this happens regardless of whether we need the whole document because
@@ -141,26 +143,11 @@ PlanStageReqs computeChildReqsForGroup(const PlanStageReqs& reqs, const GroupNod
     return childReqs;
 }
 
-// Search the group-by ('_id') and accumulator expressions of a $group for field path expressions,
-// and populate a slot in 'childOutputs' for each path found. Each slot is bound via a ProjectStage
-// to an EExpression that evaluates the path traversal.
-//
-// This function also adds each path it finds to the 'groupFieldSet' output.
+// Collect the FieldPath expressions referenced by a GroupNode that should be exposed in a slot for
+// the group stage to work properly.
 MONGO_COMPILER_NOINLINE
-SbStage projectPathTraversalsForGroupBy(StageBuilderState& state,
-                                        const GroupNode& groupNode,
-                                        const PlanStageReqs& childReqs,
-                                        SbStage childStage,
-                                        PlanStageSlots& childOutputs,
-                                        StringSet& groupFieldSet) {
-    // Slot to EExpression map that tracks path traversal expressions. Note that this only contains
-    // expressions corresponding to paths which require traversals (that is, if there exists a
-    // top level field slot corresponding to a field, we take care not to add it to 'projects' to
-    // avoid rebinding a slot).
-    sbe::SlotExprPairVector projects;
-
-    // Lambda which populates 'projects' and 'childOutputs' with an expression and/or a slot,
-    // respectively, corresponding to the value of 'fieldExpr'.
+StringMap<const ExpressionFieldPath*> collectFieldPaths(const GroupNode* groupNode) {
+    StringMap<const ExpressionFieldPath*> groupFieldMap;
     auto accumulateFieldPaths = [&](const ExpressionFieldPath* fieldExpr) {
         // We optimize neither a field path for the top-level document itself nor a field path
         // that refers to a variable instead.
@@ -170,43 +157,56 @@ SbStage projectPathTraversalsForGroupBy(StageBuilderState& state,
 
         // Don't generate an expression if we have one already.
         std::string fp = fieldExpr->getFieldPathWithoutCurrentPrefix().fullPath();
-        if (groupFieldSet.count(fp)) {
+        if (groupFieldMap.count(fp)) {
             return;
         }
-
-        // Mark 'fp' as being seen and either find a slot corresponding to it or generate an
-        // expression for it and bind it to a slot.
-        groupFieldSet.insert(fp);
-        TypedSlot slot = [&]() -> TypedSlot {
-            // Special case: top level fields which already have a slot.
-            if (fieldExpr->getFieldPath().getPathLength() == 2) {
-                return childOutputs.get({PlanStageSlots::kField, StringData(fp)});
-            } else {
-                // General case: we need to generate a path traversal expression.
-                auto result = stage_builder::generateExpression(
-                    state,
-                    fieldExpr,
-                    childOutputs.getIfExists(PlanStageSlots::kResult),
-                    &childOutputs);
-
-                if (result.hasSlot()) {
-                    return TypedSlot{*result.getSlot(), TypeSignature::kAnyScalarType};
-                } else {
-                    auto newSlot = state.slotId();
-                    auto expr = result.extractExpr(state);
-                    projects.emplace_back(newSlot, std::move(expr.expr));
-                    return TypedSlot{newSlot, expr.typeSignature};
-                }
-            }
-        }();
-
-        childOutputs.set(std::make_pair(PlanStageSlots::kPathExpr, std::move(fp)), slot);
+        // Neither if it's a top level field which already have a slot.
+        if (fieldExpr->getFieldPath().getPathLength() != 2) {
+            groupFieldMap.emplace(fp, fieldExpr);
+        }
     };
-
     // Walk over all field paths involved in this $group stage.
-    walkAndActOnFieldPaths(groupNode.groupByExpression.get(), accumulateFieldPaths);
-    for (const auto& accStmt : groupNode.accumulators) {
+    walkAndActOnFieldPaths(groupNode->groupByExpression.get(), accumulateFieldPaths);
+    for (const auto& accStmt : groupNode->accumulators) {
         walkAndActOnFieldPaths(accStmt.expr.argument.get(), accumulateFieldPaths);
+    }
+    return groupFieldMap;
+}
+
+// Given a list of field path expressions used in the group-by ('_id') and accumulator expressions
+// of a $group, populate a slot in 'childOutputs' for each path found. Each slot is bound via a
+// ProjectStage to an EExpression that evaluates the path traversal.
+MONGO_COMPILER_NOINLINE
+SbStage projectPathTraversalsForGroupBy(
+    StageBuilderState& state,
+    const GroupNode& groupNode,
+    SbStage childStage,
+    PlanStageSlots& childOutputs,
+    const StringMap<const ExpressionFieldPath*>& groupFieldMap) {
+    // Slot to EExpression map that tracks path traversal expressions. Note that this only contains
+    // expressions corresponding to paths which require traversals (that is, if there exists a
+    // top level field slot corresponding to a field, we take care not to add it to 'projects' to
+    // avoid rebinding a slot).
+    sbe::SlotExprPairVector projects;
+
+    // Populates 'projects' and 'childOutputs' with an expression and/or a slot, respectively,
+    // corresponding to the value of 'fieldExpr'.
+    for (auto& fp : groupFieldMap) {
+        // Either find a slot corresponding to it or generate an expression for it and bind it to a
+        // slot.
+        TypedSlot slot;
+        auto result = stage_builder::generateExpression(
+            state, fp.second, childOutputs.getIfExists(PlanStageSlots::kResult), &childOutputs);
+
+        if (result.hasSlot()) {
+            slot = TypedSlot{*result.getSlot(), TypeSignature::kAnyScalarType};
+        } else {
+            auto newSlot = state.slotId();
+            auto expr = result.extractExpr(state);
+            projects.emplace_back(newSlot, std::move(expr.expr));
+            slot = TypedSlot{newSlot, expr.typeSignature};
+        }
+        childOutputs.set(std::make_pair(PlanStageSlots::kPathExpr, fp.first), slot);
     }
 
     if (!projects.empty()) {
@@ -217,75 +217,77 @@ SbStage projectPathTraversalsForGroupBy(StageBuilderState& state,
 }
 
 MONGO_COMPILER_NOINLINE
-std::tuple<sbe::value::SlotVector, SbStage, std::unique_ptr<sbe::EExpression>> generateGroupByKey(
-    StageBuilderState& state,
-    const boost::intrusive_ptr<Expression>& idExpr,
-    const PlanStageSlots& outputs,
-    SbStage stage,
-    PlanNodeId nodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator) {
+std::tuple<sbe::value::SlotVector, SbStage, std::unique_ptr<sbe::EExpression>>
+generateGroupByObjKey(StageBuilderState& state,
+                      ExpressionObject* idExprObj,
+                      const PlanStageSlots& outputs,
+                      SbStage stage,
+                      PlanNodeId nodeId) {
     auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
 
-    if (auto idExprObj = dynamic_cast<ExpressionObject*>(idExpr.get()); idExprObj) {
-        sbe::value::SlotVector slots;
-        sbe::EExpression::Vector exprs;
+    VariableTypes varTypes = buildVariableTypes(outputs);
+    sbe::value::SlotVector slots;
+    sbe::EExpression::Vector exprs;
+    sbe::SlotExprPairVector projects;
 
-        sbe::SlotExprPairVector projects;
-
-        for (auto&& [fieldName, fieldExpr] : idExprObj->getChildExpressions()) {
-            auto expr = generateExpression(state, fieldExpr.get(), rootSlot, &outputs);
-
-            auto slot = state.slotId();
-            projects.emplace_back(slot, expr.extractExpr(state).expr);
-
-            slots.push_back(slot);
-            exprs.emplace_back(makeStrConstant(fieldName));
-            exprs.emplace_back(makeVariable(slot));
-        }
-
-        if (!projects.empty()) {
-            stage = makeProject(std::move(stage), std::move(projects), nodeId);
-        }
-
-        // When there's only one field in the document _id expression, 'Nothing' is converted to
-        // 'Null'.
-        // TODO SERVER-21992: Remove the following block because this block emulates the classic
-        // engine's buggy behavior. With index that can handle 'Nothing' and 'Null' differently,
-        // SERVER-21992 issue goes away and the distinct scan should be able to return 'Nothing' and
-        // 'Null' separately.
-        if (slots.size() == 1) {
-            auto slot = state.slotId();
-            stage =
-                makeProject(std::move(stage), nodeId, slot, makeFillEmptyNull(std::move(exprs[1])));
-
-            slots[0] = slot;
-            exprs[1] = makeVariable(slots[0]);
-        }
-
-        // Composes the _id document and assigns a slot to the result using 'newObj' function if _id
-        // should produce a document. For example, resultSlot = newObj(field1, slot1, ..., fieldN,
-        // slotN)
-        return {slots, std::move(stage), sbe::makeE<sbe::EFunction>("newObj"_sd, std::move(exprs))};
-    }
-
-    auto groupByExpr =
-        generateExpression(state, idExpr.get(), rootSlot, &outputs).extractExpr(state).expr;
-
-    if (auto groupByExprConstant = groupByExpr->as<sbe::EConstant>(); groupByExprConstant) {
-        // When the group id is Nothing (with $$REMOVE for example), we use null instead.
-        auto tag = groupByExprConstant->getConstant().first;
-        if (tag == sbe::value::TypeTags::Nothing) {
-            groupByExpr = makeNullConstant();
-        }
-        return {sbe::value::SlotVector{}, std::move(stage), std::move(groupByExpr)};
-    } else {
-        // The group-by field may end up being 'Nothing' and in that case _id: null will be
-        // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
-        auto fillEmptyNullExpr = makeFillEmptyNull(std::move(groupByExpr));
+    for (auto&& [fieldName, fieldExpr] : idExprObj->getChildExpressions()) {
+        auto abt = abt::unwrap(
+            generateExpression(state, fieldExpr.get(), rootSlot, &outputs).extractABT());
 
         auto slot = state.slotId();
-        stage = makeProject(std::move(stage), nodeId, slot, std::move(fillEmptyNullExpr));
+        projects.emplace_back(slot, abtToExpr(abt, state, &varTypes).expr);
 
+        slots.push_back(slot);
+        exprs.emplace_back(makeStrConstant(fieldName));
+        exprs.emplace_back(makeVariable(slot));
+    }
+
+    if (!projects.empty()) {
+        stage = makeProject(std::move(stage), std::move(projects), nodeId);
+    }
+
+    // When there's only one field in the document _id expression, 'Nothing' is converted to
+    // 'Null'.
+    // TODO SERVER-21992: Remove the following block because this block emulates the classic
+    // engine's buggy behavior. With index that can handle 'Nothing' and 'Null' differently,
+    // SERVER-21992 issue goes away and the distinct scan should be able to return 'Nothing' and
+    // 'Null' separately.
+    if (slots.size() == 1) {
+        auto slot = state.slotId();
+        stage = makeProject(std::move(stage), nodeId, slot, makeFillEmptyNull(std::move(exprs[1])));
+
+        slots[0] = slot;
+        exprs[1] = makeVariable(slots[0]);
+    }
+
+    // Composes the _id document and assigns a slot to the result using 'newObj' function if _id
+    // should produce a document. For example, resultSlot = newObj(field1, slot1, ..., fieldN,
+    // slotN)
+    return {slots, std::move(stage), sbe::makeE<sbe::EFunction>("newObj"_sd, std::move(exprs))};
+}
+
+MONGO_COMPILER_NOINLINE
+std::tuple<sbe::value::SlotVector, SbStage, std::unique_ptr<sbe::EExpression>>
+generateGroupBySingleKey(StageBuilderState& state,
+                         const boost::intrusive_ptr<Expression>& idExpr,
+                         const PlanStageSlots& outputs,
+                         SbStage stage,
+                         PlanNodeId nodeId) {
+    auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
+    // The group-by field may end up being 'Nothing' and in that case _id: null will be
+    // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
+    SbExprBuilder b(state);
+    auto groupBySbExpr =
+        b.makeFillEmptyNull(generateExpression(state, idExpr.get(), rootSlot, &outputs));
+    auto abtGroupBy = abt::unwrap(groupBySbExpr.extractABT());
+    VariableTypes varTypes = buildVariableTypes(outputs);
+    auto groupByExpr = abtToExpr(abtGroupBy, state, &varTypes);
+
+    if (auto groupByExprConstant = groupByExpr.expr->as<sbe::EConstant>(); groupByExprConstant) {
+        return {sbe::value::SlotVector{}, std::move(stage), std::move(groupByExpr.expr)};
+    } else {
+        auto slot = state.slotId();
+        stage = makeProject(std::move(stage), nodeId, slot, std::move(groupByExpr.expr));
         return {sbe::value::SlotVector{slot}, std::move(stage), nullptr};
     }
 }
@@ -761,23 +763,91 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const auto& childNode = groupNode->children[0].get();
     const auto& accStmts = groupNode->accumulators;
 
-    // Builds the child and gets the child result slot.
-    auto childReqs = computeChildReqsForGroup(reqs, *groupNode);
+    // Builds the child and gets the child result slot. If we don't need the full result object, we
+    // can process block values.
+    auto childReqs = computeChildReqsForGroup(reqs, *groupNode)
+                         .setCanProcessBlockValues(!reqs.has(PlanStageSlots::kResult));
     auto [childStage, childOutputs] = build(childNode, childReqs);
 
-    // Set of field paths referenced by group. Useful for de-duplicating fields and clearing the
+    // Map of field paths referenced by group. Useful for de-duplicating fields and clearing the
     // slots corresponding to fields in 'childOutputs' so that they are not mistakenly referenced by
     // parent stages.
-    StringSet groupFieldSet;
-    childStage = projectPathTraversalsForGroupBy(
-        _state, *groupNode, childReqs, std::move(childStage), childOutputs, groupFieldSet);
+    StringMap<const ExpressionFieldPath*> groupFieldMap = collectFieldPaths(groupNode);
+    if (!groupFieldMap.empty()) {
+        // If we have block values in input, convert them to scalar values before computing the
+        // projection.
+        if (hasBlockOutput(childOutputs)) {
+            childStage = buildBlockToRow(std::move(childStage), childOutputs);
+        }
+
+        childStage = projectPathTraversalsForGroupBy(
+            _state, *groupNode, std::move(childStage), childOutputs, groupFieldMap);
+    }
 
     sbe::value::SlotVector groupBySlots;
     SbStage groupByStage;
     std::unique_ptr<sbe::EExpression> idFinalExpr;
 
-    std::tie(groupBySlots, groupByStage, idFinalExpr) = generateGroupByKey(
-        _state, idExpr, childOutputs, std::move(childStage), nodeId, &_slotIdGenerator);
+    // If we have an object as group id, let's stop block processing immediately and build
+    // the required projection to create it. If we have a single expression, we can try to
+    // vectorize it.
+    if (auto idExprObj = dynamic_cast<ExpressionObject*>(idExpr.get()); idExprObj) {
+        if (hasBlockOutput(childOutputs)) {
+            childStage = buildBlockToRow(std::move(childStage), childOutputs);
+        }
+        std::tie(groupBySlots, groupByStage, idFinalExpr) =
+            generateGroupByObjKey(_state, idExprObj, childOutputs, std::move(childStage), nodeId);
+    } else {
+        // Attempt to use a block-enabled project stage.
+        if (hasBlockOutput(childOutputs)) {
+            // The group-by field may end up being 'Nothing' and in that case _id: null will be
+            // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
+            SbExprBuilder b(_state);
+            auto groupByBlockExpr =
+                buildVectorizedExpr(b.makeFillEmptyNull(generateExpression(
+                                        _state,
+                                        idExpr.get(),
+                                        childOutputs.getIfExists(PlanStageSlots::kResult),
+                                        &childOutputs)),
+                                    childOutputs,
+                                    false);
+            if (groupByBlockExpr.has_value() &&
+                TypeSignature::kBlockType.isSubset(groupByBlockExpr->typeSignature)) {
+
+                // Make up a temporary field name so that we can register the slot in the
+                // childOutputs, as buildBlockToRow below reads from it to get the slots to convert
+                // to scalar. Use a Base64-encoded UUID to minimize the chance of colliding with
+                // existing fields.
+                std::array<unsigned char, 16> nonce = UUID::gen().data();
+                auto groupIdFieldName = std::make_pair(PlanStageSlots::kField,
+                                                       base64::encode(nonce.data(), sizeof(nonce)));
+
+                auto slot = _state.slotId();
+                groupByStage = makeProject(
+                    std::move(childStage), nodeId, slot, std::move(groupByBlockExpr->expr));
+                groupBySlots = sbe::value::SlotVector{slot};
+                childOutputs.set(groupIdFieldName,
+                                 TypedSlot{slot, groupByBlockExpr->typeSignature});
+
+                // TODO: remove this section when $group is able to digest block values.
+                // For now, we have to close the block processing pipeline here, remove the
+                // slot we just added and replace the slot used as group id with the scalar
+                // result.
+                groupByStage = buildBlockToRow(std::move(groupByStage), childOutputs);
+                groupBySlots[0] = childOutputs.get(groupIdFieldName).slotId;
+                childOutputs.clear(groupIdFieldName);
+            } else {
+                // Vectorization is not possible, stop block processing now.
+                childStage = buildBlockToRow(std::move(childStage), childOutputs);
+            }
+        }
+
+        // If vectorization wasn't needed, or if it failed, create the scalar projection.
+        if (!groupByStage) {
+            std::tie(groupBySlots, groupByStage, idFinalExpr) = generateGroupBySingleKey(
+                _state, idExpr, childOutputs, std::move(childStage), nodeId);
+        }
+    }
 
     auto [fieldNames, finalSlots, outStage] = buildGroupAggregation(_state,
                                                                     *groupNode,
@@ -794,8 +864,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Clear all fields needed by this group stage from 'childOutputs' to avoid references to
     // ExpressionFieldPath values that are no longer visible.
-    for (const auto& groupField : groupFieldSet) {
-        childOutputs.clear({PlanStageSlots::kPathExpr, StringData(groupField)});
+    for (const auto& groupField : groupFieldMap) {
+        childOutputs.clear({PlanStageSlots::kPathExpr, StringData(groupField.first)});
     }
 
     auto fieldNamesSet = StringDataSet{fieldNames.begin(), fieldNames.end()};

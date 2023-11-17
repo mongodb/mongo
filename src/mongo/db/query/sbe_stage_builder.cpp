@@ -1493,7 +1493,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             return false;
         });
 
-    auto forwardingReqs = reqs.copy()
+    auto forwardingReqs = reqs.copyForChild()
                               .clearResult()
                               .clearMRInfo()
                               .clear(kRecordId)
@@ -1501,7 +1501,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                               .clearAllSortKeys()
                               .setSortKeys(std::move(sortKeys));
 
-    auto childReqs = forwardingReqs.copy()
+    auto childReqs = forwardingReqs.copyForChild()
                          .set(kRecordId)
                          .set(kSnapshotId)
                          .set(kIndexIdent)
@@ -1836,13 +1836,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    auto forwardingReqs = reqs.copy();
+    auto forwardingReqs = reqs.copyForChild();
 
     if (hasPartsWithCommonPrefix) {
         forwardingReqs.clearMRInfo().setResult();
     }
 
-    auto childReqs = forwardingReqs.copy().setFields(fields);
+    auto childReqs = forwardingReqs.copyForChild().setFields(fields);
 
     auto [stage, childOutputs] = build(child, childReqs);
     auto outputs = std::move(childOutputs);
@@ -2054,7 +2054,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto child = sn->children[0].get();
 
     // The child must produce all of the slots required by the parent of this SortNode.
-    auto childReqs = reqs.copy();
+    auto childReqs = reqs.copyForChild();
 
     std::vector<std::string> fields;
     StringDataSet sortPathsSet;
@@ -2156,7 +2156,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // addition, children must always produce a 'recordIdSlot' if the 'dedup' flag is true, and
     // they must produce kField slots for each part of the sort pattern.
     auto childReqs =
-        reqs.copy().setIf(kRecordId, mergeSortNode->dedup).setSortKeys(std::move(sortKeys));
+        reqs.copyForChild().setIf(kRecordId, mergeSortNode->dedup).setSortKeys(std::move(sortKeys));
 
     std::vector<std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>> inputStagesAndSlots;
 
@@ -2237,7 +2237,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // The child must produce all of the slots required by the parent of this MatchNode. Also, if
     // the filter needs the whole document, the child must produce 'kResult' as well.
-    PlanStageReqs childReqs = reqs.copy().setFields(std::move(fields));
+    PlanStageReqs childReqs = reqs.copyForChild().setFields(std::move(fields));
 
     if (needChildResultDoc) {
         childReqs.clearMRInfo().setResult();
@@ -2275,7 +2275,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // The child must produce all of the slots required by the parent of this UnwindNode, plus this
     // node needs to produce the result slot.
-    PlanStageReqs childReqs = reqs.copy().clearMRInfo().setResult();
+    PlanStageReqs childReqs = reqs.copyForChild().clearMRInfo().setResult();
     auto [stage, outputs] = build(un->children[0].get(), childReqs);
     // Clear the root of the original field being unwound so later plan stages do not reference it.
     outputs.clearField(fp.getSubpath(0));
@@ -2433,8 +2433,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // The $replaceRoot operation only ever needs 'kResult' if there are operations in the 'newRoot'
     // expression that need the whole document.
     PlanStageReqs childReqs = newRootDeps.needWholeDocument
-        ? reqs.copy().clearAllFields().clearMRInfo().setResult()
-        : reqs.copy().clearAllFields().clearResult().clearMRInfo().setFields(
+        ? reqs.copyForChild().clearAllFields().clearMRInfo().setResult()
+        : reqs.copyForChild().clearAllFields().clearResult().clearMRInfo().setFields(
               getTopLevelFields(newRootDeps.fields));
 
     auto [stage, outputs] = build(rrn->children[0].get(), childReqs);
@@ -3178,7 +3178,8 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
     }
 
     // Start preparing the requirements for our child.
-    auto childReqs = reqs.copy().clear(kResult).setIf(kResult, childMakeResult).clearAllFields();
+    auto childReqs =
+        reqs.copyForChild().clear(kResult).setIf(kResult, childMakeResult).clearAllFields();
 
     // If our parent requested MakeResultInfo and we were able to support the MakeResultInfo req,
     // then we need to update the MakeResultInfo req inside 'childReqs' to reflect the effects of
@@ -3615,7 +3616,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Children must produce all of the slots required by the parent of this OrNode. In addition
     // to that, children must always produce a 'recordIdSlot' if the 'dedup' flag is true, and
     // children must produce a 'resultSlot' if 'filter' needs the whole document.
-    auto childReqs = reqs.copy().setIf(kRecordId, orn->dedup).setFields(std::move(fields));
+    auto childReqs = reqs.copyForChild().setIf(kRecordId, orn->dedup).setFields(std::move(fields));
 
     if (needChildResultDoc) {
         childReqs.clearMRInfo();
@@ -3683,7 +3684,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // assumption.
     tassert(5432216, "text match input must be fetched", root->children[0]->fetched());
 
-    auto childReqs = reqs.copy().clearMRInfo().setResult();
+    auto childReqs = reqs.copyForChild().clearMRInfo().setResult();
     auto [stage, outputs] = build(textNode->children[0].get(), childReqs);
     tassert(5432217, "result slot is not produced by text match sub-plan", outputs.has(kResult));
 
@@ -3736,7 +3737,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // for 'resultSlot'. In addition to that, the child must always produce a 'returnKeySlot'.
     // After build() returns, we take the 'returnKeySlot' produced by the child and store it into
     // 'resultSlot' for the parent of this ReturnKeyNode to consume.
-    auto childReqs = reqs.copy().clearResult().clearMRInfo().clearAllFields().set(kReturnKey);
+    auto childReqs =
+        reqs.copyForChild().clearResult().clearMRInfo().clearAllFields().set(kReturnKey);
     auto [stage, outputs] = build(returnKeyNode->children[0].get(), childReqs);
 
     outputs.set(kResult, outputs.get(kReturnKey));
@@ -3757,7 +3759,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     tassert(6023412, "buildAndHash() does not support kSortKey", !reqs.hasSortKeys());
     tassert(5073711, "need at least two children for AND_HASH", andHashNode->children.size() >= 2);
 
-    auto childReqs = reqs.copy().clearMRInfo().setResult().set(kRecordId).clearAllFields();
+    auto childReqs = reqs.copyForChild().clearMRInfo().setResult().set(kRecordId).clearAllFields();
 
     auto outerChild = andHashNode->children[0].get();
     auto innerChild = andHashNode->children[1].get();
@@ -3857,12 +3859,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     tassert(
         5073706, "need at least two children for AND_SORTED", andSortedNode->children.size() >= 2);
 
-    auto childReqs = reqs.copy().clearMRInfo().setResult().set(kRecordId).clearAllFields();
+    auto childReqs = reqs.copyForChild().clearMRInfo().setResult().set(kRecordId).clearAllFields();
 
     auto outerChild = andSortedNode->children[0].get();
     auto innerChild = andSortedNode->children[1].get();
 
-    auto outerChildReqs = childReqs.copy()
+    auto outerChildReqs = childReqs.copyForChild()
                               .clear(kSnapshotId)
                               .clear(kIndexIdent)
                               .clear(kIndexKey)
@@ -4041,7 +4043,7 @@ SlotBasedStageBuilder::buildShardFilterCovered(const QuerySolutionNode* root,
         ? static_cast<const IndexScanNode*>(child)->index.keyPattern
         : static_cast<const VirtualScanNode*>(child)->indexKeyPattern;
 
-    auto childReqs = reqs.copy();
+    auto childReqs = reqs.copyForChild();
 
     // If we're sharded make sure that we don't return data that isn't owned by the shard. This
     // situation can occur when pending documents from in-progress migrations are inserted and when
@@ -4131,7 +4133,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         return buildShardFilterCovered(root, reqs);
     }
 
-    auto childReqs = reqs.copy();
+    auto childReqs = reqs.copyForChild();
 
     // If we're sharded make sure that we don't return data that isn't owned by the shard. This
     // situation can occur when pending documents from in-progress migrations are inserted and when
@@ -4320,9 +4322,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }();
 
     auto child = root->children[0].get();
-    auto childReqs = reqs.copy().clearResult().clearMRInfo().setResultIf(reqResult);
+    auto childReqs = reqs.copyForChild().clearResult().clearMRInfo().setResultIf(reqResult);
 
-    auto forwardingReqs = childReqs.copy();
+    auto forwardingReqs = childReqs.copyForChild();
 
     childReqs.setFields(getTopLevelFields(windowNode->partitionByRequiredFields));
     childReqs.setFields(getTopLevelFields(windowNode->sortByRequiredFields));
@@ -5238,7 +5240,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         return makeE<sbe::EFunction>(functionName, std::move(args));
     };
 
-    auto childReqs = reqs.copy()
+    auto childReqs = reqs.copyForChild()
                          .set(kRecordId)
                          .set(kSnapshotId)
                          .set(kIndexIdent)
@@ -5469,7 +5471,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     bool clearSlots = stageType != STAGE_VIRTUAL_SCAN && stageType != STAGE_COLUMN_SCAN &&
         stageType != STAGE_LIMIT && stageType != STAGE_SKIP && stageType != STAGE_TEXT_MATCH &&
         stageType != STAGE_RETURN_KEY && stageType != STAGE_AND_HASH &&
-        stageType != STAGE_AND_SORTED && stageType != STAGE_GROUP && stageType != STAGE_SEARCH;
+        stageType != STAGE_AND_SORTED && stageType != STAGE_GROUP && stageType != STAGE_SEARCH &&
+        stageType != STAGE_UNPACK_TS_BUCKET;
 
     outputs.clearNonRequiredSlotsAndInfos(reqs, clearSlots);
 

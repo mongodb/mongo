@@ -96,6 +96,11 @@ bool allBools(const value::TypeTags* tag, size_t sz) {
     return true;
 }
 
+bool emptyPositionInfo(const std::vector<char>& positionInfo) {
+    return positionInfo.empty() ||
+        std::all_of(positionInfo.begin(), positionInfo.end(), [](const char& c) { return c == 1; });
+}
+
 struct FillEmptyFunctor {
     FillEmptyFunctor(value::TypeTags fillTag, value::Value fillVal)
         : _fillTag(fillTag), _fillVal(fillVal) {}
@@ -698,9 +703,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
 
     auto valsExtracted = valueBlock->extract();
     tassert(7953533, "Expected all bool inputs", allBools(valsExtracted.tags, valsExtracted.count));
+    tassert(7953535, "Unsupported empty block", valsExtracted.count > 0);
 
     const auto& positionInfo = cellBlock->filterPositionInfo();
-    if (positionInfo.empty()) {
+    if (emptyPositionInfo(positionInfo)) {
         // Return the input unchanged.
         return moveFromStack(0);
     }
@@ -708,7 +714,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
     tassert(7953534,
             "Expected position info count to be same as value size",
             valsExtracted.count == positionInfo.size());
-    tassert(7953535, "Unsupported empty block", valsExtracted.count > 0);
     tassert(7953536, "First position info element should always be true", positionInfo[0]);
 
     // Note: if this code ends up being a bottleneck, we can make some changes. foldCounts()
@@ -741,7 +746,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_P(ArityType arity) {
-    MONGO_UNREACHABLE;
+    auto [valBlockOwned, valBlockTag, valBlockVal] = getFromStack(0);
+    invariant(valBlockTag == value::TypeTags::valueBlock);
+
+    auto [cellOwned, cellTag, cellVal] = getFromStack(1);
+    invariant(cellTag == value::TypeTags::cellBlock);
+    auto* cellBlock = value::bitcastTo<value::CellBlock*>(cellVal);
+
+    const auto& positionInfo = cellBlock->filterPositionInfo();
+    tassert(7953901, "Only top-level cell values are supported", emptyPositionInfo(positionInfo));
+    // Return the input unchanged.
+    return moveFromStack(0);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellBlockGetFlatValuesBlock(

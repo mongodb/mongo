@@ -214,9 +214,10 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
     TypeSignature rhs = const_cast<optimizer::ABT&>(op.getRightChild()).visit(*this, false);
     switch (op.op()) {
         case optimizer::Operations::FillEmpty: {
-            // If the argument is already guaranteed not to be a Nothing, the fillEmpty can be
-            // removed.
-            if (!TypeSignature::kNothingType.isSubset(lhs)) {
+            // If the argument is already guaranteed not to be a Nothing, or the replacement value
+            // is a Nothing itself, the fillEmpty can be removed.
+            if (!TypeSignature::kNothingType.isSubset(lhs) ||
+                rhs.isSubset(TypeSignature::kNothingType)) {
                 swapAndUpdate(n,
                               std::exchange(const_cast<optimizer::ABT&>(op.getLeftChild()),
                                             optimizer::make<optimizer::Blackhole>()));

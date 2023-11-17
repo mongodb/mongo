@@ -46,6 +46,7 @@
 
 namespace mongo::stage_builder {
 
+class PlanStageSlots;
 struct StageBuilderState;
 
 optimizer::ProjectionName getABTVariableName(sbe::value::SlotId slotId);
@@ -71,15 +72,22 @@ struct TypedExpression {
 using VariableTypes = stdx::
     unordered_map<optimizer::ProjectionName, TypeSignature, optimizer::ProjectionName::Hasher>;
 
+// Collect the type information of the slots declared in the provided stage output.
+VariableTypes buildVariableTypes(const PlanStageSlots& outputs);
+
+// Return whether the declared outputs contain a block value.
+bool hasBlockOutput(const PlanStageSlots& outputs);
+
 // Run constant folding on the provided ABT tree and return its type signature. If the type
-// information in the slotInfo is available, it is used to assign a type to the visible slots.
+// information for the visible slots is available in the slotInfo argument, it is used to perform a
+// more precise type checking optimization. On return, the abt argument points to the modified tree.
 TypeSignature constantFold(optimizer::ABT& abt,
                            StageBuilderState& state,
                            const VariableTypes* slotInfo = nullptr);
 
-// Optimize and convert the provided ABT tree into an equivalent EExpression tree, returning its
-// type signature. If the type information in the slotInfo is available, it is used to assign a type
-// to the visible slots.
+// Optimize (by modifying it in place via a call to constantFold) and convert the provided ABT tree
+// into an equivalent typed EExpression tree. The type information for the visible slots provided in
+// the slotInfo argument is forwarded to the constantFold operation.
 TypedExpression abtToExpr(optimizer::ABT& abt,
                           StageBuilderState& state,
                           const VariableTypes* slotInfo = nullptr);

@@ -1183,7 +1183,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         _state.data->foreignHashJoinCollections.emplace(eqLookupNode->foreignCollection);
     }
 
-    auto localReqs = reqs.copy().clearMRInfo().setResult();
+    auto localReqs = reqs.copyForChild().clearMRInfo().setResult();
     auto [localStage, localOutputs] = build(eqLookupNode->children[0].get(), localReqs);
     SlotId localDocumentSlot = localOutputs.get(PlanStageSlots::kResult).slotId;
 
