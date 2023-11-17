@@ -2275,9 +2275,14 @@ public:
                 inputExpr = *slot;
             }
         } else {
-            auto it = _context->environment.find(expr->getVariableId());
-            if (it != _context->environment.end()) {
+            const auto& varId = expr->getVariableId();
+            const auto& injectedVariables = _context->state.data->injectedVariables;
+            if (auto it = _context->environment.find(varId); it != _context->environment.end()) {
                 inputExpr = abt::wrap(makeVariable(makeLocalVariableName(it->second, 0)));
+            } else if (auto injectedIt = injectedVariables.find(varId);
+                       injectedIt != injectedVariables.end()) {
+                auto [frameId, slotId] = injectedIt->second;
+                inputExpr = abt::wrap(makeVariable(makeLocalVariableName(frameId, slotId)));
             } else {
                 inputExpr = _context->state.getGlobalVariableSlot(expr->getVariableId());
             }

@@ -995,34 +995,71 @@ public:
         auto expCtx = _context->state.expCtx;
         invariant(expCtx);
 
+        // We want to translate this into an SBE expression that returns 'true' any time '$a.b.c'
+        // is an array, and {<cmpExpr>: ["$a.b.c", <rhs>]} otherwise. (<cmpExpr> is $eq, $lt, $gt
+        // etc).
+        // First we're going to create an agg expression that of the form:
+        // {$eq: ['$$INTERNAL_FIELD_PATH_EXPR_FOR_INTERNAL_EXPR_*', <rhs>]}
+        // We'll then translate this into an SBE expression, placing the result of the LHS field
+        // path expression into the internal variable.
+        //
+        // '$$INTERNAL_FIELD_PATH_EXPR_FOR_INTERNAL_EXPR' <=== the output of '$a.b.c'
+        //
+        // We can then generate an expression of the form:
+        //
+        // let l1 = <expression for '$a.b.c.'>
+        //   if (isArray(l1)) true // Return true any time we see an array
+        //   else <expression for $eq: [l1, <rhs>]>
+        //
+        // We then coerce this to boolean, and we're done.
+        auto& state = _context->state;
+
+        // Generate a variable name that won't conflict with anything else. Note that in agg, all
+        // variable names starting with a capital letter are reserved for internal use, so there is
+        // no risk of conflict with a user-chosen variable name.
+        const std::string aggVarName = str::stream()
+            << "INTERNAL_FIELD_PATH_EXPR_FOR_INTERNAL_EXPR_"
+            << std::to_string(state.slotIdGenerator->generate());
+        auto aggVarId = expCtx->variablesParseState.defineVariable(aggVarName);
+
+        SbExprBuilder b(state);
+        const auto frameId = state.frameIdGenerator->generate();
+        const sbe::value::SlotId frameSlotId = 0;
+        auto lhsVar = b.makeVariable(frameId, frameSlotId);
+
+        // Inject the internal variable into the stage builder state, so that the expression stage
+        // builder knows that INTERNAL_FIELD_PATH_EXPR* points to the frameId/slot we generated.
+        state.data->injectedVariables.emplace(aggVarId, std::pair(frameId, frameSlotId));
+        ON_BLOCK_EXIT([&]() { state.data->injectedVariables.erase(aggVarId); });
+
+        // Generate an agg expression which does the comparison, referencing the internal variable.
+        auto cmpAggExpr = ExpressionCompare::create(
+            expCtx.get(),
+            cmp,
+            ExpressionFieldPath::createVarFromString(
+                expCtx.get(), aggVarName, expCtx->variablesParseState),
+            ExpressionConstant::create(expCtx.get(), Value(expr->getData())));
+
+        // Translate the agg expression to SBE.
+        auto translatedCmpExpr = generateExpression(
+            _context->state, cmpAggExpr.get(), _context->rootSlot, _context->slots);
+
+        auto isArrayExpr = b.makeIf(b.makeFillEmptyTrue(b.makeFunction("isArray", lhsVar.clone())),
+                                    b.makeBoolConstant(true),
+                                    std::move(translatedCmpExpr));
+
+        // Now generate the actual field path expression for the LHS.
         auto fieldPathExpr = ExpressionFieldPath::createPathFromString(
             expCtx.get(), expr->fieldRef()->dottedField().toString(), expCtx->variablesParseState);
         auto translatedFieldPathExpr = generateExpression(
             _context->state, fieldPathExpr.get(), _context->rootSlot, _context->slots);
 
-        SbExprBuilder b(_context->state);
-        auto frameId = _context->state.frameIdGenerator->generate();
-        auto newVar = b.makeVariable(frameId, 0);
-
-        auto cmpExpr = ExpressionCompare::create(
-            expCtx.get(),
-            cmp,
-            fieldPathExpr,
-            ExpressionConstant::create(expCtx.get(), Value(expr->getData())));
-
-        auto translatedCmpExpr =
-            generateExpression(_context->state, cmpExpr.get(), _context->rootSlot, _context->slots);
-
-        auto isArrayExpr = b.makeIf(b.makeFillEmptyTrue(b.makeFunction("isArray", newVar.clone())),
-                                    b.makeBoolConstant(true),
-                                    std::move(translatedCmpExpr));
-
+        // Put the LHS into the slot we generated in a let statement.
         auto cmpWArrayCheckExpr = b.makeLet(
             frameId, SbExpr::makeSeq(std::move(translatedFieldPathExpr)), std::move(isArrayExpr));
 
-        auto& frame = _context->topFrame();
         // Convert the result of the '{$expr: ..}' expression to a boolean value.
-        frame.pushExpr(
+        _context->topFrame().pushExpr(
             b.makeFillEmptyFalse(b.makeFunction("coerceToBool"_sd, std::move(cmpWArrayCheckExpr))));
     }
 
