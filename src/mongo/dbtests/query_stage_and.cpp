@@ -75,8 +75,7 @@ public:
 
     const IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
         std::vector<const IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(
-            &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);
+        coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         if (indexes.empty()) {
             FAIL(str::stream() << "Unable to find index with key pattern " << obj);
         }

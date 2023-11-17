@@ -594,9 +594,7 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
         }
 
         auto idx = collection->getIndexCatalog()->findIndexByName(
-            opCtx,
-            indexName,
-            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+            opCtx, indexName, true /* includeUnfinishedIndexes */);
         if (!idx) {
             return Status(ErrorCodes::IndexNotFound,
                           str::stream()
@@ -683,8 +681,9 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 // Use index scan.
                 auto indexCatalog = collection->getIndexCatalog();
                 invariant(indexCatalog);
-                const IndexDescriptor* indexDescriptor = indexCatalog->findIndexByName(
-                    opCtx, *indexName, IndexCatalog::InclusionPolicy::kReady);
+                bool includeUnfinishedIndexes = false;
+                const IndexDescriptor* indexDescriptor =
+                    indexCatalog->findIndexByName(opCtx, *indexName, includeUnfinishedIndexes);
                 if (!indexDescriptor) {
                     return Result(ErrorCodes::IndexNotFound,
                                   str::stream() << "Index not found, ns:" << nsOrUUID.toString()
