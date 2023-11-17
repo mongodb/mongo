@@ -296,6 +296,10 @@ public:
         return _expr;
     }
 
+    void optimize() {
+        _expr = _expr->optimize();
+    }
+
 private:
     boost::intrusive_ptr<Expression> _expr;
 };

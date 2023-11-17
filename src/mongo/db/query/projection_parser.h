@@ -45,13 +45,15 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                  const BSONObj& obj,
                  const MatchExpression* query,
                  const BSONObj& queryObj,
-                 ProjectionPolicies policies);
+                 ProjectionPolicies policies,
+                 bool shouldOptimize = false);
 
 /**
  * Overload of parse() to be used when not parsing a projection from a find() command.
  */
 Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                  const BSONObj& obj,
-                 ProjectionPolicies policies);
+                 ProjectionPolicies policies,
+                 bool shouldOptimize = false);
 }  // namespace projection_ast
 }  // namespace mongo

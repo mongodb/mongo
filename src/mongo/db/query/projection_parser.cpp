@@ -590,7 +590,8 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                  const BSONObj& obj,
                  const MatchExpression* const query,
                  const BSONObj& queryObj,
-                 ProjectionPolicies policies) {
+                 ProjectionPolicies policies,
+                 bool shouldOptimize) {
     if (!policies.findOnlyFeaturesAllowed()) {
         // In agg-style syntax it is illegal to have an empty projection specification.
         uassert(51272, "projection specification must have at least one field", !obj.isEmpty());
@@ -636,13 +637,18 @@ Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
         invariant(root.removeChild("_id"));
     }
 
+    if (shouldOptimize) {
+        optimizeProjection(&root);
+    }
+
     return Projection{std::move(root), *ctx.type};
 }
 
 Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
                  const BSONObj& obj,
-                 ProjectionPolicies policies) {
-    return parse(std::move(expCtx), obj, nullptr, BSONObj(), std::move(policies));
+                 ProjectionPolicies policies,
+                 bool shouldOptimize) {
+    return parse(std::move(expCtx), obj, nullptr, BSONObj(), std::move(policies), shouldOptimize);
 }
 }  // namespace projection_ast
 }  // namespace mongo

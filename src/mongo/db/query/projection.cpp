@@ -55,6 +55,27 @@ struct DepsAnalysisData {
 };
 
 /**
+ * Optimizes the expressions in the projection while walking the AST tree.
+ */
+class ProjectionOptimizationVisitor final : public ProjectionASTMutableVisitor {
+public:
+    void visit(ProjectionPathASTNode* node) final {}
+
+    void visit(ProjectionPositionalASTNode* node) final {}
+
+    void visit(ProjectionSliceASTNode* node) final {}
+
+    void visit(ProjectionElemMatchASTNode* node) final {}
+
+    void visit(ExpressionASTNode* node) final {
+        node->optimize();
+    }
+
+    void visit(BooleanConstantASTNode* node) final {}
+    void visit(MatchExpressionASTNode* node) final {}
+};
+
+/**
  * Does "broad" analysis on the projection, about whether the entire document, or details from the
  * match expression are needed and so on.
  */
@@ -192,6 +213,15 @@ auto analyzeProjection(const ProjectionPathASTNode* root, ProjectType type) {
 }
 }  // namespace
 
+void optimizeProjection(ProjectionPathASTNode* root) {
+    PathTrackingVisitorContext context;
+    ProjectionOptimizationVisitor optimizationVisitor;
+    PathTrackingMutableWalker<PathTrackingDummyDefaultType> walker{
+        &context, {&optimizationVisitor}, {}};
+
+    projection_ast_walker::walk<PathTrackingMutableWalker<PathTrackingDummyDefaultType>, false>(
+        &walker, root);
+}
 
 Projection::Projection(ProjectionPathASTNode root, ProjectType type)
     : _root(std::move(root)), _type(type), _deps(analyzeProjection(&_root, type)) {}

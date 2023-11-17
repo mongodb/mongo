@@ -247,8 +247,12 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     // Validate the projection if there is one.
     if (!_qr->getProj().isEmpty()) {
         try {
-            _proj.emplace(projection_ast::parse(
-                expCtx, _qr->getProj(), _root.get(), _qr->getFilter(), projectionPolicies));
+            _proj.emplace(projection_ast::parse(expCtx,
+                                                _qr->getProj(),
+                                                _root.get(),
+                                                _qr->getFilter(),
+                                                projectionPolicies,
+                                                true /* Should optimize? */));
 
             // Fail if any of the projection's dependencies are unavailable.
             DepsTracker{unavailableMetadata}.requestMetadata(_proj->metadataDeps());
