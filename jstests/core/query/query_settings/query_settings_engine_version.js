@@ -9,14 +9,13 @@
 //
 
 import {getPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
-
-const coll = db[jsTestName()];
-const qsutils = new QuerySettingsUtils(db, coll.getName());
 
 // Create the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.
-assert.commandWorked(db.createCollection(coll.getName()));
+const coll = assertDropAndRecreateCollection(db, jsTestName());
+const qsutils = new QuerySettingsUtils(db, coll.getName());
 
 // Create the index, such that we can ensure that index hints can be combined with query settings,
 // when query settings specify only query engine version.
@@ -38,10 +37,6 @@ const nonSbeEligibleQuery = {
     sort: {"a.0": 1},
     hint: indexKeyPattern,
 };
-
-// Set the 'clusterServerParameterRefreshIntervalSecs' value to 1 second for faster fetching of
-// 'querySettings' cluster parameter on mongos from the configsvr.
-const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
 
 function assertHintedIndexWasUsed(queryPlanner) {
     const winningPlan = getWinningPlan(queryPlanner);
@@ -120,6 +115,3 @@ function assertHintedIndexWasUsed(queryPlanner) {
 
     qsutils.removeAllQuerySettings();
 }
-
-// Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
-clusterParamRefreshSecs.restore();

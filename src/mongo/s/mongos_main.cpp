@@ -805,7 +805,9 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupMongoS);
     ChangeStreamOptionsManager::create(serviceContext);
-    query_settings::QuerySettingsManager::create(serviceContext);
+    query_settings::QuerySettingsManager::create(serviceContext, [](OperationContext* opCtx) {
+        uassertStatusOK(ClusterServerParameterRefresher::get(opCtx)->refreshParameters(opCtx));
+    });
 
     auto opCtxHolder = tc->makeOperationContext();
     auto const opCtx = opCtxHolder.get();

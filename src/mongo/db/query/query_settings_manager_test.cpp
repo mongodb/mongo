@@ -123,7 +123,7 @@ public:
     }
 
     void setUp() final {
-        QuerySettingsManager::create(getServiceContext());
+        QuerySettingsManager::create(getServiceContext(), {});
 
         _opCtx = cc().makeOperationContext();
         _expCtx = ExpressionContext::makeBlankExpressionContext(opCtx(), {NamespaceString()});

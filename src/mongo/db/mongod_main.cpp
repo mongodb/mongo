@@ -2146,7 +2146,7 @@ int mongod_main(int argc, char* argv[]) {
         ChangeStreamChangeCollectionManager::create(service);
     }
 
-    query_settings::QuerySettingsManager::create(service);
+    query_settings::QuerySettingsManager::create(service, {});
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {

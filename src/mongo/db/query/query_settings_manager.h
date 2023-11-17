@@ -112,14 +112,17 @@ struct VersionedQueryShapeConfigurations {
 class QuerySettingsManager {
 public:
     static constexpr auto kQuerySettingsClusterParameterName = "querySettings"_sd;
-    explicit QuerySettingsManager(ServiceContext* service) {}
+    QuerySettingsManager(ServiceContext* service,
+                         std::function<void(OperationContext*)> clusterParameterRefreshFn)
+        : _clusterParameterRefreshFn(clusterParameterRefreshFn) {}
 
     ~QuerySettingsManager() = default;
 
     QuerySettingsManager(const QuerySettingsManager&) = delete;
     QuerySettingsManager& operator=(const QuerySettingsManager&) = delete;
 
-    static void create(ServiceContext* service);
+    static void create(ServiceContext* service,
+                       std::function<void(OperationContext*)> clusterParameterRefreshFn);
 
     static QuerySettingsManager& get(ServiceContext* service);
     static QuerySettingsManager& get(OperationContext* opCtx);
@@ -159,6 +162,12 @@ public:
                                      const boost::optional<TenantId>& tenantId);
 
     /**
+     * Updates the QueryShapeConfiguration cache by calling the 'clusterParameterRefreshFn'. This
+     * can be a no-op if no 'clusterParameterRefreshFn' was provided in the constructor.
+     */
+    void refreshQueryShapeConfigurations(OperationContext* opCtx);
+
+    /**
      * Removes all query settings documents for the given tenant.
      */
     void removeAllQueryShapeConfigurations(OperationContext* opCtx,
@@ -188,6 +197,7 @@ private:
 
     TenantIdMap<VersionedQueryShapeConfigurations> _tenantIdToVersionedQueryShapeConfigurationsMap;
     Lock::ResourceMutex _mutex = Lock::ResourceMutex("QuerySettingsManager::mutex");
+    std::function<void(OperationContext*)> _clusterParameterRefreshFn;
 };
 };  // namespace query_settings
 }  // namespace mongo

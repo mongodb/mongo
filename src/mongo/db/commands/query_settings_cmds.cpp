@@ -110,7 +110,9 @@ void readModifyWrite(OperationContext* opCtx,
                      std::function<void(std::vector<QueryShapeConfiguration>&)> modify) {
     auto& querySettingsManager = QuerySettingsManager::get(opCtx);
 
-    // Read the query settings array from the cache.
+    // Read the query settings array from the cache. The cache might not have the latest cluster
+    // parameter values on mongos, therefore we trigger the cache update before reading from it.
+    querySettingsManager.refreshQueryShapeConfigurations(opCtx);
     auto settingsArray =
         querySettingsManager.getAllQueryShapeConfigurations(opCtx, dbName.tenantId());
 
@@ -123,6 +125,7 @@ void readModifyWrite(OperationContext* opCtx,
                         makeSetClusterParameterRequest(settingsArray, dbName),
                         boost::none,
                         querySettingsManager.getClusterParameterTime(opCtx, dbName.tenantId()));
+    querySettingsManager.refreshQueryShapeConfigurations(opCtx);
 
     /**
      * Clears the SBE plan cache if 'querySettingsPlanCacheInvalidation' failpoint is set.

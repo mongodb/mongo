@@ -10,21 +10,22 @@
 //   does_not_support_stepdowns,
 //   simulate_atlas_proxy_incompatible,
 //   cqf_incompatible,
+//   # 'planCacheClear' command is not allowed with the security token.
+//   not_allowed_with_security_token,
 // ]
 //
 
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBE = checkSBEEnabled(db);
 
-const coll = db[jsTestName()];
-const qsutils = new QuerySettingsUtils(db, coll.getName());
-
 // Create the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.
-assert.commandWorked(db.createCollection(coll.getName()));
+const coll = assertDropAndRecreateCollection(db, jsTestName());
+const qsutils = new QuerySettingsUtils(db, coll.getName());
 assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}, {a: 1, b: 1}]));
 
 // Insert data into the collection.
@@ -55,16 +56,15 @@ const querySettingsAB = {
     indexHints: {allowedIndexes: ["a_1_b_1"]}
 };
 
-// Set the 'clusterServerParameterRefreshIntervalSecs' value to 1 second for faster fetching of
-// 'querySettings' cluster parameter on mongos from the configsvr.
-const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
-
 // Ensure that query settings cluster parameter is empty.
 qsutils.assertQueryShapeConfiguration([]);
 
 // Ensure that explain output contains index scans with indexes specified in
 // 'settings.indexHints.allowedIndexes'
 function assertQuerySettingsApplication(findCmd, settings, shouldCheckPlanCache = true) {
+    // Clear the plan cache before running any queries.
+    coll.getPlanCache().clear();
+
     const explain = db.runCommand({explain: findCmd});
     const ixscanStages = getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN");
     assert.gte(ixscanStages.length, 1, explain);
@@ -133,6 +133,3 @@ function assertQuerySettingsApplication(findCmd, settings, shouldCheckPlanCache 
     assert.commandFailedWithCode(db.runCommand({...query, querySettings: querySettingsAB}),
                                  [7746900, 7746901])
 }
-
-// Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
-clusterParamRefreshSecs.restore();

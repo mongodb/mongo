@@ -8,13 +8,13 @@
 // ]
 //
 
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
-
-const qsutils = new QuerySettingsUtils(db, jsTestName());
 
 // Creating the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.
-assert.commandWorked(db.createCollection(jsTestName()));
+const coll = assertDropAndRecreateCollection(db, jsTestName());
+const qsutils = new QuerySettingsUtils(db, coll.getName());
 
 const adminDB = db.getSiblingDB("admin");
 
@@ -26,10 +26,6 @@ const querySettingsA = {
 const querySettingsB = {
     indexHints: {allowedIndexes: ["b_1"]}
 };
-
-// Set the 'clusterServerParameterRefreshIntervalSecs' value to 1 second for faster fetching of
-// 'querySettings' cluster parameter on mongos from the configsvr.
-const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
 
 // Ensure that query settings cluster parameter is empty.
 { qsutils.assertQueryShapeConfiguration([]); }
@@ -98,6 +94,3 @@ const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
     qsutils.removeAllQuerySettings();
     qsutils.assertExplainQuerySettings(queryA, undefined);
 }
-
-// Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
-clusterParamRefreshSecs.restore();

@@ -123,8 +123,9 @@ QuerySettingsManager& QuerySettingsManager::get(OperationContext* opCtx) {
     return *getQuerySettingsManager(opCtx->getServiceContext());
 }
 
-void QuerySettingsManager::create(ServiceContext* service) {
-    getQuerySettingsManager(service).emplace(service);
+void QuerySettingsManager::create(
+    ServiceContext* service, std::function<void(OperationContext*)> clusterParameterRefreshFn) {
+    getQuerySettingsManager(service).emplace(service, clusterParameterRefreshFn);
 }
 
 boost::optional<std::pair<QuerySettings, QueryInstance>>
@@ -228,6 +229,11 @@ std::vector<QueryShapeConfiguration> QuerySettingsManager::getAllQueryShapeConfi
         }
     }
     return configurations;
+}
+
+void QuerySettingsManager::refreshQueryShapeConfigurations(OperationContext* opCtx) {
+    if (_clusterParameterRefreshFn)
+        _clusterParameterRefreshFn(opCtx);
 }
 
 void QuerySettingsManager::removeAllQueryShapeConfigurations(
