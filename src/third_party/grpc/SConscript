@@ -43,11 +43,9 @@ if grpc_env.ToolchainIs('msvc'):
 grpc_root = grpc_env.Dir(".").srcnode()
 
 utf8_range_env = grpc_env.Clone()
-utf8_range_env.Append(
-    CPPPATH=[
-        grpc_root.Dir('dist/third_party/utf8_range'),
-    ]
-)
+utf8_range_env.Append(CPPPATH=[
+    grpc_root.Dir('dist/third_party/utf8_range'),
+])
 utf8_range_env.Library(
     target="utf8_range",
     source=[
@@ -155,7 +153,7 @@ upb_generated_protobuf_descriptor_obj = upb_env.LibraryObject(
     target="upb_generated_protobuf_descriptor",
     source=[
         "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
-    ]
+    ],
 )[0]
 
 upb_env.Library(
@@ -189,12 +187,10 @@ upb_env.Library(
 
 upb_env.Library(
     target="upb_eps_copy_input_stream",
-    source=[
-        "dist/third_party/upb/upb/wire/eps_copy_input_stream.c"
-    ],
+    source=["dist/third_party/upb/upb/wire/eps_copy_input_stream.c"],
     LIBDEPS=[
         "upb_mem",
-    ]
+    ],
 )
 
 upb_env.Library(
@@ -209,7 +205,7 @@ upb_env.Library(
         "upb_mini_table",
         "upb_wire",
         "upb_wire_reader",
-    ]
+    ],
 )
 
 upb_env.Library(
@@ -239,7 +235,7 @@ upb_env.Library(
         "upb_message_accessors",
         "upb_mini_descriptor",
         "upb_mini_table",
-    ]
+    ],
 )
 
 upb_env.Library(

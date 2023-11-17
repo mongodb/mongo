@@ -1,4 +1,4 @@
-# Generated from parse_lib_from_ninja.py   
+# Generated from parse_lib_from_ninja.py
 Import("env")
 env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
 env.InjectThirdParty(libraries=['abseil-cpp'])
@@ -37,9 +37,7 @@ env.Library(
     source=[
         'dist/absl/base/internal/strerror.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_scoped_set_env added as a dependency of other abseil libraries
@@ -60,9 +58,7 @@ env.Library(
     source=[
         'dist/absl/base/internal/spinlock_wait.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_log_severity is an explicit dependency to the server build
@@ -71,9 +67,7 @@ env.Library(
     source=[
         'dist/absl/base/log_severity.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_base is an explicit dependency to the server build
@@ -370,9 +364,7 @@ env.Library(
     source=[
         'dist/absl/debugging/leak_check.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_failure_signal_handler added as a dependency of other abseil libraries
@@ -536,9 +528,7 @@ env.Library(
     source=[
         'dist/absl/flags/internal/commandlineflag.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_flags_commandlineflag added as a dependency of other abseil libraries
@@ -1008,9 +998,7 @@ env.Library(
     source=[
         'dist/absl/log/internal/nullguard.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_log_internal_globals added as a dependency of other abseil libraries
@@ -1340,9 +1328,7 @@ env.Library(
     source=[
         'dist/absl/numeric/int128.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_periodic_sampler added as a dependency of other abseil libraries
@@ -1362,9 +1348,7 @@ env.Library(
     source=[
         'dist/absl/profiling/internal/exponential_biased.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_random_internal_randen_hwaes is an explicit dependency to the server build
@@ -1416,9 +1400,7 @@ env.Library(
     source=[
         'dist/absl/random/seed_gen_exception.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_random_internal_pool_urbg is an explicit dependency to the server build
@@ -1548,9 +1530,7 @@ env.Library(
     source=[
         'dist/absl/random/internal/randen_round_keys.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_statusor is an explicit dependency to the server build
@@ -2014,9 +1994,7 @@ env.Library(
         'dist/absl/time/internal/cctz/src/time_zone_posix.cc',
         'dist/absl/time/internal/cctz/src/zone_info_source.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_civil_time is an explicit dependency to the server build
@@ -2025,9 +2003,7 @@ env.Library(
     source=[
         'dist/absl/time/internal/cctz/src/civil_time_detail.cc',
     ],
-    LIBDEPS=[
-
-    ],
+    LIBDEPS=[],
 )
 
 # absl_time is an explicit dependency to the server build

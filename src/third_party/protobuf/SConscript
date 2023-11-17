@@ -55,10 +55,9 @@ env['PROTOC_DESCRIPTOR_PROTO'] = protobuf_env.File(
     "dist/src/google/protobuf/descriptor.proto").abspath
 
 utf8_validity_env = protobuf_env.Clone()
-utf8_validity_env.Append(
-    CPPPATH=[
-        protobuf_root.Dir('dist/third_party/utf8_range'),
-    ], )
+utf8_validity_env.Append(CPPPATH=[
+    protobuf_root.Dir('dist/third_party/utf8_range'),
+], )
 
 utf8_validity_env.Library(
     target='utf8_validity',
@@ -67,11 +66,9 @@ utf8_validity_env.Library(
     ],
 )
 
-protobuf_env.Append(
-    CPPPATH=[
-        protobuf_root.Dir('dist/third_party/utf8_range'),
-    ]
-)
+protobuf_env.Append(CPPPATH=[
+    protobuf_root.Dir('dist/third_party/utf8_range'),
+])
 
 protobuf_env.Library(
     target='protobuf',
