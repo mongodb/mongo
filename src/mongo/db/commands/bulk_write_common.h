@@ -118,7 +118,7 @@ write_ops::DeleteCommandRequest makeDeleteCommandRequestForFLE(
     OperationContext* opCtx,
     const BulkWriteDeleteOp* op,
     const BulkWriteCommandRequest& req,
-    const mongo::NamespaceInfoEntry& nsInfoEntry);
+    const mongo::NamespaceInfoEntry& nsEntry);
 
 BulkWriteCommandRequest makeSingleOpBulkWriteCommandRequest(
     const BulkWriteCommandRequest& bulkWriteReq, size_t opIdx);

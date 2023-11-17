@@ -248,17 +248,15 @@ write_ops::UpdateCommandRequest makeUpdateCommandRequestFromUpdateOp(
     updateCommand.setExpectPrefix(req.getExpectPrefix());
     updateCommand.setLet(req.getLet());
 
-    updateCommand.getWriteCommandRequestBase().setIsTimeseriesNamespace(
-        nsEntry.getIsTimeseriesNamespace());
-    updateCommand.getWriteCommandRequestBase().setCollectionUUID(nsEntry.getCollectionUUID());
+    auto& requestBase = updateCommand.getWriteCommandRequestBase();
+    requestBase.setIsTimeseriesNamespace(nsEntry.getIsTimeseriesNamespace());
+    requestBase.setCollectionUUID(nsEntry.getCollectionUUID());
 
-    updateCommand.getWriteCommandRequestBase().setEncryptionInformation(
-        nsEntry.getEncryptionInformation());
-    updateCommand.getWriteCommandRequestBase().setBypassDocumentValidation(
-        req.getBypassDocumentValidation());
+    requestBase.setEncryptionInformation(nsEntry.getEncryptionInformation());
+    requestBase.setBypassDocumentValidation(req.getBypassDocumentValidation());
 
-    updateCommand.getWriteCommandRequestBase().setStmtIds(std::vector<StmtId>{stmtId});
-    updateCommand.getWriteCommandRequestBase().setOrdered(req.getOrdered());
+    requestBase.setStmtIds(std::vector<StmtId>{stmtId});
+    requestBase.setOrdered(req.getOrdered());
 
     return updateCommand;
 }
@@ -267,7 +265,7 @@ write_ops::DeleteCommandRequest makeDeleteCommandRequestForFLE(
     OperationContext* opCtx,
     const BulkWriteDeleteOp* op,
     const BulkWriteCommandRequest& req,
-    const mongo::NamespaceInfoEntry& nsInfoEntry) {
+    const mongo::NamespaceInfoEntry& nsEntry) {
     write_ops::DeleteOpEntry deleteEntry;
     if (op->getCollation()) {
         deleteEntry.setCollation(op->getCollation());
@@ -277,15 +275,16 @@ write_ops::DeleteCommandRequest makeDeleteCommandRequestForFLE(
     deleteEntry.setQ(op->getFilter());
 
     std::vector<write_ops::DeleteOpEntry> deletes{deleteEntry};
-    write_ops::DeleteCommandRequest deleteRequest(nsInfoEntry.getNs(), deletes);
+    write_ops::DeleteCommandRequest deleteRequest(nsEntry.getNs(), deletes);
     deleteRequest.setDollarTenant(req.getDollarTenant());
     deleteRequest.setExpectPrefix(req.getExpectPrefix());
     deleteRequest.setLet(req.getLet());
     deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-    deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(
-        nsInfoEntry.getEncryptionInformation());
-    deleteRequest.getWriteCommandRequestBase().setBypassDocumentValidation(
-        req.getBypassDocumentValidation());
+
+    auto& requestBase = deleteRequest.getWriteCommandRequestBase();
+    requestBase.setCollectionUUID(nsEntry.getCollectionUUID());
+    requestBase.setEncryptionInformation(nsEntry.getEncryptionInformation());
+    requestBase.setBypassDocumentValidation(req.getBypassDocumentValidation());
 
     return deleteRequest;
 }
