@@ -55,6 +55,12 @@ commands:
             reason:
                 type: object
                 optional: true
+            throwIfReasonDiffers:
+                type: bool
+                description: >-
+                    If true, throw an invariant in case the collection critical section is already
+                    taken by another operation with a different reason.
+                optional: true
             # TODO SERVER-79600: Remove once the release of the critical section clears the
             # filtering metaddata. WARNING: new parameter, do not use in DDLCoordinators unless
             # it's drained.

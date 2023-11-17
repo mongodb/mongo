@@ -124,7 +124,9 @@ public:
                             ns(),
                             reason,
                             ShardingCatalogClient::kLocalWriteConcern,
-                            /* throwIfReasonDiffers */ true);
+                            request().getThrowIfReasonDiffers()
+                                ? *request().getThrowIfReasonDiffers()
+                                : true);
                         break;
                     case CriticalSectionBlockTypeEnum::kWrites:
                         service->acquireRecoverableCriticalSectionBlockWrites(
