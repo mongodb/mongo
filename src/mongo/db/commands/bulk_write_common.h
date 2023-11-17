@@ -71,6 +71,12 @@ int32_t getStatementId(const BulkWriteCommandRequest& req, size_t currentOpIdx);
  */
 NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite);
 
+
+/**
+ * Return true when the operation uses unacknowledged writeConcern, i.e. {w: 0, j: false}.
+ */
+bool isUnacknowledgedBulkWrite(OperationContext* opCtx);
+
 /**
  * Helper for FLE support. Build a InsertCommandRequest from a BulkWriteCommandRequest.
  */

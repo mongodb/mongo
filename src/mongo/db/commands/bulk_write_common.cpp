@@ -162,6 +162,13 @@ NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite) {
     return nss[0];
 }
 
+bool isUnacknowledgedBulkWrite(OperationContext* opCtx) {
+    const WriteConcernOptions& writeConcern = opCtx->getWriteConcern();
+    return writeConcern.isUnacknowledged() &&
+        (writeConcern.syncMode == WriteConcernOptions::SyncMode::NONE ||
+         writeConcern.syncMode == WriteConcernOptions::SyncMode::UNSET);
+}
+
 write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
     const std::vector<mongo::BSONObj>& documents,
     const BulkWriteCommandRequest& req,

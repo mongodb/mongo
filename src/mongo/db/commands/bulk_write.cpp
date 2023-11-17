@@ -1407,7 +1407,8 @@ public:
             const NamespaceString cursorNss =
                 NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
 
-            if (replies.size() == 0) {
+            if (replies.size() == 0 || bulk_write_common::isUnacknowledgedBulkWrite(opCtx)) {
+                // Skip cursor creation and return the simplest reply.
                 return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
                                                  0 /* cursorId */, {} /* firstBatch */, cursorNss),
                                              summaryFields.nErrors,

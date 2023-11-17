@@ -199,9 +199,22 @@ public:
             bulk_write_exec::BulkWriteReplyInfo replyInfo) const {
             const auto& req = bulkRequest;
             auto reqObj = unparsedRequest.body;
-
+            auto& [replyItems, summaryFields, wcErrors, retriedStmtIds] = replyInfo;
             const NamespaceString cursorNss =
                 NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
+
+            if (bulk_write_common::isUnacknowledgedBulkWrite(opCtx)) {
+                // Skip cursor creation and return the simplest reply.
+                return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
+                                                 0 /* cursorId */, {} /* firstBatch */, cursorNss),
+                                             summaryFields.nErrors,
+                                             summaryFields.nInserted,
+                                             summaryFields.nMatched,
+                                             summaryFields.nModified,
+                                             summaryFields.nUpserted,
+                                             summaryFields.nDeleted);
+            }
+
             ClusterClientCursorParams params(cursorNss,
                                              APIParameters::get(opCtx),
                                              ReadPreferenceSetting::get(opCtx),
@@ -226,7 +239,6 @@ public:
             params.originatingPrivileges = bulk_write_common::getPrivileges(req);
 
             auto queuedDataStage = std::make_unique<RouterStageQueuedData>(opCtx);
-            auto& [replyItems, summaryFields, wcErrors, retriedStmtIds] = replyInfo;
             BulkWriteCommandReply reply;
             reply.setNErrors(summaryFields.nErrors);
             reply.setNInserted(summaryFields.nInserted);
