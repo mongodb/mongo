@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_manager.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
@@ -45,8 +45,8 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_settings_cluster_parameter_gen.h"
-#include "mongo/db/query/query_settings_gen.h"
+#include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -165,6 +165,7 @@ QuerySettingsManager::getQuerySettingsForQueryShapeHash(
     OperationContext* opCtx,
     const query_shape::QueryShapeHash& queryShapeHash,
     const boost::optional<TenantId>& tenantId) const {
+    Lock::SharedLock readLock(opCtx, _mutex);
     // Perform the lookup for namespace string to query settings map maintained for the given
     // tenant.
     auto queryShapeConfigurationsIt =

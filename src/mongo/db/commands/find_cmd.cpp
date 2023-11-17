@@ -99,7 +99,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/find_key_generator.h"
@@ -193,47 +193,16 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
     curOp->setNS_inlock(nss);
 }
 
-/**
- * Performs the lookup for the QuerySettings given the 'parsedRequest'.
- */
+// TODO: SERVER-73632 Remove Feature Flag for PM-635.
+// Remove query settings lookup as it is only done on mongos.
 query_settings::QuerySettings lookupQuerySettingsForFind(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const ParsedFindCommand& parsedRequest,
-    const CollectionPtr& collection,
     const NamespaceString& nss) {
     auto opCtx = expCtx->opCtx;
-
-    // TODO: SERVER-73632 Remove Feature Flag for PM-635.
-    // Remove query settings lookup as it is only done on mongos.
-    if (ShardingState::get(opCtx)->enabled()) {
-        return parsedRequest.findCommandRequest->getQuerySettings().get_value_or({});
-    }
-
-    // No QuerySettings lookup for IDHACK queries.
-    if (!feature_flags::gFeatureFlagQuerySettings.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-        (collection &&
-         isIdHackEligibleQuery(
-             collection, *parsedRequest.findCommandRequest, parsedRequest.collator.get()))) {
-        return query_settings::QuerySettings();
-    }
-
-    auto& manager = query_settings::QuerySettingsManager::get(opCtx);
-    auto queryShapeHashFn = [&]() {
-        auto& opDebug = CurOp::get(opCtx)->debug();
-        if (opDebug.queryStatsKey) {
-            return opDebug.queryStatsKey->getQueryShapeHash(
-                opCtx, parsedRequest.findCommandRequest->getSerializationContext());
-        }
-
-        return std::make_unique<query_shape::FindCmdShape>(parsedRequest, expCtx)
-            ->sha256Hash(opCtx, parsedRequest.findCommandRequest->getSerializationContext());
-    };
-
-    // Return the found query settings or an empty one.
-    return manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
-        .get_value_or({})
-        .first;
+    return ShardingState::get(opCtx)->enabled()
+        ? parsedRequest.findCommandRequest->getQuerySettings().get_value_or({})
+        : query_settings::lookupForFind(expCtx, parsedRequest, nss);
 }
 
 /**
@@ -276,7 +245,7 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
             /*requiresFullQueryStatsFeatureFlag*/ false);
     }
 
-    expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedRequest, collection, nss));
+    expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedRequest, nss));
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = std::move(expCtx),
         .parsedFind = std::move(parsedRequest),
@@ -460,9 +429,7 @@ public:
                  .extensionsCallback = ExtensionsCallbackReal(opCtx, &nss),
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
-            auto querySettings =
-                lookupQuerySettingsForFind(expCtx, *parsedRequest, collectionPtr, nss);
-            expCtx->setQuerySettings(std::move(querySettings));
+            expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedRequest, nss));
             auto cq = std::make_unique<CanonicalQuery>(
                 CanonicalQueryParams{.expCtx = std::move(expCtx),
                                      .parsedFind = std::move(parsedRequest),

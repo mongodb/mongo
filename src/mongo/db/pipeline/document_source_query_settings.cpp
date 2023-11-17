@@ -34,8 +34,8 @@
 #include "mongo/db/pipeline/document_source_query_settings_gen.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/query/query_settings_manager.h"
-#include "mongo/db/query/query_settings_utils.h"
+#include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_utils.h"
 
 namespace mongo {
 

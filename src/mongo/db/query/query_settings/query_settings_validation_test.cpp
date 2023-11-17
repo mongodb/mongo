@@ -28,8 +28,8 @@
  */
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_settings_manager.h"
-#include "mongo/db/query/query_settings_utils.h"
+#include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/serialization_context.h"

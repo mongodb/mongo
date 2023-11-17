@@ -29,37 +29,12 @@
 
 #pragma once
 
-#include "mongo/db/query/query_settings_gen.h"
-#include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/stdx/unordered_set.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 
 namespace mongo::query_settings {
 
-struct RepresentativeQueryInfo {
-    const BSONObj serializedQueryShape;
-    const query_shape::QueryShapeHash queryShapeHash;
-    const NamespaceString namespaceString;
-    const stdx::unordered_set<NamespaceString> involvedNamespaces;
-    const boost::optional<mongo::EncryptionInformation> encryptionInformation;
-    const bool isIdHackQuery;
-};
-
 /**
- * Creates the corresponding RepresentativeQueryInfo instance by parsing the representative
- * query BSONObj.
+ * Computes hash of 'querySettings'.
  */
-RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
-                                                 OperationContext* opCtx,
-                                                 const boost::optional<TenantId>& tenantId);
-
-namespace utils {
-
-/**
- * Runs all validation rules on the 'setQuerySettings' command.
- */
-void validateQuerySettings(const QueryShapeConfiguration& config,
-                           const RepresentativeQueryInfo& representativeQueryInfo,
-                           const boost::optional<TenantId>& tenantId);
-
-}  // namespace utils
+size_t hash(const QuerySettings& querySettings);
 }  // namespace mongo::query_settings

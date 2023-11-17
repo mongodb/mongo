@@ -40,8 +40,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/query_settings_manager.h"
-#include "mongo/db/query/query_settings_utils.h"
+#include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/find_key_generator.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -57,42 +56,6 @@
 #include "mongo/s/query/cluster_find.h"
 
 namespace mongo {
-
-namespace {
-/**
- * Performs the lookup for the QuerySettings given the 'parsedRequest'.
- */
-query_settings::QuerySettings lookupQuerySettingsForFind(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const ParsedFindCommand& parsedRequest,
-    const NamespaceString& nss) {
-    // No QuerySettings lookup for IDHACK queries.
-    if (!feature_flags::gFeatureFlagQuerySettings.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-        isIdHackEligibleQueryWithoutCollator(*parsedRequest.findCommandRequest)) {
-        return query_settings::QuerySettings();
-    }
-
-    auto opCtx = expCtx->opCtx;
-    auto& manager = query_settings::QuerySettingsManager::get(opCtx);
-    auto queryShapeHashFn = [&]() {
-        auto& opDebug = CurOp::get(opCtx)->debug();
-        if (opDebug.queryStatsKey) {
-            return opDebug.queryStatsKey->getQueryShapeHash(
-                opCtx, parsedRequest.findCommandRequest->getSerializationContext());
-        }
-
-        return std::make_unique<query_shape::FindCmdShape>(parsedRequest, expCtx)
-            ->sha256Hash(opCtx, parsedRequest.findCommandRequest->getSerializationContext());
-    };
-
-    // Return the found query settings or an empty one.
-    return manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
-        .get_value_or({})
-        .first;
-}
-
-}  // namespace
 
 /**
  * Implements the find command for a router.
@@ -362,7 +325,8 @@ public:
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
             // Look up the query settings and attach them to the ExpressionContext.
-            expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedFind, expCtx->ns));
+            expCtx->setQuerySettings(
+                query_settings::lookupForFind(expCtx, *parsedFind, expCtx->ns));
             return {std::move(expCtx), std::move(parsedFind)};
         }
 

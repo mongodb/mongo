@@ -584,7 +584,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/shardsvr_process_interface',
-        '$BUILD_DIR/mongo/db/query/query_settings_manager',
+        '$BUILD_DIR/mongo/db/query/query_settings/utils',
         '$BUILD_DIR/mongo/db/repl/change_stream_oplog_notification',
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',

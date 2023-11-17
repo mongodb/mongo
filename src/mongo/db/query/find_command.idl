@@ -44,7 +44,7 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/query/cursor_response.idl"
     - "mongo/db/query/hint.idl"
-    - "mongo/db/query/query_settings.idl"
+    - "mongo/db/query/query_settings/query_settings.idl"
 
 types:
     boolNoOpSerializer:

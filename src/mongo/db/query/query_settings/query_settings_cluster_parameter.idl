@@ -34,7 +34,7 @@ global:
 imports:
   - "mongo/db/basic_types.idl"
   - "mongo/db/query/query_feature_flags.idl"
-  - "mongo/db/query/query_settings.idl"
+  - "mongo/db/query/query_settings/query_settings.idl"
   - "mongo/idl/cluster_server_parameter.idl"
 
 structs:

@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_settings_utils.h"
+#include "mongo/db/query/query_settings/query_settings_utils.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_utils.h"
@@ -161,6 +162,35 @@ RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
         return createRepresentativeInfoAgg(cmd, expCtx, tenantId);
     }
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
+}
+
+query_settings::QuerySettings lookupForFind(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                            const ParsedFindCommand& parsedRequest,
+                                            const NamespaceString& nss) {
+    // No QuerySettings lookup for IDHACK queries.
+    if (!feature_flags::gFeatureFlagQuerySettings.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+        isIdHackEligibleQueryWithoutCollator(*parsedRequest.findCommandRequest)) {
+        return query_settings::QuerySettings();
+    }
+
+    auto opCtx = expCtx->opCtx;
+    auto& manager = query_settings::QuerySettingsManager::get(opCtx);
+    auto queryShapeHashFn = [&]() {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        if (opDebug.queryStatsKey) {
+            return opDebug.queryStatsKey->getQueryShapeHash(
+                opCtx, parsedRequest.findCommandRequest->getSerializationContext());
+        }
+
+        return std::make_unique<query_shape::FindCmdShape>(parsedRequest, expCtx)
+            ->sha256Hash(opCtx, parsedRequest.findCommandRequest->getSerializationContext());
+    };
+
+    // Return the found query settings or an empty one.
+    return manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
+        .get_value_or({})
+        .first;
 }
 
 namespace utils {

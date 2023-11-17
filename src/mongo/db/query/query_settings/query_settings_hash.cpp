@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_settings_hash.h"
+#include "mongo/db/query/query_settings/query_settings_hash.h"
 
 namespace mongo::query_settings {
 

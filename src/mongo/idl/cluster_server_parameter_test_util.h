@@ -40,7 +40,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
