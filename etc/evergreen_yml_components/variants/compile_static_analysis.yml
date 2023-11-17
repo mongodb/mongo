@@ -138,11 +138,8 @@ buildvariants:
     <<: *linux-x86-dynamic-compile-expansions
     bv_future_git_tag: r100.0.0-9999
     compile_variant: *linux-x86-dynamic-compile-future-tag-multiversion
-  depends_on:
-  - name: version_expansions_gen
-    variant: enterprise-rhel-80-64-bit-future-git-tag-multiversion-version-gen
   tasks:
-  - name: compile_test_serial_TG
+  - name: compile_test_serial_future_git_tag_multiversion_TG
 
 - <<: *generic_linux_compile_params
   name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required  # TODO: replace with Sanitizer.

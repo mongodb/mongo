@@ -1724,7 +1724,7 @@ buildvariants:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
-  - name: archive_dist_test
+  - name: archive_dist_test_debug_future_git_tag_multiversion
     variant: linux-x86-dynamic-compile-future-tag-multiversion
   tasks:
   - name: .multiversion !.future_git_tag_incompatible
