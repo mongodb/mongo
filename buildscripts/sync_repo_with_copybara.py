@@ -8,7 +8,6 @@ from typing import Optional
 from github import GithubIntegration
 
 from buildscripts.util.read_config import read_config_file
-from evergreen.api import RetryingEvergreenApi
 
 
 def run_command(command):  # noqa: D406,D407
@@ -74,24 +73,6 @@ def get_installation_access_token(app_id: int, private_key: str,
         return None
 
 
-def send_failure_message_to_slack(expansions):
-    """
-    Send a failure message to a specific Slack channel when the Copybara task fails.
-
-    :param expansions: Dictionary containing various expansion data.
-    """
-    current_version_id = expansions.get("version_id", None)
-    error_msg = (
-        "Evergreen task '* Copybara Sync Between Repos' failed\n"
-        f"For more details: <https://spruce.mongodb.com/version/{current_version_id}|here>.")
-
-    evg_api = RetryingEvergreenApi.get_api(config_file=".evergreen.yml")
-    evg_api.send_slack_message(
-        target="#sdp-triager",
-        msg=error_msg,
-    )
-
-
 def main():
     """Clone the Copybara repo, build its Docker image, and set up and run migrations."""
     parser = argparse.ArgumentParser()
@@ -123,7 +104,6 @@ def main():
     git_destination_url_with_token = f"https://x-access-token:{access_token_copybara_syncer}@github.com/mongodb/mongo.git"
 
     # Set up the Docker command and execute it
-    # --last-rev Defines the last revision that was migrated to the destination during the initial synchronization between repositories using Copybara
     docker_cmd = [
         "docker run",
         "-v ~/.ssh:/root/.ssh",
@@ -131,7 +111,7 @@ def main():
         f'-v "{current_dir}/copybara.sky":/usr/src/app/copy.bara.sky',
         "-e COPYBARA_CONFIG='copy.bara.sky'",
         "-e COPYBARA_SUBCOMMAND='migrate'",
-        f"-e COPYBARA_OPTIONS='-v --last-rev=0dd92d9 --git-destination-url={git_destination_url_with_token}'",
+        f"-e COPYBARA_OPTIONS='-v --git-destination-url={git_destination_url_with_token}'",
         "copybara copybara",
     ]
 
@@ -150,8 +130,7 @@ def main():
                for acceptable_message in acceptable_error_messages):
             return
 
-        # Send a failure message to #sdp-triager if the Copybara sync task fails.
-        send_failure_message_to_slack(expansions)
+        raise
 
 
 if __name__ == "__main__":

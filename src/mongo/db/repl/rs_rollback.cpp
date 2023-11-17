@@ -860,10 +860,9 @@ void dropIndex(OperationContext* opCtx,
                IndexCatalog* indexCatalog,
                const string& indexName,
                NamespaceString& nss) {
-    auto indexDescriptor = indexCatalog->findIndexByName(
-        opCtx,
-        indexName,
-        IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+    bool includeUnfinishedIndexes = true;
+    auto indexDescriptor =
+        indexCatalog->findIndexByName(opCtx, indexName, includeUnfinishedIndexes);
     if (!indexDescriptor) {
         LOGV2_WARNING(21725,
                       "Rollback failed to drop index {indexName} in {namespace}: index not found.",

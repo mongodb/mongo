@@ -257,8 +257,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
     invariant(canonicalQuery);
     // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
-        collection->getIndexCatalog()->getIndexIterator(opCtx,
-                                                        IndexCatalog::InclusionPolicy::kReady);
+        collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
 
@@ -1480,8 +1479,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
     // unwinds arrays and treats each element in an array as its own key.
     const bool mayUnwindArrays = !(plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
-        collection->getIndexCatalog()->getIndexIterator(opCtx,
-                                                        IndexCatalog::InclusionPolicy::kReady);
+        collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     auto query = parsedDistinct.getQuery()->getQueryRequest().getFilter();
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
