@@ -291,6 +291,9 @@ TEST_F(QueryPlannerTest, TextInsideOrOfAnd) {
 
 // SERVER-13039
 TEST_F(QueryPlannerTest, TextInsideAndOrAnd) {
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryEnableBooleanExpressionsSimplifier", true);
+
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
