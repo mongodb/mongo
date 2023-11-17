@@ -50,8 +50,8 @@
 #include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -98,7 +98,7 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
     // Lock-free reads are not supported if a storage txn is already open w/o the lock-free reads
     // operation flag set.
     return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
-        !opCtx->lockState()->isWriteLocked() &&
+        !shard_role_details::getLocker(opCtx)->isWriteLocked() &&
         !(opCtx->recoveryUnit()->isActive() && !opCtx->isLockFreeReadsOp());
 }
 
@@ -1133,14 +1133,14 @@ OldClientContext::~OldClientContext() {
     if (_opCtx->getKillStatus() != ErrorCodes::OK)
         return;
 
-    invariant(_opCtx->lockState()->isLocked());
+    invariant(shard_role_details::getLocker(_opCtx)->isLocked());
     auto currentOp = CurOp::get(_opCtx);
     Top::get(_opCtx->getClient()->getServiceContext())
         .record(_opCtx,
                 currentOp->getNSS(),
                 currentOp->getLogicalOp(),
-                _opCtx->lockState()->isWriteLocked() ? Top::LockType::WriteLocked
-                                                     : Top::LockType::ReadLocked,
+                shard_role_details::getLocker(_opCtx)->isWriteLocked() ? Top::LockType::WriteLocked
+                                                                       : Top::LockType::ReadLocked,
                 _timer.micros(),
                 currentOp->isCommand(),
                 currentOp->getReadWriteType());

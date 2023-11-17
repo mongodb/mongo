@@ -58,7 +58,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
@@ -66,6 +65,7 @@
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_build_entry_helpers.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/cloner_utils.h"
@@ -189,7 +189,7 @@ bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
                                                      const CollectionPtr& collection,
                                                      IndexBuildProtocol protocol) {
     const auto& nss = collection->ns();
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X),
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X),
               str::stream() << nss.toStringForErrorMsg());
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -290,7 +290,7 @@ void onCommitIndexBuild(OperationContext* opCtx,
 
     invariant(IndexBuildProtocol::kTwoPhase == replState->protocol,
               str::stream() << "onCommitIndexBuild: " << buildUUID);
-    invariant(opCtx->lockState()->isWriteLocked(),
+    invariant(shard_role_details::getLocker(opCtx)->isWriteLocked(),
               str::stream() << "onCommitIndexBuild: " << buildUUID);
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
@@ -321,7 +321,8 @@ void onAbortIndexBuild(OperationContext* opCtx,
         return;
     }
 
-    invariant(opCtx->lockState()->isWriteLocked(), replState.buildUUID.toString());
+    invariant(shard_role_details::getLocker(opCtx)->isWriteLocked(),
+              replState.buildUUID.toString());
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto collUUID = replState.collectionUUID;
@@ -673,7 +674,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                                                            const std::vector<BSONObj>& specs,
                                                            const UUID& buildUUID,
                                                            IndexBuildProtocol protocol) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X));
 
     std::vector<std::string> indexNames;
     for (auto& spec : specs) {
@@ -1496,7 +1497,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         // to be able to abort two phase index builds during the oplog replay phase.
         if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
             // The AutoGetCollection helper takes the RSTL implicitly.
-            invariant(opCtx->lockState()->isRSTLLocked());
+            invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked());
 
             // Override the 'signalAction' as this is an initial syncing node.
             // Don't override it if it's a rollback abort which would be explictly requested
@@ -1571,7 +1572,7 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
     // OpObservers may introduce lock acquisitions (i.e. sharding state locks) and cause an
     // interruption during cleanup. For correctness, we must perform these final writes. Temporarily
     // disable interrupts.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
 
     CollectionWriter coll(opCtx, replState->collectionUUID);
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
@@ -2123,7 +2124,7 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
     invariant(collection,
               str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
     auto nss = collection->ns();
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X),
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X),
               str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
 
     auto buildUUID = UUID::gen();
@@ -2651,7 +2652,7 @@ void IndexBuildsCoordinator::_runIndexBuild(
     auto replState = invariant(swReplState);
 
     // Add build UUID to lock manager diagnostic output.
-    auto locker = opCtx->lockState();
+    auto locker = shard_role_details::getLocker(opCtx);
     auto oldLockerDebugInfo = locker->getDebugInfo();
     {
         str::stream ss;
@@ -3153,7 +3154,8 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     // impact on user operations. Other steps of the index builds such as the draining phase have
     // normal priority because index builds are required to eventually catch-up with concurrent
     // writers. Otherwise we risk never finishing the index build.
-    ScopedAdmissionPriorityForLock priority(opCtx->lockState(), AdmissionContext::Priority::kLow);
+    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
+                                            AdmissionContext::Priority::kLow);
     {
         indexBuildsSSS.scanCollection.addAndFetch(1);
 
@@ -3193,7 +3195,8 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     // impact on user operations. Other steps of the index builds such as the draining phase have
     // normal priority because index builds are required to eventually catch-up with concurrent
     // writers. Otherwise we risk never finishing the index build.
-    ScopedAdmissionPriorityForLock priority(opCtx->lockState(), AdmissionContext::Priority::kLow);
+    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
+                                            AdmissionContext::Priority::kLow);
     {
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         AutoGetCollection collLock(opCtx, dbAndUUID, MODE_IX);
@@ -3458,7 +3461,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
     // At this point, the commitIndexBuild entry has already been written and replicated. For
     // correctness, we must perform these final writes. Temporarily disable interrupts.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
 
     removeIndexBuildEntryAfterCommitOrAbort(opCtx, dbAndUUID, *indexBuildEntryColl, *replState);
     replState->stats.numIndexesAfter = getNumIndexesTotal(opCtx, collection.get());
@@ -3478,7 +3481,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     CollectionWriter& collection,
     const UUID& buildUUID,
     RepairData repair) noexcept {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
+    invariant(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_X));
 
     auto replState = invariant(_getIndexBuild(buildUUID));
 
@@ -3569,7 +3573,7 @@ int IndexBuildsCoordinator::getNumIndexesTotal(OperationContext* opCtx,
                                                const CollectionPtr& collection) {
     invariant(collection);
     const auto& nss = collection->ns();
-    invariant(opCtx->lockState()->isLocked(),
+    invariant(shard_role_details::getLocker(opCtx)->isLocked(),
               str::stream() << "Unable to get index count because collection was not locked"
                             << nss.toStringForErrorMsg());
 

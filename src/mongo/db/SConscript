@@ -646,6 +646,7 @@ env.Library(
         'cancelable_operation_context.cpp',
         'client.cpp',
         'client_strand.cpp',
+        'locker_api.cpp',
         'default_baton.cpp',
         'operation_context.cpp',
         'operation_context_group.cpp',

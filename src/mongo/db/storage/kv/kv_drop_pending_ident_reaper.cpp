@@ -44,7 +44,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
@@ -291,7 +291,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
 }
 
 void KVDropPendingIdentReaper::clearDropPendingState(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(opCtx)->isW());
 
     stdx::lock_guard<Latch> lock(_mutex);
     // We only delete the timestamped drops. Non-timestamped drops cannot be rolled back, and the

@@ -37,6 +37,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_command.h"
@@ -62,7 +63,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         // Critical to monitoring and observability, categorize the command as immediate priority.
-        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+        ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
                                                             AdmissionContext::Priority::kImmediate);
 
         if (cmdObj["forShell"].trueValue())

@@ -59,9 +59,9 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -273,7 +273,7 @@ public:
             wuow.release();
 
             opCtx->recoveryUnit()->abortUnitOfWork();
-            opCtx->lockState()->endWriteUnitOfWork();
+            shard_role_details::getLocker(opCtx)->endWriteUnitOfWork();
 
             return opTime;
         }();

@@ -40,8 +40,8 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/find_command.h"
@@ -128,7 +128,7 @@ void acquireRecoverableCriticalSection(OperationContext* opCtx,
                 "blockUserWrites"_attr = blockUserWrites);
 
     invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     {
         // If we intend to start blocking user writes, take the GlobalLock in MODE_X in order to
@@ -242,7 +242,7 @@ void UserWritesRecoverableCriticalSectionService::
                 logAttrs(nss));
 
     invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     {
         // Take the GlobalLock in MODE_X in order to ensure that any ongoing writes have completed
@@ -301,7 +301,7 @@ void UserWritesRecoverableCriticalSectionService::
                 logAttrs(nss));
 
     invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     {
         Lock::GlobalLock globalLock(opCtx, MODE_IX);
@@ -353,7 +353,7 @@ void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSect
     LOGV2_DEBUG(6351909, 3, "Releasing user writes recoverable critical section", logAttrs(nss));
 
     invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     {
         Lock::GlobalLock globalLock(opCtx, MODE_IX);

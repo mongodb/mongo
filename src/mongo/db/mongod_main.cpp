@@ -1992,7 +1992,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // of this function to prevent any operations from running that need a lock.
     //
     LOGV2(4784929, "Acquiring the global lock for shutdown");
-    opCtx->lockState()->lockGlobal(opCtx, MODE_X);
+    shard_role_details::getLocker(opCtx)->lockGlobal(opCtx, MODE_X);
 
     // Global storage engine may not be started in all cases before we exit
     if (serviceContext->getStorageEngine()) {

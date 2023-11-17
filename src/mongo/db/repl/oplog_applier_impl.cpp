@@ -59,7 +59,7 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/initial_syncer.h"
@@ -403,7 +403,8 @@ void _setOplogApplicationWorkerOpCtxStates(OperationContext* opCtx) {
     // Applying an Oplog batch is crucial to the stability of the Replica Set. We
     // mark it as having Immediate priority so that it skips waiting for ticket
     // acquisition and flow control.
-    opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+    shard_role_details::getLocker(opCtx)->setAdmissionPriority(
+        AdmissionContext::Priority::kImmediate);
 
     // Ensure future transactions read without a timestamp.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
@@ -554,7 +555,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         // The oplog applier is crucial for stability of the replica set. As a result we mark it as
         // having Immediate priority. This makes the operation skip waiting for ticket acquisition
         // and flow control.
-        ScopedAdmissionPriorityForLock priority(opCtx.lockState(),
+        ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(&opCtx),
                                                 AdmissionContext::Priority::kImmediate);
 
         // For pausing replication in tests.
@@ -670,7 +671,7 @@ void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
             // Oplog writes are crucial to the stability of the replica set. We mark the operations
             // as having Immediate priority so that it skips waiting for ticket acquisition and flow
             // control.
-            ScopedAdmissionPriorityForLock priority(opCtx->lockState(),
+            ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx.get()),
                                                     AdmissionContext::Priority::kImmediate);
 
             UnreplicatedWritesBlock uwb(opCtx.get());

@@ -56,7 +56,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -190,7 +190,8 @@ private:
         // If `curOp` is a sub-operation, we store the snapshot of lock stats as the base lock stats
         // of the current operation.
         if (_top) {
-            if (auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none)) {
+            if (auto lockerInfo =
+                    shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none)) {
                 curOp->_lockStatsBase = lockerInfo->stats;
             }
         }
@@ -361,9 +362,10 @@ void CurOp::setGenericOpRequestDetails(NamespaceString nss,
                                        const Command* command,
                                        BSONObj cmdObj,
                                        NetworkOp op) {
-    // Set the _isCommand flags based on network op only. For legacy writes on mongoS, we resolve
-    // them to OpMsgRequests and then pass them into the Commands path, so having a valid Command*
-    // here does not guarantee that the op was issued from the client using a command protocol.
+    // Set the _isCommand flags based on network op only. For legacy writes on mongoS, we
+    // resolve them to OpMsgRequests and then pass them into the Commands path, so having a
+    // valid Command* here does not guarantee that the op was issued from the client using a
+    // command protocol.
     const bool isCommand = (op == dbMsg || (op == dbQuery && nss.isCommand()));
     auto logicalOp = (command ? command->getLogicalOp() : networkOpToLogicalOp(op));
 
@@ -427,9 +429,9 @@ TickSource::Tick CurOp::startTime() {
     }
 
     // The '_start' value is initialized to 0 and gets assigned on demand the first time it gets
-    // accessed. The above thread ownership requirement ensures that there will never be concurrent
-    // calls to this '_start' assignment, but we use compare-exchange anyway as an additional check
-    // that writes to '_start' never race.
+    // accessed. The above thread ownership requirement ensures that there will never be
+    // concurrent calls to this '_start' assignment, but we use compare-exchange anyway as an
+    // additional check that writes to '_start' never race.
     TickSource::Tick unassignedStart = 0;
     invariant(_start.compare_exchange_strong(unassignedStart, _tickSource->getTicks()));
     return _start.load();
@@ -539,29 +541,30 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     }
 
     // Defer calculating the CPU time until we know that we actually are going to write it to
-    // the logs or profiler. The CPU time may have been determined earlier if it was a dependency
-    // of 'filter' in which case this is a no-op.
+    // the logs or profiler. The CPU time may have been determined earlier if it was a
+    // dependency of 'filter' in which case this is a no-op.
     if (forceLog || shouldLogSlowOp || _dbprofile >= 2) {
         calculateCpuTime();
     }
 
     if (forceLog || shouldLogSlowOp) {
-        auto lockerInfo = opCtx->lockState()->getLockerInfo(_lockStatsBase);
-        if (_debug.storageStats == nullptr && opCtx->lockState()->wasGlobalLockTaken() &&
+        auto lockerInfo = shard_role_details::getLocker(opCtx)->getLockerInfo(_lockStatsBase);
+        if (_debug.storageStats == nullptr &&
+            shard_role_details::getLocker(opCtx)->wasGlobalLockTaken() &&
             opCtx->getServiceContext()->getStorageEngine()) {
-            // Do not fetch operation statistics again if we have already got them (for instance,
-            // as a part of stashing the transaction).
-            // Take a lock before calling into the storage engine to prevent racing against a
-            // shutdown. Any operation that used a storage engine would have at-least held a
-            // global lock at one point, hence we limit our lock acquisition to such operations.
-            // We can get here and our lock acquisition be timed out or interrupted, log a
-            // message if that happens.
+            // Do not fetch operation statistics again if we have already got them (for
+            // instance, as a part of stashing the transaction). Take a lock before calling into
+            // the storage engine to prevent racing against a shutdown. Any operation that used
+            // a storage engine would have at-least held a global lock at one point, hence we
+            // limit our lock acquisition to such operations. We can get here and our lock
+            // acquisition be timed out or interrupted, log a message if that happens.
             try {
                 // Slow query logs are critical for observability and should not wait for ticket
-                // acquisition. Slow queries can happen for various reasons; however, if queries are
-                // slower due to ticket exhaustion, queueing in order to log can compound the issue.
+                // acquisition. Slow queries can happen for various reasons; however, if queries
+                // are slower due to ticket exhaustion, queueing in order to log can compound
+                // the issue.
                 ScopedAdmissionPriorityForLock skipAdmissionControl(
-                    opCtx->lockState(), AdmissionContext::Priority::kImmediate);
+                    shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kImmediate);
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(500),
@@ -668,9 +671,9 @@ BSONObj appendCommentField(OperationContext* opCtx, const BSONObj& cmdObj) {
 }
 
 /**
- * Appends {<name>: obj} to the provided builder.  If obj is greater than maxSize, appends a string
- * summary of obj as { <name>: { $truncated: "obj" } }. If a comment parameter is present, add it to
- * the truncation object.
+ * Appends {<name>: obj} to the provided builder.  If obj is greater than maxSize, appends a
+ * string summary of obj as { <name>: { $truncated: "obj" } }. If a comment parameter is
+ * present, add it to the truncation object.
  */
 void appendAsObjOrString(StringData name,
                          const BSONObj& obj,
@@ -701,8 +704,9 @@ void appendAsObjOrString(StringData name,
 
         StringData truncation = StringData(objToString).substr(0, *maxSize);
 
-        // Append the truncated representation of the object to the builder. If a comment parameter
-        // is present, write it to the object alongside the truncated op. This object will appear as
+        // Append the truncated representation of the object to the builder. If a comment
+        // parameter is present, write it to the object alongside the truncated op. This object
+        // will appear as
         // {$truncated: "{find: \"collection\", filter: {x: 1, ...", comment: "comment text" }
         BSONObjBuilder truncatedBuilder(builder->subobjStart(name));
         truncatedBuilder.append("$truncated", truncation);
@@ -728,8 +732,8 @@ BSONObj CurOp::truncateAndSerializeGenericCursor(GenericCursor* cursor,
         auto originatingCommand = tempObj.done().getObjectField("truncatedObj");
         cursor->setOriginatingCommand(originatingCommand.getOwned());
     }
-    // lsid, ns, and planSummary exist in the top level curop object, so they need to be temporarily
-    // removed from the cursor object to avoid duplicating information.
+    // lsid, ns, and planSummary exist in the top level curop object, so they need to be
+    // temporarily removed from the cursor object to avoid duplicating information.
     auto lsid = cursor->getLsid();
     auto ns = cursor->getNs();
     auto originalPlanSummary(cursor->getPlanSummary() ? boost::optional<std::string>(
@@ -765,10 +769,11 @@ void CurOp::reportState(BSONObjBuilder* builder,
     bool omitAndRedactInformation = getShouldOmitDiagnosticInformation();
     builder->append("redacted", omitAndRedactInformation);
 
-    // When the currentOp command is run, it returns a single response object containing all current
-    // operations; this request will fail if the response exceeds the 16MB document limit. By
-    // contrast, the $currentOp aggregation stage does not have this restriction. If 'truncateOps'
-    // is true, limit the size of each op to 1000 bytes. Otherwise, do not truncate.
+    // When the currentOp command is run, it returns a single response object containing all
+    // current operations; this request will fail if the response exceeds the 16MB document
+    // limit. By contrast, the $currentOp aggregation stage does not have this restriction. If
+    // 'truncateOps' is true, limit the size of each op to 1000 bytes. Otherwise, do not
+    // truncate.
     const boost::optional<size_t> maxQuerySize{truncateOps, 1000};
 
     auto opDescription =
@@ -863,12 +868,12 @@ void CurOp::reportState(BSONObjBuilder* builder,
         builder->append("dataThroughputAverage", *_debug.dataThroughputAverage);
     }
 
-    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage engine
-    // initialization and FCV checking is ignored there, so here we also need to ignore FCV to keep
-    // consistent behavior.
+    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage
+    // engine initialization and FCV checking is ignored there, so here we also need to ignore
+    // FCV to keep consistent behavior.
     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
             .isEnabledAndIgnoreFCVUnsafe()) {
-        auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
+        auto admissionPriority = shard_role_details::getLocker(opCtx)->getAdmissionPriority();
         if (admissionPriority < AdmissionContext::Priority::kNormal) {
             builder->append("admissionPriority", toString(admissionPriority));
         }
@@ -926,7 +931,7 @@ void OpDebug::report(OperationContext* opCtx,
                      logv2::DynamicAttributes* pAttrs) const {
     Client* client = opCtx->getClient();
     auto& curop = *CurOp::get(opCtx);
-    auto flowControlStats = opCtx->lockState()->getFlowControlStats();
+    auto flowControlStats = shard_role_details::getLocker(opCtx)->getFlowControlStats();
 
     if (iscommand) {
         pAttrs->add("type", "command");
@@ -1092,12 +1097,12 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("reslen", responseLength);
     }
 
-    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage engine
-    // initialization and FCV checking is ignored there, so here we also need to ignore FCV to keep
-    // consistent behavior.
+    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage
+    // engine initialization and FCV checking is ignored there, so here we also need to ignore
+    // FCV to keep consistent behavior.
     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
             .isEnabledAndIgnoreFCVUnsafe()) {
-        auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
+        auto admissionPriority = shard_role_details::getLocker(opCtx)->getAdmissionPriority();
         if (admissionPriority < AdmissionContext::Priority::kNormal) {
             pAttrs->add("admissionPriority", admissionPriority);
         }
@@ -1392,8 +1397,8 @@ void OpDebug::appendUserInfo(const CurOp& c,
 std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requestedFields,
                                                                   bool needWholeDocument) {
     // This function is analogous to OpDebug::append. The main difference is that append() does
-    // the work of building BSON right away, while appendStaged() stages the work to be done later.
-    // It returns a std::function that builds BSON when called.
+    // the work of building BSON right away, while appendStaged() stages the work to be done
+    // later. It returns a std::function that builds BSON when called.
 
     // The other difference is that appendStaged can avoid building BSON for unneeded fields.
     // requestedFields is a set of top-level field names; any fields beyond this list may be
@@ -1588,8 +1593,8 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
 
     addIfNeeded("locks", [](auto field, auto args, auto& b) {
-        if (auto lockerInfo =
-                args.opCtx->lockState()->getLockerInfo(args.curop.getLockStatsBase())) {
+        if (auto lockerInfo = shard_role_details::getLocker(args.opCtx)
+                                  ->getLockerInfo(args.curop.getLockStatsBase())) {
             BSONObjBuilder locks(b.subobjStart(field));
             lockerInfo->stats.report(&locks);
         }
@@ -1613,7 +1618,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
 
     addIfNeeded("flowControl", [](auto field, auto args, auto& b) {
         BSONObj flowControlMetrics =
-            makeFlowControlObject(args.opCtx->lockState()->getFlowControlStats());
+            makeFlowControlObject(shard_role_details::getLocker(args.opCtx)->getFlowControlStats());
         BSONObjBuilder flowControlBuilder(b.subobjStart(field));
         flowControlBuilder.appendElements(flowControlMetrics);
     });

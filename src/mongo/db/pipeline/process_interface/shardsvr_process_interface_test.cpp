@@ -38,9 +38,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_queue.h"
@@ -88,7 +87,8 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
     setupNShards(2);
 
     // Need a real locker for storage operations.
-    getClient()->swapLockState(std::make_unique<LockerImpl>(expCtx()->opCtx->getServiceContext()));
+    shard_role_details::swapLocker(
+        operationContext(), std::make_unique<LockerImpl>(expCtx()->opCtx->getServiceContext()));
 
     const NamespaceString kOutNss =
         NamespaceString::createNamespaceString_forTest("unittests-out", "sharded_agg_test");

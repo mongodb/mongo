@@ -57,10 +57,10 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -204,11 +204,11 @@ Status insertDocumentsImpl(OperationContext* opCtx,
                            bool fromMigrate) {
     const auto& nss = collection->ns();
 
-    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX) ||
-            (nss.isOplog() && opCtx->lockState()->isWriteLocked()) ||
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX) ||
+            (nss.isOplog() && shard_role_details::getLocker(opCtx)->isWriteLocked()) ||
             (nss.isChangeCollection() && nss.tenantId() &&
-             opCtx->lockState()->isLockHeldForMode({ResourceType::RESOURCE_TENANT, *nss.tenantId()},
-                                                   MODE_IX)));
+             shard_role_details::getLocker(opCtx)->isLockHeldForMode(
+                 {ResourceType::RESOURCE_TENANT, *nss.tenantId()}, MODE_IX)));
 
     const size_t count = std::distance(begin, end);
 
@@ -366,8 +366,8 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
         return status;
     }
 
-    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX) ||
-            (nss.isOplog() && opCtx->lockState()->isWriteLocked()));
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX) ||
+            (nss.isOplog() && shard_role_details::getLocker(opCtx)->isWriteLocked()));
 
     RecordId recordId;
     if (collection->isClustered()) {
@@ -581,7 +581,8 @@ void updateDocument(OperationContext* opCtx,
                 compareSafeContentElem(oldDoc.value(), newDoc));
     }
 
-    dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
+    dassert(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_IX));
     invariant(oldDoc.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
     invariant(newDoc.isOwned());
 
@@ -675,7 +676,8 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
                                               bool* indexesAffected,
                                               OpDebug* opDebug,
                                               CollectionUpdateArgs* args) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
+    dassert(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_IX));
     invariant(oldDoc.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
     invariant(collection->updateWithDamagesSupported());
 

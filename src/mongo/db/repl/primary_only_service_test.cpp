@@ -45,8 +45,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -596,7 +596,8 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstanceHoldingISLock) {
         // The RstlKillOpThread would only interrupt a read operation if the OperationContext opted
         // into always being interrupted.
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-        ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())
+                         ->wasGlobalLockTakenInModeConflictingWithWrites());
 
         auto [instance2, isPausedOrShutdown] =
             TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
@@ -648,7 +649,8 @@ DEATH_TEST_F(PrimaryOnlyServiceTest,
     {
         Lock::GlobalLock lk(opCtx.get(), MODE_IS);
         ASSERT_FALSE(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
-        ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())
+                         ->wasGlobalLockTakenInModeConflictingWithWrites());
         TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
     }
 }

@@ -27,39 +27,42 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
+#pragma once
 
-#include "mongo/db/client.h"
-#include "mongo/db/locker_api.h"
+#include <memory>
+
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
 
 namespace mongo {
-namespace {
 
-class TransactionResourcesNonMongoDClientObserver : public ServiceContext::ClientObserver {
-public:
-    TransactionResourcesNonMongoDClientObserver() = default;
-    ~TransactionResourcesNonMongoDClientObserver() = default;
+namespace shard_role_details {
 
-    void onCreateClient(Client* client) final {}
+/**
+ * Interface for locking.  Caller DOES NOT own pointer.
+ */
+inline Locker* getLocker(OperationContext* opCtx) {
+    return opCtx->lockState();
+}
 
-    void onDestroyClient(Client* client) final {}
+inline const Locker* getLocker(const OperationContext* opCtx) {
+    return opCtx->lockState();
+}
 
-    void onCreateOperationContext(OperationContext* opCtx) final {
-        shard_role_details::setLocker(opCtx,
-                                      std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-    }
+/**
+ * Sets the locker for use by this OperationContext. Call during OperationContext initialization,
+ * only.
+ */
+void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker);
 
-    void onDestroyOperationContext(OperationContext* opCtx) final {}
-};
+/**
+ * Swaps the locker, releasing the old locker to the caller.
+ * The Client lock is going to be acquired by this function.
+ */
+std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Locker> newLocker);
+std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
+                                   std::unique_ptr<Locker> newLocker,
+                                   WithLock lk);
 
-ServiceContext::ConstructorActionRegisterer transactionResourcesConstructor{
-    "TransactionResourcesConstructor", [](ServiceContext* service) {
-        service->registerClientObserver(
-            std::make_unique<TransactionResourcesNonMongoDClientObserver>());
-    }};
-
-}  // namespace
+}  // namespace shard_role_details
 }  // namespace mongo

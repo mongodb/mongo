@@ -41,7 +41,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog.h"
@@ -149,8 +149,8 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSession(Operati
     // deadlock
     invariant(opCtx->getLogicalSessionId());
     invariant(!operationSessionDecoration(opCtx));
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     auto lsid = *opCtx->getLogicalSessionId();
     return _checkOutSessionInner(opCtx, lsid, boost::none /* killToken */);

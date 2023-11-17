@@ -55,12 +55,12 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_build_interceptor_gen.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -153,7 +153,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
                                                    const InsertDeleteOptions& options,
                                                    TrackDuplicates trackDuplicates,
                                                    DrainYieldPolicy drainYieldPolicy) {
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // These are used for logging only.
     int64_t totalDeleted = 0;
@@ -375,7 +375,7 @@ void IndexBuildInterceptor::_yield(OperationContext* opCtx,
     opCtx->recoveryUnit()->abandonSnapshot();
     yieldable->yield();
 
-    auto locker = opCtx->lockState();
+    auto locker = shard_role_details::getLocker(opCtx);
     Locker::LockSnapshot snapshot;
     locker->saveLockStateAndUnlock(&snapshot);
 
@@ -488,7 +488,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                                         const MultikeyPaths& multikeyPaths,
                                         Op op,
                                         int64_t* const numKeysOut) {
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     invariant(op != IndexBuildInterceptor::Op::kUpdate);
 
     // Maintain parity with IndexAccessMethods handling of key counting. Only include
@@ -560,7 +560,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                                         const std::vector<column_keygen::CellPatch>& keys,
                                         int64_t* const numKeysWrittenOut,
                                         int64_t* const numKeysDeletedOut) {
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     int64_t numKeysWritten = 0;
     int64_t numKeysDeleted = 0;

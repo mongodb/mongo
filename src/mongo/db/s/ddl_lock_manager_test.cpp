@@ -62,20 +62,24 @@ TEST_F(DDLLockManagerTest, LockNormalCollection) {
         const StringData reason;
         DDLLockManager::ScopedCollectionDDLLock ddlLock(operationContext(), nss, reason, MODE_X);
 
-        ASSERT_TRUE(operationContext()->lockState()->isLockHeldForMode(
-            ResourceId{RESOURCE_DDL_DATABASE, nss.dbName()}, MODE_IX));
-        ASSERT_TRUE(operationContext()->lockState()->isLockHeldForMode(
-            ResourceId{RESOURCE_DDL_COLLECTION,
-                       NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())},
-            MODE_X));
+        ASSERT_TRUE(
+            shard_role_details::getLocker(operationContext())
+                ->isLockHeldForMode(ResourceId{RESOURCE_DDL_DATABASE, nss.dbName()}, MODE_IX));
+        ASSERT_TRUE(
+            shard_role_details::getLocker(operationContext())
+                ->isLockHeldForMode(ResourceId{RESOURCE_DDL_COLLECTION,
+                                               NamespaceStringUtil::serialize(
+                                                   nss, SerializationContext::stateDefault())},
+                                    MODE_X));
     }
 
-    ASSERT_FALSE(operationContext()->lockState()->isLockHeldForMode(
-        ResourceId{RESOURCE_DDL_DATABASE, nss.dbName()}, MODE_IX));
-    ASSERT_FALSE(operationContext()->lockState()->isLockHeldForMode(
-        ResourceId{RESOURCE_DDL_COLLECTION,
-                   NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())},
-        MODE_X));
+    ASSERT_FALSE(shard_role_details::getLocker(operationContext())
+                     ->isLockHeldForMode(ResourceId{RESOURCE_DDL_DATABASE, nss.dbName()}, MODE_IX));
+    ASSERT_FALSE(shard_role_details::getLocker(operationContext())
+                     ->isLockHeldForMode(ResourceId{RESOURCE_DDL_COLLECTION,
+                                                    NamespaceStringUtil::serialize(
+                                                        nss, SerializationContext::stateDefault())},
+                                         MODE_X));
 }
 
 TEST_F(DDLLockManagerTest, LockTimeseriesBucketsCollection) {
@@ -88,21 +92,26 @@ TEST_F(DDLLockManagerTest, LockTimeseriesBucketsCollection) {
         DDLLockManager::ScopedCollectionDDLLock ddlLock(
             operationContext(), bucketsNss, reason, MODE_X);
 
-        ASSERT_TRUE(operationContext()->lockState()->isLockHeldForMode(
-            ResourceId{RESOURCE_DDL_DATABASE, viewNss.dbName()}, MODE_IX));
-        ASSERT_TRUE(operationContext()->lockState()->isLockHeldForMode(
-            ResourceId{
-                RESOURCE_DDL_COLLECTION,
-                NamespaceStringUtil::serialize(viewNss, SerializationContext::stateDefault())},
-            MODE_X));
+        ASSERT_TRUE(
+            shard_role_details::getLocker(operationContext())
+                ->isLockHeldForMode(ResourceId{RESOURCE_DDL_DATABASE, viewNss.dbName()}, MODE_IX));
+        ASSERT_TRUE(
+            shard_role_details::getLocker(operationContext())
+                ->isLockHeldForMode(ResourceId{RESOURCE_DDL_COLLECTION,
+                                               NamespaceStringUtil::serialize(
+                                                   viewNss, SerializationContext::stateDefault())},
+                                    MODE_X));
     }
 
-    ASSERT_FALSE(operationContext()->lockState()->isLockHeldForMode(
-        ResourceId{RESOURCE_DDL_DATABASE, viewNss.dbName()}, MODE_IX));
-    ASSERT_FALSE(operationContext()->lockState()->isLockHeldForMode(
-        ResourceId{RESOURCE_DDL_COLLECTION,
-                   NamespaceStringUtil::serialize(viewNss, SerializationContext::stateDefault())},
-        MODE_X));
+    ASSERT_FALSE(
+        shard_role_details::getLocker(operationContext())
+            ->isLockHeldForMode(ResourceId{RESOURCE_DDL_DATABASE, viewNss.dbName()}, MODE_IX));
+    ASSERT_FALSE(
+        shard_role_details::getLocker(operationContext())
+            ->isLockHeldForMode(ResourceId{RESOURCE_DDL_COLLECTION,
+                                           NamespaceStringUtil::serialize(
+                                               viewNss, SerializationContext::stateDefault())},
+                                MODE_X));
 }
 
 }  // namespace mongo

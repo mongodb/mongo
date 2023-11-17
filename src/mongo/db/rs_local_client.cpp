@@ -40,8 +40,8 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -122,8 +122,8 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
     boost::optional<ScopeGuard<std::function<void()>>> readSourceGuard;
 
     if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
-        invariant(!opCtx->lockState()->isLocked());
-        invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+        invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+        invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
         // Resets to the original read source at the end of this operation.
         auto originalReadSource = opCtx->recoveryUnit()->getTimestampReadSource();
@@ -208,8 +208,8 @@ Status RSLocalClient::runAggregation(
      * consistent with any remote client. We extract the readConcern from the request and apply
      * it to the opCtx's readSource/readTimestamp. Leave as it was originally before returning*/
 
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // extracting readConcern
     repl::ReadConcernArgs requestReadConcernArgs;

@@ -70,13 +70,12 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_stats.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/prepare_conflict_tracker.h"
@@ -737,7 +736,7 @@ void ReplicationCoordinatorImpl::_startInitialSync(
     std::shared_ptr<InitialSyncerInterface> initialSyncerCopy;
 
     // Initial sync may take locks during startup; make sure there is no possibility of conflict.
-    dassert(!opCtx->lockState()->isLocked());
+    dassert(!shard_role_details::getLocker(opCtx)->isLocked());
     try {
         {
             // Must take the lock to set _initialSyncer, but not call it.
@@ -863,7 +862,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) 
 
     // Make sure we're not holding any locks; existing locks might conflict with operations
     // we take during initial sync or replication steady state startup.
-    dassert(!opCtx->lockState()->isLocked());
+    dassert(!shard_role_details::getLocker(opCtx)->isLocked());
 
     // Check to see if we need to do an initial sync.
     const auto lastOpTime = getMyLastAppliedOpTime();
@@ -1210,7 +1209,7 @@ void ReplicationCoordinatorImpl::clearSyncSourceDenylist() {
 
 Status ReplicationCoordinatorImpl::setFollowerModeRollback(OperationContext* opCtx) {
     invariant(opCtx);
-    invariant(opCtx->lockState()->isRSTLExclusive());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
     return _setFollowerMode(opCtx, MemberState::RS_ROLLBACK);
 }
 
@@ -1662,7 +1661,7 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* opCt
 
     // We should never wait for replication if we are holding any locks, because this can
     // potentially block for long time while doing network activity.
-    if (opCtx->lockState()->isLocked()) {
+    if (shard_role_details::getLocker(opCtx)->isLocked()) {
         return {ErrorCodes::IllegalOperation,
                 "Waiting for replication not allowed while holding a lock"};
     }
@@ -2073,7 +2072,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
 
     // We should never wait for replication if we are holding any locks, because this can
     // potentially block for long time while doing network activity.
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     auto interruptStatus = opCtx->checkForInterruptNoAssert();
     if (!interruptStatus.isOK()) {
@@ -2537,7 +2536,7 @@ BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     OnRemoteCmdScheduledFn onRemoteCmdScheduled,
     OnRemoteCmdCompleteFn onRemoteCmdComplete) {
     // About to make network and DBDirectClient (recursive) calls, so we should not hold any locks.
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     const auto primaryHostAndPort = getCurrentPrimaryHostAndPort();
     if (primaryHostAndPort.empty()) {
@@ -2597,7 +2596,7 @@ void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
 
         // Don't kill step up/step down thread.
         if (toKill && !toKill->isKillPending() && toKill->getOpID() != rstlOpCtx->getOpID()) {
-            auto locker = toKill->lockState();
+            auto locker = shard_role_details::getLocker(toKill);
             if (toKill->shouldAlwaysInterruptAtStepDownOrUp() ||
                 locker->wasGlobalLockTakenInModeConflictingWithWrites() ||
                 PrepareConflictTracker::get(toKill).isWaitingOnPrepareConflict()) {
@@ -2647,7 +2646,8 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
         // Dump all locks to identify which thread(s) are holding RSTL.
         LockManager::get(opCtx)->dump();
 
-        auto lockerInfo = opCtx->lockState()->getLockerInfo(CurOp::get(opCtx)->getLockStatsBase());
+        auto lockerInfo = shard_role_details::getLocker(opCtx)->getLockerInfo(
+            CurOp::get(opCtx)->getLockStatsBase());
         BSONObjBuilder lockRep;
         lockerInfo->stats.report(&lockRep);
 
@@ -2761,7 +2761,7 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::rstlRelease() {
 
 void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::rstlReacquire() {
     // Ensure that we are not holding the RSTL lock in any mode.
-    invariant(!_opCtx->lockState()->isRSTLLocked());
+    invariant(!shard_role_details::getLocker(_opCtx)->isRSTLLocked());
 
     // Since we have released the RSTL lock at this point, there can be some conflicting
     // operations sneaked in here. We need to kill those operations to acquire the RSTL lock.
@@ -2840,7 +2840,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     auto updateMemberState = [&] {
         invariant(lk.owns_lock());
-        invariant(opCtx->lockState()->isRSTLExclusive());
+        invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
 
         // Make sure that we leave _canAcceptNonLocalWrites in the proper state.
         _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
@@ -2887,7 +2887,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
         // oplog, then wait until enough secondaries are caught up for us to finish stepdown.
         arsd.rstlRelease();
-        invariant(!opCtx->lockState()->isLocked());
+        invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
         // Make sure we re-acquire the RSTL before returning so that we're always holding the
         // RSTL when the onExitGuard set up earlier runs.
@@ -2902,7 +2902,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             // attempt, we might as well spend whatever time we need to acquire it now.  For
             // the same reason, we also disable lock acquisition interruption, to guarantee that
             // we get the lock eventually.
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+            UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
 
             // Since we have released the RSTL lock at this point, there can be some read
             // operations sneaked in here, that might hold global lock in S mode or blocked on
@@ -3033,7 +3033,7 @@ bool ReplicationCoordinatorImpl::isWritablePrimaryForReportingPurposes() {
 bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(OperationContext* opCtx,
                                                             const DatabaseName& dbName) {
     // The answer isn't meaningful unless we hold the ReplicationStateTransitionLock.
-    invariant(opCtx->lockState()->isRSTLLocked() || opCtx->isLockFreeReadsOp());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() || opCtx->isLockFreeReadsOp());
     return canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
 }
 
@@ -3080,7 +3080,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
     }
     // Assert that we are holding the RSTL, meaning the value returned from
     // `_canAcceptReplicatedWrites_UNSAFE` is guaranteed to be accurate.
-    invariant(opCtx->lockState()->isRSTLLocked(), toStringForLogging(nsOrUUID));
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked(), toStringForLogging(nsOrUUID));
     // Otherwise, check whether we can currently accept replicated writes.
     return _canAcceptReplicatedWrites_UNSAFE(opCtx);
 }
@@ -3134,7 +3134,7 @@ bool ReplicationCoordinatorImpl::_isCollectionReplicated(OperationContext* opCtx
 Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* opCtx,
                                                          const NamespaceString& ns,
                                                          bool secondaryOk) {
-    invariant(opCtx->lockState()->isRSTLLocked() || opCtx->isLockFreeReadsOp());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() || opCtx->isLockFreeReadsOp());
     return checkCanServeReadsFor_UNSAFE(opCtx, ns, secondaryOk);
 }
 
@@ -3277,7 +3277,8 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
 
     boost::optional<Timestamp> lastStableRecoveryTimestamp = boost::none;
     try {
-        opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+        shard_role_details::getLocker(opCtx)->setAdmissionPriority(
+            AdmissionContext::Priority::kImmediate);
         // We need to hold the lock so that we don't run when storage is being shutdown.
         Lock::GlobalLock lk(opCtx,
                             MODE_IS,
@@ -4053,7 +4054,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
 
         lk.lock();
         if (_topCoord->isSteppingDownUnconditionally()) {
-            invariant(opCtx->lockState()->isRSTLExclusive());
+            invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
             LOGV2(21355, "Stepping down from primary, because we received a new config");
             // We need to release the mutex before yielding locks for prepared transactions, which
             // might check out sessions, to avoid deadlocks with checked-out sessions accessing
@@ -5910,7 +5911,7 @@ Status ReplicationCoordinatorImpl::updateTerm(OperationContext* opCtx, long long
     }
 
     // Check we haven't acquired any lock, because potential stepdown needs global lock.
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     // If the term is already up to date, we can skip the update and the mutex acquisition.
     if (!_needToUpdateTerm(term))
@@ -6201,7 +6202,7 @@ void ReplicationCoordinatorImpl::ReadWriteAbility::setCanAcceptNonLocalWrites(
     WithLock lk, OperationContext* opCtx, bool canAcceptWrites) {
     // We must be holding the RSTL in mode X to change _canAcceptNonLocalWrites.
     invariant(opCtx);
-    invariant(opCtx->lockState()->isRSTLExclusive());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
     if (canAcceptWrites == canAcceptNonLocalWrites(lk)) {
         return;
     }
@@ -6220,7 +6221,7 @@ bool ReplicationCoordinatorImpl::ReadWriteAbility::canAcceptNonLocalWrites(
     OperationContext* opCtx) const {
     // We must be holding the RSTL.
     invariant(opCtx);
-    invariant(opCtx->lockState()->isRSTLLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked());
     return _canAcceptNonLocalWrites.loadRelaxed();
 }
 
@@ -6232,7 +6233,7 @@ bool ReplicationCoordinatorImpl::ReadWriteAbility::canServeNonLocalReads(
     OperationContext* opCtx) const {
     // We must be holding the RSTL.
     invariant(opCtx);
-    invariant(opCtx->lockState()->isRSTLLocked() || opCtx->isLockFreeReadsOp());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() || opCtx->isLockFreeReadsOp());
     return _canServeNonLocalReads.loadRelaxed();
 }
 
@@ -6240,7 +6241,7 @@ void ReplicationCoordinatorImpl::ReadWriteAbility::setCanServeNonLocalReads(Oper
                                                                             unsigned int newVal) {
     // We must be holding the RSTL in mode X to change _canServeNonLocalReads.
     invariant(opCtx);
-    invariant(opCtx->lockState()->isRSTLExclusive());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
     _canServeNonLocalReads.store(newVal);
 }
 

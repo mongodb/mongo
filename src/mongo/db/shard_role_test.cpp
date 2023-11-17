@@ -52,9 +52,9 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/member_state.h"
@@ -388,9 +388,10 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
                                                     repl::ReadConcernArgs(),
                                                     AcquisitionPrerequisites::kWrite},
                                                    MODE_IX);
-        ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IX));
         ASSERT_TRUE(
-            opCtx()->lockState()->isCollectionLockedForMode(nssUnshardedCollection1, MODE_IX));
+            shard_role_details::getLocker(opCtx())->isDbLockedForMode(dbNameTestDb, MODE_IX));
+        ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(
+            nssUnshardedCollection1, MODE_IX));
         validateAcquisition(acquisition);
     }
 
@@ -408,8 +409,9 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
         ASSERT_TRUE(acquisitions.at(nssUnshardedCollection1).isCollection());
         const auto& acquisition = acquisitions.at(nssUnshardedCollection1).getCollection();
 
-        ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
-        ASSERT_FALSE(opCtx()->lockState()->isLockHeldForMode(
+        ASSERT_FALSE(
+            shard_role_details::getLocker(opCtx())->isDbLockedForMode(dbNameTestDb, MODE_IS));
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isLockHeldForMode(
             ResourceId{RESOURCE_COLLECTION, nssUnshardedCollection1}, MODE_IS));
         validateAcquisition(acquisition);
     }
@@ -556,9 +558,10 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
                 opCtx(), nssUnshardedCollection1, AcquisitionPrerequisites::kWrite),
             MODE_IX);
 
-        ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IX));
         ASSERT_TRUE(
-            opCtx()->lockState()->isCollectionLockedForMode(nssUnshardedCollection1, MODE_IX));
+            shard_role_details::getLocker(opCtx())->isDbLockedForMode(dbNameTestDb, MODE_IX));
+        ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(
+            nssUnshardedCollection1, MODE_IX));
         validateAcquisition(acquisition);
     }
 
@@ -573,8 +576,9 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
         ASSERT_TRUE(acquisitions.at(nssUnshardedCollection1).isCollection());
         const auto& acquisition = acquisitions.at(nssUnshardedCollection1).getCollection();
 
-        ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
-        ASSERT_FALSE(opCtx()->lockState()->isLockHeldForMode(
+        ASSERT_FALSE(
+            shard_role_details::getLocker(opCtx())->isDbLockedForMode(dbNameTestDb, MODE_IS));
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isLockHeldForMode(
             ResourceId{RESOURCE_COLLECTION, nssUnshardedCollection1}, MODE_IS));
         validateAcquisition(acquisition);
     }
@@ -635,9 +639,10 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {
                                                     repl::ReadConcernArgs(),
                                                     AcquisitionPrerequisites::kWrite},
                                                    MODE_IX);
-        ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IX));
         ASSERT_TRUE(
-            opCtx()->lockState()->isCollectionLockedForMode(nssShardedCollection1, MODE_IX));
+            shard_role_details::getLocker(opCtx())->isDbLockedForMode(dbNameTestDb, MODE_IX));
+        ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(
+            nssShardedCollection1, MODE_IX));
         validateAcquisition(acquisition);
     }
 
@@ -654,8 +659,9 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {
         ASSERT_TRUE(acquisitions.at(nssShardedCollection1).isCollection());
         const auto& acquisition = acquisitions.at(nssShardedCollection1).getCollection();
 
-        ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
-        ASSERT_FALSE(opCtx()->lockState()->isLockHeldForMode(
+        ASSERT_FALSE(
+            shard_role_details::getLocker(opCtx())->isDbLockedForMode(dbNameTestDb, MODE_IS));
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isLockHeldForMode(
             ResourceId{RESOURCE_COLLECTION, nssUnshardedCollection1}, MODE_IS));
         validateAcquisition(acquisition);
     }
@@ -933,7 +939,8 @@ TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeTakesLocksWhenInMultiDocTran
                                         {dbVersionTestDb, ShardVersion::UNSHARDED()},
                                         repl::ReadConcernArgs(),
                                         AcquisitionPrerequisites::kRead});
-    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nssUnshardedCollection1, MODE_IS));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(
+        nssUnshardedCollection1, MODE_IS));
 }
 
 TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeDoesNotTakeLocksWhenNotInMultiDocTransaction) {
@@ -943,7 +950,7 @@ TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeDoesNotTakeLocksWhenNotInMul
                                         {dbVersionTestDb, ShardVersion::UNSHARDED()},
                                         repl::ReadConcernArgs(),
                                         AcquisitionPrerequisites::kRead});
-    ASSERT_FALSE(opCtx()->lockState()->isLockHeldForMode(
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isLockHeldForMode(
         ResourceId{RESOURCE_COLLECTION, nssUnshardedCollection1}, MODE_IS));
 }
 
@@ -985,12 +992,14 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsAllWithCorrectPlacementConcern) 
     ASSERT_TRUE(acquisitionShardedColl.getShardingFilter().has_value());
 
     // Assert the DB lock is held, but not recursively (i.e. only once).
-    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IX));
-    ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isDbLockedForMode(dbNameTestDb, MODE_IX));
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isGlobalLockedRecursively());
 
     // Assert both collections are locked.
-    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nssUnshardedCollection1, MODE_IX));
-    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nssShardedCollection1, MODE_IX));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(
+        nssUnshardedCollection1, MODE_IX));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(
+        nssShardedCollection1, MODE_IX));
 }
 
 TEST_F(ShardRoleTest, AcquireMultipleCollectionsWithIncorrectPlacementConcernThrows) {
@@ -1218,20 +1227,20 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithLocks) {
                                                },
                                                MODE_IX);
 
-    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(nss, MODE_IX));
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
     opCtx()->recoveryUnit()->abandonSnapshot();
 
-    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-    ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(nss, MODE_IX));
 
     // Restore the resources
     restoreTransactionResourcesToOperationContext(opCtx(), std::move(yieldedTransactionResources));
-    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(nss, MODE_IX));
 }
 
 TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
@@ -1250,20 +1259,23 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
     ASSERT_EQ(1, acquisitions.size());
     ASSERT_TRUE(acquisitions.at(nss).isCollection());
 
-    ASSERT_TRUE(opCtx()->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_IS));
-    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_NONE));
+    ASSERT_TRUE(
+        shard_role_details::getLocker(opCtx())->isLockHeldForMode(resourceIdGlobal, MODE_IS));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_NONE));
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
     opCtx()->recoveryUnit()->abandonSnapshot();
 
-    ASSERT_FALSE(opCtx()->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_IS));
-    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_NONE));
+    ASSERT_FALSE(
+        shard_role_details::getLocker(opCtx())->isLockHeldForMode(resourceIdGlobal, MODE_IS));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_NONE));
 
     // Restore the resources
     restoreTransactionResourcesToOperationContext(opCtx(), std::move(yieldedTransactionResources));
-    ASSERT_TRUE(opCtx()->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_IS));
-    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_NONE));
+    ASSERT_TRUE(
+        shard_role_details::getLocker(opCtx())->isLockHeldForMode(resourceIdGlobal, MODE_IS));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_NONE));
 }
 
 TEST_F(ShardRoleTest,
@@ -1312,8 +1324,8 @@ TEST_F(ShardRoleTest,
                                  ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
                              });
 
-    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-    ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(nss, MODE_IX));
 }
 
 TEST_F(ShardRoleTest, RestoreForWriteInvalidatesAcquisitionIfPlacementConcernDbVersionNoLongerMet) {
@@ -1345,8 +1357,8 @@ TEST_F(ShardRoleTest, RestoreForWriteInvalidatesAcquisitionIfPlacementConcernDbV
                                  ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
                              });
 
-    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-    ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(nss, MODE_IX));
 }
 
 TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
@@ -1390,7 +1402,7 @@ TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
 
     // Try to restore the resources should work because placement concern (IGNORED) can be met.
     restoreTransactionResourcesToOperationContext(opCtx(), std::move(yieldedTransactionResources));
-    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(nss, MODE_IX));
 }
 
 void ShardRoleTest::testRestoreFailsIfCollectionBecomesCreated(
@@ -1787,8 +1799,10 @@ TEST_F(ShardRoleTest, YieldAndRestoreCursor) {
              {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
         PlanExecutor* cursorExec = pinnedCursor->getExecutor();
 
-        ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-        ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+        ASSERT_TRUE(
+            shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_IX));
+        ASSERT_TRUE(
+            shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(nss, MODE_IX));
 
         // State will be restored on getMore.
         cursorExec->saveState();
@@ -1796,8 +1810,10 @@ TEST_F(ShardRoleTest, YieldAndRestoreCursor) {
 
         stashTransactionResourcesFromOperationContext(opCtx(), pinnedCursor.getCursor());
 
-        ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-        ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+        ASSERT_FALSE(
+            shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_IX));
+        ASSERT_FALSE(
+            shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(nss, MODE_IX));
 
         return pinnedCursor->cursorid();
     }();
@@ -1810,14 +1826,16 @@ TEST_F(ShardRoleTest, YieldAndRestoreCursor) {
     auto& cursorPin = cursorPinStatus.getValue();
 
     ON_BLOCK_EXIT([&] {
-        ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-        ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+        ASSERT_FALSE(
+            shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_IX));
+        ASSERT_FALSE(
+            shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(nss, MODE_IX));
     });
 
     HandleTransactionResourcesFromStasher handler(opCtx(), cursorPin.getCursor());
 
-    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(nss, MODE_IX));
 }
 
 // ---------------------------------------------------------------------------
@@ -2129,24 +2147,24 @@ TEST_F(ShardRoleTest,
         }
 
         // Check not recursively locked.
-        ASSERT_TRUE(opCtx()->lockState()->isReadLocked());  // Global lock
-        ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+        ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isReadLocked());  // Global lock
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isGlobalLockedRecursively());
         if (!withLocks) {
             ASSERT_TRUE(opCtx()->isLockFreeReadsOp());
         }
 
         // Release one acquisition. Global lock still held.
         acquisition1.reset();
-        ASSERT_TRUE(opCtx()->lockState()->isReadLocked());  // Global lock
-        ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+        ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isReadLocked());  // Global lock
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isGlobalLockedRecursively());
         if (!withLocks) {
             ASSERT_TRUE(opCtx()->isLockFreeReadsOp());
         }
 
         // Release the other acquisition. Global lock no longer held.
         acquisition2.reset();
-        ASSERT_FALSE(opCtx()->lockState()->isReadLocked());  // Global lock
-        ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isReadLocked());  // Global lock
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isGlobalLockedRecursively());
         if (!withLocks) {
             ASSERT_FALSE(opCtx()->isLockFreeReadsOp());
         }
@@ -2181,24 +2199,24 @@ TEST_F(ShardRoleTest,
             : acquireCollectionMaybeLockFree(opCtx(), acquisitionRequest2);
 
         // Check locked recursively.
-        ASSERT_TRUE(opCtx()->lockState()->isReadLocked());  // Global lock
-        ASSERT_TRUE(opCtx()->lockState()->isGlobalLockedRecursively());
+        ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isReadLocked());  // Global lock
+        ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isGlobalLockedRecursively());
         if (!withLocks) {
             ASSERT_TRUE(opCtx()->isLockFreeReadsOp());
         }
 
         // Release one acquisition. Check no longer locked recursively.
         acquisition1.reset();
-        ASSERT_TRUE(opCtx()->lockState()->isReadLocked());  // Global lock
-        ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+        ASSERT_TRUE(shard_role_details::getLocker(opCtx())->isReadLocked());  // Global lock
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isGlobalLockedRecursively());
         if (!withLocks) {
             ASSERT_TRUE(opCtx()->isLockFreeReadsOp());
         }
 
         // Release the other acquisition. Check no locks are held.
         acquisition2.reset();
-        ASSERT_FALSE(opCtx()->lockState()->isReadLocked());  // Global lock
-        ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isReadLocked());  // Global lock
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isGlobalLockedRecursively());
         if (!withLocks) {
             ASSERT_FALSE(opCtx()->isLockFreeReadsOp());
         }

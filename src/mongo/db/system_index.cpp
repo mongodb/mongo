@@ -50,10 +50,10 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -114,7 +114,7 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
             !replCoord->getSettings().isReplSet() ||
                 replCoord->canAcceptWritesForDatabase(opCtx, ns.dbName()));
 
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     try {
         auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, spec.toBSON());

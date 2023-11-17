@@ -68,7 +68,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
@@ -76,6 +75,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -407,7 +407,8 @@ public:
             // cursors to be closed under the global MODE_X lock, after having sent interrupt
             // signals to read operations. This operation must never hold open storage cursors while
             // ignoring interrupt.
-            InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
+            InterruptibleLockGuard interruptibleLockAcquisition(
+                shard_role_details::getLocker(opCtx));
 
             // Parse the command BSON to a FindCommandRequest.
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, nss, _request);
@@ -547,7 +548,8 @@ public:
                 // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
                 // depend on data reaching secondaries in order to proceed; and secondaries may get
                 // stalled replicating because of an inability to acquire a read ticket.
-                opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+                shard_role_details::getLocker(opCtx)->setAdmissionPriority(
+                    AdmissionContext::Priority::kImmediate);
             }
 
             // If this read represents a reverse oplog scan, we want to bypass oplog visibility
@@ -641,7 +643,8 @@ public:
             // cursors to be closed under the global MODE_X lock, after having sent interrupt
             // signals to read operations. This operation must never hold open storage cursors while
             // ignoring interrupt.
-            InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
+            InterruptibleLockGuard interruptibleLockAcquisition(
+                shard_role_details::getLocker(opCtx));
 
             const auto& collectionPtr = collectionOrView->getCollectionPtr();
 

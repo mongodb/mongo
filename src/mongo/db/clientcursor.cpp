@@ -45,6 +45,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/cursor_server_params.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -241,7 +242,8 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     : _opCtx(opCtx),
       _cursor(cursor),
       _cursorManager(cursorManager),
-      _interruptibleLockGuard(std::make_unique<InterruptibleLockGuard>(opCtx->lockState())) {
+      _interruptibleLockGuard(
+          std::make_unique<InterruptibleLockGuard>(shard_role_details::getLocker(opCtx))) {
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
     invariant(!_cursor->_disposed);

@@ -42,7 +42,6 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/exec/field_name_bloom_filter.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -54,6 +53,7 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/stage_types.h"

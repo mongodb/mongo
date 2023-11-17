@@ -33,9 +33,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/constants.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -71,7 +71,8 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     // batches that are taking a long time.
     auto opCtx = client->makeOperationContext();
     opCtx->setEnforceConstraints(false);
-    opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+    shard_role_details::getLocker(opCtx.get())
+        ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
     for (auto& collector : _collectors) {
         // Skip collection if this collector has no data to return

@@ -47,6 +47,7 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor_impl.h"
@@ -162,8 +163,8 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 
     if (_params.lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
         opCtx()->getClient()->isFromUserConnection() &&
-        opCtx()->lockState()->shouldWaitForTicket()) {
-        _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(opCtx())->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx()), AdmissionContext::Priority::kLow);
     }
 
     boost::optional<Record> record;
@@ -526,8 +527,8 @@ void CollectionScan::doDetachFromOperationContext() {
 void CollectionScan::doReattachToOperationContext() {
     if (_params.lowPriority && gDeprioritizeUnboundedUserCollectionScans.load() &&
         opCtx()->getClient()->isFromUserConnection() &&
-        opCtx()->lockState()->shouldWaitForTicket()) {
-        _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(opCtx())->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx()), AdmissionContext::Priority::kLow);
     }
     if (_cursor)
         _cursor->reattachToOperationContext(opCtx());

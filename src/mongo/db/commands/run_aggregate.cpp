@@ -74,7 +74,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
@@ -82,6 +81,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -1081,7 +1081,7 @@ Status runAggregate(OperationContext* opCtx,
     // replication rollback, which at the storage layer waits for all cursors to be closed under the
     // global MODE_X lock, after having sent interrupt signals to read operations. This operation
     // must never hold open storage cursors while ignoring interrupt.
-    InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
+    InterruptibleLockGuard interruptibleLockAcquisition(shard_role_details::getLocker(opCtx));
 
     auto initContext = [&](auto_get_collection::ViewMode m) -> void {
         ctx.emplace(opCtx,

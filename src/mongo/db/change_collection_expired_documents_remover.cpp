@@ -51,6 +51,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -119,7 +120,7 @@ void removeExpiredDocuments(Client* client) {
             // on each node. It is imperative that removal is prioritized so it can keep up with
             // inserts and prevent users from running out of disk space.
             ScopedAdmissionPriorityForLock skipAdmissionControl(
-                opCtx->lockState(), AdmissionContext::Priority::kImmediate);
+                shard_role_details::getLocker(opCtx.get()), AdmissionContext::Priority::kImmediate);
 
             auto expiredAfterSeconds =
                 change_stream_serverless_helpers::getExpireAfterSeconds(tenantId);

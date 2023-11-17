@@ -38,6 +38,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
@@ -146,9 +147,14 @@ protected:
         FailPointEnableBlock fp("overrideDDLLockTimeout",
                                 BSON("timeoutMillisecs" << timeoutMillisecs));
         return std::make_pair(
+            ScopedBaseDDLLock{opCtx,
+                              shard_role_details::getLocker(opCtx),
+                              ns.dbName(),
+                              reason,
+                              mode,
+                              waitForRecovery},
             ScopedBaseDDLLock{
-                opCtx, opCtx->lockState(), ns.dbName(), reason, mode, waitForRecovery},
-            ScopedBaseDDLLock{opCtx, opCtx->lockState(), ns, reason, mode, waitForRecovery});
+                opCtx, shard_role_details::getLocker(opCtx), ns, reason, mode, waitForRecovery});
     }
 
     /**

@@ -39,7 +39,6 @@
 
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_stats.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/str.h"
 

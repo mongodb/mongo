@@ -41,7 +41,7 @@
 #include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -68,7 +68,8 @@ public:
     ClientAndCtx makeClientWithLocker(const std::string& clientName) {
         auto client = getServiceContext()->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        client->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
+        shard_role_details::swapLocker(opCtx.get(),
+                                       std::make_unique<LockerImpl>(opCtx->getServiceContext()));
         return std::make_pair(std::move(client), std::move(opCtx));
     }
 
@@ -109,7 +110,8 @@ void failsWithLockTimeout(std::function<void()> func, Milliseconds timeoutMillis
 
 TEST_F(CatalogRAIITestFixture, AutoGetDBDeadline) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_X));
     failsWithLockTimeout(
         [&] {
             AutoGetDb db(client2.second.get(), nss.dbName(), MODE_X, Date_t::now() + timeoutMs);
@@ -129,7 +131,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBGlobalLockDeadline) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineNow) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), nss.dbName(), MODE_X, Date_t::now()); },
         Milliseconds(0));
@@ -137,7 +140,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineNow) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineMin) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), nss.dbName(), MODE_X, Date_t{}); },
         Milliseconds(0));
@@ -145,9 +149,11 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineMin) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionCollLockDeadline) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
     Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
-    ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isCollectionLockedForMode(nss, MODE_X));
     failsWithLockTimeout(
         [&] {
             AutoGetCollection coll(
@@ -161,7 +167,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionCollLockDeadline) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockDeadline) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_X));
     failsWithLockTimeout(
         [&] {
             AutoGetCollection coll(
@@ -175,7 +182,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockDeadline) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionGlobalLockDeadline) {
     Lock::GlobalLock gLock1(client1.second.get(), MODE_X);
-    ASSERT(client1.second->lockState()->isLocked());
+    ASSERT(shard_role_details::getLocker(client1.second.get())->isLocked());
     failsWithLockTimeout(
         [&] {
             AutoGetCollection coll(
@@ -189,9 +196,11 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionGlobalLockDeadline) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineNow) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
     Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
-    ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isCollectionLockedForMode(nss, MODE_X));
 
     failsWithLockTimeout(
         [&] {
@@ -205,9 +214,11 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineNow) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineMin) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
     Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
-    ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isCollectionLockedForMode(nss, MODE_X));
 
     failsWithLockTimeout(
         [&] {
@@ -219,7 +230,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineMin) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionNotCompatibleWithRSTLExclusiveLock) {
     Lock::GlobalLock gLock1(client1.second.get(), MODE_X);
-    ASSERT(client1.second->lockState()->isLocked());
+    ASSERT(shard_role_details::getLocker(client1.second.get())->isLocked());
 
     failsWithLockTimeout(
         [&] {
@@ -234,7 +245,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionNotCompatibleWithRSTLExclusiveLo
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockCompatibleX) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     AutoGetCollection coll(client2.second.get(), nss, MODE_X);
 }
@@ -253,26 +265,34 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionSecondaryNamespacesSingleDb) {
                         AutoGetCollection::Options{}.secondaryNssOrUUIDs(
                             secondaryNamespaces.cbegin(), secondaryNamespaces.cend()));
 
-    ASSERT(opCtx1->lockState()->isRSTLLocked());
-    ASSERT(opCtx1->lockState()->isReadLocked());  // Global lock check
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.dbName(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.dbName(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.dbName(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(nss, MODE_IS));
-    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss1, MODE_IS));
-    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss2, MODE_IS));
+    ASSERT(shard_role_details::getLocker(opCtx1)->isRSTLLocked());
+    ASSERT(shard_role_details::getLocker(opCtx1)->isReadLocked());  // Global lock check
+    ASSERT(shard_role_details::getLocker(opCtx1)->isDbLockedForMode(nss.dbName(), MODE_IS));
+    ASSERT(
+        shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNss1.dbName(), MODE_IS));
+    ASSERT(
+        shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNss2.dbName(), MODE_IS));
+    ASSERT(shard_role_details::getLocker(opCtx1)->isCollectionLockedForMode(nss, MODE_IS));
+    ASSERT(
+        shard_role_details::getLocker(opCtx1)->isCollectionLockedForMode(kSecondaryNss1, MODE_IS));
+    ASSERT(
+        shard_role_details::getLocker(opCtx1)->isCollectionLockedForMode(kSecondaryNss2, MODE_IS));
 
-    ASSERT(!opCtx1->lockState()->isRSTLExclusive());
-    ASSERT(!opCtx1->lockState()->isGlobalLockedRecursively());
-    ASSERT(!opCtx1->lockState()->isWriteLocked());
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.dbName(), MODE_IS));
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb2.dbName(), MODE_IS));
-    ASSERT(!opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb1, MODE_IS));
-    ASSERT(!opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb2, MODE_IS));
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isRSTLExclusive());
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isGlobalLockedRecursively());
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isWriteLocked());
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNssOtherDb1.dbName(),
+                                                                     MODE_IS));
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNssOtherDb2.dbName(),
+                                                                     MODE_IS));
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isCollectionLockedForMode(kSecondaryNssOtherDb1,
+                                                                             MODE_IS));
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isCollectionLockedForMode(kSecondaryNssOtherDb2,
+                                                                             MODE_IS));
 
     // All the locks should release.
     autoGetColl.reset();
-    ASSERT(!opCtx1->lockState()->isLocked());  // Global lock check
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isLocked());  // Global lock check
 }
 
 // Test multiple collections being locked with MODE_IX. Multi-document transaction reads use MODE_IX
@@ -290,25 +310,33 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNamespacesMODEIX) {
                         AutoGetCollection::Options{}.secondaryNssOrUUIDs(
                             secondaryNamespaces.cbegin(), secondaryNamespaces.cend()));
 
-    ASSERT(opCtx1->lockState()->isRSTLLocked());
-    ASSERT(opCtx1->lockState()->isWriteLocked());  // Global lock check
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.dbName(), MODE_IX));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.dbName(), MODE_IX));
-    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(nss, MODE_IX));
-    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss1, MODE_IX));
-    ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss2, MODE_IX));
+    ASSERT(shard_role_details::getLocker(opCtx1)->isRSTLLocked());
+    ASSERT(shard_role_details::getLocker(opCtx1)->isWriteLocked());  // Global lock check
+    ASSERT(shard_role_details::getLocker(opCtx1)->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(
+        shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNss1.dbName(), MODE_IX));
+    ASSERT(
+        shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNss2.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(opCtx1)->isCollectionLockedForMode(nss, MODE_IX));
+    ASSERT(
+        shard_role_details::getLocker(opCtx1)->isCollectionLockedForMode(kSecondaryNss1, MODE_IX));
+    ASSERT(
+        shard_role_details::getLocker(opCtx1)->isCollectionLockedForMode(kSecondaryNss2, MODE_IX));
 
-    ASSERT(!opCtx1->lockState()->isRSTLExclusive());
-    ASSERT(!opCtx1->lockState()->isGlobalLockedRecursively());
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.dbName(), MODE_IX));
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb2.dbName(), MODE_IX));
-    ASSERT(!opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb1, MODE_IX));
-    ASSERT(!opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb2, MODE_IX));
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isRSTLExclusive());
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isGlobalLockedRecursively());
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNssOtherDb1.dbName(),
+                                                                     MODE_IX));
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNssOtherDb2.dbName(),
+                                                                     MODE_IX));
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isCollectionLockedForMode(kSecondaryNssOtherDb1,
+                                                                             MODE_IX));
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isCollectionLockedForMode(kSecondaryNssOtherDb2,
+                                                                             MODE_IX));
 
     // All the locks should release.
     autoGetColl.reset();
-    ASSERT(!opCtx1->lockState()->isLocked());  // Global lock check
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isLocked());  // Global lock check
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetDbSecondaryNamespacesSingleDb) {
@@ -317,29 +345,35 @@ TEST_F(CatalogRAIITestFixture, AutoGetDbSecondaryNamespacesSingleDb) {
     boost::optional<AutoGetDb> autoGetDb;
     autoGetDb.emplace(opCtx1, nss.dbName(), MODE_IS, Date_t::max());
 
-    ASSERT(opCtx1->lockState()->isRSTLLocked());
-    ASSERT(opCtx1->lockState()->isReadLocked());  // Global lock check
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.dbName(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.dbName(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.dbName(), MODE_IS));
+    ASSERT(shard_role_details::getLocker(opCtx1)->isRSTLLocked());
+    ASSERT(shard_role_details::getLocker(opCtx1)->isReadLocked());  // Global lock check
+    ASSERT(shard_role_details::getLocker(opCtx1)->isDbLockedForMode(nss.dbName(), MODE_IS));
+    ASSERT(
+        shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNss1.dbName(), MODE_IS));
+    ASSERT(
+        shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNss2.dbName(), MODE_IS));
 
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.dbName(), MODE_IS));
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb2.dbName(), MODE_IS));
-    ASSERT(!opCtx1->lockState()->isRSTLExclusive());
-    ASSERT(!opCtx1->lockState()->isGlobalLockedRecursively());
-    ASSERT(!opCtx1->lockState()->isWriteLocked());
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNssOtherDb1.dbName(),
+                                                                     MODE_IS));
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isDbLockedForMode(kSecondaryNssOtherDb2.dbName(),
+                                                                     MODE_IS));
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isRSTLExclusive());
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isGlobalLockedRecursively());
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isWriteLocked());
 
     // All the locks should release.
     autoGetDb.reset();
-    ASSERT(!opCtx1->lockState()->isLocked());  // Global lock check.
+    ASSERT(!shard_role_details::getLocker(opCtx1)->isLocked());  // Global lock check.
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNssCollLockDeadline) {
     // Take a MODE_X collection lock on kSecondaryNss1.
     boost::optional<AutoGetCollection> autoGetCollWithXLock;
     autoGetCollWithXLock.emplace(client1.second.get(), kSecondaryNss1, MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(kSecondaryNss1.dbName(), MODE_IX));
-    ASSERT(client1.second->lockState()->isCollectionLockedForMode(kSecondaryNss1, MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(kSecondaryNss1.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isCollectionLockedForMode(kSecondaryNss1, MODE_X));
 
     // Now trying to take a MODE_IS lock on kSecondaryNss1 as a secondary collection should fail.
     const std::vector<NamespaceStringOrUUID> secondaryNamespacesConflict{
@@ -448,8 +482,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDifferentTenantsConflictingNamespaces) {
     AutoGetDb db1(client1.second.get(), dbName1, MODE_X);
     AutoGetDb db2(client2.second.get(), dbName2, MODE_X);
 
-    ASSERT(client1.second->lockState()->isDbLockedForMode(dbName1, MODE_X));
-    ASSERT(client2.second->lockState()->isDbLockedForMode(dbName2, MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())->isDbLockedForMode(dbName1, MODE_X));
+    ASSERT(shard_role_details::getLocker(client2.second.get())->isDbLockedForMode(dbName2, MODE_X));
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetDBWithTenantHitsDeadline) {
@@ -457,7 +491,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBWithTenantHitsDeadline) {
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(TenantId(OID::gen()), db);
 
     Lock::DBLock dbLock1(client1.second.get(), dbName, MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(dbName, MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())->isDbLockedForMode(dbName, MODE_X));
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), dbName, MODE_X, Date_t::now() + timeoutMs); },
         timeoutMs);

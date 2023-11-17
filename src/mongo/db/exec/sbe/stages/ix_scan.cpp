@@ -46,6 +46,7 @@
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/record_id.h"
@@ -226,8 +227,9 @@ void IndexScanStageBase::doDetachFromOperationContext() {
 
 void IndexScanStageBase::doAttachToOperationContext(OperationContext* opCtx) {
     if (_lowPriority && _open && gDeprioritizeUnboundedUserIndexScans.load() &&
-        _opCtx->getClient()->isFromUserConnection() && _opCtx->lockState()->shouldWaitForTicket()) {
-        _priority.emplace(opCtx->lockState(), AdmissionContext::Priority::kLow);
+        _opCtx->getClient()->isFromUserConnection() &&
+        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kLow);
     }
     if (_cursor) {
         _cursor->reattachToOperationContext(opCtx);
@@ -290,8 +292,9 @@ PlanState IndexScanStageBase::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
     if (_lowPriority && !_priority && gDeprioritizeUnboundedUserIndexScans.load() &&
-        _opCtx->getClient()->isFromUserConnection() && _opCtx->lockState()->shouldWaitForTicket()) {
-        _priority.emplace(_opCtx->lockState(), AdmissionContext::Priority::kLow);
+        _opCtx->getClient()->isFromUserConnection() &&
+        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(_opCtx), AdmissionContext::Priority::kLow);
     }
 
     // We are about to get next record from a storage cursor so do not bother saving our internal

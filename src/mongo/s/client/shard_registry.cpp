@@ -48,8 +48,8 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime_with.h"
@@ -162,7 +162,7 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
     // is disallowed.
     tassert(7032320,
             "Can't perform ShardRegistry lookup while holding locks",
-            !opCtx->lockState() || !opCtx->lockState()->isLocked());
+            !shard_role_details::getLocker(opCtx)->isLocked());
 
 
     auto lastForcedReloadIncrement = _forceReloadIncrement.load();

@@ -65,12 +65,12 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -832,7 +832,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const bool allowRenameOutOfTheWay,
                                    const boost::optional<BSONObj>& idIndex) {
 
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
 
     const NamespaceString newCollName(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
     auto newCmd = cmdObj;

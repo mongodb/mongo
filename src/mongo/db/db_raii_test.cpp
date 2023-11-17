@@ -42,9 +42,9 @@
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -89,7 +89,8 @@ public:
     ClientAndCtx makeClientWithLocker(const std::string& clientName) {
         auto client = getServiceContext()->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        client->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
+        shard_role_details::swapLocker(opCtx.get(),
+                                       std::make_unique<LockerImpl>(opCtx->getServiceContext()));
         return std::make_pair(std::move(client), std::move(opCtx));
     }
 
@@ -139,9 +140,11 @@ void failsWithLockTimeout(std::function<void()> func, Milliseconds timeoutMillis
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadCollLockDeadline) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
     Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
-    ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isCollectionLockedForMode(nss, MODE_X));
     failsWithLockTimeout(
         [&] {
             AutoGetCollectionForRead acfr(
@@ -154,7 +157,8 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadCollLockDeadline) {
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockDeadline) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_X));
     failsWithLockTimeout(
         [&] {
             AutoGetCollectionForRead coll(
@@ -167,7 +171,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockDeadline) {
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadGlobalLockDeadline) {
     Lock::GlobalLock gLock1(client1.second.get(), MODE_X);
-    ASSERT(client1.second->lockState()->isLocked());
+    ASSERT(shard_role_details::getLocker(client1.second.get())->isLocked());
     failsWithLockTimeout(
         [&] {
             AutoGetCollectionForRead coll(
@@ -180,9 +184,11 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadGlobalLockDeadline) {
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDeadlineNow) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
     Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
-    ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isCollectionLockedForMode(nss, MODE_X));
 
     failsWithLockTimeout(
         [&] {
@@ -194,9 +200,11 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDeadlineNow) {
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDeadlineMin) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
     Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
-    ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isCollectionLockedForMode(nss, MODE_X));
 
     failsWithLockTimeout(
         [&] {
@@ -208,7 +216,8 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDeadlineMin) {
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockCompatibleXNoCollection) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     AutoGetCollectionForRead coll(client2.second.get(), nss);
 }
@@ -219,7 +228,8 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockCompatibleXCollectionExi
         storageInterface()->createCollection(client1.second.get(), nss, defaultCollectionOptions));
 
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     AutoGetCollectionForRead coll(client2.second.get(), nss);
     ASSERT(coll.getCollection());
@@ -231,7 +241,8 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockCompatibleXCollectionExi
         storageInterface()->createCollection(client1.second.get(), nss, defaultCollectionOptions));
 
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
     auto opCtx = client2.second.get();
     opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                                   Timestamp(1, 2));
@@ -251,7 +262,8 @@ TEST_F(DBRAIITestFixture,
     ASSERT_OK(repl::ReplicationCoordinator::get(client1.second.get())
                   ->setFollowerMode(repl::MemberState::RS_SECONDARY));
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     // Simulate using a DBDirectClient to test this behavior for user reads.
     client2.first->setInDirectClient(true);
@@ -272,7 +284,8 @@ TEST_F(DBRAIITestFixture,
         client1.second.get()->getServiceContext()->getStorageEngine()->getSnapshotManager();
     snapshotManager->setLastApplied(replCoord->getMyLastAppliedOpTime().getTimestamp());
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT(shard_role_details::getLocker(client1.second.get())
+               ->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     // Simulate using a DBDirectClient to test this behavior for user reads.
     client2.first->setInDirectClient(true);

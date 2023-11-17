@@ -46,10 +46,10 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
@@ -138,8 +138,8 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
 
     const bool keyGenerationOnly = mode == RetrySkippedRecordMode::kKeyGeneration;
 
-    dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns(),
-                                                          keyGenerationOnly ? MODE_IX : MODE_X));
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+        collection->ns(), keyGenerationOnly ? MODE_IX : MODE_X));
     if (!_skippedRecordsTable) {
         return Status::OK();
     }

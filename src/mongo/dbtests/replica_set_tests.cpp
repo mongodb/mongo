@@ -34,8 +34,8 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -108,7 +108,7 @@ private:
 TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    ScopedAdmissionPriorityForLock priority(opCtx->lockState(),
+    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx.get()),
                                             AdmissionContext::Priority::kImmediate);
     auto replCoordExternalState = getReplCoordExternalState();
 
@@ -132,7 +132,7 @@ TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
 TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithOldTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    ScopedAdmissionPriorityForLock priority(opCtx->lockState(),
+    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx.get()),
                                             AdmissionContext::Priority::kImmediate);
     auto replCoordExternalState = getReplCoordExternalState();
 
@@ -156,7 +156,7 @@ TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithOldTerm) {
 TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithEqualTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    ScopedAdmissionPriorityForLock priority(opCtx->lockState(),
+    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx.get()),
                                             AdmissionContext::Priority::kImmediate);
     auto replCoordExternalState = getReplCoordExternalState();
 

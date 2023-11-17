@@ -58,13 +58,13 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -861,7 +861,7 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     // Get the collection indexes and options from the donor shard.
 
     // Do not hold any locks while issuing remote calls.
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     auto cmd = nssOrUUID.isNamespaceString() ? BSON("listIndexes" << nssOrUUID.nss().coll())
                                              : BSON("listIndexes" << nssOrUUID.uuid());

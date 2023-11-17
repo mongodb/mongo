@@ -60,9 +60,9 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -451,10 +451,11 @@ TEST_F(
 TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineNow) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     Lock::DBLock lock(_opCtx.get(), nss.dbName(), MODE_X);
-    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
+    ASSERT(shard_role_details::getLocker(_opCtx.get())->isDbLockedForMode(nss.dbName(), MODE_X));
     try {
         AutoGetDb db(_opCtx.get(), nss.dbName(), MODE_X, Date_t::now());
-        ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
+        ASSERT(
+            shard_role_details::getLocker(_opCtx.get())->isDbLockedForMode(nss.dbName(), MODE_X));
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         FAIL("Should get the db within the timeout");
     }
@@ -463,10 +464,11 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineNow) {
 TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     Lock::DBLock lock(_opCtx.get(), nss.dbName(), MODE_X);
-    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
+    ASSERT(shard_role_details::getLocker(_opCtx.get())->isDbLockedForMode(nss.dbName(), MODE_X));
     try {
         AutoGetDb db(_opCtx.get(), nss.dbName(), MODE_X, Date_t());
-        ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
+        ASSERT(
+            shard_role_details::getLocker(_opCtx.get())->isDbLockedForMode(nss.dbName(), MODE_X));
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         FAIL("Should get the db within the timeout");
     }
@@ -475,9 +477,9 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
 TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineNow) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     Lock::DBLock dbLock(_opCtx.get(), nss.dbName(), MODE_X);
-    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
+    ASSERT(shard_role_details::getLocker(_opCtx.get())->isDbLockedForMode(nss.dbName(), MODE_X));
     Lock::CollectionLock collLock(_opCtx.get(), nss, MODE_X);
-    ASSERT(_opCtx.get()->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    ASSERT(shard_role_details::getLocker(_opCtx.get())->isCollectionLockedForMode(nss, MODE_X));
     try {
         AutoGetCollectionForReadCommand db(
             _opCtx.get(), nss, AutoGetCollection::Options{}.deadline(Date_t::now()));
@@ -489,9 +491,9 @@ TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineNow) {
 TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineMin) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     Lock::DBLock dbLock(_opCtx.get(), nss.dbName(), MODE_X);
-    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
+    ASSERT(shard_role_details::getLocker(_opCtx.get())->isDbLockedForMode(nss.dbName(), MODE_X));
     Lock::CollectionLock collLock(_opCtx.get(), nss, MODE_X);
-    ASSERT(_opCtx.get()->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    ASSERT(shard_role_details::getLocker(_opCtx.get())->isCollectionLockedForMode(nss, MODE_X));
     try {
         AutoGetCollectionForReadCommand db(
             _opCtx.get(), nss, AutoGetCollection::Options{}.deadline(Date_t()));

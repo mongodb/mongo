@@ -54,6 +54,7 @@
 #include "mongo/db/commands/generic_servers_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -177,7 +178,7 @@ void HostInfoCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) cons
 template <>
 HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext* opCtx) {
     // Critical to observability and diagnosability, categorize as immediate priority.
-    ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+    ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
                                                         AdmissionContext::Priority::kImmediate);
 
     ProcessInfo p;
@@ -227,7 +228,7 @@ void GetCmdLineOptsCmd::Invocation::doCheckAuthorization(OperationContext* opCtx
 template <>
 GetCmdLineOptsReply GetCmdLineOptsCmd::Invocation::typedRun(OperationContext* opCtx) {
     // Critical to observability and diagnosability, categorize as immediate priority.
-    ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+    ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
                                                         AdmissionContext::Priority::kImmediate);
 
     GetCmdLineOptsReply reply;
@@ -318,7 +319,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         // Critical to observability and diagnosability, categorize as immediate priority.
-        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+        ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
                                                             AdmissionContext::Priority::kImmediate);
 
         if (MONGO_unlikely(hangInGetLog.shouldFail())) {

@@ -53,8 +53,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -223,7 +223,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 ScopeGuard unblockWritesLegacyOnExit([&] {
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT
+                    UninterruptibleLockGuard noInterrupt(  // NOLINT
+                        shard_role_details::getLocker(opCtx));
                     unblockWritesLegacy(opCtx);
                 });
 

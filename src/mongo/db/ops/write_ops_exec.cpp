@@ -75,7 +75,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
@@ -84,6 +83,7 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/introspect.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/not_primary_error_tracker.h"
@@ -1096,7 +1096,7 @@ WriteResult performInserts(OperationContext* opCtx,
     // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork() ||
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
 
     auto& curOp = *CurOp::get(opCtx);
@@ -1539,7 +1539,7 @@ WriteResult performUpdates(OperationContext* opCtx,
     // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork() ||
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
@@ -1803,7 +1803,7 @@ WriteResult performDeletes(OperationContext* opCtx,
     // Delete performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork() ||
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
@@ -1923,7 +1923,7 @@ Status performAtomicTimeseriesWrites(
     OperationContext* opCtx,
     const std::vector<write_ops::InsertCommandRequest>& insertOps,
     const std::vector<write_ops::UpdateCommandRequest>& updateOps) try {
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     invariant(!opCtx->inMultiDocumentTransaction());
     invariant(!insertOps.empty() || !updateOps.empty());
 

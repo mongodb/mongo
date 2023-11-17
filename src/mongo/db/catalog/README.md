@@ -262,11 +262,11 @@ The `$listCatalog` operator does not format its results with the IDL-derived for
 This has implications for applications that read the durable catalog using $listCatalog rather than the recommended listIndexes
 command. Below are a few examples where the `listIndexes` results may differ from `$listCatalog`.
 
-| Index Type | Index Option | createIndexes | listIndexes | $listCatalog |
-| ---------- | ------------ | ------------- | ----------- | ------------ |
-| [Sparse](https://www.mongodb.com/docs/v6.0/core/index-sparse/) | [sparse (safeBool)](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L84) | `db.t.createIndex({a: 1}, {sparse: 12345})` | `{ "v" : 2, "key" : { "a" : 1 }, "name" : "a_1", "sparse" : true }` | `{ "v" : 2, "key" : { "a" : 1 }, "name" : "a_1", "sparse" : 12345 }` |
-| [TTL](https://www.mongodb.com/docs/v6.0/core/index-ttl/) | [expireAfterSeconds (safeInt)](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L88) | `db.t.createIndex({created: 1}, {expireAfterSeconds: 10.23})` | `{ "v" : 2, "key" : { "created" : 1 }, "name" : "created_1", "expireAfterSeconds" : 10 }` | `{ "v" : 2, "key" : { "created" : 1 }, "name" : "created_1", "expireAfterSeconds" : 10.23 }` |
-| [Geo](https://www.mongodb.com/docs/v6.0/tutorial/build-a-2d-index/) | [bits (safeInt)](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L117) | `db.t.createIndex({p: '2d'}, {bits: 16.578})` | `{ "v" : 2, "key" : { "p" : "2d" }, "name" : "p_2d", "bits" : 16 }` | `{ "v" : 2, "key" : { "p" : "2d" }, "name" : "p_2d", "bits" : 16.578 }` |
+| Index Type                                                          | Index Option                                                                                                                                     | createIndexes                                                 | listIndexes                                                                               | $listCatalog                                                                                 |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [Sparse](https://www.mongodb.com/docs/v6.0/core/index-sparse/)      | [sparse (safeBool)](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L84)            | `db.t.createIndex({a: 1}, {sparse: 12345})`                   | `{ "v" : 2, "key" : { "a" : 1 }, "name" : "a_1", "sparse" : true }`                       | `{ "v" : 2, "key" : { "a" : 1 }, "name" : "a_1", "sparse" : 12345 }`                         |
+| [TTL](https://www.mongodb.com/docs/v6.0/core/index-ttl/)            | [expireAfterSeconds (safeInt)](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L88) | `db.t.createIndex({created: 1}, {expireAfterSeconds: 10.23})` | `{ "v" : 2, "key" : { "created" : 1 }, "name" : "created_1", "expireAfterSeconds" : 10 }` | `{ "v" : 2, "key" : { "created" : 1 }, "name" : "created_1", "expireAfterSeconds" : 10.23 }` |
+| [Geo](https://www.mongodb.com/docs/v6.0/tutorial/build-a-2d-index/) | [bits (safeInt)](https://github.com/mongodb/mongo/blob/532c0679ef4fc8313a9e00a1334ca18e04ff6914/src/mongo/db/list_indexes.idl#L117)              | `db.t.createIndex({p: '2d'}, {bits: 16.578})`                 | `{ "v" : 2, "key" : { "p" : "2d" }, "name" : "p_2d", "bits" : 16 }`                       | `{ "v" : 2, "key" : { "p" : "2d" }, "name" : "p_2d", "bits" : 16.578 }`                      |
 
 #### $listCatalog in a sharded cluster
 
@@ -896,13 +896,13 @@ resource until the conflicting granted locks are unlocked.  The different types 
 This matrix answers the question, given a granted lock on a resource with the mode given, is a
 requested lock on that same resource with the given mode compatible?
 
-| Requested Mode |||                  Granted Mode               |||
-|:---------------|:---------:|:-------:|:-------:|:------:|:------:|
-|                | MODE_NONE | MODE_IS | MODE_IX | MODE_S | MODE_X |
-| MODE_IS        |     Y     |    Y    |    Y    |    Y   |   N    |
-| MODE_IX        |     Y     |    Y    |    Y    |    N   |   N    |
-| MODE_S         |     Y     |    Y    |    N    |    Y   |   N    |
-| MODE_X         |     Y     |    N    |    N    |    N   |   N    |
+| Requested Mode |           |         | Granted Mode |        |        |
+| :------------- | :-------: | :-----: | :----------: | :----: | :----: |
+|                | MODE_NONE | MODE_IS |   MODE_IX    | MODE_S | MODE_X |
+| MODE_IS        |     Y     |    Y    |      Y       |   Y    |   N    |
+| MODE_IX        |     Y     |    Y    |      Y       |   N    |   N    |
+| MODE_S         |     Y     |    Y    |      N       |   Y    |   N    |
+| MODE_X         |     Y     |    N    |      N       |   N    |   N    |
 
 Typically, locks are granted in the order they are queued, but some LockRequest behaviors can be
 specially selected to break this rule. One behavior is _enqueueAtFront_, which allows important lock
@@ -1301,12 +1301,12 @@ secondary oplog application and [initial sync][] where the uniqueness constraint
 temporarily. Indexes store key value pairs where they key is the `KeyString`. Current WiredTiger
 secondary unique indexes may have a mix of the old and new representations described below.
 
-| Index type                   | (Key, Value)                                                                                                                           | Data Format Version            |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `_id` index                  | (`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`)                                                                 | index V1: 6<br />index V2: 8   |
-| non-unique index             | (`KeyString` with `RecordId`, optionally `TypeBits`)                                                                                   | index V1: 6<br />index V2: 8   |
-| unique secondary index (new) | (`KeyString` with `RecordId`, optionally `TypeBits`)                                                                                   | index V1: 13<br />index V2: 14 |
-| unique secondary index (old) | (`KeyString` with `RecordId`, optionally `TypeBits`) or<br />(`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`)    | index V1: 11<br />index V2: 12 |
+| Index type                   | (Key, Value)                                                                                                                        | Data Format Version            |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `_id` index                  | (`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`)                                                              | index V1: 6<br />index V2: 8   |
+| non-unique index             | (`KeyString` with `RecordId`, optionally `TypeBits`)                                                                                | index V1: 6<br />index V2: 8   |
+| unique secondary index (new) | (`KeyString` with `RecordId`, optionally `TypeBits`)                                                                                | index V1: 13<br />index V2: 14 |
+| unique secondary index (old) | (`KeyString` with `RecordId`, optionally `TypeBits`) or<br />(`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`) | index V1: 11<br />index V2: 12 |
 
 The reason for the change in index format is that the secondary key uniqueness property can be
 temporarily violated during oplog application (because operations may be applied out of order).
@@ -1690,7 +1690,7 @@ Flow Control is only concerned whether an operation is 'immediate' priority and 
 The preferred method for setting an operation's priority is through the RAII type [ScopedAdmissionPriorityForLock](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/db/concurrency/locker.h#L747).
 
 ```
-ScopedAdmissionPriorityForLock priority(opCtx->lockState(), AdmissionContext::Priority::kLow);
+ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kLow);
 ```
 
 Since the GlobalLock may be acquired and released multiple times throughout an operation's lifetime, it's important to limit the scope of reprioritization to prevent unintentional side-effects. However, if there is a special circumstance where the RAII cannot possibly be used, the priority can be set directly through [Locker::setAdmissionPriority()](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/db/concurrency/locker.h#L525).
@@ -2517,20 +2517,20 @@ oplog.
 [Multiversion concurrency control]: https://en.wikipedia.org/wiki/Multiversion_concurrency_control
 
 ## Table of MongoDB <-> WiredTiger <-> Log version numbers
-|                MongoDB | WiredTiger | Log |
-|------------------------|------------|-----|
-|                 3.0.15 |      2.5.3 |   1 |
-|                 3.2.20 |      2.9.2 |   1 |
-|                 3.4.15 |      2.9.2 |   1 |
-|                  3.6.4 |      3.0.1 |   2 |
-|                 4.0.16 |      3.1.1 |   3 |
-|                  4.2.1 |      3.2.2 |   3 |
-|                  4.2.6 |      3.3.0 |   3 |
-| 4.2.6 (blessed by 4.4) |      3.3.0 |   4 |
-|                  4.4.0 |     10.0.0 |   5 |
-|                  5.0.0 |     10.0.1 |   5 |
-|          4.4.11, 5.0.6 |     10.0.2 |   5 |
-|                  6.0.0 |     10.0.2 |   5 |
-|                  6.1.0 |     11.0.1 |   5 |
-|                  6.2.0 |     11.2.0 |   5 |
-|                  7.0.0 |     11.2.0 |   5 |
+| MongoDB                | WiredTiger | Log |
+| ---------------------- | ---------- | --- |
+| 3.0.15                 | 2.5.3      | 1   |
+| 3.2.20                 | 2.9.2      | 1   |
+| 3.4.15                 | 2.9.2      | 1   |
+| 3.6.4                  | 3.0.1      | 2   |
+| 4.0.16                 | 3.1.1      | 3   |
+| 4.2.1                  | 3.2.2      | 3   |
+| 4.2.6                  | 3.3.0      | 3   |
+| 4.2.6 (blessed by 4.4) | 3.3.0      | 4   |
+| 4.4.0                  | 10.0.0     | 5   |
+| 5.0.0                  | 10.0.1     | 5   |
+| 4.4.11, 5.0.6          | 10.0.2     | 5   |
+| 6.0.0                  | 10.0.2     | 5   |
+| 6.1.0                  | 11.0.1     | 5   |
+| 6.2.0                  | 11.2.0     | 5   |
+| 7.0.0                  | 11.2.0     | 5   |

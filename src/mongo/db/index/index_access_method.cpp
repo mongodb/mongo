@@ -62,7 +62,6 @@
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
@@ -77,6 +76,7 @@
 #include "mongo/db/index/s2_bucket_access_method.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -833,7 +833,7 @@ const IndexCatalogEntry* IndexAccessMethod::BulkBuilder::yield(OperationContext*
     opCtx->recoveryUnit()->abandonSnapshot();
     collection.yield();
 
-    auto locker = opCtx->lockState();
+    auto locker = shard_role_details::getLocker(opCtx);
     Locker::LockSnapshot snapshot;
     locker->saveLockStateAndUnlock(&snapshot);
 

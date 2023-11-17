@@ -43,7 +43,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -163,14 +163,14 @@ DatabaseShardingState::ScopedSharedDatabaseShardingState DatabaseShardingState::
 DatabaseShardingState::ScopedExclusiveDatabaseShardingState
 DatabaseShardingState::assertDbLockedAndAcquireExclusive(OperationContext* opCtx,
                                                          const DatabaseName& dbName) {
-    dassert(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS));
+    dassert(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IS));
     return acquireExclusive(opCtx, dbName);
 }
 
 DatabaseShardingState::ScopedSharedDatabaseShardingState
 DatabaseShardingState::assertDbLockedAndAcquireShared(OperationContext* opCtx,
                                                       const DatabaseName& dbName) {
-    dassert(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS));
+    dassert(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IS));
     return acquireShared(opCtx, dbName);
 }
 
@@ -193,9 +193,10 @@ void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
 void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
                                                     const DatabaseVersion& receivedVersion) const {
     {
-        const auto critSecSignal = getCriticalSectionSignal(
-            opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
-                                                : ShardingMigrationCriticalSection::kRead);
+        const auto critSecSignal =
+            getCriticalSectionSignal(shard_role_details::getLocker(opCtx)->isWriteLocked()
+                                         ? ShardingMigrationCriticalSection::kWrite
+                                         : ShardingMigrationCriticalSection::kRead);
         const auto optCritSecReason = getCriticalSectionReason();
 
         uassert(StaleDbRoutingVersion(_dbName, receivedVersion, boost::none, critSecSignal),
@@ -243,7 +244,7 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx) c
 }
 
 void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
     LOGV2(7286900,
           "Setting this node's cached database info",
@@ -253,7 +254,7 @@ void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseTyp
 }
 
 void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngoingRefresh) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
     if (cancelOngoingRefresh) {
         _cancelDbMetadataRefresh();
@@ -289,12 +290,12 @@ void DatabaseShardingState::exitCriticalSectionNoChecks(OperationContext* opCtx)
 }
 
 void DatabaseShardingState::setMovePrimaryInProgress(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_X));
     _movePrimaryInProgress = true;
 }
 
 void DatabaseShardingState::unsetMovePrimaryInProgress(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
     _movePrimaryInProgress = false;
 }
 

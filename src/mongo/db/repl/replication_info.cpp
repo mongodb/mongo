@@ -66,6 +66,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/direct_shard_client_tracker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
@@ -400,7 +401,7 @@ public:
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) final {
         // Critical to monitoring and observability, categorize the command as immediate priority.
-        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+        ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
                                                             AdmissionContext::Priority::kImmediate);
 
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);

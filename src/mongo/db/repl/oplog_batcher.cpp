@@ -44,7 +44,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog.h"
@@ -347,7 +347,8 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
         OplogBatch ops(batchLimits.ops);
         try {
             auto opCtx = cc().makeOperationContext();
-            opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+            shard_role_details::getLocker(opCtx.get())
+                ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
             // During storage change operations, we may shut down storage under a global lock
             // and wait for any storage-using opCtxs to exit.  This results in a deadlock with
@@ -361,7 +362,8 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             // UninterruptibleLockGuard in batch application because the only cause of
             // interruption would be shutdown, and the ReplBatcher thread has its own shutdown
             // handling.
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+            UninterruptibleLockGuard noInterrupt(  // NOLINT.
+                shard_role_details::getLocker(opCtx.get()));
 
             // Locks the oplog to check its max size, do this in the UninterruptibleLockGuard.
             batchLimits.bytes = getBatchLimitOplogBytes(opCtx.get(), storageInterface);
@@ -438,7 +440,7 @@ std::size_t getBatchLimitOplogEntries() {
 
 std::size_t getBatchLimitOplogBytes(OperationContext* opCtx, StorageInterface* storageInterface) {
     // We can't change the timestamp source within a write unit of work.
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     auto oplogMaxSizeResult = storageInterface->getOplogMaxSize(opCtx);
     auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
     return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes.load()));

@@ -43,7 +43,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/primary_only_service.h"
@@ -130,7 +130,7 @@ boost::optional<Timestamp> _calculatePin(OperationContext* opCtx) {
     // application, which already serializes these writes.
 
     invariant(!opCtx->isEnforcingConstraints() ||
-              opCtx->lockState()->isCollectionLockedForMode(
+              shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
                   NamespaceString::kDonorReshardingOperationsNamespace, LockMode::MODE_X));
 
     // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise abandon

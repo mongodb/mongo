@@ -63,7 +63,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/delayable_timeout_callback.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
@@ -996,7 +996,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
         lk.lock();
         if (_topCoord->isSteppingDownUnconditionally()) {
-            invariant(opCtx->lockState()->isRSTLExclusive());
+            invariant(shard_role_details::getLocker(opCtx.get())->isRSTLExclusive());
             LOGV2(21481,
                   "Stepping down from primary, because we received a new config via heartbeat");
             // We need to release the mutex before yielding locks for prepared transactions, which

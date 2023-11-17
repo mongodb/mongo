@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/executor/remote_command_request.h"
@@ -53,7 +54,8 @@ void createImportDoneMarkerLocalCollection(OperationContext* opCtx, const UUID& 
 
     UnreplicatedWritesBlock writeBlock(opCtx);
     // Collections in 'local' db should not expect any lock or prepare conflicts.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowAcquisitionOfLocks(opCtx->lockState());
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowAcquisitionOfLocks(
+        shard_role_details::getLocker(opCtx));
 
     auto status = StorageInterface::get(opCtx)->createCollection(
         opCtx, getImportDoneMarkerNs(migrationId), CollectionOptions());
@@ -71,7 +73,8 @@ void dropImportDoneMarkerLocalCollection(OperationContext* opCtx, const UUID& mi
 
     UnreplicatedWritesBlock writeBlock(opCtx);
     // Collections in 'local' db should not expect any lock or prepare conflicts.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowAcquisitionOfLocks(opCtx->lockState());
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowAcquisitionOfLocks(
+        shard_role_details::getLocker(opCtx));
 
     auto status =
         StorageInterface::get(opCtx)->dropCollection(opCtx, getImportDoneMarkerNs(migrationId));
@@ -86,7 +89,8 @@ void dropImportDoneMarkerLocalCollection(OperationContext* opCtx, const UUID& mi
 void assertImportDoneMarkerLocalCollExistsOnMergeConsistent(OperationContext* opCtx,
                                                             const UUID& migrationId) {
     const auto& markerNss = getImportDoneMarkerNs(migrationId);
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowAcquisitionOfLocks(opCtx->lockState());
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowAcquisitionOfLocks(
+        shard_role_details::getLocker(opCtx));
     AutoGetCollectionForRead collection(opCtx, markerNss);
 
     // If the node is restored using cloud provider snapshot that was taken from a backup node

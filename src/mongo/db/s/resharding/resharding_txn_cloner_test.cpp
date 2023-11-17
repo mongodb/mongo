@@ -62,10 +62,10 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
@@ -502,7 +502,7 @@ protected:
             wuow.release();
 
             opCtx->recoveryUnit()->abortUnitOfWork();
-            opCtx->lockState()->endWriteUnitOfWork();
+            shard_role_details::getLocker(opCtx)->endWriteUnitOfWork();
 
             return opTime;
         }();

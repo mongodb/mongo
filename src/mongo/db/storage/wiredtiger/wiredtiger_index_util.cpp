@@ -38,7 +38,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
@@ -65,7 +65,7 @@ bool WiredTigerIndexUtil::appendCustomStats(OperationContext* opCtx,
                                             BSONObjBuilder* output,
                                             double scale,
                                             const std::string& uri) {
-    dassert(opCtx->lockState()->isReadLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     {
         BSONObjBuilder metadata(output->subobjStart("metadata"));
         Status status = WiredTigerUtil::getApplicationMetadata(opCtx, uri, &metadata);
@@ -105,7 +105,7 @@ bool WiredTigerIndexUtil::appendCustomStats(OperationContext* opCtx,
 Status WiredTigerIndexUtil::compact(OperationContext* opCtx,
                                     const std::string& uri,
                                     boost::optional<int64_t> freeSpaceTargetMB) {
-    dassert(opCtx->lockState()->isWriteLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isWriteLocked());
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     if (!cache->isEphemeral()) {
         WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();

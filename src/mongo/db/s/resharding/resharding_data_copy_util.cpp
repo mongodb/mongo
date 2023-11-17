@@ -50,10 +50,10 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
@@ -98,8 +98,8 @@ namespace mongo::resharding::data_copy {
 void ensureCollectionExists(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const CollectionOptions& options) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     writeConflictRetry(opCtx, "resharding::data_copy::ensureCollectionExists", nss, [&] {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
@@ -116,8 +116,8 @@ void ensureCollectionExists(OperationContext* opCtx,
 void ensureCollectionDropped(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<UUID>& uuid) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     writeConflictRetry(opCtx, "resharding::data_copy::ensureCollectionDropped", nss, [&] {
         AutoGetCollection coll(opCtx, nss, MODE_X);
@@ -170,8 +170,8 @@ void ensureOplogCollectionsDropped(OperationContext* opCtx,
 
 void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
                                                 const CommonReshardingMetadata& metadata) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // It is safe for resharding to drop and reacquire locks when checking for collection existence
     // because the coordinator will prevent two resharding operations from running for the same

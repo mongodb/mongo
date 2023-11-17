@@ -27,39 +27,26 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-
-#include "mongo/db/client.h"
 #include "mongo/db/locker_api.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
 
 namespace mongo {
-namespace {
 
-class TransactionResourcesNonMongoDClientObserver : public ServiceContext::ClientObserver {
-public:
-    TransactionResourcesNonMongoDClientObserver() = default;
-    ~TransactionResourcesNonMongoDClientObserver() = default;
+namespace shard_role_details {
 
-    void onCreateClient(Client* client) final {}
+void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker) {
+    opCtx->setLockState(std::move(locker));
+}
 
-    void onDestroyClient(Client* client) final {}
+std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Locker> newLocker) {
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    return opCtx->swapLockState(std::move(newLocker), lk);
+}
 
-    void onCreateOperationContext(OperationContext* opCtx) final {
-        shard_role_details::setLocker(opCtx,
-                                      std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-    }
+std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
+                                   std::unique_ptr<Locker> newLocker,
+                                   WithLock lk) {
+    return opCtx->swapLockState(std::move(newLocker), lk);
+}
 
-    void onDestroyOperationContext(OperationContext* opCtx) final {}
-};
-
-ServiceContext::ConstructorActionRegisterer transactionResourcesConstructor{
-    "TransactionResourcesConstructor", [](ServiceContext* service) {
-        service->registerClientObserver(
-            std::make_unique<TransactionResourcesNonMongoDClientObserver>());
-    }};
-
-}  // namespace
+}  // namespace shard_role_details
 }  // namespace mongo

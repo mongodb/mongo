@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/service_context.h"
@@ -82,7 +83,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         // Critical to observability and diagnosability, annotate as immediate priority.
-        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+        ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
                                                             AdmissionContext::Priority::kImmediate);
         result.append("id", repl::instanceId);
         return true;

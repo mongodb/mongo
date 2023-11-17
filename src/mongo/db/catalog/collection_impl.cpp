@@ -62,12 +62,12 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/doc_validation_util.h"
 #include "mongo/db/matcher/expression.h"
@@ -377,7 +377,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
             // commit time, otherwise it is startup and we can register immediately.
             auto svcCtx = opCtx->getClient()->getServiceContext();
             auto uuid = *collectionOptions.uuid;
-            if (opCtx->lockState()->inAWriteUnitOfWork()) {
+            if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
                 opCtx->recoveryUnit()->onCommit(
                     [svcCtx, uuid](OperationContext*, boost::optional<Timestamp>) {
                         TTLCollectionCache::get(svcCtx).registerTTLInfo(
@@ -890,7 +890,7 @@ void CollectionImpl::updateClusteredIndexTTLSetting(OperationContext* opCtx,
 Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
                                         boost::optional<long long> newCappedSize,
                                         boost::optional<long long> newCappedMax) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
 
     if (!_shared->_isCapped) {
         return Status(ErrorCodes::InvalidNamespace,
@@ -985,8 +985,8 @@ void CollectionImpl::registerCappedInserts(OperationContext* opCtx,
     // we never get here while holding an uninterruptible, read-ticketed lock. That would indicate
     // that we are operating with the wrong global lock semantics, and either hold too weak a lock
     // (e.g. IS) or that we upgraded in a way we shouldn't (e.g. IS -> IX).
-    invariant(!opCtx->lockState()->hasReadTicket() ||
-              !opCtx->lockState()->uninterruptibleLocksRequested());
+    invariant(!shard_role_details::getLocker(opCtx)->hasReadTicket() ||
+              !shard_role_details::getLocker(opCtx)->uninterruptibleLocksRequested());
 
     auto* uncommitted =
         CappedWriter::get(opCtx).getUncommitedRecordsFor(_shared->_recordStore->getIdent());
@@ -1088,7 +1088,7 @@ uint64_t CollectionImpl::getIndexFreeStorageBytes(OperationContext* const opCtx)
  * 4) re-write indexes
  */
 Status CollectionImpl::truncate(OperationContext* opCtx) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
     invariant(_indexCatalog->numIndexesInProgress() == 0);
 
     // 1) store index specs
@@ -1121,7 +1121,7 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
 }
 
 void CollectionImpl::setValidator(OperationContext* opCtx, Validator validator) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
 
     auto validatorDoc = validator.validatorDoc.getOwned();
     auto validationLevel = validationLevelOrDefault(_metadata->options.validationLevel);
@@ -1145,7 +1145,7 @@ boost::optional<ValidationActionEnum> CollectionImpl::getValidationAction() cons
 }
 
 Status CollectionImpl::setValidationLevel(OperationContext* opCtx, ValidationLevelEnum newLevel) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
 
     auto status = checkValidationOptionsCanBeUsed(_metadata->options, newLevel, boost::none);
     if (!status.isOK()) {
@@ -1176,7 +1176,7 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, ValidationLev
 
 Status CollectionImpl::setValidationAction(OperationContext* opCtx,
                                            ValidationActionEnum newAction) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
 
     auto status = checkValidationOptionsCanBeUsed(_metadata->options, boost::none, newAction);
     if (!status.isOK()) {
@@ -1209,7 +1209,7 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
                                        BSONObj newValidator,
                                        boost::optional<ValidationLevelEnum> newLevel,
                                        boost::optional<ValidationActionEnum> newAction) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
 
     auto status = checkValidationOptionsCanBeUsed(_metadata->options, newLevel, newAction);
     if (!status.isOK()) {

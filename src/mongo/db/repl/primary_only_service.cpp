@@ -48,8 +48,8 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -624,8 +624,10 @@ std::pair<boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>>, bool>
 PrimaryOnlyService::lookupInstance(OperationContext* opCtx, const InstanceID& id) {
     // If this operation is holding any database locks, then it must have opted into getting
     // interrupted at stepdown to prevent deadlocks.
-    invariant(!opCtx->lockState()->isLocked() || opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
-              opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+    invariant(
+        !shard_role_details::getLocker(opCtx)->isLocked() ||
+        opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
+        shard_role_details::getLocker(opCtx)->wasGlobalLockTakenInModeConflictingWithWrites());
 
     stdx::unique_lock lk(_mutex);
     _waitForStateNotRebuilding(opCtx, lk);
@@ -651,8 +653,10 @@ std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::g
     OperationContext* opCtx) {
     // If this operation is holding any database locks, then it must have opted into getting
     // interrupted at stepdown to prevent deadlocks.
-    invariant(!opCtx->lockState()->isLocked() || opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
-              opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+    invariant(
+        !shard_role_details::getLocker(opCtx)->isLocked() ||
+        opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
+        shard_role_details::getLocker(opCtx)->wasGlobalLockTakenInModeConflictingWithWrites());
 
     std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> instances;
 

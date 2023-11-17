@@ -35,7 +35,7 @@
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/authz_session_external_state_d.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -50,7 +50,7 @@ AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
 
 void AuthzSessionExternalStateMongod::startRequest(OperationContext* opCtx) {
     // No locks should be held as this happens before any database accesses occur
-    dassert(!opCtx->lockState()->isLocked());
+    dassert(!shard_role_details::getLocker(opCtx)->isLocked());
 
     _checkShouldAllowLocalhost(opCtx);
 }

@@ -52,8 +52,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
@@ -947,7 +947,7 @@ public:
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-        opCtx->lockState()->setDebugInfo(redact(_request.body).toString());
+        shard_role_details::getLocker(opCtx)->setDebugInfo(redact(_request.body).toString());
         bool ok = _command->runWithReplyBuilder(opCtx, _dbName, _request.body, result);
         if (!ok) {
             BSONObjBuilder bob = result->getBodyBuilder();

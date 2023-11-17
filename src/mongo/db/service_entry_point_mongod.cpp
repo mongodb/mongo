@@ -44,9 +44,8 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_concern.h"
@@ -200,7 +199,7 @@ public:
         // transactions will do a noop write at commit time, which should have incremented the
         // lastOp. And speculative majority semantics dictate that "abortTransaction" should not
         // wait for write concern on operations the transaction observed.
-        if (opCtx->lockState()->wasGlobalLockTakenForWrite() &&
+        if (shard_role_details::getLocker(opCtx)->wasGlobalLockTakenForWrite() &&
             !opCtx->inMultiDocumentTransaction()) {
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
             lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -225,8 +224,8 @@ public:
     }
 
     void waitForLinearizableReadConcern(OperationContext* opCtx) const override {
-        // When a linearizable read command is passed in, check to make sure we're reading
-        // from the primary.
+        // When a linearizable read command is passed in, check to make sure we're reading from the
+        // primary.
         if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
             repl::ReadConcernLevel::kLinearizableReadConcern) {
             uassertStatusOK(mongo::waitForLinearizableReadConcern(opCtx, Milliseconds::zero()));
@@ -291,8 +290,9 @@ public:
     void resetLockerState(OperationContext* opCtx) const noexcept override {
         // It is necessary to lock the client to change the Locker on the OperationContext.
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        invariant(!opCtx->lockState()->isLocked());
-        opCtx->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()), lk);
+        invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+        shard_role_details::swapLocker(
+            opCtx, std::make_unique<LockerImpl>(opCtx->getServiceContext()), lk);
     }
 
     std::unique_ptr<PolymorphicScoped> scopedOperationCompletionShardingActions(

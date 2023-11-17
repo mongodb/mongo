@@ -58,7 +58,6 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -66,6 +65,7 @@
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_client_sharded.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -365,7 +365,7 @@ void ShardingInitializationMongoD::shutDown(OperationContext* opCtx) {
 }
 
 bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(OperationContext* opCtx) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     // In sharded queryableBackupMode mode, we ignore the shardIdentity document on disk and instead
     // *require* a shardIdentity document to be passed through --overrideShardIdentity
@@ -471,7 +471,7 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
 void ShardingInitializationMongoD::initializeFromShardIdentity(
     OperationContext* opCtx, const ShardIdentityType& shardIdentity) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
-    invariant(opCtx->lockState()->isLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isLocked());
 
     uassertStatusOKWithContext(
         shardIdentity.validate(),

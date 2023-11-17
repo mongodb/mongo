@@ -43,7 +43,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/hello_response.h"
@@ -465,7 +465,7 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(OperationContext* opCtx, Date
 void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) noexcept {
     // Writes that occur in code paths that call signalDrainComplete are expected to have Immediate
     // priority.
-    ScopedAdmissionPriorityForLock priority(opCtx->lockState(),
+    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
                                             AdmissionContext::Priority::kImmediate);
     getExternalState()->setFirstOpTimeOfMyTerm(OpTime(Timestamp(1, 1), getReplCoord()->getTerm()));
     getReplCoord()->signalDrainComplete(opCtx, getReplCoord()->getTerm());

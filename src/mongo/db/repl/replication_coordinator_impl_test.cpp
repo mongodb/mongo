@@ -50,9 +50,8 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
@@ -2222,9 +2221,9 @@ TEST_F(StepDownTest,
     // Make sure stepDown cannot grab the RSTL in mode X. We need to use a different
     // locker to test this, or otherwise stepDown will be granted the lock automatically.
     ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
-    ASSERT_TRUE(opCtx->lockState()->isRSTLExclusive());
-    auto locker =
-        getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->isRSTLExclusive());
+    auto locker = shard_role_details::swapLocker(
+        opCtx.get(), std::make_unique<LockerImpl>(opCtx->getServiceContext()));
 
     ASSERT_THROWS_CODE(
         getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000)),
@@ -2233,9 +2232,9 @@ TEST_F(StepDownTest,
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     ASSERT_TRUE(locker->isRSTLExclusive());
-    ASSERT_FALSE(opCtx->lockState()->isRSTLLocked());
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->isRSTLLocked());
 
-    getClient()->swapLockState(std::move(locker));
+    shard_role_details::swapLocker(opCtx.get(), std::move(locker));
 }
 
 /* Step Down Test for a 5-node replica set */

@@ -62,12 +62,12 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -824,7 +824,8 @@ public:
                 // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
                 // depend on data reaching secondaries in order to proceed; and secondaries may get
                 // stalled replicating because of an inability to acquire a read ticket.
-                opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+                shard_role_details::getLocker(opCtx)->setAdmissionPriority(
+                    AdmissionContext::Priority::kImmediate);
             }
 
             // Perform validation checks which don't cause the cursor to be deleted on failure.

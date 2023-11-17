@@ -60,9 +60,9 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -646,7 +646,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
 
 void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
                                                 const DatabaseName& dbName) {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
 
     if (dbName == DatabaseName::kLocal) {
         // Collections in the local database are not replicated, so we do not need an _id index on
@@ -693,7 +693,7 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
 }
 
 void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName) {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, dbName);
     invariant(db);

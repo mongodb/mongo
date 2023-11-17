@@ -40,8 +40,8 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -81,7 +81,7 @@ void PlanStageTestFixture::prepareTree(CompileCtx* ctx, PlanStage* root) {
     // We want to avoid recursive locking since this results in yield plans that don't yield when
     // they should.
     boost::optional<Lock::GlobalLock> globalLock;
-    if (!operationContext()->lockState()->isLocked()) {
+    if (!shard_role_details::getLocker(operationContext())->isLocked()) {
         globalLock.emplace(operationContext(), MODE_IS);
     }
     if (_yieldPolicy) {

@@ -44,8 +44,8 @@
 #include "mongo/db/collection_type.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/top.h"
@@ -519,7 +519,7 @@ public:
         // to call abandonSnapshot() to close any open transactions on destruction. Any reads or
         // writes should have already completed as we are exiting the scope. Therefore, this call is
         // safe.
-        if (_opCtx->lockState()->isLocked()) {
+        if (shard_role_details::getLocker(_opCtx)->isLocked()) {
             _opCtx->recoveryUnit()->abandonSnapshot();
         }
         // It is illegal to call setPrepareConflictBehavior() while any storage transaction is

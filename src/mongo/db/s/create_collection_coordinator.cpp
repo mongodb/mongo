@@ -63,10 +63,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -1193,7 +1193,7 @@ boost::optional<CreateCollectionResponse> commit(
 
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         {
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+            UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
                 ->clearFilteringMetadata(opCtx);

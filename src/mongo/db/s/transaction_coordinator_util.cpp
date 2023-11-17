@@ -53,9 +53,9 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -401,7 +401,8 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
     // drains any outstanding cross-shard transactions before completing an FCV upgrade/downgrade.
     // It does so by waiting for the participant portion of the cross-shard transaction to have
     // released its FCV IX lock.
-    ShouldNotConflictWithSetFeatureCompatibilityVersionBlock noFCVLock{opCtx->lockState()};
+    ShouldNotConflictWithSetFeatureCompatibilityVersionBlock noFCVLock{
+        shard_role_details::getLocker(opCtx)};
     DBDirectClient client(opCtx);
 
     // Throws if serializing the request or deserializing the response fails.
@@ -487,26 +488,26 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
         boost::none /* no need for a backoff */,
         [](const StatusWith<repl::OpTime>& s) { return shouldRetryPersistingCoordinatorState(s); },
         [&scheduler, lsid, txnNumberAndRetryCounter, participants, decision, affectedNamespaces] {
-            return scheduler.scheduleWork(
-                [lsid,
-                 txnNumberAndRetryCounter,
-                 participants = participants,
-                 decision,
-                 affectedNamespaces = affectedNamespaces](OperationContext* opCtx) mutable {
-                    // Do not acquire a storage ticket in order to avoid unnecessary serialization
-                    // with other prepared transactions that are holding a storage ticket
-                    // themselves; see SERVER-60682.
-                    ScopedAdmissionPriorityForLock setTicketAquisition(
-                        opCtx->lockState(), AdmissionContext::Priority::kImmediate);
-                    getTransactionCoordinatorWorkerCurOpRepository()->set(
-                        opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kWritingDecision);
-                    return persistDecisionBlocking(opCtx,
-                                                   lsid,
-                                                   txnNumberAndRetryCounter,
-                                                   std::move(participants),
-                                                   decision,
-                                                   std::move(affectedNamespaces));
-                });
+            return scheduler.scheduleWork([lsid,
+                                           txnNumberAndRetryCounter,
+                                           participants = participants,
+                                           decision,
+                                           affectedNamespaces = affectedNamespaces](
+                                              OperationContext* opCtx) mutable {
+                // Do not acquire a storage ticket in order to avoid unnecessary serialization
+                // with other prepared transactions that are holding a storage ticket
+                // themselves; see SERVER-60682.
+                ScopedAdmissionPriorityForLock setTicketAquisition(
+                    shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kImmediate);
+                getTransactionCoordinatorWorkerCurOpRepository()->set(
+                    opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kWritingDecision);
+                return persistDecisionBlocking(opCtx,
+                                               lsid,
+                                               txnNumberAndRetryCounter,
+                                               std::move(participants),
+                                               decision,
+                                               std::move(affectedNamespaces));
+            });
         });
 }
 

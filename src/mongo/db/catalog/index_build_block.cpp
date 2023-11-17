@@ -44,10 +44,10 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_index_usage_tracker.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/skipped_record_tracker.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -138,7 +138,7 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
 
 Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bool forRecovery) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // need this first for names, etc...
     BSONObj keyPattern = _spec.getObjectField("key");
@@ -197,7 +197,7 @@ IndexBuildBlock::~IndexBuildBlock() {
 
 void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // Audit that the index build is being aborted.
     audit::logCreateIndex(opCtx->getClient(),
@@ -222,7 +222,7 @@ void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
 
 void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, collection->ns());
 

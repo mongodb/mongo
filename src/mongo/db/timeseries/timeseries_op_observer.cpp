@@ -42,7 +42,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
@@ -72,7 +72,7 @@ void TimeSeriesOpObserver::onInserts(OperationContext* opCtx,
     // DOES need to be -- that will cause correctness issues). Additionally, if the user tried
     // to insert measurements with dates outside the standard range, chances are they will do so
     // again, and we will have only set the flag a little early.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);
     auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, nss);

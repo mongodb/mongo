@@ -93,9 +93,9 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -2561,7 +2561,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
         return swPinnedTimestamp;
     }
 
-    if (opCtx->lockState()->inAWriteUnitOfWork()) {
+    if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
         // If we've moved the pin and are in a `WriteUnitOfWork`, assume the caller has a write that
         // should be atomic with this pin request. If the `WriteUnitOfWork` is rolled back, either
         // unpin the oldest timestamp or repin the previous value.

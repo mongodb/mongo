@@ -60,8 +60,8 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/resource_catalog.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
@@ -529,7 +529,7 @@ public:
             *batchedCatalogWriteInstance, std::move(clone), boost::none);
 
         // Nothing more to do if we are not in a WUOW.
-        if (!opCtx->lockState()->inAWriteUnitOfWork()) {
+        if (!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
             return;
         }
 
@@ -651,7 +651,7 @@ std::shared_ptr<const CollectionCatalog> CollectionCatalog::latest(OperationCont
     // threads always results in the non-batched write branch to be taken. Futhermore, the second
     // part of the condition is checking the lock state will give us sequentially consistent
     // ordering.
-    if (ongoingBatchedWrite.loadRelaxed() && opCtx->lockState()->isW()) {
+    if (ongoingBatchedWrite.loadRelaxed() && shard_role_details::getLocker(opCtx)->isW()) {
         return batchedCatalogWriteInstance;
     }
 
@@ -796,13 +796,13 @@ void CollectionCatalog::write(OperationContext* opCtx,
     // because normal operations calling this will all be serialized, but
     // BatchedCollectionCatalogWriter skips this mechanism as it knows it is the sole user of the
     // server by holding a Global MODE_X lock.
-    invariant(opCtx->lockState()->isLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isLocked());
 
     // If global MODE_X lock are held we can re-use a cloned CollectionCatalog instance when
     // 'ongoingBatchedWrite' and 'batchedCatalogWriteInstance' are set. Make sure we are the one
     // holding the write lock.
     if (ongoingBatchedWrite.load()) {
-        invariant(opCtx->lockState()->isW());
+        invariant(shard_role_details::getLocker(opCtx)->isW());
         job(*batchedCatalogWriteInstance);
         return;
     }
@@ -818,8 +818,8 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
                                      const BSONObj& collation,
                                      ViewsForDatabase::Durability durability) const {
     invariant(durability == ViewsForDatabase::Durability::kAlreadyDurable ||
-              opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
-    invariant(opCtx->lockState()->isCollectionLockedForMode(
+              shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(viewName, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
 
     invariant(_viewsForDatabase.find(viewName.dbName()));
@@ -867,8 +867,8 @@ Status CollectionCatalog::modifyView(
     const NamespaceString& viewOn,
     const BSONArray& pipeline,
     const ViewsForDatabase::PipelineValidatorFn& validatePipeline) const {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_X));
-    invariant(opCtx->lockState()->isCollectionLockedForMode(
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(viewName, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
     invariant(_viewsForDatabase.find(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
@@ -913,8 +913,8 @@ Status CollectionCatalog::modifyView(
 }
 
 Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceString& viewName) const {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
-    invariant(opCtx->lockState()->isCollectionLockedForMode(
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(viewName, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
     invariant(_viewsForDatabase.find(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
@@ -1537,7 +1537,7 @@ void CollectionCatalog::dropCollection(OperationContext* opCtx,
 }
 
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, DatabaseName dbName) {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_X));
     ResourceCatalog::get().remove({RESOURCE_DATABASE, dbName}, dbName);
     _viewsForDatabase = _viewsForDatabase.erase(dbName);
 }
@@ -1599,7 +1599,8 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
 
         auto nss = uncommittedPtr->ns();
         // If the collection is newly created, invariant on the collection being locked in MODE_IX.
-        invariant(!newColl || opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX),
+        invariant(!newColl ||
+                      shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX),
                   nss.toStringForErrorMsg());
         return uncommittedPtr.get();
     }
@@ -1612,7 +1613,7 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
     if (coll->ns().isOplog())
         return coll.get();
 
-    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(coll->ns(), MODE_X));
 
     // Skip cloning and return directly if allowed.
     if (_alreadyClonedForBatchedWriter(coll)) {
@@ -1715,7 +1716,8 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     // exists.
     if (uncommittedPtr) {
         // If the collection is newly created, invariant on the collection being locked in MODE_IX.
-        invariant(!newColl || opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX),
+        invariant(!newColl ||
+                      shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX),
                   nss.toStringForErrorMsg());
         return uncommittedPtr.get();
     }
@@ -1731,7 +1733,7 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     if (!coll)
         return nullptr;
 
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X));
 
     // Skip cloning and return directly if allowed.
     if (_alreadyClonedForBatchedWriter(coll)) {
@@ -1983,7 +1985,7 @@ std::vector<UUID> CollectionCatalog::getAllCollectionUUIDsFromDb(const DatabaseN
 
 std::vector<NamespaceString> CollectionCatalog::getAllCollectionNamesFromDb(
     OperationContext* opCtx, const DatabaseName& dbName) const {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_S));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_S));
 
     std::vector<NamespaceString> ret;
     for (auto it = _orderedCollections.lower_bound(std::make_pair(dbName, minUuid));
@@ -2110,7 +2112,7 @@ CollectionCatalog::ViewCatalogSet CollectionCatalog::getViewCatalogDbNames(
 void CollectionCatalog::registerCollection(OperationContext* opCtx,
                                            std::shared_ptr<Collection> coll,
                                            boost::optional<Timestamp> commitTime) {
-    invariant(opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(opCtx)->isW());
 
     const auto& nss = coll->ns();
 
@@ -2249,7 +2251,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
 
 void CollectionCatalog::registerUncommittedView(OperationContext* opCtx,
                                                 const NamespaceString& nss) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(nss.dbName()), MODE_X));
 
     // Since writing to system.views requires an X lock, we only need to cross-check collection
@@ -2331,7 +2333,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
 }
 
 void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& dbName) const {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(dbName), MODE_X));
 
     const ViewsForDatabase* viewsForDbPtr = _viewsForDatabase.find(dbName);
@@ -2380,9 +2382,9 @@ void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext
 bool CollectionCatalog::hasExclusiveAccessToCollection(OperationContext* opCtx,
                                                        const NamespaceString& nss) {
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    return opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X) ||
+    return shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X) ||
         (uncommittedCatalogUpdates.isCreatedCollection(opCtx, nss) &&
-         opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+         shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
 }
 
 const Collection* CollectionCatalog::_lookupSystemViews(OperationContext* opCtx,
@@ -2430,7 +2432,7 @@ bool CollectionCatalog::_alreadyClonedForBatchedWriter(
 
 BatchedCollectionCatalogWriter::BatchedCollectionCatalogWriter(OperationContext* opCtx)
     : _opCtx(opCtx) {
-    invariant(_opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(_opCtx)->isW());
     invariant(!batchedCatalogWriteInstance);
     invariant(batchedCatalogClonedCollections.empty());
 
@@ -2444,7 +2446,7 @@ BatchedCollectionCatalogWriter::BatchedCollectionCatalogWriter(OperationContext*
     ongoingBatchedWrite.store(true);
 }
 BatchedCollectionCatalogWriter::~BatchedCollectionCatalogWriter() {
-    invariant(_opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(_opCtx)->isW());
     invariant(_batchedInstance == batchedCatalogWriteInstance.get());
 
     // Publish out batched instance, validate that no other writers have been able to write during

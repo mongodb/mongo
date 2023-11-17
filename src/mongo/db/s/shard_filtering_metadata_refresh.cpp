@@ -48,9 +48,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -156,14 +156,14 @@ bool joinDbVersionOperation(OperationContext* opCtx,
 Status refreshDbMetadata(OperationContext* opCtx,
                          const DatabaseName& dbName,
                          CancellationToken cancellationToken) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
     ScopeGuard resetRefreshFutureOnError([&] {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         // Can be uninterruptible because the work done under it can never block.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
         auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
         scopedDss->resetDbMetadataRefreshFuture();
     });
@@ -255,7 +255,7 @@ SharedSemiFuture<void> recoverRefreshDbVersion(OperationContext* opCtx,
 void onDbVersionMismatch(OperationContext* opCtx,
                          const DatabaseName& dbName,
                          boost::optional<DatabaseVersion> receivedDbVersion) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
@@ -419,7 +419,8 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
             ScopeGuard resetRefreshFutureOnError([&] {
                 // TODO (SERVER-71444): Fix to be interruptible or document exception.
                 // Can be uninterruptible because the work done under it can never block
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                UninterruptibleLockGuard noInterrupt(  // NOLINT.
+                    shard_role_details::getLocker(opCtx));
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
                 scopedCsr->resetPlacementVersionRecoverRefreshFuture();
             });
@@ -534,7 +535,7 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
 void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           boost::optional<ChunkVersion> chunkVersionReceived) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
@@ -560,7 +561,7 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
             // The refresh threads do not perform any data reads themselves, therefore they don't
             // need to go through admission control.
             ScopedAdmissionPriorityForLock skipAdmissionControl(
-                opCtx->lockState(), AdmissionContext::Priority::kImmediate);
+                shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kImmediate);
 
             boost::optional<Lock::DBLock> dbLock;
             boost::optional<Lock::CollectionLock> collLock;
@@ -638,7 +639,7 @@ Status onCollectionPlacementVersionMismatchNoExcept(
 }
 
 CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const NamespaceString& nss) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
@@ -669,7 +670,7 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
 
 ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
                                                 const NamespaceString& nss) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {

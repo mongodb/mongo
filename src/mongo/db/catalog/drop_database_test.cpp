@@ -48,9 +48,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
@@ -104,7 +104,7 @@ public:
 };
 
 void OpObserverMock::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
-    ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     OpObserverNoop::onDropDatabase(opCtx, dbName);
     // Do not update 'droppedDatabaseNames' if OpObserverNoop::onDropDatabase() throws.
     droppedDatabaseNames.insert(dbName);
@@ -116,7 +116,7 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               std::uint64_t numRecords,
                                               const CollectionDropType dropType,
                                               bool markFromMigrate) {
-    ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     auto opTime = OpObserverNoop::onDropCollection(
         opCtx, collectionName, uuid, numRecords, dropType, markFromMigrate);
     invariant(opTime.isNull());

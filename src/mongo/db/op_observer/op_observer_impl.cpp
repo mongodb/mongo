@@ -55,9 +55,9 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
@@ -1222,7 +1222,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
 
     // Make sure the UUID values in the Collection metadata, the Collection object, and the UUID
     // catalog are all present and equal.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X));
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, nss.dbName());
     // Some unit tests call the op observer on an unregistered Database.
@@ -1526,17 +1526,17 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
     // There should not be a parent WUOW outside of this one. This guarantees the safety of the
     // write conflict retry loop.
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // We must not have a maximum lock timeout, since writing the commit or abort oplog entry for a
     // prepared transaction must always succeed.
-    invariant(!opCtx->lockState()->hasMaxLockTimeout());
+    invariant(!shard_role_details::getLocker(opCtx)->hasMaxLockTimeout());
 
     writeConflictRetry(
         opCtx, "onPreparedTransactionCommitOrAbort", NamespaceString::kRsOplogNamespace, [&] {
             // Writes to the oplog only require a Global intent lock. Guaranteed by
             // OplogSlotReserver.
-            invariant(opCtx->lockState()->isWriteLocked());
+            invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
             WriteUnitOfWork wuow(opCtx);
             const auto oplogOpTime =
@@ -1599,11 +1599,11 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
     // exception. In order to safely allow exceptions to be thrown at that point, this function must
     // be called from an outer WriteUnitOfWork in order to be rolled back upon reaching the
     // exception.
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // Writes to the oplog only require a Global intent lock. Guaranteed by
     // OplogSlotReserver.
-    invariant(opCtx->lockState()->isWriteLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
     if (const auto& info = applyOpsOplogSlotAndOperationAssignment;
         info.applyOpsEntries.size() > 1U ||           // partial transaction
@@ -1715,11 +1715,11 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     // exception. In order to safely allow exceptions to be thrown at that point, this function must
     // be called from an outer WriteUnitOfWork in order to be rolled back upon reaching the
     // exception.
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // Writes to the oplog only require a Global intent lock. Guaranteed by
     // OplogSlotReserver.
-    invariant(opCtx->lockState()->isWriteLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
     // Batched writes do not violate the multiple timestamp constraint because they do not
     // replicate over multiple applyOps oplog entries or write pre/post images to the
@@ -1819,7 +1819,7 @@ void OpObserverImpl::onTransactionPrepare(
 
     // Writes to the oplog only require a Global intent lock. Guaranteed by
     // OplogSlotReserver.
-    invariant(opCtx->lockState()->isWriteLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
     // It is possible that the transaction resulted in no changes, In that case, we
     // should not write any operations other than the prepare oplog entry.
@@ -1828,11 +1828,11 @@ void OpObserverImpl::onTransactionPrepare(
         // throw an exception. In order to safely allow exceptions to be thrown at that
         // point, this function must be called from an outer WriteUnitOfWork in order to
         // be rolled back upon reaching the exception.
-        invariant(opCtx->lockState()->inAWriteUnitOfWork());
+        invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
         // Writes to the oplog only require a Global intent lock. Guaranteed by
         // OplogSlotReserver.
-        invariant(opCtx->lockState()->isWriteLocked());
+        invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
         if (applyOpsOperationAssignment.applyOpsEntries.size() > 1U) {
             // Partial transactions create/reserve multiple oplog entries in the same

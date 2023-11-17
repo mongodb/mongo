@@ -67,10 +67,10 @@
 #include "mongo/db/catalog/validate_state.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
@@ -367,7 +367,8 @@ void _reportValidationResults(OperationContext* opCtx,
     results->readTimestamp = validateState->getValidateTimestamp();
 
     if (validateState->isFullIndexValidation()) {
-        invariant(opCtx->lockState()->isCollectionLockedForMode(validateState->nss(), MODE_X));
+        invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+            validateState->nss(), MODE_X));
     }
 
     BSONObjBuilder keysPerIndex;
@@ -580,7 +581,7 @@ Status validate(OperationContext* opCtx,
                 BSONObjBuilder* output,
                 bool logDiagnostics,
                 const SerializationContext& sc) {
-    invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair);
 
     // This is deliberately outside of the try-catch block, so that any errors thrown in the
     // constructor fail the cmd, as opposed to returning OK with valid:false.
@@ -631,7 +632,8 @@ Status validate(OperationContext* opCtx,
 
     try {
         invariant(!validateState.isFullIndexValidation() ||
-                  opCtx->lockState()->isCollectionLockedForMode(validateState.nss(), MODE_X));
+                  shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                      validateState.nss(), MODE_X));
 
         // Record store validation code is executed before we open cursors because it may close
         // and/or invalidate all open cursors.

@@ -41,8 +41,8 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -182,7 +182,7 @@ void WiredTigerColumnStore::insert(OperationContext* opCtx,
 void WiredTigerColumnStore::WriteCursor::insert(PathView path, RowId rid, CellView cell) {
     // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
     // (global MODE_IS).
-    dassert(_opCtx->lockState()->isLocked());
+    dassert(shard_role_details::getLocker(_opCtx)->isLocked());
 
     auto key = makeKey(path, rid);
     auto keyItem = WiredTigerItem(key);
@@ -206,7 +206,7 @@ void WiredTigerColumnStore::remove(OperationContext* opCtx, PathView path, RowId
 void WiredTigerColumnStore::WriteCursor::remove(PathView path, RowId rid) {
     // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
     // (global MODE_IS).
-    dassert(_opCtx->lockState()->isLocked());
+    dassert(shard_role_details::getLocker(_opCtx)->isLocked());
 
     auto key = makeKey(path, rid);
     auto keyItem = WiredTigerItem(key);
@@ -229,7 +229,7 @@ void WiredTigerColumnStore::update(OperationContext* opCtx,
 void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellView cell) {
     // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
     // (global MODE_IS).
-    dassert(_opCtx->lockState()->isLocked());
+    dassert(shard_role_details::getLocker(_opCtx)->isLocked());
 
     auto key = makeKey(path, rid);
     auto keyItem = WiredTigerItem(key);
@@ -247,7 +247,7 @@ void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellVi
 }
 
 IndexValidateResults WiredTigerColumnStore::validate(OperationContext* opCtx, bool full) const {
-    dassert(opCtx->lockState()->isReadLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
 
     IndexValidateResults results;
 
@@ -537,7 +537,7 @@ bool WiredTigerColumnStore::isEmpty(OperationContext* opCtx) {
 }
 
 long long WiredTigerColumnStore::getSpaceUsedBytes(OperationContext* opCtx) const {
-    dassert(opCtx->lockState()->isReadLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
     WT_SESSION* s = ru->getSession()->getSession();
 
@@ -548,7 +548,7 @@ long long WiredTigerColumnStore::getSpaceUsedBytes(OperationContext* opCtx) cons
 }
 
 long long WiredTigerColumnStore::getFreeStorageBytes(OperationContext* opCtx) const {
-    dassert(opCtx->lockState()->isReadLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
     WiredTigerSession* session = ru->getSession();
 

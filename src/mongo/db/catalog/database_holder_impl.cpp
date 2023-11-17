@@ -51,8 +51,8 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -77,8 +77,8 @@ Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, const DatabaseName&
             "invalid db name: " + dbName.toStringForErrorMsg(),
             DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
 
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS) ||
-              (dbName.isLocalDB() && opCtx->lockState()->isLocked()));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IS) ||
+              (dbName.isLocalDB() && shard_role_details::getLocker(opCtx)->isLocked()));
 
     stdx::lock_guard<SimpleMutex> lk(_m);
 
@@ -127,7 +127,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     uassert(6198701,
             "invalid db name: " + dbName.toStringForErrorMsg(),
             DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
 
     if (justCreated)
         *justCreated = false;  // Until proven otherwise.
@@ -191,14 +191,14 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
 
 void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
     invariant(db);
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // Store the name so we have if for after the db object is deleted
     auto name = db->name();
 
     LOGV2_DEBUG(20310, 1, "dropDatabase {name}", "name"_attr = name);
 
-    invariant(opCtx->lockState()->isDbLockedForMode(name, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(name, MODE_X));
 
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& coll : catalog->range(name)) {
@@ -261,7 +261,7 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, const DatabaseName& dbNa
     uassert(6198700,
             "invalid db name: " + dbName.toStringForErrorMsg(),
             DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_X));
 
     stdx::lock_guard<SimpleMutex> lk(_m);
 
@@ -278,7 +278,7 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, const DatabaseName& dbNa
 }
 
 void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(opCtx)->isW());
 
     while (true) {
         std::vector<DatabaseName> dbs;

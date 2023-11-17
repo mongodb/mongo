@@ -43,9 +43,9 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/delete_request_gen.h"
@@ -131,7 +131,7 @@ Status ReshardingOplogApplicationRules::applyOperation(
     const repl::OplogEntry& op) const {
     LOGV2_DEBUG(49901, 3, "Applying op for resharding", "op"_attr = redact(op.toBSONForLogging()));
 
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     invariant(opCtx->writesAreReplicated());
 
     return writeConflictRetry(opCtx, "applyOplogEntryCRUDOpResharding", op.getNss(), [&] {

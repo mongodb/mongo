@@ -41,8 +41,8 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -167,7 +167,7 @@ Status NoopWriter::startWritingPeriodicNoops(OpTime lastKnownOpTime) {
             // Noop writes are critical for the cluster stability, so we mark it as having Immediate
             // priority. As a result it will skip both flow control and waiting for ticket
             // acquisition.
-            ScopedAdmissionPriorityForLock priority(opCtx->lockState(),
+            ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
                                                     AdmissionContext::Priority::kImmediate);
             _writeNoop(opCtx);
         });

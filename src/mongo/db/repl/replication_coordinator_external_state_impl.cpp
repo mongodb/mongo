@@ -61,11 +61,11 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
@@ -492,8 +492,9 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
 }
 
 void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* opCtx) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(opCtx->lockState()->getAdmissionPriority() == AdmissionContext::Priority::kImmediate,
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(shard_role_details::getLocker(opCtx)->getAdmissionPriority() ==
+                  AdmissionContext::Priority::kImmediate,
               "Replica Set state changes are critical to the cluster and should not be throttled");
 
     if (_oplogBuffer) {
@@ -502,8 +503,9 @@ void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* 
 }
 
 OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isRSTLExclusive());
-    invariant(opCtx->lockState()->getAdmissionPriority() == AdmissionContext::Priority::kImmediate,
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
+    invariant(shard_role_details::getLocker(opCtx)->getAdmissionPriority() ==
+                  AdmissionContext::Priority::kImmediate,
               "Replica Set state changes are critical to the cluster and should not be throttled");
 
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -745,7 +747,8 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     OperationContext* opCtx, const LastVote& lastVote) {
     BSONObj lastVoteObj = lastVote.toBSON();
 
-    invariant(opCtx->lockState()->getAdmissionPriority() == AdmissionContext::Priority::kImmediate,
+    invariant(shard_role_details::getLocker(opCtx)->getAdmissionPriority() ==
+                  AdmissionContext::Priority::kImmediate,
               "Writes that are part of elections should not be throttled");
 
     try {
@@ -762,7 +765,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
 
         boost::optional<UninterruptibleLockGuard> noInterrupt;
         if (replCoord->isInPrimaryOrSecondaryState_UNSAFE())
-            noInterrupt.emplace(opCtx->lockState());
+            noInterrupt.emplace(shard_role_details::getLocker(opCtx));
 
         Status status = writeConflictRetry(
             opCtx, "save replica set lastVote", NamespaceString::kLastVoteNamespace, [&] {
@@ -920,7 +923,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
     // As opCtx does not expose a method to allow skipping flow control on purpose we mark the
     // operation as having Immediate priority. This will skip flow control and ticket acquisition.
     // It is fine to do this since the system is essentially shutting down at this point.
-    ScopedAdmissionPriorityForLock priority(opCtx->lockState(),
+    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
                                             AdmissionContext::Priority::kImmediate);
 
     // Tell the system to stop updating the oplogTruncateAfterPoint asynchronously and to go

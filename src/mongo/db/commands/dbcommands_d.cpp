@@ -57,7 +57,6 @@
 #include "mongo/db/commands/set_profiling_filter_globally_cmd.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"

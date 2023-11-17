@@ -86,7 +86,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
@@ -95,6 +94,7 @@
 #include "mongo/db/global_index.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
@@ -229,7 +229,7 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
                                const CollectionPtr& oplogCollection,
                                std::vector<Record>* records,
                                const std::vector<Timestamp>& timestamps) {
-    invariant(opCtx->lockState()->isWriteLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
     Status status = oplogCollection->getRecordStore()->insertRecords(opCtx, records, timestamps);
     if (!status.isOK())
@@ -278,7 +278,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
                             OplogApplication::Mode mode) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(indexNss, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(indexNss, MODE_X));
 
     // Check if collection exists.
     auto databaseHolder = DatabaseHolder::get(opCtx);
@@ -382,7 +382,8 @@ void writeToImageCollection(OperationContext* opCtx,
     // In practice, this lock acquisition on kConfigImagesNamespace cannot block. The only time a
     // stronger lock acquisition is taken on this namespace is during step up to create the
     // collection.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+        shard_role_details::getLocker(opCtx));
     auto collection = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
@@ -1473,12 +1474,14 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 collection);
         requestNss = collection->ns();
         dassert(requestNss == collectionAcquisition.nss());
-        dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX));
+        dassert(
+            shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(requestNss, MODE_IX));
     } else {
         requestNss = op.getNss();
         invariant(requestNss.coll().size());
-        dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX),
-                requestNss.toStringForErrorMsg());
+        dassert(
+            shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(requestNss, MODE_IX),
+            requestNss.toStringForErrorMsg());
     }
 
     const CollectionPtr& collection = collectionAcquisition.getCollectionPtr();
@@ -1506,7 +1509,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
         o2 = op.getObject2().value();
 
     const IndexCatalog* indexCatalog = !collection ? nullptr : collection->getIndexCatalog();
-    const bool haveWrappingWriteUnitOfWork = opCtx->lockState()->inAWriteUnitOfWork();
+    const bool haveWrappingWriteUnitOfWork =
+        shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork();
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "applyOps not supported on view: " << requestNss.toStringForErrorMsg(),
             collection || !CollectionCatalog::get(opCtx)->lookupView(opCtx, requestNss));
@@ -2354,7 +2358,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                 "aborting index build and retrying",
                                 logAttrs(ns));
                 } else {
-                    invariant(!opCtx->lockState()->isLocked());
+                    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
                     auto swUUID = op->getUuid();
                     if (!swUUID) {
@@ -2470,7 +2474,7 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx) {
 }
 
 void establishOplogCollectionForLogging(OperationContext* opCtx, const Collection* oplog) {
-    invariant(opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(opCtx)->isW());
     invariant(oplog);
     LocalOplogInfo::get(opCtx)->setCollection(oplog);
 }

@@ -62,7 +62,6 @@
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/global_settings.h"
@@ -71,6 +70,7 @@
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/s2_bucket_access_method.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -277,7 +277,7 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
             if (feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 !collection->isCapped()) {
-                if (opCtx->lockState()->inAWriteUnitOfWork()) {
+                if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
                     opCtx->recoveryUnit()->onCommit(
                         [svcCtx = opCtx->getServiceContext(),
                          uuid = collection->uuid(),
@@ -448,7 +448,8 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
                                          const CollectionPtr& collection,
                                          long long numIndexesInCollectionCatalogEntry,
                                          const std::vector<std::string>& indexNamesToDrop) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
+    invariant(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_X));
 
     LOGV2_ERROR(20365,
                 "Internal Index Catalog state",
@@ -1331,8 +1332,9 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
 Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx,
                                                          Collection* collection,
                                                          IndexCatalogEntry* entry) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     const std::string indexName = entry->descriptor()->indexName();
 

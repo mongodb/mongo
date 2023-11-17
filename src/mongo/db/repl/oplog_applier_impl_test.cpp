@@ -75,11 +75,11 @@
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -596,7 +596,7 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommand) {
                                             const BSONObj&) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+        ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
         ASSERT_EQUALS(nss, collNss);
         return Status::OK();
     };
@@ -622,7 +622,7 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenant) {
                                             const BSONObj&) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+        ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
         ASSERT_TRUE(collNss.tenantId());
         ASSERT_EQ(tid, collNss.tenantId().get());
         ASSERT_EQUALS(nss, collNss);
@@ -657,7 +657,7 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantRequireTenantIDFa
                                             const BSONObj&) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+        ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
         ASSERT_TRUE(collNss.tenantId());
         ASSERT_EQ(tid, collNss.tenantId().get());
         ASSERT_EQUALS(nss, collNss);
@@ -700,7 +700,8 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantAlreadyExists) {
                                             const BSONObj&) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nssTenant2.dbName(), MODE_IX));
+        ASSERT_TRUE(
+            shard_role_details::getLocker(opCtx)->isDbLockedForMode(nssTenant2.dbName(), MODE_IX));
         ASSERT_TRUE(collNss.tenantId());
         ASSERT_EQ(tid2, collNss.tenantId().get());
         ASSERT_EQUALS(nssTenant2, collNss);

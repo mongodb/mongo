@@ -40,7 +40,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/s/sharding_api_d_params_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -150,7 +150,7 @@ boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(
 Status OperationShardingState::waitForCriticalSectionToComplete(
     OperationContext* opCtx, SharedSemiFuture<void> critSecSignal) noexcept {
     // Must not block while holding a lock
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     // If we are in a transaction, limit the time we can wait behind the critical section. This is
     // needed in order to prevent distributed deadlocks in situations where a DDL operation needs to

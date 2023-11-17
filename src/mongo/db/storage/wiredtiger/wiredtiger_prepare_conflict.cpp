@@ -40,8 +40,8 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_stats.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
@@ -129,7 +129,7 @@ int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx, std::function<in
     CurOp::get(opCtx)->debug().additiveMetrics.incrementPrepareReadConflicts(1);
     wiredTigerPrepareConflictLog(attempts);
 
-    const auto lockerInfo = opCtx->lockState()->getLockerInfo(boost::none);
+    const auto lockerInfo = shard_role_details::getLocker(opCtx)->getLockerInfo(boost::none);
     invariant(lockerInfo);
     for (const auto& lock : lockerInfo->locks) {
         const auto type = lock.resourceId.getType();

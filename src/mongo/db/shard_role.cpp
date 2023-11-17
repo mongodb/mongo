@@ -54,9 +54,9 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -205,7 +205,7 @@ void verifyDbAndCollection(OperationContext* opCtx,
             "Modifications to system.views must take an exclusive lock",
             operationType == AcquisitionPrerequisites::OperationType::kRead ||
                 !nss.isSystemDotViews() ||
-                opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+                shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X));
 
     // Verify that we are using the latest instance if we intend to perform writes.
     if (operationType == AcquisitionPrerequisites::OperationType::kWrite) {
@@ -518,7 +518,7 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
     //   * under an IX lock (nested reads under IX lock holding operations).
     //   * if a storage txn is already open w/o the lock-free reads operation flag set.
     return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
-        !opCtx->lockState()->isWriteLocked() &&
+        !shard_role_details::getLocker(opCtx)->isWriteLocked() &&
         !(opCtx->recoveryUnit()->isActive() && !opCtx->isLockFreeReadsOp());
 }
 
@@ -922,7 +922,7 @@ SnapshotAttempt::~SnapshotAttempt() {
         return;
     }
 
-    if (_openedSnapshot && !_opCtx->lockState()->inAWriteUnitOfWork()) {
+    if (_openedSnapshot && !shard_role_details::getLocker(_opCtx)->inAWriteUnitOfWork()) {
         _opCtx->recoveryUnit()->abandonSnapshot();
     }
     CurOp::get(_opCtx)->yielded();
@@ -1005,7 +1005,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
         return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
             opCtx, *catalog, std::move(sortedAcquisitionRequests));
     } catch (...) {
-        if (openSnapshot && !opCtx->lockState()->inAWriteUnitOfWork())
+        if (openSnapshot && !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork())
             opCtx->recoveryUnit()->abandonSnapshot();
         throw;
     }
@@ -1113,7 +1113,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
             return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
                 opCtx, *catalog, std::move(sortedAcquisitionRequests));
         } catch (...) {
-            if (openSnapshot && !opCtx->lockState()->inAWriteUnitOfWork())
+            if (openSnapshot && !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork())
                 opCtx->recoveryUnit()->abandonSnapshot();
             throw;
         }
@@ -1268,7 +1268,7 @@ YieldedTransactionResources yieldTransactionResourcesFromOperationContext(Operat
             transactionResources.acquiredViews.empty());
 
     Locker::LockSnapshot lockSnapshot;
-    opCtx->lockState()->saveLockStateAndUnlock(&lockSnapshot);
+    shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
     transactionResources.yielded.emplace(
         TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
 
@@ -1344,7 +1344,7 @@ void restoreTransactionResourcesToOperationContext(
         // Reacquire locks. External yields do not have a lock snapshot so we only restore for
         // internal yields.
         if (auto ptr = transactionResources.yielded.get_ptr()) {
-            opCtx->lockState()->restoreLockState(opCtx, ptr->yieldedLocker);
+            shard_role_details::getLocker(opCtx)->restoreLockState(opCtx, ptr->yieldedLocker);
             transactionResources.yielded.reset();
         }
 
@@ -1437,7 +1437,7 @@ void restoreTransactionResourcesToOperationContext(
                     // attempts. Yield the locks.
                     Locker::LockSnapshot lockSnapshot;
                     opCtx->recoveryUnit()->abandonSnapshot();
-                    opCtx->lockState()->saveLockStateAndUnlock(&lockSnapshot);
+                    shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
                     transactionResources.yielded.emplace(
                         TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
                     // Wait for the critical section to finish.

@@ -43,7 +43,6 @@
 #include "mongo/db/catalog/collection_compact.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/compact_gen.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

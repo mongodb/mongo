@@ -58,9 +58,9 @@
 #include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/commands/write_commands_common.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
@@ -321,7 +321,8 @@ public:
             boost::optional<ScopedAdmissionPriorityForLock> priority;
             if (request().getNamespace() == NamespaceString::kConfigSampledQueriesNamespace ||
                 request().getNamespace() == NamespaceString::kConfigSampledQueriesDiffNamespace) {
-                priority.emplace(opCtx->lockState(), AdmissionContext::Priority::kLow);
+                priority.emplace(shard_role_details::getLocker(opCtx),
+                                 AdmissionContext::Priority::kLow);
             }
 
             if (hangInsertBeforeWrite.shouldFail([&](const BSONObj& data) {

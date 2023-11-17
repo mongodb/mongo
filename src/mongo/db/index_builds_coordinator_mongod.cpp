@@ -56,11 +56,11 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -145,7 +145,7 @@ void runVoteCommand(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     // No locks should be held.
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     Backoff exponentialBackoff(Seconds(1), Seconds(2));
 
@@ -291,7 +291,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
     auto writeBlockState = GlobalUserWriteBlockState::get(opCtx);
 
-    invariant(!opCtx->lockState()->isRSTLExclusive(), buildUUID.toString());
+    invariant(!shard_role_details::getLocker(opCtx)->isRSTLExclusive(), buildUUID.toString());
 
     const auto nss = CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nssOrUuid);
 
@@ -901,7 +901,7 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
 
     while (true) {
         // Future wait should hold no locks.
-        invariant(!opCtx->lockState()->isLocked(),
+        invariant(!shard_role_details::getLocker(opCtx)->isLocked(),
                   str::stream() << "holding locks while waiting for commit or abort: "
                                 << replState->buildUUID);
 
@@ -1070,7 +1070,7 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
                           << " providedCommitQuorum: " << newCommitQuorum.toBSON());
     }
 
-    invariant(opCtx->lockState()->isRSTLLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked());
     // About to update the commit quorum value on-disk. So, take the lock in exclusive mode to
     // prevent readers from reading the commit quorum value and making decision on commit quorum
     // satisfied with the stale read commit quorum value.

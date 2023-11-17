@@ -77,7 +77,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -88,6 +87,7 @@
 #include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
@@ -757,7 +757,7 @@ private:
 
     // Do any initialization of the lock state required for a transaction.
     void _setLockStateForTransaction(OperationContext* opCtx) {
-        opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
+        shard_role_details::getLocker(opCtx)->setSharedLocksShouldTwoPhaseLock(true);
     }
 
     // Clear any lock state which may have changed after the locker update.
@@ -2003,7 +2003,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
         .onError<ErrorCodes::ShardCannotRefreshDueToLocksHeld>([this](Status s) -> Future<void> {
             auto opCtx = _execContext->getOpCtx();
             if (!opCtx->getClient()->isInDirectClient() && !_refreshedCatalogCache) {
-                invariant(!opCtx->lockState()->isLocked());
+                invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
                 auto refreshInfo = s.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
                 invariant(refreshInfo);
@@ -2410,14 +2410,14 @@ void HandleRequest::startOperation() {
     if (client.isInDirectClient()) {
         if (!opCtx->getLogicalSessionId() || !opCtx->getTxnNumber()) {
             invariant(!opCtx->inMultiDocumentTransaction() &&
-                      !opCtx->lockState()->inAWriteUnitOfWork());
+                      !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
         }
     } else {
         NotPrimaryErrorTracker::get(client).startRequest();
         AuthorizationSession::get(client)->startRequest(opCtx);
 
         // We should not be holding any locks at this point
-        invariant(!opCtx->lockState()->isLocked());
+        invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     }
     {
         stdx::lock_guard<Client> lk(client);
@@ -2451,7 +2451,7 @@ void HandleRequest::completeOperation(DbResponse& response) {
 
     if (shouldProfile) {
         // Performance profiling is on
-        if (opCtx->lockState()->isReadLocked()) {
+        if (shard_role_details::getLocker(opCtx)->isReadLocked()) {
             LOGV2_DEBUG(21970, 1, "Note: not profiling because of recursive read lock");
         } else if (executionContext->client().isInDirectClient()) {
             LOGV2_DEBUG(21971, 1, "Note: not profiling because we are in DBDirectClient");
@@ -2462,7 +2462,7 @@ void HandleRequest::completeOperation(DbResponse& response) {
         } else if (opCtx->readOnly()) {
             LOGV2_DEBUG(21973, 1, "Note: not profiling because server is read-only");
         } else {
-            invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+            invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
             profile(opCtx, executionContext->op());
         }
     }

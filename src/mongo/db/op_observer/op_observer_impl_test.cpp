@@ -61,9 +61,9 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
@@ -216,7 +216,7 @@ std::vector<repl::OpTime> reserveOpTimesInSideTransaction(OperationContext* opCt
     wuow.release();
 
     opCtx->recoveryUnit()->abortUnitOfWork();
-    opCtx->lockState()->endWriteUnitOfWork();
+    shard_role_details::getLocker(opCtx)->endWriteUnitOfWork();
 
     return reservedSlots;
 }
@@ -305,7 +305,8 @@ protected:
         std::vector<BSONObj> allOplogEntries;
         repl::OplogInterfaceLocal oplogInterface(opCtx);
 
-        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+            shard_role_details::getLocker(opCtx));
         auto oplogIter = oplogInterface.makeIterator();
         while (true) {
             StatusWith<std::pair<BSONObj, RecordId>> swEntry = oplogIter->next();
@@ -334,7 +335,7 @@ protected:
         // RSTL lock for prepared transactions.
         if (opCtx->inMultiDocumentTransaction() &&
             TransactionParticipant::get(opCtx).transactionIsPrepared()) {
-            opCtx->lockState()->unlockRSTLforPrepare();
+            shard_role_details::getLocker(opCtx)->unlockRSTLforPrepare();
         }
         return ret;
     }
@@ -1555,7 +1556,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
 
     // Mimic committing the transaction.
     opCtx()->setWriteUnitOfWork(nullptr);
-    opCtx()->lockState()->unsetMaxLockTimeout();
+    shard_role_details::getLocker(opCtx())->unsetMaxLockTimeout();
 
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
@@ -1625,7 +1626,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
 
     // Mimic aborting the transaction.
     opCtx()->setWriteUnitOfWork(nullptr);
-    opCtx()->lockState()->unsetMaxLockTimeout();
+    shard_role_details::getLocker(opCtx())->unsetMaxLockTimeout();
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
         opObserver().onTransactionAbort(opCtx(), abortSlot);
@@ -1771,7 +1772,7 @@ TEST_F(OpObserverTransactionTest, AbortingPreparedTransactionWritesToTransaction
 
     // Mimic aborting the transaction.
     opCtx()->setWriteUnitOfWork(nullptr);
-    opCtx()->lockState()->unsetMaxLockTimeout();
+    shard_role_details::getLocker(opCtx())->unsetMaxLockTimeout();
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
         opObserver().onTransactionAbort(opCtx(), abortSlot);
@@ -1851,7 +1852,7 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
 
     // Mimic committing the transaction.
     opCtx()->setWriteUnitOfWork(nullptr);
-    opCtx()->lockState()->unsetMaxLockTimeout();
+    shard_role_details::getLocker(opCtx())->unsetMaxLockTimeout();
 
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
@@ -4065,7 +4066,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
 
     // Mimic committing the transaction.
     opCtx()->setWriteUnitOfWork(nullptr);
-    opCtx()->lockState()->unsetMaxLockTimeout();
+    shard_role_details::getLocker(opCtx())->unsetMaxLockTimeout();
 
     // commitTimestamp must be greater than the prepareTimestamp.
     auto commitTimestamp = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
@@ -4141,7 +4142,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
 
     // Mimic aborting the transaction by resetting the WUOW.
     opCtx()->setWriteUnitOfWork(nullptr);
-    opCtx()->lockState()->unsetMaxLockTimeout();
+    shard_role_details::getLocker(opCtx())->unsetMaxLockTimeout();
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
         opObserver().onTransactionAbort(opCtx(), abortSlot);
@@ -4347,7 +4348,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedPackingTest) {
 
     // Mimic committing the transaction.
     opCtx()->setWriteUnitOfWork(nullptr);
-    opCtx()->lockState()->unsetMaxLockTimeout();
+    shard_role_details::getLocker(opCtx())->unsetMaxLockTimeout();
 
     // commitTimestamp must be greater than the prepareTimestamp.
     auto commitTimestamp = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);

@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/health_log_gen.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -300,7 +301,7 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
                                IncludeDuplicateRecordId includeDuplicateRecordId) {
     // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
     // (global MODE_IS).
-    dassert(opCtx->lockState()->isLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isLocked());
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
 
     LOGV2_TRACE_INDEX(20093, "KeyString: {keyString}", "keyString"_attr = keyString);
@@ -317,7 +318,7 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
                               bool dupsAllowed) {
     // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
     // (global MODE_IS).
-    dassert(opCtx->lockState()->isLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isLocked());
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
 
     WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
@@ -335,7 +336,7 @@ boost::optional<RecordId> WiredTigerIndex::findLoc(OperationContext* opCtx,
 }
 
 IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool full) const {
-    dassert(opCtx->lockState()->isReadLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
 
     IndexValidateResults results;
     WiredTigerUtil::validateTableLogging(opCtx,
@@ -407,7 +408,7 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
     // Printing the index entry metadata requires a new session. We cannot open other cursors when
     // there are open history store cursors in the session. We also need to make sure that the
     // existing session has not written data to avoid potential deadlocks.
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     WiredTigerSession session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
 
     // Per the version cursor API:
@@ -471,7 +472,7 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
 }
 
 long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
-    dassert(opCtx->lockState()->isReadLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
     WT_SESSION* s = ru->getSession()->getSession();
 
@@ -482,7 +483,7 @@ long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
 }
 
 long long WiredTigerIndex::getFreeStorageBytes(OperationContext* opCtx) const {
-    dassert(opCtx->lockState()->isReadLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
     WiredTigerSession* session = ru->getSessionNoTxn();
 
@@ -1307,7 +1308,7 @@ protected:
 
 
     void seekForKeyStringInternal(const key_string::Value& keyStringValue) {
-        dassert(_opCtx->lockState()->isReadLocked());
+        dassert(shard_role_details::getLocker(_opCtx)->isReadLocked());
         seekWTCursor(keyStringValue);
 
         _lastMoveSkippedKey = false;

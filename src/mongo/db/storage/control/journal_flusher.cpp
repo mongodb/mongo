@@ -37,7 +37,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -111,10 +111,12 @@ void JournalFlusher::run() {
         // Updates to a non-replicated collection, oplogTruncateAfterPoint, are made by this thread.
         // As this operation is critical for data durability we mark it as having Immediate priority
         // to skip ticket and flow control.
-        _uniqueCtx.get()->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+        shard_role_details::getLocker(_uniqueCtx->get())
+            ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
         // The journal flusher should not conflict with the setFCV command.
-        _uniqueCtx->get()->lockState()->setShouldConflictWithSetFeatureCompatibilityVersion(false);
+        shard_role_details::getLocker(_uniqueCtx->get())
+            ->setShouldConflictWithSetFeatureCompatibilityVersion(false);
     };
 
     setUpOpCtx();

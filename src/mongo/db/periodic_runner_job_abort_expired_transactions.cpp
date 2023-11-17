@@ -33,7 +33,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
 #include "mongo/db/service_context.h"
@@ -118,7 +118,7 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
             // transaction aborter thread from stalling behind any
             // non-transaction, exclusive lock taking operation blocked
             // behind an active transaction's intent lock.
-            opCtx->lockState()->setMaxLockTimeout(Milliseconds(0));
+            shard_role_details::getLocker(opCtx.get())->setMaxLockTimeout(Milliseconds(0));
 
             // This thread needs storage rollback to complete timely, so instruct the storage
             // engine to not do any extra eviction for this thread, if supported.

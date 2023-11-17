@@ -64,10 +64,10 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -289,7 +289,7 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client,
                                                const NamespaceString nss) {
     auto opCtxRaii = factory.makeOperationContext(client);
     auto opCtx = opCtxRaii.get();
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // Create the destination collection if necessary.
     writeConflictRetry(opCtx, "createReshardingLocalOplogBuffer", nss, [&] {

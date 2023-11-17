@@ -599,7 +599,8 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
         // it in memory.
         [&] { /* noop */ });
 
-    if (status == NEED_YIELD && isEOF() && !opCtx()->lockState()->inAWriteUnitOfWork()) {
+    if (status == NEED_YIELD && isEOF() &&
+        !shard_role_details::getLocker(opCtx())->inAWriteUnitOfWork()) {
         // If this stage is already exhausted it won't use its children stages anymore and therefore
         // it's okay if we failed to restore them. Avoid requesting a yield to the plan executor.
         // Restoring from yield could fail due to a sharding placement change. Throwing a

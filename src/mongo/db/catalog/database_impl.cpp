@@ -62,7 +62,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -211,7 +211,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
 
     // When in restore mode, views created on collections that weren't restored will be removed. We
     // only do this during startup when the global lock is held.
-    if (storageGlobalParams.restore && opCtx->lockState()->isW()) {
+    if (storageGlobalParams.restore && shard_role_details::getLocker(opCtx)->isW()) {
         // Refresh our copy of the catalog, since we may have modified it above.
         catalog = CollectionCatalog::get(opCtx);
         try {
@@ -281,12 +281,12 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
 
 void DatabaseImpl::setDropPending(OperationContext* opCtx, bool dropPending) {
     auto mode = dropPending ? MODE_X : MODE_IX;
-    invariant(opCtx->lockState()->isDbLockedForMode(name(), mode));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(name(), mode));
     _dropPending.store(dropPending);
 }
 
 bool DatabaseImpl::isDropPending(OperationContext* opCtx) const {
-    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(name(), MODE_IS));
     return _dropPending.load();
 }
 
@@ -305,7 +305,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
     long long indexSize = 0;
     long long indexFreeStorageSize = 0;
 
-    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(name(), MODE_IS));
 
     catalog::forEachCollectionFromDb(
         opCtx, name(), MODE_IS, [&](const Collection* collection) -> bool {
@@ -372,9 +372,10 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
 }
 
 Status DatabaseImpl::dropView(OperationContext* opCtx, NamespaceString viewName) const {
-    dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
-    dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
-    dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
+    dassert(shard_role_details::getLocker(opCtx)->isDbLockedForMode(name(), MODE_IX));
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(viewName, MODE_IX));
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+        NamespaceString(_viewsName), MODE_X));
 
     Status status = CollectionCatalog::get(opCtx)->dropView(opCtx, viewName);
     Top::get(opCtx->getServiceContext()).collectionDropped(viewName);
@@ -410,7 +411,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                                                 NamespaceString nss,
                                                 repl::OpTime dropOpTime,
                                                 bool markFromMigrate) const {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X));
 
     LOGV2_DEBUG(20313, 1, "dropCollection", logAttrs(nss));
 
@@ -538,7 +539,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
           "dropOpTime"_attr = dropOpTime);
     {
         // This is a uniquely generated drop-pending namespace that no other operations are using.
-        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+            shard_role_details::getLocker(opCtx));
         Lock::CollectionLock collLk(opCtx, dpns, MODE_X);
         fassert(40464, renameCollection(opCtx, nss, dpns, stayTemp));
     }
@@ -592,8 +594,8 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
                                       bool stayTemp) const {
     audit::logRenameCollection(opCtx->getClient(), fromNss, toNss);
 
-    invariant(opCtx->lockState()->isCollectionLockedForMode(fromNss, MODE_X));
-    invariant(opCtx->lockState()->isCollectionLockedForMode(toNss, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(fromNss, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(toNss, MODE_X));
 
     invariant(fromNss.dbName() == _name);
     invariant(toNss.dbName() == _name);
@@ -664,9 +666,10 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
 Status DatabaseImpl::createView(OperationContext* opCtx,
                                 const NamespaceString& viewName,
                                 const CollectionOptions& options) const {
-    dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
-    dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
-    dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
+    dassert(shard_role_details::getLocker(opCtx)->isDbLockedForMode(name(), MODE_IX));
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(viewName, MODE_IX));
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+        NamespaceString(_viewsName), MODE_X));
 
     invariant(options.isView());
 
@@ -738,7 +741,7 @@ Collection* DatabaseImpl::_createCollection(
     const boost::optional<VirtualCollectionOptions>& vopts) const {
     invariant(!options.isView());
 
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
 
     auto coordinator = repl::ReplicationCoordinator::get(opCtx);
     bool canAcceptWrites =

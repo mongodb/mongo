@@ -54,6 +54,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/read_concern_support_result.h"
@@ -160,7 +161,7 @@ public:
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) final {
         // Critical to observability and diagnosability, categorize as immediate priority.
-        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+        ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
                                                             AdmissionContext::Priority::kImmediate);
 
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);

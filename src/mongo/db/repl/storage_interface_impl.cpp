@@ -57,7 +57,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
@@ -68,6 +67,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/parsed_delete.h"
@@ -1203,7 +1203,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
 boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTimestamp(
     OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) {
     invariant(oplog);
-    invariant(opCtx->lockState()->isLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isLocked());
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec = InternalPlanner::collectionScan(
         opCtx, &oplog, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, InternalPlanner::BACKWARD);
@@ -1477,7 +1477,7 @@ void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationCont
                                                                    bool primaryOnly) {
     // Waiting for oplog writes to be visible in the oplog does not use any storage engine resources
     // and must not wait for ticket acquisition to avoid deadlocks with updating oplog visibility.
-    ScopedAdmissionPriorityForLock setTicketAquisition(opCtx->lockState(),
+    ScopedAdmissionPriorityForLock setTicketAquisition(shard_role_details::getLocker(opCtx),
                                                        AdmissionContext::Priority::kImmediate);
 
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
@@ -1495,7 +1495,7 @@ void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
                                                 bool orderedCommit) {
     // Setting the oplog visibility does not use any storage engine resources and must skip ticket
     // acquisition to avoid deadlocks with updating oplog visibility.
-    ScopedAdmissionPriorityForLock setTicketAquisition(opCtx->lockState(),
+    ScopedAdmissionPriorityForLock setTicketAquisition(shard_role_details::getLocker(opCtx),
                                                        AdmissionContext::Priority::kImmediate);
 
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);

@@ -59,13 +59,13 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
@@ -720,8 +720,8 @@ BSONObj CommonMongodProcessInterface::_reportCurrentOpForClient(
         }
 
         // Append lock stats before returning.
-        if (auto lockerInfo = clientOpCtx->lockState()->getLockerInfo(
-                CurOp::get(*clientOpCtx)->getLockStatsBase())) {
+        if (auto lockerInfo = shard_role_details::getLocker(clientOpCtx)
+                                  ->getLockerInfo(CurOp::get(*clientOpCtx)->getLockStatsBase())) {
             fillLockerInfo(*lockerInfo, builder);
         }
 
@@ -729,7 +729,7 @@ BSONObj CommonMongodProcessInterface::_reportCurrentOpForClient(
             tcWorkerRepo->reportState(clientOpCtx, &builder);
         }
 
-        auto flowControlStats = clientOpCtx->lockState()->getFlowControlStats();
+        auto flowControlStats = shard_role_details::getLocker(clientOpCtx)->getFlowControlStats();
         flowControlStats.writeToBuilder(builder);
     }
 

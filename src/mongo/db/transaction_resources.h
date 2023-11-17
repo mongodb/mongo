@@ -39,7 +39,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"

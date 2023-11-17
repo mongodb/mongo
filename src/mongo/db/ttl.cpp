@@ -66,7 +66,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/batched_delete_stage.h"
 #include "mongo/db/exec/collection_scan_common.h"
@@ -74,6 +73,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/canonical_query.h"
@@ -546,7 +546,8 @@ bool TTLMonitor::_doTTLSubPass(
             // 'AdmissionContext::Priority::kNormal' for one index means the priority will be
             // 'normal' for all indexes.
             AdmissionContext::Priority priority = getTTLPriority(uuid, ttlPriorityMap);
-            ScopedAdmissionPriorityForLock priorityGuard(opCtx->lockState(), priority);
+            ScopedAdmissionPriorityForLock priorityGuard(shard_role_details::getLocker(opCtx),
+                                                         priority);
 
             for (const auto& info : infos) {
                 bool moreToDelete = _doTTLIndexDelete(opCtx, &ttlCollectionCache, uuid, info);

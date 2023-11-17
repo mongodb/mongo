@@ -70,13 +70,13 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -266,16 +266,18 @@ protected:
 
     void lockDb(LockMode mode) {
         _autoDb.reset();
-        invariant(_opCtx.lockState()->isDbLockedForMode(_nss.dbName(), MODE_NONE));
+        invariant(
+            shard_role_details::getLocker(&_opCtx)->isDbLockedForMode(_nss.dbName(), MODE_NONE));
         _autoDb.reset(new AutoGetDb(&_opCtx, _nss.dbName(), mode));
-        invariant(_opCtx.lockState()->isDbLockedForMode(_nss.dbName(), mode));
+        invariant(shard_role_details::getLocker(&_opCtx)->isDbLockedForMode(_nss.dbName(), mode));
         _db = _autoDb.get()->getDb();
     }
 
     void releaseDb() {
         _autoDb.reset();
         _db = nullptr;
-        invariant(_opCtx.lockState()->isDbLockedForMode(_nss.dbName(), MODE_NONE));
+        invariant(
+            shard_role_details::getLocker(&_opCtx)->isDbLockedForMode(_nss.dbName(), MODE_NONE));
     }
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();

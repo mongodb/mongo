@@ -56,7 +56,6 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/collection_scan_common.h"
@@ -76,6 +75,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -874,7 +874,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     // locks ourselves in this function because double-locking forces any PlanExecutor we create to
     // adopt an INTERRUPT_ONLY policy.
     invariant(opCtx->isLockFreeReadsOp() ||
-              opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IS));
+              shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(coll->ns(), MODE_IS));
 
     auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
     auto* randomCursorSampleRatioParam =

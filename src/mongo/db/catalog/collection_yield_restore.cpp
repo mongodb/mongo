@@ -34,7 +34,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/util/assert_util_core.h"
@@ -48,15 +48,15 @@ bool locked(OperationContext* opCtx, const NamespaceString& ns) {
     }
 
     if (ns.isOplog()) {
-        return opCtx->lockState()->isReadLocked();
+        return shard_role_details::getLocker(opCtx)->isReadLocked();
     }
 
     if (ns.isChangeCollection() && ns.tenantId()) {
-        return opCtx->lockState()->isLockHeldForMode(
+        return shard_role_details::getLocker(opCtx)->isLockHeldForMode(
             {ResourceType::RESOURCE_TENANT, *ns.tenantId()}, MODE_IS);
     }
 
-    return opCtx->lockState()->isCollectionLockedForMode(ns, MODE_IS);
+    return shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns, MODE_IS);
 }
 
 }  // namespace

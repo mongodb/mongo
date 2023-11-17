@@ -37,11 +37,11 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/duplicate_key_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
@@ -92,7 +92,7 @@ void DuplicateKeyTracker::keepTemporaryTable() {
 Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
                                       const IndexCatalogEntry* indexCatalogEntry,
                                       const key_string::Value& key) {
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     LOGV2_DEBUG(20676,
                 1,
@@ -134,7 +134,7 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
 
 Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx,
                                              const IndexCatalogEntry* indexCatalogEntry) const {
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     auto constraintsCursor = _keyConstraintsTable->rs()->getCursor(opCtx);
     auto record = constraintsCursor->next();
