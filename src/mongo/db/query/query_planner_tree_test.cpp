@@ -402,6 +402,8 @@ TEST_F(QueryPlannerTest,
     // With the simplifer enabled the solution below will be simplified to "{a:1, b:2, c:1, $or:
     // [{d:3}, {e:4}]}" which allow the multiplanner to build more effective test with only one
     // fecth instead of two.
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryEnableBooleanExpressionsSimplifier", true);
 
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuery(fromjson("{c: 1, $or: [{a:1, b:2, d:3}, {a:1, b:2, e:4}]}"));

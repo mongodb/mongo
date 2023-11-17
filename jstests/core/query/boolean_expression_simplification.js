@@ -11,6 +11,14 @@
 
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/analyze_plan.js";
 
+const parameterName = "internalQueryEnableBooleanExpressionsSimplifier";
+const isSImplifierEnabled =
+    assert.commandWorked(db.adminCommand({getParameter: 1, [parameterName]: 1}))[parameterName];
+if (!isSImplifierEnabled) {
+    jsTest.log("Skipping the Boolean simplier tests, since the simplifier is disabled...");
+    quit();
+}
+
 /**
  * Checks possible representations of an empty filter in query plans, which can be empty object '{}'
  * or missing value.

@@ -1287,7 +1287,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: internalQueryEnableBooleanExpressionsSimplifier
     cpp_vartype: AtomicWord<bool>
-    default: true
+    default: false
 
   internalQueryMaximumNumberOfUniquePredicatesToSimplify:
     description: "If the number of unique predicates in an expression is larger than
