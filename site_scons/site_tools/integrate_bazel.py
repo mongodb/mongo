@@ -23,6 +23,7 @@ _SUPPORTED_PLATFORM_MATRIX = [
     "linux:arm64:gcc",
     "linux:arm64:clang",
     "windows:amd64:msvc",
+    "macos:amd64:clang",
     "macos:arm64:clang",
 ]
 
@@ -366,7 +367,8 @@ def generate(env: SCons.Environment.Environment) -> None:
         # === Architecture/platform ===
 
         # Bail if current architecture not supported for Bazel:
-        normalized_arch = platform.machine().lower().replace("aarch64", "arm64")
+        normalized_arch = platform.machine().lower().replace("aarch64", "arm64").replace(
+            "x86_64", "amd64")
         normalized_os = sys.platform.replace("win32", "windows").replace("darwin", "macos")
         current_platform = f"{normalized_os}:{normalized_arch}:{env.ToolchainName()}"
         if current_platform not in _SUPPORTED_PLATFORM_MATRIX:
@@ -429,7 +431,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         # We always use --compilation_mode debug for now as we always want -g, so assume -dbg location
         out_dir_platform = "$TARGET_ARCH"
         if normalized_os == "macos":
-            out_dir_platform = "darwin_arm64"
+            out_dir_platform = "darwin_arm64" if normalized_arch == "arm64" else "darwin"
         elif normalized_os == "windows":
             out_dir_platform = "x64_windows"
         env["BAZEL_OUT_DIR"] = env.Dir(f"#/bazel-out/{out_dir_platform}-dbg/bin/")
