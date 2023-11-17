@@ -104,6 +104,7 @@ def main():
     git_destination_url_with_token = f"https://x-access-token:{access_token_copybara_syncer}@github.com/mongodb/mongo.git"
 
     # Set up the Docker command and execute it
+    # --last-rev Defines the last revision that was migrated to the destination during the initial synchronization between repositories using Copybara
     docker_cmd = [
         "docker run",
         "-v ~/.ssh:/root/.ssh",
@@ -111,7 +112,7 @@ def main():
         f'-v "{current_dir}/copybara.sky":/usr/src/app/copy.bara.sky',
         "-e COPYBARA_CONFIG='copy.bara.sky'",
         "-e COPYBARA_SUBCOMMAND='migrate'",
-        f"-e COPYBARA_OPTIONS='-v --git-destination-url={git_destination_url_with_token}'",
+        f"-e COPYBARA_OPTIONS='-v --last-rev=0dd92d9 --git-destination-url={git_destination_url_with_token}'",
         "copybara copybara",
     ]
 
