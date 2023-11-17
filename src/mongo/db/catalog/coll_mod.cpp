@@ -181,7 +181,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             } else {
                 std::vector<const IndexDescriptor*> indexes;
                 coll->getIndexCatalog()->findIndexesByKeyPattern(
-                    opCtx, keyPattern, IndexCatalog::InclusionPolicy::kReady, &indexes);
+                    opCtx, keyPattern, false, &indexes);
 
                 if (indexes.size() > 1) {
                     return Status(ErrorCodes::AmbiguousIndexKeyPattern,

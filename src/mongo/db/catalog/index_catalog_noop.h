@@ -75,10 +75,9 @@ public:
         return nullptr;
     }
 
-    IndexDescriptor* findIndexByName(
-        OperationContext* const opCtx,
-        const StringData name,
-        const InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override {
+    IndexDescriptor* findIndexByName(OperationContext* const opCtx,
+                                     const StringData name,
+                                     const bool includeUnfinishedIndexes = false) const override {
         return nullptr;
     }
 
@@ -86,14 +85,14 @@ public:
         OperationContext* const opCtx,
         const BSONObj& key,
         const BSONObj& collationSpec,
-        const InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override {
+        const bool includeUnfinishedIndexes = false) const override {
         return nullptr;
     }
 
     void findIndexesByKeyPattern(
         OperationContext* const opCtx,
         const BSONObj& key,
-        const InclusionPolicy inclusionPolicy,
+        const bool includeUnfinishedIndexes,
         std::vector<const IndexDescriptor*>* const matches) const override {}
 
     IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* const opCtx,
@@ -103,11 +102,10 @@ public:
         return nullptr;
     }
 
-    void findIndexByType(
-        OperationContext* const opCtx,
-        const std::string& type,
-        std::vector<const IndexDescriptor*>& matches,
-        const InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override {}
+    void findIndexByType(OperationContext* const opCtx,
+                         const std::string& type,
+                         std::vector<const IndexDescriptor*>& matches,
+                         const bool includeUnfinishedIndexes = false) const override {}
 
     const IndexDescriptor* refreshEntry(OperationContext* const opCtx,
                                         const IndexDescriptor* const oldDesc) override {
@@ -128,7 +126,7 @@ public:
     }
 
     std::unique_ptr<IndexIterator> getIndexIterator(
-        OperationContext* const opCtx, const InclusionPolicy inclusionPolicy) const override {
+        OperationContext* const opCtx, const bool includeUnfinishedIndexes) const override {
         return {};
     }
 

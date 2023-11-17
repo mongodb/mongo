@@ -104,13 +104,10 @@ Status checkReplState(OperationContext* opCtx,
 StatusWith<const IndexDescriptor*> getDescriptorByKeyPattern(OperationContext* opCtx,
                                                              IndexCatalog* indexCatalog,
                                                              const BSONElement& keyPattern) {
+    const bool includeUnfinished = true;
     std::vector<const IndexDescriptor*> indexes;
-    indexCatalog->findIndexesByKeyPattern(opCtx,
-                                          keyPattern.embeddedObject(),
-                                          IndexCatalog::InclusionPolicy::kReady |
-                                              IndexCatalog::InclusionPolicy::kUnfinished |
-                                              IndexCatalog::InclusionPolicy::kFrozen,
-                                          &indexes);
+    indexCatalog->findIndexesByKeyPattern(
+        opCtx, keyPattern.embeddedObject(), includeUnfinished, &indexes);
     if (indexes.empty()) {
         return Status(ErrorCodes::IndexNotFound,
                       str::stream()
@@ -274,12 +271,9 @@ Status dropReadyIndexes(OperationContext* opCtx,
         return Status::OK();
     }
 
+    bool includeUnfinished = true;
     for (const auto& indexName : indexNames) {
-        auto desc = indexCatalog->findIndexByName(opCtx,
-                                                  indexName,
-                                                  IndexCatalog::InclusionPolicy::kReady |
-                                                      IndexCatalog::InclusionPolicy::kUnfinished |
-                                                      IndexCatalog::InclusionPolicy::kFrozen);
+        auto desc = indexCatalog->findIndexByName(opCtx, indexName, includeUnfinished);
         if (!desc) {
             return Status(ErrorCodes::IndexNotFound,
                           str::stream() << "index not found with name [" << indexName << "]");
@@ -455,13 +449,9 @@ Status dropIndexes(OperationContext* opCtx,
             // index catalog. This would indicate that while we yielded our locks during the abort
             // phase, a new identical index was created.
             auto indexCatalog = collection->getIndexCatalog();
+            const bool includeUnfinished = false;
             for (const auto& indexName : indexNames) {
-                auto desc =
-                    indexCatalog->findIndexByName(opCtx,
-                                                  indexName,
-                                                  IndexCatalog::InclusionPolicy::kReady |
-                                                      IndexCatalog::InclusionPolicy::kUnfinished |
-                                                      IndexCatalog::InclusionPolicy::kFrozen);
+                auto desc = indexCatalog->findIndexByName(opCtx, indexName, includeUnfinished);
                 if (!desc) {
                     // A similar index wasn't created while we yielded the locks during abort.
                     continue;

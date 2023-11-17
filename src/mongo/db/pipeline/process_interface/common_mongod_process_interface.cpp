@@ -184,8 +184,7 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
         auto idxCatalog = collection->getIndexCatalog();
         auto idx = idxCatalog->findIndexByName(opCtx,
                                                indexName,
-                                               IndexCatalog::InclusionPolicy::kReady |
-                                                   IndexCatalog::InclusionPolicy::kUnfinished);
+                                               /* includeUnfinishedIndexes */ true);
         uassert(ErrorCodes::IndexNotFound,
                 "Could not find entry in IndexCatalog for index " + indexName,
                 idx);
@@ -446,8 +445,7 @@ bool CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
         return fieldPaths == std::set<FieldPath>{"_id"};
     }
 
-    auto indexIterator = collection->getIndexCatalog()->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady);
+    auto indexIterator = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (indexIterator->more()) {
         const IndexCatalogEntry* entry = indexIterator->next();
         if (supportsUniqueKey(expCtx, entry, fieldPaths)) {

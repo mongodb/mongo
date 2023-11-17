@@ -930,8 +930,7 @@ uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx,
                                       int scale) const {
     const IndexCatalog* idxCatalog = getIndexCatalog();
 
-    auto ii = idxCatalog->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+    std::unique_ptr<IndexCatalog::IndexIterator> ii = idxCatalog->getIndexIterator(opCtx, true);
 
     uint64_t totalSize = 0;
 
@@ -965,7 +964,8 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     // 1) store index specs
     std::vector<BSONObj> indexSpecs;
     {
-        auto ii = _indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+        std::unique_ptr<IndexCatalog::IndexIterator> ii =
+            _indexCatalog->getIndexIterator(opCtx, false);
         while (ii->more()) {
             const IndexDescriptor* idx = ii->next()->descriptor();
             indexSpecs.push_back(idx->infoObj().getOwned());

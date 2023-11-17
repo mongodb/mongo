@@ -109,16 +109,11 @@ void assertEmpty(OperationContext* opCtx, const NamespaceString& nss) {
 }
 bool indexExists(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
     auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-    return coll->getIndexCatalog()->findIndexByName(
-               opCtx,
-               idxName,
-               IndexCatalog::InclusionPolicy::kReady |
-                   IndexCatalog::InclusionPolicy::kUnfinished) != nullptr;
+    return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, true) != nullptr;
 }
 bool indexReady(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
     auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-    return coll->getIndexCatalog()->findIndexByName(
-               opCtx, idxName, IndexCatalog::InclusionPolicy::kReady) != nullptr;
+    return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, false) != nullptr;
 }
 size_t getNumIndexEntries(OperationContext* opCtx,
                           const NamespaceString& nss,
@@ -127,7 +122,7 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 
     auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
     IndexCatalog* catalog = coll->getIndexCatalog();
-    auto desc = catalog->findIndexByName(opCtx, idxName, IndexCatalog::InclusionPolicy::kReady);
+    auto desc = catalog->findIndexByName(opCtx, idxName, false);
 
     if (desc) {
         auto cursor = catalog->getEntry(desc)->accessMethod()->newCursor(opCtx);
