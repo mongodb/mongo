@@ -983,6 +983,29 @@ const Collection* CollectionCatalog::establishConsistentCollection(
     return lookupCollectionByNamespaceOrUUID(opCtx, nssOrUUID);
 }
 
+std::vector<const Collection*> CollectionCatalog::establishConsistentCollections(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    boost::optional<Timestamp> readTimestamp) const {
+
+    std::vector<const Collection*> result;
+
+    // We iterate both already committed and uncommitted changes and validate them with
+    // the storage snapshot
+    for (const auto& coll : range(dbName)) {
+        result.push_back(establishConsistentCollection(opCtx, coll->ns(), readTimestamp));
+    }
+
+    for (auto const& [ns, coll] : _pendingCommitNamespaces) {
+        if (ns.dbName() == dbName) {
+            result.push_back(establishConsistentCollection(opCtx, ns, readTimestamp));
+        }
+    }
+
+    return result;
+}
+
+
 bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
                                              const NamespaceStringOrUUID& nsOrUUID,
                                              boost::optional<Timestamp> readTimestamp) const {

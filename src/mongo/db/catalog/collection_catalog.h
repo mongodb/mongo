@@ -265,6 +265,11 @@ public:
                                                     const NamespaceStringOrUUID& nssOrUUID,
                                                     boost::optional<Timestamp> readTimestamp) const;
 
+    std::vector<const Collection*> establishConsistentCollections(
+        OperationContext* opCtx,
+        const DatabaseName& dbName,
+        boost::optional<Timestamp> readTimestamp) const;
+
     /**
      * Returns a shared_ptr to a drop pending index if it's found and not expired.
      */
