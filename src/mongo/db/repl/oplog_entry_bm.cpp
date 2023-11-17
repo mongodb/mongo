@@ -56,7 +56,7 @@ BSONObj createOplogEntryWithNStatementIds(int numStmtIds) {
         }
         bab.done();
     }
-    return bob.done();
+    return bob.obj();
 }
 }  // namespace
 
