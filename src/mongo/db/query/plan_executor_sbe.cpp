@@ -333,16 +333,8 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
     // Capped insert data; declared outside the loop so we hold a shared pointer to the capped
     // insert notifier the entire time we are in the loop. Holding a shared pointer to the capped
     // insert notifier is necessary for the notifierVersion to advance.
-    //
-    // Note that we need to hold a database intent lock before acquiring a notifier.
-    boost::optional<AutoGetCollectionForReadMaybeLockFree> coll;
     std::unique_ptr<insert_listener::Notifier> notifier;
     if (insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
-        if (!_opCtx->isLockFreeReadsOp() &&
-            !_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS)) {
-            coll.emplace(_opCtx, _nss);
-        }
-
         notifier = insert_listener::getCappedInsertNotifier(_opCtx, _nss, _yieldPolicy.get());
     }
 
