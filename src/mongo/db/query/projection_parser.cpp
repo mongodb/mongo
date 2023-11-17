@@ -637,10 +637,8 @@ Projection parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
         invariant(root.removeChild("_id"));
     }
 
-    // Optimize the projection expression if requested and as long as not explicitly disabled
-    // pipeline optimization.
-    auto fp = globalFailPointRegistry().find("disablePipelineOptimization");
-    if (shouldOptimize && !(fp && fp->shouldFail())) {
+    // Optimize the projection expression if requested.
+    if (shouldOptimize) {
         optimizeProjection(&root);
     }
 
