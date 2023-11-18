@@ -856,18 +856,46 @@ TEST(Path, LowerPathField) {
 
     runPathLowering(env, prefixId, tree);
 
-    ASSERT_EXPLAIN_AUTO(
-        "FunctionCall [makeBsonObj]\n"
-        "  Const [MakeObjSpec([fieldA = MakeObj([fieldB = LambdaArg(0, false)], Open)], Open, "
-        "NewObj, 0)]\n"
-        "  Variable [rootObj]\n"
-        "  Const [false]\n"
-        "  LambdaAbstraction [valDefault_0]\n"
-        "    If []\n"
+    ASSERT_EXPLAIN(
+        "Let [valField_1]\n"
+        "  FunctionCall [traverseP]\n"
+        "    FunctionCall [getField]\n"
+        "      Variable [rootObj]\n"
+        "      Const [\"fieldA\"]\n"
+        "    LambdaAbstraction [inputField_0]\n"
+        "      Let [valField_0]\n"
+        "        Let [valDefault_0]\n"
+        "          FunctionCall [getField]\n"
+        "            Variable [inputField_0]\n"
+        "            Const [\"fieldB\"]\n"
+        "          If []\n"
+        "            FunctionCall [exists]\n"
+        "              Variable [valDefault_0]\n"
+        "            Variable [valDefault_0]\n"
+        "            Const [0]\n"
+        "        If []\n"
+        "          BinaryOp [Or]\n"
+        "            FunctionCall [exists]\n"
+        "              Variable [valField_0]\n"
+        "            FunctionCall [isObject]\n"
+        "              Variable [inputField_0]\n"
+        "          FunctionCall [setField]\n"
+        "            Variable [inputField_0]\n"
+        "            Const [\"fieldB\"]\n"
+        "            Variable [valField_0]\n"
+        "          Variable [inputField_0]\n"
+        "    Const [Nothing]\n"
+        "  If []\n"
+        "    BinaryOp [Or]\n"
         "      FunctionCall [exists]\n"
-        "        Variable [valDefault_0]\n"
-        "      Variable [valDefault_0]\n"
-        "      Const [0]\n",
+        "        Variable [valField_1]\n"
+        "      FunctionCall [isObject]\n"
+        "        Variable [rootObj]\n"
+        "    FunctionCall [setField]\n"
+        "      Variable [rootObj]\n"
+        "      Const [\"fieldA\"]\n"
+        "      Variable [valField_1]\n"
+        "    Variable [rootObj]\n",
         tree);
 }
 
@@ -899,10 +927,14 @@ TEST(Path, LowerPathDrop) {
     runPathLowering(env, prefixId, tree);
 
     ASSERT_EXPLAIN_AUTO(
-        "FunctionCall [makeBsonObj]\n"
-        "  Const [MakeObjSpec([a, b], Open, RetInput, 0)]\n"
-        "  Variable [root]\n"
-        "  Const [false]\n",
+        "If []\n"
+        "  FunctionCall [isObject]\n"
+        "    Variable [root]\n"
+        "  FunctionCall [dropFields]\n"
+        "    Variable [root]\n"
+        "    Const [\"a\"]\n"
+        "    Const [\"b\"]\n"
+        "  Variable [root]\n",
         tree);
 }
 
@@ -917,10 +949,14 @@ TEST(Path, LowerPathKeep) {
     runPathLowering(env, prefixId, tree);
 
     ASSERT_EXPLAIN_AUTO(
-        "FunctionCall [makeBsonObj]\n"
-        "  Const [MakeObjSpec([a, b], Closed, RetInput, 0)]\n"
-        "  Variable [root]\n"
-        "  Const [false]\n",
+        "If []\n"
+        "  FunctionCall [isObject]\n"
+        "    Variable [root]\n"
+        "  FunctionCall [keepFields]\n"
+        "    Variable [root]\n"
+        "    Const [\"a\"]\n"
+        "    Const [\"b\"]\n"
+        "  Variable [root]\n",
         tree);
 }
 

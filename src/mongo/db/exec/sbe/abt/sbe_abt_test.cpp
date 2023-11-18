@@ -249,7 +249,7 @@ TEST_F(ABTSBE, Lower6) {
     auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
     sbe::value::ValueGuard guard(resultTag, resultVal);
 
-    ASSERT(sbe::value::isObject(resultTag));
+    ASSERT_EQ(sbe::value::TypeTags::Object, resultTag);
 }
 
 TEST_F(ABTSBE, Lower7) {

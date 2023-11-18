@@ -70,7 +70,7 @@ function test({agg, requiresRowStoreExpr, requiredRowstoreReads}) {
     const nullRegex =
         /columnscan s.* ((s.*)|(none)) paths\[.*\] pathFilters\[.*\] rowStoreExpr\[\] @.* @.*/;
     const notNullRegex =
-        /columnscan s.* ((s.*)|(none)) paths\[.*\] pathFilters\[.*\] rowStoreExpr\[((.*, \n)|(.+makeBsonObj.*))/;
+        /columnscan s.* ((s.*)|(none)) paths\[.*\] pathFilters\[.*\] rowStoreExpr\[.*, \n/;
     if (requiresRowStoreExpr) {
         assert(!nullRegex.test(sbeStages), `Don't expect null rowstoreExpr in ${sbeStages}`);
         assert(notNullRegex.test(sbeStages), `Expected non-null rowstoreExpr in ${sbeStages}`);
