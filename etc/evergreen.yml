@@ -6103,6 +6103,7 @@ tasks:
   - *kill_processes
   - *cleanup_environment
   - *set_up_venv
+  - func: "configure evergreen api credentials"
   - *f_expansions_write
   - func: "sync repo with copybara"
 
