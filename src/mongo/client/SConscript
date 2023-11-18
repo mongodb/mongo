@@ -290,16 +290,6 @@ env.Library(
 )
 
 env.Library(
-    target='connection_pool',
-    source=[
-        'connection_pool.cpp',
-    ],
-    LIBDEPS=[
-        'clientdriver_network',
-    ],
-)
-
-env.Library(
     target='remote_command_targeter',
     source=[
         'remote_command_targeter_factory_impl.cpp',

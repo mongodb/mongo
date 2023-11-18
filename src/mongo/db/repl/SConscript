@@ -168,7 +168,6 @@ env.Library(
         'bgsync.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/connection_pool',
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/service_context',

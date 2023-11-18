@@ -44,7 +44,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/client/connection_pool.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -743,14 +742,18 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
 
     OplogInterfaceLocal localOplog(opCtx);
 
-    ConnectionPool connectionPool;
-    std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
-    auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
-        if (!connection.get()) {
-            connection.reset(new ConnectionPool::ConnectionPtr(
-                &connectionPool, source, Date_t::now(), kRollbackOplogSocketTimeout));
-        };
-        return connection->get();
+    std::unique_ptr<DBClientConnection> connection;
+    auto getConnection = [&connection, source]() -> DBClientBase* {
+        if (!connection) {
+            connection = std::make_unique<DBClientConnection>();
+            connection->setSoTimeout(durationCount<Milliseconds>(kRollbackOplogSocketTimeout) /
+                                     1000.0);
+            connection->connect(source, StringData(), boost::none);
+            if (auth::isInternalAuthSet()) {
+                connection->authenticateInternalUser();
+            }
+        }
+        return connection.get();
     };
 
     // Because oplog visibility is updated asynchronously, wait until all uncommitted oplog entries
