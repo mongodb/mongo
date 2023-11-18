@@ -40,7 +40,6 @@ selector:
   - jstests/core/**/geo_2d_explain.js  # executionSuccess in different spot in explain().
   - jstests/core/**/geo_s2explain.js  # inputStage in different spot in explain().
   - jstests/core/**/geo_s2sparse.js  # keysPerIndex in different spot in validate().
-  - jstests/core/**/killop_drop_collection.js # Uses fsyncLock.
   # Logical sessions require that only one user be authenticated,
   # but this suite puts us in a multi-auth state.
   - jstests/core/**/list_all_sessions.js # Too many users authenticated

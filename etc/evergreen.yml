@@ -1341,6 +1341,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .serverless
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
+  - name: .unsplittable_collections
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
@@ -1594,6 +1595,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .serverless
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
+  - name: .unsplittable_collections
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: streams
@@ -2071,6 +2073,7 @@ buildvariants:
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
+  - name: .unsplittable_collections
   - name: unshard_collection_fuzzer_gen
   - name: .updatefuzzer
   - name: .watchdog

@@ -1,5 +1,3 @@
-# This suite starts a cluster with two shards and runs JS core tests with the 'apiVersion'
-# parameter passed in for every command.
 test_kind: js_test
 
 selector:
@@ -9,15 +7,32 @@ selector:
   - src/mongo/db/modules/*/jstests/fle2/**/*.js
 
   exclude_files:
-  # This test initiates a txn with API parameters, but runs txn-continuing commands in a separate
-  # Thread object. Since those commands will not have API parameters appended, they will fail due
-  # to not matching the API parameters of the txn-initiating command.
-  - jstests/core/txns/kill_op_on_txn_expiry.js
-
-  #
-  # Taken from sharding_jscore_passthrough.yml.
-  #
-
+  # These tests are run in sharded_jscore_txns.
+  - jstests/core/txns/**/*.js
+  # TODO: SERVER-81495 Enable timeseries tests
+  - jstests/core/timeseries/**/*.js
+  # TODO: SERVER-79876 Enable the following tests once unique indexes are enabled for unsplittable collections
+  - jstests/core/ddl/collmod_convert_index_uniqueness.js
+  - jstests/core/ddl/collmod_convert_to_unique_violations.js
+  - jstests/core/ddl/collmod_convert_to_unique_violations_size_limit.js
+  # TODO: SERVER-83396 Enable once unsplittable collections are created through the create command
+  - jstests/core/ddl/create_collection.js
+  - jstests/core/failcommand_failpoint.js
+  - jstests/core/views/views_collation.js
+  # TODO: SERVER-82791 Enable after fix
+  - jstests/core/views/views_creation.js
+  # TODO: SERVER-82802 Enable after fixing system.js feature with collections living outside the primary
+  - jstests/core/**/mr_stored.js
+  - jstests/core/**/system_js_access.js
+  - jstests/core/**/system_js_drop.js
+  - jstests/core/**/where_system_js.js
+  - jstests/core/loadserverscripts.js
+  - jstests/core/storefunc.js
+  # TODO: SERVER-82806 Enable after fix
+  - jstests/core/ddl/collection_uuid_index_commands.js
+  # TODO: SERVER-83399 Enable after fix
+  - src/mongo/db/modules/enterprise/jstests/fle2/cleanup_collection.js
+  - src/mongo/db/modules/enterprise/jstests/fle2/compact_collection.js
   # The following tests fail because a certain command or functionality is not supported on
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/**/apitest_db.js  # serverStatus output doesn't have storageEngine.
@@ -42,56 +57,43 @@ selector:
   - jstests/core/**/geo_s2explain.js  # inputStage in different spot in explain().
   - jstests/core/**/geo_s2sparse.js  # keysPerIndex in different spot in validate().
   - jstests/core/**/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
+  - jstests/core/**/or_to_in.js # queryPlanner in different spot in explain()
   # The following tests fail because of divergent dropCollection behavior between standalones and
   # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
   # we expect a second drop to return status OK.
   - jstests/core/**/explain_upsert.js
-
-  # transactionLifetimeLimitSeconds parameter is not available in mongos.
-  - jstests/core/txns/abort_expired_transaction.js
-  - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
-  - jstests/core/txns/kill_op_on_txn_expiry.js
-
-  # Uses hangAfterCollectionInserts failpoint not available on mongos.
-  - jstests/core/txns/speculative_snapshot_includes_all_writes.js
-
-  # Profile can only be run against the admin database on mongos.
-  - jstests/core/txns/transactions_profiling.js
-  - jstests/core/txns/transactions_profiling_with_drops.js
-
-  # Implicitly creates a database through a collection rename, which does not work in a sharded
-  # cluster.
-  - jstests/core/txns/transactions_block_ddl.js
+  # The following tests fail because explain expect a different plan query when collections live on separate shards
+  # TODO: SERVER-83351 Investigate if this tests can be rewritten to support sharded-cluster scenarios
+  - jstests/core/query/explain/explain_find_trivially_false_predicates_in_agg_pipelines.js
+  - jstests/core/query/plan_cache/plan_cache_list_plans.js
+  - jstests/core/index/index_filter_commands.js
+  - jstests/core/index/index_stats.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
   # system.profile collection doesn't exist on mongos.
   - requires_profiling
-  # Transactions are not allowed to operate on capped collections.
-  - requires_capped
-  # Prepare is not a command on mongos.
-  - uses_prepare_transaction
-  # These tests already pass in API parameters, so we avoid overwriting them.
-  - uses_api_parameters
+  # TODO: SERVER-83396 Remove no longer needed `assumes_no_implicit_collection_creation_after_drop`
+  # and `assumes_no_implicit_collection_creation_on_get_collection` tags
+  - assumes_no_implicit_collection_creation_after_drop
+  - assumes_no_implicit_collection_creation_on_get_collection
+  # TODO: SERVER-81937 Enable transaction tests
+  - uses_transactions
+  # TODO: SERVER-83268 Enable timeseries tests
+  - requires_timeseries
 
 executor:
   archive:
     hooks:
-      - CheckReplOplogs
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
+    tests: true
   config:
     shell_options:
-      eval: >-
-        globalThis.testingReplication = true;
-        await import('jstests/libs/override_methods/set_api_version.js');
+      eval: load("jstests/libs/override_methods/implicitly_create_unsplittable_collections_on_random_shards.js")
   hooks:
-  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
-  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
-  # validating the entire contents of the collection.
-  - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
@@ -100,10 +102,11 @@ executor:
     n: 20
   fixture:
     class: ShardedClusterFixture
+    num_shards: 2
+    enable_balancer: false
     mongos_options:
       set_parameters:
         enableTestCommands: 1
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-    num_rs_nodes_per_shard: 2

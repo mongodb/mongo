@@ -20,8 +20,6 @@ function makeView(viewName, viewOn, pipeline, expectedErrorCode) {
     } else {
         assert.commandWorked(res, "Could not create view " + tojson(options));
     }
-
-    return viewsDb.getCollection(viewName);
 }
 
 function makeLookup(from) {

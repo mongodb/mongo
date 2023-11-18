@@ -53,8 +53,12 @@ export var FixtureHelpers = (function() {
      * sharded.
      */
     function isSharded(coll) {
-        const db = coll.getDB();
-        return db.getSiblingDB("config").collections.find({_id: coll.getFullName()}).count() > 0;
+        const collEntry =
+            coll.getDB().getSiblingDB("config").collections.findOne({_id: coll.getFullName()});
+        if (collEntry === null) {
+            return false;
+        }
+        return collEntry.unsplittable === null || !collEntry.unsplittable;
     }
 
     /**

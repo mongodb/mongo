@@ -6604,6 +6604,12 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
+  name: unsplittable_collections_created_on_any_shard_jscore_passthrough_gen
+  tags: ["unsplittable_collections"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
   name: sharded_collections_jscore_passthrough_with_auto_bootstrap_gen
   tags: ["sharding", "jscore"]
   commands:

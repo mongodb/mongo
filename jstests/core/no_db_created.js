@@ -1,6 +1,7 @@
 // Checks that some operations do not create a database
 //
 // @tags: [
+//   assumes_no_implicit_collection_creation_on_get_collection,
 //   # The test runs commands that are not allowed with security token: compact.
 //   not_allowed_with_security_token,
 //   requires_non_retryable_commands,

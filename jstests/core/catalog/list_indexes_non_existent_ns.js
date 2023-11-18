@@ -1,3 +1,10 @@
+/**
+ * Tests list indexes on non existent DB.
+ *
+ * @tags: [
+ *     assumes_no_implicit_collection_creation_on_get_collection,
+ * ]
+ */
 // Test the listIndexes command on non-existent collection.
 var dbTest = db.getSiblingDB("list_indexes_non_existent_db");
 assert.commandWorked(dbTest.dropDatabase());

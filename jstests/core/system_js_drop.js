@@ -13,8 +13,8 @@
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
-const coll = testDB.coll;
-const systemJs = testDB.system.js;
+const coll = testDB.getCollection('coll');
+const systemJs = testDB.getCollection('system.js');
 
 assert.commandWorked(coll.insert([{name: 'Alice', age: 20}, {name: 'Bob', age: 18}]));
 

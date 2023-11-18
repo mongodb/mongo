@@ -9,6 +9,7 @@
  *     requires_fcv_60,
  *     # $listCatalog result can be large and may be returned in multiple batches.
  *     requires_getmore,
+ *     requires_timeseries,
  *     # $listCatalog will not prefix namespaces in its responses, and therefore is incompatible
  *     # with prefix checking.
  *     simulate_atlas_proxy_incompatible,

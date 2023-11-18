@@ -9,7 +9,7 @@
 // ]
 const testDB = db.getSiblingDB("where_system_js");
 const testColl = testDB.where_system_js;
-const systemJsColl = testDB.system.js;
+const systemJsColl = testDB.getCollection("system.js");
 
 assert.commandWorked(testDB.dropDatabase());
 

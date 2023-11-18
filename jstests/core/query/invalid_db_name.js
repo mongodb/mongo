@@ -1,7 +1,9 @@
 // Ensures that invalid DB names are reported as write errors
 //
-// Can't shard collection with invalid db name.
-// @tags: [assumes_unsharded_collection]
+// Can't create a collection with invalid database name
+// @tags: [
+//     assumes_no_implicit_collection_creation_on_get_collection
+// ]
 var invalidDB = db.getSiblingDB("NonExistentDB");
 
 // This is a hack to bypass invalid database name checking by the DB constructor

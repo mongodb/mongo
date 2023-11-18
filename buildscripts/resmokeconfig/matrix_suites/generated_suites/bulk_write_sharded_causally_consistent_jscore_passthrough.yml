@@ -77,10 +77,6 @@ selector:
   - jstests/core/**/create_indexes.js
   - jstests/core/**/list_indexes_non_existent_ns.js
   - jstests/core/**/mr_preserve_indexes.js
-  - jstests/core/**/dbcase.js
-  - jstests/core/**/dbcase2.js
-  - jstests/core/**/no_db_created.js
-  - jstests/core/**/killop_drop_collection.js
   - jstests/core/**/benchrun_pipeline_updates.js
   - jstests/core/timeseries/timeseries_delete_hint.js
   - jstests/core/**/set_param1.js
@@ -101,6 +97,7 @@ selector:
   - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
   - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
   exclude_with_any_tags:
+  - assumes_no_implicit_collection_creation_on_get_collection
   - assumes_against_mongod_not_mongos
   - assumes_standalone_mongod
   - assumes_no_implicit_collection_creation_after_drop

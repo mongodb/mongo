@@ -69,10 +69,6 @@ selector:
   - jstests/core/**/create_indexes.js
   - jstests/core/**/list_indexes_non_existent_ns.js
   - jstests/core/**/mr_preserve_indexes.js
-  - jstests/core/**/dbcase.js
-  - jstests/core/**/dbcase2.js
-  - jstests/core/**/no_db_created.js
-  - jstests/core/**/killop_drop_collection.js
   - jstests/core/**/geo_borders.js
   - jstests/core/**/distinct_index1.js
   - jstests/core/**/explain1.js
@@ -87,6 +83,7 @@ selector:
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
+  - assumes_no_implicit_collection_creation_on_get_collection
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection

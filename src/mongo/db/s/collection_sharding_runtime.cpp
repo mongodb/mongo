@@ -518,7 +518,6 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         ShardVersionFactory::make(currentMetadata, wantedCollectionIndexes);
 
     const ChunkVersion receivedPlacementVersion = receivedShardVersion.placementVersion();
-
     const bool isPlacementVersionIgnored =
         ShardVersion::isPlacementVersionIgnored(receivedShardVersion);
     const boost::optional<Timestamp> receivedIndexVersion = receivedShardVersion.indexVersion();
