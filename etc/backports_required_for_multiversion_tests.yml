@@ -431,6 +431,10 @@ last-continuous:
     ticket: SERVER-82447
   - test_file: jstests/core/query/explode_for_sort_plan_cache.js
     ticket: SERVER-83777
+  - test_file: src/mongo/db/modules/enterprise/jstests/external_auth_oidc/oidc_internal_authz.js
+    ticket: SERVER-78066
+  - test_file: src/mongo/db/modules/enterprise/jstests/external_auth_oidc/oidc_omit_client_id.js
+    ticket: SERVER-78066
   suites: null
 last-lts:
   all:
