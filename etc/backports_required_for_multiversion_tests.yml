@@ -521,6 +521,10 @@ last-continuous:
     ticket: SERVER-39336
   - test_file: jstests/aggregation/expressions/expression_mod.js
     ticket: SERVER-39336
+  - test_file: src/mongo/db/modules/enterprise/jstests/external_auth_oidc/oidc_internal_authz.js
+    ticket: SERVER-78066
+  - test_file: src/mongo/db/modules/enterprise/jstests/external_auth_oidc/oidc_omit_client_id.js
+    ticket: SERVER-78066
   suites: null
 last-lts:
   all:
