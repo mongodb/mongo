@@ -5339,6 +5339,7 @@ tasks:
   - *git_get_project
   - *set_task_expansion_macros
   - *set_up_virtualenv
+  - func: "configure evergreen api credentials"
   - command: expansions.write
     params:
       file: src/expansions.yml
