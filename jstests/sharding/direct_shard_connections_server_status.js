@@ -22,6 +22,24 @@ function assertDirectShardConnectionsMetrics(conn, expected) {
               {expected, actual: res.directShardConnections});
 }
 
+function assertSoonDirectShardConnectionsMetrics(conn, expected) {
+    let numTries = 0;
+    assert.soon(() => {
+        numTries++;
+        const res = conn.adminCommand({serverStatus: 1});
+        assert(res.hasOwnProperty("directShardConnections"), res);
+        if (res.directShardConnections.current != expected.current ||
+            res.directShardConnections.totalCreated != expected.totalCreated) {
+            if (numTries % 100 == 0) {
+                jsTest.log("Still waiting for direct shard connections metrics " +
+                           tojson({expected, actual: res.directShardConnections}));
+            }
+            return false;
+        }
+        return true;
+    });
+}
+
 const st = new ShardingTest({mongos: 1, shards: 1});
 const shard0Primary = st.rs0.getPrimary();
 
@@ -78,7 +96,8 @@ insertThread.join();
 jsTest.log("Test metrics after closing the new external connection");
 currentDirectShardConnections.current--;
 assertNoDirectShardConnectionsMetrics(st.s);
-assertDirectShardConnectionsMetrics(shard0Primary, currentDirectShardConnections);
+// Use assert.soon since there can be a lag for when the connection is destroyed on the server side.
+assertSoonDirectShardConnectionsMetrics(shard0Primary, currentDirectShardConnections);
 
 // TODO (SERVER-79353): Connect to shard0's primary on the router port and verify that
 // its serverStatus metrics do not contain "directShardConnections" metrics, and that the
