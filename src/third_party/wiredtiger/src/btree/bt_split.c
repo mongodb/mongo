@@ -402,9 +402,6 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
     uint32_t slots;
     void *p;
 
-    WT_STAT_CONN_DATA_INCR(session, cache_eviction_deepen);
-    WT_STAT_CONN_DATA_INCR(session, cache_eviction_split_internal);
-
     btree = S2BT(session);
     alloc_index = NULL;
     locked = NULL;
@@ -558,6 +555,9 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
     /* Adjust the root's memory footprint. */
     __wt_cache_page_inmem_incr(session, root, root_incr);
     __wt_cache_page_inmem_decr(session, root, root_decr);
+
+    WT_STAT_CONN_DATA_INCR(session, cache_eviction_deepen);
+    WT_STAT_CONN_DATA_INCR(session, cache_eviction_split_internal);
 
     __wt_gen_next(session, WT_GEN_SPLIT, NULL);
 err:
@@ -908,8 +908,6 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
     uint32_t slots;
     void *p;
 
-    WT_STAT_CONN_DATA_INCR(session, cache_eviction_split_internal);
-
     /* Mark the page dirty. */
     WT_RET(__wt_page_modify_init(session, page));
     __wt_page_modify_set(session, page);
@@ -1093,6 +1091,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
     /* Adjust the page's memory footprint. */
     __wt_cache_page_inmem_incr(session, page, page_incr);
     __wt_cache_page_inmem_decr(session, page, page_decr);
+
+    WT_STAT_CONN_DATA_INCR(session, cache_eviction_split_internal);
 
     __wt_gen_next(session, WT_GEN_SPLIT, NULL);
 err:
@@ -1767,8 +1767,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     int i;
     void *key;
 
-    WT_STAT_CONN_DATA_INCR(session, cache_inmem_split);
-
     page = ref->page;
     right = NULL;
     page_decr = parent_incr = right_incr = 0;
@@ -1981,8 +1979,10 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     /*
      * Split into the parent.
      */
-    if ((ret = __split_parent(session, ref, split_ref, 2, parent_incr, false, true)) == 0)
+    if ((ret = __split_parent(session, ref, split_ref, 2, parent_incr, false, true)) == 0) {
+        WT_STAT_CONN_DATA_INCR(session, cache_inmem_split);
         return (0);
+    }
 
     /*
      * Failure.
@@ -2098,8 +2098,6 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
     size_t parent_incr;
     uint32_t i, new_entries;
 
-    WT_STAT_CONN_DATA_INCR(session, cache_eviction_split_leaf);
-
     page = ref->page;
     mod = page->modify;
     new_entries = mod->mod_multi_entries;
@@ -2119,6 +2117,7 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
      * Split into the parent; if we're closing the file, we hold it exclusively.
      */
     WT_ERR(__split_parent(session, ref, ref_new, new_entries, parent_incr, closing, true));
+    WT_STAT_CONN_DATA_INCR(session, cache_eviction_split_leaf);
 
     /*
      * The split succeeded, we can no longer fail.
