@@ -29,6 +29,7 @@ if protobuf_env.ToolchainIs('gcc'):
         CCFLAGS=[
             '-Wno-stringop-overflow',
             '-Wno-error=deprecated',
+            '-Wno-error=attributes',
         ],
     )
 
