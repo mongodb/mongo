@@ -12,14 +12,33 @@ import os
 import subprocess
 import sys
 
+from contextlib import contextmanager
+
 from github.GithubIntegration import GithubIntegration
+
+
+@contextmanager
+def cwd(path):
+    """Change working directory"""
+
+    oldpwd = os.getcwd()
+    try:
+        os.chdir(path)
+    except Exception as e:
+        sys.exit(e)
+    try:
+        yield
+    finally:
+        os.chdir(oldpwd)
 
 
 # Get the App
 app_id = os.getenv("GITHUB_APP_ID")
 private_key = os.getenv("GITHUB_APP_PRIVATE_KEY")
 if (not app_id) or (not private_key):
-    sys.exit("Please ensure GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY environment variables are set.")
+    sys.exit(
+        "Please ensure GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY environment variables are set."
+    )
 try:
     app = GithubIntegration(int(app_id), private_key)
 except Exception as e:
@@ -29,24 +48,20 @@ except Exception as e:
 owner = os.getenv("GITHUB_OWNER")
 repo = os.getenv("GITHUB_REPO")
 if (not owner) or (not repo):
-    sys.exit("Please ensure GITHUB_OWNER and GITHUB_REPO environment variables are set.")
+    sys.exit(
+        "Please ensure GITHUB_OWNER and GITHUB_REPO environment variables are set."
+    )
 try:
     installation = app.get_repo_installation(owner, repo)
-    print(f"{installation.id=} for {owner}/{repo}")
 except Exception as e:
     sys.exit(e)
 
-# Get an installation access token
 try:
+    # Get an installation access token
     installation_auth = app.get_access_token(installation.id)
-    # Print the token to STDOUT and save it in an environment variable
-    os.environ["GITHUB_APP_INSTALLATION_TOKEN"] = installation_auth.token
-except Exception as e:
-    sys.exit(e)
 
-# Use the token to push the commit
-try:
-    with os.chdir('wiredtiger.github.com'):
+    # Use the token to push the commit
+    with cwd("wiredtiger.github.com"):
         cmd = f"git push https://'{app_id}:{installation_auth.token}'@github.com/{owner}/{repo}"
         subprocess.run([cmd], shell=True, check=True)
 except Exception as e:

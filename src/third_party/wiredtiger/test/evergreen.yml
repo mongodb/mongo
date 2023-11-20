@@ -449,7 +449,7 @@ functions:
 
             # Synchronize the generated documentation with the current one.
             echo "Synchronizing documentation for branch $branch ..."
-            rsync -avq ../wiredtiger/docs-$branch/ $branch/ --delete
+            rsync -aq ../wiredtiger/docs-$branch/ $branch/ --delete
 
             # Commit and push the changes if any.
             if [[ $(git status "$branch" --porcelain) ]]; then
@@ -948,7 +948,7 @@ functions:
         bucket: build_external
         permissions: public-read
         content_type: application/tar
-        display_name: Artifacts
+        display_name: ${artifacts_name|Artifacts}
         remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}${postfix|}.tgz
   "upload endian format artifacts":
     - command: s3.put
@@ -3187,6 +3187,15 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger docs"
       - func: "update wiredtiger docs"
+      - func: "upload artifact"
+        vars:
+          artifacts_name: wiredtiger
+      - func: "upload artifact"
+        vars:
+          upload_filename: wiredtiger.github.com.tgz
+          upload_source_dir: wiredtiger.github.com
+          artifacts_name: wiredtiger.github.com
+          postfix: -wiredtiger.github.com
 
   - name: syscall-linux
     commands:
