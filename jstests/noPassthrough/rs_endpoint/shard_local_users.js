@@ -4,7 +4,12 @@
  * There is no need to test with a serverless replica set since sharding isn't supported in
  * serverless so the cluster cannot become multi-shard.
  *
- * @tags: [requires_fcv_73, featureFlagCheckForDirectShardOperations, requires_persistence]
+ * @tags: [
+ *   requires_fcv_73,
+ *   featureFlagEmbeddedRouter,
+ *   featureFlagCheckForDirectShardOperations,
+ *   requires_persistence
+ * ]
  */
 
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
@@ -73,7 +78,7 @@ function runTests(shard0Primary, tearDownFunc) {
     const shard1AuthDB = shard1Primary.getDB(authDbName);
     const shard1TestColl = shard1AuthDB.getSiblingDB(dbName).getCollection(collName);
 
-    // TODO (SERVER-81968): Connect to the router port on a shardsvr mongod instead.
+    // TODO (SERVER-83380): Connect to the router port on a shardsvr mongod instead.
     const mongos = MongoRunner.runMongos({configdb: shard0URL, keyFile});
     const mongosAuthDB = mongos.getDB(authDbName);
     const mongosTestColl = mongosAuthDB.getSiblingDB(dbName).getCollection(collName);

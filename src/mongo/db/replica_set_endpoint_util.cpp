@@ -72,14 +72,35 @@ bool isTargetedCommandRequest(OperationContext* opCtx, const OpMsgRequest& opMsg
 }
 
 /**
+ * Returns the router service.
+ */
+Service* getRouterService(OperationContext* opCtx) {
+    auto routerService = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
+    invariant(routerService);
+    return routerService;
+}
+
+/**
  * Returns true if this is a request for a command that does not exist on a router.
  */
 bool isRoutableCommandRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
-    Service routerService{opCtx->getServiceContext(), ClusterRole::RouterServer};
-    return CommandHelpers::findCommand(&routerService, opMsgReq.getCommandName());
+    return CommandHelpers::findCommand(getRouterService(opCtx), opMsgReq.getCommandName());
 }
 
 }  // namespace
+
+ScopedSetRouterService::ScopedSetRouterService(OperationContext* opCtx)
+    : _opCtx(opCtx), _originalService(opCtx->getService()) {
+    // Verify that the opCtx is not using the router service already.
+    invariant(!_originalService->role().has(ClusterRole::RouterServer));
+    _opCtx->getClient()->setService(getRouterService(opCtx));
+}
+
+ScopedSetRouterService::~ScopedSetRouterService() {
+    // Verify that the opCtx is still using the router service.
+    invariant(_opCtx->getService()->role().has(ClusterRole::RouterServer));
+    _opCtx->getClient()->setService(_originalService);
+}
 
 bool isReplicaSetEndpointClient(Client* client) {
     if (client->isRouterClient()) {

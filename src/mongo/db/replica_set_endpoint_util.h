@@ -40,6 +40,8 @@ const std::set<StringData> kTargetedCmdNames = {"clearLog",
                                                 "configureFailPoint",
                                                 "connectionStatus",
                                                 "currentOp",
+                                                "fsync",
+                                                "fsyncUnlock",
                                                 "getLog",
                                                 "getParameter",
                                                 "getShardVersion",
@@ -55,6 +57,21 @@ const std::set<StringData> kTargetedCmdNames = {"clearLog",
                                                 "setParameter",
                                                 "serverStatus",
                                                 "_flushRoutingTableCacheUpdates"};
+
+/**
+ * RAII type for making the OperationContext it is instantiated with use the router service util it
+ * goes out of scope. Throws an invariant error if the OperationContext is already using the router
+ * service.
+ */
+class ScopedSetRouterService {
+public:
+    ScopedSetRouterService(OperationContext* opCtx);
+    ~ScopedSetRouterService();
+
+private:
+    OperationContext* const _opCtx;
+    Service* const _originalService;
+};
 
 /**
  * Returns true if this is a client on the shard port of a shardsvr mongod that supports

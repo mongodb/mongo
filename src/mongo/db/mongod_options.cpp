@@ -715,6 +715,9 @@ Status storeMongodOptions(const moe::Environment& params) {
                serverGlobalParams.maintenanceMode == ServerGlobalParams::MaintenanceMode::None) {
         serverGlobalParams.doAutoBootstrapSharding = true;
         serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+        if (feature_flags::gEmbeddedRouter.isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot)) {
+            serverGlobalParams.clusterRole += ClusterRole::RouterServer;
+        }
     }
 
     if (!params.count("net.port")) {

@@ -152,6 +152,13 @@ public:
     }
 
     /**
+     * Overwrites the Service for this client. To be used by the replica set endpoint only.
+     */
+    Service* setService(Service* service) {
+        return _service = service;
+    }
+
+    /**
      * Returns the Service that owns this client.
      */
     Service* getService() const {
@@ -399,7 +406,7 @@ private:
         _opCtx = opCtx;
     }
 
-    Service* const _service;
+    Service* _service;
     const std::shared_ptr<transport::Session> _session;
 
     // Description for the client (e.g. conn8)

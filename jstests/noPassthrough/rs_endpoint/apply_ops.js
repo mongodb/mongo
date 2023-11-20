@@ -1,7 +1,12 @@
 /*
- * Tests that applyOps command work correctly when the replica set endpoint is used.
+ * Tests that applyOps commands work correctly when the replica set endpoint is used.
  *
- * @tags: [requires_fcv_73, featureFlagSecurityToken, requires_persistence]
+ * @tags: [
+ *   requires_fcv_73,
+ *   featureFlagEmbeddedRouter,
+ *   featureFlagSecurityToken,
+ *   requires_persistence
+ * ]
  */
 
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
@@ -18,19 +23,21 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     const dbName = "testDb";
     const collName = "testColl";
     const ns = dbName + "." + collName;
+    const writeConcern = {w: "majority"};
 
     const shard0TestColl = shard0Primary.getDB(dbName).getCollection(collName);
+    assert.commandWorked(shard0TestColl.insert({_id: 0, x: 0}));
 
-    const createCollRes = shard0Primary.adminCommand(
-        {applyOps: [{op: "c", ns: dbName + ".$cmd", o: {create: collName}}]});
+    // Verify that applyOps works correctly on shard0.
+    const insertRes = shard0Primary.adminCommand(
+        {applyOps: [{"op": "i", ns, "o": {_id: 1, x: 1}}], writeConcern});
     if (isMultitenant) {
         // applyOps command is not supported in multitenancy mode.
-        assert.commandFailedWithCode(createCollRes, ErrorCodes.Unauthorized);
+        assert.commandFailedWithCode(insertRes, ErrorCodes.Unauthorized);
     } else {
-        assert.commandWorked(createCollRes);
-        assert.commandWorked(
-            shard0Primary.adminCommand({applyOps: [{"op": "i", ns, "o": {_id: 1, x: 0}}]}));
-        assert.eq(shard0TestColl.find().itcount(), 1);
+        assert.commandWorked(insertRes);
+        assert.eq(shard0TestColl.find().itcount(), 2);
+        assert.neq(shard0TestColl.find({_id: 0}, null));
         assert.neq(shard0TestColl.findOne({_id: 1}), null);
     }
 
@@ -50,33 +57,43 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     const shard1TestDB = shard1Primary.getDB(dbName);
     const shard1TestColl = shard1TestDB.getCollection(collName);
 
-    const shard0URL = getReplicaSetURL(shard0Primary);
-    // TODO (SERVER-81968): Connect to the router port on a shardsvr mongod instead.
-    const mongos = MongoRunner.runMongos({configdb: shard0URL});
-    assert.commandWorked(mongos.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
+    // Run the addShard command against shard0's primary mongod instead to verify that
+    // replica set endpoint supports router commands.
+    assert.commandWorked(
+        shard0Primary.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains two shards (one config shard and one regular shard)");
 
+    const shard0URL = getReplicaSetURL(shard0Primary);
+    // TODO (SERVER-83380): Connect to the router port on a shardsvr mongod instead.
+    const mongos = MongoRunner.runMongos({configdb: shard0URL});
     // applyOps command is not supported on a router.
     assert.commandFailedWithCode(
-        mongos.adminCommand({applyOps: [{op: "c", ns: dbName + ".$cmd", o: {drop: collName}}]}),
+        mongos.adminCommand(
+            {applyOps: [{op: "c", ns: dbName + ".$cmd", o: {drop: collName}}], writeConcern}),
         ErrorCodes.CommandNotFound);
 
-    assert.commandWorked(shard1Primary.adminCommand(
-        {applyOps: [{op: "c", ns: dbName + ".$cmd", o: {create: collName}}]}));
-    assert.commandWorked(
-        shard1Primary.adminCommand({applyOps: [{"op": "i", ns, "o": {_id: 1, x: 0}}]}));
-    assert.eq(shard1TestColl.find().itcount(), 1);
-    assert.neq(shard1TestColl.findOne({_id: 1}), null);
-
+    // Verify that applyOps works correctly on shard0 and shard1.
     assert.commandWorked(shard0Primary.adminCommand(
-        {applyOps: [{op: "c", ns: dbName + ".$cmd", o: {drop: collName}}]}));
-    assert.eq(shard0TestColl.find({}).itcount(), 0);
-    // The collection should still exist on shard1.
+        {applyOps: [{"op": "i", ns, "o": {_id: 2, x: 2}}], writeConcern}));
+    assert.commandWorked(shard1Primary.adminCommand(
+        {applyOps: [{op: "c", ns: dbName + ".$cmd", o: {create: collName}}], writeConcern}));
+    assert.commandWorked(shard1Primary.adminCommand(
+        {applyOps: [{"op": "i", ns, "o": {_id: 3, x: 3}}], writeConcern}));
+    // shard0 has two documents for the test collection.
+    assert.eq(shard0TestColl.find({}).itcount(), 3);
+    assert.neq(shard0TestColl.find({_id: 0}, null));
+    assert.neq(shard0TestColl.findOne({_id: 1}), null);
+    assert.neq(shard0TestColl.findOne({_id: 2}), null);
+    // shard1 has one document for the test collection.
     assert.eq(shard1TestColl.find({}).itcount(), 1);
+    assert.neq(shard1TestColl.findOne({_id: 3}), null);
 
-    // Remove the second shard from the cluster.
+    // Remove the second shard (shard1) from the cluster. Note that on shard1 the test collection
+    // was created directly via the applyOps command above, i.e. without going through the router,
+    // so the config server doesn't know about the presence of the test collection on shard1 so
+    // the shard can be removed shard1 without draining those documents.
     assert.soon(() => {
         const res = assert.commandWorked(mongos.adminCommand({removeShard: shard1Name}));
         return res.state == "completed";
@@ -85,20 +102,38 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains one shard (config shard) again");
 
-    // The insert should fail since the collection does not exists on shard0.
-    assert.commandFailedWithCode(
-        shard0Primary.adminCommand({applyOps: [{"op": "i", ns, "o": {_id: 1, x: 0}}]}),
-        ErrorCodes.NamespaceNotFound);
+    // Verify that applyOps works correctly on shard0.
+    assert.commandWorked(shard0Primary.adminCommand(
+        {applyOps: [{"op": "i", ns, "o": {_id: 4, x: 4}}], writeConcern}));
+    assert.eq(shard0TestColl.find({}).itcount(), 4);
+    assert.neq(shard0TestColl.find({_id: 0}, null));
+    assert.neq(shard0TestColl.findOne({_id: 1}), null);
+    assert.neq(shard0TestColl.findOne({_id: 2}), null);
+    assert.neq(shard0TestColl.findOne({_id: 4}), null);
 
     // Add the second shard back but convert the config shard to dedicated config server.
+    // Drop the test collection from the shard since it is illegal to add a shard with a collection
+    // that already exists in the cluster (the removeShard command would fail with an
+    // OperationFailed error as verified below).
+    assert.commandFailedWithCode(
+        mongos.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}),
+        ErrorCodes.OperationFailed);
+    assert.commandWorked(shard1Primary.adminCommand(
+        {applyOps: [{op: "c", ns: dbName + ".$cmd", o: {drop: collName}}], writeConcern}));
     assert.commandWorked(mongos.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
     assert.commandWorked(mongos.adminCommand({transitionToDedicatedConfigServer: 1}));
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains one shard (regular shard)");
 
-    // The collection should still exist on shard1.
-    assert.eq(shard1TestColl.find({}).itcount(), 1);
+    // Verify that applyOps works correctly on shard1.
+    assert.commandWorked(shard1Primary.adminCommand(
+        {applyOps: [{op: "c", ns: dbName + ".$cmd", o: {create: collName}}], writeConcern}));
+    assert.commandWorked(shard1Primary.adminCommand(
+        {applyOps: [{"op": "i", ns, "o": {_id: 5, x: 5}}], writeConcern}));
+    // shard1 has one document for the test collection.
+    assert.eq(shard1TestColl.find().itcount(), 1);
+    assert.neq(shard1TestColl.findOne({_id: 5}), null);
 
     tearDownFunc();
     shard1Rst.stopSet();
@@ -137,17 +172,19 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     runTests(primary /* shard0Primary */, tearDownFunc);
 }
 
-{
-    jsTest.log("Running tests for a single-shard cluster");
-    const st = new ShardingTest({
-        shards: 1,
-        rs: {nodes: 2, setParameter: {featureFlagReplicaSetEndpoint: true}},
-        configShard: true,
-    });
-    const tearDownFunc = () => st.stop();
+// TODO (SERVER-81968): Re-enable single-shard cluster test cases once config shards support
+// embedded routers.
+// {
+//     jsTest.log("Running tests for a single-shard cluster");
+//     const st = new ShardingTest({
+//         shards: 1,
+//         rs: {nodes: 2, setParameter: {featureFlagReplicaSetEndpoint: true}},
+//         configShard: true,
+//     });
+//     const tearDownFunc = () => st.stop();
 
-    runTests(st.rs0.getPrimary() /* shard0Primary */, tearDownFunc);
-}
+//     runTests(st.rs0.getPrimary() /* shard0Primary */, tearDownFunc);
+// }
 
 {
     jsTest.log("Running tests for a serverless replica set bootstrapped as a single-shard cluster");

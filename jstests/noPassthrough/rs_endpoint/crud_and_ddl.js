@@ -1,7 +1,12 @@
 /*
  * Tests that CRUD and DDL commands work correctly when the replica set endpoint is used.
  *
- * @tags: [requires_fcv_73, featureFlagSecurityToken, requires_persistence]
+ * @tags: [
+ *   requires_fcv_73,
+ *   featureFlagEmbeddedRouter,
+ *   featureFlagSecurityToken,
+ *   requires_persistence
+ * ]
  */
 
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
@@ -53,13 +58,18 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     const shard1Primary = shard1Rst.getPrimary();
     const shard1TestColl = shard1Primary.getDB(dbName).getCollection(collName);
 
+    // Run the enableSharding and addShard commands against shard0's primary mongod instead
+    // to verify that replica set endpoint supports router commands.
+    // TODO (PM-3364): Remove the enableSharding command below once we start tracking unsharded
+    // collections.
+    assert.commandWorked(shard0Primary.adminCommand({enableSharding: dbName}));
+    assert.commandWorked(
+        shard0Primary.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
+
     const shard0URL = getReplicaSetURL(shard0Primary);
-    // TODO (SERVER-81968): Connect to the router port on a shardsvr mongod instead.
+    // TODO (SERVER-83380): Connect to the router port on a shardsvr mongod instead.
     const mongos = MongoRunner.runMongos({configdb: shard0URL});
     const mongosTestColl = mongos.getDB(dbName).getCollection(collName);
-    // TODO (SERVER-81968): Remove once we start tracking unsharded collection.
-    assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(mongos.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains two shards (one config shard and one regular shard)");
@@ -133,7 +143,9 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
 {
     jsTest.log("Running tests for a replica set bootstrapped as a single-shard cluster");
     const rst = new ReplSetTest({
-        nodes: 2,
+        // TODO (SERVER-83433): Make the replica set have secondaries to get test coverage for
+        // running db hash check while the replica set is fsync locked.
+        nodes: 1,
         nodeOptions: {
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
@@ -151,17 +163,24 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     runTests(primary /* shard0Primary */, tearDownFunc);
 }
 
-{
-    jsTest.log("Running tests for a single-shard cluster");
-    const st = new ShardingTest({
-        shards: 1,
-        rs: {nodes: 2, setParameter: {featureFlagReplicaSetEndpoint: true}},
-        configShard: true,
-    });
-    const tearDownFunc = () => st.stop();
+// TODO (SERVER-81968): Re-enable single-shard cluster test cases once config shards support
+// embedded routers.
+// {
+//     jsTest.log("Running tests for a single-shard cluster");
+//     const st = new ShardingTest({
+//         shards: 1,
+//         rs: {
+//             // TODO (SERVER-83433): Make the replica set have secondaries to get test coverage
+//             // for running db hash check while the replica set is fsync locked.
+//             nodes: 1,
+//             setParameter: {featureFlagReplicaSetEndpoint: true}
+//         },
+//         configShard: true,
+//     });
+//     const tearDownFunc = () => st.stop();
 
-    runTests(st.rs0.getPrimary() /* shard0Primary */, tearDownFunc);
-}
+//     runTests(st.rs0.getPrimary() /* shard0Primary */, tearDownFunc);
+// }
 
 {
     jsTest.log("Running tests for a serverless replica set bootstrapped as a single-shard cluster");
