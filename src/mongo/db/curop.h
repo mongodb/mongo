@@ -336,6 +336,8 @@ public:
     boost::optional<std::size_t> queryStatsKeyHash;
     // The Key used by query stats to generate the query stats store key.
     std::unique_ptr<query_stats::Key> queryStatsKey;
+    // True if the request was rate limited and stats should not be collected.
+    bool queryStatsRateLimited{false};
 
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
