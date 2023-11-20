@@ -1,4 +1,6 @@
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+/*
+ * @tags: [requires_sbe]
+ */
 
 const st = new ShardingTest({
     shards: 2,
@@ -10,13 +12,6 @@ const st = new ShardingTest({
 });
 
 const db = st.getDB("test");
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    st.stop();
-    quit();
-}
-
 const coll = db.analyze_coll;
 coll.drop();
 

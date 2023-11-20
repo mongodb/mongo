@@ -2,9 +2,12 @@
  * Tests the logic around the termination condition for the SBE multiplanner. In particular,
  * demonstrates that unlike the classic multiplanner, the SBE multiplanner's end condition is by
  * default not proportional to the size of the collection.
+ *
+ * @tags: [
+ *   # This test assumes that SBE is being used for most queries.
+ *   requires_sbe,
+ * ]
  */
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
 const numDocs = 1000;
 const dbName = "sbe_multiplanner_db";
 const collName = "sbe_multiplanner_coll";
@@ -20,13 +23,6 @@ const trialLengthFromWorksKnob = 0.1 * numDocs;
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB(dbName);
-
-// This test assumes that SBE is being used for most queries.
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 const coll = db[collName];
 
 // Gets the "allPlansExecution" section from the explain of a query that has zero results, but for

@@ -2,8 +2,12 @@
  * Tests the number of read is correctly bounded during SBE multiplanning. We don't want to reduce
  * the max read bound to 0 because that will effectively disable the trial run tracking for that
  * metric. See SERVER-79088 for more details.
+ *
+ * @tags: [
+ *    # This test assumes that SBE is being used for most queries.
+ *    requires_sbe,
+ * ]
  */
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const dbName = "sbe_multiplanner_db";
 const collName = "sbe_multiplanner_coll";
@@ -11,13 +15,6 @@ const collName = "sbe_multiplanner_coll";
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB(dbName);
-
-// This test assumes that SBE is being used for most queries.
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 const coll = db[collName];
 
 for (let i = 0; i < 100; i++) {

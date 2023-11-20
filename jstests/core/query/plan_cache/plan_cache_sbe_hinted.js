@@ -13,15 +13,9 @@
  *   assumes_standalone_mongod,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_experimental_incompatible,
+ *   requires_sbe,
  * ]
  */
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
-if (!checkSBEEnabled(db)) {
-    jsTest.log("Skip running the test because SBE is not enabled");
-    quit();
-}
-
 const coll = db.plan_cache_sbe;
 coll.drop();
 

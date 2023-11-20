@@ -10,6 +10,7 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
+ *   requires_sbe
  * ]
  */
 import {
@@ -19,17 +20,9 @@ import {
     getSingleNodeExplain,
     getWinningPlan,
 } from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const st = new ShardingTest({shards: 2, config: 1});
 const db = st.s.getDB("test");
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE $lookup is not enabled.");
-    st.stop();
-    quit();
-}
-
 const coll = db.lookup_with_limit;
 const other = db.lookup_with_limit_other;
 coll.drop();

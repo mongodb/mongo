@@ -1,22 +1,16 @@
 /**
  * Tests that the query engine used is recorded correctly in the logs, system.profile, and
  * serverStatus.
+ *
+ * @tags: [requires_sbe]
  */
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 let conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 
 let db = conn.getDB(jsTestName());
-
-// This test assumes that SBE is being used for most queries.
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 
 function initializeTestCollection() {
     assert.commandWorked(db.dropDatabase());
