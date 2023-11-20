@@ -246,7 +246,7 @@ std::pair<bool, boost::optional<BSONObj>> handleWouldChangeOwningShardErrorRetry
         // Process a WriteConcernError, if one occurred.
         auto writeConcernDetail = getWriteConcernErrorDetailFromBSONObj(commitResponse);
         if (writeConcernDetail && !writeConcernDetail->toStatus().isOK())
-            processWCErrorFn(writeConcernDetail.release());
+            processWCErrorFn(std::move(writeConcernDetail));
     } catch (DBException& e) {
         if (e.code() == ErrorCodes::DuplicateKey &&
             e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id")) {

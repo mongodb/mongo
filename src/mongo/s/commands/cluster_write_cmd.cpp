@@ -396,7 +396,9 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
                         return wouldChangeOwningShardErrorInfo;
                     },
                     // ProcessWCEFn:
-                    [&](WriteConcernErrorDetail* wce) { response->setWriteConcernError(wce); },
+                    [&](std::unique_ptr<WriteConcernErrorDetail> wce) {
+                        response->setWriteConcernError(wce.release());
+                    },
                     // ProcessWriteErrorFn:
                     [&](DBException& e) {
                         if (!response->isErrDetailsSet()) {

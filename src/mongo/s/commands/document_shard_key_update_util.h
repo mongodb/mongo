@@ -103,7 +103,7 @@ typedef std::function<boost::optional<WouldChangeOwningShardInfo>()> RerunOrigin
  *  i.e. saving the error to  set on the command response. The logic for this differs between
  * 'update' and 'bulkWrite' as they have different response types.
  */
-typedef std::function<void(WriteConcernErrorDetail*)> ProcessWCErrorFn;
+typedef std::function<void(std::unique_ptr<WriteConcernErrorDetail>)> ProcessWCErrorFn;
 /**
  *  A function provided by the caller of 'handleWouldChangeOwningShardErrorRetryableWriteLegacy'
  *  to do custom processing of any exception that occurs while executing the transaction. The logic

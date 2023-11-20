@@ -427,7 +427,7 @@ public:
                                 response, opCtx->inMultiDocumentTransaction());
                         },
                         // ProcessWCEFn:
-                        [&](WriteConcernErrorDetail* wce) {
+                        [&](std::unique_ptr<WriteConcernErrorDetail> wce) {
                             auto bwWce = BulkWriteWriteConcernError::parseOwned(
                                 IDLParserContext("BulkWriteWriteConcernError"), wce->toBSON());
                             response.wcErrors = bwWce;
