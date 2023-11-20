@@ -891,7 +891,7 @@ unsigned long countNumaNodes() {
                 while (boost::filesystem::exists(
                     std::string(str::stream() << "/sys/devices/system/node/node" << i++)))
                     ;
-                return i;
+                return i - 1;
             }
         }
     } catch (boost::filesystem::filesystem_error& e) {
