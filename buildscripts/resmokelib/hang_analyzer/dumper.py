@@ -432,6 +432,10 @@ class GDBDumper(Dumper):
         self._timeout_seconds_for_gdb_process = timeout_seconds_for_gdb_process
         super().__init__(root_logger, dbg_output)
 
+    def get_timeout_secs(self):
+        """Returns the remaining time left before we timeout."""
+        return self._timeout_seconds_for_gdb_process
+
     def _reduce_timeout_for_gdb_process(self, timeout_period: int):
         """Reduce timeout for remaining gdb processes."""
         self._timeout_seconds_for_gdb_process -= timeout_period

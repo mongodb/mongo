@@ -112,22 +112,46 @@ class HangAnalyzer(Subcommand):
         dump_pids = {}
         # Dump core files of all processes, except python & java.
         if self.options.dump_core:
-            for pinfo in [
-                    pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)
-            ]:
-                if self._check_enough_free_space():
-                    try:
-                        dumpers.dbg.dump_info(pinfo, take_dump=True)
-                    except dumper.DumpError as err:
-                        self.root_logger.error(err.message)
-                        dump_pids = {**err.dump_pids, **dump_pids}
-                    except Exception as err:  # pylint: disable=broad-except
-                        self.root_logger.info("Error encountered when invoking debugger %s", err)
-                        trapped_exceptions.append(traceback.format_exc())
-                else:
-                    self.root_logger.info(
-                        "Not enough space for a core dump, skipping %s processes with PIDs %s",
-                        pinfo.name, str(pinfo.pidv))
+            take_core_processes = [
+                pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)
+            ]
+            if (os.getenv('ASAN_OPTIONS') or os.getenv('TSAN_OPTIONS')):
+                quit_processes = []
+                for pinfo in take_core_processes:
+                    for pid in pinfo.pidv:
+                        # The mongo signal processing thread needs to be resumed to handle the SIGQUIT.
+                        quit_process = psutil.Process(pid)
+                        process.resume_process(self.root_logger, pinfo.name, pid)
+                        self.root_logger.info(
+                            "Process %d may be running a sanitizer which uses a large amount of virtual memory.",
+                            pid)
+                        self.root_logger.info(
+                            "Sending SIGQUIT to capture a more manageable sized core dump")
+                        process.quit_process(self.root_logger, pinfo.name, pid)
+                        quit_processes.append(quit_process)
+                self.root_logger.info("Waiting for all processes to end after SIGQUIT")
+                assert isinstance(dumpers.dbg, dumper.GDBDumper)
+                _, alive = psutil.wait_procs(quit_processes, timeout=dumpers.dbg.get_timeout_secs())
+                if alive:
+                    raise RuntimeError(
+                        f"The following processes took too long to end after SIGQUIT: {alive}")
+            else:
+                for pinfo in take_core_processes:
+                    if self._check_enough_free_space():
+                        try:
+                            dumpers.dbg.dump_info(pinfo, take_dump=True)
+                        except dumper.DumpError as err:
+                            self.root_logger.error(err.message)
+                            dump_pids = {**err.dump_pids, **dump_pids}
+                        except Exception as err:  # pylint: disable=broad-except
+                            self.root_logger.info("Error encountered when invoking debugger %s",
+                                                  err)
+
+                            trapped_exceptions.append(traceback.format_exc())
+                    else:
+                        self.root_logger.info(
+                            "Not enough space for a core dump, skipping %s processes with PIDs %s",
+                            pinfo.name, str(pinfo.pidv))
 
         # Download symbols after pausing if the task ID is not None and not running with sanitizers.
         # Sanitizer builds are not stripped and don't require debug symbols.
