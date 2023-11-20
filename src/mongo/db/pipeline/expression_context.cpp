@@ -261,8 +261,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
       variablesParseState(variables.useIdGenerator()),
       maxFeatureCompatibilityVersion(boost::none),  // Ensure all features are allowed.
       mayDbProfile(true),
-      _collator(
-          nullptr),  // TODO SERVER-81604 Instantiate collator for makeBlankExpressionContext()
+      _collator(nullptr),
       _documentComparator(_collator.getCollator()),
       _valueComparator(_collator.getCollator()) {
     variables.setDefaultRuntimeConstants(opCtx);
