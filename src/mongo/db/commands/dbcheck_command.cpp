@@ -307,6 +307,11 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
             indexName = invocation.getSecondaryIndex().value();
         }
 
+        if (invocation.getBsonValidateMode()) {
+            secondaryIndexCheckParameters->setBsonValidateMode(
+                invocation.getBsonValidateMode().value());
+        }
+
         // TODO SERVER-78399: Remove special handling start/end being optional once feature flag is
         // removed.
 

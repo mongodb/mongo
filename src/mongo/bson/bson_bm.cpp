@@ -39,6 +39,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -135,7 +136,7 @@ void BM_validate_contents(benchmark::State& state) {
     BSONObj array = builder.done();
 
     const auto& elem = array[0].Obj();
-    auto status = validateBSON(elem.objdata(), elem.objsize(), BSONValidateMode::kFull);
+    auto status = validateBSON(elem.objdata(), elem.objsize(), BSONValidateModeEnum::kFull);
     if (!status.isOK())
         LOGV2(6752100, "Validate failed", "elem"_attr = elem, "status"_attr = status);
     invariant(status.isOK());
@@ -143,7 +144,7 @@ void BM_validate_contents(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::ClobberMemory();
         benchmark::DoNotOptimize(
-            validateBSON(array.objdata(), array.objsize(), BSONValidateMode::kFull));
+            validateBSON(array.objdata(), array.objsize(), BSONValidateModeEnum::kFull));
         totalSize += array.objsize();
     }
     state.SetBytesProcessed(totalSize);

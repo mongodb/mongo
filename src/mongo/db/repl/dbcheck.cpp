@@ -38,6 +38,7 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -221,14 +222,16 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
     const std::string& msg,
     ScopeEnum scope,
     OplogEntriesEnum operation,
-    const Status& err) {
-    return dbCheckHealthLogEntry(nss,
-                                 collectionUUID,
-                                 SeverityEnum::Warning,
-                                 msg,
-                                 ScopeEnum::Cluster,
-                                 operation,
-                                 BSON("success" << false << "error" << err.toString()));
+    const Status& err,
+    const BSONObj& context) {
+    return dbCheckHealthLogEntry(
+        nss,
+        collectionUUID,
+        SeverityEnum::Warning,
+        msg,
+        ScopeEnum::Cluster,
+        operation,
+        BSON("success" << false << "error" << err.toString() << "context" << context));
 }
 
 /**
@@ -623,17 +626,35 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
             _secondaryIndexCheckParameters.value().getValidateMode() ==
                 DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck) {
             const auto status =
-                validateBSON(currentObjData, currentObjSize, BSONValidateMode::kDefault);
+                validateBSON(currentObjData,
+                             currentObjSize,
+                             _secondaryIndexCheckParameters.value().getBsonValidateMode());
             if (!status.isOK()) {
                 const auto msg = "Document is not well-formed BSON";
-                const auto logEntry =
-                    dbCheckErrorHealthLogEntry(collPtr->ns(),
-                                               collPtr->uuid(),
-                                               msg,
-                                               ScopeEnum::Document,
-                                               OplogEntriesEnum::Batch,
-                                               status,
-                                               BSON("recordID" << currentRecordId.toString()));
+                std::unique_ptr<HealthLogEntry> logEntry;
+                if (status.code() != ErrorCodes::NonConformantBSON) {
+                    logEntry =
+                        dbCheckErrorHealthLogEntry(collPtr->ns(),
+                                                   collPtr->uuid(),
+                                                   msg,
+                                                   ScopeEnum::Document,
+                                                   OplogEntriesEnum::Batch,
+                                                   status,
+                                                   BSON("recordID" << currentRecordId.toString()));
+                } else {
+                    // If there was a BSON error from kFull/kExtended modes (that is not caught by
+                    // kDefault), the error code would be NonConformantBSON. We log a warning
+                    // instead because the kExtended/kFull modes were recently added, so users may
+                    // have non-conformant documents that exist before the checks.
+                    logEntry = dbCheckWarningHealthLogEntry(
+                        collPtr->ns(),
+                        collPtr->uuid(),
+                        msg,
+                        ScopeEnum::Document,
+                        OplogEntriesEnum::Batch,
+                        status,
+                        BSON("recordID" << currentRecordId.toString()));
+                }
                 HealthLogInterface::get(opCtx)->log(*logEntry);
             }
         }

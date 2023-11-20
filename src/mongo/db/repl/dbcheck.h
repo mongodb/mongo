@@ -106,7 +106,8 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
     const std::string& msg,
     ScopeEnum scope,
     OplogEntriesEnum operation,
-    const Status& err);
+    const Status& err,
+    const BSONObj& context = BSONObj());
 /**
  * Get a HealthLogEntry for a dbCheck batch.
  */

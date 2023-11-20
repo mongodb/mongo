@@ -38,6 +38,7 @@
 #include <vector>
 
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -107,11 +108,11 @@ public:
             _mode == ValidateMode::kForegroundCheckBSON;
     }
 
-    BSONValidateMode getBSONValidateMode() const {
+    BSONValidateModeEnum getBSONValidateMode() const {
         return isFullValidation() || _mode == ValidateMode::kForegroundCheckBSON ||
                 _mode == ValidateMode::kBackgroundCheckBSON
-            ? BSONValidateMode::kFull
-            : BSONValidateMode::kExtended;
+            ? BSONValidateModeEnum::kFull
+            : BSONValidateModeEnum::kExtended;
     }
 
     bool isCollectionSchemaViolated() const {

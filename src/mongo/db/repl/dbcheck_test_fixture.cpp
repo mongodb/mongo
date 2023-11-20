@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bson_validate_gen.h"
+#include "mongo/util/fail_point.h"
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/bsonobj.h"
@@ -86,7 +88,8 @@ void DbCheckTest::setUp() {
 void DbCheckTest::insertDocs(OperationContext* opCtx,
                              int startIDNum,
                              int numDocs,
-                             const std::vector<std::string>& fieldNames) {
+                             const std::vector<std::string>& fieldNames,
+                             bool duplicateFieldNames) {
     const AutoGetCollection coll(opCtx, kNss, MODE_IX);
     std::vector<InsertStatement> inserts;
     for (int i = 0; i < numDocs; ++i) {
@@ -96,9 +99,37 @@ void DbCheckTest::insertDocs(OperationContext* opCtx,
             bsonBuilder << name << i + startIDNum;
         }
 
+        // If `duplicateFieldNames` is true, the inserted doc will have a duplicated field name so
+        // that it fails the kExtended mode of BSON validate check.
+        if (duplicateFieldNames && !fieldNames.empty()) {
+            bsonBuilder << fieldNames[0] << i + startIDNum + 1;
+        }
+
         const auto obj = bsonBuilder.obj();
         inserts.push_back(InsertStatement(obj));
     }
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(collection_internal::insertDocuments(
+            opCtx, *coll, inserts.begin(), inserts.end(), nullptr, false));
+        wuow.commit();
+    }
+}
+
+void DbCheckTest::insertInvalidUuid(OperationContext* opCtx,
+                                    int startIDNum,
+                                    const std::vector<std::string>& fieldNames) {
+    const AutoGetCollection coll(opCtx, kNss, MODE_IX);
+    std::vector<InsertStatement> inserts;
+
+    BSONObjBuilder bsonBuilder;
+    bsonBuilder << "_id" << startIDNum;
+    uint8_t uuidBytes[] = {0, 0, 0, 0, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, 0, 0};
+    // The UUID is invalid because its length is 10 instead of 16.
+    bsonBuilder << "invalid uuid" << BSONBinData(uuidBytes, 10, newUUID);
+    const auto obj = bsonBuilder.obj();
+    inserts.push_back(InsertStatement(obj));
 
     {
         WriteUnitOfWork wuow(opCtx);
@@ -215,11 +246,13 @@ void DbCheckTest::runHashForCollectionCheck(
 SecondaryIndexCheckParameters DbCheckTest::createSecondaryIndexCheckParams(
     DbCheckValidationModeEnum validateMode,
     StringData secondaryIndex,
-    bool skipLookupForExtraKeys) {
+    bool skipLookupForExtraKeys,
+    BSONValidateModeEnum bsonValidateMode) {
     auto params = SecondaryIndexCheckParameters();
     params.setValidateMode(validateMode);
     params.setSecondaryIndex(secondaryIndex);
     params.setSkipLookupForExtraKeys(skipLookupForExtraKeys);
+    params.setBsonValidateMode(bsonValidateMode);
     return params;
 }
 

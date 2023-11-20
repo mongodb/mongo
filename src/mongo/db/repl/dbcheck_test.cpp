@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bson_validate_gen.h"
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/catalog/health_log.h"
@@ -81,4 +82,54 @@ TEST_F(DbCheckTest, DbCheckHasherMissingKeys) {
     ASSERT_EQ(numErrDocs, getNumDocsFoundInHealthLog(opCtx, missingKeyQuery));
 }
 
+TEST_F(DbCheckTest, DbCheckDocumentWithDuplicateFieldNames) {
+    auto opCtx = operationContext();
+    std::vector<std::string> fieldNames = {"a", "b", "c"};
+
+    createIndex(opCtx, BSON("a" << 1));
+    const auto numWarningDocs = 10;
+    insertDocs(
+        opCtx, 0 /* startIdNum */, numWarningDocs, fieldNames, true /* duplicateFieldNames */);
+
+    auto params = createSecondaryIndexCheckParams(
+        DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
+        "" /* secondaryIndex */,
+        false /* skipLookupForExtraKeys */,
+        BSONValidateModeEnum::kFull);
+    runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params);
+
+    // Shut down the health log writer so that the writes get flushed to the health log collection.
+    auto service = getServiceContext();
+    HealthLogInterface::get(service)->shutdown();
+
+    // Verify that the correct number of health log warning entries were logged.
+    ASSERT_EQ(numWarningDocs, getNumDocsFoundInHealthLog(opCtx, BSONWarningQuery));
+    ASSERT_EQ(numWarningDocs, getNumDocsFoundInHealthLog(opCtx, warningQuery));
+    ASSERT_EQ(0, getNumDocsFoundInHealthLog(opCtx, errQuery));
+}
+
+TEST_F(DbCheckTest, DbCheckDocumentWithInvalidUuid) {
+    auto opCtx = operationContext();
+    std::vector<std::string> fieldNames = {"a", "b", "c"};
+
+    createIndex(opCtx, BSON("a" << 1));
+    const auto numWarningDocs = 1;
+    insertInvalidUuid(opCtx, 0 /* startIdNum */, fieldNames);
+
+    auto params = createSecondaryIndexCheckParams(
+        DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
+        "" /* secondaryIndex */,
+        false /* skipLookupForExtraKeys */,
+        BSONValidateModeEnum::kExtended);
+    runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params);
+
+    // Shut down the health log writer so that the writes get flushed to the health log collection.
+    auto service = getServiceContext();
+    HealthLogInterface::get(service)->shutdown();
+
+    // Verify that the correct number of health log warning entries were logged.
+    ASSERT_EQ(numWarningDocs, getNumDocsFoundInHealthLog(opCtx, BSONWarningQuery));
+    ASSERT_EQ(numWarningDocs, getNumDocsFoundInHealthLog(opCtx, warningQuery));
+    ASSERT_EQ(0, getNumDocsFoundInHealthLog(opCtx, errQuery));
+}
 }  // namespace mongo

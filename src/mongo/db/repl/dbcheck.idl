@@ -37,6 +37,7 @@ imports:
   - "mongo/db/basic_types.idl"
   - "mongo/db/write_concern_options.idl"
   - "mongo/db/record_id.idl"
+  - "mongo/bson/bson_validate.idl"
 
 server_parameters:
     dbCheckHealthLogEveryNBatches:
@@ -107,6 +108,9 @@ structs:
       skipLookupForExtraKeys:
         type: safeBool
         default: false
+      bsonValidateMode:
+        type: BSONValidateMode
+        default: kDefault
 
   DbCheckSingleInvocation:
     description: "Command object for dbCheck invocation"
@@ -191,6 +195,10 @@ structs:
         description: Controls whether or not to run the reverse lookup portion of the extra index keys check.
         type: safeBool
         default: false
+      bsonValidateMode:
+        description: The validate mode that dbCheck will run for BSON consistency checks
+        type: BSONValidateMode
+        optional: true
 
   DbCheckAllInvocation:
     description: "Command object for database-wide form of dbCheck invocation"

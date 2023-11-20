@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bson_validate_gen.h"
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
@@ -62,12 +63,21 @@ public:
     /**
      *  Inserts 'numDocs' docs with _id values starting at 'startIDNum' and incrementing for each
      * document. Callers must avoid duplicate key insertions. These keys always contain a value in
-     * the 'a' field.
+     * the 'a' field. If `duplicateFieldNames` is true, the inserted doc will have a duplicated
+     * field name so that it fails the kExtended mode of BSON validate check.
      */
     void insertDocs(OperationContext* opCtx,
                     int startIDNum,
                     int numDocs,
-                    const std::vector<std::string>& fieldNames);
+                    const std::vector<std::string>& fieldNames,
+                    bool duplicateFieldNames = false);
+
+    /**
+     * Insert a document with an invalid UUID (incorrect length).
+     */
+    void insertInvalidUuid(OperationContext* opCtx,
+                           int startIDNum,
+                           const std::vector<std::string>& fieldNames);
 
     /**
      * Deletes 'numDocs' docs from kNss with _id values starting at 'startIDNum' and incrementing
@@ -120,7 +130,8 @@ public:
     SecondaryIndexCheckParameters createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum validateMode,
         StringData secondaryIndex,
-        bool skipLookupForExtraKeys = false);
+        bool skipLookupForExtraKeys = false,
+        BSONValidateModeEnum bsonValidateMode = BSONValidateModeEnum::kDefault);
 
     /**
      * Creates a DbCheckCollectionInfo struct.
@@ -146,5 +157,8 @@ const auto errQuery = BSON(HealthLogEntry::kSeverityFieldName << "error");
 const auto missingKeyQuery =
     BSON(HealthLogEntry::kSeverityFieldName << "error" << HealthLogEntry::kMsgFieldName
                                             << "Document has missing index keys");
-
+const auto warningQuery = BSON(HealthLogEntry::kSeverityFieldName << "warning");
+const auto BSONWarningQuery =
+    BSON(HealthLogEntry::kSeverityFieldName << "warning" << HealthLogEntry::kMsgFieldName
+                                            << "Document is not well-formed BSON");
 }  // namespace mongo
