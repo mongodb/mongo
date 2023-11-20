@@ -27,6 +27,7 @@
  */
 
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <list>
 #include <sstream>
@@ -196,42 +197,14 @@ kv_table_item::exists() const
  *     Get the corresponding value. Return NONE if not found. Throw an exception on error.
  */
 data_value
-kv_table_item::get(timestamp_t timestamp) const
+kv_table_item::get(kv_transaction_snapshot_ptr txn_snapshot, txn_id_t txn_id,
+  timestamp_t read_timestamp, timestamp_t stable_timestamp) const
 {
     std::lock_guard lock_guard(_lock);
     kv_update::timestamp_comparator cmp;
 
     if (_updates.empty())
         return NONE;
-
-    if (has_prepared_nolock(timestamp))
-        throw wiredtiger_exception(WT_PREPARE_CONFLICT);
-
-    auto i = std::upper_bound(_updates.begin(), _updates.end(), timestamp, cmp);
-    if (i == _updates.begin())
-        return NONE;
-
-    return (*(--i))->value();
-}
-
-/*
- * kv_table_item::get --
- *     Get the corresponding value. Return NONE if not found. Throw an exception on error.
- */
-data_value
-kv_table_item::get(kv_transaction_ptr txn) const
-{
-    std::lock_guard lock_guard(_lock);
-    kv_update::timestamp_comparator cmp;
-
-    if (!txn)
-        throw model_exception("Null transaction");
-
-    if (_updates.empty())
-        return NONE;
-
-    txn_id_t txn_id = txn->id();
-    timestamp_t read_timestamp = txn->read_timestamp();
 
     if (has_prepared_nolock(read_timestamp))
         throw wiredtiger_exception(WT_PREPARE_CONFLICT);
@@ -240,24 +213,36 @@ kv_table_item::get(kv_transaction_ptr txn) const
      * See if the transaction wrote something - we read our own writes, irrespective of the read
      * timestamp.
      */
-    for (auto i = _updates.rbegin(); i != _updates.rend(); i++)
-        if ((*i)->txn_id() == txn_id)
-            return (*i)->value();
+    if (txn_id != k_txn_none)
+        for (auto i = _updates.rbegin(); i != _updates.rend(); i++)
+            if ((*i)->txn_id() == txn_id)
+                return (*i)->value();
 
     /* Otherwise do a regular read using the transaction's read timestamp and snapshot. */
     auto i = std::upper_bound(_updates.begin(), _updates.end(), read_timestamp, cmp);
 
-    while (i != _updates.begin()) {
-        const std::shared_ptr<kv_update> &u = *(--i);
-        /*
-         * The transaction snapshot includes only committed transactions, so no need to check
-         * whether the update is actually committed.
-         */
-        if (txn->visible_txn(u->txn_id()))
-            return u->value();
+    /* Return the most recent visible value. */
+    if (!txn_snapshot) {
+        if (stable_timestamp != k_timestamp_latest)
+            throw model_exception(
+              "If the stable timestamp is set, the transaction snapshot must be set also");
+        if (i == _updates.begin())
+            return NONE;
+        return (*(--i))->value();
+    } else {
+        while (i != _updates.begin()) {
+            const std::shared_ptr<kv_update> &u = *(--i);
+            /*
+             * The transaction snapshot includes only committed transactions, so no need to check
+             * whether the update is actually committed.
+             */
+            if (txn_snapshot->contains(u->txn_id()) && u->durable_timestamp() <= stable_timestamp) {
+                assert(u->committed());
+                return u->value();
+            }
+        }
+        return NONE;
     }
-
-    return NONE;
 }
 
 /*

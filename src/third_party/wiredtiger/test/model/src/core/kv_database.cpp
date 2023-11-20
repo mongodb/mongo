@@ -29,6 +29,10 @@
 #include <algorithm>
 #include <iostream>
 
+extern "C" {
+#include "wt_internal.h"
+}
+
 #include "model/kv_database.h"
 #include "model/kv_transaction.h"
 
@@ -46,11 +50,52 @@ kv_database::create_table(const char *name)
 
     auto i = _tables.find(s);
     if (i != _tables.end())
-        throw model_exception(std::string("Table already exists: ") + s);
+        throw model_exception("Table already exists: " + s);
 
     kv_table_ptr table = std::make_shared<kv_table>(name);
     _tables[s] = table;
     return table;
+}
+
+/*
+ * kv_database::create_checkpoint --
+ *     Create a checkpoint. Throw an exception if the name is not unique.
+ */
+kv_checkpoint_ptr
+kv_database::create_checkpoint(const char *name)
+{
+    std::lock_guard lock_guard(_checkpoints_lock);
+
+    /* Use the default checkpoint name, if it is not specified. */
+    if (name == nullptr)
+        name = WT_CHECKPOINT;
+    std::string ckpt_name = name;
+
+    /* We can overwrite the default checkpoint, but not the others without deleting them first. */
+    if (ckpt_name != WT_CHECKPOINT) {
+        auto i = _checkpoints.find(ckpt_name);
+        if (i != _checkpoints.end())
+            throw model_exception("Checkpoint already exists: " + ckpt_name);
+    }
+
+    /* Create the checkpoint. */
+    kv_checkpoint_ptr ckpt =
+      std::make_shared<kv_checkpoint>(name, txn_snapshot(), _stable_timestamp);
+
+    /* Remember it. */
+    _checkpoints[ckpt_name] = ckpt;
+    return ckpt;
+}
+
+/*
+ * kv_database::checkpoint --
+ *     Get the checkpoint. Throw an exception if it does not exist.
+ */
+kv_checkpoint_ptr
+kv_database::checkpoint(const char *name)
+{
+    std::string ckpt_name = name != nullptr ? name : WT_CHECKPOINT;
+    return checkpoint(ckpt_name);
 }
 
 /*
@@ -64,7 +109,7 @@ kv_database::begin_transaction(timestamp_t read_timestamp)
 
     txn_id_t id = ++_last_transaction_id;
     kv_transaction_ptr txn =
-      std::make_shared<kv_transaction>(*this, id, std::move(txn_snapshot_nolock()), read_timestamp);
+      std::make_shared<kv_transaction>(*this, id, txn_snapshot_nolock(), read_timestamp);
 
     _active_transactions[id] = txn;
     return txn;
@@ -92,7 +137,7 @@ kv_database::remove_inactive_transaction(txn_id_t id)
  * kv_database::txn_snapshot --
  *     Create a transaction snapshot.
  */
-kv_transaction_snapshot
+kv_transaction_snapshot_ptr
 kv_database::txn_snapshot(txn_id_t do_not_exclude)
 {
     std::lock_guard lock_guard(_transactions_lock);
@@ -103,7 +148,7 @@ kv_database::txn_snapshot(txn_id_t do_not_exclude)
  * kv_database::txn_snapshot --
  *     Create a transaction snapshot. Do not lock, because the caller already has a lock.
  */
-kv_transaction_snapshot
+kv_transaction_snapshot_ptr
 kv_database::txn_snapshot_nolock(txn_id_t do_not_exclude)
 {
     std::unordered_set<txn_id_t> active_txn_ids;
@@ -114,7 +159,8 @@ kv_database::txn_snapshot_nolock(txn_id_t do_not_exclude)
         if (state != kv_transaction_state::committed && state != kv_transaction_state::rolled_back)
             active_txn_ids.insert(p.first);
     }
-    return kv_transaction_snapshot{_last_transaction_id, std::move(active_txn_ids)};
+    return std::make_shared<kv_transaction_snapshot>(
+      _last_transaction_id, std::move(active_txn_ids));
 }
 
 } /* namespace model */

@@ -34,6 +34,7 @@
 #include <mutex>
 
 #include "model/data_value.h"
+#include "model/kv_checkpoint.h"
 #include "model/kv_update.h"
 
 namespace model {
@@ -80,13 +81,39 @@ public:
      * kv_table_item::get --
      *     Get the corresponding value. Return NONE if not found. Throw an exception on error.
      */
-    data_value get(timestamp_t timestamp) const;
+    inline data_value
+    get(timestamp_t timestamp) const
+    {
+        return get(kv_transaction_snapshot_ptr(nullptr), k_txn_none, timestamp);
+    }
 
     /*
      * kv_table_item::get --
      *     Get the corresponding value. Return NONE if not found. Throw an exception on error.
      */
-    data_value get(kv_transaction_ptr txn) const;
+    inline data_value
+    get(kv_checkpoint_ptr ckpt, timestamp_t timestamp) const
+    {
+        if (!ckpt)
+            throw model_exception("Null checkpoint");
+        /*
+         * When using checkpoint cursors, we need to compare the stable timestamp against the
+         * durable timestamp, not the commit timestamp.
+         */
+        return get(ckpt->snapshot(), k_txn_none, timestamp, timestamp);
+    }
+
+    /*
+     * kv_table_item::get --
+     *     Get the corresponding value. Return NONE if not found. Throw an exception on error.
+     */
+    inline data_value
+    get(kv_transaction_ptr txn) const
+    {
+        if (!txn)
+            throw model_exception("Null transaction");
+        return get(txn->snapshot(), txn->id(), txn->read_timestamp());
+    }
 
     /*
      * kv_table_item::fix_timestamps --
@@ -122,6 +149,13 @@ protected:
      *     Fail the given update and throw an exception indicating rollback.
      */
     void fail_with_rollback(std::shared_ptr<kv_update> update);
+
+    /*
+     * kv_table_item::get --
+     *     Get the corresponding value. Return NONE if not found. Throw an exception on error.
+     */
+    data_value get(kv_transaction_snapshot_ptr txn_snapshot, txn_id_t txn_id,
+      timestamp_t read_timestamp, timestamp_t stable_timestamp = k_timestamp_latest) const;
 
     /*
      * kv_table_item::has_prepared_nolock --

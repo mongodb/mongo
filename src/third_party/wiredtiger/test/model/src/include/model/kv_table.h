@@ -137,6 +137,14 @@ public:
      *     Get the value. Return a copy of the value if is found, or NONE if not found. Throw an
      *     exception on error.
      */
+    data_value get(kv_checkpoint_ptr ckpt, const data_value &key,
+      timestamp_t timestamp = k_timestamp_latest) const;
+
+    /*
+     * kv_table::get --
+     *     Get the value. Return a copy of the value if is found, or NONE if not found. Throw an
+     *     exception on error.
+     */
     data_value get(kv_transaction_ptr txn, const data_value &key) const;
 
     /*
@@ -145,6 +153,13 @@ public:
      */
     int get_ext(
       const data_value &key, data_value &out, timestamp_t timestamp = k_timestamp_latest) const;
+
+    /*
+     * kv_table::get_ext --
+     *     Get the value and return the error code instead of throwing an exception.
+     */
+    int get_ext(kv_checkpoint_ptr ckpt, const data_value &key, data_value &out,
+      timestamp_t timestamp = k_timestamp_latest) const;
 
     /*
      * kv_table::get_ext --
