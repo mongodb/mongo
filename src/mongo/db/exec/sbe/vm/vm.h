@@ -1779,33 +1779,19 @@ private:
         using TypeTags = value::TypeTags;
 
         const auto& fields = spec->fields;
-        const auto& actions = spec->actions;
-        const auto defActionType = spec->fieldsScopeIsClosed() ? MakeObjSpec::ActionType::kDrop
-                                                               : MakeObjSpec::ActionType::kKeep;
 
-        // Invoke the produceBsonObject() lambda with the appropriate iterator type.
-        switch (rootTag) {
-            case TypeTags::bsonObject: {
-                // For BSON objects, use BsonObjCursor.
-                auto cursor = BsonObjCursor(
-                    fields, actions, defActionType, value::bitcastTo<const char*>(rootVal));
-                produceBsonObject(spec, stackOffsets, code, bob, std::move(cursor));
-                break;
-            }
-            case TypeTags::Object: {
-                // For SBE objects, use ObjectCursor.
-                auto cursor =
-                    ObjectCursor(fields, actions, defActionType, value::getObjectView(rootVal));
-                produceBsonObject(spec, stackOffsets, code, bob, std::move(cursor));
-                break;
-            }
-            default: {
-                // For all other types, use BsonObjCursor initialized with an empty object.
-                auto cursor =
-                    BsonObjCursor(fields, actions, defActionType, BSONObj::kEmptyObject.objdata());
-                produceBsonObject(spec, stackOffsets, code, bob, std::move(cursor));
-                break;
-            }
+        // Invoke the produceBsonObject() lambda with the appropriate iterator type. For
+        // SBE objects, we use ObjectCursor. For all other types, we use BsonObjCursor.
+        if (rootTag == TypeTags::Object) {
+            auto obj = value::getObjectView(rootVal);
+
+            produceBsonObject(spec, stackOffsets, code, bob, ObjectCursor(fields, obj));
+        } else {
+            const char* obj = rootTag == TypeTags::bsonObject
+                ? value::bitcastTo<const char*>(rootVal)
+                : BSONObj::kEmptyObject.objdata();
+
+            produceBsonObject(spec, stackOffsets, code, bob, BsonObjCursor(fields, obj));
         }
     }
 
