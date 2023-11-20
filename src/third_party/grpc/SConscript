@@ -16,6 +16,8 @@ if grpc_env.ToolchainIs('gcc', 'clang'):
     if grpc_env.ToolchainIs('gcc'):
         grpc_env.Append(
             CCFLAGS=[
+                '-Wno-stringop-overread',  # false positive: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98465#c30
+                '-Wno-stringop-overflow',
                 '-Wno-error=attributes',
                 '-Wno-error=class-memaccess',
                 '-Wno-error=overloaded-virtual',
