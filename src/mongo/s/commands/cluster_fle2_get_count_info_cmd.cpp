@@ -59,6 +59,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/router_role.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -67,8 +68,8 @@ namespace {
 /**
  * Retrieve a set of tags from ESC. Returns a count suitable for either insert or query.
  *
- * Always routes to primary shard for a database because ESC is pinned to primary shard and ESC is
- * not sharded.
+ * Always routes to owning/primary shard for a database because ESC is pinned to a single/primary
+ * shard and ESC is not sharded.
  */
 class ClusterGetQueryableEncryptionCountInfoCmd final
     : public TypedCommand<ClusterGetQueryableEncryptionCountInfoCmd> {
@@ -133,14 +134,15 @@ ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext
     }
 
     auto nss = request().getNamespace();
-    const auto dbInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
+    const auto cri =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+    tassert(7924701, "ESC collection cannot be sharded", !cri.cm.isSharded());
 
     auto response = uassertStatusOK(
-        executeCommandAgainstDatabasePrimary(
+        executeCommandAgainstShardWithMinKeyChunk(
             opCtx,
-            nss.dbName(),
-            dbInfo,
+            nss,
+            cri,
             applyReadWriteConcern(
                 opCtx,
                 this,
