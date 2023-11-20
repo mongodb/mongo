@@ -5,13 +5,6 @@
 # Any global task, function, or taskgroup definition can be added here. Note that if
 # the definition is added to another file, YAML anchors from this file can't be used.
 
-command_type: system
-exec_timeout_secs: 21600  # 6 hours.
-oom_tracker: true
-pre_error_fails_task: true
-stepback: true
-
-
 # Files that match an ignore-list pattern will not trigger a build, if they're the only modified
 # files in the patch.
 ignore:
@@ -27,91 +20,6 @@ ignore:
 - "!/etc/evergreen.yml"
 - "README"
 
-
-## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
-parameters:
-- key: patch_compile_flags
-  description: "Additional SCons flags to be applied during scons compile invocations in this patch"
-
-- key: future_git_tag
-  description: "Future git tag to be added. If empty, we will use the most recent git tag instead."
-
-- key: last_lts_evg_version_id
-  description: "The Evergreen Version ID of the last-lts MongoDB binaries. Only binaries from release variants are used"
-
-- key: last_continuous_evg_version_id
-  description: "The Evergreen Version ID of the last-continuous MongoDB binaries. Only binaries from release variants are used"
-
-- key: antithesis_image_tag
-  description: "The docker tag to use when pushing images to Antithesis"
-
-- key: build_patch_id
-  description: "Patch id of evergreen patch to pull binaries from for testing."
-
-## Cron parameters.
-- key: project_required_suggested_cron
-  value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
-  description: "Cron schedule for required and suggested variants"
-- key: project_nightly_cron
-  value: "0 4 * * *" # Every day starting at 0400 UTC
-  description: "Cron schedule for nightly variants"
-- key: project_weekly_cron
-  value: "0 4 * * 0" # Every week starting 0400 UTC Sunday
-  description: "Cron schedule for nightly variants"
-
-
-#######################################
-#               Modules               #
-#######################################
-# if a module is added and to be added to the manifest
-# be sure to add the module to git.get_project revisions parameter
-modules:
-- name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
-  branch: master
-
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
-
-- name: dsi
-  repo: git@github.com:10gen/dsi.git
-  prefix: ${workdir}/src
-  branch: master
-- name: genny
-  repo: git@github.com:10gen/genny.git
-  prefix: ${workdir}/src
-  branch: master
-- name: workloads
-  repo: git@github.com:10gen/workloads.git
-  prefix: ${workdir}/src
-  branch: master
-- name: linkbench
-  repo: git@github.com:10gen/linkbench.git
-  prefix: ${workdir}/src
-  branch: master
-- name: linkbench2
-  repo: git@github.com:10gen/linkbench2.git
-  prefix: ${workdir}/src
-  branch: master
-- name: tsbs
-  repo: git@github.com:mongodb-forks/tsbs.git
-  prefix: ${workdir}/src
-  branch: main
-- name: YCSB
-  repo: git@github.com:mongodb-labs/YCSB.git
-  prefix: ${workdir}/src
-  branch: production
-- name: flamegraph
-  repo: git@github.com:mongodb-forks/flamegraph.git
-  prefix: ${workdir}/src
-  branch: master
-- name: PrivateWorkloads
-  repo: git@github.com:10gen/PrivateWorkloads.git
-  prefix: ${workdir}/src
-  branch: production
 
 #######################################
 #             Variable                #
@@ -2750,49 +2658,6 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/antithesis_image_build_and_push.sh"
-
-# Pre task steps
-pre:
-- func: "set task expansion macros"
-- func: "f_expansions_write"
-- func: "f_dsi_pre_run"
-
-# Post task steps
-post:
-- func: "f_expansions_write"
-- func: "upload npm logs"
-- func: "attach local resmoke invocation"
-- func: "attach multiversion exclude tags"
-- func: "attach report"
-- func: "attach task errors"
-- func: "attach artifacts"
-- func: "save ec2 task artifacts"
-- func: "attach wiki page"
-- func: "upload docker compose"
-- func: "upload jstestfuzz minimized output"
-- func: "kill processes"
-- func: "save local client logs"
-- func: "save jepsen artifacts"
-- func: "save blackduck artifacts"
-- func: "save mongo coredumps"
-- func: "generate hang analyzer tasks"
-- func: "save failed unittests"
-- func: "save hang analyzer debugger files"
-- func: "save disk statistics"
-- func: "save system resource information"
-- func: "save UndoDB recordings"
-- func: "umount shared scons directory"
-- func: "umount tmp directory"
-- func: "cleanup FUSE watchdog"
-- func: "cleanup environment"
-- func: "cleanup jepsen docker test"
-- func: "f_dsi_post_run"
-
-# Timeout steps
-timeout:
-- func: "f_expansions_write"
-- func: "run hang analyzer"
-- func: "wait for resmoke to shutdown"
 
 
 #######################################

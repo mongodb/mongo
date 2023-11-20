@@ -73,6 +73,10 @@ def _load_expansions(expansions_file) -> dict:
         return expansions
 
 
+def _clean_key(key):
+    return key.replace("-", "_")
+
+
 @click.command()
 @click.argument("expansions_file", type=str)
 @click.argument("defaults_file", type=str)
@@ -87,7 +91,7 @@ def _main(expansions_file: str, defaults_file: str):
                 expansions[key] = value
 
         for key, value in expansions.items():
-            print(f"{key}={quote(value)}; ", end="")
+            print(f"{_clean_key(key)}={quote(value)}; ", end="")
 
     except Exception as ex:  # pylint: disable=broad-except
         _error(ex)
