@@ -2758,5 +2758,55 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneAndDeleteOneBroadcastMatchWit
     }
 }
 
+TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneBroadcastNoMatchWithStaleDBError) {
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithIdWithoutShardKey", true};
+
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(kNss);
+        // Op style update.
+        updateOp.setUpdates({buildUpdate(BSON("_id" << 1), BSON("$inc" << BSON("a" << 1)), false)});
+        return updateOp;
+    }());
+
+    makeCollectionRoutingInfo(kNss, _shardKeyPattern, nullptr, false, {BSON("x" << 0)}, {});
+    _criTargeter = CollectionRoutingInfoTargeter(getOpCtx(), kNss);
+
+    BatchWriteOp batchOp(getOpCtx(), request);
+
+    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+    auto status = batchOp.targetBatch(getCollectionRoutingInfoTargeter(), false, &targeted);
+    ASSERT_OK(status);
+    ASSERT_EQ(status.getValue(), WriteType::WithoutShardKeyWithId);
+    ASSERT_EQUALS(targeted.size(), 2);
+
+    const static Timestamp timestamp{2};
+
+    BatchedCommandResponse firstShardResp;
+    firstShardResp.addToErrDetails(write_ops::WriteError(
+        0,
+        Status(StaleDbRoutingVersion(kNss.dbName(), DatabaseVersion(), boost::none),
+               "Stale DB error")));
+    firstShardResp.setStatus(Status::OK());
+
+    auto iterator = targeted.begin();
+
+    // Respond to first targeted batch.
+    TrackedErrors trackedErrors;
+    trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
+    batchOp.noteBatchResponse(*iterator->second, firstShardResp, &trackedErrors);
+
+    ASSERT(!batchOp.isFinished());
+    iterator++;
+
+    BatchedCommandResponse secondShardResp;
+    buildResponse(0, &secondShardResp);
+
+    // Respond to second targeted batch.
+    batchOp.noteBatchResponse(*iterator->second, secondShardResp, nullptr);
+
+    ASSERT(!batchOp.isFinished());
+}
+
 }  // namespace
 }  // namespace mongo
