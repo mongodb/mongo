@@ -75,6 +75,7 @@ void ShardingState::setInitialized(ShardId shardId, OID clusterId) {
     _initializationStatus = Status::OK();
 
     _initializationState.store(static_cast<uint32_t>(InitializationState::kInitialized));
+    _initStateChangedCV.notify_all();
 }
 
 void ShardingState::setInitialized(Status failedStatus) {
@@ -86,6 +87,7 @@ void ShardingState::setInitialized(Status failedStatus) {
 
     _initializationStatus = std::move(failedStatus);
     _initializationState.store(static_cast<uint32_t>(InitializationState::kError));
+    _initStateChangedCV.notify_all();
 }
 
 boost::optional<Status> ShardingState::initializationStatus() {
@@ -128,7 +130,24 @@ OID ShardingState::clusterId() {
 }
 
 void ShardingState::clearForTests() {
+    stdx::unique_lock<Latch> ul(_mutex);
     _initializationState.store(static_cast<uint32_t>(InitializationState::kNew));
+    _initStateChangedCV.notify_all();
+}
+
+void ShardingState::waitUntilEnabled(OperationContext* opCtx) {
+    stdx::unique_lock ul(_mutex);
+
+    // If an error occurred earlier, wait for it to succeed or get cleared.
+    opCtx->waitForConditionOrInterrupt(_initStateChangedCV, ul, [this] {
+        return _getInitializationState() != InitializationState::kError;
+    });
+
+    opCtx->waitForConditionOrInterrupt(_initStateChangedCV, ul, [this] {
+        return _getInitializationState() != InitializationState::kNew;
+    });
+
+    uassertStatusOK(_initializationStatus);
 }
 
 }  // namespace mongo

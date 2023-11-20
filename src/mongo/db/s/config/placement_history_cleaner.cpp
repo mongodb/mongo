@@ -50,6 +50,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -128,6 +129,13 @@ PlacementHistoryCleaner* PlacementHistoryCleaner::get(OperationContext* opCtx) {
 void PlacementHistoryCleaner::runOnce(Client* client, size_t minPlacementHistoryDocs) {
     auto opCtxHolder = client->makeOperationContext();
     auto opCtx = opCtxHolder.get();
+
+    // TODO: SERVER-82965 remove wait
+    try {
+        ShardingState::get(opCtx)->waitUntilEnabled(opCtx);
+    } catch (const DBException&) {
+        return;
+    }
 
     try {
         // Count the number of entries in the placementHistory collection; skip cleanup if below

@@ -91,6 +91,11 @@ public:
     bool enabled() const;
 
     /**
+     * Waits until sharding state becomes enabled or a new error occurred after we started waiting.
+     */
+    void waitUntilEnabled(OperationContext* opCtx);
+
+    /**
      * Returns Status::OK if the ShardingState is enabled; if not, returns an error describing
      * whether the ShardingState is just not yet initialized, or if this shard is not running with
      * --shardsvr at all.
@@ -164,6 +169,7 @@ private:
 
     // Only valid if _initializationState is kError. Contains the reason for initialization failure.
     Status _initializationStatus{ErrorCodes::InternalError, "Uninitialized value"};
+    stdx::condition_variable _initStateChangedCV;
 };
 
 }  // namespace mongo

@@ -820,11 +820,11 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
                 ->updateReplSetHosts(rsMonitorConfigConnStr,
                                      ShardRegistry::ConnectionStringUpdateType::kConfirmed);
         }
-
-        // Start transaction coordinator service only if the node is the primary of a replica set.
-        TransactionCoordinatorService::get(opCtx)->onShardingInitialization(
-            opCtx, isReplSet && isStandaloneOrPrimary);
     }
+
+    // Start transaction coordinator service only if the node is the primary of a replica set.
+    TransactionCoordinatorService::get(opCtx)->onShardingInitialization(
+        opCtx, isReplSet && isStandaloneOrPrimary);
 
     LOGV2(22071,
           "Finished initializing sharding components",

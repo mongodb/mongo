@@ -41,6 +41,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_params_gen.h"
@@ -126,6 +127,11 @@ void TransactionCoordinatorService::createCoordinator(
 void TransactionCoordinatorService::reportCoordinators(OperationContext* opCtx,
                                                        bool includeIdle,
                                                        std::vector<BSONObj>* ops) {
+    // TODO: SERVER-82965 Remove early return
+    if (!ShardingState::get(opCtx)->enabled()) {
+        return;
+    }
+
     std::shared_ptr<CatalogAndScheduler> cas;
     try {
         cas = _getCatalogAndScheduler(opCtx);
@@ -203,6 +209,11 @@ boost::optional<SharedSemiFuture<txn::CommitDecision>> TransactionCoordinatorSer
 
 void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                                              Milliseconds recoveryDelayForTesting) {
+    // TODO: SERVER-82965 Remove early return
+    if (!ShardingState::get(opCtx)->enabled()) {
+        return;
+    }
+
     joinPreviousRound();
 
     stdx::lock_guard<Latch> lg(_mutex);
@@ -378,6 +389,11 @@ void TransactionCoordinatorService::cancelIfCommitNotYetStarted(
     OperationContext* opCtx,
     LogicalSessionId lsid,
     TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
+    // TODO: SERVER-82965 Remove early return
+    if (!ShardingState::get(opCtx)->enabled()) {
+        return;
+    }
+
     auto cas = _getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 
