@@ -154,4 +154,27 @@ TEST(ConvertToBitsetTreeTests, TwoElemMatches) {
     auto tree = convertToBitsetTree(maxterm);
     ASSERT_EQ(expectedTree, tree);
 }
+
+TEST(BitsetTreeTests, ApplyDeMorgan) {
+    BitsetTreeNode root(BitsetTreeNode::Or, true);  // rooted $nor
+    root.leafChildren = makeBitsetTerm("0010", "1010");
+    root.internalChildren.emplace_back(BitsetTreeNode::Or, true);  // nested $nor
+    root.internalChildren.back().leafChildren = makeBitsetTerm("0010", "0111");
+    root.internalChildren.emplace_back(BitsetTreeNode::Or, false);
+    root.internalChildren.back().leafChildren = makeBitsetTerm("0010", "0111");
+    root.internalChildren.emplace_back(BitsetTreeNode::And, false);
+    root.internalChildren.back().leafChildren = makeBitsetTerm("0010", "0011");
+
+    BitsetTreeNode expectedRoot(BitsetTreeNode::And, false);
+    expectedRoot.leafChildren = makeBitsetTerm("1000", "1010");
+    expectedRoot.internalChildren.emplace_back(BitsetTreeNode::Or, false);
+    expectedRoot.internalChildren.back().leafChildren = makeBitsetTerm("0010", "0111");
+    expectedRoot.internalChildren.emplace_back(BitsetTreeNode::And, false);
+    expectedRoot.internalChildren.back().leafChildren = makeBitsetTerm("0101", "0111");
+    expectedRoot.internalChildren.emplace_back(BitsetTreeNode::Or, false);
+    expectedRoot.internalChildren.back().leafChildren = makeBitsetTerm("0001", "0011");
+
+    root.applyDeMorgan();
+    ASSERT_EQ(expectedRoot, root);
+}
 }  // namespace mongo::boolean_simplification

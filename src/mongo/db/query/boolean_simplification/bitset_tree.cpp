@@ -168,10 +168,10 @@ BitsetTreeNode restoreBitsetTree(const Minterm& minterm) {
 }  // namespace
 
 void BitsetTreeNode::applyDeMorganImpl(bool isParentNegated) {
-    const bool isThisNegated = this->isNegated ^ isParentNegated;
-    if (isThisNegated) {
-        isNegated = false;
+    const bool isThisNegated = isNegated ^ isParentNegated;
+    isNegated = false;
 
+    if (isThisNegated) {
         switch (type) {
             case BitsetTreeNode::And:
                 type = BitsetTreeNode::Or;
@@ -184,10 +184,10 @@ void BitsetTreeNode::applyDeMorganImpl(bool isParentNegated) {
         }
 
         leafChildren.flip();
+    }
 
-        for (auto& child : internalChildren) {
-            child.applyDeMorganImpl(true);
-        }
+    for (auto& child : internalChildren) {
+        child.applyDeMorganImpl(isThisNegated);
     }
 }
 
