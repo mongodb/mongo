@@ -3013,9 +3013,6 @@ tasks:
       # TODO DEVPROD-2513 remove "--copt /std:c++20" flag when toolchain sets this automatically
       args: >-
         --config=local
-        --host_platform=@mongo_toolchain//:windows_amd64_msvc
-        --platforms=@mongo_toolchain//:windows_amd64_msvc
-        --//bazel/config:compiler_type=msvc
         --compilation_mode=dbg
         --//bazel/config:build_mode=dbg
         --copt /std:c++20

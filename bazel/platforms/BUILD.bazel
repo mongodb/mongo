@@ -1,0 +1,47 @@
+# Define supported build platforms.
+
+package(default_visibility = ["//visibility:public"])
+
+[
+    platform(
+        name = "linux_arm64_" + compiler,
+        constraint_values = [
+            "@platforms//os:linux",
+            "@platforms//cpu:arm64",
+            "@bazel_tools//tools/cpp:" + compiler,
+        ],
+        exec_properties = {
+            # debian gcc based image contains the base our toolchain needs (glibc version and build-essentials)
+            # https://hub.docker.com/layers/library/gcc/12.3-bookworm/images/sha256-6a3a5694d10299dbfb8747b98621abf4593bb54a5396999caa013cba0e17dd4f?context=explore
+            "container-image": "docker://docker.io/library/gcc@sha256:6a3a5694d10299dbfb8747b98621abf4593bb54a5396999caa013cba0e17dd4f",
+        }
+    )
+    for compiler in ["clang", "gcc"]
+]
+
+platform(
+    name = "windows_amd64_msvc",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+        "@bazel_tools//tools/cpp:msvc",
+    ]
+)
+
+platform(
+    name = "macos_arm64_clang",
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:macos",
+        "@bazel_tools//tools/cpp:clang",
+    ]
+)
+
+platform(
+    name = "macos_amd64_clang",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+        "@bazel_tools//tools/cpp:clang",
+    ]
+)
