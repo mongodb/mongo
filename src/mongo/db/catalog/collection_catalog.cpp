@@ -1887,6 +1887,19 @@ bool CollectionCatalog::isLatestCollection(OperationContext* opCtx,
     return coll->get() == collection;
 }
 
+void CollectionCatalog::ensureCollectionIsNew(OperationContext* opCtx,
+                                              const NamespaceString& nss) const {
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+    const auto& entries = uncommittedCatalogUpdates.entries();
+    auto hasUncommittedCreateEntry = std::any_of(
+        entries.begin(), entries.end(), [&](const UncommittedCatalogUpdates::Entry& entry) {
+            return entry.action == UncommittedCatalogUpdates::Entry::Action::kCreatedCollection &&
+                entry.nss == nss;
+        });
+    invariant(hasUncommittedCreateEntry);
+    _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kAll);
+}
+
 void CollectionCatalog::iterateViews(
     OperationContext* opCtx,
     const DatabaseName& dbName,

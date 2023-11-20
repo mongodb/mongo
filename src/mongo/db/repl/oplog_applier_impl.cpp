@@ -325,10 +325,8 @@ void _addOplogChainOpsToWriterVectors(OperationContext* opCtx,
     partialTxnList->clear();
 
     if (op->shouldPrepare()) {
-        // Prepared transaction operations should not have commands.
-        invariant(!shouldSerialize);
         OplogApplierUtils::addDerivedPrepares(
-            opCtx, op, &extractedOps, writerVectors, collPropertiesCache);
+            opCtx, op, &extractedOps, writerVectors, collPropertiesCache, shouldSerialize);
         return;
     }
 

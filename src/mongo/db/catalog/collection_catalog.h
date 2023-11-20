@@ -449,6 +449,13 @@ public:
     bool isLatestCollection(OperationContext* opCtx, const Collection* collection) const;
 
     /**
+     * Verifies that the provided collection name doesn't exist in the catalog and is exclusively
+     * present in the uncommitted updates of the operation. For the check to be meaningful it should
+     * be performed against CollectionCatalog::latest.
+     */
+    void ensureCollectionIsNew(OperationContext* opCtx, const NamespaceString& nss) const;
+
+    /**
      * Iterates through the views in the catalog associated with database `dbName`, applying
      * 'callback' to each view.  If the 'callback' returns false, the iterator exits early.
      *

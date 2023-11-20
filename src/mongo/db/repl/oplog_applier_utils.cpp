@@ -300,7 +300,8 @@ void OplogApplierUtils::addDerivedPrepares(
     OplogEntry* prepareOp,
     std::vector<OplogEntry>* derivedOps,
     std::vector<std::vector<ApplierOperation>>* writerVectors,
-    CachedCollectionProperties* collPropertiesCache) {
+    CachedCollectionProperties* collPropertiesCache,
+    bool serial) {
 
     // Get the SplitPrepareSessionManager to be used to create split sessions.
     auto splitSessManager = ReplicationCoordinator::get(opCtx)->getSplitPrepareSessionManager();
@@ -334,10 +335,19 @@ void OplogApplierUtils::addDerivedPrepares(
         // split session when moving the ops to the real writer vector.
         std::set<uint32_t> writerIds;
         std::vector<std::vector<const OplogEntry*>> bufWriterVectors(writerVectors->size());
+        boost::optional<uint32_t> serialWriterId;
         for (auto&& op : *derivedOps) {
             auto writerId = getWriterId(opCtx, &op, collPropertiesCache, writerVectors->size());
-            addToWriterVectorImpl(writerId, &bufWriterVectors, &op);
-            writerIds.emplace(writerId);
+            if (serial && !serialWriterId) {
+                serialWriterId.emplace(writerId);
+                writerIds.emplace(*serialWriterId);
+            }
+            if (serialWriterId) {
+                addToWriterVectorImpl(*serialWriterId, &bufWriterVectors, &op);
+            } else {
+                addToWriterVectorImpl(writerId, &bufWriterVectors, &op);
+                writerIds.emplace(writerId);
+            }
         }
 
         const auto& sessionInfos = splitSessFunc({writerIds.begin(), writerIds.end()});

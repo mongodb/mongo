@@ -85,6 +85,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -156,6 +157,10 @@ boost::optional<std::vector<StmtId>> _getCommittedStmtIds(const LogicalSessionId
 Status _applyOperationsForTransaction(OperationContext* opCtx,
                                       const std::vector<OplogEntry>& txnOps,
                                       repl::OplogApplication::Mode oplogApplicationMode) {
+
+    const bool allowCollectionCreatinInPreparedTransactions =
+        feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     // Apply each the operations via repl::applyOperation.
     for (const auto& op : txnOps) {
         try {
@@ -163,9 +168,12 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                 continue;
             }
 
-            // Presently, it is not allowed to run a prepared transaction with a command
-            // inside. TODO(SERVER-46105)
-            invariant(!op.isCommand());
+            if (!allowCollectionCreatinInPreparedTransactions) {
+                // Presently, it is not allowed to run a prepared transaction with a command inside.
+                // TODO(SERVER-46105)
+                invariant(!op.isCommand());
+            }
+
             auto coll = acquireCollection(
                 opCtx,
                 CollectionAcquisitionRequest(op.getNss(),
@@ -174,12 +182,22 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                                              AcquisitionPrerequisites::kWrite),
                 MODE_IX);
             const bool isDataConsistent = true;
-            auto status = repl::applyOperation_inlock(opCtx,
-                                                      coll,
-                                                      ApplierOperation{&op},
-                                                      false /*alwaysUpsert*/,
-                                                      oplogApplicationMode,
-                                                      isDataConsistent);
+            auto status = [&] {
+                if (op.isCommand()) {
+                    invariant(op.getCommandType() == OplogEntry::CommandType::kCreate ||
+                                  op.getCommandType() == OplogEntry::CommandType::kCreateIndexes,
+                              "Multi-document transactions only support 'create' and "
+                              "'createIndexes' command");
+                    return repl::applyCommand_inlock(
+                        opCtx, ApplierOperation{&op}, oplogApplicationMode);
+                }
+                return repl::applyOperation_inlock(opCtx,
+                                                   coll,
+                                                   ApplierOperation{&op},
+                                                   false /*alwaysUpsert*/,
+                                                   oplogApplicationMode,
+                                                   isDataConsistent);
+            }();
             if (!status.isOK()) {
                 return status;
             }

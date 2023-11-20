@@ -1,5 +1,4 @@
-// Test that new collection creation fails in a cross-shard write transaction, but succeeds in a
-// single-shard write transaction.
+// Test that new collection creation succeeds in a sharded write transaction.
 //
 // @tags: [
 //   requires_sharding,
@@ -9,6 +8,8 @@
 import {
     retryOnceOnTransientAndRestartTxnOnMongos
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbNameShard0 = "test";
 const dbNameShard2 = "testOther";
@@ -17,6 +18,7 @@ const collName = "foo";
 const st = new ShardingTest({
     shards: 3,
     mongos: 1,
+    rs: {nodes: 2},
 });
 
 const versionSupportsSingleWriteShardCommitOptimization =
@@ -38,7 +40,7 @@ const session = st.s.getDB(dbNameShard0).getMongo().startSession({causalConsiste
 
 let sessionDBShard0 = session.getDatabase(dbNameShard0);
 let sessionDBShard2 = session.getDatabase(dbNameShard2);
-let newCollName = "newColl";
+const newCollName = "newColl";
 
 // Ensure no stale version errors occur.
 let doc = st.s.getDB(dbNameShard0).getCollection(collName).findOne({_id: 5});
@@ -55,8 +57,16 @@ retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
     assert.commandWorked(sessionDBShard0.createCollection(newCollName));
     assert.commandWorked(sessionDBShard2.createCollection(newCollName));
 }, txnOptions);
-assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+
+if (FeatureFlagUtil.isEnabled(st.s, "TrackUnshardedCollectionsOnShardingCatalog")) {
+    assert.commandWorked(session.commitTransaction_forTesting());
+
+    assertDropCollection(st.s.getDB(dbNameShard0), newCollName);
+    assertDropCollection(st.s.getDB(dbNameShard2), newCollName);
+} else {
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
+                                 ErrorCodes.OperationNotSupportedInTransaction);
+}
 
 jsTest.log("Testing collection creation in a single-shard write transaction.");
 session.startTransaction(txnOptions);
