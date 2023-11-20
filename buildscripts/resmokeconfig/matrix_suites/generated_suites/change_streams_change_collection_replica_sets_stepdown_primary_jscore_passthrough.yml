@@ -47,6 +47,7 @@ executor:
             retryWrites: true
           tenantId: 636d957b2646ddfaf9b5e13f
           useResponsePrefixChecking: true
+          useSecurityToken: true
       nodb: ''
   fixture:
     all_nodes_electable: true
