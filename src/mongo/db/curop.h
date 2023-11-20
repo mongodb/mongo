@@ -361,9 +361,9 @@ public:
     // after optimizations.
     Microseconds planningTime{0};
 
-    // Amount of CPU time used by this thread. Will remain zero if this platform does not support
+    // Amount of CPU time used by this thread. Will remain -1 if this platform does not support
     // this feature.
-    Nanoseconds cpuTime{0};
+    Nanoseconds cpuTime{-1};
 
     int responseLength{-1};
 

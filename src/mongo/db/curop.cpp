@@ -442,7 +442,7 @@ void CurOp::done() {
 }
 
 void CurOp::calculateCpuTime() {
-    if (_cpuTimer && _debug.cpuTime == Nanoseconds::zero()) {
+    if (_cpuTimer && _debug.cpuTime < Nanoseconds::zero()) {
         _debug.cpuTime = _cpuTimer->getElapsed();
     }
 }
@@ -1159,7 +1159,9 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("operationMetrics", builder.obj());
     }
 
-    if (cpuTime > Nanoseconds::zero()) {
+    // Always report cpuNanos in rare cases that it is zero to facilitate testing that expects this
+    // field to always exist.
+    if (cpuTime >= Nanoseconds::zero()) {
         pAttrs->add("cpuNanos", durationCount<Nanoseconds>(cpuTime));
     }
 
@@ -1352,7 +1354,9 @@ void OpDebug::append(OperationContext* opCtx,
         b.append("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
-    if (cpuTime > Nanoseconds::zero()) {
+    // Always log cpuNanos in rare cases that it is zero to facilitate testing that expects this
+    // field to always exist.
+    if (cpuTime >= Nanoseconds::zero()) {
         b.appendNumber("cpuNanos", durationCount<Nanoseconds>(cpuTime));
     }
 
@@ -1671,7 +1675,9 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
 
     addIfNeeded("cpuNanos", [](auto field, auto args, auto& b) {
-        if (args.op.cpuTime > Nanoseconds::zero()) {
+        // Always report cpuNanos in rare cases that it is zero to facilitate testing that expects
+        // this field to always exist.
+        if (args.op.cpuTime >= Nanoseconds::zero()) {
             b.appendNumber(field, durationCount<Nanoseconds>(args.op.cpuTime));
         }
     });
