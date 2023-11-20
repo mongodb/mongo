@@ -38,8 +38,10 @@
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
+#include <absl/hash/hash.h>
 #include <boost/optional/optional.hpp>
 
+#include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
@@ -306,6 +308,16 @@ public:
 
     size_t transport(const Constant& expr) {
         auto [tag, val] = expr.get();
+        // Extended types cannot be used directly with hashValue().
+        if (tag != sbe::value::TypeTags::Nothing && sbe::value::tagToType(tag) == BSONType::EOO) {
+            if (tag == sbe::value::TypeTags::makeObjSpec) {
+                return computeHashSeq<17>(
+                    absl::Hash<sbe::MakeObjSpec>{}(*sbe::value::getMakeObjSpecView(val)));
+            }
+
+            // Extended types must implement their own hash functions.
+            MONGO_UNREACHABLE_TASSERT(7936706);
+        }
         return computeHashSeq<17>(sbe::value::hashValue(tag, val));
     }
 
