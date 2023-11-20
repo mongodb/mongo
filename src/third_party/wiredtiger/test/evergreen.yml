@@ -5966,6 +5966,14 @@ buildvariants:
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-test
+    - name: csuite-long-running-bucket1
+      # Some of the long-running tests require a large instance to run successfully.
+      distros: ubuntu2004-large
+      batchtime: 1440 # once a day
+    - name: csuite-long-running-bucket2
+      # Some of the long-running tests require a large instance to run successfully.
+      distros: ubuntu2004-large
+      batchtime: 1440 # once a day
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
@@ -6030,14 +6038,16 @@ buildvariants:
     - name: format-stress-pull-request-test
     - name: make-check-test
       distros: ubuntu2004-large
-    - name: csuite-long-running-bucket1
-      # Some of the long-running tests require a large instance to run successfully.
-      distros: ubuntu2004-large
-      batchtime: 1440 # once a day
-    - name: csuite-long-running-bucket2
-      # Some of the long-running tests require a large instance to run successfully.
-      distros: ubuntu2004-large
-      batchtime: 1440 # once a day
+      # FIXME-WT-11989 Long running test may timeout with sanitizers.
+    # - name: csuite-long-running-bucket1
+    #   # Some of the long-running tests require a large instance to run successfully.
+    #   distros: ubuntu2004-large
+    #   batchtime: 1440 # once a day
+      # FIXME-WT-11989 Long running test may timeout with sanitizers.
+    # - name: csuite-long-running-bucket2
+    #   # Some of the long-running tests require a large instance to run successfully.
+    #   distros: ubuntu2004-large
+    #   batchtime: 1440 # once a day
 
 - name: ubuntu2004-ubsan
   display_name: "! Ubuntu 20.04 UBSAN"
