@@ -29,42 +29,38 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define TIMEOUT 1
 #define MAX_RETRIES 5
-
+#define TIMEOUT 1
+/* Have enough records to give us time to interrupt compaction. */
 #define NUM_RECORDS (800 * WT_THOUSAND)
 
-/* Constants and variables declaration. */
+static const char compact_file[] = "compact_started";
 /*
  * You may want to add "verbose=[compact,compact_progress]" to the connection config string to get
  * better view on what is happening.
  */
 static const char conn_config[] =
   "create,cache_size=1GB,timing_stress_for_test=[compact_slow],statistics=(all),statistics_log=("
-  "json,on_close,wait=1)";
+  "json,on_close,wait=1),debug_mode=(background_compact)";
+static char data_str[1024] = "";
 static const char table_config_row[] =
   "allocation_size=4KB,leaf_page_max=4KB,key_format=Q,value_format=QQQS";
 static const char table_config_col[] =
   "allocation_size=4KB,leaf_page_max=4KB,key_format=r,value_format=QQQS";
-static char data_str[1024] = "";
-static const char working_dir_row[] = "WT_TEST.data-correctness-row";
-static const char working_dir_col[] = "WT_TEST.data-correctness-col";
-static const char compact_file[] = "compact_started";
 static char value_a[] = "AA";
 static char value_b[] = "BB";
 static char value_c[] = "CC";
 static char value_d[] = "DD";
+static const char working_dir_row[] = "WT_TEST.data-correctness-row";
+static const char working_dir_col[] = "WT_TEST.data-correctness-col";
 
-static void sig_handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
-
-/* Forward declarations. */
-static int run_test(bool column_store, const char *uri, bool preserve);
-static void populate(WT_SESSION *session, const char *uri);
-static void workload_compact(const char *, const char *, const char *uri);
-static void remove_records(WT_SESSION *session, const char *uri, int commit_ts);
-static void run_compact(WT_SESSION *session, const char *uri);
-static void large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts);
 static void check(WT_SESSION *session, const char *uri, char *value, int commit_ts);
+static void large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts);
+static void populate(WT_SESSION *session, const char *uri);
+static void remove_records(WT_SESSION *session, const char *uri, int commit_ts);
+static int run_test(bool column_store, bool background_compact, const char *uri, bool preserve);
+static void sig_handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+static void workload_compact(const char *, bool, const char *, const char *uri);
 
 /*
  * sig_handler --
@@ -77,9 +73,7 @@ sig_handler(int sig)
 
     WT_UNUSED(sig);
     pid = wait(NULL);
-    /*
-     * The core file will indicate why the child exited. Choose EINVAL here.
-     */
+    /* The core file will indicate why the child exited, choose EINVAL here. */
     testutil_die(EINVAL, "Child process %" PRIu64 " abnormally exited", (uint64_t)pid);
 }
 
@@ -91,14 +85,20 @@ int
 main(int argc, char *argv[])
 {
     TEST_OPTS *opts, _opts;
+    int i, j;
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
 
-    testutil_assert(run_test(false, opts->uri, opts->preserve) == EXIT_SUCCESS);
-
-    testutil_assert(run_test(true, opts->uri, opts->preserve) == EXIT_SUCCESS);
+    for (i = 0; i < 2; ++i) {
+        for (j = 0; j < 2; ++j)
+            /*
+             * Use i and j to alternate between column/row store and foreground/background
+             * compaction scenarios.
+             */
+            testutil_assert(run_test(i, j, opts->uri, opts->preserve) == EXIT_SUCCESS);
+    }
 
     testutil_cleanup(opts);
 
@@ -106,24 +106,12 @@ main(int argc, char *argv[])
 }
 
 /*
- * run_compact --
- *     TODO: Add a comment describing this function.
- */
-static void
-run_compact(WT_SESSION *session, const char *uri)
-{
-    printf("Compact start...\n");
-    /* Perform compact operation. */
-    testutil_check(session->compact(session, uri, NULL));
-    printf("Compact end...\n");
-}
-
-/*
  * run_test --
- *     TODO: Add a comment describing this function.
+ *     Child: starts compaction. Parent: kills the child as soon as the child has started compaction
+ *     and verifies the unclean database.
  */
 static int
-run_test(bool column_store, const char *uri, bool preserve)
+run_test(bool column_store, bool background_compact, const char *uri, bool preserve)
 {
     struct sigaction sa;
     WT_CONNECTION *conn;
@@ -135,7 +123,8 @@ run_test(bool column_store, const char *uri, bool preserve)
     testutil_work_dir_from_path(
       home, sizeof(home), column_store ? working_dir_col : working_dir_row);
 
-    printf("Work directory: %s\n", home);
+    printf("%s store, %s compaction, work directory: %s.\n", column_store ? "Column" : "Row",
+      background_compact ? "background" : "foreground", home);
     testutil_recreate_dir(home);
 
     /* Fork a child to create tables and perform operations on them. */
@@ -144,28 +133,30 @@ run_test(bool column_store, const char *uri, bool preserve)
     testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
     testutil_assert_errno((pid = fork()) >= 0);
 
-    if (pid == 0) { /* child */
+    /* Child. */
+    if (pid == 0) {
 
-        workload_compact(home, column_store ? table_config_col : table_config_row, uri);
+        workload_compact(
+          home, background_compact, column_store ? table_config_col : table_config_row, uri);
 
+        printf("Child finished processing...\n");
         /*
          * We do not expect test to reach here. The child process should have been killed by the
          * parent process.
          */
-        printf("Child finished processing...\n");
         return (EXIT_FAILURE);
     }
 
-    /* parent */
+    /* Parent */
     /*
      * This test uses timing stress in compact so sleep for the configured amount of time before
      * killing the child. Start the timeout from the time we notice that child process has started
      * compact. That allows the test to run correctly on really slow machines.
      */
     while (!testutil_exists(home, compact_file))
-        testutil_sleep_wait(1, pid);
+        testutil_sleep_wait(TIMEOUT, pid);
 
-    /* Sleep for a while. Let the child process do some operations on the tables. */
+    /* Sleep for a specific time to give compaction a chance to do some work. */
     sleep(TIMEOUT);
     sa.sa_handler = SIG_DFL;
     testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
@@ -174,11 +165,10 @@ run_test(bool column_store, const char *uri, bool preserve)
     printf("Kill child\n");
     testutil_assert_errno(kill(pid, SIGKILL) == 0);
     testutil_assert_errno(waitpid(pid, &status, 0) != -1);
-
     printf("Compact process interrupted and killed...\n");
-    printf("Open database and run recovery\n");
 
     /* Open the connection which forces recovery to be run. */
+    printf("Open database and run recovery\n");
     testutil_check(wiredtiger_open(home, NULL, TESTUTIL_ENV_CONFIG_REC, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
@@ -191,8 +181,6 @@ run_test(bool column_store, const char *uri, bool preserve)
     check(session, uri, value_b, 30);
     check(session, uri, value_b, 40);
     check(session, uri, value_b, 50);
-
-    testutil_check(session->checkpoint(session, NULL));
 
     testutil_check(session->close(session, NULL));
     session = NULL;
@@ -211,23 +199,22 @@ run_test(bool column_store, const char *uri, bool preserve)
 
 /*
  * workload_compact --
- *     TODO: Add a comment describing this function.
+ *     Create a table with content that can be compacted. Create a sentinel file when compaction is
+ *     about to start.
  */
 static void
-workload_compact(const char *home, const char *table_config, const char *uri)
+workload_compact(
+  const char *home, bool background_compact, const char *table_config, const char *uri)
 {
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    char tscfg[64];
+    char tscfg[64], compact_cfg[512];
 
     testutil_check(wiredtiger_open(home, NULL, conn_config, &conn));
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    testutil_snprintf(tscfg, sizeof(tscfg),
-      "oldest_timestamp=%d"
-      ",stable_timestamp=%d",
-      10, 10);
+    testutil_snprintf(tscfg, sizeof(tscfg), "oldest_timestamp=%d,stable_timestamp=%d", 10, 10);
     testutil_check(conn->set_timestamp(conn, tscfg));
 
     /* Create and populate table. Checkpoint the data after that. */
@@ -252,24 +239,39 @@ workload_compact(const char *home, const char *table_config, const char *uri)
     testutil_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%d", 30);
     testutil_check(conn->set_timestamp(conn, tscfg));
 
-    /*
-     * Remove 1/3 of data from the middle of the key range to let compact relocate blocks from the
-     * end of the file. Checkpoint the changes after the removal.
-     */
+    /* Remove records to give compaction some work to do. */
     remove_records(session, uri, 60);
 
     /*
-     * Force checkpoint is the first step in the compact operation, we do the same thing here to
-     * save some time in the compact operation.
+     * Checkpoint is the first step in the compact operation, we do the same thing here to save some
+     time in the compact operation.
      */
-    testutil_check(session->checkpoint(session, "force"));
+    testutil_check(session->checkpoint(session, NULL));
+
+    /* Set a low threshold to ensure compaction runs. */
+    testutil_snprintf(compact_cfg, sizeof(compact_cfg), "free_space_target=1MB%s",
+      background_compact ? ",background=true" : "");
 
     /*
-     * Create the compact_started file so that the parent process can start its timer.
+     * Because foreground and background compaction behave differently, we don't create the sentinel
+     * file at the same time for each scenario. In the foreground compaction scenario, the compact
+     * API returns once compaction is done, therefore we need to create the sentinel file before
+     * compacting the file. On the other hand, when enabling background compaction, the API returns
+     * straight away so we can create the sentinel file once the service has been enabled but we
+     * have to wait for some time to make sure compaction started.
      */
-    testutil_sentinel(home, compact_file);
+    if (!background_compact)
+        testutil_sentinel(home, compact_file);
 
-    run_compact(session, uri);
+    printf(
+      "%s starting...\n", background_compact ? "Background compaction" : "Foreground compaction");
+    testutil_check(session->compact(session, background_compact ? NULL : uri, compact_cfg));
+    if (background_compact) {
+        testutil_sentinel(home, compact_file);
+        /* Give some time for compaction to start. */
+        sleep(5 * TIMEOUT);
+    } else
+        printf("Foreground compaction ended...\n");
 }
 
 /*
@@ -280,7 +282,7 @@ static void
 check(WT_SESSION *session, const char *uri, char *value, int read_ts)
 {
     WT_CURSOR *cursor;
-    size_t val_1_size, val_2_size;
+    size_t val_1_size;
     uint64_t val1, val2, val3;
     int i;
     char *str_val;
@@ -298,10 +300,7 @@ check(WT_SESSION *session, const char *uri, char *value, int read_ts)
         cursor->set_key(cursor, i + 1);
         testutil_check(cursor->search(cursor));
         testutil_check(cursor->get_value(cursor, &val1, &val2, &val3, &str_val));
-
-        val_2_size = strlen(str_val);
-
-        testutil_assert(val_1_size == val_2_size);
+        testutil_assert(val_1_size == strlen(str_val));
         testutil_assert(memcmp(value, str_val, val_1_size) == 0);
     }
 
@@ -312,7 +311,7 @@ check(WT_SESSION *session, const char *uri, char *value, int read_ts)
 
 /*
  * large_updates --
- *     TODO: Add a comment describing this function.
+ *     Update all the records with a given value at a specific timestamp.
  */
 static void
 large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts)
@@ -331,18 +330,19 @@ large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts)
     testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%d", commit_ts);
     for (i = 0; i < NUM_RECORDS; i++) {
         testutil_check(session->begin_transaction(session, NULL));
+
         cursor->set_key(cursor, i + 1);
         val = (uint64_t)__wt_random(&rnd);
         cursor->set_value(cursor, val, val, val, value);
-        while (((ret = cursor->insert(cursor)) == WT_ROLLBACK) && retry_attempts < MAX_RETRIES) {
-            printf("Rollback transaction for key %d\n", i + 1);
+
+        while (((ret = cursor->insert(cursor)) == WT_ROLLBACK) && retry_attempts++ < MAX_RETRIES) {
+            printf("Rollback transaction for key %d\n", i);
             testutil_check(session->rollback_transaction(session, NULL));
             testutil_check(session->begin_transaction(session, NULL));
-            ++retry_attempts;
         }
 
-        if (retry_attempts == MAX_RETRIES)
-            testutil_die(ret, "Cursor insert returned WT_ROLLBACK for %d times", MAX_RETRIES);
+        testutil_assertfmt(retry_attempts < MAX_RETRIES,
+          "Cursor insert returned WT_ROLLBACK for %d times", retry_attempts);
 
         testutil_check(ret);
         testutil_check(session->commit_transaction(session, tscfg));
@@ -354,7 +354,7 @@ large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts)
 
 /*
  * populate --
- *     TODO: Add a comment describing this function.
+ *     Populate a table with random strings.
  */
 static void
 populate(WT_SESSION *session, const char *uri)
@@ -388,7 +388,7 @@ populate(WT_SESSION *session, const char *uri)
 
 /*
  * remove_records --
- *     TODO: Add a comment describing this function.
+ *     Remove a third of the records from the start of the key range.
  */
 static void
 remove_records(WT_SESSION *session, const char *uri, int commit_ts)
@@ -401,8 +401,7 @@ remove_records(WT_SESSION *session, const char *uri, int commit_ts)
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 
     testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%d", commit_ts);
-    /* Remove 1/3 of the records from the middle of the key range. */
-    for (i = NUM_RECORDS / 3; i < (NUM_RECORDS * 2) / 2; i++) {
+    for (i = 1; i <= NUM_RECORDS / 3; i++) {
         testutil_check(session->begin_transaction(session, NULL));
         cursor->set_key(cursor, i);
         testutil_check(cursor->remove(cursor));
