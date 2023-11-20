@@ -131,17 +131,12 @@ public:
 
 
     RecordId& operator=(RecordId&& other) {
-        swap(other);
-        return *this;
-    }
-
-    void swap(RecordId& other) {
-        // We perform a byte-wise swap here to avoid concerns with the actual underlying type of the
-        // RecordId.
-        std::array<std::byte, sizeof(RecordId)> tmp;
-        std::memcpy(reinterpret_cast<void*>(tmp.data()), this, sizeof(RecordId));
+        if (_format == Format::kBigStr) {
+            HeapStr::getBufferFrom(_data).~ConstSharedBuffer();
+        }
         std::memcpy(reinterpret_cast<void*>(this), &other, sizeof(RecordId));
-        std::memcpy(reinterpret_cast<void*>(&other), tmp.data(), sizeof(RecordId));
+        other._format = kNull;
+        return *this;
     }
 
     /**
@@ -608,10 +603,6 @@ inline StringBuilder& operator<<(StringBuilder& stream, const RecordId& id) {
 
 inline std::ostream& operator<<(std::ostream& stream, const RecordId& id) {
     return stream << "RecordId(" << id.toString() << ')';
-}
-
-inline void swap(RecordId& lhs, RecordId& rhs) {
-    lhs.swap(rhs);
 }
 
 }  // namespace mongo
