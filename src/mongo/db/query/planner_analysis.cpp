@@ -883,7 +883,8 @@ void QueryPlannerAnalysis::removeImpreciseInternalExprFilters(const QueryPlanner
     // imprecise filters may be able to save us the significant work of doing a fetch. In such
     // cases, we assume the imprecise filter is always worth applying.
     if (root.fetched() && root.filter) {
-        expression::removeImpreciseInternalExprNodes(root.filter.get());
+        root.filter =
+            expression::assumeImpreciseInternalExprNodesReturnTrue(std::move(root.filter));
     }
 
     for (auto& child : root.children) {

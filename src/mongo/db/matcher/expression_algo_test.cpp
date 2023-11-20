@@ -2836,43 +2836,155 @@ TEST(SplitMatchExpressionForColumns, LeavesOriginalMatchExpressionFunctional) {
         BSON("albatross" << 45 << "blackbird" << 1 << "cowbird" << 2)));
 }
 
-TEST(RemoveImprecisePredicates, LeavesImprecisePredicatesInOrs) {
-    const auto predicateStr =
+struct RemoveImprecisePredicateTestCase {
+    std::string initialPredicateStr;
+
+    struct AssertTriviallyTrue {};
+    struct AssertTriviallyFalse {};
+    struct AssertPredicateRewritten {
+        std::string predicateStr;
+    };
+    stdx::variant<AssertTriviallyTrue, AssertTriviallyFalse, AssertPredicateRewritten> expected;
+};
+
+void testRemoveImprecisePredicates(const RemoveImprecisePredicateTestCase& testCase) {
+    ParsedMatchExpressionForTest predicate(testCase.initialPredicateStr);
+    auto newExpr = expression::assumeImpreciseInternalExprNodesReturnTrue(predicate.release());
+
+
+    stdx::visit(OverloadedVisitor{
+                    [&](RemoveImprecisePredicateTestCase::AssertTriviallyTrue) {
+                        ASSERT(newExpr->isTriviallyTrue());
+                    },
+                    [&](RemoveImprecisePredicateTestCase::AssertTriviallyFalse) {
+                        ASSERT(newExpr->isTriviallyFalse());
+                    },
+                    [&](RemoveImprecisePredicateTestCase::AssertPredicateRewritten a) {
+                        auto expected = ParsedMatchExpressionForTest(a.predicateStr).release();
+                        MatchExpression::sortTree(expected.get());
+                        ASSERT(expected->equivalent(newExpr.get()));
+                    },
+                },
+                testCase.expected);
+}
+
+TEST(RemoveImprecisePredicates, ImprecisePredicateInTopLevelOrBecomesAlwaysTrue) {
+    RemoveImprecisePredicateTestCase t{
         "{"
         " $or: [{a: {$_internalExprEq: 123}}, {b: {gt: 5}}]"
-        "}";
+        "}",
+        RemoveImprecisePredicateTestCase::AssertTriviallyTrue{}};
+    testRemoveImprecisePredicates(t);
+}
 
-    ParsedMatchExpressionForTest predicate(predicateStr);
-    auto expr = predicate.release();
+TEST(RemoveImprecisePredicates, RemovesImprecisePredicatesFromTopLevelAnd) {
+    RemoveImprecisePredicateTestCase t{
+        "{"
+        " $and: [{a: {$_internalExprEq: 123}},"
+        "        {c: {$eq: 123}}]"
+        "}",
+        RemoveImprecisePredicateTestCase::AssertPredicateRewritten{"{"
+                                                                   " $and: [{c: {$eq: 123}}]"
+                                                                   "}"}};
+    testRemoveImprecisePredicates(t);
+}
 
-    expression::removeImpreciseInternalExprNodes(expr.get());
-    MatchExpression::sortTree(expr.get());
-
-    auto expected = ParsedMatchExpressionForTest(predicateStr).release();
-    MatchExpression::sortTree(expected.get());
-    ASSERT(expected->equivalent(expr.get()));
+TEST(RemoveImprecisePredicates, ImprecisePredicateInTopLevelNorBecomesAlwaysFalse) {
+    RemoveImprecisePredicateTestCase t{
+        "{"
+        " $nor: [{a: {$_internalExprEq: 123}},"
+        "        {c: {$eq: 123}}]"
+        "}",
+        RemoveImprecisePredicateTestCase::AssertTriviallyFalse{}};
+    testRemoveImprecisePredicates(t);
 }
 
 TEST(RemoveImprecisePredicates, RemovesImprecisePredicateFromNestedAnds) {
-    const auto predicateStr =
+    RemoveImprecisePredicateTestCase t{
         "{"
         " $or: [{$and: [{$expr: {$eq: ['$a', 123]}}, {a: {$_internalExprEq: 123}}]}, "
         "       {$and: [{$expr: {$eq: ['$b', 456]}}, {b: {$_internalExprEq: 456}}]}] "
-        "}";
+        "}",
+        RemoveImprecisePredicateTestCase::AssertPredicateRewritten{
+            "{"
+            " $or: [{$and: [{$expr: {$eq: ['$a', {$const: 123}]}}]}, {$and: [{$expr: {$eq: ['$b', "
+            "{$const: 456}]}}]}] "
+            "}"}};
+    testRemoveImprecisePredicates(t);
+}
 
-    ParsedMatchExpressionForTest predicate(predicateStr);
-    auto expr = predicate.release();
-
-    expression::removeImpreciseInternalExprNodes(expr.get());
-    MatchExpression::sortTree(expr.get());
-
-    const auto expectedStr =
+TEST(RemoveImprecisePredicates, RemovesImprecisePredicatesNestedBelowAnds) {
+    RemoveImprecisePredicateTestCase t{
         "{"
-        " $or: [{$and: [{$expr: {$eq: ['$a', {$const: 123}]}}]}, {$and: [{$expr: {$eq: ['$b', "
-        "{$const: 456}]}}]}] "
-        "}";
-    auto expected = ParsedMatchExpressionForTest(expectedStr).release();
-    MatchExpression::sortTree(expected.get());
-    ASSERT(expected->equivalent(expr.get()));
+        " $and: [{$or: [{a: {$_internalExprEq: 123}}, {b: 456}]},"
+        "        {c: {$eq: 123}}]"
+        "}",
+        RemoveImprecisePredicateTestCase::AssertPredicateRewritten{"{"
+                                                                   " $and: [{c: {$eq: 123}}]"
+                                                                   "}"}};
+    testRemoveImprecisePredicates(t);
+}
+
+TEST(RemoveImprecisePredicates, RemovesImprecisePredicatesNestedBelowOrs) {
+    RemoveImprecisePredicateTestCase t{
+        "{"
+        " $or: [{$nor: [{a: {$_internalExprEq: 123}}, {b: 456}]},"
+        "       {c: {$eq: 123}}]"
+        "}",
+        RemoveImprecisePredicateTestCase::AssertPredicateRewritten{"{"
+                                                                   " $or: [{c: {$eq: 123}}]"
+                                                                   "}"}};
+    testRemoveImprecisePredicates(t);
+}
+
+TEST(RemoveImprecisePredicates, RemovesImprecisePredicatesBelowNors) {
+    RemoveImprecisePredicateTestCase t{
+        "{"
+        " $nor: [{$and: [{a: {$_internalExprEq: 123}}, {b: 456}]},"
+        "       {c: {$eq: 123}}]"
+        "}",
+        RemoveImprecisePredicateTestCase::AssertPredicateRewritten{
+            "{"
+            " $nor: [{$and: [{b: 456}]}, {c: {$eq: 123}}]"
+            "}"}};
+    testRemoveImprecisePredicates(t);
+}
+
+TEST(RemoveImprecisePredicates, AndBecomesTriviallyFalseWhenChildIsTriviallyFalse) {
+    RemoveImprecisePredicateTestCase t{
+        "{"
+        " $and: [{$nor: [{a: {$_internalExprEq: 123}}, {b: 456}]},"
+        "       {c: {$eq: 123}}]"
+        "}",
+        RemoveImprecisePredicateTestCase::AssertTriviallyFalse{}};
+    testRemoveImprecisePredicates(t);
+}
+
+TEST(RemoveImprecisePredicates, TriviallyFalseExpressionInOrIsRemoved) {
+    RemoveImprecisePredicateTestCase t{
+        "{"
+        " $or: [{$nor: [{a: {$_internalExprEq: 123}}, {b: 456}]},"
+        "        {c: {$eq: 123}},"
+        "        {d: {$eq: 123}}]"
+        "}",
+        RemoveImprecisePredicateTestCase::AssertPredicateRewritten{"{"
+                                                                   " $or: [{c: {$eq: 123}},"
+                                                                   "       {d: {$eq: 123}}]"
+                                                                   "}"}};
+    testRemoveImprecisePredicates(t);
+}
+
+TEST(RemoveImprecisePredicates, RemovesTriviallyFalseChildOfNor) {
+    RemoveImprecisePredicateTestCase t{
+        "{"
+        " $nor: [{$nor: [{a: {$_internalExprEq: 123}}, {b: 456}]},"
+        "       {c: {$eq: 123}},"
+        "       {d: {$eq: 456}}]"
+        "}",
+        RemoveImprecisePredicateTestCase::AssertPredicateRewritten{
+            "{"
+            " $nor: [{c: {$eq: 123}}, {d: {$eq: 456}}]"
+            "}"}};
+    testRemoveImprecisePredicates(t);
 }
 }  // namespace mongo

@@ -51,6 +51,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
@@ -1143,28 +1144,86 @@ void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path) {
 
     func(expr, path);
 }
+namespace {
+/**
+ * Helper function for assumeImpreciseInternalExprNodesReturnTrue(). Given a tree-like
+ * match expression (one which can have multiple children e.g. AND, OR, NOR), walk it and
+ * apply the assumeImpreciseInternalExprNodesReturnTrue() to each child.
+ *
+ * If a child is trivially true or trivially false, the expression is simplified based on the
+ * callbacks onTriviallyTrue() and onTriviallyFalse(). A return of nullptr from the callback
+ * indicates that the node should be removed, and a return value of non-null indicates that the
+ * non-null value should replace the entire match expression.
+ */
+std::unique_ptr<MatchExpression> rewriteTreeNode(
+    std::unique_ptr<MatchExpression> exprOwned,
+    const std::function<std::unique_ptr<MatchExpression>(std::unique_ptr<MatchExpression>)>&
+        onTriviallyTrue,
+    const std::function<std::unique_ptr<MatchExpression>(std::unique_ptr<MatchExpression>)>&
+        onTriviallyFalse) {
 
-void removeImpreciseInternalExprNodes(MatchExpression* expr) {
-    auto matchType = expr->matchType();
-    // InternalExprs are only combined via AND and OR, and we assume that the ones we can remove
-    // are within AND nodes (along with the more precise ExprMatchExpression). It is possible we'll
-    // "miss" removing InternalExpr* nodes that we _could_ remove, but that is ok. InternalExprs
-    // are not combined via NOR or NOT.
-    if (matchType == MatchExpression::AND || matchType == MatchExpression::OR) {
-        auto* listOfNode = static_cast<ListOfMatchExpression*>(expr);
+    auto* listOfNode = static_cast<ListOfMatchExpression*>(exprOwned.get());
+    size_t i = 0;
+    size_t nChildren = exprOwned->numChildren();
 
-        // In principle we can remove any imprecise expression beneath an AND, effectively assuming
-        // that it returns true, and relying on a later precise filter to remove any false
-        // positives. TODO finish this comment
-        if (matchType == MatchExpression::AND) {
-            listOfNode->removeChildrenIf([](const auto* node) {
-                return ComparisonMatchExpressionBase::isInternalExprComparison(node->matchType());
-            });
+    while (i < nChildren) {
+        auto& node = (*listOfNode->getChildVector())[i];
+        auto newNode = assumeImpreciseInternalExprNodesReturnTrue(std::move(node));
+        if (newNode->isTriviallyTrue()) {
+            if (auto ret = onTriviallyTrue(std::move(newNode)); ret) {
+                return ret;
+            } else {
+                listOfNode->removeChild(i);
+                nChildren--;
+            }
+        } else if (newNode->isTriviallyFalse()) {
+            if (auto ret = onTriviallyFalse(std::move(newNode)); ret) {
+                return ret;
+            } else {
+                listOfNode->removeChild(i);
+                nChildren--;
+            }
+        } else {
+            (*listOfNode->getChildVector())[i] = std::move(newNode);
+            ++i;
         }
+    }
+    return exprOwned;
+}
+}  // namespace
 
-        for (auto& node : *expr->getChildVector()) {
-            removeImpreciseInternalExprNodes(node.get());
-        }
+std::unique_ptr<MatchExpression> assumeImpreciseInternalExprNodesReturnTrue(
+    std::unique_ptr<MatchExpression> exprOwned) {
+    auto matchType = exprOwned->matchType();
+    auto expr = exprOwned.get();
+
+    if (matchType == MatchExpression::AND) {
+        return rewriteTreeNode(
+            std::move(exprOwned),
+            // Remove any trivially true node.
+            [](auto trueNode) { return nullptr; },
+            // If any false node is found, that becomes the new root.
+            [](auto falseNode) { return falseNode; });
+
+    } else if (matchType == MatchExpression::OR) {
+        return rewriteTreeNode(
+            std::move(exprOwned),
+            // Any trivially true node makes this OR true.
+            [](auto trueNode) { return trueNode; },
+            // If any false node is found, remove it.
+            [](auto falseNode) { return nullptr; });
+
+    } else if (matchType == MatchExpression::NOR) {
+        return rewriteTreeNode(
+            std::move(exprOwned),
+            // Any trivially true node makes this entire node false.
+            [](auto trueNode) { return std::make_unique<AlwaysFalseMatchExpression>(); },
+            // If any false node is found, remove it.
+            [](auto falseNode) { return nullptr; });
+    } else if (ComparisonMatchExpressionBase::isInternalExprComparison(expr->matchType())) {
+        return std::make_unique<AlwaysTrueMatchExpression>();
+    } else {
+        return exprOwned;
     }
 }
 
