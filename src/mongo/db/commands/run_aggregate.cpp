@@ -143,6 +143,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/unordered_set.h"
@@ -804,6 +805,62 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
     return execs;
 }
 
+ScopedSetShardRole setShardRole(OperationContext* opCtx,
+                                const NamespaceString& underlyingNss,
+                                const NamespaceString& viewNss,
+                                const CollectionRoutingInfo& cri) {
+    const auto optPlacementConflictTimestamp = [&]() {
+        auto originalShardVersion = OperationShardingState::get(opCtx).getShardVersion(viewNss);
+
+        // Since for requests on timeseries namespaces the ServiceEntryPoint installs shard version
+        // on the buckets collection instead of the viewNss.
+        // TODO: SERVER-80719 Remove this.
+        if (!originalShardVersion && underlyingNss.isTimeseriesBucketsCollection()) {
+            originalShardVersion =
+                OperationShardingState::get(opCtx).getShardVersion(underlyingNss);
+        }
+
+        return originalShardVersion ? originalShardVersion->placementConflictTime() : boost::none;
+    }();
+
+
+    if (cri.cm.hasRoutingTable()) {
+        const auto myShardId = ShardingState::get(opCtx)->shardId();
+
+        auto sv = cri.getShardVersion(myShardId);
+        if (optPlacementConflictTimestamp) {
+            sv.setPlacementConflictTime(*optPlacementConflictTimestamp);
+        }
+        return ScopedSetShardRole(
+            opCtx, underlyingNss, sv /*shardVersion*/, boost::none /*databaseVersion*/);
+    } else {
+        auto sv = ShardVersion::UNSHARDED();
+        if (optPlacementConflictTimestamp) {
+            sv.setPlacementConflictTime(*optPlacementConflictTimestamp);
+        }
+        return ScopedSetShardRole(opCtx,
+                                  underlyingNss,
+                                  ShardVersion::UNSHARDED() /*shardVersion*/,
+                                  cri.cm.dbVersion() /*databaseVersion*/);
+    }
+}
+
+bool canReadUnderlyingCollectionLocally(OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+    const auto myShardId = ShardingState::get(opCtx)->shardId();
+    const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+
+    const auto chunkManagerMaybeAtClusterTime =
+        atClusterTime ? ChunkManager::makeAtTime(cri.cm, atClusterTime->asTimestamp()) : cri.cm;
+
+    if (chunkManagerMaybeAtClusterTime.isSharded()) {
+        return false;
+    } else if (chunkManagerMaybeAtClusterTime.isUnsplittable()) {
+        return chunkManagerMaybeAtClusterTime.getMinKeyShardIdWithSimpleCollation() == myShardId;
+    } else {
+        return chunkManagerMaybeAtClusterTime.dbPrimary() == myShardId;
+    }
+}
+
 Status runAggregateOnView(OperationContext* opCtx,
                           const NamespaceString& origNss,
                           const AggregateCommandRequest& request,
@@ -844,15 +901,6 @@ Status runAggregateOnView(OperationContext* opCtx,
     // With the view & collation resolved, we can relinquish locks.
     resetContextFn();
 
-    // Set this operation's shard version for the underlying collection to unsharded.
-    // This is prerequisite for future shard versioning checks.
-    boost::optional<ScopedSetShardRole> scopeSetShardRole;
-    if (!serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-        scopeSetShardRole.emplace(opCtx,
-                                  resolvedView.getNamespace(),
-                                  ShardVersion::UNSHARDED() /* shardVersion */,
-                                  boost::none /* databaseVersion */);
-    };
     uassert(std::move(resolvedView),
             "Explain of a resolved view must be executed by mongos",
             !ShardingState::get(opCtx)->enabled() || !request.getExplain());
@@ -862,21 +910,60 @@ Status runAggregateOnView(OperationContext* opCtx,
     auto newCmd = aggregation_request_helper::serializeToCommandObj(newRequest);
 
     auto status{Status::OK()};
-    try {
+    if (!OperationShardingState::get(opCtx).isComingFromRouter(opCtx)) {
+        // Non sharding-aware operation.
+        // Run the translated query on the view on this node.
         status = runAggregate(opCtx, newRequest, newCmd, privileges, result, resolvedView, request);
-    } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
-        // Since we expect the view to be UNSHARDED, if we reached to this point there are
-        // two possibilities:
-        //   1. The shard doesn't know what its shard version/state is and needs to recover
-        //      it (in which case we throw so that the shard can run recovery)
-        //   2. The collection references by the view is actually SHARDED, in which case the
-        //      router must execute it
-        if (const auto staleInfo{ex.extraInfo<StaleConfigInfo>()}) {
-            uassert(std::move(resolvedView),
-                    "Resolved views on sharded collections must be executed by mongos",
-                    !staleInfo->getVersionWanted());
-        }
-        throw;
+    } else {
+        // Sharding-aware operation.
+        sharding::router::CollectionRouter router(opCtx->getServiceContext(),
+                                                  resolvedView.getNamespace());
+        status = router.route(
+            opCtx,
+            "runAggregateOnView",
+            [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                const auto readUnderlyingCollectionLocally =
+                    canReadUnderlyingCollectionLocally(opCtx, cri);
+
+                boost::optional<ScopedUnsetImplicitTimeSeriesBucketsShardRole>
+                    scopedUnsetImplicitTimeSeriesBucketsShardRole;
+                if (resolvedView.timeseries()) {
+                    scopedUnsetImplicitTimeSeriesBucketsShardRole.emplace(
+                        opCtx, resolvedView.getNamespace());
+                }
+
+                // Setup the opCtx's OperationShardingState with the expected placement versions for
+                // the underlying collection. Use the same 'placementConflictTime' from the original
+                // request, if present.
+                const auto scopedShardRole =
+                    setShardRole(opCtx, resolvedView.getNamespace(), origNss, cri);
+
+                // If the underlying collection is unsharded and is located on this shard, then we
+                // can execute the view aggregation locally. Otherwise, we need to kick-back to the
+                // router.
+                if (readUnderlyingCollectionLocally) {
+                    // Run the resolved aggregation locally.
+                    return runAggregate(
+                        opCtx, newRequest, newCmd, privileges, result, resolvedView, request);
+                } else {
+                    // Cannot execute the resolved aggregation locally. The router must do it.
+                    //
+                    // Before throwing the kick-back exception, validate the routing table
+                    // we are basing this decision on. We do so by briefly entering into
+                    // the shard-role by acquiring the underlying collection.
+                    const auto underlyingColl = acquireCollectionMaybeLockFree(
+                        opCtx,
+                        CollectionAcquisitionRequest::fromOpCtx(
+                            opCtx,
+                            resolvedView.getNamespace(),
+                            AcquisitionPrerequisites::OperationType::kRead));
+
+                    // Throw the kick-back exception.
+                    uasserted(std::move(resolvedView),
+                              "Resolved views on collections that do not exclusively live on the "
+                              "db-primary shard must be executed by mongos");
+                }
+            });
     }
 
     {

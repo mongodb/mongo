@@ -1853,6 +1853,7 @@ void ExecCommandDatabase::_initiateCommand() {
             // We expect all versioned commands to be sent over 'system.buckets' namespace. But it
             // is possible that a stale mongos may send the request over a view namespace. In this
             // case, we initialize the 'OperationShardingState' with buckets namespace.
+            // TODO: SERVER-80719 revisit this.
             const auto invocationNss = _invocation->ns();
             auto bucketNss = invocationNss.makeTimeseriesBucketsNamespace();
             // Hold reference to the catalog for collection lookup without locks to be safe.

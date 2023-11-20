@@ -261,4 +261,38 @@ ScopedSetShardRole::~ScopedSetShardRole() {
     }
 }
 
+ScopedUnsetImplicitTimeSeriesBucketsShardRole::ScopedUnsetImplicitTimeSeriesBucketsShardRole(
+    OperationContext* opCtx, const NamespaceString& nss)
+    : _opCtx(opCtx), _nss(nss) {
+    invariant(nss.isTimeseriesBucketsCollection());
+
+    auto& oss = OperationShardingState::get(_opCtx);
+
+    auto it = oss._shardVersions.find(
+        NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
+    if (it != oss._shardVersions.end()) {
+        tassert(8123300,
+                "Cannot unset implicit timeseries buckets shard role if recursion level is greater "
+                "than 1",
+                it->second.recursion == 1);
+        _stashedShardVersion.emplace(it->second.v);
+        oss._shardVersions.erase(it);
+    }
+}
+
+ScopedUnsetImplicitTimeSeriesBucketsShardRole::~ScopedUnsetImplicitTimeSeriesBucketsShardRole() {
+    auto& oss = OperationShardingState::get(_opCtx);
+    auto it = oss._shardVersions.find(
+        NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
+    invariant(it == oss._shardVersions.end());
+
+    if (_stashedShardVersion) {
+        auto emplaceResult = oss._shardVersions.emplace(
+            NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()),
+            *_stashedShardVersion);
+        auto& tracker = emplaceResult.first->second;
+        tracker.recursion = 1;
+    }
+}
+
 }  // namespace mongo

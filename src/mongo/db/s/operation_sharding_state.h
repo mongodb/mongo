@@ -66,6 +66,22 @@ private:
     boost::optional<DatabaseVersion> _databaseVersion;
 };
 
+// TODO: SERVER-80719 Remove this.
+// Unsets the implicit shard role that the service_entry_point sets as UNSHARDED on timeseries
+// buckets collections when the original request was on a timeseries view collection.
+class ScopedUnsetImplicitTimeSeriesBucketsShardRole {
+public:
+    ScopedUnsetImplicitTimeSeriesBucketsShardRole(OperationContext* opCtx,
+                                                  const NamespaceString& nss);
+
+    ~ScopedUnsetImplicitTimeSeriesBucketsShardRole();
+
+private:
+    OperationContext* _opCtx;
+    NamespaceString _nss;
+    boost::optional<ShardVersion> _stashedShardVersion;
+};
+
 /**
  * A decoration on OperationContext representing per-operation shard version metadata sent to mongod
  * from mongos as a command parameter.
@@ -176,6 +192,7 @@ public:
 
 private:
     friend class ScopedSetShardRole;
+    friend class ScopedUnsetImplicitTimeSeriesBucketsShardRole;
     friend class ShardServerOpObserver;  // For access to _allowCollectionCreation below
 
     // Specifies whether the request is allowed to create database/collection implicitly
