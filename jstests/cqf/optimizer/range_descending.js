@@ -10,17 +10,19 @@
 import {assertValueOnPlanPath} from "jstests/libs/optimizer_utils.js";
 
 const coll = db.cqf_range_descending;
+let docs = [];
 /*
  * This is the most basic case: a single range predicate with a descending index.
  */
 {
     coll.drop();
-    assert.commandWorked(coll.insertOne({a: 1}));
+    docs.push({a: 1});
     const indexKey = {a: -1};
     assert.commandWorked(coll.createIndex(indexKey));
     for (let i = 0; i < 100; ++i) {
-        assert.commandWorked(coll.insert({}));
+        docs.push({});
     }
+    assert.commandWorked(coll.insertMany(docs));
     const query = {a: {$gte: 0, $lte: 2}};
     {
         const res = coll.find(query).hint(indexKey).toArray();
@@ -37,18 +39,22 @@ const coll = db.cqf_range_descending;
  */
 {
     coll.drop();
-    var bulkOp = coll.initializeOrderedBulkOp();
+    docs = [];
     for (let i = 10; i <= 30; i += 10) {
         for (let j = 1; j <= 3; j++) {
             for (let k = 0; k < 10; k++) {
-                bulkOp.insert({a: i, b: j});
+                docs.push({a: i, b: j});
             }
         }
     }
-    for (let i = 0; i < 1000; ++i) {
-        bulkOp.insert({});
+    let newDocs = Array.from({length: 1000}, () => ({a: 10}));
+    // Distribute interesting documents to encourage IndexScan when sampling in chunks.
+    for (let i = 0; i < docs.length; i++) {
+        const idx = Math.floor(i * (newDocs.length / docs.length));
+        newDocs[idx] = docs[i];
+        newDocs.push({a: 10})
     }
-    assert.commandWorked(bulkOp.execute());
+    assert.commandWorked(coll.insertMany(newDocs));
     const indexKey = {a: 1, b: -1};
     assert.commandWorked(coll.createIndex(indexKey));
     const query = {a: {$gte: 10, $lte: 20}, b: {$gt: 1}};
@@ -66,10 +72,12 @@ const coll = db.cqf_range_descending;
  */
 {
     coll.drop();
-    assert.commandWorked(coll.insertOne({a: 1, b: 1}));
+    docs = [];
+    docs.push({a: 1, b: 1});
     for (let i = 0; i < 100; i++) {
-        assert.commandWorked(coll.insert({a: i + 2, b: i + 2}));
+        docs.push({a: i + 2, b: i + 2});
     }
+    assert.commandWorked(coll.insertMany(docs));
     const indexKey = {a: -1, b: -1};
     assert.commandWorked(coll.createIndex(indexKey));
     const query = [{a: 1}, {_id: 0, a: 1, b: 1}];

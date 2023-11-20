@@ -2,7 +2,7 @@ import {
     assertValueOnPath,
     assertValueOnPlanPath,
     checkCascadesOptimizerEnabled,
-    navigateToPlanPath,
+    navigateToPlanPath
 } from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
@@ -12,16 +12,18 @@ if (!checkCascadesOptimizerEnabled(db)) {
 
 const t = db.cqf_array_match;
 t.drop();
+let docs = [];
 
 for (let i = 0; i < 10; i++) {
-    assert.commandWorked(t.insert({a: 2, b: 1}));
-    assert.commandWorked(t.insert({a: [2], b: 1}));
-    assert.commandWorked(t.insert({a: [[2]], b: 1}));
-    assert.commandWorked(t.insert({a: [0, 1], b: 1}));
-    assert.commandWorked(t.insert({a: [], b: 1}));
-    assert.commandWorked(t.insert({a: [3, []], b: 1}));
+    docs.push({a: 2, b: 1});
+    docs.push({a: [2], b: 1});
+    docs.push({a: [[2]], b: 1});
+    docs.push({a: [0, 1], b: 1});
+    docs.push({a: [], b: 1});
+    docs.push({a: [3, []], b: 1});
 }
 
+assert.commandWorked(t.insertMany(docs));
 assert.commandWorked(t.createIndex({a: 1}));
 
 {
@@ -37,12 +39,18 @@ assert.commandWorked(t.createIndex({a: 1}));
     assert.eq(10, res.executionStats.nReturned);
 }
 
+t.drop();
+assert.commandWorked(t.createIndex({a: 1}));
+
 // Generate enough documents for index to be preferable.
-const bulk = t.initializeUnorderedBulkOp();
-for (let i = 0; i < 1000; i++) {
-    bulk.insert({a: i + 10});
+let newDocs = Array.from({length: 1060}, (_, i) => ({a: i + 10}));
+
+// Distribute interesting documents to encourage IndexScan when sampling in chunks.
+for (let i = 0; i < docs.length; i++) {
+    const idx = Math.floor(i * (newDocs.length / docs.length));
+    newDocs[idx] = docs[i];
 }
-assert.commandWorked(bulk.execute());
+assert.commandWorked(t.insertMany(newDocs));
 
 {
     const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: [2]}}}]);

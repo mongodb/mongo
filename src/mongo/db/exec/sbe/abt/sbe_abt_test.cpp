@@ -728,20 +728,19 @@ TEST_F(NodeSBE, SamplingTest) {
                                       prefixId);
 
     // We are not lowering the paths.
-    OptPhaseManager phaseManagerForSampling{
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        false /*requireRID*/,
-        metadata,
-        makeHeuristicCE(),
-        makeHeuristicCE(),
-        makeCostEstimator(getTestCostModel()),
-        defaultConvertPathToInterval,
-        defaultConvertPathToInterval,
-        DebugInfo::kDefaultForProd,
-        {._numSamplingChunks = 5, ._sqrtSampleSizeEnabled = false}};
+    OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
+                                             OptPhase::MemoExplorationPhase,
+                                             OptPhase::MemoImplementationPhase},
+                                            prefixId,
+                                            false /*requireRID*/,
+                                            metadata,
+                                            makeHeuristicCE(),
+                                            makeHeuristicCE(),
+                                            makeCostEstimator(getTestCostModel()),
+                                            defaultConvertPathToInterval,
+                                            defaultConvertPathToInterval,
+                                            DebugInfo::kDefaultForProd,
+                                            {._sqrtSampleSizeEnabled = false}};
 
     // Used to record the sampling plans.
     ABTVector nodes;
@@ -786,9 +785,9 @@ TEST_F(NodeSBE, SamplingTest) {
         "|   Const [2]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
-        "|   LimitSkip [limit: 200, skip: 0]\n"
+        "|   LimitSkip [limit: 100, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, test]\n"
-        "LimitSkip [limit: 5, skip: 0]\n"
+        "LimitSkip [limit: 10, skip: 0]\n"
         "PhysicalScan [{'<rid>': rid_0}, test]\n",
         nodes.front());
 }
