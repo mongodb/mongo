@@ -682,7 +682,8 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                 clearUser();
                 LOGV2(20245,
                       "Removed deleted user from session cache of user information",
-                      "user"_attr = name);
+                      "user"_attr = name,
+                      "error"_attr = status);
                 return;
             }
             case ErrorCodes::UnsupportedFormat: {
