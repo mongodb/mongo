@@ -2236,6 +2236,17 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
         ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->next(c); });
     }
 
+    if (ret != WT_NOTFOUND) {
+        curId = getKey(c);
+        // If the curId is higher than the read timestamp, it must be for backward search. Per the
+        // requirement of the API, the largest smaller than the oplog read timestamp should be
+        // returned.
+        if (_readTimestampForOplog && curId.getLong() > *_readTimestampForOplog) {
+            invariant(!_forward);
+            ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->prev(c); });
+        }
+    }
+
     // If we tried to return an earlier record but we found the end (for forward) or beginning (for
     // reverse), go back to our original location so that we have something to return.
     if (ret == WT_NOTFOUND) {
