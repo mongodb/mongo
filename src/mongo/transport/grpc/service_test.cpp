@@ -467,6 +467,7 @@ TEST_F(CommandServiceTest, ServerSendsMultipleMessages) {
         OpMsg response;
         response.body = BSON("nReceived" << nReceived);
         ASSERT_TRUE(stream->Write(response.serialize().sharedBuffer()));
+        ASSERT_EQ(stream->Finish().error_code(), ::grpc::OK);
     };
 
     runTestWithBothMethods(serverHandler, clientCallback);
