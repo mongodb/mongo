@@ -517,6 +517,10 @@ last-continuous:
     ticket: SERVER-83247
   - test_file: jstests/core/timeseries/timeseries_project_pushdown.js
     ticket: SERVER-82447
+  - test_file: jstests/core/query/project/projection_expr_mod.js
+    ticket: SERVER-39336
+  - test_file: jstests/aggregation/expressions/expression_mod.js
+    ticket: SERVER-39336
   suites: null
 last-lts:
   all:
@@ -1096,4 +1100,8 @@ last-lts:
     ticket: SERVER-83247
   - test_file: jstests/core/timeseries/timeseries_project_pushdown.js
     ticket: SERVER-82447
+  - test_file: jstests/core/query/project/projection_expr_mod.js
+    ticket: SERVER-39336
+  - test_file: jstests/aggregation/expressions/expression_mod.js
+    ticket: SERVER-39336
   suites: null

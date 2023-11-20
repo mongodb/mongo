@@ -17,63 +17,70 @@ var coll = testDB.getCollection(collName);
 // The $match portion ensures they are of the correct type as the shell turns the ints back to
 // doubles at the end so we can not check types with assert.
 coll.save({});
-var result = coll.aggregate({
-    $project: {
-        _id: 0,
-        dub_dub: {$mod: [138.5, 3.0]},
-        dub_int: {$mod: [138.5, NumberLong(3)]},
-        dub_long: {$mod: [138.5, NumberInt(3)]},
-        int_dub: {$mod: [NumberInt(8), 3.25]},
-        int_dubint: {$mod: [NumberInt(8), 3.0]},
-        int_int: {$mod: [NumberInt(8), NumberInt(3)]},
-        int_long: {$mod: [NumberInt(8), NumberLong(3)]},
-        long_dub: {$mod: [NumberLong(8), 3.25]},
-        long_dubint: {$mod: [NumberLong(8), 3.0]},
-        long_dublong: {$mod: [NumberLong(500000000000), 450000000000.0]},
-        long_int: {$mod: [NumberLong(8), NumberInt(3)]},
-        long_long: {$mod: [NumberLong(8), NumberLong(3)]},
-        verylong_verylong: {$mod: [NumberLong(800000000000), NumberLong(300000000000)]}
-    }
-},
-                            {
-                                $match: {
-                                    // 1 is NumberDouble
-                                    dub_dub: {$type: 1},
-                                    dub_int: {$type: 1},
-                                    dub_long: {$type: 1},
-                                    int_dub: {$type: 1},
-                                    // 16 is NumberInt
-                                    int_dubint: {$type: 16},
-                                    int_int: {$type: 16},
-                                    // 18 is NumberLong
-                                    int_long: {$type: 18},
-                                    long_dub: {$type: 1},
-                                    long_dubint: {$type: 18},
-                                    long_dublong: {$type: 1},
-                                    long_int: {$type: 18},
-                                    long_long: {$type: 18},
-                                    verylong_verylong: {$type: 18}
-                                }
-                            });
+var result =
+    coll.aggregate({
+            $project: {
+                _id: 0,
+                dub_dub: {$mod: [138.5, 3.0]},
+                dub_int: {$mod: [138.5, NumberInt(3)]},
+                dub_long: {$mod: [138.5, NumberLong(3)]},
+                int_dub: {$mod: [NumberInt(8), 3.25]},
+                int_dubint: {$mod: [NumberInt(8), 3.0]},
+                int_int: {$mod: [NumberInt(8), NumberInt(3)]},
+                int_long: {$mod: [NumberInt(8), NumberLong(3)]},
+                long_dub: {$mod: [NumberLong(8), 3.25]},
+                long_dubint: {$mod: [NumberLong(8), 3.0]},
+                long_dublong: {$mod: [NumberLong(500000000000), 450000000000.0]},
+                long_int: {$mod: [NumberLong(8), NumberInt(3)]},
+                long_long: {$mod: [NumberLong(8), NumberLong(3)]},
+                verylong_verylong: {$mod: [NumberLong(800000000000), NumberLong(300000000000)]}
+            }
+        },
+                   {
+                       $project: {
+                           _id: 0,
+                           dub_dub: {type: {$type: "$dub_dub"}, value: "$dub_dub"},
+                           dub_int: {type: {$type: "$dub_int"}, value: "$dub_int"},
+                           dub_long: {type: {$type: "$dub_long"}, value: "$dub_long"},
+                           int_dub: {type: {$type: "$int_dub"}, value: "$int_dub"},
+                           int_dubint: {type: {$type: "$int_dubint"}, value: "$int_dubint"},
+                           int_int: {type: {$type: "$int_int"}, value: "$int_int"},
+                           int_long: {type: {$type: "$int_long"}, value: "$int_long"},
+                           long_dub: {type: {$type: "$long_dub"}, value: "$long_dub"},
+                           long_dubint: {type: {$type: "$long_dubint"}, value: "$long_dubint"},
+                           long_dublong: {type: {$type: "$long_dublong"}, value: "$long_dublong"},
+                           long_int: {type: {$type: "$long_int"}, value: "$long_int"},
+                           long_long: {type: {$type: "$long_long"}, value: "$long_long"},
+                           verylong_verylong:
+                               {type: {$type: "$verylong_verylong"}, value: "$verylong_verylong"},
+                       },
+                   })
+        .toArray();
 
 // Correct answers (it is mainly the types that are important here).
 var expectedResult = [{
-    dub_dub: 0.5,
-    dub_int: 0.5,
-    dub_long: 0.5,
-    int_dub: 1.5,
-    int_dubint: 2,
-    int_int: 2,
-    int_long: NumberLong(2),
-    long_dub: 1.5,
-    long_dubint: NumberLong(2),
-    long_dublong: 50000000000,
-    long_int: NumberLong(2),
-    long_long: NumberLong(2),
-    verylong_verylong: NumberLong(200000000000)
+    dub_dub: {type: "double", value: 0.5},
+    dub_int: {type: "double", value: 0.5},
+    dub_long: {type: "double", value: 0.5},
+    int_dub: {type: "double", value: 1.5},
+    int_dubint: {type: "double", value: 2.0},
+    int_int: {type: "int", value: 2},
+    int_long: {type: "long", value: NumberLong(2)},
+    long_dub: {type: "double", value: 1.5},
+    long_dubint: {type: "double", value: 2.0},
+    long_dublong: {type: "double", value: 50000000000},
+    long_int: {type: "long", value: NumberLong(2)},
+    long_long: {type: "long", value: NumberLong(2)},
+    verylong_verylong: {type: "long", value: NumberLong(200000000000)}
 }];
 
-assert.eq(result.toArray(), expectedResult, tojson(result));
+assert.eq(result.length, 1, `Expected one result`);
+
+for (const key of Object.keys(expectedResult[0])) {
+    const real = result[0][key];
+    const expected = expectedResult[0][key];
+    assert.eq(real, expected, `Result for ${key} has incorrect type or value, or is missing`);
+}
 
 //
 // Confirm error cases.

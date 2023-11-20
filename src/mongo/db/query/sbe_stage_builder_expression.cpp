@@ -2489,28 +2489,6 @@ public:
         auto lhsName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
         auto rhsName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
-        // If the rhs is a small integral double, convert it to int32 to match $mod MQL semantics.
-        auto numericConvert32 = makeABTFunction(
-            "convert",
-            makeVariable(rhsName),
-            optimizer::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt32)));
-        auto rhsExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{
-                optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::And,
-                    makeABTFunction("typeMatch",
-                                    makeVariable(rhsName),
-                                    optimizer::Constant::int32(
-                                        getBSONTypeMask(sbe::value::TypeTags::NumberDouble))),
-                    makeNot(makeABTFunction("typeMatch",
-                                            makeVariable(lhsName),
-                                            optimizer::Constant::int32(getBSONTypeMask(
-                                                sbe::value::TypeTags::NumberDouble))))),
-                optimizer::make<optimizer::BinaryOp>(optimizer::Operations::FillEmpty,
-                                                     std::move(numericConvert32),
-                                                     makeVariable(rhsName))},
-            makeVariable(rhsName));
-
         auto modExpr = buildABTMultiBranchConditional(
             ABTCaseValuePair{
                 optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
@@ -2522,7 +2500,7 @@ public:
                                                      generateABTNonNumericCheck(lhsName),
                                                      generateABTNonNumericCheck(rhsName)),
                 makeABTFail(ErrorCodes::Error{7157718}, "$mod only supports numeric types")},
-            makeABTFunction("mod", makeVariable(lhsName), std::move(rhsExpr)));
+            makeABTFunction("mod", makeVariable(lhsName), makeVariable(rhsName)));
 
         pushABT(optimizer::make<optimizer::Let>(
             std::move(lhsName),

@@ -3342,9 +3342,7 @@ StatusWith<Value> ExpressionMod::apply(Value lhs, Value rhs) {
             return Status(ErrorCodes::Error(16610), str::stream() << "can't $mod by zero");
         };
 
-        if (leftType == NumberDouble || (rightType == NumberDouble && !rhs.integral())) {
-            // Need to do fmod. Integer-valued double case is handled below.
-
+        if (leftType == NumberDouble || rightType == NumberDouble) {
             double left = lhs.coerceToDouble();
             return Value(fmod(left, right));
         }
