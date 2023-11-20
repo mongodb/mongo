@@ -115,6 +115,12 @@ if env.GetOption('sanitize') and 'undefined' in env.GetOption('sanitize').split(
             '-fno-sanitize=signed-integer-overflow',
         ],
     )
+
+if env.ToolchainIs('gcc'):
+    env.Append(
+        CCFLAGS=[
+            '-Wno-error=ignored-attributes',
+        ], )
 """)
 
     # This will loop through the ninja file looking for the specified target libs.

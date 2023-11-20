@@ -31,6 +31,12 @@ if env.GetOption('sanitize') and 'undefined' in env.GetOption('sanitize').split(
         ],
     )
 
+if env.ToolchainIs('gcc'):
+    env.Append(
+        CCFLAGS=[
+            '-Wno-error=ignored-attributes',
+        ], )
+
 # absl_strerror added as a dependency of other abseil libraries
 env.Library(
     target='absl_strerror',

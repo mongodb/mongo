@@ -28,6 +28,7 @@ if protobuf_env.ToolchainIs('gcc'):
         CPPDEFINES=[],
         CCFLAGS=[
             '-Wno-stringop-overflow',
+            '-Wno-error=deprecated',
         ],
     )
 
