@@ -60,7 +60,7 @@ const sendFCVUpDown = function(ver) {
 };
 
 Random.setRandomSeed();
-let maxSleep = 5000;  // 5 sec.
+let maxSleep = 1000;  // 1 sec.
 let currSleep = 10;   // Start at 10ms.
 
 // Get time interval to sleep in ms.
