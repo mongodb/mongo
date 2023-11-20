@@ -147,6 +147,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: streams
   - name: streams_auth
+  - name: .unsplittable_collections
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
