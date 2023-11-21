@@ -194,7 +194,8 @@ void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
                                           _pathToInterval,
                                           _constFold,
                                           *_logicalPropsDerivation,
-                                          useSubstitutionCE ? *_substitutionCE : *_explorationCE);
+                                          useSubstitutionCE ? *_substitutionCE : *_explorationCE,
+                                          _queryParameters);
     rootGroupId = logicalRewriter->addRootNode(input);
 
     if (runStandalone) {

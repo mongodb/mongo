@@ -193,13 +193,15 @@ public:
         Context(const Metadata* metadata,
                 const DebugInfo* debugInfo,
                 const LogicalPropsInterface* logicalPropsDerivation,
-                const CardinalityEstimator* cardinalityEstimator);
+                const CardinalityEstimator* cardinalityEstimator,
+                const QueryParameterMap* queryParameters);
 
         // None of those should be null.
         const Metadata* _metadata;
         const DebugInfo* _debugInfo;
         const LogicalPropsInterface* _logicalPropsDerivation;
         const CardinalityEstimator* _cardinalityEstimator;
+        const QueryParameterMap* _queryParameters;
     };
 
     struct Stats {

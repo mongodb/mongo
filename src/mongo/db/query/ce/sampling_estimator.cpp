@@ -243,11 +243,12 @@ public:
                        const Metadata& metadata,
                        const cascades::Memo& memo,
                        const properties::LogicalProps& logicalProps,
+                       const QueryParameterMap& queryParameters,
                        CERecord childResult,
                        CERecord /*exprResult*/) {
         if (_phaseManager.getHints()._forceSamplingCEFallBackForFilterNode ||
             !properties::hasProperty<properties::IndexingAvailability>(logicalProps)) {
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, queryParameters, n);
         }
 
         SamplingPlanExtractor planExtractor(memo, _phaseManager, _sampleSize);
@@ -255,7 +256,7 @@ public:
         ABT abtTree = make<FilterNode>(node.getFilter(), planExtractor.extract(n.copy()));
 
         return estimateFilterCE(
-            metadata, memo, logicalProps, n, std::move(abtTree), childResult._ce);
+            metadata, memo, logicalProps, queryParameters, n, std::move(abtTree), childResult._ce);
     }
 
     CERecord transport(const ABT::reference_type n,
@@ -263,11 +264,12 @@ public:
                        const Metadata& metadata,
                        const cascades::Memo& memo,
                        const properties::LogicalProps& logicalProps,
+                       const QueryParameterMap& queryParameters,
                        CERecord childResult,
                        CERecord /*bindResult*/,
                        CERecord /*refsResult*/) {
         if (!properties::hasProperty<properties::IndexingAvailability>(logicalProps)) {
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, queryParameters, n);
         }
 
         const ScanDefinition& scanDef = getScanDefFromIndexingAvailability(
@@ -345,9 +347,14 @@ public:
                 // Continue the sampling estimation only if the field from the partial schema is
                 // indexed.
                 const CERecord& filterCE = isFieldPathIndexed(key, scanDef)
-                    ? estimateFilterCE(
-                          metadata, memo, logicalProps, n, std::move(entry), childResult._ce)
-                    : _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
+                    ? estimateFilterCE(metadata,
+                                       memo,
+                                       logicalProps,
+                                       queryParameters,
+                                       n,
+                                       std::move(entry),
+                                       childResult._ce)
+                    : _fallbackCE->deriveCE(metadata, memo, logicalProps, queryParameters, n);
                 const SelectivityType sel =
                     childResult._ce > 0.0 ? (filterCE._ce / childResult._ce) : SelectivityType{0.0};
                 selTreeBuilder.atom(sel);
@@ -367,9 +374,10 @@ public:
                        const Metadata& metadata,
                        const cascades::Memo& memo,
                        const properties::LogicalProps& logicalProps,
+                       const QueryParameterMap& queryParameters,
                        Ts&&...) {
         if (canBeLogicalNode<T>()) {
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, queryParameters, n);
         }
         return {0.0, samplingLabel};
     }
@@ -377,14 +385,17 @@ public:
     CERecord derive(const Metadata& metadata,
                     const cascades::Memo& memo,
                     const properties::LogicalProps& logicalProps,
+                    const QueryParameterMap& queryParameters,
                     const ABT::reference_type logicalNodeRef) {
-        return algebra::transport<true>(logicalNodeRef, *this, metadata, memo, logicalProps);
+        return algebra::transport<true>(
+            logicalNodeRef, *this, metadata, memo, logicalProps, queryParameters);
     }
 
 private:
     CERecord estimateFilterCE(const Metadata& metadata,
                               const cascades::Memo& memo,
                               const properties::LogicalProps& logicalProps,
+                              const QueryParameterMap& queryParameters,
                               const ABT::reference_type n,
                               ABT abtTree,
                               CEType childResult) {
@@ -396,7 +407,7 @@ private:
 
         const auto selectivity = estimateSelectivity(abtTree);
         if (!selectivity) {
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, queryParameters, n);
         }
 
         _selectivityCacheMap.emplace(std::move(abtTree), *selectivity);
@@ -498,8 +509,9 @@ SamplingEstimator::~SamplingEstimator() {}
 CERecord SamplingEstimator::deriveCE(const Metadata& metadata,
                                      const cascades::Memo& memo,
                                      const properties::LogicalProps& logicalProps,
+                                     const QueryParameterMap& queryParameters,
                                      const ABT::reference_type logicalNodeRef) const {
-    return _transport->derive(metadata, memo, logicalProps, logicalNodeRef);
+    return _transport->derive(metadata, memo, logicalProps, queryParameters, logicalNodeRef);
 }
 
 }  // namespace mongo::optimizer::ce

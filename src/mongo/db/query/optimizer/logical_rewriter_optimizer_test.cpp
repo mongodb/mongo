@@ -112,7 +112,8 @@ TEST(LogicalRewriter, Memo) {
     auto debugInfo = DebugInfo::kDefaultForTests;
     DefaultLogicalPropsDerivation lPropsDerivation;
     auto ceDerivation = makeHeuristicCE();
-    Memo::Context memoCtx{&metadata, &debugInfo, &lPropsDerivation, ceDerivation.get()};
+    QueryParameterMap qp;
+    Memo::Context memoCtx{&metadata, &debugInfo, &lPropsDerivation, ceDerivation.get(), &qp};
     Memo memo;
 
     ABT scanNode = make<ScanNode>("ptest", "test");

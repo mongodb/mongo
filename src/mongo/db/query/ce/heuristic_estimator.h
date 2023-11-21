@@ -47,6 +47,7 @@ public:
     CERecord deriveCE(const Metadata& metadata,
                       const cascades::Memo& memo,
                       const properties::LogicalProps& /*logicalProps*/,
+                      const QueryParameterMap& queryParameters,
                       ABT::reference_type logicalNodeRef) const override final;
 };
 

@@ -145,11 +145,12 @@ void Benchmark::runBenchmark(const std::string& pipeline, size_t numIterations) 
 CERecord CardinalityEstimatorWrapper::deriveCE(const Metadata& metadata,
                                                const cascades::Memo& memo,
                                                const properties::LogicalProps& logicalProps,
+                                               const QueryParameterMap& queryParameters,
                                                ABT::reference_type logicalNodeRef) const {
     Nanoseconds elapsed(0);
     CERecord ce = [&]() {
         auto timer = _benchmark->getTimer(&elapsed);
-        return _estimator->deriveCE(metadata, memo, logicalProps, logicalNodeRef);
+        return _estimator->deriveCE(metadata, memo, logicalProps, queryParameters, logicalNodeRef);
     }();
 
     // Accumulate total 'deriveCE' time per query.

@@ -401,6 +401,7 @@ private:
 CERecord HeuristicEstimator::deriveCE(const Metadata& metadata,
                                       const cascades::Memo& memo,
                                       const properties::LogicalProps& /*logicalProps*/,
+                                      const QueryParameterMap& /*queryParameters*/,
                                       const ABT::reference_type logicalNodeRef) const {
     return {HeuristicTransport::derive(metadata, memo, logicalNodeRef), "heuristic"};
 }

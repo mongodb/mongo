@@ -293,6 +293,7 @@ public:
                        const ScanNode& node,
                        const cascades::Memo& memo,
                        const properties::LogicalProps& logicalProps,
+                       const QueryParameterMap& /*queryParameters*/,
                        CERecord /*bindResult*/) {
         return {_stats->getCardinality(), histogramLabel};
     }
@@ -302,6 +303,7 @@ public:
                        const Metadata& metadata,
                        const cascades::Memo& memo,
                        const properties::LogicalProps& logicalProps,
+                       const QueryParameterMap& /*queryParameters*/,
                        CERecord childResult,
                        CERecord /*bindsResult*/,
                        CERecord /*refsResult*/) {
@@ -335,6 +337,7 @@ public:
                        const Metadata& metadata,
                        const cascades::Memo& memo,
                        const properties::LogicalProps& logicalProps,
+                       const QueryParameterMap& /*queryParameters*/,
                        CERecord childResult,
                        CERecord /*refsResult*/) {
         // Root node does not change cardinality.
@@ -350,9 +353,10 @@ public:
                        const Metadata& metadata,
                        const cascades::Memo& memo,
                        const properties::LogicalProps& logicalProps,
+                       const QueryParameterMap& queryParameters,
                        Ts&&...) {
         if (canBeLogicalNode<T>()) {
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, queryParameters, n);
         }
         return {0.0, "Not a Node"};
     }
@@ -480,9 +484,11 @@ HistogramEstimator::~HistogramEstimator() {}
 CERecord HistogramEstimator::deriveCE(const Metadata& metadata,
                                       const cascades::Memo& memo,
                                       const properties::LogicalProps& logicalProps,
+                                      const QueryParameterMap& queryParameters,
                                       const ABT::reference_type logicalNodeRef) const {
+    tassert(8342301, "Histogram CE unimplemented for parameterized query", queryParameters.empty());
     return algebra::transport<true>(
-        logicalNodeRef, *this->_transport, metadata, memo, logicalProps);
+        logicalNodeRef, *this->_transport, metadata, memo, logicalProps, queryParameters);
 }
 
 }  // namespace mongo::optimizer::ce

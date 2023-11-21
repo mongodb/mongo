@@ -63,6 +63,7 @@ public:
     virtual CERecord deriveCE(const Metadata& metadata,
                               const Memo& memo,
                               const properties::LogicalProps& logicalProps,
+                              const QueryParameterMap& queryParameters,
                               ABT::reference_type logicalNodeRef) const = 0;
 };
 

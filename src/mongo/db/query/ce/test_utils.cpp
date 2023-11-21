@@ -119,7 +119,7 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
     // the original ABT (usually testing the CE for FilterNodes). The memo won't have any groups for
     // us to estimate directly yet.
     if (_optPhases.empty()) {
-        auto card = cht->deriveCE(_metadata, memo, {}, abt.ref());
+        auto card = cht->deriveCE(_metadata, memo, {}, qp, abt.ref());
 
         if constexpr (kCETestLogOnly) {
             std::cout << "CE: {" << card._ce << ", " << card._mode << "}" << std::endl;

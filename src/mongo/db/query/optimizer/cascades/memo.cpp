@@ -410,15 +410,18 @@ private:
 Memo::Context::Context(const Metadata* metadata,
                        const DebugInfo* debugInfo,
                        const LogicalPropsInterface* logicalPropsDerivation,
-                       const CardinalityEstimator* cardinalityEstimator)
+                       const CardinalityEstimator* cardinalityEstimator,
+                       const QueryParameterMap* queryParameters)
     : _metadata(metadata),
       _debugInfo(debugInfo),
       _logicalPropsDerivation(logicalPropsDerivation),
-      _cardinalityEstimator(cardinalityEstimator) {
+      _cardinalityEstimator(cardinalityEstimator),
+      _queryParameters(queryParameters) {
     invariant(_metadata != nullptr);
     invariant(_debugInfo != nullptr);
     invariant(_logicalPropsDerivation != nullptr);
     invariant(_cardinalityEstimator != nullptr);
+    invariant(_queryParameters != nullptr);
 }
 
 size_t Memo::GroupIdVectorHash::operator()(const Memo::GroupIdVector& v) const {
@@ -505,7 +508,9 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
     const bool simpleIdLookup = isSimpleIdLookup(nodeRef);
     const CEType estimate = simpleIdLookup
         ? CEType{1.0}
-        : ctx._cardinalityEstimator->deriveCE(*ctx._metadata, *this, props, nodeRef)._ce;
+        : ctx._cardinalityEstimator
+              ->deriveCE(*ctx._metadata, *this, props, *ctx._queryParameters, nodeRef)
+              ._ce;
 
     auto ceProp = properties::CardinalityEstimate(estimate);
 
@@ -534,7 +539,7 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
                 const CERecord singularEst = simpleIdLookup
                     ? CERecord{1.0, "simpleIdLookup"}
                     : ctx._cardinalityEstimator->deriveCE(
-                          *ctx._metadata, *this, props, singularReq.ref());
+                          *ctx._metadata, *this, props, *ctx._queryParameters, singularReq.ref());
                 partialSchemaKeyCE.emplace_back(e.first, singularEst);
                 _estimatesCache.emplace(cacheKey, singularEst);
             });
