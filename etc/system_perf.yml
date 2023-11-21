@@ -3199,12 +3199,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks:
-      # TODO PERF-4868 run same set of workloads as Linux 1-Node ReplSet
-      - name: industry_benchmarks
-      - name: ycsb_60GB
-      - name: ycsb_60GB.long
-      - name: smoke_test
+    tasks: *1nodetasks
 
   - name: perf-1-node-replSet.arm.aws.2023-09
     display_name: PERF 1-Node ReplSet ARM AWS 2023-09
@@ -4205,13 +4200,65 @@ buildvariants:
       - "rhel70-perf-replset"
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
-      # TODO PERF-4868 run same set of workloads as Linux 3-Node ReplSet
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: industry_benchmarks_w1
       - name: ycsb_60GB
       - name: ycsb_60GB.long
       - name: industry_benchmarks_secondary_reads
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      # TODO PERF-4909 Remove or enable depending on decision in ticket
+      # - name: refine_shard_key_transaction_stress
       - name: smoke_test
+      - name: secondary_performance  # Uses a special 2 node mongodb setup
+      - name: non_sharded_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: change_streams_preimage_throughput
+      - name: change_streams_latency
+      - name: change_streams_preimage_latency
+      - name: change_streams_listen_throughput
+      - name: snapshot_reads
+      - name: secondary_reads
+      - name: tpcc
+      - name: tpcc_majority
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      # TODO: Enable in SERVER-66572.
+      # - name: tpch_10_normalized
+      # - name: tpch_10_denormalized
+      - name: linkbench
+      - name: linkbench2
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
+      - name: tsbs_query_fixed_bucketing
+      - name: tsbs-query-genny
+      - name: tsbs-query-optimizations
+      - name: big_update_10k
+      - name: mixed_workloads_genny_rate_limited_high_value
+      - name: load_test_high_value
+      - name: majority_reads10_k_threads_high_value
+      - name: large_indexed_ins_high_value
+      - name: expressive_queries_high_value
+      - name: time_series_sort_high_value
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
+      - name: array_traversal_high_value
+      - name: filter_with_complex_logical_expression_high_value
+      - name: mongos_workloads
 
   - name: linux-3-node-replSet-intel.2022-11
     display_name: Linux 3-Node ReplSet Intel 2022-11
