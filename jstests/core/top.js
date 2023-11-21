@@ -41,14 +41,14 @@ var numRecords = 100;
 for (var i = 0; i < numRecords; i++) {
     assert.commandWorked(testColl.insert({_id: i}));
 }
-assertTopDiffEq(testColl, lastTop, "insert", numRecords);
-lastTop = assertTopDiffEq(testColl, lastTop, "writeLock", numRecords);
+assertTopDiffEq(testDB, testColl, lastTop, "insert", numRecords);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "writeLock", numRecords);
 
 // Update
 for (i = 0; i < numRecords; i++) {
     assert.commandWorked(testColl.update({_id: i}, {x: i}));
 }
-lastTop = assertTopDiffEq(testColl, lastTop, "update", numRecords);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "update", numRecords);
 
 // Queries
 var query = {};
@@ -56,7 +56,7 @@ for (i = 0; i < numRecords; i++) {
     query[i] = testColl.find({x: {$gte: i}}).batchSize(2);
     assert.eq(query[i].next()._id, i);
 }
-lastTop = assertTopDiffEq(testColl, lastTop, "queries", numRecords);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "queries", numRecords);
 
 // Getmore
 for (i = 0; i < numRecords / 2; i++) {
@@ -65,19 +65,19 @@ for (i = 0; i < numRecords / 2; i++) {
     assert.eq(query[i].next()._id, i + 3);
     assert.eq(query[i].next()._id, i + 4);
 }
-lastTop = assertTopDiffEq(testColl, lastTop, "getmore", numRecords);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "getmore", numRecords);
 
 // Remove
 for (i = 0; i < numRecords; i++) {
     assert.commandWorked(testColl.remove({_id: 1}));
 }
-lastTop = assertTopDiffEq(testColl, lastTop, "remove", numRecords);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "remove", numRecords);
 
 // Upsert, note that these are counted as updates, not inserts
 for (i = 0; i < numRecords; i++) {
     assert.commandWorked(testColl.update({_id: i}, {x: i}, {upsert: 1}));
 }
-lastTop = assertTopDiffEq(testColl, lastTop, "update", numRecords);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "update", numRecords);
 
 // Commands
 var res;
@@ -92,7 +92,7 @@ for (i = 0; i < numRecords; i++) {
     res = assert.commandWorked(testDB.runCommand({count: testColl.getName()}));
     assert.eq(res.n, numRecords, tojson(res));
 }
-lastTop = assertTopDiffEq(testColl, lastTop, "commands", numRecords);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "commands", numRecords);
 
 // "findAndModify" command
 lastTop = getTop(testColl);
@@ -108,7 +108,7 @@ for (i = 0; i < numRecords; i++) {
     }));
     assert.eq(res.value.x, i, tojson(res));
 }
-lastTop = assertTopDiffEq(testColl, lastTop, "commands", numRecords);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "commands", numRecords);
 
 lastTop = getTop(testColl);
 if (lastTop === undefined) {
@@ -123,29 +123,29 @@ for (i = 0; i < numRecords; i++) {
     }));
     assert.eq(res.value.x, i + 1, tojson(res));
 }
-lastTop = assertTopDiffEq(testColl, lastTop, "commands", numRecords);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "commands", numRecords);
 
 // aggregate
 assert.eq(0, testColl.aggregate([]).itcount());  // All records were just deleted.
-assertTopDiffEq(testColl, lastTop, "commands", 1);
-lastTop = assertTopDiffEq(testColl, lastTop, "readLock", 1);
+assertTopDiffEq(testDB, testColl, lastTop, "commands", 1);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "readLock", 1);
 
 // getIndexes
 assert.eq(1, testColl.getIndexes().length);
-assertTopDiffEq(testColl, lastTop, "commands", 1);
-lastTop = assertTopDiffEq(testColl, lastTop, "readLock", 1);
+assertTopDiffEq(testDB, testColl, lastTop, "commands", 1);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "readLock", 1);
 
 // aggregate with $indexStats
 assert.doesNotThrow(() => testColl.aggregate([{$indexStats: {}}]).itcount());
-assertTopDiffEq(testColl, lastTop, "commands", 1);
-lastTop = assertTopDiffEq(testColl, lastTop, "readLock", 1);
+assertTopDiffEq(testDB, testColl, lastTop, "commands", 1);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "readLock", 1);
 
 // createIndex
 res = assert.commandWorked(testColl.createIndex({x: 1}));
-assertTopDiffEq(testColl, lastTop, "writeLock", 1);
-lastTop = assertTopDiffEq(testColl, lastTop, "commands", 1);
+assertTopDiffEq(testDB, testColl, lastTop, "writeLock", 1);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "commands", 1);
 
 // dropIndex
 res = assert.commandWorked(testColl.dropIndex({x: 1}));
-assertTopDiffEq(testColl, lastTop, "commands", 1);
-lastTop = assertTopDiffEq(testColl, lastTop, "writeLock", 1);
+assertTopDiffEq(testDB, testColl, lastTop, "commands", 1);
+lastTop = assertTopDiffEq(testDB, testColl, lastTop, "writeLock", 1);

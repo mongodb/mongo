@@ -48,6 +48,7 @@ selector:
   - jstests/core/txns/prepare_conflict.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
+  - requires_profiling
   include_with_any_tags:
   - multiversion_sanity_check
   roots:

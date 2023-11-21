@@ -1,5 +1,7 @@
 // Utility functions for obtaining and diffing top and latency histogram statistics.
 
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 /**
  * Returns the latency histograms for the given collection.
  */
@@ -22,13 +24,21 @@ export function diffHistogram(thisHistogram, lastHistogram) {
  * Asserts that the difference of histogram stats on collection coll since the lastHistogram was
  * recorded is equal to the readDiff, writeDiff, and commandDiff values. Returns the new histogram.
  */
-export function assertHistogramDiffEq(coll, lastHistogram, readDiff, writeDiff, commandDiff) {
+export function assertHistogramDiffEq(db, coll, lastHistogram, readDiff, writeDiff, commandDiff) {
     let thisHistogram = getHistogramStats(coll);
     let diff = diffHistogram(thisHistogram, lastHistogram);
     // Running the $collStats aggregation itself will increment read stats by one.
     assert.eq(diff.reads, readDiff + 1, "miscounted histogram reads");
     assert.eq(diff.writes, writeDiff, "miscounted histogram writes");
-    assert.eq(diff.commands, commandDiff, "miscounted histogram commands");
+
+    // In some cases, the actual result could contain more results than expected because some
+    // background commands could sneak in. For instance, a checkDB command run against a replica set
+    // runs an extra "listIndex" command.
+    let allowedDiff = 0;
+    if (FixtureHelpers.isReplSet(db)) {
+        allowedDiff = 1;
+    }
+    assert.lte(Math.abs(diff.commands - commandDiff), allowedDiff, "miscounted histogram commands");
     return thisHistogram;
 }
 
@@ -61,7 +71,7 @@ export function diffTop(key, thisTop, lastTop) {
  * Asserts that the count difference of top stats of the key on collection coll since lastTop was
  * recorded is equal to expectedCountDiff. Returns the new top stats.
  */
-export function assertTopDiffEq(coll, lastTop, key, expectedCountDiff) {
+export function assertTopDiffEq(db, coll, lastTop, key, expectedCountDiff) {
     let thisTop = getTop(coll);
     let diff = diffTop(key, thisTop, lastTop);
     assert.gte(diff.count, 0, "non-decreasing count");
@@ -70,6 +80,14 @@ export function assertTopDiffEq(coll, lastTop, key, expectedCountDiff) {
     // monotonic clock in SERVER-26812, then we can uncomment these.
     // assert.gte(diff.time, 0, "non-decreasing time");
     // assert.eq(diff.count !== 0, diff.time > 0, "non-zero time iff non-zero count");
-    assert.eq(diff.count, expectedCountDiff, "top reports wrong count for " + key);
+
+    // In some cases, the actual result could contain more results than expected because some
+    // background commands could sneak in. For instance, a checkDB command run against a replica set
+    // runs an extra "listIndexes" command.
+    let allowedDiff = 0;
+    if (FixtureHelpers.isReplSet(db)) {
+        allowedDiff = 1;
+    }
+    assert.lte(diff.count - expectedCountDiff, allowedDiff, "top reports wrong count for " + key);
     return thisTop;
 }
