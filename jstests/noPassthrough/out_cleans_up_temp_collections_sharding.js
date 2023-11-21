@@ -65,6 +65,11 @@ function failFn_dropDbAndSigKill() {
     failFn_sigkill();
 }
 
+function failFn_dropDbAndKillOp() {
+    testDB.dropDatabase();
+    failFn_killOp();
+}
+
 function testFn(timeseries, failFn) {
     assert.eq(0, getTempCollections().length);
 
@@ -116,6 +121,10 @@ assert.commandWorked(sourceColl.insert({x: 1}));
 
 jsTest.log("Running test with normal collection and killOp");
 testFn(false, failFn_killOp);
+
+jsTest.log("Running test with normal collection and dropDbAndkillOp");
+testFn(false, failFn_dropDbAndKillOp);
+assert.commandWorked(sourceColl.insert({x: 1}));
 
 jsTest.log("Running test with timeseries collection and SIGKILL");
 testFn(true, failFn_sigkill);

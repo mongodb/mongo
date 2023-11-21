@@ -459,29 +459,36 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
     // Build and execute the _shardsvrDropCollection command against the primary shard of the given
     // database.
     sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), ns.dbName());
-    router.route(
-        opCtx,
-        "ShardServerProcessInterface::dropCollection",
-        [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-            ShardsvrDropCollection dropCollectionCommand(ns);
-            BSONObj cmdObj = CommandHelpers::appendMajorityWriteConcern(
-                dropCollectionCommand.toBSON({}), opCtx->getWriteConcern());
-            auto response = executeCommandAgainstDatabasePrimary(
-                opCtx,
-                ns.dbName(),
-                cdb,
-                cmdObj,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
-            uassertStatusOKWithContext(response.swResponse,
-                                       str::stream() << "failed while running command " << cmdObj);
-            auto result = response.swResponse.getValue().data;
-            uassertStatusOKWithContext(getStatusFromCommandResult(result),
-                                       str::stream() << "failed while running command " << cmdObj);
-            uassertStatusOKWithContext(
-                getWriteConcernStatusFromCommandResult(result),
-                str::stream() << "write concern failed while running command " << cmdObj);
-        });
+    try {
+        router.route(opCtx,
+                     "ShardServerProcessInterface::dropCollection",
+                     [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                         ShardsvrDropCollection dropCollectionCommand(ns);
+                         BSONObj cmdObj = CommandHelpers::appendMajorityWriteConcern(
+                             dropCollectionCommand.toBSON({}), opCtx->getWriteConcern());
+                         auto response = executeCommandAgainstDatabasePrimary(
+                             opCtx,
+                             ns.dbName(),
+                             cdb,
+                             cmdObj,
+                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                             Shard::RetryPolicy::kIdempotent);
+                         uassertStatusOKWithContext(response.swResponse,
+                                                    str::stream() << "failed while running command "
+                                                                  << cmdObj);
+                         auto result = response.swResponse.getValue().data;
+                         uassertStatusOKWithContext(getStatusFromCommandResult(result),
+                                                    str::stream() << "failed while running command "
+                                                                  << cmdObj);
+                         uassertStatusOKWithContext(
+                             getWriteConcernStatusFromCommandResult(result),
+                             str::stream()
+                                 << "write concern failed while running command " << cmdObj);
+                     });
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // The database might have been dropped by a different operation, so the collection no
+        // longer exists.
+    }
 }
 
 void ShardServerProcessInterface::dropTempCollection(OperationContext* opCtx,
