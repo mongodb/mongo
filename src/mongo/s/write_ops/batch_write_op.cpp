@@ -686,17 +686,16 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
     if (dbVersion)
         request.setDbVersion(*dbVersion);
 
-    if (_clientRequest.hasWriteConcern()) {
-        if (_clientRequest.isVerboseWC()) {
-            request.setWriteConcern(_clientRequest.getWriteConcern());
+    if (!TransactionRouter::get(_opCtx)) {
+        // Append the write concern from the opCtx extracted during command setup.
+        const auto wc = _opCtx->getWriteConcern();
+        if (wc.requiresWriteAcknowledgement()) {
+            request.setWriteConcern(wc.toBSON());
         } else {
             // Mongos needs to send to the shard with w > 0 so it will be able to see the
             // writeErrors
-            request.setWriteConcern(upgradeWriteConcern(_clientRequest.getWriteConcern()));
+            request.setWriteConcern(upgradeWriteConcern(wc.toBSON()));
         }
-    } else if (!TransactionRouter::get(_opCtx)) {
-        // Apply the WC from the opCtx (except if in a transaction).
-        request.setWriteConcern(_opCtx->getWriteConcern().toBSON());
     }
 
     return request;
@@ -887,7 +886,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     batchResp->setStatus(Status::OK());
 
     // For non-verbose, it's all we need.
-    if (!_clientRequest.isVerboseWC()) {
+    if (!_opCtx->getWriteConcern().requiresWriteAcknowledgement()) {
         return;
     }
 

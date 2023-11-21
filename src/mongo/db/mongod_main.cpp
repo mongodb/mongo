@@ -834,7 +834,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                       "Error loading read and write concern defaults at startup",
                       "error"_attr = redact(ex));
     }
-    readWriteConcernDefaultsMongodStartupChecks(startupOpCtx.get());
+    readWriteConcernDefaultsMongodStartupChecks(startupOpCtx.get(), replSettings.isReplSet());
 
     MirrorMaestro::init(serviceContext);
 
