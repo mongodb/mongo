@@ -2315,106 +2315,164 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                          true /* participateInTrialRunTracking */);
 
     //
-    // If needed, build project parent node to add the unwind output array index to the result doc.
+    // Build project parent node to add the unwind and/or index outputs to the result doc. Since
+    // docs are immutable in SBE, doing this the simpler way via separate ProjectStages for each
+    // output leads to an extra result doc copy if both unwind and index get projected. To avoid
+    // this, we build a single ProjectStage that handles all possible combinations of needed
+    // projections. This is simplified slightly by the fact that we know whether the index output
+    // was requested or not, so we can wire only the relevant combinations.
     //
 
-    // Variables whose values are to be projected into the result document (as wrapped SlotIds).
+    // Paths in result document to project to.
+    std::vector<std::string> fieldPaths;
+
+    // Variables whose values are to be projected into the result document.
     std::vector<ProjectNode> projectionNodes;
 
-    TypedSlot resultSlot1;
+    // The projection expression that adds the index and/or unwind values to the result doc.
+    TypedExpression finalProjectExpr;
+
     if (un->indexPath) {
-        projectionNodes.emplace_back(SbExpr{arrayIndexSlot});
+        // "includeArrayIndex" option (Cases 1-3). The index is always projected in these.
 
         // If our parent wants the array index field, set our outputs to point it to that slot.
-        // Otherwise clearNonRequiredSlots() will have cleared this field, so we don't need to.
         if (reqs.has({PlanStageSlots::SlotType::kField, un->indexPath->fullPath()})) {
             outputs.set(PlanStageSlots::OwnedSlotName{PlanStageSlots::SlotType::kField,
                                                       un->indexPath->fullPath()},
                         arrayIndexSlot);
         }
 
-        // Create a projection expression to project the array index to the result document.
-        SbExpr indexProjectExpr = generateProjection(
-            _state,
-            projection_ast::ProjectType::kAddition,
-            {un->indexPath->fullPath()},
-            std::move(projectionNodes),
-            SbExpr{childResultSlot.slotId});  // current result doc: updated by the projection
+        // Case 1: index Null, unwind val //////////////////////////////////////////////////////////
+        // We need two copies of the Case 1 expression as it is used twice, but the copy constructor
+        // is deleted so we are forced to std::move it.
+        SbExpr indexNullUnwindValProjExpr[2];
 
-        // Create a projection expression to force project a Null array index to the result doc.
+        for (int copy = 0; copy < 2; ++copy) {
+            fieldPaths.clear();
+            projectionNodes.clear();
+
+            // Index output
+            fieldPaths.emplace_back(un->indexPath->fullPath());
+            projectionNodes.emplace_back(SbExpr{makeConstant(sbe::value::TypeTags::Null, 0)});
+
+            // Unwind output
+            fieldPaths.emplace_back(fp.fullPath());
+            projectionNodes.emplace_back(SbExpr{unwindSlot});
+
+            indexNullUnwindValProjExpr[copy] = generateProjection(
+                _state,
+                projection_ast::ProjectType::kAddition,
+                std::move(fieldPaths),
+                std::move(projectionNodes),
+                SbExpr{childResultSlot.slotId});  // current result doc: updated by the projection
+        }
+
+        // Case 2: index val, unwind val ///////////////////////////////////////////////////////////
+        fieldPaths.clear();
         projectionNodes.clear();
-        projectionNodes.emplace_back(SbExpr{makeConstant(sbe::value::TypeTags::Null, 0)});
-        SbExpr indexNullProjectExpr = generateProjection(
+
+        // Index output
+        fieldPaths.emplace_back(un->indexPath->fullPath());
+        projectionNodes.emplace_back(SbExpr{arrayIndexSlot});
+
+        // Unwind output
+        fieldPaths.emplace_back(fp.fullPath());
+        projectionNodes.emplace_back(SbExpr{unwindSlot});
+
+        SbExpr indexValUnwindValProjExpr = generateProjection(
             _state,
             projection_ast::ProjectType::kAddition,
-            {un->indexPath->fullPath()},
+            std::move(fieldPaths),
             std::move(projectionNodes),
             SbExpr{childResultSlot.slotId});  // current result doc: updated by the projection
 
-        // Wrap 'indexProjectExpr' and 'indexNullProjectExpr' in a conditional to handle quirky MQL
-        // edge cases.
-        SbExprBuilder ifIndexBuilder{_state};
-        TypedExpression ifIndexProjectExpr =
-            ifIndexBuilder
-                .makeIf(
-                    /* if */ ifIndexBuilder.makeBinaryOp(
-                        sbe::EPrimBinary::logicOr,
-                        ifIndexBuilder.makeFunction("isNull",
-                                                    ifIndexBuilder.makeVariable(arrayIndexSlot)),
-                        ifIndexBuilder.makeBinaryOp(
-                            sbe::EPrimBinary::greaterEq,
-                            ifIndexBuilder.makeVariable(arrayIndexSlot),
-                            makeConstant(sbe::value::TypeTags::NumberInt64, 0))),
-                    /* then project index */ std::move(indexProjectExpr),
-                    /* else project Null */ std::move(indexNullProjectExpr))
+        // Case 3: index Null //////////////////////////////////////////////////////////////////////
+        fieldPaths.clear();
+        projectionNodes.clear();
+
+        // Index output
+        fieldPaths.emplace_back(un->indexPath->fullPath());
+        projectionNodes.emplace_back(SbExpr{makeConstant(sbe::value::TypeTags::Null, 0)});
+
+        SbExpr indexNullProjExpr = generateProjection(
+            _state,
+            projection_ast::ProjectType::kAddition,
+            std::move(fieldPaths),
+            std::move(projectionNodes),
+            SbExpr{childResultSlot.slotId});  // current result document: updated by the projection
+
+        // Wrap the above projection subexpressions in conditionals that correctly handle quirky MQL
+        // edge cases:
+        //   if isNull(index)
+        //      then if exists(unwind)
+        //              then project {Null, unwind}
+        //              else project {Null,       }
+        //      else if index >= 0
+        //              then project {index, unwind}
+        //              else project {Null,  unwind}
+        SbExprBuilder bldI{_state};
+        finalProjectExpr =
+            /* outer if */ bldI
+                .makeIf(bldI.makeFunction("isNull", bldI.makeVariable(arrayIndexSlot)),
+                        /* outer then */
+                        bldI.makeIf(
+                            /* inner1 if */ bldI.makeFunction(
+                                "exists", sbe::makeE<sbe::EVariable>(unwindSlot)),
+                            /* inner1 then */ std::move(indexNullUnwindValProjExpr[0]),
+                            /* inner1 else */ std::move(indexNullProjExpr)),
+                        /* outer else */
+                        bldI.makeIf(
+                            /* inner2 if */ bldI.makeBinaryOp(
+                                sbe::EPrimBinary::greaterEq,
+                                bldI.makeVariable(arrayIndexSlot),
+                                makeConstant(sbe::value::TypeTags::NumberInt64, 0)),
+                            /* inner2 then */ std::move(indexValUnwindValProjExpr),
+                            /* inner2 else */ std::move(indexNullUnwindValProjExpr[1])))
                 .extractExpr(_state);
-
-        resultSlot1 = TypedSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType};
-        stage = makeProjectStage(std::move(stage),
-                                 un->nodeId(),
-                                 resultSlot1.slotId,  // output result document
-                                 std::move(ifIndexProjectExpr.expr));
     } else {
-        // The "includeArrayIndex" option was not specified, so we do not wire the stage to project
-        // it, and 'resultSlot1' is just an alias of the prior 'childResultSlot'.
-        resultSlot1 = childResultSlot;
-    }
+        // No "includeArrayIndex" option (Cases 4-5). The index is never projected in these.
 
-    //
-    // Build project (grand)parent node to add the unwound value to the result doc.
-    //
+        // Case 4: unwind val //////////////////////////////////////////////////////////////////////
+        fieldPaths.clear();
+        projectionNodes.clear();
 
-    // Create a projection expression to project the unwind value to the result document.
-    projectionNodes.clear();
-    projectionNodes.emplace_back(SbExpr{unwindSlot});
-    SbExpr unwindProjectExpr = generateProjection(
-        _state,
-        projection_ast::ProjectType::kAddition,
-        {fp.fullPath()},
-        std::move(projectionNodes),
-        SbExpr{resultSlot1.slotId});  // current result document: updated by the projection
+        // Unwind output
+        fieldPaths.emplace_back(fp.fullPath());
+        projectionNodes.emplace_back(SbExpr{unwindSlot});
 
-    // Wrap 'unwindProjectExpr' in a conditional that correctly handles the quirky MQL edge cases.
-    // If the unwind field was not an array, we avoid projecting the Nothing value to the result as
-    // this would incorrectly create the dotted path above that value in the result document.
-    SbExprBuilder ifUnwindBuilder{_state};
-    TypedExpression ifUnwindProjectExpr =
-        ifUnwindBuilder
-            .makeIf(
-                /* if */ ifUnwindBuilder.makeFunction("isNull",
-                                                      ifUnwindBuilder.makeVariable(arrayIndexSlot)),
-                /* then no-op */ ifUnwindBuilder.makeVariable(resultSlot1.slotId),
-                /* else project */ std::move(unwindProjectExpr))
-            .extractExpr(_state);
+        SbExpr unwindValProjExpr = generateProjection(
+            _state,
+            projection_ast::ProjectType::kAddition,
+            std::move(fieldPaths),
+            std::move(projectionNodes),
+            SbExpr{childResultSlot.slotId});  // current result document: updated by the projection
 
-    TypedSlot resultSlot2 = TypedSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType};
+        // Case 5: NO-OP - original doc ////////////////////////////////////////////////////////////
+        // Does not need a generateProjection() call as it will be handled in the wrapper logic.
+
+        // Wrap 'unwindValProjExpr' in a conditional that correctly handles the quirky MQL edge
+        // cases. If the unwind field was not an array (indicated by 'arrayIndexSlot' containing
+        // Null), we avoid projecting its value to the result, as if it is Nothing (instead of a
+        // singleton) this would incorrectly create the dotted path above that value in the result
+        // document. We don't need to project in the singleton case either as the result doc already
+        // has that singleton at the unwind field location.
+        SbExprBuilder bldU{_state};
+        finalProjectExpr =
+            bldU.makeIf(
+                    /* if */ bldU.makeFunction("isNull", bldU.makeVariable(arrayIndexSlot)),
+                    /* then no-op */ bldU.makeVariable(childResultSlot.slotId),
+                    /* else project */ std::move(unwindValProjExpr))
+                .extractExpr(_state);
+    }  // else no "includeArrayIndex"
+
+    // Create the ProjectStage that adds the output(s) to the result doc via 'finalProjectExpr'.
+    TypedSlot resultSlot = TypedSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType};
     stage = makeProjectStage(std::move(stage),
                              un->nodeId(),
-                             resultSlot2.slotId,  // output result document
-                             std::move(ifUnwindProjectExpr.expr));
+                             resultSlot.slotId,  // output result document
+                             std::move(finalProjectExpr.expr));
 
-    outputs.set(kResult, resultSlot2);
-
+    outputs.set(kResult, resultSlot);
     return {std::move(stage), std::move(outputs)};
 }  // buildUnwind
 
