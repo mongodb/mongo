@@ -258,7 +258,6 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
               block->name, (uintmax_t)offset, size, objectid);
             WT_RET(__wt_chunkcache_free_external(session, block, objectid, offset, size));
             WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
-            WT_STAT_CONN_INCR(session, chunkcache_retries_checksum_mismatch);
         }
     }
 

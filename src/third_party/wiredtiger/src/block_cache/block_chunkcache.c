@@ -146,7 +146,7 @@ __chunkcache_drop_queued_work(WT_SESSION_IMPL *session)
 
     --conn->chunkcache_queue_len;
 
-    WT_STAT_CONN_INCR(session, chunkcache_metadata_work_units_dropped);
+    /* FIXME-WT-11726 Add statistic. */
 
     __wt_free(session, entry);
 }
@@ -957,7 +957,6 @@ __wt_chunkcache_free_external(
             if (__hash_id_eq(&chunk->hash_id, &hash_id)) {
                 already_removed += chunk->chunk_size;
                 TAILQ_REMOVE(WT_BUCKET_CHUNKS(chunkcache, bucket_id), chunk, next_chunk);
-                __delete_update_stats(session, chunk);
                 __chunkcache_free_chunk(session, chunk);
                 break;
             }
@@ -1134,7 +1133,6 @@ __wt_chunkcache_create_from_metadata(WT_SESSION_IMPL *session, const char *name,
       "new chunk instantiated from metadata during startup: %s(%u), offset=%" PRId64 ", size=%lu",
       (char *)name, id, newchunk->chunk_offset, newchunk->chunk_size);
     WT_STAT_CONN_INCR(session, chunkcache_created_from_metadata);
-    WT_STAT_CONN_INCRV(session, chunkcache_bytes_read_persistent, chunk_size);
     __insert_update_stats(session, newchunk);
 
     if (0) {
