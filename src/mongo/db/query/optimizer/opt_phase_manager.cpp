@@ -478,4 +478,8 @@ const RIDProjectionsMap& OptPhaseManager::getRIDProjections() const {
     return _ridProjections;
 }
 
+const QueryParameterMap& OptPhaseManager::getQueryParameters() const {
+    return _queryParameters;
+}
+
 }  // namespace mongo::optimizer

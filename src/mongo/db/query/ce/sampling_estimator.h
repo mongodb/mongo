@@ -53,7 +53,10 @@ class SamplingExecutor {
 public:
     virtual ~SamplingExecutor() = default;
     virtual boost::optional<optimizer::SelectivityType> estimateSelectivity(
-        const Metadata& metadata, int64_t sampleSize, const PlanAndProps& planAndProps) = 0;
+        const Metadata& metadata,
+        int64_t sampleSize,
+        const QueryParameterMap& queryParameters,
+        const PlanAndProps& planAndProps) = 0;
 };
 
 /**

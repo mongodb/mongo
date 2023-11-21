@@ -83,7 +83,10 @@ namespace mongo::optimizer {
 
 
 boost::optional<optimizer::SelectivityType> ABTRecorder::estimateSelectivity(
-    const Metadata& /*metadata*/, const int64_t /*sampleSize*/, const PlanAndProps& planAndProps) {
+    const Metadata& /*metadata*/,
+    const int64_t /*sampleSize*/,
+    const QueryParameterMap& /*queryParameters*/,
+    const PlanAndProps& planAndProps) {
     _nodes.push_back(planAndProps._node);
     return SelectivityType{0.0};
 }

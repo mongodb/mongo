@@ -174,6 +174,8 @@ public:
 
     const RIDProjectionsMap& getRIDProjections() const;
 
+    const QueryParameterMap& getQueryParameters() const;
+
 private:
     bool hasPhase(OptPhase phase) const;
 

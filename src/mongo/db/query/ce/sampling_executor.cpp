@@ -42,7 +42,10 @@ namespace mongo::optimizer::ce {
 SBESamplingExecutor::~SBESamplingExecutor() {}
 
 boost::optional<optimizer::SelectivityType> SBESamplingExecutor::estimateSelectivity(
-    const Metadata& metadata, const int64_t sampleSize, const PlanAndProps& planAndProps) {
+    const Metadata& metadata,
+    const int64_t sampleSize,
+    const QueryParameterMap& queryParameters,
+    const PlanAndProps& planAndProps) {
     auto env = VariableEnvironment::build(planAndProps._node);
     SlotVarMap slotMap;
     auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO Use factory
@@ -58,6 +61,13 @@ boost::optional<optimizer::SelectivityType> SBESamplingExecutor::estimateSelecti
     // TODO: return errors instead of exceptions?
     uassert(6624244, "Lowering failed", sbePlan != nullptr);
     uassert(6624245, "Invalid slot map size", slotMap.size() == 1);
+
+    // Bind query parameters to runtime slots.
+    for (auto&& [paramId, slotId] : inputParamToSlotMap) {
+        auto [paramTag, paramVal] = queryParameters.at(paramId).get();
+        auto accessor = runtimeEnvironment->getAccessor(slotId);
+        accessor->reset(false, paramTag, paramVal);
+    }
 
     sbePlan->attachToOperationContext(_opCtx);
     sbe::CompileCtx ctx(std::move(runtimeEnvironment));

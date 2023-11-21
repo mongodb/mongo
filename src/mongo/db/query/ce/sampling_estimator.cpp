@@ -451,8 +451,10 @@ private:
                                 "explain"_attr = ExplainGenerator::explainV2(planAndProps._node));
         }
 
-        return _executor->estimateSelectivity(
-            _phaseManager.getMetadata(), _sampleSize, planAndProps);
+        return _executor->estimateSelectivity(_phaseManager.getMetadata(),
+                                              _sampleSize,
+                                              _phaseManager.getQueryParameters(),
+                                              planAndProps);
     }
 
     const ScanDefinition& getScanDefFromIndexingAvailability(

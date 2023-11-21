@@ -44,7 +44,10 @@ public:
     ~SBESamplingExecutor();
 
     boost::optional<optimizer::SelectivityType> estimateSelectivity(
-        const Metadata& metadata, int64_t sampleSize, const PlanAndProps& planAndProps) final;
+        const Metadata& metadata,
+        int64_t sampleSize,
+        const QueryParameterMap& queryParameters,
+        const PlanAndProps& planAndProps) final;
 
 private:
     OperationContext* _opCtx;

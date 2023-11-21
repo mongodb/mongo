@@ -56,6 +56,7 @@ public:
     boost::optional<optimizer::SelectivityType> estimateSelectivity(
         const Metadata& /*metadata*/,
         int64_t /*sampleSize*/,
+        const QueryParameterMap& /*queryParameters*/,
         const PlanAndProps& planAndProps) final;
 
 private:
