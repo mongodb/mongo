@@ -385,6 +385,8 @@ struct __wt_table;
 typedef struct __wt_table WT_TABLE;
 struct __wt_thread;
 typedef struct __wt_thread WT_THREAD;
+struct __wt_thread_check;
+typedef struct __wt_thread_check WT_THREAD_CHECK;
 struct __wt_thread_group;
 typedef struct __wt_thread_group WT_THREAD_GROUP;
 struct __wt_tiered;

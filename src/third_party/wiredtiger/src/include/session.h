@@ -159,12 +159,14 @@ struct __wt_session_impl {
     u_int scratch_alloc;   /* Currently allocated */
     size_t scratch_cached; /* Scratch bytes cached */
 #ifdef HAVE_DIAGNOSTIC
-    /*
-     * Variables used to look for violations of the contract that a session is only used by a single
-     * session at once.
-     */
-    wt_shared volatile uintmax_t api_tid;
-    wt_shared volatile uint32_t api_enter_refcnt;
+
+    /* Enforce the contract that a session is only used by a single thread at a time. */
+    struct __wt_thread_check {
+        WT_SPINLOCK lock;
+        uintmax_t owning_thread;
+        uint32_t entry_count;
+    } thread_check;
+
     /*
      * It's hard to figure out from where a buffer was allocated after it's leaked, so in diagnostic
      * mode we track them; DIAGNOSTIC can't simply add additional fields to WT_ITEM structures

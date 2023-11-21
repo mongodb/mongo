@@ -396,6 +396,10 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
     /* Decrement the count of open sessions. */
     WT_STAT_CONN_DECR(session, session_open);
 
+#ifdef HAVE_DIAGNOSTIC
+    __wt_spin_destroy(session, &session->thread_check.lock);
+#endif
+
     /*
      * Sessions are re-used, clear the structure: the clear sets the active field to 0, which will
      * exclude the hazard array from review by the eviction thread. Because some session fields are
@@ -2540,6 +2544,10 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
     memset(session->unittest_assert_msg, 0, WT_SESSION_UNITTEST_BUF_LEN);
 #endif
 
+#ifdef HAVE_DIAGNOSTIC
+    WT_ERR(__wt_spin_init(session, &session_ret->thread_check.lock, "thread check lock"));
+#endif
+
     /*
      * Initialize the pseudo random number generator. We're not seeding it, so all of the sessions
      * initialize to the same value and proceed in lock step for the session's life. That's not a
@@ -2629,6 +2637,9 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
     WT_STAT_CONN_INCR(session, session_open);
 
 err:
+#ifdef HAVE_DIAGNOSTIC
+    __wt_spin_destroy(session, &session->thread_check.lock);
+#endif
     __wt_spin_unlock(session, &conn->api_lock);
     return (ret);
 }
