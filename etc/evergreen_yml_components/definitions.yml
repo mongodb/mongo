@@ -2949,15 +2949,7 @@ tasks:
         archive-dist-test
       task_compile_flags: >-
         PREFIX=dist-test
-  - command: subprocess.exec
-    params:
-      binary: bash
-      add_expansions_to_env: true
-      args:
-      - "src/evergreen/run_python_script.sh"
-      - "evergreen/macos_notary.py"
-      - "mongodb-binaries.${ext|tgz}"
-
+      sign_macos_archive: true
   - command: s3.put
     params:
       optional: true
@@ -8081,14 +8073,7 @@ tasks:
         ${additional_package_targets|}
       task_compile_flags: >-
         --legacy-tarball
-  - command: subprocess.exec
-    params:
-      binary: bash
-      add_expansions_to_env: true
-      args:
-      - "src/evergreen/run_python_script.sh"
-      - "evergreen/macos_notary.py"
-      - "mongodb-dist.${ext|tgz}"
+      sign_macos_archive: true
   - func: "f_expansions_write"
   - command: subprocess.exec
     params:
