@@ -64,6 +64,7 @@ DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::doGetN
 
     // Get the next input document.
     auto input = pSource->getNext();
+
     if (!input.isAdvanced()) {
         return input;
     }

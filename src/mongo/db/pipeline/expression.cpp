@@ -3145,6 +3145,7 @@ const std::string recordIdName = "recordId";
 const std::string indexKeyName = "indexKey";
 const std::string sortKeyName = "sortKey";
 const std::string searchScoreDetailsName = "searchScoreDetails";
+const std::string searchSequenceTokenName = "searchSequenceToken";
 const std::string timeseriesBucketMinTimeName = "timeseriesBucketMinTime";
 const std::string timeseriesBucketMaxTimeName = "timeseriesBucketMaxTime";
 const std::string vectorSearchScoreName = "vectorSearchScore";
@@ -3160,6 +3161,7 @@ const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
     {searchHighlightsName, MetaType::kSearchHighlights},
     {searchScoreName, MetaType::kSearchScore},
     {searchScoreDetailsName, MetaType::kSearchScoreDetails},
+    {searchSequenceTokenName, MetaType::kSearchSequenceToken},
     {sortKeyName, MetaType::kSortKey},
     {textScoreName, MetaType::kTextScore},
     {timeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
@@ -3176,6 +3178,7 @@ const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTyp
     {MetaType::kSearchHighlights, searchHighlightsName},
     {MetaType::kSearchScore, searchScoreName},
     {MetaType::kSearchScoreDetails, searchScoreDetailsName},
+    {MetaType::kSearchSequenceToken, searchSequenceTokenName},
     {MetaType::kSortKey, sortKeyName},
     {MetaType::kTextScore, textScoreName},
     {MetaType::kTimeseriesBucketMinTime, timeseriesBucketMinTimeName},
@@ -3197,7 +3200,8 @@ intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
 
         auto typeName = iter->first;
         auto usesUnstableField = (typeName == "searchScore") || (typeName == "indexKey") ||
-            (typeName == "textScore") || (typeName == "searchHighlights");
+            (typeName == "textScore") || (typeName == "searchHighlights") ||
+            (typeName == "searchSequenceToken");
 
         if (apiStrict && usesUnstableField) {
             uasserted(ErrorCodes::APIStrictError,
@@ -3260,6 +3264,9 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
         case MetaType::kSearchScoreDetails:
             return metadata.hasSearchScoreDetails() ? Value(metadata.getSearchScoreDetails())
                                                     : Value();
+        case MetaType::kSearchSequenceToken:
+            return metadata.hasSearchSequenceToken() ? Value(metadata.getSearchSequenceToken())
+                                                     : Value();
         case MetaType::kTimeseriesBucketMinTime:
             return metadata.hasTimeseriesBucketMinTime()
                 ? Value(metadata.getTimeseriesBucketMinTime())
