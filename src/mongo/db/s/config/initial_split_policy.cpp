@@ -58,11 +58,28 @@ using ChunkDistributionMap = stdx::unordered_map<ShardId, size_t>;
 using ZoneShardMap = StringMap<std::vector<ShardId>>;
 using boost::intrusive_ptr;
 
-std::vector<ShardId> getAllShardIdsSorted(OperationContext* opCtx) {
-    // Many tests assume that chunks will be placed on shards
-    // according to their IDs in ascending lexical order.
-    auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload();
+std::vector<ShardId> getAllNonDrainingShardIdsSorted(OperationContext* opCtx) {
+    const auto shardsAndOpTime = uassertStatusOKWithContext(
+        Grid::get(opCtx)->catalogClient()->getAllShards(
+            opCtx, repl::ReadConcernLevel::kMajorityReadConcern, true /* excludeDraining */),
+        "Cannot retrieve updated shard list from config server");
+    const auto shards = std::move(shardsAndOpTime.value);
+    const auto lastVisibleOpTime = std::move(shardsAndOpTime.opTime);
+
+    LOGV2_DEBUG(6566600,
+                1,
+                "Successfully retrieved updated shard list from config server",
+                "nonDrainingShardsNumber"_attr = shards.size(),
+                "lastVisibleOpTime"_attr = lastVisibleOpTime);
+
+    std::vector<ShardId> shardIds;
+    std::transform(shards.begin(),
+                   shards.end(),
+                   std::back_inserter(shardIds),
+                   [](const ShardType& shard) { return ShardId(shard.getName()); });
+
     std::sort(shardIds.begin(), shardIds.end());
+
     return shardIds;
 }
 
@@ -409,7 +426,7 @@ InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFir
     const SplitPolicyParams& params) {
 
     // On which shards are the generated chunks allowed to be placed.
-    const auto shardIds = getAllShardIdsSorted(opCtx);
+    const auto shardIds = getAllNonDrainingShardIdsSorted(opCtx);
 
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
@@ -440,7 +457,7 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
     const SplitPolicyParams& params) {
     invariant(!_tags.empty());
 
-    const auto shardIds = getAllShardIdsSorted(opCtx);
+    const auto shardIds = getAllNonDrainingShardIdsSorted(opCtx);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
@@ -776,12 +793,12 @@ InitialSplitPolicy::ShardCollectionConfig ReshardingSplitPolicy::createFirstChun
     }
 
     {
-        auto allShardIds = getAllShardIdsSorted(opCtx);
-        for (const auto& shard : allShardIds) {
+        auto shardIds = getAllNonDrainingShardIdsSorted(opCtx);
+        for (const auto& shard : shardIds) {
             chunkDistribution.emplace(shard, 0);
         }
 
-        zoneToShardMap.emplace("", std::move(allShardIds));
+        zoneToShardMap.emplace("", std::move(shardIds));
     }
 
     std::vector<ChunkType> chunks;

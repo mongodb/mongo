@@ -82,7 +82,7 @@ public:
                                                            const NamespaceString& nss) override;
 
     StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-        OperationContext* opCtx, repl::ReadConcernLevel readConcern) override;
+        OperationContext* opCtx, repl::ReadConcernLevel readConcern, bool excludeDraining) override;
 
     Status runUserManagementWriteCommand(OperationContext* opCtx,
                                          StringData commandName,
