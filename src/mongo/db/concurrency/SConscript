@@ -74,21 +74,9 @@ env.Library(
     ],
 )
 
-env.Benchmark(
-    target='lock_manager_bm',
-    source=[
-        'd_concurrency_bm.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_non_d',
-        'lock_manager',
-    ],
-)
-
 env.CppUnitTest(
     target='lock_manager_test',
     source=[
-        'd_concurrency_test.cpp',
         'fast_map_noalloc_test.cpp',
         'lock_manager_test.cpp',
         'lock_stats_test.cpp',
@@ -102,7 +90,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
-        '$BUILD_DIR/mongo/util/progress_meter',
         'exception_util',
         'lock_manager',
     ],

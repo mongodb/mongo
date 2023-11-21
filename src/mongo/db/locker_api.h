@@ -35,7 +35,6 @@
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
-
 namespace shard_role_details {
 
 /**
@@ -63,6 +62,11 @@ std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Lock
 std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
                                    std::unique_ptr<Locker> newLocker,
                                    WithLock lk);
+
+/**
+ * Dumps the contents of all locks to the log.
+ */
+void dumpLockManager();
 
 }  // namespace shard_role_details
 }  // namespace mongo

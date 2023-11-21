@@ -152,11 +152,6 @@ public:
     bool hasConflictingRequests(ResourceId resId, const LockRequest* request) const;
 
     /**
-     * Dumps the contents of all locks to the log.
-     */
-    void dump() const;
-
-    /**
      * Dumps the contents of all locks into a BSON object
      * to be used in lockInfo command in the shell.
      * Adds a "lockInfo" element to the `result` object:
@@ -172,6 +167,16 @@ public:
      */
     void getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
                          BSONObjBuilder* result);
+
+    /**
+     * The backend of `dump` and `getLockInfoBSON`.
+     * If `mutableThis`, then we also clean the unused locks in the buckets while iterating.
+     * @param `mutableThis` is a nonconst `this`, but it is null if caller is const.
+     */
+    void getLockInfoArray(const std::map<LockerId, BSONObj>& lockToClientMap,
+                          bool forLogging,
+                          LockManager* mutableThis,
+                          BSONArrayBuilder* buckets) const;
 
     /**
      * Returns a vector of those locks granted for the given resource.
@@ -213,16 +218,6 @@ private:
      * Retrieves the Partition that a particular LockRequest should use for intent locking.
      */
     Partition* _getPartition(LockRequest* request) const;
-
-    /**
-     * The backend of `dump` and `getLockInfoBSON`.
-     * If `mutableThis`, then we also clean the unused locks in the buckets while iterating.
-     * @param `mutableThis` is a nonconst `this`, but it is null if caller is const.
-     */
-    void _buildLocksArray(const std::map<LockerId, BSONObj>& lockToClientMap,
-                          bool forLogging,
-                          LockManager* mutableThis,
-                          BSONArrayBuilder* buckets) const;
 
     /**
      * Should be invoked when the state of a lock changes in a way, which could potentially

@@ -646,7 +646,6 @@ env.Library(
         'cancelable_operation_context.cpp',
         'client.cpp',
         'client_strand.cpp',
-        'locker_api.cpp',
         'default_baton.cpp',
         'operation_context.cpp',
         'operation_context_group.cpp',
@@ -918,6 +917,7 @@ env.Library(
     source=[
         'catalog/collection_operation_source.cpp',
         'direct_shard_client_tracker.cpp',
+        'locker_api.cpp',
         'replica_set_endpoint_sharding_state.cpp',
         'replica_set_endpoint_util.cpp',
         's/collection_metadata.cpp',
@@ -1183,7 +1183,7 @@ env.Library(
         'service_context',
     ],
     LIBDEPS_PRIVATE=[
-        'concurrency/lock_manager',
+        'shard_role_api',
     ],
 )
 
@@ -2752,6 +2752,7 @@ if wiredtiger:
             'collection_index_usage_tracker_test.cpp',
             'commands_test.cpp',
             'curop_test.cpp',
+            'd_concurrency_test.cpp',
             'database_name_test.cpp',
             'db_raii_multi_collection_test.cpp',
             'db_raii_test.cpp',
@@ -2780,9 +2781,9 @@ if wiredtiger:
             'operation_time_tracker_test.cpp',
             'persistent_task_store_test.cpp',
             'query/fle/equality_predicate_test.cpp',
+            'query/fle/query_rewriter_test.cpp',
             'query/fle/range_predicate_test.cpp',
             'query/fle/range_validator_test.cpp',
-            'query/fle/query_rewriter_test.cpp',
             'read_write_concern_defaults_test.cpp',
             'read_write_concern_provenance_test.cpp',
             'record_id_test.cpp',
@@ -2821,6 +2822,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/util/clock_source_mock',
             '$BUILD_DIR/mongo/util/net/network',
             '$BUILD_DIR/mongo/util/net/ssl_options_server',
+            '$BUILD_DIR/mongo/util/progress_meter',
             'auth/auth',
             'auth/authmocks',
             'auth/security_token',
@@ -2951,8 +2953,19 @@ env.Benchmark(
         'operation_cpu_timer_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         'service_context',
+        'shard_role_api',
+    ],
+)
+
+env.Benchmark(
+    target='d_concurrency_bm',
+    source=[
+        'd_concurrency_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_non_d',
+        'shard_role_api',
     ],
 )
 
