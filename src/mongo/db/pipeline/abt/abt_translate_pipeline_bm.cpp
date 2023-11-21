@@ -88,6 +88,7 @@ public:
         std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =
             Pipeline::parse(pipeline, expCtx);
         parsedPipeline->optimizePipeline();
+        QueryParameterMap queryParameters;
 
         if (!isEligibleForBonsai_forTesting(testServiceContext.getServiceContext(),
                                             *parsedPipeline.get())) {
@@ -102,7 +103,8 @@ public:
                                        *parsedPipeline,
                                        scanProjName,
                                        make<ScanNode>(scanProjName, "collection"),
-                                       prefixId));
+                                       prefixId,
+                                       queryParameters));
             benchmark::ClobberMemory();
         }
     }

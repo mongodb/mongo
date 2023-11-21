@@ -149,6 +149,7 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
     ABT valueArray = createValueArray(inputObjs);
 
     const ProjectionName scanProjName = prefixId.getNextId("scan");
+    QueryParameterMap qp;
     ABT tree = translatePipelineToABT(metadata,
                                       *pipeline.get(),
                                       scanProjName,
@@ -156,7 +157,8 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
                                                           boost::none,
                                                           std::move(valueArray),
                                                           true /*hasRID*/),
-                                      prefixId);
+                                      prefixId,
+                                      qp);
 
     OPTIMIZER_DEBUG_LOG(
         6264807, 5, "SBE translated ABT", "explain"_attr = ExplainGenerator::explainV2(tree));

@@ -81,6 +81,7 @@ public:
         auto cq = std::make_unique<CanonicalQuery>(
             CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
                                  .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        QueryParameterMap qp;
 
         if (!isEligibleForBonsai_forTesting(*cq)) {
             state.SkipWithError("CanonicalQuery is not supported by CQF");
@@ -89,8 +90,13 @@ public:
 
         // This is where recording starts.
         for (auto keepRunning : state) {
-            benchmark::DoNotOptimize(translateCanonicalQueryToABT(
-                metadata, *cq, scanProjName, make<ScanNode>(scanProjName, "collection"), prefixId));
+            benchmark::DoNotOptimize(
+                translateCanonicalQueryToABT(metadata,
+                                             *cq,
+                                             scanProjName,
+                                             make<ScanNode>(scanProjName, "collection"),
+                                             prefixId,
+                                             qp));
             benchmark::ClobberMemory();
         }
     }

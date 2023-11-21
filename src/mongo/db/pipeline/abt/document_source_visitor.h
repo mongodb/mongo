@@ -66,6 +66,7 @@ ABT translatePipelineToABT(const Metadata& metadata,
                            const Pipeline& pipeline,
                            ProjectionName scanProjName,
                            ABT initialNode,
-                           PrefixId& prefixId);
+                           PrefixId& prefixId,
+                           QueryParameterMap& queryParameters);
 
 }  // namespace mongo::optimizer

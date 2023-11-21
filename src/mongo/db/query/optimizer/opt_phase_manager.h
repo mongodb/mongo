@@ -115,7 +115,8 @@ public:
                     PathToIntervalFn pathToInterval,
                     ConstFoldFn constFold,
                     DebugInfo debugInfo,
-                    QueryHints queryHints = {});
+                    QueryHints queryHints,
+                    QueryParameterMap queryParameters);
 
     // We only allow moving.
     OptPhaseManager(const OptPhaseManager& /*other*/) = delete;
@@ -270,6 +271,10 @@ private:
 
     // We don't own this.
     PrefixId& _prefixId;
+
+    // Map from parameter ID to constant for the query we are optimizing. This is used by the CE
+    // module to estimate selectivities of query parameters.
+    QueryParameterMap _queryParameters;
 };
 
 }  // namespace mongo::optimizer

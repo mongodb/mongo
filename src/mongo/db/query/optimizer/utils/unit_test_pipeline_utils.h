@@ -57,7 +57,8 @@ ABT translatePipeline(const Metadata& metadata,
                       std::string scanDefName,
                       PrefixId& prefixId,
                       const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {},
-                      bool parameterized = false);
+                      bool parameterized = false,
+                      QueryParameterMap* = nullptr);
 
 void formatGoldenTestHeader(StringData variationName,
                             StringData pipelineStr,

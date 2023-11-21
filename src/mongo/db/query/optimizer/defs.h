@@ -42,6 +42,7 @@
 #include <vector>
 
 #include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/syntax/syntax_fwd_declare.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/util/named_enum.h"
 
@@ -386,5 +387,10 @@ struct QueryHints {
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(ScanOrder, SCAN_ORDER);
 #undef SCAN_ORDER
+
+/*
+ * Type for storing mapping between query parameter IDs and Constants.
+ */
+using QueryParameterMap = opt::unordered_map<int32_t, Constant>;
 
 }  // namespace mongo::optimizer

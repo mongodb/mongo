@@ -160,7 +160,8 @@ OptPhaseManager makePhaseManager(
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
                            std::move(debugInfo),
-                           std::move(queryHints)};
+                           std::move(queryHints),
+                           {} /*queryParameters*/};
 }
 
 OptPhaseManager makePhaseManager(
@@ -181,7 +182,8 @@ OptPhaseManager makePhaseManager(
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
                            std::move(debugInfo),
-                           std::move(queryHints)};
+                           std::move(queryHints),
+                           {} /*queryParameters*/};
 }
 
 
@@ -200,7 +202,8 @@ OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
                            std::move(debugInfo),
-                           std::move(queryHints)};
+                           std::move(queryHints),
+                           {} /*queryParameters*/};
 }
 
 bool planComparator(const PlanAndProps& e1, const PlanAndProps& e2) {

@@ -93,7 +93,7 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
     if constexpr (kCETestLogOnly) {
         std::cout << ExplainGenerator::explainV2(abt) << std::endl;
     }
-
+    QueryParameterMap qp;  // Intentionally unused
     OptPhaseManager phaseManager{_optPhases,
                                  _prefixId,
                                  false /*requireRID*/,
@@ -104,7 +104,8 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
                                  defaultConvertPathToInterval,
                                  ConstEval::constFold,
                                  DebugInfo::kDefaultForTests,
-                                 _hints};
+                                 _hints,
+                                 qp};
     optimize(phaseManager, abt);
 
     const auto& memo = phaseManager.getMemo();

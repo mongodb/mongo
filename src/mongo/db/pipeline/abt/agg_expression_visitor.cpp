@@ -929,8 +929,12 @@ private:
 ABT generateAggExpression(const Expression* expr,
                           const ProjectionName& rootProjection,
                           PrefixId& prefixId) {
-    ExpressionAlgebrizerContext ctx(
-        true /*assertExprSort*/, false /*assertPathSort*/, rootProjection, prefixId);
+    QueryParameterMap queryParameters;
+    ExpressionAlgebrizerContext ctx(true /*assertExprSort*/,
+                                    false /*assertPathSort*/,
+                                    rootProjection,
+                                    prefixId,
+                                    queryParameters);
     ABTAggExpressionVisitor visitor(ctx);
 
     AggExpressionWalker walker(&visitor);

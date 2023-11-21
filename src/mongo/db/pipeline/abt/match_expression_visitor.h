@@ -44,6 +44,7 @@ namespace mongo::optimizer {
 ABT generateMatchExpression(const MatchExpression* expr,
                             bool allowAggExpressions,
                             const ProjectionName& rootProjection,
-                            PrefixId& prefixId);
+                            PrefixId& prefixId,
+                            QueryParameterMap& queryParameters);
 
 }  // namespace mongo::optimizer

@@ -72,7 +72,8 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  PathToIntervalFn pathToInterval,
                                  ConstFoldFn constFold,
                                  DebugInfo debugInfo,
-                                 QueryHints queryHints)
+                                 QueryHints queryHints,
+                                 QueryParameterMap queryParameters)
     : _phaseSet(std::move(phaseSet)),
       _debugInfo(std::move(debugInfo)),
       _hints(std::move(queryHints)),
@@ -88,7 +89,8 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
       _postMemoPlan(),
       _requireRID(requireRID),
       _ridProjections(),
-      _prefixId(prefixId) {
+      _prefixId(prefixId),
+      _queryParameters(std::move(queryParameters)) {
     uassert(6624093, "Cost derivation is null", _costEstimator);
     uassert(7088900, "Exploration CE is null", _explorationCE);
     uassert(7088901, "Substitution CE is null", _substitutionCE);

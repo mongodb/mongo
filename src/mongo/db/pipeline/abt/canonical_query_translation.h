@@ -41,6 +41,7 @@ ABT translateCanonicalQueryToABT(const Metadata& metadata,
                                  const CanonicalQuery& canonicalQuery,
                                  ProjectionName scanProjName,
                                  ABT initialNode,
-                                 PrefixId& prefixId);
+                                 PrefixId& prefixId,
+                                 QueryParameterMap& queryParameters);
 
 }  // namespace mongo::optimizer

@@ -14,6 +14,8 @@ metadata:
 			CE type: (empty)
 
 -- OUTPUT:
+Query parameters:
+0: 1
 Root [{test}]
 Filter []
 |   EvalFilter []
@@ -43,6 +45,8 @@ metadata:
 			CE type: (empty)
 
 -- OUTPUT:
+Query parameters:
+0: 1
 Root [{scan_0}]
 Filter []
 |   EvalFilter []

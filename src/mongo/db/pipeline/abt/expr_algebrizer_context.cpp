@@ -38,12 +38,14 @@ namespace mongo::optimizer {
 ExpressionAlgebrizerContext::ExpressionAlgebrizerContext(const bool assertExprSort,
                                                          const bool assertPathSort,
                                                          const ProjectionName& rootProjection,
-                                                         PrefixId& prefixId)
+                                                         PrefixId& prefixId,
+                                                         QueryParameterMap& queryParameters)
     : _assertExprSort(assertExprSort),
       _assertPathSort(assertPathSort),
       _rootProjection(rootProjection),
       _rootProjVar(make<Variable>(_rootProjection)),
-      _prefixId(prefixId) {}
+      _prefixId(prefixId),
+      _queryParameters(queryParameters) {}
 
 void ExpressionAlgebrizerContext::push(ABT node) {
     if (_assertExprSort) {
@@ -77,6 +79,10 @@ const ABT& ExpressionAlgebrizerContext::getRootProjVar() const {
 
 PrefixId& ExpressionAlgebrizerContext::getPrefixId() {
     return _prefixId;
+}
+
+QueryParameterMap& ExpressionAlgebrizerContext::getQueryParameters() {
+    return _queryParameters;
 }
 
 }  // namespace mongo::optimizer

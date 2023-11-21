@@ -367,7 +367,8 @@ void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
     ABT matchExpr = generateMatchExpression(source.getMatchExpression(),
                                             true /*allowAggExpressions*/,
                                             entry._rootProjection,
-                                            ctx.getPrefixId());
+                                            ctx.getPrefixId(),
+                                            ctx.getQueryParameters());
 
     {
         // If we have a top-level composition, flatten it into a chain of separate FilterNodes. We
@@ -424,8 +425,12 @@ void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
         : make<ValueScanNode>(ProjectionNameVector{scanProjName},
                               createInitialScanProps(scanProjName, scanDefName));
 
-    ABT pipelineABT = translatePipelineToABT(
-        metadata, pipeline, scanProjName, std::move(initialNode), ctx.getPrefixId());
+    ABT pipelineABT = translatePipelineToABT(metadata,
+                                             pipeline,
+                                             scanProjName,
+                                             std::move(initialNode),
+                                             ctx.getPrefixId(),
+                                             ctx.getQueryParameters());
 
     uassert(6624425, "Expected root node for union pipeline", pipelineABT.is<RootNode>());
     ABT pipelineABTWithoutRoot = pipelineABT.cast<RootNode>()->getChild();
@@ -552,8 +557,9 @@ ABT translatePipelineToABT(const Metadata& metadata,
                            const Pipeline& pipeline,
                            ProjectionName scanProjName,
                            ABT initialNode,
-                           PrefixId& prefixId) {
-    AlgebrizerContext ctx(prefixId, {scanProjName, std::move(initialNode)});
+                           PrefixId& prefixId,
+                           QueryParameterMap& queryParameters) {
+    AlgebrizerContext ctx(prefixId, {scanProjName, std::move(initialNode)}, queryParameters);
     ABTDocumentSourceTranslationVisitorContext visitorCtx(ctx, metadata);
 
     ServiceContext* serviceCtx = pipeline.getContext()->opCtx->getServiceContext();

@@ -242,8 +242,9 @@ TEST_F(ServiceContextTest, BasicCanonicalQueryTranslation) {
 
     MatchExpression::unparameterize(cq->getPrimaryMatchExpression());
 
+    QueryParameterMap qp;
     auto translation = translateCanonicalQueryToABT(
-        metadata, *cq, ProjectionName{"test"}, make<ScanNode>("test", "test"), prefixId);
+        metadata, *cq, ProjectionName{"test"}, make<ScanNode>("test", "test"), prefixId, qp);
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{test}]\n"
         "Filter []\n"

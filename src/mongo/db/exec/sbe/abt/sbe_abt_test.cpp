@@ -482,6 +482,7 @@ TEST_F(NodeSBE, Lower1) {
     ABT valueArray = make<Constant>(tag, val);
 
     const ProjectionName scanProjName = prefixId.getNextId("scan");
+    QueryParameterMap qp;
     ABT tree = translatePipelineToABT(metadata,
                                       *pipeline.get(),
                                       scanProjName,
@@ -489,7 +490,8 @@ TEST_F(NodeSBE, Lower1) {
                                                           boost::none,
                                                           std::move(valueArray),
                                                           true /*hasRID*/),
-                                      prefixId);
+                                      prefixId,
+                                      qp);
 
     auto phaseManager = makePhaseManager(OptPhaseManager::getAllProdRewrites(),
                                          prefixId,
@@ -642,6 +644,7 @@ TEST_F(NodeSBE, RequireRID) {
     }
     ABT valueArray = make<Constant>(tag, val);
 
+    QueryParameterMap qp;
     ABT tree =
         translatePipelineToABT(metadata,
                                *pipeline.get(),
@@ -650,7 +653,8 @@ TEST_F(NodeSBE, RequireRID) {
                                                    createInitialScanProps(scanProjName, "test"),
                                                    std::move(valueArray),
                                                    true /*hasRID*/),
-                               prefixId);
+                               prefixId,
+                               qp);
 
     auto phaseManager = makePhaseManagerRequireRID(OptPhaseManager::getAllProdRewrites(),
                                                    prefixId,
@@ -720,12 +724,13 @@ TEST_F(NodeSBE, SamplingTest) {
         "[{$match: {a: 2}}]", NamespaceString::createNamespaceString_forTest("test"), opCtx.get());
 
     const ProjectionName scanProjName = prefixId.getNextId("scan");
-
+    QueryParameterMap qp;
     ABT tree = translatePipelineToABT(metadata,
                                       *pipeline.get(),
                                       scanProjName,
                                       make<ScanNode>(scanProjName, scanDefName),
-                                      prefixId);
+                                      prefixId,
+                                      qp);
 
     // We are not lowering the paths.
     OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
@@ -740,7 +745,8 @@ TEST_F(NodeSBE, SamplingTest) {
                                             defaultConvertPathToInterval,
                                             defaultConvertPathToInterval,
                                             DebugInfo::kDefaultForProd,
-                                            {._sqrtSampleSizeEnabled = false}};
+                                            {._sqrtSampleSizeEnabled = false},
+                                            qp};
 
     // Used to record the sampling plans.
     ABTVector nodes;
@@ -762,7 +768,8 @@ TEST_F(NodeSBE, SamplingTest) {
         defaultConvertPathToInterval,
         ConstEval::constFold,
         DebugInfo::kDefaultForTests,
-        {} /*queryHints*/};
+        {} /*queryHints*/,
+        qp};
 
     PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(tree));
 

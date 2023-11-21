@@ -50,7 +50,8 @@ public:
     ExpressionAlgebrizerContext(bool assertExprSort,
                                 bool assertPathSort,
                                 const ProjectionName& rootProjection,
-                                PrefixId& prefixId);
+                                PrefixId& prefixId,
+                                QueryParameterMap& queryParameters);
 
     /**
      * Push an ABT onto the stack. Optionally perform a check on the type of the ABT based on
@@ -77,6 +78,8 @@ public:
     const ABT& getRootProjVar() const;
 
     PrefixId& getPrefixId();
+
+    QueryParameterMap& getQueryParameters();
 
     /**
      * Returns a unique projection. It will be prefixed by 'uniqueIdPrefix'.
@@ -138,6 +141,8 @@ private:
     // Used to track expressions contained under an $elemMatch. Each entry is either an
     // ELEM_MATCH_OBJECT or ELEM_MATCH_VALUE.
     std::vector<MatchExpression::MatchType> _elemMatchStack;
+
+    QueryParameterMap& _queryParameters;
 };
 
 }  // namespace mongo::optimizer

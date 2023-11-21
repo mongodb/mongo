@@ -14,6 +14,8 @@ metadata:
 			CE type: (empty)
 
 -- OUTPUT:
+Query parameters:
+(no parameters)
 Root [{test}]
 Filter []
 |   EvalFilter []
@@ -39,6 +41,8 @@ metadata:
 			CE type: (empty)
 
 -- OUTPUT:
+Query parameters:
+(no parameters)
 Root [{scan_0}]
 Filter []
 |   EvalFilter []
@@ -64,6 +68,8 @@ metadata:
 			CE type: (empty)
 
 -- OUTPUT:
+Query parameters:
+0: 1
 Root [{test}]
 Filter []
 |   EvalFilter []
@@ -93,6 +99,8 @@ metadata:
 			CE type: (empty)
 
 -- OUTPUT:
+Query parameters:
+0: 1
 Root [{scan_0}]
 Filter []
 |   EvalFilter []
@@ -122,6 +130,8 @@ metadata:
 			CE type: (empty)
 
 -- OUTPUT:
+Query parameters:
+0: [1, 2, 3]
 Root [{test}]
 Filter []
 |   EvalFilter []
@@ -151,6 +161,8 @@ metadata:
 			CE type: (empty)
 
 -- OUTPUT:
+Query parameters:
+0: [1, 2, 3]
 Root [{scan_0}]
 Filter []
 |   EvalFilter []
@@ -180,6 +192,8 @@ metadata:
 			CE type: (empty)
 
 -- OUTPUT:
+Query parameters:
+0: ["abc", "def", "ghi"]
 Root [{test}]
 Filter []
 |   EvalFilter []
@@ -209,6 +223,8 @@ metadata:
 			CE type: (empty)
 
 -- OUTPUT:
+Query parameters:
+0: ["abc", "def", "ghi"]
 Root [{scan_0}]
 Filter []
 |   EvalFilter []

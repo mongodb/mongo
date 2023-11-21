@@ -231,7 +231,6 @@ public:
         ABT result = make<PathIdentity>();
 
         const auto [tagTraverse, valTraverse] = sbe::value::makeNewArray();
-        sbe::value::ValueGuard arrGuard{tagTraverse, valTraverse};
         auto arrTraversePtr = sbe::value::getArrayView(valTraverse);
         arrTraversePtr->reserve(equalities.size());
 
@@ -259,9 +258,10 @@ public:
                 makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32, *expr->getInputParamId()),
                         make<Constant>(sbe::value::TypeTags::NumberInt32,
                                        static_cast<int>(tagTraverse))));
+            _ctx.getQueryParameters().emplace(*expr->getInputParamId(),
+                                              Constant(tagTraverse, valTraverse));
         } else {
             result = make<Constant>(tagTraverse, valTraverse);
-            arrGuard.reset();
         }
         result = make<PathCompare>(Operations::EqMember, std::move(result));
 
@@ -467,6 +467,10 @@ public:
         const ProjectionName lambdaProjName{_ctx.getNextId("lambda_sizeMatch")};
         auto result = [&]() {
             if (expr->getInputParamId()) {
+                _ctx.getQueryParameters().emplace(
+                    *expr->getInputParamId(),
+                    Constant(sbe::value::TypeTags::NumberInt64,
+                             sbe::value::bitcastFrom<int64_t>(*expr->getInputParamId())));
                 return make<FunctionCall>(
                     kParameterFunctionName,
                     makeSeq(
@@ -578,17 +582,15 @@ private:
         assertSupportedPathExpression(expr);
 
         auto [tag, val] = sbe::value::makeValue(Value(expr->getData()));
-        sbe::value::ValueGuard guard{tag, val};
-
         auto result = ABT{make<PathIdentity>()};
         if (expr->getInputParamId()) {
             result = make<FunctionCall>(
                 kParameterFunctionName,
                 makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32, *expr->getInputParamId()),
                         make<Constant>(sbe::value::TypeTags::NumberInt32, static_cast<int>(tag))));
+            _ctx.getQueryParameters().emplace(*expr->getInputParamId(), Constant(tag, val));
         } else {
             result = make<Constant>(tag, val);
-            guard.reset();
         }
         result = make<PathCompare>(op, std::move(result));
 
@@ -728,9 +730,13 @@ private:
 ABT generateMatchExpression(const MatchExpression* expr,
                             const bool allowAggExpressions,
                             const ProjectionName& rootProjection,
-                            PrefixId& prefixId) {
-    ExpressionAlgebrizerContext ctx(
-        false /*assertExprSort*/, true /*assertPathSort*/, rootProjection, prefixId);
+                            PrefixId& prefixId,
+                            QueryParameterMap& queryParameters) {
+    ExpressionAlgebrizerContext ctx(false /*assertExprSort*/,
+                                    true /*assertPathSort*/,
+                                    rootProjection,
+                                    prefixId,
+                                    queryParameters);
     ABTMatchExpressionPreVisitor preVisitor(ctx);
     ABTMatchExpressionVisitor postVisitor(ctx, allowAggExpressions);
     MatchExpressionWalker walker(&preVisitor, nullptr /*inVisitor*/, &postVisitor);

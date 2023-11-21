@@ -50,8 +50,13 @@ public:
         ABT _node;
     };
 
-    AlgebrizerContext(PrefixId& prefixId, NodeWithRootProjection node)
-        : _node(std::move(node)), _scanProjName(_node._rootProjection), _prefixId(prefixId) {
+    AlgebrizerContext(PrefixId& prefixId,
+                      NodeWithRootProjection node,
+                      QueryParameterMap& queryParameters)
+        : _node(std::move(node)),
+          _scanProjName(_node._rootProjection),
+          _prefixId(prefixId),
+          _queryParameters(queryParameters) {
         assertNodeSort(_node._node);
     }
 
@@ -83,11 +88,16 @@ public:
         return _scanProjName;
     }
 
+    QueryParameterMap& getQueryParameters() {
+        return _queryParameters;
+    }
+
 private:
     NodeWithRootProjection _node;
     ProjectionName _scanProjName;
 
     PrefixId& _prefixId;
+    QueryParameterMap& _queryParameters;
 };
 
 }  // namespace mongo::optimizer
