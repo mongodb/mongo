@@ -28,6 +28,18 @@ env.Library(
     ],
 )
 
+env.Program(
+    target="bson_column_encoder",
+    source=[
+        "bson_column_encoder.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'bson_column',
+        'bson_extract',
+    ],
+)
+
 env.Benchmark(
     target='simple8b_bm',
     source=[
