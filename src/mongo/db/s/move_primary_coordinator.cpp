@@ -518,8 +518,7 @@ void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
     };
 }
 
-std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
-    OperationContext* opCtx) const {
+std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(OperationContext* opCtx) {
     // Enable write blocking bypass to allow cloning of catalog data even if writes are disallowed.
     WriteBlockBypass::get(opCtx).set(true);
 
@@ -530,28 +529,31 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
         uassertStatusOK(shardRegistry->getShard(opCtx, ShardingState::get(opCtx)->shardId()));
     const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
 
-    const auto cloneCommand = [&] {
+    auto cloneCommand = [&](boost::optional<OperationSessionInfo> osi) {
         BSONObjBuilder commandBuilder;
         commandBuilder.append(
             "_shardsvrCloneCatalogData",
             DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault()));
         commandBuilder.append("from", fromShard->getConnString().toString());
+        if (osi.is_initialized()) {
+            commandBuilder.appendElements(osi->toBSON());
+        }
         return CommandHelpers::appendMajorityWriteConcern(commandBuilder.obj());
-    }();
+    };
 
-    const auto cloneResponse =
-        toShard->runCommand(opCtx,
-                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                            DatabaseName::kAdmin,
-                            cloneCommand,
-                            Shard::RetryPolicy::kNoRetry);
+    auto clonedCollections = [&](const BSONObj& command) {
+        const auto cloneResponse =
+            toShard->runCommand(opCtx,
+                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                DatabaseName::kAdmin,
+                                command,
+                                Shard::RetryPolicy::kNoRetry);
 
-    uassertStatusOKWithContext(
-        Shard::CommandResponse::getEffectiveStatus(cloneResponse),
-        "movePrimary operation on database {} failed to clone data to recipient {}"_format(
-            _dbName.toStringForErrorMsg(), toShardId.toString()));
+        uassertStatusOKWithContext(
+            Shard::CommandResponse::getEffectiveStatus(cloneResponse),
+            "movePrimary operation on database {} failed to clone data to recipient {}"_format(
+                _dbName.toStringForErrorMsg(), toShardId.toString()));
 
-    auto clonedCollections = [&] {
         std::vector<NamespaceString> colls;
         for (const auto& bsonElem : cloneResponse.getValue().response["clonedColls"].Obj()) {
             if (bsonElem.type() == String) {
@@ -562,8 +564,15 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
 
         std::sort(colls.begin(), colls.end());
         return colls;
-    }();
-    return clonedCollections;
+    };
+
+    try {
+        return clonedCollections(cloneCommand(getNewSession(opCtx)));
+    } catch (const ExceptionFor<ErrorCodes::NotARetryableWriteCommand>&) {
+        // TODO SERVER-83213: we're dealing with an older binary version, retry without the OSI
+        // protection. Remove once 8.0 is last-lts.
+        return clonedCollections(cloneCommand(boost::none));
+    }
 }
 
 void MovePrimaryCoordinator::assertClonedData(

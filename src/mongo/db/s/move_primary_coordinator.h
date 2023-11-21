@@ -88,6 +88,13 @@ private:
     void cloneData(OperationContext* opCtx);
 
     /**
+     * Requests to the recipient to clone all the collections of the given database currently owned
+     * by this shard. Once the cloning is complete, the recipient returns the list of the actually
+     * cloned collections.
+     */
+    std::vector<NamespaceString> cloneDataToRecipient(OperationContext* opCtx);
+
+    /**
      * Logs in the `config.changelog` collection a specific event for `movePrimary` operations.
      */
     void logChange(OperationContext* opCtx,
@@ -106,14 +113,6 @@ private:
      */
     void assertNoOrphanedDataOnRecipient(
         OperationContext* opCtx, const std::vector<NamespaceString>& collectionsToClone) const;
-
-
-    /**
-     * Requests to the recipient to clone all the collections of the given database currently owned
-     * by this shard. Once the cloning is complete, the recipient returns the list of the actually
-     * cloned collections.
-     */
-    std::vector<NamespaceString> cloneDataToRecipient(OperationContext* opCtx) const;
 
     /**
      * Ensures that the list of actually cloned collections (returned by the cloning command)
