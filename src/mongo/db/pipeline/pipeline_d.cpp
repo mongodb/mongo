@@ -752,10 +752,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         }
     };
 
+    // For performance, we pass a null callback instead of 'extractAndAttachPipelineStages' when
+    // 'pipeline' is empty. The 'extractAndAttachPipelineStages' is a no-op when there are no
+    // pipeline stages, so we can save some work by skipping it. The 'getExecutorFind()' function is
+    // responsible for checking that the callback is non-null before calling it.
     return getExecutorFind(expCtx->opCtx,
                            collections,
                            std::move(cq.getValue()),
-                           std::move(extractAndAttachPipelineStages),
+                           !pipeline->getSources().empty()
+                               ? std::move(extractAndAttachPipelineStages)
+                               : std::function<void(CanonicalQuery*, bool)>{},
                            true /* permitYield */,
                            plannerOpts);
 }
