@@ -60,6 +60,8 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 namespace WriteConcerns {
 
 const WriteConcernOptions kMajorityWriteConcernShardingTimeout{
@@ -204,7 +206,6 @@ private:
                  bool upsert,
                  const WriteConcernOptions& writeConcern =
                      WriteConcerns::kMajorityWriteConcernShardingTimeout) {
-        using namespace fmt::literals;
         DBDirectClient dbClient(opCtx);
 
         auto commandResponse = write_ops::checkWriteErrors(dbClient.update([&] {

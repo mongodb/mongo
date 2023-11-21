@@ -79,7 +79,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 namespace mongo {
-using namespace fmt::literals;
+
 const char* TimeseriesModifyStage::kStageType = "TS_MODIFY";
 
 TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,

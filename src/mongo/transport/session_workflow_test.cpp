@@ -90,7 +90,6 @@
 
 namespace mongo::transport {
 namespace {
-using namespace fmt::literals;
 
 const Status kClosedSessionError{ErrorCodes::SocketException, "Session is closed"};
 const Status kNetworkError{ErrorCodes::HostUnreachable, "Someone is unreachable"};

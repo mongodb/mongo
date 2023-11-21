@@ -50,7 +50,6 @@
 #include "mongo/unittest/assert.h"
 
 namespace mongo::sbe {
-using namespace fmt::literals;
 class BlockStagesTest : public PlanStageTestFixture {
 protected:
     BSONObj compressBucket(const BSONObj& bucket) {

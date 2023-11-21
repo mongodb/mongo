@@ -183,7 +183,6 @@ BatchTransform makeUpdateTransform(const std::string& updateOp) {
  * field of the 'on' extracted from 'doc' is nullish or an array.
  */
 BSONObj extractMergeOnFieldsFromDoc(const Document& doc, const std::set<FieldPath>& mergeOnFields) {
-    using namespace fmt::literals;
     MutableDocument result;
     for (const auto& field : mergeOnFields) {
         auto value = doc.getNestedField(field);

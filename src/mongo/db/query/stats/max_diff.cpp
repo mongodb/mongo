@@ -50,7 +50,6 @@
 namespace mongo::stats {
 namespace {
 namespace value = sbe::value;
-using namespace fmt::literals;
 
 std::string printDistribution(const DataDistribution& distr, size_t nElems) {
     std::ostringstream os;

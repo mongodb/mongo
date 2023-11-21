@@ -69,8 +69,6 @@
 
 namespace mongo::auth {
 namespace {
-using namespace fmt::literals;
-
 const auto validatedTenancyScopeDecoration =
     OperationContext::declareDecoration<boost::optional<ValidatedTenancyScope>>();
 

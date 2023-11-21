@@ -62,7 +62,6 @@
 MONGO_FAIL_POINT_DEFINE(overrideDDLLockTimeout);
 
 namespace mongo {
-using namespace fmt::literals;
 namespace {
 
 const auto ddlLockManagerDecorator = ServiceContext::declareDecoration<DDLLockManager>();
@@ -102,6 +101,7 @@ void DDLLockManager::_lock(OperationContext* opCtx,
         if (!opCtx->waitForConditionOrInterruptUntil(_stateCV, lock, deadline, [&] {
                 return _state == State::kPrimaryAndRecovered || !waitForRecovery;
             })) {
+            using namespace fmt::literals;
             uasserted(
                 ErrorCodes::LockTimeout,
                 "Failed to acquire DDL lock for namespace '{}' in mode {} after {} with reason "
@@ -128,6 +128,7 @@ void DDLLockManager::_lock(OperationContext* opCtx,
     try {
         locker->lock(opCtx, resId, mode, deadline);
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+        using namespace fmt::literals;
 
         std::vector<std::string> lockHoldersArr;
         const auto& lockHolders = locker->getLockInfoFromResourceHolders(resId);

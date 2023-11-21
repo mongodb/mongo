@@ -129,7 +129,6 @@
 
 namespace mongo {
 namespace {
-using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeCheckingMongosShutdownInterrupt);
 const auto kOperationTime = "operationTime"_sd;

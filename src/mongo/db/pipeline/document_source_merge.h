@@ -114,7 +114,6 @@ public:
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const final {
-            using namespace fmt::literals;
             ReadConcernSupportResult result = {
                 {level == repl::ReadConcernLevel::kLinearizableReadConcern,
                  {ErrorCodes::InvalidOptions,

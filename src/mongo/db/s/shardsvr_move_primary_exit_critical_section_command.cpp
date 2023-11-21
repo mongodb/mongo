@@ -64,7 +64,6 @@
 
 namespace mongo {
 namespace {
-using namespace fmt::literals;
 
 class ShardsvrMovePrimaryExitCriticalSectionCommand final
     : public TypedCommand<ShardsvrMovePrimaryExitCriticalSectionCommand> {

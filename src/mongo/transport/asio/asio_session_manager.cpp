@@ -36,7 +36,6 @@
 
 namespace mongo::transport {
 std::string AsioSessionManager::getClientThreadName(const Session& session) const {
-    using namespace fmt::literals;
     return "conn{}"_format(session.id());
 }
 

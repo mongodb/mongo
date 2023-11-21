@@ -897,7 +897,6 @@ void BenchRunState::onWorkerFinished() {
 
 namespace {
 void doAuth(DBClientBase& conn, StringData username, StringData password) {
-    using namespace fmt::literals;
     try {
         conn.auth(DatabaseName::kAdmin, username, password);
     } catch (DBException& e) {

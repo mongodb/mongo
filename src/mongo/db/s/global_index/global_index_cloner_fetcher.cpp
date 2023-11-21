@@ -68,7 +68,6 @@ namespace mongo {
 namespace global_index {
 
 namespace {
-using namespace fmt::literals;
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx,
                                                               const NamespaceString& nss,

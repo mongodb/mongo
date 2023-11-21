@@ -89,7 +89,6 @@ Status TenantMigrationRecipientAccessBlocker::waitUntilCommittedOrAborted(Operat
 
 SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanRunCommandFuture(
     OperationContext* opCtx, StringData command) {
-    using namespace fmt::literals;
     if (MONGO_unlikely(tenantMigrationRecipientNotRejectReads.shouldFail())) {
         return SharedSemiFuture<void>();
     }

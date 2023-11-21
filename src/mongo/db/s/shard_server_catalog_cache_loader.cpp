@@ -101,7 +101,6 @@
 namespace mongo {
 
 using namespace shardmetadatautil;
-using namespace fmt::literals;
 
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 

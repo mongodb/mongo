@@ -90,7 +90,6 @@ void addRoleNameObjectsToArrayElement(mutablebson::Element array, RoleNameIterat
 void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privilegesElement,
                                                  mutablebson::Element warningsElement,
                                                  const PrivilegeVector& privileges) {
-    using namespace fmt::literals;
     for (const auto& privilege : privileges) {
         try {
             fassert(17178, privilegesElement.appendObject("", privilege.toBSON()));

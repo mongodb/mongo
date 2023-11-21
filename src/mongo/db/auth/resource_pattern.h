@@ -149,7 +149,6 @@ public:
      * "<dbName>.system.buckets.<collectionName>"
      */
     static ResourcePattern forExactSystemBucketsCollection(const NamespaceString& nss) {
-        using namespace fmt::literals;
         uassert(ErrorCodes::InvalidNamespace,
                 "Invalid namespace '{}.system.buckets.{}'"_format(
                     nss.dbName().toStringForErrorMsg(), nss.coll()),

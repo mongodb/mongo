@@ -73,7 +73,6 @@
 
 namespace mongo {
 namespace repl {
-using namespace fmt::literals;
 
 // Allow the heartbeat interval to be forcibly overridden on this node.
 MONGO_FAIL_POINT_DEFINE(forceHeartbeatIntervalMS);

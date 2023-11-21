@@ -44,7 +44,7 @@
 
 namespace mongo::stats {
 namespace value = sbe::value;
-using namespace fmt::literals;
+
 const std::string StrDistribution::_alphabet =
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 

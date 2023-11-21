@@ -738,7 +738,6 @@ Status isDroppableCollection(OperationContext* opCtx, const NamespaceString& nss
             nss.isSystemDotJavascript() || nss.isSystemStatsCollection();
     };
 
-    using namespace fmt::literals;
     if (nss.isSystemDotProfile()) {
         if (CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()) != 0)
             return Status(ErrorCodes::IllegalOperation,

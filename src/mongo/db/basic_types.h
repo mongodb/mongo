@@ -38,6 +38,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/variant.h"
 
+using namespace fmt::literals;
+
 namespace mongo {
 
 /**

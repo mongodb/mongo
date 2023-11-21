@@ -66,7 +66,6 @@
 
 namespace mongo {
 namespace {
-using namespace fmt::literals;
 
 class CommitShardSplitCmd : public TypedCommand<CommitShardSplitCmd> {
 public:

@@ -43,6 +43,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
+using namespace fmt::literals;
 
 /**
  * Manipulates the state of the OperationContext so that while this object is in scope, reads and
@@ -194,7 +195,6 @@ private:
 
 template <typename B>
 DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
-    using namespace fmt::literals;
     if (_done) {
         return GetNextResult::makeEOF();
     }

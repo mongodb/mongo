@@ -259,7 +259,6 @@ void onDbVersionMismatch(OperationContext* opCtx,
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-    using namespace fmt::literals;
     tassert(ErrorCodes::IllegalOperation,
             "Can't check version of {} database"_format(dbName.toStringForErrorMsg()),
             !dbName.isAdminDB() && !dbName.isConfigDB());

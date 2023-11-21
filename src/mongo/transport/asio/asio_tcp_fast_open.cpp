@@ -191,7 +191,6 @@ void checkSupportedByLibc(bool srv, bool cli) {
 
 void checkEnabledByKernel(bool srv, bool cli) {
 #if defined(TCP_FASTOPEN) && defined(__linux__)
-    using namespace fmt::literals;
     if (!srv && !cli)
         return;
     std::string procfile("/proc/sys/net/ipv4/tcp_fastopen");

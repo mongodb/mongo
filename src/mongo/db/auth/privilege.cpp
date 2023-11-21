@@ -50,7 +50,6 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-using namespace fmt::literals;
 namespace {
 void uassertNoConflict(StringData resource, StringData found, bool cond) {
     uassert(

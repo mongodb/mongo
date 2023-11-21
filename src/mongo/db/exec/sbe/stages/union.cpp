@@ -198,7 +198,6 @@ const SpecificStats* UnionStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> UnionStage::debugPrint() const {
-    using namespace fmt::literals;
     auto ret = PlanStage::debugPrint();
 
     ret.emplace_back(DebugPrinter::Block("[`"));

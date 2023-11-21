@@ -101,7 +101,6 @@
 
 
 namespace mongo::shell_utils {
-using namespace fmt::literals;
 namespace {
 boost::filesystem::path getUserDir() {
 #ifdef _WIN32
