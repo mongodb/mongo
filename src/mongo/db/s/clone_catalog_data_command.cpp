@@ -31,13 +31,18 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/write_block_bypass.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/clone_catalog_data_gen.h"
 
@@ -46,6 +51,28 @@
 
 namespace mongo {
 namespace {
+
+void cloneDatabase(OperationContext* opCtx,
+                   const std::string& dbName,
+                   StringData from,
+                   BSONObjBuilder& result) {
+    auto const catalogClient = Grid::get(opCtx)->catalogClient();
+    auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
+        opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern, {});
+
+    DisableDocumentValidation disableValidation(opCtx);
+
+    // Clone the non-ignored collections.
+    std::set<std::string> clonedColls;
+
+    Cloner cloner;
+    uassertStatusOK(cloner.copyDb(opCtx, dbName, from.toString(), shardedColls, &clonedColls));
+
+    {
+        BSONArrayBuilder cloneBarr = result.subarrayStart("clonedColls");
+        cloneBarr.append(clonedColls);
+    }
+}
 
 /**
  * Currently, _shardsvrCloneCatalogData will clone all data (including metadata). In the second part
@@ -74,6 +101,10 @@ public:
         return true;
     }
 
+    virtual bool supportsRetryableWrite() const override {
+        return true;
+    }
+
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const DatabaseName&,
                                  const BSONObj&) const override {
@@ -90,7 +121,6 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-
         auto shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
@@ -120,22 +150,42 @@ public:
                 str::stream() << "Can't run _shardsvrCloneCatalogData without a source",
                 !from.empty());
 
-        auto const catalogClient = Grid::get(opCtx)->catalogClient();
-        const auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
-            opCtx, dbname, repl::ReadConcernLevel::kMajorityReadConcern);
+        // For newer versions, execute the operation in another operation context with local write
+        // concern to prevent doing waits while we're holding resources (we have a session checked
+        // out).
+        if (TransactionParticipant::get(opCtx)) {
+            {
+                // Use ACR to have a thread holding the session while we do the cloning.
+                auto newClient = opCtx->getServiceContext()->makeClient("CloneCatalogCommand");
+                {
+                    stdx::lock_guard<Client> lk(*newClient.get());
+                    newClient->setSystemOperationKillableByStepdown(lk);
+                }
 
-        DisableDocumentValidation disableValidation(opCtx);
+                AlternativeClientRegion acr(newClient);
+                auto executor =
+                    Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
+                auto newOpCtxPtr = CancelableOperationContext(
+                    cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
 
-        // Clone the non-ignored collections.
-        std::set<std::string> clonedColls;
-
-        Cloner cloner;
-        uassertStatusOK(cloner.copyDb(opCtx, dbname, from.toString(), shardedColls, &clonedColls));
-        {
-            BSONArrayBuilder cloneBarr = result.subarrayStart("clonedColls");
-            cloneBarr.append(clonedColls);
+                AuthorizationSession::get(newOpCtxPtr.get()->getClient())
+                    ->grantInternalAuthorization(newOpCtxPtr.get()->getClient());
+                newOpCtxPtr->setWriteConcern(ShardingCatalogClient::kLocalWriteConcern);
+                WriteBlockBypass::get(newOpCtxPtr.get()).set(true);
+                cloneDatabase(newOpCtxPtr.get(), dbname, from, result);
+            }
+            // Since no write happened on this txnNumber, we need to make a dummy write to protect
+            // against older requests with old txnNumbers.
+            DBDirectClient client(opCtx);
+            client.update(NamespaceString::kServerConfigurationNamespace,
+                          BSON("_id"
+                               << "CloneCatalogDataStats"),
+                          BSON("$inc" << BSON("count" << 1)),
+                          true /* upsert */,
+                          false /* multi */);
+        } else {
+            cloneDatabase(opCtx, dbname, from, result);
         }
-
         return true;
     }
 
