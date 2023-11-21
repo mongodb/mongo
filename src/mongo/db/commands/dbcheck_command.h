@@ -79,7 +79,7 @@ struct DbCheckCollectionBatchStats {
  * For organizing the results of batches for extra index keys check.
  */
 struct DbCheckExtraIndexKeysBatchStats {
-    int64_t nDocs;
+    int64_t nKeys;
     int64_t nBytes;
     key_string::Value firstIndexKey;
     key_string::Value lastIndexKey;
@@ -89,6 +89,7 @@ struct DbCheckExtraIndexKeysBatchStats {
     std::string md5;
     repl::OpTime time;
     boost::optional<Timestamp> readTimestamp;
+    Date_t deadline;
 };
 
 /**

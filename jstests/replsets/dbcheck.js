@@ -302,29 +302,53 @@ function testDbCheckParameters() {
     }
     {
         // Validate maxDbCheckMBperSec.
-        clearHealthLog(replSet);
         const coll = db.getSiblingDB("maxDbCheckMBperSec").maxDbCheckMBperSec;
+        assert.commandWorked(db.getSiblingDB("maxDbCheckMBperSec").runCommand({
+            createIndexes: coll.getName(),
+            indexes: [{key: {a: 1}, name: 'a_1'}],
+        }));
 
         // Insert nDocs, each slightly larger than the maxDbCheckMBperSec value (1MB), which is the
         // default value, while maxBatchTimeMillis is defaulted to 1 second. Consequently, we will
         // have only 1MB per batch.
         const nDocs = 5;
-        coll.insertMany([...Array(nDocs).keys()].map(x => ({a: 'a'.repeat(1024 * 1024 * 2)})),
+        const chars = ['a', 'b', 'c', 'd', 'e'];
+        coll.insertMany([...Array(nDocs).keys()].map(x => ({a: chars[x].repeat(1024 * 1024 * 2)})),
                         {ordered: false});
+        [{}, {validateMode: "dataConsistency"}, {
+            validateMode: "dataConsistencyAndMissingIndexKeysCheck"
+        }].forEach(parameters => {
+            clearHealthLog(replSet);
+            runDbCheck(replSet, db.getSiblingDB("maxDbCheckMBperSec"), coll.getName(), parameters);
 
-        runDbCheck(replSet, db.getSiblingDB("maxDbCheckMBperSec"), coll.getName(), {});
+            // DbCheck logs (nDocs + 1) batches to account for each batch hitting the time deadline
+            // after processing only one document. Then, DbCheck will run an additional empty batch
+            // at the end to confirm that there are no more documents.
+            let query = {"operation": "dbCheckBatch"};
+            checkHealthLog(healthlog, query, nDocs + 1);
 
-        // DbCheck logs (nDocs + 1) batches to account for each batch hitting the time deadline
-        // after processing only one document. Then, DbCheck will run an additional empty batch at
-        // the end to confirm that there are no more documents.
+            query = {"operation": "dbCheckBatch", "data.count": 1};
+            checkHealthLog(healthlog, query, nDocs);
+
+            query = {"operation": "dbCheckBatch", "data.count": 0};
+            checkHealthLog(healthlog, query, 1);
+        });
+
+        clearHealthLog(replSet);
+        runDbCheck(replSet, db.getSiblingDB("maxDbCheckMBperSec"), coll.getName(), {
+            validateMode: "extraIndexKeysCheck",
+            secondaryIndex: "a_1",
+        });
+
+        // DbCheck logs (nDocs) batches to account for each batch hitting the time deadline after
+        // processing only one document.
+        // Extra index check's implementation is different from 'dataConsistency' as it doesn't need
+        // to run an additional empty batch at the end to confirm that there are no more documents.
         let query = {"operation": "dbCheckBatch"};
-        checkHealthLog(healthlog, query, nDocs + 1);
+        checkHealthLog(healthlog, query, nDocs);
 
         query = {"operation": "dbCheckBatch", "data.count": 1};
         checkHealthLog(healthlog, query, nDocs);
-
-        query = {"operation": "dbCheckBatch", "data.count": 0};
-        checkHealthLog(healthlog, query, 1);
     }
 }
 

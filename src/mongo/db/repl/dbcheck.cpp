@@ -429,8 +429,7 @@ void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
 Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                                                  const Collection* collection,
                                                  const key_string::Value& first,
-                                                 const key_string::Value& last,
-                                                 Date_t deadline) {
+                                                 const key_string::Value& last) {
     // hashForExtraIndexKeysCheck must only be called if the hasher was created with indexName.
     invariant(_indexName);
     StringData indexName = _indexName.get();
@@ -442,8 +441,8 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
     auto iam = indexCatalogEntry->accessMethod()->asSortedData();
     const auto ordering = iam->getSortedDataInterface()->getOrdering();
 
-    std::unique_ptr<SortedDataInterface::Cursor> indexCursor =
-        iam->newCursor(opCtx, true /* forward */);
+    auto indexCursor =
+        std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, _dataThrottle);
     auto firstBson =
         key_string::toBsonSafe(first.getBuffer(), first.getSize(), ordering, first.getTypeBits());
     auto lastBson =
@@ -451,8 +450,8 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
     indexCursor->setEndPosition(lastBson, true /*inclusive*/);
 
     // Iterate through index table.
-    for (auto currEntry = indexCursor->seekForKeyString(first); currEntry;
-         currEntry = indexCursor->nextKeyString()) {
+    for (auto currEntry = indexCursor->seekForKeyString(opCtx, first); currEntry;
+         currEntry = indexCursor->nextKeyString(opCtx)) {
         const auto keyString = currEntry->keyString;
         auto keyStringBson = key_string::toBsonSafe(
             keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());

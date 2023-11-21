@@ -198,13 +198,12 @@ public:
                                   Date_t deadline = Date_t::max());
 
     /**
-     * Hash index keys up to the deadline.
+     * Hash index keys between first and last inclusive.
      */
     Status hashForExtraIndexKeysCheck(OperationContext* opCtx,
                                       const Collection* collection,
                                       const key_string::Value& first,
-                                      const key_string::Value& last,
-                                      Date_t deadline = Date_t::max());
+                                      const key_string::Value& last);
 
     /**
      * Checks if a document has missing index keys by finding the index keys that should be

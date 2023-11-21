@@ -138,6 +138,10 @@ public:
         return _cursor->isRecordIdAtEndOfKeyString();
     }
 
+    void setEndPosition(const BSONObj& key, bool inclusive) {
+        _cursor->setEndPosition(key, inclusive);
+    }
+
 private:
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
     DataThrottle* _dataThrottle;

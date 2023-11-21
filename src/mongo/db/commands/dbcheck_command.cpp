@@ -674,20 +674,9 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
 
     int64_t totalBytesSeen = 0;
     int64_t totalKeysSeen = 0;
-    using Clock = stdx::chrono::system_clock;
-    using TimePoint = stdx::chrono::time_point<Clock>;
-    TimePoint lastStart = Clock::now();
-    int64_t docsInCurrentInterval = 0;
-
     do {
-        using namespace std::literals::chrono_literals;
-
-        if (Clock::now() - lastStart > 1s) {
-            lastStart = Clock::now();
-            docsInCurrentInterval = 0;
-        }
-
         DbCheckExtraIndexKeysBatchStats batchStats = {0};
+        batchStats.deadline = Date_t::now() + Milliseconds(_info.maxBatchTimeMillis);
 
         // 1. Get batch bounds (stored in batchStats) and run reverse lookup if
         // skipLookupForExtraKeys is not set.
@@ -759,21 +748,11 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
         // 5. Check if we've exceeded any limits.
         _batchesProcessed++;
         totalBytesSeen += batchStats.nBytes;
-        totalKeysSeen += batchStats.nDocs;
-        docsInCurrentInterval += batchStats.nDocs;
+        totalKeysSeen += batchStats.nKeys;
 
-        bool tooManyDocs = totalKeysSeen >= _info.maxCount;
+        bool tooManyKeys = totalKeysSeen >= _info.maxCount;
         bool tooManyBytes = totalBytesSeen >= _info.maxSize;
-        reachedEnd = batchStats.finishedIndexCheck || tooManyDocs || tooManyBytes;
-
-        if (docsInCurrentInterval > _info.maxRate && _info.maxRate > 0) {
-            // If an extremely low max rate has been set (substantially smaller than the
-            // batch size) we might want to sleep for multiple seconds between batches.
-            int64_t timesExceeded = docsInCurrentInterval / _info.maxRate;
-
-            stdx::this_thread::sleep_for(timesExceeded * 1s - (Clock::now() - lastStart));
-        }
-
+        reachedEnd = batchStats.finishedIndexCheck || tooManyKeys || tooManyBytes;
     } while (!reachedEnd);
 
     // TODO SERVER-79846: Add testing for progress meter
@@ -882,9 +861,8 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
         return e.toStatus();
     }
 
-    const auto batchDeadline = Date_t::now() + Milliseconds(_info.maxBatchTimeMillis);
-    Status status = hasher->hashForExtraIndexKeysCheck(
-        opCtx, collection.get(), batchFirst, batchLast, batchDeadline);
+    Status status =
+        hasher->hashForExtraIndexKeysCheck(opCtx, collection.get(), batchFirst, batchLast);
     if (!status.isOK()) {
         return status;
     }
@@ -1063,8 +1041,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     const auto ordering = iam->getSortedDataInterface()->getOrdering();
 
 
-    std::unique_ptr<SortedDataInterface::Cursor> indexCursor =
-        iam->newCursor(opCtx, true /* forward */);
+    auto indexCursor =
+        std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_info.dataThrottle);
 
 
     // Set the index cursor's end position based on the inputted end parameter for when to stop
@@ -1085,7 +1063,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         logAttrs(_info.nss),
         "uuid"_attr = _info.uuid);
 
-    auto currIndexKey = indexCursor->seekForKeyString(lookupStart);
+    auto currIndexKey = indexCursor->seekForKeyString(opCtx, lookupStart);
 
     // Note that if we can't find lookupStart (e.g. it was deleted in between snapshots),
     // seekForKeyString will automatically return the next adjacent keystring in the storage
@@ -1148,9 +1126,9 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         numBytes += keyString.getSize();
         numKeys++;
         batchStats.nBytes += keyString.getSize();
-        batchStats.nDocs++;
+        batchStats.nKeys++;
 
-        currIndexKey = indexCursor->nextKeyString();
+        currIndexKey = indexCursor->nextKeyString(opCtx);
 
         // Set nextLookupStart.
         if (currIndexKey) {
@@ -1162,8 +1140,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         // snapshot/batch, so skip this check.
         if (!(currIndexKey && (keyString == currIndexKey.get().keyString))) {
             // Check if we should finish this batch.
-            if (batchStats.nBytes >= _info.maxBytesPerBatch ||
-                batchStats.nDocs >= _info.maxDocsPerBatch) {
+            if (batchStats.nKeys >= _info.maxDocsPerBatch) {
                 batchStats.finishedIndexBatch = true;
                 break;
             }
@@ -1171,6 +1148,11 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
             if (numKeys >= repl::dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot.load()) {
                 break;
             }
+        }
+
+        if (Date_t::now() > batchStats.deadline) {
+            batchStats.finishedIndexBatch = true;
+            break;
         }
     }
 
@@ -1211,9 +1193,12 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
         }
         MONGO_UNREACHABLE;
     }();
-    RecordData record;
-    bool res = collection->getRecordStore()->findRecord(opCtx, recordId, &record);
-    if (!res) {
+
+    auto seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
+        opCtx, collection->getRecordStore(), &_info.dataThrottle);
+
+    auto record = seekRecordStoreCursor->seekExact(opCtx, recordId);
+    if (!record) {
         LOGV2_DEBUG(7844802,
                     3,
                     "reverse lookup failed to find record data",
@@ -1247,7 +1232,7 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
     }
 
     // Found record in record store.
-    auto recordBson = record.toBson();
+    auto recordBson = record->data.toBson();
 
     // Generate the set of keys for the record data and check that it includes the
     // index key.
