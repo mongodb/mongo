@@ -90,7 +90,8 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 void dropCollectionLocally(OperationContext* opCtx,
                            const NamespaceString& nss,
                            bool markFromMigrate) {
-    DropCollectionCoordinator::dropCollectionLocally(opCtx, nss, markFromMigrate);
+    DropCollectionCoordinator::dropCollectionLocally(
+        opCtx, nss, markFromMigrate, false /* dropSystemCollections */);
     LOGV2_DEBUG(5515100,
                 1,
                 "Dropped target collection locally on renameCollection participant.",

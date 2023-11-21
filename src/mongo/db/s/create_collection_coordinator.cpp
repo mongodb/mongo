@@ -549,7 +549,13 @@ void broadcastDropCollection(OperationContext* opCtx,
                        participants.end());
 
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss, participants, executor, osi, true /* fromMigrate */);
+        opCtx,
+        nss,
+        participants,
+        executor,
+        osi,
+        true /* fromMigrate */,
+        false /* dropSystemCollections */);
 }
 
 boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithSameOptions(

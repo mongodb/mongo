@@ -510,6 +510,11 @@ commands:
                 type: bool 
                 description: "Whether the drop comes as a result of an interrupted migration process."
                 optional: true
+            dropSystemCollections: 
+                type: bool 
+                description: "Allow dropping a system collection. False if no value is present."
+                optional: true
+
         reply_type: OkReply
 
     _shardsvrRenameCollection:

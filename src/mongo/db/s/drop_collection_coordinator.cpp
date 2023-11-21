@@ -89,7 +89,8 @@ namespace mongo {
 
 void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                                                       const NamespaceString& nss,
-                                                      bool fromMigrate) {
+                                                      bool fromMigrate,
+                                                      bool dropSystemCollections) {
 
     boost::optional<UUID> collectionUUID;
     {
@@ -143,12 +144,14 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
 
     try {
         DropReply unused;
-        uassertStatusOK(
-            dropCollection(opCtx,
-                           nss,
-                           &unused,
-                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops,
-                           fromMigrate));
+        uassertStatusOK(dropCollection(
+            opCtx,
+            nss,
+            &unused,
+            (dropSystemCollections
+                 ? DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops
+                 : DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops),
+            fromMigrate));
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // Note that even if the namespace was not found we have to execute the code below!
         LOGV2_DEBUG(5280920,
@@ -328,13 +331,25 @@ void DropCollectionCoordinator::_commitDropCollection(
                        participants.end());
 
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss(), participants, **executor, getNewSession(opCtx), true /*fromMigrate*/);
+        opCtx,
+        nss(),
+        participants,
+        **executor,
+        getNewSession(opCtx),
+        true /* fromMigrate */,
+        false /* dropSystemCollections */);
 
     // The sharded collection must be dropped on the primary shard after it has been
     // dropped on all of the other shards to ensure it can only be re-created as
     // unsharded with a higher optime than all of the drops.
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss(), {primaryShardId}, **executor, getNewSession(opCtx), false /*fromMigrate*/);
+        opCtx,
+        nss(),
+        {primaryShardId},
+        **executor,
+        getNewSession(opCtx),
+        false /* fromMigrate */,
+        false /* dropSystemCollections */);
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss());
     LOGV2(5390503, "Collection dropped", logAttrs(nss()));
