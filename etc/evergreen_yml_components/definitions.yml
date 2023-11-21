@@ -2666,7 +2666,8 @@ functions:
 tasks:
 
 ## compile - build all scons targets except unittests ##
-- name: compile_dist_test
+- &compile_dist_test
+  name: compile_dist_test
   tags: []
   depends_on:
   - name: version_expansions_gen
@@ -2679,6 +2680,11 @@ tasks:
         ${additional_compile_targets|}
       task_compile_flags: >-
         PREFIX=dist-test
+
+- <<: *compile_dist_test
+  name: compile_dist_test_future_git_tag_multiversion
+  depends_on:
+  - name: version_expansions_future_git_tag_multiversion_gen
 
 ## compile - build bazel targets ##
 ## The bazel migration is in progress & this
@@ -2938,7 +2944,8 @@ tasks:
       args:
       - "src/evergreen/gen_patch_test_tags.sh"
 
-- name: archive_dist_test
+- &archive_dist_test
+  name: archive_dist_test
   tags: []
   depends_on:
   - name: compile_dist_test
@@ -3036,7 +3043,13 @@ tasks:
       content_type: application/tar
       display_name: Python venv (see included venv_readme.txt)
 
-- name: archive_dist_test_debug
+- <<: *archive_dist_test
+  name: archive_dist_test_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dist_test_future_git_tag_multiversion
+
+- &archive_dist_test_debug
+  name: archive_dist_test_debug
   tags: []
   depends_on:
   - name: archive_dist_test
@@ -3049,6 +3062,11 @@ tasks:
         PREFIX=dist-test
 
   - func: "upload debugsymbols"
+
+- <<: *archive_dist_test_debug
+  name: archive_dist_test_debug_future_git_tag_multiversion
+  depends_on:
+  - name: archive_dist_test_future_git_tag_multiversion
 
 - name: compile_ninja
   tags: []
@@ -3320,7 +3338,8 @@ tasks:
       display_name: Libdeps Graph Data
 
 ## compile_all - build all scons targets ##
-- name: compile_all
+- &compile_all
+  name: compile_all
   tags: []
   depends_on:
   - name: compile_dist_test
@@ -3329,6 +3348,11 @@ tasks:
     vars:
       targets: install-all-meta
       compiling_for_test: true
+
+- <<: *compile_all
+  name: compile_all_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dist_test_future_git_tag_multiversion
 
 - name: compile_all_but_not_unittests
   tags: []
@@ -3380,6 +3404,11 @@ tasks:
       targets: install-unittests install-unittests-debug
       compiling_for_test: true
 
+- <<: *compile_unittests
+  name: compile_unittests_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dist_test_future_git_tag_multiversion
+
 - name: build_metrics_tasks_gen
   depends_on:
   - name: version_expansions_gen
@@ -3422,7 +3451,8 @@ tasks:
   name: compile_unittests_for_recorded_unittest
 
 ## run_unittests ##
-- name: run_unittests
+- &run_unittests
+  name: run_unittests
   tags: []
   depends_on:
   - name: compile_unittests
@@ -3436,6 +3466,11 @@ tasks:
     vars:
       suite: unittests
       install_dir: build/install/bin
+
+- <<: *run_unittests
+  name: run_unittests_future_git_tag_multiversion
+  depends_on:
+  - name: compile_unittests_future_git_tag_multiversion
 
 ## pretty_printer ##
 - <<: *task_template
@@ -3568,7 +3603,8 @@ tasks:
   - func: "run tests"
 
 ## compile_dbtest ##
-- name: compile_dbtest
+- &compile_dbtest
+  name: compile_dbtest
   tags: []
   depends_on:
   - name: compile_dist_test
@@ -3578,8 +3614,14 @@ tasks:
       targets: install-dbtest install-dbtest-debug
       compiling_for_test: true
 
+- <<: *compile_dbtest
+  name: compile_dbtest_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dist_test_future_git_tag_multiversion
+
 ## run_dbtest ##
-- name: run_dbtest
+- &run_dbtest
+  name: run_dbtest
   tags: []
   depends_on:
   - name: compile_dbtest
@@ -3594,7 +3636,13 @@ tasks:
       suite: dbtest
       install_dir: build/install/bin
 
-- name: archive_dbtest
+- <<: *run_dbtest
+  name: run_dbtest_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dbtest_future_git_tag_multiversion
+
+- &archive_dbtest
+  name: archive_dbtest
   tags: []
   depends_on:
   - name: compile_dbtest
@@ -3603,6 +3651,11 @@ tasks:
     vars:
       targets: archive-dbtest archive-dbtest-debug
       compiling_for_test: true
+
+- <<: *archive_dbtest
+  name: archive_dbtest_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dbtest_future_git_tag_multiversion
 
 - name: compile_integration_test
   tags: []
@@ -5531,7 +5584,8 @@ tasks:
   - func: "upload pip requirements"
   - func: "generate version burn in"
 
-- name: version_expansions_gen
+- &version_expansions_gen
+  name: version_expansions_gen
   commands:
   - command: manifest.load
   - *git_get_project
@@ -5543,6 +5597,9 @@ tasks:
   - func: "upload pip requirements"
   - func: "generate and upload version expansions"
   - func: "generate and upload resmoke constants"
+
+- <<: *version_expansions_gen
+  name: version_expansions_future_git_tag_multiversion_gen
 
 - <<: *gen_task_template
   name: auth_audit_gen
@@ -9496,6 +9553,19 @@ task_groups:
   - run_dbtest
   - archive_dbtest
   - compile_all
+
+- <<: *compile_task_group_template
+  name: compile_test_serial_future_git_tag_multiversion_TG
+  tasks:
+  - compile_dist_test_future_git_tag_multiversion
+  - archive_dist_test_future_git_tag_multiversion
+  - archive_dist_test_debug_future_git_tag_multiversion
+  - compile_unittests_future_git_tag_multiversion
+  - run_unittests_future_git_tag_multiversion
+  - compile_dbtest_future_git_tag_multiversion
+  - run_dbtest_future_git_tag_multiversion
+  - archive_dbtest_future_git_tag_multiversion
+  - compile_all_future_git_tag_multiversion
 
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_TG
