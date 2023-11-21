@@ -14,7 +14,8 @@ replSetTest.startSet({
     setParameter: {
         featureFlagServerlessChangeStreams: true,
         multitenancySupport: true,
-        featureFlagRequireTenantID: true
+        featureFlagRequireTenantID: true,
+        featureFlagSecurityToken: true
     }
 });
 replSetTest.initiate();
@@ -22,18 +23,19 @@ replSetTest.initiate();
 let primary = replSetTest.getPrimary();
 const tenantId = ObjectId();
 
+const token = _createTenantToken({tenant: tenantId});
+primary._setSecurityToken(token);
+
 // Enable the change stream to create the change collection.
-assert.commandWorked(
-    primary.getDB("admin").runCommand({setChangeStreamState: 1, enabled: true, $tenant: tenantId}));
+assert.commandWorked(primary.getDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
 
 // Insert a document to the collection and then capture the corresponding oplog timestamp. This
 // timestamp will be the start timestamp beyond (inclusive) which we will validate the oplog and the
 // change collection entries.
-const startTimestamp =
-    assert
-        .commandWorked(primary.getDB("test").runCommand(
-            {insert: "seedCollection", documents: [{_id: "beginTs"}], $tenant: tenantId}))
-        .operationTime;
+const startTimestamp = assert
+                           .commandWorked(primary.getDB("test").runCommand(
+                               {insert: "seedCollection", documents: [{_id: "beginTs"}]}))
+                           .operationTime;
 
 // Pause the checkpointing, as such non-journaled collection including the change collection will
 // not be persisted.
@@ -42,25 +44,29 @@ pauseCheckpointThreadFailPoint.wait();
 
 // Insert a document to the collection.
 assert.commandWorked(primary.getDB("test").runCommand(
-    {insert: "stockPrice", documents: [{_id: "mdb", price: 250}], $tenant: tenantId}));
+    {insert: "stockPrice", documents: [{_id: "mdb", price: 250}]}));
 
 // Verify that the inserted document can be queried from the 'stockPrice', the 'oplog.rs', and
 // the 'system.change_collection'.
 assert.eq(assert
               .commandWorked(primary.getDB("test").runCommand(
-                  {find: "stockPrice", filter: {_id: "mdb", price: 250}, $tenant: tenantId}))
+                  {find: "stockPrice", filter: {_id: "mdb", price: 250}}))
               .cursor.firstBatch.length,
           1);
+
+// Clear the token before accessing the local database
+primary._setSecurityToken(undefined);
 assert.eq(assert
               .commandWorked(primary.getDB("local").runCommand(
                   {find: "oplog.rs", filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}}}))
               .cursor.firstBatch.length,
           1);
+primary._setSecurityToken(token);
+
 assert.eq(assert
               .commandWorked(primary.getDB("config").runCommand({
                   find: "system.change_collection",
-                  filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}},
-                  $tenant: tenantId
+                  filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}}
               }))
               .cursor.firstBatch.length,
           1);
@@ -81,23 +87,30 @@ const standalone = MongoRunner.runMongod({
 });
 assert.neq(null, standalone, "Fail to restart the node as standalone");
 
+// Set the token on the new connection
+standalone._setSecurityToken(token);
+
 // Verify that the inserted document does not exist both in the 'stockPrice' and
 // the 'system.change_collection' but exists in the 'oplog.rs'.
 assert.eq(assert
               .commandWorked(standalone.getDB("test").runCommand(
-                  {find: "stockPrice", filter: {_id: "mdb", price: 250}, $tenant: tenantId}))
+                  {find: "stockPrice", filter: {_id: "mdb", price: 250}}))
               .cursor.firstBatch.length,
           0);
+
+// Clear the token before accessing the local database
+standalone._setSecurityToken(undefined);
 assert.eq(assert
               .commandWorked(standalone.getDB("local").runCommand(
                   {find: "oplog.rs", filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}}}))
               .cursor.firstBatch.length,
           1);
+standalone._setSecurityToken(token);
+
 assert.eq(assert
               .commandWorked(standalone.getDB("config").runCommand({
                   find: "system.change_collection",
-                  filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}},
-                  $tenant: tenantId
+                  filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}}
               }))
               .cursor.firstBatch.length,
           0);
@@ -117,30 +130,31 @@ replSetTest.start(primary, {
 });
 
 primary = replSetTest.getPrimary();
+primary._setSecurityToken(token);
 
 // Verify that the 'stockPrice' and the 'system.change_collection' now have the inserted
 // document. This document was inserted by applying oplog entries during the startup recovery.
 assert.eq(assert
               .commandWorked(primary.getDB("test").runCommand(
-                  {find: "stockPrice", filter: {_id: "mdb", price: 250}, $tenant: tenantId}))
+                  {find: "stockPrice", filter: {_id: "mdb", price: 250}}))
               .cursor.firstBatch.length,
           1);
 assert.eq(assert
               .commandWorked(primary.getDB("config").runCommand({
                   find: "system.change_collection",
-                  filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}},
-                  $tenant: tenantId
+                  filter: {ns: "test.stockPrice", o: {_id: "mdb", price: 250}}
               }))
               .cursor.firstBatch.length,
           1);
 
 // Get the oplog timestamp up to this point. All oplog entries upto this timestamp must exist in the
 // change collection.
+primary._setSecurityToken(undefined);
 const endTimestamp = primary.getDB("local").oplog.rs.find().toArray().at(-1).ts;
 assert(endTimestamp !== undefined);
 
 // Verify that the oplog and the change collection entries between the ('startTimestamp',
 // 'endTimestamp'] window are exactly same and in the same order.
-verifyChangeCollectionEntries(primary, startTimestamp, endTimestamp, tenantId);
+verifyChangeCollectionEntries(primary, startTimestamp, endTimestamp, tenantId, token);
 
 replSetTest.stopSet();

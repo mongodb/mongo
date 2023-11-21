@@ -41,7 +41,7 @@ assert.commandWorked(primary.getDB('$external').runCommand({
 let res = assert.commandWorked(adminDb.runCommand({find: "system.users", filter: {}}));
 assert.eq(1, res.cursor.firstBatch.length);
 
-primary._setSecurityToken("");
+primary._setSecurityToken(undefined);
 
 // Delete the auth schema doc. This should cause initial sync to fail, because a user exists
 // without an auth schema doc.

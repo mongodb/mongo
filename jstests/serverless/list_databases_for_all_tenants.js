@@ -67,7 +67,7 @@ function createMultitenantDatabases(conn, tokenConn, num) {
             {"name": 'auto_gen_db_' + i.toString(), "tenantId": kTenant, "empty": false});
     }
     // Reset token
-    conn._setSecurityToken("");
+    conn._setSecurityToken(undefined);
     return [tenantIds, tokens, expectedDatabases];
 }
 
@@ -223,7 +223,7 @@ function runTestInvalidCommands(primary) {
         createUser: "unauthorizedUsr",
         roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
-    primary._setSecurityToken("");
+    primary._setSecurityToken(undefined);
     tokenConn._setSecurityToken(
         _createSecurityToken({user: "unauthorizedUsr", db: '$external', tenant: kTenant}, kVTSKey));
     const tokenAdminDB = tokenConn.getDB("admin");

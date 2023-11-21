@@ -3,10 +3,11 @@
 // Verifies that the oplog and change collection entries are the same for the provided tenant
 // 'tenantId' for the specified timestamp window:- (startOplogTimestamp, endOplogTimestamp].
 export function verifyChangeCollectionEntries(
-    connection, startOplogTimestamp, endOplogTimestamp, tenantId) {
+    connection, startOplogTimestamp, endOplogTimestamp, tenantId, token) {
     // Fetch the oplog documents for the provided tenant for the specified timestamp window. Note
     // that the startOplogTimestamp is expected to be just before the first write, while the
     // endOplogTimestamp is expected to be the timestamp of the final write in the test.
+    connection._setSecurityToken(undefined);
     const oplogColl = connection.getDB("local").oplog.rs;
     const oplogEntries = oplogColl
                              .find({
@@ -18,6 +19,9 @@ export function verifyChangeCollectionEntries(
                              })
                              .toArray();
 
+    // Set token for the following command
+    connection._setSecurityToken(token);
+
     // Fetch all documents from the tenant's change collection for the specified timestamp window.
     const changeCollectionEntries =
         assert
@@ -25,8 +29,7 @@ export function verifyChangeCollectionEntries(
                 find: "system.change_collection",
                 filter:
                     {$and: [{_id: {$gt: startOplogTimestamp}}, {_id: {$lte: endOplogTimestamp}}]},
-                batchSize: 1000000,
-                $tenant: tenantId
+                batchSize: 1000000
             }))
             .cursor.firstBatch;
 
@@ -84,8 +87,7 @@ export class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
         this.startSet({setParameter});
         this.initiate();
 
-        // Create a root user within the multitenant environment to enable passing '$tenant' to
-        // commands.
+        // Create a root user within the multitenant environment
         assert.commandWorked(this.getPrimary().getDB("admin").runCommand(
             {createUser: "root", pwd: "pwd", roles: ["root"]}));
 
@@ -137,20 +139,16 @@ export class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
 
         const adminDb = tokenConn.getDB("admin");
 
-        // Login to the root user with 'ActionType::useTenant' such that the '$tenant' can be
-        // used.
         assert(adminDb.auth("root", "pwd"));
 
         // Create the user with the provided roles if it does not exist.
+        tokenConn._setSecurityToken(_createTenantToken({tenant: tenantId}));
         const existingUser =
-            assert
-                .commandWorked(adminDb.runCommand(
-                    {find: "system.users", filter: {user: user}, $tenant: tenantId}))
+            assert.commandWorked(adminDb.runCommand({find: "system.users", filter: {user: user}}))
                 .cursor.firstBatch;
         if (existingUser.length === 0) {
             assert.commandWorked(
-                tokenConn.getDB("$external")
-                    .runCommand({createUser: user, '$tenant': tenantId, roles: userRoles}));
+                tokenConn.getDB("$external").runCommand({createUser: user, roles: userRoles}));
         }
 
         // Set the provided tenant id into the security token for the user.

@@ -19,7 +19,7 @@ rst.initiate();
 const kTenant = ObjectId();
 const adminDb = rst.getPrimary().getDB('admin');
 
-// Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
+// Create a user for testing
 assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
 assert(adminDb.auth('admin', 'pwd'));
 
@@ -31,8 +31,9 @@ assert.commandWorked(adminDb.setProfilingLevel(2, {slowms: -1}));
 
 const primary = rst.getPrimary();
 
-assert.commandWorked(primary.getDB("test").runCommand(
-    {insert: "foo", documents: [{_id: 0, a: 1, b: 1}], '$tenant': kTenant}));
+primary._setSecurityToken(_createTenantToken({tenant: kTenant}));
+assert.commandWorked(
+    primary.getDB("test").runCommand({insert: "foo", documents: [{_id: 0, a: 1, b: 1}]}));
 
 print(`Checking ${primary.fullOptions.logFile} for client metadata message`);
 const log = cat(primary.fullOptions.logFile);
@@ -49,4 +50,6 @@ for (var a of log.split("\n")) {
 assert(predicate.test(log),
        "'Slow query' log line missing in mongod log file!\n" +
            "Log file contents: " + rst.getPrimary().fullOptions.logFile);
+
+primary._setSecurityToken(undefined);
 rst.stopSet();
