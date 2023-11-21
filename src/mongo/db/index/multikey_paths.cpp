@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,35 +27,48 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/index/multikey_paths.h"
 
-#include <cstddef>
-#include <functional>
-#include <set>
-#include <string>
-#include <vector>
+#include "mongo/util/str.h"
 
 namespace mongo {
-// If non-empty, a vector with size equal to the number of elements in the index key pattern. Each
-// element in the vector is an ordered set of positions (starting at 0) into the corresponding
-// indexed field that represent what prefixes of the indexed field cause the index to be multikey.
-//
-// For example, with the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause the
-// index to be multikey, we'd have a std::vector<std::set<size_t>>{{0U, 1U}, {0U}}.
-//
-// Further Examples:
-// Index                  PathsThatAreMultiKey  MultiKeyPaths
-// --------------------   --------------------  --------------------
-// {'a.b': 1, 'a.c': 1}   "a", "a.b"            {{0U, 1U}, {0U}}
-// {a: 1, b: 1}           "b"                   {{}, {0U}}
-// {a: 1, b: 1}           "a"                   {{0U}, {}}
-// {'a.b.c': 1, d: 1}     "a.b.c"               {{2U}, {}}
-// {'a.b': 1, c: 1, d: 1} "a.b", "d"            {{1U}, {}, {0U}}
-// {a: 1, b: 1}           none                  {{}, {}}
-// {a: 1, b: 1}           no multikey metadata  {}
-//
-// An empty vector is used to represent that the index doesn't support path-level multikey tracking.
-using MultikeyPaths = std::vector<std::set<std::size_t>>;
 
-std::string multikeyPathsToString(MultikeyPaths paths);
+std::string multikeyPathsToString(MultikeyPaths paths) {
+    str::stream builder;
+    builder << "[";
+    auto pathIt = paths.begin();
+    while (true) {
+        if (pathIt == paths.end()) {
+            break;
+        }
+
+        builder << "{";
+
+        auto pathSet = *pathIt;
+        auto setIt = pathSet.begin();
+        while (true) {
+            if (setIt == pathSet.end()) {
+                break;
+            }
+
+            builder << *setIt;
+            if (++setIt == pathSet.end()) {
+                break;
+            } else {
+                builder << ",";
+            }
+        }
+
+        builder << "}";
+
+        if (++pathIt == paths.end()) {
+            break;
+        } else {
+            builder << ",";
+        }
+    }
+    builder << "]";
+    return builder;
+}
+
 }  // namespace mongo

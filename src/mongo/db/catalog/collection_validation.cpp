@@ -295,35 +295,6 @@ void addErrorIfUnequal(T stored, T cached, StringData name, ValidateResults* res
     }
 }
 
-std::string multikeyPathsToString(MultikeyPaths paths) {
-    str::stream builder;
-    builder << "[";
-    auto pathIt = paths.begin();
-    while (true) {
-        builder << "{";
-
-        auto pathSet = *pathIt;
-        auto setIt = pathSet.begin();
-        while (true) {
-            builder << *setIt++;
-            if (setIt == pathSet.end()) {
-                break;
-            } else {
-                builder << ",";
-            }
-        }
-        builder << "}";
-
-        if (++pathIt == paths.end()) {
-            break;
-        } else {
-            builder << ",";
-        }
-    }
-    builder << "]";
-    return builder;
-}
-
 void _validateCatalogEntry(OperationContext* opCtx,
                            ValidateState* validateState,
                            ValidateResults* results) {
