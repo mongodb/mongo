@@ -847,9 +847,11 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   const std::vector<ShardId>& shardIds,
                                                   std::shared_ptr<executor::TaskExecutor> executor,
                                                   const OperationSessionInfo& osi,
-                                                  bool fromMigrate) {
+                                                  bool fromMigrate,
+                                                  bool dropSystemCollections) {
     ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
     dropCollectionParticipant.setFromMigrate(fromMigrate);
+    dropCollectionParticipant.setDropSystemCollections(dropSystemCollections);
 
     const auto cmdObj =
         CommandHelpers::appendMajorityWriteConcern(dropCollectionParticipant.toBSON({}));

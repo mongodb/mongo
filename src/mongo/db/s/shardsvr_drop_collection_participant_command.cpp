@@ -87,7 +87,9 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             bool fromMigrate = request().getFromMigrate().value_or(false);
-            DropCollectionCoordinator::dropCollectionLocally(opCtx, ns(), fromMigrate);
+            const bool dropSystemCollections = request().getDropSystemCollections().value_or(false);
+            DropCollectionCoordinator::dropCollectionLocally(
+                opCtx, ns(), fromMigrate, dropSystemCollections);
 
             // Since no write that generated a retryable write oplog entry with this sessionId and
             // txnNumber happened, we need to make a dummy write so that the session gets durably
