@@ -29,12 +29,15 @@
 
 #include "mongo/db/replica_set_endpoint_util.h"
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/s/replica_set_endpoint_feature_flag_gen.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -49,6 +52,21 @@ namespace {
 bool isInternalClient(OperationContext* opCtx) {
     return !opCtx->getClient()->session() || opCtx->getClient()->isInternalClient() ||
         opCtx->getClient()->isInDirectClient();
+}
+
+/**
+ * Returns true if this is a request for an unreplicated database or collection.
+ */
+bool isUnreplicatedDatabaseOrCollectionCommandRequest(const OpMsgRequest& opMsgReq) {
+    if (opMsgReq.getDbName().isLocalDB()) {
+        return true;
+    }
+    if (const auto& firstElement = opMsgReq.body.firstElement();
+        firstElement.type() == BSONType::String &&
+        firstElement.String() == NamespaceString::kSystemDotProfileCollectionName) {
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -128,7 +146,7 @@ bool shouldRouteRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
         return false;
     }
 
-    if (isInternalClient(opCtx) || opMsgReq.getDbName().isLocalDB() ||
+    if (isInternalClient(opCtx) || isUnreplicatedDatabaseOrCollectionCommandRequest(opMsgReq) ||
         isTargetedCommandRequest(opCtx, opMsgReq) || !isRoutableCommandRequest(opCtx, opMsgReq)) {
         return false;
     }
