@@ -134,8 +134,6 @@ public:
         return *_writeConcern;
     }
 
-    bool isVerboseWC() const;
-
     void setShardVersion(ShardVersion shardVersion) {
         _shardVersion = std::move(shardVersion);
     }
