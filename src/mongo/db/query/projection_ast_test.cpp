@@ -524,6 +524,7 @@ TEST_F(ProjectionASTTest, TestDebugBSONWithLiteralValue) {
 }
 
 TEST_F(ProjectionASTTest, TestDebugLargeBSONWithLiteralValue) {
+    using namespace fmt::literals;
     const auto joinFields = [](const std::vector<std::string>& fields) {
         return "{{{}}}"_format(fmt::join(fields, ", "));
     };

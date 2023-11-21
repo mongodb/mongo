@@ -186,6 +186,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
 }
 
 WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
+    using namespace fmt::literals;
     if (wEl.isNumber()) {
         uassert(ErrorCodes::FailedToParse, "w cannot be NaN", !wEl.isNaN());
         auto wNum = wEl.safeNumberLong();

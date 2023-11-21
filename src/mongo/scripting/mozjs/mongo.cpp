@@ -355,6 +355,7 @@ namespace {
  */
 template <typename Params, typename MakeRequest>
 void doRunCommand(JSContext* cx, JS::CallArgs args, MakeRequest makeRequest) {
+    using namespace fmt::literals;
     uassert(ErrorCodes::BadValue,
             str::stream() << Params::kCommandName << " needs 4 args",
             args.length() >= 4);

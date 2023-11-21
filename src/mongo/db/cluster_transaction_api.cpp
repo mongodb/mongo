@@ -59,6 +59,7 @@ StringMap<std::string> clusterCommandTranslations = {
     {"update", "clusterUpdate"}};
 
 BSONObj replaceCommandNameWithClusterCommandName(BSONObj cmdObj) {
+    using namespace fmt::literals;
     auto cmdName = cmdObj.firstElement().fieldNameStringData();
     auto newNameIt = clusterCommandTranslations.find(cmdName);
     uassert(6349501,

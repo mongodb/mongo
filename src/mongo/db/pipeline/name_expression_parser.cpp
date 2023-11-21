@@ -42,6 +42,7 @@
 
 namespace mongo {
 NameExpression::NameExpression(const BSONElement& nameElem) : _name(nameElem) {
+    using namespace fmt::literals;
     auto type = nameElem.type();
     uassert(8117100,
             "Invalid name expression: {}"_format(nameElem.toString()),

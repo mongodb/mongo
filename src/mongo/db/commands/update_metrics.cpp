@@ -45,6 +45,7 @@ namespace mongo {
 // the metrics are incorrect and will need to be separated based on role.
 // TODO: SERVER-79353 Register the update metrics in a role-aware manner.
 std::shared_ptr<CounterMetric> getSingletonMetricPtr(StringData commandName, StringData stat) {
+    using namespace fmt::literals;
     static StaticImmortal cacheStorage = StringMap<std::shared_ptr<CounterMetric>>{};
     std::string path = "commands.{}.{}"_format(commandName, stat);
     auto& metric = (*cacheStorage)[path];

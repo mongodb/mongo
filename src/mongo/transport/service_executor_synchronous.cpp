@@ -124,6 +124,7 @@ public:
 };
 
 void ServiceExecutorSyncImpl::SharedState::schedule(Task task, StringData name) {
+    using namespace fmt::literals;
     if (!isRunning()) {
         task(Status(ErrorCodes::ShutdownInProgress, "{} is not running"_format(name)));
         return;

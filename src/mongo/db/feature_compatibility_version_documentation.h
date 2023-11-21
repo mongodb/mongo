@@ -36,7 +36,6 @@
 namespace mongo {
 namespace feature_compatibility_version_documentation {
 using namespace fmt::literals;
-
 const std::string kCompatibilityLink =
     "https://docs.mongodb.com/master/release-notes/{}-compatibility/#feature-compatibility"_format(
         multiversion::toString(multiversion::GenericFCV::kLastLTS));
