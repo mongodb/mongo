@@ -896,9 +896,10 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                               createInitialScanProps(scanProjName, scanDefName));
 
     // Check if pipeline is eligible for plan caching.
-    auto _isCacheable = false;
+    // TODO SERVER-83414: Enable histogram CE with parameterization.
+    auto _isCacheable = (internalQueryCardinalityEstimatorMode != "histogram"_sd);
     if (pipeline) {
-        _isCacheable = [&]() -> bool {
+        _isCacheable &= [&]() -> bool {
             auto& sources = pipeline->getSources();
             if (sources.empty())
                 return false;
@@ -917,16 +918,19 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
             return true;
         }();
         _isCacheable = false;  // TODO: SERVER-82185: Remove once E2E parameterization enabled
-        if (_isCacheable)
+        if (_isCacheable) {
             MatchExpression::parameterize(
                 dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())->getMatchExpression());
+        }
         abt = translatePipelineToABT(metadata, *pipeline, scanProjName, std::move(abt), prefixId);
     } else {
         // Clear match expression auto-parameterization by setting max param count to zero before
         // CQ to ABT translation
         // TODO: SERVER-82185: Update value of _isCacheable to true for M2-eligible queries
-        if (!_isCacheable)
+        _isCacheable = false;  // TODO: SERVER-82185: Remove once E2E parameterization enabled
+        if (!_isCacheable) {
             MatchExpression::unparameterize(canonicalQuery->getPrimaryMatchExpression());
+        }
         abt = translateCanonicalQueryToABT(
             metadata, *canonicalQuery, scanProjName, std::move(abt), prefixId);
     }
