@@ -90,7 +90,8 @@ public:
      */
     CommandService(TransportLayer* tl,
                    RPCHandler callback,
-                   std::shared_ptr<WireVersionProvider> wvProvider);
+                   std::shared_ptr<WireVersionProvider> wvProvider,
+                   std::shared_ptr<ClientCache> clientCache = nullptr);
 
     ~CommandService() = default;
 
@@ -114,7 +115,7 @@ private:
     TransportLayer* _tl;
     RPCHandler _callback;
     std::shared_ptr<WireVersionProvider> _wvProvider;
-    std::unique_ptr<ClientCache> _clientCache;
+    std::shared_ptr<ClientCache> _clientCache;
 
     mutable stdx::mutex _mutex;  // NOLINT
     stdx::condition_variable _shutdownCV;

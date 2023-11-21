@@ -66,11 +66,19 @@ public:
      */
     AddResult add(const UUID& clientId);
 
+    std::size_t getUniqueClientsSeen() const {
+        return _uniqueClientsSeen.load();
+    }
+
 private:
     // We only care about whether an ID has been seen, so the cached value is irrelevant.
     struct Data {};
 
     synchronized_value<LRUCache<UUID, Data, UUID::Hash>> _cache;
+
+    // An APPROXIMATION of unique clients seen over time.
+    // As clients fall out of the LRU, reconnects will cause them to be counted again.
+    AtomicWord<std::size_t> _uniqueClientsSeen{0};
 };
 
 }  // namespace mongo::transport::grpc

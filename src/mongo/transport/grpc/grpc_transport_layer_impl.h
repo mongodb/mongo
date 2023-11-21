@@ -91,6 +91,10 @@ public:
         return _sessionManager.get();
     }
 
+    std::shared_ptr<SessionManager> getSharedSessionManager() const override {
+        return _sessionManager;
+    }
+
 private:
     mutable stdx::mutex _mutex;
     bool _isShutdown = false;
@@ -101,7 +105,7 @@ private:
     // Invalidated after setup().
     std::vector<std::unique_ptr<Service>> _services;
     Options _options;
-    std::unique_ptr<SessionManager> _sessionManager;
+    std::shared_ptr<SessionManager> _sessionManager;
 };
 
 }  // namespace mongo::transport::grpc

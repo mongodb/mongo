@@ -170,6 +170,7 @@ tlEnv.Library(
 env.Library(
     target='session_manager',
     source=[
+        'session_manager.cpp',
         'session_manager_common.idl',
         'session_manager_common.cpp',
         'session_workflow.cpp',
@@ -245,6 +246,7 @@ tlEnv.CppUnitTest(
         'message_compressor_registry_test.cpp',
         'service_executor_test.cpp',
         'max_conns_override_test.cpp',
+        'session_manager_test.cpp',
         'session_workflow_test.cpp',
         'transport_layer_manager_test.cpp',
         'transport_layer_manager_grpc_test.cpp' if shouldBuildGRPC(tlEnv) else [],

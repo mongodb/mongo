@@ -40,6 +40,7 @@ ClientCache::AddResult ClientCache::add(const UUID& clientId) {
     if (MONGO_likely(syncCache->find(clientId) != syncCache->end())) {
         return AddResult::kRefreshed;
     }
+    _uniqueClientsSeen.fetchAndAddRelaxed(+1);
     (void)syncCache->add(clientId, {});
     return AddResult::kCreated;
 }

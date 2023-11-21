@@ -208,11 +208,16 @@ auto makeRpcServiceMethod(CommandService* service, const char* name, HandlerType
 
 CommandService::CommandService(TransportLayer* tl,
                                RPCHandler callback,
-                               std::shared_ptr<WireVersionProvider> wvProvider)
+                               std::shared_ptr<WireVersionProvider> wvProvider,
+                               std::shared_ptr<ClientCache> clientCache)
     : _tl{tl},
       _callback{std::move(callback)},
       _wvProvider{std::move(wvProvider)},
-      _clientCache{std::make_unique<ClientCache>()} {
+      _clientCache{std::move(clientCache)} {
+
+    if (!_clientCache) {
+        _clientCache = std::make_shared<ClientCache>();
+    }
 
     AddMethod(makeRpcServiceMethod(
         this,

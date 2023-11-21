@@ -345,12 +345,6 @@ bool SessionManagerCommon::waitForNoSessions(Milliseconds timeout) {
     return _sessions->sync().waitForEmpty(deadline);
 }
 
-void SessionManagerCommon::appendStats(BSONObjBuilder* bob) const {
-    for (auto&& observer : _observers) {
-        observer->appendTransportServerStats(bob);
-    }
-}
-
 std::size_t SessionManagerCommon::numOpenSessions() const {
     auto sync = _sessions->sync();
     return sync.size();

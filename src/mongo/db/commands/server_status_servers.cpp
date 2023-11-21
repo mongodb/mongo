@@ -55,25 +55,6 @@ namespace {
 
 // some universal sections
 
-class Connections : public ServerStatusSection {
-public:
-    Connections() : ServerStatusSection("connections") {}
-
-    bool includeByDefault() const override {
-        return true;
-    }
-
-    BSONObj generateSection(OperationContext* opCtx,
-                            const BSONElement& configElement) const override {
-        BSONObjBuilder bb;
-        if (auto tlm = opCtx->getServiceContext()->getTransportLayerManager()) {
-            tlm->appendSessionManagerStats(&bb);
-        }
-        return bb.obj();
-    }
-
-} connections;
-
 class Network : public ServerStatusSection {
 public:
     Network() : ServerStatusSection("network") {}

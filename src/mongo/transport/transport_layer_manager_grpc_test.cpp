@@ -36,6 +36,7 @@
 #include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/asio/asio_session_impl.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
+#include "mongo/transport/grpc/client_cache.h"
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/grpc/grpc_session_manager.h"
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
@@ -166,13 +167,15 @@ private:
         grpcOpts.enableEgress = true;
         grpcOpts.clientMetadata = grpc::makeClientMetadataDocument();
         auto* svcCtx = getServiceContext();
-        auto sm = std::make_unique<grpc::GRPCSessionManager>(svcCtx);
+        auto clientCache = std::make_shared<grpc::ClientCache>();
+        auto sm = std::make_unique<grpc::GRPCSessionManager>(svcCtx, clientCache);
         auto grpcLayer = std::make_unique<grpc::GRPCTransportLayerImpl>(
             svcCtx, std::move(grpcOpts), std::move(sm));
         uassertStatusOK(grpcLayer->registerService(std::make_unique<grpc::CommandService>(
             grpcLayer.get(),
             [&](auto session) { _serverCb(*session); },
-            std::make_shared<grpc::WireVersionProvider>())));
+            std::make_shared<grpc::WireVersionProvider>(),
+            std::move(clientCache))));
         return grpcLayer;
     }
 

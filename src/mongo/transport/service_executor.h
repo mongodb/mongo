@@ -37,9 +37,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/session_manager.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -200,19 +200,8 @@ private:
  */
 class ServiceExecutorStats {
 public:
-    /**
-     * Get the current value of ServiceExecutorStats for the given ServiceContext.
-     *
-     * Note that this value is intended for statistics and logging. It is unsynchronized and
-     * unsuitable for informing decisions in runtime.
-     */
-    static ServiceExecutorStats get(ServiceContext* ctx) noexcept;
-
-    // The total number of Clients currently active.
-    size_t totalClients = 0;
-
     // The number of Clients that are allowed to ignore maxConns and use reserved resources.
-    size_t limitExempt = 0;
+    AtomicWord<std::size_t> limitExempt{0};
 };
 
 }  // namespace mongo::transport

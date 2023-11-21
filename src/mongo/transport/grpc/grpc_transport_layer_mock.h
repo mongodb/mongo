@@ -84,8 +84,12 @@ public:
 
     const std::vector<HostAndPort>& getListeningAddresses() const override;
 
-    SessionManager* getSessionManager() const {
+    SessionManager* getSessionManager() const override {
         return nullptr;
+    }
+
+    std::shared_ptr<SessionManager> getSharedSessionManager() const override {
+        return {};
     }
 
 private:

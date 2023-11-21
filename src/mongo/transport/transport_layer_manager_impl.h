@@ -94,7 +94,7 @@ public:
                               bool asyncOCSPStaple) override;
 #endif
 
-    void appendSessionManagerStats(BSONObjBuilder*) const override;
+    void forEach(std::function<void(TransportLayer*)> fn) override;
     bool hasActiveSessions() const override;
     void checkMaxOpenSessionsAtStartup() const override;
     void endAllSessions(Client::TagMask tags) override;

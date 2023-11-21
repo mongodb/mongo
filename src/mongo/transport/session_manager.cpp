@@ -27,24 +27,47 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/transport/session_manager_common.h"
+#include "mongo/transport/session_manager.h"
+#include "mongo/db/service_context.h"
+#include "mongo/transport/transport_layer.h"
 
 namespace mongo::transport {
 
-/**
- * ASIO specialization of SessionManagerCommon.
- */
-class AsioSessionManager : public SessionManagerCommon {
+class SessionManager::OperationObserver : public ServiceContext::ClientObserver {
 public:
-    using SessionManagerCommon::SessionManagerCommon;
+    void onCreateClient(Client* client) final {}
+    void onDestroyClient(Client* client) final {}
 
-    void appendStats(BSONObjBuilder* bob) const;
+    void onCreateOperationContext(OperationContext* opCtx) final {
+        if (auto sm = getSessionManager(opCtx->getClient())) {
+            sm->_totalOperations.fetchAndAddRelaxed(1);
+        }
+    }
 
-protected:
-    std::string getClientThreadName(const Session&) const override;
-    void configureServiceExecutorContext(Client* client, bool isPrivilegedSession) const override;
+    void onDestroyOperationContext(OperationContext* opCtx) final {
+        if (auto sm = getSessionManager(opCtx->getClient())) {
+            sm->_completedOperations.fetchAndAddRelaxed(1);
+        }
+    }
+
+private:
+    static SessionManager* getSessionManager(Client* client) {
+        if (!client->session())
+            return nullptr;
+
+        auto* tl = client->session()->getTransportLayer();
+        if (!tl)
+            return nullptr;
+
+        return tl->getSessionManager();
+    }
 };
+
+namespace {
+ServiceContext::ConstructorActionRegisterer opCountObserverRegisterer{
+    "SessionManager::OperationObserver", [](ServiceContext* sc) {
+        sc->registerClientObserver(std::make_unique<SessionManager::OperationObserver>());
+    }};
+}  // namespace
 
 }  // namespace mongo::transport

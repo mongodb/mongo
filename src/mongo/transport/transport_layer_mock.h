@@ -111,8 +111,12 @@ public:
         const TransientSSLParams& transientSSLParams) override;
 #endif
 
-    SessionManager* getSessionManager() const {
+    SessionManager* getSessionManager() const override {
         return _sessionManager.get();
+    }
+
+    std::shared_ptr<SessionManager> getSharedSessionManager() const override {
+        return _sessionManager;
     }
 
 private:
@@ -126,7 +130,7 @@ private:
     stdx::unordered_map<Session::Id, Connection> _sessions;
     bool _shutdown = false;
 
-    std::unique_ptr<SessionManager> _sessionManager;
+    std::shared_ptr<SessionManager> _sessionManager;
 };
 
 }  // namespace transport

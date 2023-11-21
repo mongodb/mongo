@@ -70,8 +70,6 @@ using ConstructorActionList = std::list<ServiceContext::ConstructorDestructorAct
 
 ServiceContext* globalServiceContext = nullptr;
 
-AtomicWord<int> _numCurrentOps{0};
-
 }  // namespace
 
 LockedClient::LockedClient(Client* client) : _lk{*client}, _client{client} {}
@@ -293,16 +291,6 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     auto opCtx = std::make_unique<OperationContext>(
         client, OperationIdManager::get(this).issueForClient(client));
 
-    if (client->session()) {
-        _numCurrentOps.addAndFetch(1);
-    }
-
-    ScopeGuard numOpsGuard([&] {
-        if (client->session()) {
-            _numCurrentOps.subtractAndFetch(1);
-        }
-    });
-
     // We must prevent changing the storage engine while setting a new opCtx on the client.
     auto sharedStorageChangeToken = _storageChangeLk.acquireSharedStorageChangeToken();
 
@@ -339,7 +327,6 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         client->_setOperationContext(opCtx.get());
     }
 
-    numOpsGuard.dismiss();
     onCreateGuard.dismiss();
     batonGuard.dismiss();
 
@@ -440,11 +427,6 @@ void ServiceContext::_delistOperation(OperationContext* opCtx) noexcept {
         invariant(client->getOperationContext() == opCtx);
         client->_setOperationContext({});
     }
-
-    if (client->session()) {
-        _numCurrentOps.subtractAndFetch(1);
-    }
-
     opCtx->releaseOperationKey();
 }
 
@@ -492,10 +474,6 @@ void ServiceContext::notifyStartupComplete() {
     _startupComplete = true;
     lk.unlock();
     _startupCompleteCondVar.notify_all();
-}
-
-int ServiceContext::getActiveClientOperations() {
-    return _numCurrentOps.load();
 }
 
 namespace {

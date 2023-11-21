@@ -30,20 +30,53 @@
 
 #include <utility>
 
+#include "mongo/logv2/log.h"
+#include "mongo/transport/session_manager.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/testing_proctor.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
-const auto HelloMetricsDecoration = ServiceContext::declareDecoration<HelloMetrics>();
-const auto InExhaustHelloDecoration = transport::Session::declareDecoration<InExhaustHello>();
-}  // namespace
+// TODO SERVER-84117: Tighten up Session object lifecycle
+// TransportlessHelloMetrics are used during unit tests and should not be expected at other times.
+const auto transportlessHelloMetrics = ServiceContext::declareDecoration<HelloMetrics>();
+const auto inExhaustHelloDecoration = transport::Session::declareDecoration<InExhaustHello>();
 
-HelloMetrics* HelloMetrics::get(ServiceContext* service) {
-    return &HelloMetricsDecoration(service);
+HelloMetrics* getHelloMetrics(const transport::Session* session) {
+    if (!session)
+        return nullptr;
+    auto tl = session->getTransportLayer();
+    if (!tl)
+        return nullptr;
+    auto sm = tl->getSessionManager();
+    if (!sm)
+        return nullptr;
+    return &sm->helloMetrics;
 }
 
+HelloMetrics* getHelloMetrics(const InExhaustHello* decoration) {
+    return getHelloMetrics(inExhaustHelloDecoration.owner(decoration));
+}
+}  // namespace
+
 HelloMetrics* HelloMetrics::get(OperationContext* opCtx) {
-    return get(opCtx->getServiceContext());
+    if (auto transportHelloMetrics = getHelloMetrics(opCtx->getClient()->session().get())) {
+        return transportHelloMetrics;
+    }
+
+    // UnitTests are allowed to perform operations which read/write HelloMetrics
+    // even if no TransportLayer is setup, or the session is not bound to a SessionManager.
+    // Conversely, a normal server process MUST have a SessionManager to record stats on.
+    massert(8076990,
+            "Accessing HelloMetrics on operation not attached to a transport",
+            TestingProctor::instance().isEnabled());
+
+    LOGV2_DEBUG(8076991, 3, "Using global HelloMetrics");
+    return &transportlessHelloMetrics(opCtx->getServiceContext());
 }
 
 size_t HelloMetrics::getNumExhaustIsMaster() const {
@@ -86,16 +119,56 @@ void HelloMetrics::resetNumAwaitingTopologyChanges() {
     _connectionsAwaitingTopologyChanges.store(0);
 }
 
+void HelloMetrics::resetNumAwaitingTopologyChangesForAllSessionManagers(ServiceContext* svcCtx) {
+    if (auto* tlm = svcCtx->getTransportLayerManager()) {
+        tlm->forEach([](transport::TransportLayer* tl) {
+            if (tl->getSessionManager())
+                tl->getSessionManager()->helloMetrics.resetNumAwaitingTopologyChanges();
+        });
+    }
+
+    if (TestingProctor::instance().isEnabled())
+        transportlessHelloMetrics(svcCtx).resetNumAwaitingTopologyChanges();
+}
+
+void HelloMetrics::serialize(BSONObjBuilder* builder) const {
+    builder->append("exhaustIsMaster"_sd, static_cast<long long>(getNumExhaustIsMaster()));
+    builder->append("exhaustHello"_sd, static_cast<long long>(getNumExhaustHello()));
+    builder->append("awaitingTopologyChanges"_sd,
+                    static_cast<long long>(getNumAwaitingTopologyChanges()));
+}
+
 InExhaustHello* InExhaustHello::get(transport::Session* session) {
-    return &InExhaustHelloDecoration(session);
+    auto* ieh = &inExhaustHelloDecoration(session);
+    if (!ieh->_sessionManager) {
+        // Just in time initialization of _sessionManager weak_ptr.
+        if (auto* tl = session->getTransportLayer()) {
+            ieh->_sessionManager =
+                std::weak_ptr<transport::SessionManager>(tl->getSharedSessionManager());
+        }
+    }
+    return ieh;
 }
 
 InExhaustHello::~InExhaustHello() {
-    if (_inExhaustIsMaster) {
-        HelloMetrics::get(getGlobalServiceContext())->decrementNumExhaustIsMaster();
+    if (!_inExhaustIsMaster && !_inExhaustHello) {
+        // Nothing to decrement.
+        return;
     }
-    if (_inExhaustHello) {
-        HelloMetrics::get(getGlobalServiceContext())->decrementNumExhaustHello();
+
+    // _sessionManager.lock() may return an empty shared_ptr<SessionManager> if any of:
+    // 1) _sessionManager was never initialized, meaning there are no stats to back out.
+    // 2) _sessionManager was initialized empty, because this is a unit test and not associated with
+    // a SessionManager. 3) The underlying SessionManager has already been destructed by its owning
+    // TransportLayer. In any of these cases, we don't have to care about backing out stats here.
+    invariant(!!_sessionManager);
+    if (auto sessionManager = _sessionManager->lock()) {
+        if (_inExhaustIsMaster) {
+            sessionManager->helloMetrics.decrementNumExhaustIsMaster();
+        }
+        if (_inExhaustHello) {
+            sessionManager->helloMetrics.decrementNumExhaustHello();
+        }
     }
 }
 
@@ -108,28 +181,29 @@ bool InExhaustHello::getInExhaustHello() const {
 }
 
 void InExhaustHello::setInExhaust(bool inExhaust, StringData commandName) {
-    bool isHello = (commandName == "hello"_sd);
+    const bool isHello = (commandName == "hello"_sd);
+    auto* helloMetrics = getHelloMetrics(this);
 
     // Transition out of exhaust hello if setting inExhaust to false or if
     // the isMaster command is used.
     if (_inExhaustHello && (!inExhaust || !isHello)) {
-        HelloMetrics::get(getGlobalServiceContext())->decrementNumExhaustHello();
+        helloMetrics->decrementNumExhaustHello();
         _inExhaustHello = false;
     }
 
     // Transition out of exhaust isMaster if setting inExhaust to false or if
     // the hello command is used.
     if (_inExhaustIsMaster && (!inExhaust || isHello)) {
-        HelloMetrics::get(getGlobalServiceContext())->decrementNumExhaustIsMaster();
+        helloMetrics->decrementNumExhaustIsMaster();
         _inExhaustIsMaster = false;
     }
 
     if (inExhaust) {
         if (isHello && !_inExhaustHello) {
-            HelloMetrics::get(getGlobalServiceContext())->incrementNumExhaustHello();
+            helloMetrics->incrementNumExhaustHello();
             _inExhaustHello = inExhaust;
         } else if (!isHello && !_inExhaustIsMaster) {
-            HelloMetrics::get(getGlobalServiceContext())->incrementNumExhaustIsMaster();
+            helloMetrics->incrementNumExhaustIsMaster();
             _inExhaustIsMaster = inExhaust;
         }
     }

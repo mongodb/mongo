@@ -246,6 +246,12 @@ ServiceContext* initialize(const char* yaml_config) {
     ScopeGuard giGuard([] { mongo::runGlobalDeinitializers().ignore(); });
     setGlobalServiceContext(ServiceContext::make());
 
+    auto serviceContext = getGlobalServiceContext();
+    serviceContext->getService()->setServiceEntryPoint(
+        std::make_unique<ServiceEntryPointEmbedded>());
+    serviceContext->setTransportLayerManager(std::make_unique<transport::TransportLayerManagerImpl>(
+        std::make_unique<transport::TransportLayerMock>()));
+
     Client::initThread("initandlisten", getGlobalServiceContext()->getService());
 
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
@@ -256,12 +262,6 @@ ServiceContext* initialize(const char* yaml_config) {
 
     // Make sure current thread have no client set in thread_local when we leave this function
     ScopeGuard clientGuard([] { Client::releaseCurrent(); });
-
-    auto serviceContext = getGlobalServiceContext();
-    serviceContext->getService()->setServiceEntryPoint(
-        std::make_unique<ServiceEntryPointEmbedded>());
-    serviceContext->setTransportLayerManager(std::make_unique<transport::TransportLayerManagerImpl>(
-        std::make_unique<transport::TransportLayerMock>()));
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
     opObserverRegistry->addObserver(

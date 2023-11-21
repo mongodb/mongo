@@ -29,12 +29,43 @@
 
 #include "mongo/transport/asio/asio_session_manager.h"
 
+#include "mongo/db/commands/server_status.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_manager.h"
 
 namespace mongo::transport {
+namespace {
+// "connections" is a legacy name from when only one TransportLayer was in use at any time.
+// Asio, being that singular layer inherits the "connection" namespace, while others
+// are introduced in their own named section (e.g. "gRPC").
+class Connections : public ServerStatusSection {
+public:
+    Connections() : ServerStatusSection("connections") {}
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
+        bool asioSeen = false;
+        BSONObjBuilder bb;
+        if (auto tlm = opCtx->getServiceContext()->getTransportLayerManager()) {
+            tlm->forEach([&](TransportLayer* tl) {
+                if (auto sm = dynamic_cast<AsioSessionManager*>(tl->getSessionManager())) {
+                    massert(8076900, "Multiple AsioSessionManagers", !asioSeen);
+                    asioSeen = true;
+                    sm->appendStats(&bb);
+                }
+            });
+        }
+        return bb.obj();
+    }
+} connections;
+}  // namespace
+
 std::string AsioSessionManager::getClientThreadName(const Session& session) const {
     using namespace fmt::literals;
     return "conn{}"_format(session.id());
@@ -63,26 +94,27 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
     appendInt("totalCreated", numCreatedSessions());
     appendInt("rejected", _rejectedSessions);
 
-    invariant(_svcCtx);
-    appendInt("active", _svcCtx->getActiveClientOperations());
+    appendInt("active", getActiveOperations());
 
-    const auto seStats = ServiceExecutorStats::get(_svcCtx);
-    appendInt("threaded", seStats.totalClients);
+    // Historically, this number may have differed from "current" since
+    // some sessions would have used the non-threaded ServiceExecutorFixed.
+    // Currently all sessions are threaded, so this number is redundant.
+    appendInt("threaded", sessionCount);
     if (!serverGlobalParams.maxConnsOverride.empty()) {
-        appendInt("limitExempt", seStats.limitExempt);
+        appendInt("limitExempt", serviceExecutorStats.limitExempt.load());
     }
 
-    auto&& hm = HelloMetrics::get(_svcCtx);
-    appendInt("exhaustIsMaster", hm->getNumExhaustIsMaster());
-    appendInt("exhaustHello", hm->getNumExhaustHello());
-    appendInt("awaitingTopologyChanges", hm->getNumAwaitingTopologyChanges());
+    helloMetrics.serialize(bob);
 
+    invariant(_svcCtx);
     if (auto adminExec = ServiceExecutorReserved::get(_svcCtx)) {
         BSONObjBuilder section(bob->subobjStart("adminConnections"));
         adminExec->appendStats(&section);
     }
 
-    SessionManagerCommon::appendStats(bob);
+    for (auto&& observer : _observers) {
+        observer->appendTransportServerStats(bob);
+    }
 }
 
 }  // namespace mongo::transport

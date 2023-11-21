@@ -228,8 +228,12 @@ public:
         return _listenerOptions.loadBalancerPort;
     }
 
-    SessionManager* getSessionManager() const {
+    SessionManager* getSessionManager() const override {
         return _sessionManager.get();
+    }
+
+    std::shared_ptr<SessionManager> getSharedSessionManager() const override {
+        return _sessionManager;
     }
 
     /**
@@ -342,7 +346,7 @@ private:
     };
     Listener _listener;
 
-    std::unique_ptr<SessionManager> _sessionManager;
+    std::shared_ptr<SessionManager> _sessionManager;
 
     Options _listenerOptions;
     // The real incoming port in case of _listenerOptions.port==0 (ephemeral).

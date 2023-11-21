@@ -34,6 +34,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/transport/hello_metrics.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/duration.h"
 
@@ -57,6 +60,7 @@ protected:
     SessionManager() = default;
 
 public:
+    class OperationObserver;
     virtual ~SessionManager() = default;
 
     /**
@@ -85,11 +89,6 @@ public:
     virtual bool shutdown(Milliseconds timeout) = 0;
 
     /**
-     * Append high-level stats to a BSONObjBuilder for serverStatus
-     */
-    virtual void appendStats(BSONObjBuilder* bob) const = 0;
-
-    /**
      * Returns the number of sessions currently open.
      */
     virtual std::size_t numOpenSessions() const = 0;
@@ -100,6 +99,38 @@ public:
     virtual std::size_t maxOpenSessions() const {
         return std::numeric_limits<std::size_t>::max();
     }
+
+    // Stats
+
+    /**
+     * Total number of operations created on sessions belonging to this SessionManager.
+     */
+    std::size_t getTotalOperations() const {
+        return _totalOperations.load();
+    }
+
+    /**
+     * Number of operations on sessions belonging to this SessionManager
+     * which have begun but not yet completed.
+     */
+    std::size_t getActiveOperations() const {
+        return _totalOperations.load() - _completedOperations.load();
+    }
+
+    /**
+     * Total number of completed operations on sessions belonging to this SessionManager.
+     */
+    std::size_t getCompletedOperations() const {
+        return _completedOperations.load();
+    }
+
+    HelloMetrics helloMetrics;
+    ServiceExecutorStats serviceExecutorStats;
+
+protected:
+    AtomicWord<std::size_t> _totalOperations{0};
+    AtomicWord<std::size_t> _completedOperations{0};
 };
+
 }  // namespace transport
 }  // namespace mongo

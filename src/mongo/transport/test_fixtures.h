@@ -200,8 +200,6 @@ public:
 
     void endSessionByClient(Client* client) override {}
 
-    void appendStats(BSONObjBuilder*) const override {}
-
     void endAllSessions(Client::TagMask tags) override {
         _join();
     }

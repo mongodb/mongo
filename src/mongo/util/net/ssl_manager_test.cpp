@@ -85,8 +85,6 @@ public:
         return true;
     }
 
-    void appendStats(BSONObjBuilder*) const override {}
-
     size_t numOpenSessions() const override {
         stdx::unique_lock<Latch> lock(_mutex);
         return _sessions.size();

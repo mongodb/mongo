@@ -157,6 +157,14 @@ public:
      */
     virtual SessionManager* getSessionManager() const = 0;
 
+    /**
+     * Returns a shared_ptr reference to the owned SessionManager.
+     * Callers are strongly discouraged from retaining a full shared_ptr
+     * reference which may cause the SessionManager to outlive its TransportLayer.
+     * Please convert to `std::weak_ptr` if a long term, non-owning reference is needed.
+     */
+    virtual std::shared_ptr<SessionManager> getSharedSessionManager() const = 0;
+
 #ifdef MONGO_CONFIG_SSL
     /** Rotate the in-use certificates for new connections. */
     virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,

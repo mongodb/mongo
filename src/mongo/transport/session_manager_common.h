@@ -67,7 +67,6 @@ public:
     bool shutdownAndWait(Milliseconds timeout);
     bool waitForNoSessions(Milliseconds timeout);
 
-    void appendStats(BSONObjBuilder*) const override;
     std::size_t numOpenSessions() const override;
     std::size_t maxOpenSessions() const override {
         return _maxOpenSessions;

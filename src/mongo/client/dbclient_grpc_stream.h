@@ -62,7 +62,9 @@ public:
           _authToken{std::move(authToken)} {}
 
     ~DBClientGRPCStream() {
-        shutdownAndDisallowReconnect();
+        if (auto session = _getSession(); session && session->isConnected()) {
+            uassertStatusOK(session->finish());
+        }
     }
 
     /**

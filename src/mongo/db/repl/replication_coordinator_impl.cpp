@@ -4585,7 +4585,7 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
         }
         _sniToValidConfigPromiseMap.clear();
     }
-    HelloMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
+    HelloMetrics::resetNumAwaitingTopologyChangesForAllSessionManagers(getGlobalServiceContext());
 
     if (_inQuiesceMode) {
         // No more hello requests will wait for a topology change, so clear _horizonToPromiseMap.

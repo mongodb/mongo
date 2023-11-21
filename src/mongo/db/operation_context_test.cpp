@@ -1099,40 +1099,6 @@ TEST_F(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {
     ASSERT_FALSE(optCtx->isWaitingForConditionOrInterrupt());
 }
 
-TEST_F(OperationContextTest, TestActiveClientOperationsForClientsWithoutSession) {
-    auto serviceCtx = getServiceContext();
-    auto client = serviceCtx->getService()->makeClient("OperationContextTest");
-    ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
-    {
-        auto opCtx = client->makeOperationContext();
-        ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
-    }
-    ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
-}
-
-TEST_F(OperationContextTest, TestActiveClientOperations) {
-    transport::TransportLayerMock transportLayer;
-    std::shared_ptr<transport::Session> session = transportLayer.createSession();
-
-    auto serviceCtx = getServiceContext();
-    auto client = serviceCtx->getService()->makeClient("OperationContextTest", session);
-    ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
-
-    {
-        auto optCtx = client->makeOperationContext();
-        ASSERT_EQ(serviceCtx->getActiveClientOperations(), 1);
-    }
-    ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
-
-    {
-        auto optCtx = client->makeOperationContext();
-        ASSERT_EQ(serviceCtx->getActiveClientOperations(), 1);
-        serviceCtx->killAndDelistOperation(optCtx.get());
-        ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
-    }
-    ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
-}
-
 TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
     auto client = getService()->makeClient("MainClient");
     auto opCtx = client->makeOperationContext();

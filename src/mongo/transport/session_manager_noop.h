@@ -47,7 +47,6 @@ public:
     bool shutdown(Milliseconds timeout) override {
         return true;
     }
-    void appendStats(BSONObjBuilder* bob) const override {}
     std::size_t numOpenSessions() const override {
         return 0;
     }

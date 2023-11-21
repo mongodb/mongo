@@ -41,6 +41,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source.h"
@@ -56,17 +57,35 @@ namespace mongo::transport {
 namespace {
 static constexpr auto kDiagnosticLogLevel = 4;
 
-auto getServiceExecutorStats =
-    ServiceContext::declareDecoration<synchronized_value<ServiceExecutorStats>>();
 auto getServiceExecutorContext =
     Client::declareDecoration<std::unique_ptr<ServiceExecutorContext>>();
+
+SessionManager* getSessionManager(Client* client) {
+    if (!client)
+        return nullptr;
+    auto session = client->session();
+    if (!session)
+        return nullptr;
+    auto tl = session->getTransportLayer();
+    if (!tl)
+        return nullptr;
+    return tl->getSessionManager();
+}
+
+ServiceExecutorStats* getServiceExecutorContextStats(Client* client) {
+    auto* sm = getSessionManager(client);
+    if (!sm)
+        return nullptr;
+    return &sm->serviceExecutorStats;
+}
 
 // This is at best a naive solution. There could be a world where numOpenSessions() changes
 // very quickly. We are not taking locks on the SessionManager, so we may chose to schedule
 // onto the ServiceExecutorReserved when it is no longer necessary. The upside is that we
 // will automatically shift to the ServiceExecutorSynchronous after the first command loop.
 bool shouldUseReserved(Client* client) {
-    auto sm = client->session()->getTransportLayer()->getSessionManager();
+    auto* sm = getSessionManager(client);
+    invariant(sm);
     return sm->numOpenSessions() > sm->maxOpenSessions();
 }
 
@@ -84,10 +103,6 @@ void forEachServiceExecutor(ServiceContext* svcCtx, const Func& func) {
 
 }  // namespace
 
-ServiceExecutorStats ServiceExecutorStats::get(ServiceContext* ctx) noexcept {
-    return getServiceExecutorStats(ctx).get();
-}
-
 ServiceExecutorContext* ServiceExecutorContext::get(Client* client) noexcept {
     // Service worker Clients will never have a ServiceExecutorContext.
     return getServiceExecutorContext(client).get();
@@ -101,12 +116,9 @@ void ServiceExecutorContext::set(Client* client,
 
     seCtx._client = client;
 
-    {
-        auto&& syncStats = *getServiceExecutorStats(client->getServiceContext());
-        if (seCtx._canUseReserved)
-            ++syncStats->limitExempt;
-        ++syncStats->totalClients;
-    }
+    if (seCtx._canUseReserved)
+        if (auto* stats = getServiceExecutorContextStats(client))
+            stats->limitExempt.fetchAndAddRelaxed(1);
 
     LOGV2_DEBUG(4898000,
                 kDiagnosticLogLevel,
@@ -127,10 +139,11 @@ void ServiceExecutorContext::reset(Client* client) noexcept {
                 "client"_attr = client->desc(),
                 "threadingModel"_attr = true,
                 "canUseReserved"_attr = seCtx->_canUseReserved);
-    auto stats = *getServiceExecutorStats(client->getServiceContext());
+
     if (seCtx->_canUseReserved)
-        --stats->limitExempt;
-    --stats->totalClients;
+        if (auto* stats = getServiceExecutorContextStats(client))
+            stats->limitExempt.fetchAndAddRelaxed(-1);
+
     seCtx.reset();
 }
 
@@ -148,14 +161,9 @@ void ServiceExecutorContext::setCanUseReserved(bool canUseReserved) {
     }
 
     _canUseReserved = canUseReserved;
-    if (_client) {
-        auto stats = getServiceExecutorStats(_client->getServiceContext()).synchronize();
-        if (canUseReserved) {
-            ++stats->limitExempt;
-        } else {
-            --stats->limitExempt;
-        }
-    }
+    if (_client)
+        if (auto* stats = getServiceExecutorContextStats(_client))
+            stats->limitExempt.fetchAndAddRelaxed(canUseReserved ? 1 : -1);
 }
 
 ServiceExecutor* ServiceExecutorContext::getServiceExecutor() {

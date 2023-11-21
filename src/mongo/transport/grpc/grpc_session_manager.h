@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/transport/grpc/client_cache.h"
 #include "mongo/transport/session_manager_common.h"
 
 namespace mongo::transport::grpc {
@@ -38,14 +41,19 @@ namespace mongo::transport::grpc {
  */
 class GRPCSessionManager : public SessionManagerCommon {
 public:
-    using SessionManagerCommon::SessionManagerCommon;
+    GRPCSessionManager(ServiceContext* svcCtx, std::shared_ptr<ClientCache> clientCache)
+        : SessionManagerCommon(svcCtx), _clientCache(std::move(clientCache)) {}
 
-    void appendStats(BSONObjBuilder* bob) const override;
+    void appendStats(BSONObjBuilder* bob) const;
+    void endSessionByClient(mongo::Client* client) override;
 
 protected:
     std::string getClientThreadName(const Session&) const override;
     void configureServiceExecutorContext(mongo::Client* client,
                                          bool isPrivilegedSession) const override;
+
+    AtomicWord<std::size_t> _successfulSessions{0};
+    std::shared_ptr<ClientCache> _clientCache;
 };
 
 }  // namespace mongo::transport::grpc

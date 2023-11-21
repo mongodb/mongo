@@ -973,8 +973,6 @@ public:
             return Status::OK();
         }
 
-        void appendStats(BSONObjBuilder*) const override {}
-
         void startSession(std::shared_ptr<Session> session) override {
             stdx::lock_guard lk{_mutex};
             _sessions.push_back(session);

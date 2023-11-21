@@ -256,7 +256,8 @@ void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
 
         // Reset counter to 0 since we will respond to all waiting hello requests with an error.
         // All new hello requests will immediately fail with ShutdownInProgress.
-        HelloMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
+        HelloMetrics::resetNumAwaitingTopologyChangesForAllSessionManagers(
+            getGlobalServiceContext());
     }
 
     if (MONGO_unlikely(hangDuringQuiesceModeMongos.shouldFail())) {

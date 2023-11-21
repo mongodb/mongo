@@ -106,6 +106,12 @@ Status TransportLayerManagerImpl::setup() {
     return Status::OK();
 }
 
+void TransportLayerManagerImpl::forEach(std::function<void(TransportLayer*)> fn) {
+    for (auto&& tl : _tls) {
+        fn(tl.get());
+    }
+}
+
 void TransportLayerManagerImpl::appendStatsForServerStatus(BSONObjBuilder* bob) const {
     for (auto&& tl : _tls) {
         tl->appendStatsForServerStatus(bob);
@@ -205,12 +211,6 @@ Status TransportLayerManagerImpl::rotateCertificates(std::shared_ptr<SSLManagerI
     return Status::OK();
 }
 #endif
-
-void TransportLayerManagerImpl::appendSessionManagerStats(BSONObjBuilder* builder) const {
-    std::for_each(_tls.cbegin(), _tls.cend(), [&](const auto& tl) {
-        tl->getSessionManager()->appendStats(builder);
-    });
-}
 
 bool TransportLayerManagerImpl::hasActiveSessions() const {
     return std::any_of(_tls.cbegin(), _tls.cend(), [](const auto& tl) {

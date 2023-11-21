@@ -76,9 +76,9 @@ public:
 #endif
 
     /**
-     * Append stats for any session managers attached to TransportLayers.
+     * Execute a callback on every TransportLayer owned by the TransportLayerManager.
      */
-    virtual void appendSessionManagerStats(BSONObjBuilder*) const = 0;
+    virtual void forEach(std::function<void(TransportLayer*)> fn) = 0;
 
     /**
      * True if any of the TransportLayers has any active sessions.
