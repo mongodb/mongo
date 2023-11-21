@@ -853,9 +853,8 @@ class ParserContext(object):
     def add_feature_flag_fcv_gated_false_has_version(self, location):
         # type: (common.SourceLocation) -> None
         """Add an error about a feature flag that should not be FCV gated but has a version."""
-        self._add_error(
-            location, ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION,
-            ("The 'version' attribute is not allowed for feature flag that should be FCV gated"))
+        self._add_error(location, ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION, (
+            "The 'version' attribute is not allowed for feature flag that should not be FCV gated"))
 
     def add_reply_type_invalid_type(self, location, command_name, reply_type_name):
         # type: (common.SourceLocation, str, str) -> None
