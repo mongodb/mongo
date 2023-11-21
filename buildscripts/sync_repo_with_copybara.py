@@ -122,6 +122,8 @@ def main():
     current_dir = os.getcwd()
     git_destination_url_with_token = f"https://x-access-token:{access_token_copybara_syncer}@github.com/mongodb/mongo.git"
 
+    
+
     # Set up the Docker command and execute it
     # --last-rev Defines the last revision that was migrated to the destination during the initial synchronization between repositories using Copybara
     docker_cmd = [
