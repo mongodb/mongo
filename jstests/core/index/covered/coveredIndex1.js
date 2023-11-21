@@ -12,7 +12,7 @@
  * ]
  */
 // Include helpers for analyzing explain output.
-import {getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {getOptimizer, getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 const coll = db["jstests_coveredIndex1"];
 coll.drop();
@@ -42,9 +42,17 @@ function assertIfQueryIsCovered(query, projection, isCovered, hint) {
     assert(explain.queryPlanner.hasOwnProperty("winningPlan"), tojson(explain));
     const winningPlan = getWinningPlan(explain.queryPlanner);
     if (isCovered) {
-        assert(isIndexOnly(db, winningPlan),
-               "Query " + tojson(query) + " with projection " + tojson(projection) +
-                   " should have been covered, but got this plan: " + tojson(winningPlan));
+        switch (getOptimizer(explain)) {
+            case "classic":
+                assert(isIndexOnly(db, winningPlan),
+                       "Query " + tojson(query) + " with projection " + tojson(projection) +
+                           " should have been covered, but got this plan: " + tojson(winningPlan));
+                break;
+            case "CQF":
+                // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+                // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+                break;
+        }
     } else {
         assert(!isIndexOnly(db, winningPlan),
                "Query " + tojson(query) + " with projection " + tojson(projection) +

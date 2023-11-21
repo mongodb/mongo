@@ -7,7 +7,7 @@ let t = db.index_check2;
 t.drop();
 
 // Include helpers for analyzing explain output.
-import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan, getOptimizer, isIxscan} from "jstests/libs/analyze_plan.js";
 
 for (var i = 0; i < 1000; i++) {
     var a = [];
@@ -42,5 +42,17 @@ let scanned3 = t.find(q3).explain("executionStats").executionStats.totalKeysExam
 
 // print( "scanned1: " + scanned1 + " scanned2: " + scanned2 + " scanned3: " + scanned3 );
 
-// $all should just iterate either of the words
-assert(scanned3 <= Math.max(scanned1, scanned2), "$all makes query optimizer not work well");
+switch (getOptimizer(t.find(q1).explain())) {
+    case "classic":
+        // $all should just iterate either of the words
+        assert(scanned3 <= Math.max(scanned1, scanned2),
+               "$all makes query optimizer not work well");
+        break;
+    case "CQF":
+        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+        assert(scanned3 == scanned1 + scanned2);
+        break;
+    default:
+        break
+}
