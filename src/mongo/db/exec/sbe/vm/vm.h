@@ -903,6 +903,7 @@ enum class Builtin : uint16_t {
     valueBlockMin,
     valueBlockMax,
     valueBlockCount,
+    valueBlockSum,
     valueBlockGtScalar,
     valueBlockGteScalar,
     valueBlockEqScalar,
@@ -2136,6 +2137,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMin(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMax(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCount(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockSum(ArityType arity);
 
     template <class Cmp, value::ColumnOpType::Flags AddFlags = value::ColumnOpType::kNoFlags>
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCmpScalar(ArityType arity);

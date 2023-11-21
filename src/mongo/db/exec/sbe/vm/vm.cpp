@@ -9486,6 +9486,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockMax(arity);
         case Builtin::valueBlockCount:
             return builtinValueBlockCount(arity);
+        case Builtin::valueBlockSum:
+            return builtinValueBlockSum(arity);
         case Builtin::valueBlockGtScalar:
             return builtinValueBlockGtScalar(arity);
         case Builtin::valueBlockGteScalar:
@@ -9970,6 +9972,8 @@ std::string builtinToString(Builtin b) {
             return "valueBlockMax";
         case Builtin::valueBlockCount:
             return "valueBlockCount";
+        case Builtin::valueBlockSum:
+            return "valueBlockSum";
         case Builtin::valueBlockGtScalar:
             return "valueBlockGtScalar";
         case Builtin::valueBlockGteScalar:
