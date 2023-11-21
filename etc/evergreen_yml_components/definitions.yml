@@ -2524,6 +2524,20 @@ tasks:
     vars:
       suite: benchmarks_second_half
 
+- <<: *benchmark_template
+  name: benchmarks_sep
+  tags: ["benchmarks_sep"]
+  commands:
+  - func: "do benchmark setup"
+  - func: "run tests"
+    vars:
+      suite: benchmarks_sep
+      exec_timeout_secs: 21600 # 6 hour timeout.
+      resmoke_jobs_max: 1
+  - func: "send benchmark results"
+    vars:
+      suite: benchmarks_sep
+
 ## jstestfuzz ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_gen
