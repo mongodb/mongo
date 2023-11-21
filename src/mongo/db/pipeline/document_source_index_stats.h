@@ -62,7 +62,7 @@ namespace mongo {
  * Provides a document source interface to retrieve index statistics for a given namespace.
  * Each document returned represents a single index and mongod instance.
  */
-class DocumentSourceIndexStats final : public DocumentSource {
+class DocumentSourceIndexStats final {
 public:
     static constexpr StringData kStageName = "$indexStats"_sd;
 
@@ -97,40 +97,28 @@ public:
         const NamespaceString _nss;
     };
 
-    // virtuals from DocumentSource
-    const char* getSourceName() const final;
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
-
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        StageConstraints constraints(StreamType::kStreaming,
-                                     PositionRequirement::kFirst,
-                                     HostTypeRequirement::kAnyShard,
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kNotAllowed,
-                                     TransactionRequirement::kNotAllowed,
-                                     LookupRequirement::kAllowed,
-                                     UnionRequirement::kAllowed);
-
+    /**
+     * Returns the stage constraints used to override 'DocumentSourceQueue'.
+     *
+     * This stage must be executed on each and every shard. Trying to call
+     * 'MongoProcessInterface::getIndexStats()' on a 'mongos' instance will result in
+     * 'MONGO_UNREACHEABLE'.
+     */
+    static StageConstraints constraints() {
+        StageConstraints constraints(DocumentSource::StreamType::kStreaming,
+                                     DocumentSource::PositionRequirement::kFirst,
+                                     DocumentSource::HostTypeRequirement::kAnyShard,
+                                     DocumentSource::DiskUseRequirement::kNoDiskUse,
+                                     DocumentSource::FacetRequirement::kNotAllowed,
+                                     DocumentSource::TransactionRequirement::kNotAllowed,
+                                     DocumentSource::LookupRequirement::kAllowed,
+                                     DocumentSource::UnionRequirement::kAllowed);
         constraints.requiresInputDocSource = false;
         return constraints;
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        return boost::none;
-    }
-
-    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
-
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-private:
-    DocumentSourceIndexStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-    GetNextResult doGetNext() final;
-
-    std::vector<Document> _indexStats;
-    std::vector<Document>::const_iterator _indexStatsIter;
-    std::string _processName;
 };
 
 }  // namespace mongo

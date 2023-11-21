@@ -48,26 +48,51 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/util/deferred.h"
 
 namespace mongo {
 
 /**
  * A DocumentSource which re-spools a queue of documents loaded into it. This stage does not
- * retrieve any input from an earlier stage. It can be useful to adapt the usual pull-based model of
- * a pipeline to more of a push-based model by pushing documents to feed through the pipeline into
- * this queue stage.
+ * retrieve any input from an earlier stage. It can consume either a normal queue of documents or
+ * a deferred queue, a lambda which lazily generates a queue of documents when required.
+ *
+ * This stage can also be useful to adapt the usual pull-based model of a pipeline to more of a
+ * push-based model by pushing documents to feed through the pipeline into this queue stage.
  */
 class DocumentSourceQueue : public DocumentSource {
 public:
+    using DeferredQueue = Deferred<std::deque<GetNextResult>>;
+
     static constexpr StringData kStageName = "$queue"_sd;
 
     static boost::intrusive_ptr<DocumentSourceQueue> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        boost::optional<StringData> aliasStageName = boost::none);
+        boost::optional<StringData> stageNameOverride = boost::none);
 
-    DocumentSourceQueue(std::deque<GetNextResult> results,
+    /*
+     * Construct a 'DocumentSourceQueue' stage with either a:
+     * (1) An eagerly initialized 'std::deque' containing 'GetNextResult' objects.
+     * (2) A zero argument lambda, which returns a 'std::deque' of 'GetNextResult' objects.
+     *
+     * Additionally, the DocumentSource behaviour can be customized by providing any of the
+     * following optional parameters:
+     *
+     * 'stageNameOverride' - the name to be displayed in error messages, instead of the internal
+     * '$queue' one.
+     *
+     * 'serializeOverride' - the 'Value' to be returned for 'serialize()' calls instead of
+     * serializing the queue contents.
+     *
+     * 'constraintsOverride' - the 'StageConstraints' to be reported by 'constraints()' calls
+     * instead of the default ones.
+     */
+    DocumentSourceQueue(DeferredQueue results,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                        boost::optional<StringData> aliasStageName = boost::none);
+                        boost::optional<StringData> stageNameOverride = boost::none,
+                        boost::optional<Value> serializeOverride = boost::none,
+                        boost::optional<StageConstraints> constraintsOverride = boost::none);
+
     ~DocumentSourceQueue() override = default;
 
     const char* getSourceName() const override;
@@ -75,6 +100,10 @@ public:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
+        if (_constraintsOverride.has_value()) {
+            return *_constraintsOverride;
+        }
+
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
                                      HostTypeRequirement::kRunOnceAnyNode,
@@ -103,20 +132,20 @@ public:
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
-        return DistributedPlanLogic{nullptr, this, boost::none};
+        return boost::none;
     }
 
     template <class... Args>
     GetNextResult& emplace_back(Args&&... args) {
-        return _queue.emplace_back(std::forward<Args>(args)...);
+        return _queue->emplace_back(std::forward<Args>(args)...);
     }
 
     void push_back(GetNextResult&& result) {
-        _queue.push_back(std::move(result));
+        _queue->push_back(std::move(result));
     }
 
     void push_back(const GetNextResult& result) {
-        _queue.push_back(result);
+        _queue->push_back(result);
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
@@ -125,13 +154,22 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 protected:
+    // Documents are always returned starting from the front.
     GetNextResult doGetNext() override;
-    // Return documents from front of queue.
-    std::deque<GetNextResult> _queue;
+
+    DeferredQueue _queue;
 
     // An optional alias name is provided for cases like $documents where we want an error message
     // to indicate the name the user provided, not the internal $queue name.
-    boost::optional<StringData> _aliasStageName = boost::none;
+    boost::optional<StringData> _stageNameOverride = boost::none;
+
+    // An optional value provided for cases like '$querySettings' and '$indexStats' where it's
+    // desireable to serialize the stage as something other than '$queue'.
+    boost::optional<Value> _serializeOverride = boost::none;
+
+    // An optional 'StageConstraints' override useful for cases such as '$indexStats' where fine
+    // grained over the constraints are needed.
+    boost::optional<StageConstraints> _constraintsOverride = boost::none;
 };
 
 }  // namespace mongo

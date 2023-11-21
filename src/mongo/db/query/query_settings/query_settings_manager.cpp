@@ -41,6 +41,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/logical_time.h"
@@ -93,8 +94,9 @@ NamespaceString extractNamespaceString(const QueryInstance& representativeQuery,
                              SerializationContext::CallerType::Request,
                              SerializationContext::Prefix::Default,
                              true /* nonPrefixedTenantId */};
+    bool isCollectionless = representativeQuery.firstElement().type() != BSONType::String;
+    auto coll = isCollectionless ? "$cmd.aggregate" : representativeQuery.firstElement().String();
     auto db = representativeQuery.getField("$db"_sd).String();
-    auto coll = representativeQuery.firstElement().String();
     return NamespaceStringUtil::deserialize(tenantId, db, coll, kSerializationContext);
 }
 

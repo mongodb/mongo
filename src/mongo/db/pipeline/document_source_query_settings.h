@@ -86,7 +86,28 @@ public:
         const PrivilegeVector _privileges;
     };
 
-    static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
+    /**
+     * Returns the stage constraints used to override 'DocumentSourceQueue'. The 'kLocalOnly' host
+     * type requirement is needed to ensure that the reported query settings are consistent with
+     * what's present on the current node. Without this, it's possible that '$querySettings' might
+     * report configurations which are present on 'mongod' instances, but not yet present on
+     * 'mongos' ones and consequently won't be enforced.
+     */
+    static StageConstraints constraints() {
+        StageConstraints constraints{DocumentSource::StreamType::kStreaming,
+                                     DocumentSource::PositionRequirement::kFirst,
+                                     DocumentSource::HostTypeRequirement::kLocalOnly,
+                                     DocumentSource::DiskUseRequirement::kNoDiskUse,
+                                     DocumentSource::FacetRequirement::kNotAllowed,
+                                     DocumentSource::TransactionRequirement::kAllowed,
+                                     DocumentSource::LookupRequirement::kAllowed,
+                                     DocumentSource::UnionRequirement::kAllowed};
+        constraints.requiresInputDocSource = false;
+        constraints.isIndependentOfAnyCollection = true;
+        return constraints;
+    }
+
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 };
 

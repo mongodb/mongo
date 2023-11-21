@@ -127,16 +127,13 @@ runTest({
   },
 });
 
-// TODO SERVER-82128 Uncomment this test case once the $querySettings recursion issue has been
-// addressed.
-
 // Test the inception case: setting query settings on '$querySettings'.
-// runTest({
-//     queryInstance: qsutils.makeAggregateQueryInstance(
-//         /* pipeline */[{$querySettings: {showDebugQueryShape: true}}], /* collName */ 1),
-//     expectedDebugQueryShape: {
-//         cmdNs: {db: db.getName(), coll: "$cmd.aggregate"},
-//         command: "aggregate",
-//         pipeline: [{"$queue": "[]"}],
-//     },
-// });
+runTest({
+    queryInstance: qsutils.makeAggregateQueryInstance(
+        /* pipeline */[{$querySettings: {showDebugQueryShape: true}}], /* collName */ 1),
+    expectedDebugQueryShape: {
+        cmdNs: {db: db.getName(), coll: "$cmd.aggregate"},
+        command: "aggregate",
+        pipeline: [{$querySettings: {showDebugQueryShape: true}}]
+    },
+});
