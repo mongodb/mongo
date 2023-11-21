@@ -19,6 +19,8 @@
 //   requires_non_retryable_writes,
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
+//   # Uses mapReduce.
+//   requires_scripting,
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

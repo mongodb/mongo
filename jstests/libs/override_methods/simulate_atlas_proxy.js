@@ -10,7 +10,6 @@ import {
     createCmdObjWithTenantId,
     getTenantIdForDatabase,
     isCmdObjWithTenantId,
-    isDenylistedDb,
     prependTenantIdToDbNameIfApplicable,
     removeTenantIdAndMaybeCheckPrefixes,
     usingMultipleTenants
@@ -601,6 +600,7 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     const cmdName = Object.keys(cmdObj)[0];
     let checkPrefixOptions = !useResponsePrefixChecking ? {} : {
         checkPrefix: true,
+        expectPrefix: true,
         tenantId,
         dbName,
         cmdName,

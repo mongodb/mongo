@@ -6851,7 +6851,7 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
-  name: native_tenant_data_isolation_with_dollar_tenant_jscore_passthrough_gen
+  name: multitenancy_with_mongoq_unsigned_token_jscore_passthrough_gen
   tags: ["serverless"]
   commands:
   - func: "generate resmoke tasks"

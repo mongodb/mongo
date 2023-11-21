@@ -56,6 +56,7 @@ executor:
           tenantId: "636d957b2646ddfaf9b5e13f"
           hashTestNamesForMultitenancy: true
           useSecurityToken: true
+          useResponsePrefixChecking: true
   hooks:
   - class: CheckReplOplogs
   - class: CheckReplDBHash

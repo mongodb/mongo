@@ -1,21 +1,14 @@
-config_variables:
-- &keyFile jstests/libs/authTestsKey
-- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
-- &authOptions
-  authenticationDatabase: local
-  authenticationMechanism: SCRAM-SHA-256
-  password: *keyFileData
-  username: __system
-
 test_kind: js_test
 description: |
   Run test suites with a replica set and multitenancy enabled. Simulate the mongoq behavior
-  by overriding and injecting "$tenant".
+  by overriding and injecting unsigned security token.
 
 selector:
   roots:
   - jstests/core/**/*.js
   exclude_with_any_tags:
+  # This passthrough uses the `simulate_mongoq` override, which some tests are incompatible with.
+  - simulate_mongoq_incompatible
   # Exclude tests which use commands that aren't supported in Serverless.
   - command_not_supported_in_serverless
   # Theses tests expect replication is not enabled.
@@ -25,21 +18,21 @@ selector:
   # Server side javascript (such as $where, $function, $accumulator and map-reduce) is not allowed in Serverless.
   - requires_scripting
   - uses_map_reduce_with_temp_collections
-  # This test suite creates connection with user "__system", so cannot be authenticated again with different user.
+  # Skip any tests that run with auth explicitly.
   - requires_auth
   # Sharding commands are not tenant aware.
   - requires_sharding
   # Columnstore indexes are under development and cannot be used without enabling the feature flag
   - featureFlagColumnstoreIndexes
   exclude_files:
-  # The "exhaust" function does not use runCommand (required by the inject_security_token.js override).
+  # The "exhaust" function does not use runCommand (required by the simulate_mongoq.js override).
   - jstests/core/**/exhaust.js
-  # These following tests use benchRun which does not use runCommand (required by the inject_dollar_tenant.js override).
+  # These following tests use benchRun which does not use runCommand (required by the simulate_mongoq.js override).
   - jstests/core/**/bench_test1.js
   - jstests/core/**/bench_test2.js
   - jstests/core/**/benchrun_cmd_param_error.js
   - jstests/core/**/benchrun_pipeline_updates.js
-  # These tests run "applyOps" command which does not depend on $tenant to pass in tenant information.
+  # These tests run "applyOps" command which does not depend on unsigned security token pass in tenant information.
   # The tenantId is provided in the oplog entries provided to the applyOps command.
   - jstests/core/**/apply_ops*.js
   - jstests/core/**/bypass_doc_validation.js
@@ -58,8 +51,6 @@ selector:
   - jstests/core/views/view_with_invalid_dbname.js
   - jstests/core/views/views_all_commands.js
   - jstests/core/views/invalid_view_prevents_creating_new_view.js
-  # This test expects a specific error message, which does not match the error message generated in authentication mode.
-  - jstests/core/**/commands_with_uuid.js
   # Sharding command "splictVector" is not tenant aware.
   - jstests/core/**/splitvector.js
   # Sharding command "_shardsvrCreateGlobalIndex" is not tenant aware.
@@ -75,7 +66,7 @@ selector:
   # In a multitenancy environment the catalog will always return tenant-prefixed entries, so the
   # list_catalog test will be broken as it checks for non-tenant-prefixed entries.
   - jstests/core/**/list_catalog.js
-  # These tests create a new thread, so $tenant won't be properly injected.
+  # These tests create a new thread, so unsigned security token won't be properly injected.
   - jstests/core/txns/transactions_block_ddl.js
   - jstests/core/txns/write_conflicts_with_non_txns.js
   - jstests/core/txns/kill_op_on_txn_expiry.js
@@ -85,8 +76,14 @@ selector:
   # the requests causes the test to fails due to a mismatch.
   - jstests/core/api//apitest_db_profile_level.js
   # Queryable encryption test requires an internal connection for the keyvault that does not
-  # inject a $tenant.
+  # inject a security token.
   - jstests/core/queryable_encryption/**/*.js
+  # TODO SERVER-82748: make "configureFailPoint" support unsigned security token.
+  - jstests/core/administrative/profile/profile_hide_index.js
+  - jstests/core/failcommand_failpoint.js
+  - jstests/core/comment_field.js
+  # TODO SERVER-81009: fix VTS missing from opCtx for distinct transactions.
+  - jstests/core/txns/view_reads_in_transaction.js
 
 executor:
   archive:
@@ -97,48 +94,26 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      # In order to use $tenant, connect mongod with user "_system" which can be authenticated with ActionType::useTenant.
-      <<: *authOptions
       eval: |
-        jsTest.authenticate(db.getMongo());
         globalThis.testingReplication = true;
-        await import('jstests/libs/override_methods/inject_dollar_tenant.js');
+        await import('jstests/libs/override_methods/simulate_mongoq.js');
       global_vars:
         TestData: &TestData
           tenantId: "636d957b2646ddfaf9b5e13f"
+          useSignedSecurityToken: false
           hashTestNamesForMultitenancy: true
-          auth: true
-          authMechanism: SCRAM-SHA-256
-          keyFile: *keyFile
-          keyFileData: *keyFileData
-          roleGraphInvalidationIsFatal: true
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
   - class: CheckReplOplogs
-    shell_options:
-      global_vars:
-        TestData: *TestData
-      eval: jsTest.authenticate(db.getMongo())
-      <<: *authOptions
   - class: CheckReplDBHash
-    shell_options:
-      global_vars:
-        TestData: *TestData
-      eval: jsTest.authenticate(db.getMongo())
-      <<: *authOptions
   - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData: *TestData
-      eval: jsTest.authenticate(db.getMongo())
-      <<: *authOptions
   - class: CleanEveryN
     n: 20
   fixture:
     class: ReplicaSetFixture
-    num_nodes: 3
+    num_nodes: 2
     mongod_options:
       set_parameters:
         enableTestCommands: 1
@@ -147,7 +122,4 @@ executor:
         featureFlagRequireTenantID: true
         logComponentVerbosity:
           command: 2
-      auth: ''
-      keyFile: *keyFile
       noscripting: ''
-    auth_options: *authOptions

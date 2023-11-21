@@ -5,6 +5,9 @@
 //   not_allowed_with_security_token,
 //   requires_multi_updates,
 //   requires_non_retryable_commands,
+//   # `rolesInfo` response has empty database name that doesn't work with the response checker of
+//   # simulate_mongoq override.
+//   simulate_mongoq_incompatible,
 // ]
 
 // Setup some sample roles.

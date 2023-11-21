@@ -8,6 +8,8 @@ selector:
   - jstests/core/**/*.js
   - jstests/aggregation/**/*.js
   exclude_with_any_tags:
+  # This passthrough uses the `simulate_mongoq` override, which some tests are incompatible with.
+  - simulate_mongoq_incompatible
   # Exclude tests which use commands that aren't supported in Serverless.
   - command_not_supported_in_serverless
   # Exclude tests which we know use commands that don't support a security token.
@@ -58,13 +60,13 @@ selector:
   # defaultPrompt() calls buildInfo command which is not allowed with security token.
   - jstests/core/txns/shell_prompt_in_transaction.js
   # Cannot test the user is not allowed to create indexes in config.transactions as the
-  # inject_security_token.js runs command on tenant's config.transactions.
+  # simulate_mongoq.js runs command on tenant's config.transactions.
   - jstests/core/**/create_indexes.js
   # checkLog calls getLog command which is not allowed  with security token.
   - jstests/core/**/doc_validation_options.js
-  # exhaust does not use runCommand (required by the inject_security_token.js override).
+  # exhaust does not use runCommand (required by the simulate_mongoq.js override).
   - jstests/core/**/exhaust.js
-  # This test does not use same connection on same database (required by the inject_security_token.js override).
+  # This test does not use same connection on same database (required by the simulate_mongoq.js override).
   - jstests/core/txns/write_conflicts_with_non_txns.js
   # In a multitenancy environment the catalog will always return tenant-prefixed entries, and the
   # override we use in this suite checks for the absence of a prefix breaking the list_catalog tests.
@@ -74,7 +76,7 @@ selector:
   # Queryable encryption test performs implicit encryption which issues commands that don't
   # include the security token.
   - jstests/core/queryable_encryption/**/*.js
-  # These following tests use benchRun which does not use runCommand (required by the inject_security_token.js override).
+  # These following tests use benchRun which does not use runCommand (required by the simulate_mongoq.js override).
   - jstests/core/**/bench_test1.js
   - jstests/core/**/bench_test2.js
   - jstests/core/**/benchrun_cmd_param_error.js
@@ -95,9 +97,11 @@ executor:
     shell_options:
       eval: |
         globalThis.testingReplication = true;
-        await import('jstests/libs/override_methods/inject_security_token.js');
+        await import('jstests/libs/override_methods/simulate_mongoq.js');
       global_vars:
         TestData: &TestData
+          tenantId: "636d957b2646ddfaf9b5e13a"
+          useSignedSecurityToken: true
           hashTestNamesForMultitenancy: true
           testOnlyValidatedTenancyScopeKey: secret
   hooks:
@@ -111,7 +115,7 @@ executor:
     n: 20
   fixture:
     class: ReplicaSetFixture
-    num_nodes: 3
+    num_nodes: 2
     mongod_options:
       set_parameters:
         enableTestCommands: 1
