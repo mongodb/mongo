@@ -2276,7 +2276,15 @@ private:
         _argStackTop = _argStack - sizeOfElement;
     }
 
-    void allocStack(size_t size) noexcept;
+    MONGO_COMPILER_ALWAYS_INLINE_OPT void allocStack(size_t size) noexcept {
+        auto newSizeDelta = size * sizeOfElement;
+        if (_argStackEnd <= _argStackTop + newSizeDelta) {
+            allocStackImpl(newSizeDelta);
+        }
+    }
+
+    void allocStackImpl(size_t newSizeDelta) noexcept;
+
     void swapStack();
 
     // The top entry in '_argStack', or one element before the stack when empty.

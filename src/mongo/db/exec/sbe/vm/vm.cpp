@@ -214,16 +214,15 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // valueBlockApplyLambda
 };
 
-void ByteCode::allocStack(size_t size) noexcept {
-    invariant(size > 0);
-    auto newSizeDelta = size * sizeOfElement;
+void ByteCode::allocStackImpl(size_t newSizeDelta) noexcept {
+    invariant(newSizeDelta > 0);
+
     auto oldSize = _argStackEnd - _argStack;
-    if (_argStackEnd <= _argStackTop + newSizeDelta) {
-        auto oldTop = _argStackTop - _argStack;
-        _argStack = reinterpret_cast<uint8_t*>(mongoRealloc(_argStack, oldSize + newSizeDelta));
-        _argStackEnd = _argStack + oldSize + newSizeDelta;
-        _argStackTop = _argStack + oldTop;
-    }
+    auto oldTop = _argStackTop - _argStack;
+
+    _argStack = reinterpret_cast<uint8_t*>(mongoRealloc(_argStack, oldSize + newSizeDelta));
+    _argStackEnd = _argStack + oldSize + newSizeDelta;
+    _argStackTop = _argStack + oldTop;
 }
 
 std::string CodeFragment::toString() const {
