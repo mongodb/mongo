@@ -113,6 +113,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cqf_command_utils.h"
+#include "mongo/db/query/cqf_fast_paths.h"
 #include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_bounds.h"
@@ -1719,8 +1720,18 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         if (isEligibleForBonsai(*canonicalQuery, opCtx, mainColl)) {
             optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
             const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
-            auto maybeExec = getSBEExecutorViaCascadesOptimizer(
-                collections, std::move(queryHints), canonicalQuery.get());
+
+            auto maybeExec = [&] {
+                // If the query is eligible for a fast path, use the fast path plan instead of
+                // invoking the optimizer.
+                if (auto fastPathExec = optimizer::fast_path::tryGetSBEExecutorViaFastPath(
+                        collections, canonicalQuery.get())) {
+                    return fastPathExec;
+                }
+
+                return getSBEExecutorViaCascadesOptimizer(
+                    collections, std::move(queryHints), canonicalQuery.get());
+            }();
             if (maybeExec) {
                 auto exec = uassertStatusOK(makeExecFromParams(
                     std::move(canonicalQuery), nullptr /*pipeline*/, std::move(*maybeExec)));

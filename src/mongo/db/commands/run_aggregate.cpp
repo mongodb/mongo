@@ -100,6 +100,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cqf_command_utils.h"
+#include "mongo/db/query/cqf_fast_paths.h"
 #include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
@@ -1436,13 +1437,28 @@ Status runAggregate(OperationContext* opCtx,
             optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
             const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
             auto timeBegin = Date_t::now();
-            auto maybeExec = getSBEExecutorViaCascadesOptimizer(opCtx,
-                                                                expCtx,
-                                                                nss,
-                                                                collections,
-                                                                std::move(queryHints),
-                                                                request.getHint(),
-                                                                pipeline.get());
+            auto maybeExec = [&] {
+                // If the query is eligible for a fast path, use the fast path plan instead of
+                // invoking the optimizer.
+                if (auto fastPathExec = optimizer::fast_path::tryGetSBEExecutorViaFastPath(
+                        opCtx,
+                        expCtx,
+                        nss,
+                        collections,
+                        request.getExplain().has_value(),
+                        request.getHint().has_value(),
+                        pipeline.get())) {
+                    return fastPathExec;
+                }
+
+                return getSBEExecutorViaCascadesOptimizer(opCtx,
+                                                          expCtx,
+                                                          nss,
+                                                          collections,
+                                                          std::move(queryHints),
+                                                          request.getHint(),
+                                                          pipeline.get());
+            }();
             if (maybeExec) {
                 // Pass ownership of the pipeline to the executor. This is done to allow binding of
                 // parameters to use views onto the constants living in the MatchExpression (in the

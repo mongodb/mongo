@@ -1576,6 +1576,8 @@ execEnv.Library(
         'query/classic_stage_builder.cpp',
         'query/cost_model/on_coefficients_change_updater_impl.cpp',
         'query/cqf_command_utils.cpp',
+        'query/cqf_fast_paths.cpp',
+        'query/cqf_fast_paths_utils.cpp',
         'query/cqf_get_executor.cpp',
         'query/explain.cpp',
         'query/find.cpp',

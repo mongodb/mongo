@@ -955,6 +955,14 @@ server_parameters:
     cpp_varname: "internalCascadesOptimizerSamplingCEFallBackForFilterNode"
     cpp_vartype: AtomicWord<bool>
     default: true
+  
+  internalCascadesOptimizerDisableFastPath:
+    description: "Disables fast paths that shortcut the optimizer for some trivial queries."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerDisableFastPath"
+    cpp_vartype: AtomicWord<bool>
+    default: true
+    test_only: true
 
   internalQueryFrameworkControl:
     description: "Knob to control the optimizer/execution engine to use."
