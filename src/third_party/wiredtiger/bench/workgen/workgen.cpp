@@ -246,8 +246,9 @@ int
 WorkloadRunner::start_table_idle_cycle(WT_CONNECTION *conn)
 {
     WT_SESSION *session;
-    if (conn->open_session(conn, nullptr, nullptr, &session) != 0) {
-        THROW("Error opening a session.");
+    int ret = conn->open_session(conn, nullptr, nullptr, &session);
+    if (ret != 0) {
+        THROW_ERRNO(ret, "Error opening a session.");
     }
 
     for (int cycle_count = 0; !stopping; ++cycle_count) {
@@ -258,11 +259,11 @@ WorkloadRunner::start_table_idle_cycle(WT_CONNECTION *conn)
         workgen_clock(&start);
 
         /* Create a table. */
-        int ret;
-        if ((ret = session->create(session, uri, "key_format=S,value_format=S")) != 0) {
+        int ret = session->create(session, uri, "key_format=S,value_format=S");
+        if (ret != 0) {
             if (ret == EBUSY)
                 continue;
-            THROW("Table create failed in start_table_idle_cycle.");
+            THROW_ERRNO(ret, "Table create failed in start_table_idle_cycle.");
         }
 
         uint64_t stop;
@@ -276,11 +277,13 @@ WorkloadRunner::start_table_idle_cycle(WT_CONNECTION *conn)
 
         /* Open and close cursor. */
         WT_CURSOR *cursor;
-        if ((ret = session->open_cursor(session, uri, nullptr, nullptr, &cursor)) != 0) {
-            THROW("Cursor open failed.");
+        ret = session->open_cursor(session, uri, nullptr, nullptr, &cursor);
+        if (ret != 0) {
+            THROW_ERRNO(ret, "Cursor open failed.");
         }
-        if ((ret = cursor->close(cursor)) != 0) {
-            THROW("Cursor close failed.");
+        ret = cursor->close(cursor);
+        if (ret != 0) {
+            THROW_ERRNO(ret, "Cursor close failed.");
         }
 
         workgen_clock(&stop);
@@ -300,7 +303,7 @@ WorkloadRunner::start_table_idle_cycle(WT_CONNECTION *conn)
         }
 
         if (ret != 0) {
-            THROW("Table drop failed in cycle_idle_tables.");
+            THROW_ERRNO(ret, "Table drop failed in cycle_idle_tables.");
         }
         workgen_clock(&stop);
         last_interval = ns_to_sec(stop - start);
@@ -467,8 +470,9 @@ int
 WorkloadRunner::start_tables_create(WT_CONNECTION *conn)
 {
     WT_SESSION *session;
-    if (conn->open_session(conn, nullptr, nullptr, &session) != 0) {
-        THROW("Error opening a session.");
+    int ret = conn->open_session(conn, nullptr, nullptr, &session);
+    if (ret != 0) {
+        THROW_ERRNO(ret, "Error opening a session.");
     }
 
     ContextInternal *icontext = _workload->_context->_internal;
@@ -594,8 +598,9 @@ int
 WorkloadRunner::start_tables_drop(WT_CONNECTION *conn)
 {
     WT_SESSION *session;
-    if (conn->open_session(conn, nullptr, nullptr, &session) != 0) {
-        THROW("Error opening a session.");
+    int ret = conn->open_session(conn, nullptr, nullptr, &session);
+    if (ret != 0) {
+        THROW_ERRNO(ret, "Error opening a session.");
     }
 
     ContextInternal *icontext = _workload->_context->_internal;
@@ -689,7 +694,7 @@ WorkloadRunner::start_tables_drop(WT_CONNECTION *conn)
          * removed from the shared data structures, and we know no thread is operating on them.
          */
         for (auto uri : drop_files) {
-            WT_DECL_RET;
+            int ret;
             // Spin on EBUSY. We do not expect to get stuck.
             while ((ret = session->drop(session, uri.c_str(), "checkpoint_wait=false")) == EBUSY) {
                 if (stopping)
@@ -698,7 +703,7 @@ WorkloadRunner::start_tables_drop(WT_CONNECTION *conn)
                 sleep(1);
             }
             if (ret != 0)
-                THROW("Table drop failed for '" << uri << "' in start_tables_drop.");
+                THROW_ERRNO(ret, "Table drop failed for '" << uri << "' in start_tables_drop.");
 
             VERBOSE(*_workload, "Dropped table: " << uri);
         }
@@ -910,28 +915,31 @@ ContextInternal::create_all(WT_CONNECTION *conn)
      * dynamic set of tables are marked separately during creation.
      */
     WT_SESSION *session;
-    if (conn->open_session(conn, nullptr, nullptr, &session) != 0) {
-        THROW("Error opening a session.");
+    int ret = conn->open_session(conn, nullptr, nullptr, &session);
+    if (ret != 0) {
+        THROW_ERRNO(ret, "Error opening a session.");
     }
 
-    WT_DECL_RET;
     WT_CURSOR *cursor;
-    if ((ret = session->open_cursor(session, "metadata:", NULL, NULL, &cursor)) != 0) {
+    ret = session->open_cursor(session, "metadata:", NULL, NULL, &cursor);
+    if (ret != 0) {
         /* If there is no metadata (yet), this will return ENOENT. */
         if (ret == ENOENT) {
-            THROW("No metadata found while extracting dynamic set of tables.");
+            THROW_ERRNO(ret, "No metadata found while extracting dynamic set of tables.");
         }
     }
 
     /* Walk the entries in the metadata and extract the dynamic set. */
     while ((ret = cursor->next(cursor)) == 0) {
         const char *key, *v;
-        if ((ret = cursor->get_key(cursor, &key)) != 0) {
-            THROW(
+        ret = cursor->get_key(cursor, &key);
+        if (ret != 0) {
+            THROW_ERRNO(ret,
               "Error getting the key for a metadata entry while extracting dynamic set of tables.");
         }
-        if ((ret = cursor->get_value(cursor, &v)) != 0) {
-            THROW(
+        ret = cursor->get_value(cursor, &v);
+        if (ret != 0) {
+            THROW_ERRNO(ret,
               "Error getting the value for a metadata entry while extracting dynamic set of "
               "tables.");
         }
@@ -974,7 +982,7 @@ ContextInternal::create_all(WT_CONNECTION *conn)
         }
     }
     if (ret != WT_NOTFOUND) {
-        THROW("Error extracting dynamic set of tables from the metadata.");
+        THROW_ERRNO(ret, "Error extracting dynamic set of tables from the metadata.");
     }
 
     /* Make sure each base has its mirror and vice-versa. */
@@ -997,11 +1005,12 @@ ContextInternal::create_all(WT_CONNECTION *conn)
             sleep(1);
         }
         if (ret != 0)
-            THROW("Table drop failed for '" << uri << "' in create_all.");
+            THROW_ERRNO(ret, "Table drop failed for '" << uri << "' in create_all.");
     }
 
-    if ((ret = session->close(session, NULL)) != 0) {
-        THROW("Session close failed.");
+    ret = session->close(session, NULL);
+    if (ret != 0) {
+        THROW_ERRNO(ret, "Session close failed.");
     }
 
     return (0);
@@ -1359,7 +1368,7 @@ ThreadRunner::cross_check(std::vector<ThreadRunner> &runners)
 int
 ThreadRunner::run()
 {
-    WT_DECL_RET;
+    int ret;
     ThreadOptions *options = &_thread->options;
     std::string name = options->name;
 
@@ -1598,7 +1607,7 @@ ThreadRunner::op_kv_gen(Operation *op, const tint_t tint)
 int
 ThreadRunner::op_run_setup(Operation *op)
 {
-    WT_DECL_RET;
+    int ret;
 
     if (_throttle != nullptr) {
         while (_throttle_ops >= _throttle_limit && !_in_transaction && !_stop) {
@@ -1703,7 +1712,7 @@ ThreadRunner::op_run(Operation *op)
     Track *track;
     WT_CURSOR *cursor;
     WT_ITEM item;
-    WT_DECL_RET;
+    int ret;
     bool measure_latency, own_cursor, retry_op;
     timespec start_time;
     uint64_t time_us;
@@ -3159,7 +3168,7 @@ WorkloadRunner::~WorkloadRunner()
 int
 WorkloadRunner::run(WT_CONNECTION *conn)
 {
-    WT_DECL_RET;
+    int ret;
     WorkloadOptions *options = &_workload->options;
 
     _wt_home = conn->get_home(conn);
@@ -3291,7 +3300,7 @@ WorkloadRunner::final_report(timespec &totalsecs)
 int
 WorkloadRunner::run_all(WT_CONNECTION *conn)
 {
-    WT_DECL_RET;
+    int ret;
 
     // Register signal handlers for SIGINT (Ctrl-C) and SIGTERM.
     std::signal(SIGINT, signal_handler);
@@ -3447,17 +3456,19 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
     if (options->background_compact > 0) {
         WT_SESSION *session;
 
-        if (conn->open_session(conn, nullptr, nullptr, &session) != 0)
-            THROW("Error opening a session.");
+        int ret = conn->open_session(conn, nullptr, nullptr, &session);
+        if (ret != 0)
+            THROW_ERRNO(ret, "Error opening a session.");
 
         const std::string bg_compact_cfg("background=true,free_space_target=" +
           std::to_string(options->background_compact) + "MB");
-        int ret = session->compact(session, nullptr, bg_compact_cfg.c_str());
+        ret = session->compact(session, nullptr, bg_compact_cfg.c_str());
         if (ret != 0)
             THROW_ERRNO(ret, "WT_SESSION->compact background compaction could not be enabled.");
 
-        if ((ret = session->close(session, NULL)) != 0)
-            THROW("Session close failed.");
+        ret = session->close(session, NULL);
+        if (ret != 0)
+            THROW_ERRNO(ret, "Session close failed.");
     }
 
     timespec now;
