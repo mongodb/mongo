@@ -250,14 +250,12 @@ private:
                 opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
         }());
 
-        std::string unusedErrMsg;
         MoveTimingHelper moveTimingHelper(opCtx,
                                           "from",
                                           moveChunkRequest.getNss().ns(),
                                           moveChunkRequest.getMinKey(),
                                           moveChunkRequest.getMaxKey(),
                                           6,  // Total number of steps
-                                          &unusedErrMsg,
                                           moveChunkRequest.getToShardId(),
                                           moveChunkRequest.getFromShardId());
 

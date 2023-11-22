@@ -958,7 +958,13 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
           "migrationId"_attr = _migrationId->toBSON());
 
     MoveTimingHelper timing(
-        outerOpCtx, "to", _nss.ns(), _min, _max, 7 /* steps */, &_errmsg, _toShard, _fromShard);
+        outerOpCtx, "to", _nss.ns(), _min, _max, 7 /* steps */, _toShard, _fromShard);
+    ON_BLOCK_EXIT([this, &timing] {
+        // Set the error message to MoveTimingHelper just before it is destroyed. The destructor
+        // sends that message (among other things) to the ShardingLogging.
+        stdx::lock_guard<Latch> sl(_mutex);
+        timing.setCmdErrMsg(_errmsg);
+    });
 
     const auto initialState = getState();
 
