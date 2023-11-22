@@ -35,6 +35,7 @@
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/chunks_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -48,6 +49,8 @@ using std::vector;
 
 using ShardStatistics = ClusterStatistics::ShardStatistics;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;
+
+PseudoRandom _random{SecureRandom::create()->nextInt64()};
 
 const auto emptyTagSet = std::set<std::string>();
 const std::string emptyShardVersion = "";
@@ -64,6 +67,16 @@ const KeyPattern kSKeyPattern(BSON("x" << 1));
 const boost::optional<Timestamp> kCollTimestamp;
 const OID kCollEpoch;
 
+std::vector<ChunkType> makeChunks(const std::vector<std::pair<ShardId, ChunkRange>>& specs) {
+    ChunkVersion chunkVersion{1, 0, kCollEpoch};
+    std::vector<ChunkType> chunks;
+    for (const auto& [shardId, range] : specs) {
+        chunks.push_back(ChunkType(kNamespace, range, chunkVersion, shardId));
+        chunkVersion.incMajor();
+    }
+    return chunks;
+}
+
 std::shared_ptr<RoutingTableHistory> makeRoutingTable(const std::vector<ChunkType>& chunks) {
     static const UUID kCollectionUUID{UUID::gen()};
 
@@ -72,7 +85,8 @@ std::shared_ptr<RoutingTableHistory> makeRoutingTable(const std::vector<ChunkTyp
 }
 
 std::shared_ptr<ChunkManager> makeChunkManager(const std::vector<ChunkType>& chunks) {
-    return std::make_shared<ChunkManager>(makeRoutingTable(chunks), boost::none /* clusterTime */);
+    return std::make_shared<ChunkManager>(makeRoutingTable(chunks),
+                                          boost::none /* atClusterTime */);
 }
 
 DistributionStatus makeDistStatus(std::shared_ptr<ChunkManager> cm,
@@ -144,6 +158,26 @@ std::vector<MigrateInfo> balanceChunks(const ShardStatisticsVector& shardStats,
                        return shardStatistics.shardId;
                    });
     return BalancerPolicy::balance(shardStats, distribution, &availableShards);
+}
+
+void checkChunksOnShardForTag(const DistributionStatus& dist,
+                              const ShardId& shardId,
+                              const std::string& zoneName,
+                              const std::vector<ChunkType>& expectedChunks) {
+    auto expectedChunkIt = expectedChunks.cbegin();
+    const auto completed =
+        dist.forEachChunkOnShardInZone(shardId, zoneName, [&](const auto& chunk) {
+            ASSERT(expectedChunkIt != expectedChunks.end())
+                << "forEachChunkOnShardInZone loop found more chunks than expected";
+            ChunkInfo expectedChunkInfo{*expectedChunkIt++};
+            ASSERT_EQ(Chunk(expectedChunkInfo, boost::none /* atClusterTime */).toString(),
+                      chunk.toString());
+            return true;  // continue
+        });
+    ASSERT(completed)
+        << "forEachChunkOnShardInZone loop unexpectedly returned false (did not complete)";
+    ASSERT(expectedChunkIt == expectedChunks.cend())
+        << "forEachChunkOnShardInZone loop did not iterate over all the expected chunks";
 }
 
 TEST(BalancerPolicy, Basic) {
@@ -339,6 +373,40 @@ TEST(BalancerPolicy, JumboChunksNotMovedWhileEnforcingZones) {
     ASSERT_BSONOBJ_EQ(jumboChunk.getMax(), migrations[0].maxKey);
 }
 
+TEST(BalancerPolicy, JumboChunksNotMovedWhileEnforcingZonesRandom) {
+    auto [cluster, cm] = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 3, false, emptyTagSet, emptyShardVersion), 3},
+         {ShardStatistics(kShardId1, kNoMaxSize, 3, false, {"a"}, emptyShardVersion), 3}});
+
+    // construct a new chunk map where all the chunks are jumbo except this one
+    const auto jumboChunkIdx = _random.nextInt64(cluster.second[kShardId0].size());
+    const auto& jumboChunk = cluster.second[kShardId0][jumboChunkIdx];
+
+    std::vector<ChunkType> chunks;
+    cm->forEachChunk([&](const auto& chunk) {
+        ChunkType ct{kNamespace, chunk.getRange(), chunk.getLastmod(), chunk.getShardId()};
+        if (chunk.getLastmod() == jumboChunk.getVersion())
+            ct.setJumbo(false);
+        else
+            ct.setJumbo(true);
+        chunks.emplace_back(std::move(ct));
+        return true;
+    });
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(zoneInfo.addRangeToZone(
+        ZoneRange(kSKeyPattern.globalMin(), kSKeyPattern.globalMax(), "a")));
+    auto newCm = makeChunkManager(chunks);
+    const auto distribution = makeDistStatus(newCm, std::move(zoneInfo));
+
+    const auto migrations(balanceChunks(cluster.first, distribution, false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId1, migrations[0].to);
+    ASSERT_BSONOBJ_EQ(jumboChunk.getMin(), migrations[0].minKey);
+    ASSERT_BSONOBJ_EQ(jumboChunk.getMax(), migrations[0].maxKey);
+}
+
 TEST(BalancerPolicy, JumboChunksNotMoved) {
     auto [cluster, cm] = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 4},
@@ -360,6 +428,35 @@ TEST(BalancerPolicy, JumboChunksNotMoved) {
 
     auto newCm = makeChunkManager(chunks);
     const auto migrations(balanceChunks(cluster.first, makeDistStatus(newCm), false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId1, migrations[0].to);
+    ASSERT_BSONOBJ_EQ(jumboChunk.getMin(), migrations[0].minKey);
+    ASSERT_BSONOBJ_EQ(jumboChunk.getMax(), migrations[0].maxKey);
+}
+
+TEST(BalancerPolicy, JumboChunksNotMovedRandom) {
+    auto [cluster, cm] = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 4},
+         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+
+    // construct a new chunk map where all the chunks are jumbo except this one
+    const auto jumboChunkIdx = _random.nextInt64(cluster.second[kShardId0].size());
+    const auto& jumboChunk = cluster.second[kShardId0][jumboChunkIdx];
+
+    std::vector<ChunkType> chunks;
+    cm->forEachChunk([&](const auto& chunk) {
+        ChunkType ct{kNamespace, chunk.getRange(), chunk.getLastmod(), chunk.getShardId()};
+        if (chunk.getLastmod() == jumboChunk.getVersion())
+            ct.setJumbo(false);
+        else
+            ct.setJumbo(true);
+        chunks.emplace_back(std::move(ct));
+        return true;
+    });
+
+    const auto migrations(
+        balanceChunks(cluster.first, makeDistStatus(makeChunkManager(chunks)), false));
     ASSERT_EQ(1U, migrations.size());
     ASSERT_EQ(kShardId0, migrations[0].from);
     ASSERT_EQ(kShardId1, migrations[0].to);
@@ -516,6 +613,33 @@ TEST(BalancerPolicy, DrainingNoAppropriateShardsFoundDueToTag) {
     ASSERT(migrations.empty());
 }
 
+TEST(BalancerPolicy, DrainingSingleAppropriateShardFoundMultipleTags) {
+    auto [cluster, cm] = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, true, {}, emptyShardVersion), 4},
+         {ShardStatistics(kShardId1, kNoMaxSize, 2, false, {"Zone1", "Zone2"}, emptyShardVersion),
+          2},
+         {ShardStatistics(kShardId2, kNoMaxSize, 2, false, {"Zone1", "Zone2"}, emptyShardVersion),
+          2},
+         {ShardStatistics(kShardId3, kNoMaxSize, 2, false, {}, emptyShardVersion), 2}});
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(
+        cluster.second[kShardId0][0].getMin(), cluster.second[kShardId0][0].getMax(), "Zone1")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(
+        cluster.second[kShardId0][1].getMin(), cluster.second[kShardId0][1].getMax(), "Zone2")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(
+        cluster.second[kShardId0][2].getMin(), cluster.second[kShardId0][2].getMax(), "Zone1")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(
+        cluster.second[kShardId0][3].getMin(), cluster.second[kShardId0][3].getMax(), "Zone2")));
+    const auto distribution = makeDistStatus(cm, std::move(zoneInfo));
+
+    const auto migrations(balanceChunks(cluster.first, distribution, false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    const auto& recipientShard = migrations[0].to;
+    ASSERT(recipientShard == kShardId1 || recipientShard == kShardId2);
+}
+
 TEST(BalancerPolicy, NoBalancingDueToAllNodesEitherDrainingOrMaxedOut) {
     // shard0 and shard2 are draining, shard1 is maxed out
     auto [cluster, cm] = generateCluster(
@@ -597,6 +721,23 @@ TEST(BalancerPolicy, BalancerRespectsTagPolicyBeforeImbalance) {
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
 }
 
+TEST(BalancerPolicy, OverloadedShardCannotDonateDueToTags) {
+    // There is a large imbalance between shard0 and the other shard, but shard0 can't donate chunks
+    // because it would violate tags.
+    auto [cluster, cm] = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 5},
+         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0},
+         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(zoneInfo.addRangeToZone(
+        ZoneRange(kSKeyPattern.globalMin(), kSKeyPattern.globalMax(), "a")));
+    const auto distribution = makeDistStatus(cm, std::move(zoneInfo));
+
+    const auto migrations(balanceChunks(cluster.first, distribution, false));
+    ASSERT_EQ(0U, migrations.size());
+}
+
 TEST(BalancerPolicy, BalancerFixesIncorrectTagsWithCrossShardViolationOfTags) {
     // The zone policy dictates that the same shard must donate and also receive chunks. The test
     // validates that the same shard is not used as a donor and recipient as part of the same round.
@@ -618,7 +759,7 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsWithCrossShardViolationOfTags) {
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
 }
 
-TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
+TEST(BalancerPolicy, BalancerFixesIncorrectTagInOtherwiseBalancedCluster) {
     // Chunks are balanced across shards, but there are wrong tags, which need to be fixed
     auto [cluster, cm] = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 3},
@@ -636,6 +777,34 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMin(), migrations[0].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
 }
+
+TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
+    auto [cluster, cm] = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, {}, emptyShardVersion), 4},
+         {ShardStatistics(kShardId1, kNoMaxSize, 2, false, {"Zone1", "Zone2"}, emptyShardVersion),
+          2},
+         {ShardStatistics(kShardId2, kNoMaxSize, 2, false, {"Zone1", "Zone2"}, emptyShardVersion),
+          2},
+         {ShardStatistics(kShardId3, kNoMaxSize, 2, false, {}, emptyShardVersion), 2}});
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(
+        cluster.second[kShardId0][0].getMin(), cluster.second[kShardId0][0].getMax(), "Zone1")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(
+        cluster.second[kShardId0][1].getMin(), cluster.second[kShardId0][1].getMax(), "Zone2")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(
+        cluster.second[kShardId0][2].getMin(), cluster.second[kShardId0][2].getMax(), "Zone1")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(
+        cluster.second[kShardId0][3].getMin(), cluster.second[kShardId0][3].getMax(), "Zone2")));
+    const auto distribution = makeDistStatus(cm, std::move(zoneInfo));
+
+    const auto migrations(balanceChunks(cluster.first, distribution, false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    const auto& recipientShard = migrations[0].to;
+    ASSERT(recipientShard == kShardId1 || recipientShard == kShardId2);
+}
+
 
 TEST(BalancerPolicy, BalancerTagAlreadyBalanced) {
     // Chunks are balanced across shards for the tag.
@@ -776,7 +945,609 @@ TEST(BalancerPolicy, BalancerHandlesNoShardsWithTag) {
     ASSERT(balanceChunks(cluster.first, distribution, false).empty());
 }
 
-TEST(DistributionStatus, AddTagRangeOverlap) {
+TEST(DistributionStatus, OneChunkNoZone) {
+    const auto chunks =
+        makeChunks({{kShardId0, {kSKeyPattern.globalMin(), kSKeyPattern.globalMax()}}});
+    const auto cm = makeChunkManager(chunks);
+    const auto distStatus = makeDistStatus(cm);
+
+    ASSERT_EQ(kNamespace, distStatus.nss());
+
+    ASSERT_EQ(1U, distStatus.totalChunksWithTag(ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("NotExistingZone"));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShard(kShardId0));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShard(kShardId1));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId0, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "NotExistingZone"));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "NotExistingZone"));
+
+    ASSERT_EQ(1U, distStatus.getZoneInfoForShard(kShardId0).size());
+    ASSERT_EQ(0U, distStatus.getZoneInfoForShard(kShardId1).size());
+
+    const auto& noZoneInfo = distStatus.getZoneInfoForShard(kShardId0).at(ZoneInfo::kNoZoneName);
+    ASSERT_EQ(1U, noZoneInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(kSKeyPattern.globalMin(), noZoneInfo.firstChunkMinKey);
+
+    checkChunksOnShardForTag(distStatus, kShardId0, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId0, ZoneInfo::kNoZoneName, chunks);
+}
+
+TEST(DistributionStatus, OneChunkOneZone) {
+    const auto chunks =
+        makeChunks({{kShardId0, {kSKeyPattern.globalMin(), kSKeyPattern.globalMax()}}});
+    const auto cm = makeChunkManager(chunks);
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(zoneInfo.addRangeToZone(
+        ZoneRange(kSKeyPattern.globalMin(), kSKeyPattern.globalMax(), "ZoneA")));
+    const auto distStatus = makeDistStatus(cm, std::move(zoneInfo));
+
+    ASSERT_EQ(kNamespace, distStatus.nss());
+
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag(ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("NotExistingZone"));
+    ASSERT_EQ(1U, distStatus.totalChunksWithTag("ZoneA"));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShard(kShardId0));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShard(kShardId1));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "NotExistingZone"));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneA"));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "NotExistingZone"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneA"));
+
+    ASSERT_EQ(1U, distStatus.getZoneInfoForShard(kShardId0).size());
+    ASSERT_EQ(0U, distStatus.getZoneInfoForShard(kShardId1).size());
+
+    const auto& shardZoneInfo = distStatus.getZoneInfoForShard(kShardId0).at("ZoneA");
+    ASSERT_EQ(1U, shardZoneInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(kSKeyPattern.globalMin(), shardZoneInfo.firstChunkMinKey);
+
+    checkChunksOnShardForTag(distStatus, kShardId1, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneA", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId0, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneA", chunks);
+}
+
+TEST(DistributionStatus, OneChunkMultipleContiguosZones) {
+    const auto chunks =
+        makeChunks({{kShardId0, {kSKeyPattern.globalMin(), kSKeyPattern.globalMax()}}});
+    const auto cm = makeChunkManager(chunks);
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(
+        zoneInfo.addRangeToZone(ZoneRange(kSKeyPattern.globalMin(), BSON("x" << 0), "ZoneA")));
+    ASSERT_OK(
+        zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 0), kSKeyPattern.globalMax(), "ZoneB")));
+    const auto distStatus = makeDistStatus(cm, std::move(zoneInfo));
+
+    ASSERT_EQ(kNamespace, distStatus.nss());
+
+    ASSERT_EQ(1U, distStatus.totalChunksWithTag(ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("NotExistingZone"));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("ZoneA"));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("ZoneB"));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShard(kShardId0));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShard(kShardId1));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId0, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "NotExistingZone"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneA"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneB"));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "NotExistingZone"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneA"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneB"));
+
+    ASSERT_EQ(1U, distStatus.getZoneInfoForShard(kShardId0).size());
+    ASSERT_EQ(0U, distStatus.getZoneInfoForShard(kShardId1).size());
+
+    const auto& shardZoneInfo = distStatus.getZoneInfoForShard(kShardId0).at(ZoneInfo::kNoZoneName);
+    ASSERT_EQ(1U, shardZoneInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(kSKeyPattern.globalMin(), shardZoneInfo.firstChunkMinKey);
+
+    checkChunksOnShardForTag(distStatus, kShardId1, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneA", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, ZoneInfo::kNoZoneName, chunks);
+    checkChunksOnShardForTag(distStatus, kShardId0, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneA", {});
+}
+
+TEST(DistributionStatus, OneChunkMultipleSparseZones) {
+    const auto chunks =
+        makeChunks({{kShardId0, {kSKeyPattern.globalMin(), kSKeyPattern.globalMax()}}});
+    const auto cm = makeChunkManager(chunks);
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(
+        zoneInfo.addRangeToZone(ZoneRange(kSKeyPattern.globalMin(), BSON("x" << 0), "ZoneA")));
+    ASSERT_OK(
+        zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 10), kSKeyPattern.globalMax(), "ZoneB")));
+    const auto distStatus = makeDistStatus(cm, std::move(zoneInfo));
+
+    ASSERT_EQ(kNamespace, distStatus.nss());
+
+    ASSERT_EQ(1U, distStatus.totalChunksWithTag(ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("NotExistingZone"));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("ZoneA"));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("ZoneB"));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShard(kShardId0));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShard(kShardId1));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId0, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "NotExistingZone"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneA"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneB"));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "NotExistingZone"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneA"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneB"));
+
+    ASSERT_EQ(1U, distStatus.getZoneInfoForShard(kShardId0).size());
+    ASSERT_EQ(0U, distStatus.getZoneInfoForShard(kShardId1).size());
+
+    const auto& shardZoneInfo = distStatus.getZoneInfoForShard(kShardId0).at(ZoneInfo::kNoZoneName);
+    ASSERT_EQ(1U, shardZoneInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(kSKeyPattern.globalMin(), shardZoneInfo.firstChunkMinKey);
+
+    checkChunksOnShardForTag(distStatus, kShardId1, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneA", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneB", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, ZoneInfo::kNoZoneName, chunks);
+    checkChunksOnShardForTag(distStatus, kShardId0, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneA", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneB", {});
+}
+
+TEST(DistributionStatus, MultipleChunksNoZone) {
+    const auto chunks = makeChunks({{kShardId0, {kSKeyPattern.globalMin(), BSON("x" << 0)}},
+                                    {kShardId0, {BSON("x" << 0), kSKeyPattern.globalMax()}}});
+    const auto cm = makeChunkManager(chunks);
+    const auto distStatus = makeDistStatus(cm);
+
+    ASSERT_EQ(kNamespace, distStatus.nss());
+
+    ASSERT_EQ(2U, distStatus.totalChunksWithTag(ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("NotExistingZone"));
+
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShard(kShardId0));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShard(kShardId1));
+
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShardWithTag(kShardId0, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "NotExistingZone"));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "NotExistingZone"));
+
+    ASSERT_EQ(1U, distStatus.getZoneInfoForShard(kShardId0).size());
+    ASSERT_EQ(0U, distStatus.getZoneInfoForShard(kShardId1).size());
+
+    const auto& noZoneInfo = distStatus.getZoneInfoForShard(kShardId0).at(ZoneInfo::kNoZoneName);
+    ASSERT_EQ(2U, noZoneInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(kSKeyPattern.globalMin(), noZoneInfo.firstChunkMinKey);
+
+    checkChunksOnShardForTag(distStatus, kShardId0, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId0, ZoneInfo::kNoZoneName, chunks);
+}
+
+TEST(DistributionStatus, MultipleChunksDistributedNoZone) {
+    const auto chunks = makeChunks({{kShardId1, {kSKeyPattern.globalMin(), BSON("x" << 0)}},
+                                    {kShardId0, {BSON("x" << 0), kSKeyPattern.globalMax()}}});
+    const auto cm = makeChunkManager(chunks);
+    const auto distStatus = makeDistStatus(cm);
+
+    ASSERT_EQ(kNamespace, distStatus.nss());
+
+    ASSERT_EQ(2U, distStatus.totalChunksWithTag(ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("NotExistingZone"));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShard(kShardId0));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShard(kShardId1));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId0, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "NotExistingZone"));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId1, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "NotExistingZone"));
+
+    ASSERT_EQ(1U, distStatus.getZoneInfoForShard(kShardId0).size());
+    ASSERT_EQ(1U, distStatus.getZoneInfoForShard(kShardId1).size());
+
+    const auto& noZoneInfoS0 = distStatus.getZoneInfoForShard(kShardId0).at(ZoneInfo::kNoZoneName);
+    ASSERT_EQ(1U, noZoneInfoS0.numChunks);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 0), noZoneInfoS0.firstChunkMinKey);
+
+    const auto& noZoneInfoS1 = distStatus.getZoneInfoForShard(kShardId1).at(ZoneInfo::kNoZoneName);
+    ASSERT_EQ(1U, noZoneInfoS1.numChunks);
+    ASSERT_BSONOBJ_EQ(kSKeyPattern.globalMin(), noZoneInfoS1.firstChunkMinKey);
+
+    checkChunksOnShardForTag(distStatus, kShardId0, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, ZoneInfo::kNoZoneName, {chunks[1]});
+    checkChunksOnShardForTag(distStatus, kShardId1, ZoneInfo::kNoZoneName, {chunks[0]});
+}
+
+TEST(DistributionStatus, MultipleChunksTwoShardsOneZone) {
+    const auto chunks = makeChunks({{kShardId0, {kSKeyPattern.globalMin(), BSON("x" << 0)}},
+                                    {kShardId0, {BSON("x" << 0), kSKeyPattern.globalMax()}}});
+    const auto cm = makeChunkManager(chunks);
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(zoneInfo.addRangeToZone(
+        ZoneRange(kSKeyPattern.globalMin(), kSKeyPattern.globalMax(), "ZoneA")));
+    const auto distStatus = makeDistStatus(cm, std::move(zoneInfo));
+
+    ASSERT_EQ(kNamespace, distStatus.nss());
+
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag(ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("NotExistingZone"));
+    ASSERT_EQ(2U, distStatus.totalChunksWithTag("ZoneA"));
+
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShard(kShardId0));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShard(kShardId1));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "NotExistingZone"));
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneA"));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "NotExistingZone"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneA"));
+
+    ASSERT_EQ(1U, distStatus.getZoneInfoForShard(kShardId0).size());
+    ASSERT_EQ(0U, distStatus.getZoneInfoForShard(kShardId1).size());
+
+    const auto& noZoneInfo = distStatus.getZoneInfoForShard(kShardId0).at("ZoneA");
+    ASSERT_EQ(2U, noZoneInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(kSKeyPattern.globalMin(), noZoneInfo.firstChunkMinKey);
+
+    checkChunksOnShardForTag(distStatus, kShardId0, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId0, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneA", chunks);
+    checkChunksOnShardForTag(distStatus, kShardId1, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneA", {});
+}
+
+TEST(DistributionStatus, MultipleChunksTwoContiguosZones) {
+    const auto chunks = makeChunks({{kShardId0, {kSKeyPattern.globalMin(), BSON("x" << 0)}},
+                                    {kShardId0, {BSON("x" << 0), kSKeyPattern.globalMax()}}});
+    const auto cm = makeChunkManager(chunks);
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(
+        zoneInfo.addRangeToZone(ZoneRange(kSKeyPattern.globalMin(), BSON("x" << 0), "ZoneA")));
+    ASSERT_OK(
+        zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 0), kSKeyPattern.globalMax(), "ZoneB")));
+    const auto distStatus = makeDistStatus(cm, std::move(zoneInfo));
+
+    ASSERT_EQ(kNamespace, distStatus.nss());
+
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag(ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("NotExistingZone"));
+    ASSERT_EQ(1U, distStatus.totalChunksWithTag("ZoneA"));
+    ASSERT_EQ(1U, distStatus.totalChunksWithTag("ZoneB"));
+
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShard(kShardId0));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShard(kShardId1));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "NotExistingZone"));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneA"));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneB"));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "NotExistingZone"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneA"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneB"));
+
+    ASSERT_EQ(2U, distStatus.getZoneInfoForShard(kShardId0).size());
+    ASSERT_EQ(0U, distStatus.getZoneInfoForShard(kShardId1).size());
+
+    auto& shardZoneAInfo = distStatus.getZoneInfoForShard(kShardId0).at("ZoneA");
+    ASSERT_EQ(1U, shardZoneAInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(kSKeyPattern.globalMin(), shardZoneAInfo.firstChunkMinKey);
+
+    auto& shardZoneBInfo = distStatus.getZoneInfoForShard(kShardId0).at("ZoneB");
+    ASSERT_EQ(1U, shardZoneBInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 0), shardZoneBInfo.firstChunkMinKey);
+
+    checkChunksOnShardForTag(distStatus, kShardId1, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneA", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneB", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId0, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneA", {chunks[0]});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneB", {chunks[1]});
+}
+
+TEST(DistributionStatus, MultipleChunksTwoZones) {
+    const auto chunks = makeChunks({{kShardId0, {kSKeyPattern.globalMin(), BSON("x" << 0)}},
+                                    {kShardId1, {BSON("x" << 0), BSON("x" << 10)}},
+                                    {kShardId2, {BSON("x" << 10), BSON("x" << 20)}},
+                                    {kShardId2, {BSON("x" << 20), BSON("x" << 30)}},
+                                    {kShardId0, {BSON("x" << 30), BSON("x" << 40)}},
+                                    {kShardId1, {BSON("x" << 40), BSON("x" << 50)}},
+                                    {kShardId2, {BSON("x" << 50), kSKeyPattern.globalMax()}}});
+    const auto cm = makeChunkManager(chunks);
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(
+        zoneInfo.addRangeToZone(ZoneRange(kSKeyPattern.globalMin(), BSON("x" << 20), "ZoneA")));
+    ASSERT_OK(
+        zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 30), kSKeyPattern.globalMax(), "ZoneB")));
+    const auto distStatus = makeDistStatus(cm, std::move(zoneInfo));
+
+    ASSERT_EQ(kNamespace, distStatus.nss());
+
+    ASSERT_EQ(1U, distStatus.totalChunksWithTag(ZoneInfo::kNoZoneName));
+    ASSERT_EQ(3U, distStatus.totalChunksWithTag("ZoneA"));
+    ASSERT_EQ(3U, distStatus.totalChunksWithTag("ZoneB"));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("NotExistingZone"));
+
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShard(kShardId0));
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShard(kShardId1));
+    ASSERT_EQ(3U, distStatus.numberOfChunksInShard(kShardId2));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "NotExistingZone"));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneA"));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneB"));
+
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "NotExistingZone"));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneA"));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneB"));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId2, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId2, "NotExistingZone"));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId2, "ZoneA"));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId2, "ZoneB"));
+
+    ASSERT_EQ(2U, distStatus.getZoneInfoForShard(kShardId0).size());
+    ASSERT_EQ(2U, distStatus.getZoneInfoForShard(kShardId1).size());
+    ASSERT_EQ(3U, distStatus.getZoneInfoForShard(kShardId2).size());
+
+    auto& shard0ZoneAInfo = distStatus.getZoneInfoForShard(kShardId0).at("ZoneA");
+    ASSERT_EQ(1U, shard0ZoneAInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(kSKeyPattern.globalMin(), shard0ZoneAInfo.firstChunkMinKey);
+    auto& shard0ZoneBInfo = distStatus.getZoneInfoForShard(kShardId0).at("ZoneB");
+    ASSERT_EQ(1U, shard0ZoneBInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 30), shard0ZoneBInfo.firstChunkMinKey);
+
+    auto& shard1ZoneAInfo = distStatus.getZoneInfoForShard(kShardId1).at("ZoneA");
+    ASSERT_EQ(1U, shard1ZoneAInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 0), shard1ZoneAInfo.firstChunkMinKey);
+    auto& shard1ZoneBInfo = distStatus.getZoneInfoForShard(kShardId1).at("ZoneB");
+    ASSERT_EQ(1U, shard1ZoneBInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 40), shard1ZoneBInfo.firstChunkMinKey);
+
+    auto& shard2ZoneAInfo = distStatus.getZoneInfoForShard(kShardId2).at("ZoneA");
+    ASSERT_EQ(1U, shard2ZoneAInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 10), shard2ZoneAInfo.firstChunkMinKey);
+    auto& shard2NoZoneInfo = distStatus.getZoneInfoForShard(kShardId2).at(ZoneInfo::kNoZoneName);
+    ASSERT_EQ(1U, shard2NoZoneInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 20), shard2NoZoneInfo.firstChunkMinKey);
+    auto& shard2ZoneBInfo = distStatus.getZoneInfoForShard(kShardId2).at("ZoneB");
+    ASSERT_EQ(1U, shard2ZoneBInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 50), shard2ZoneBInfo.firstChunkMinKey);
+
+    checkChunksOnShardForTag(distStatus, kShardId0, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId0, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneA", {chunks[0]});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneB", {chunks[4]});
+
+    checkChunksOnShardForTag(distStatus, kShardId1, ZoneInfo::kNoZoneName, {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneA", {chunks[1]});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneB", {chunks[5]});
+
+    checkChunksOnShardForTag(distStatus, kShardId2, ZoneInfo::kNoZoneName, {chunks[3]});
+    checkChunksOnShardForTag(distStatus, kShardId2, "NotExistingZone", {});
+    checkChunksOnShardForTag(distStatus, kShardId2, "ZoneA", {chunks[2]});
+    checkChunksOnShardForTag(distStatus, kShardId2, "ZoneB", {chunks[6]});
+}
+
+TEST(DistributionStatus, MultipleChunksMulitpleZoneRanges) {
+    const auto chunks = makeChunks({{kShardId0, {kSKeyPattern.globalMin(), BSON("x" << 0)}},
+
+                                    {kShardId1, {BSON("x" << 0), BSON("x" << 10)}},   // ZoneA
+                                    {kShardId0, {BSON("x" << 10), BSON("x" << 20)}},  // ZoneA
+
+                                    {kShardId1, {BSON("x" << 20), BSON("x" << 30)}},
+                                    {kShardId0, {BSON("x" << 30), BSON("x" << 40)}},
+
+                                    {kShardId1, {BSON("x" << 40), BSON("x" << 50)}},  // ZoneA
+                                    {kShardId0, {BSON("x" << 50), BSON("x" << 60)}},  // ZoneA
+
+                                    {kShardId1, {BSON("x" << 60), kSKeyPattern.globalMax()}}});
+    const auto cm = makeChunkManager(chunks);
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 0), BSON("x" << 20), "ZoneA")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 40), BSON("x" << 60), "ZoneA")));
+    const auto distStatus = makeDistStatus(cm, std::move(zoneInfo));
+
+    ASSERT_EQ(kNamespace, distStatus.nss());
+
+    ASSERT_EQ(4U, distStatus.totalChunksWithTag(ZoneInfo::kNoZoneName));
+    ASSERT_EQ(4U, distStatus.totalChunksWithTag("ZoneA"));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("NotExistingZone"));
+
+    ASSERT_EQ(4U, distStatus.numberOfChunksInShard(kShardId0));
+    ASSERT_EQ(4U, distStatus.numberOfChunksInShard(kShardId1));
+
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShardWithTag(kShardId0, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "NotExistingZone"));
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneA"));
+
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShardWithTag(kShardId1, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "NotExistingZone"));
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneA"));
+
+    ASSERT_EQ(2U, distStatus.getZoneInfoForShard(kShardId0).size());
+    ASSERT_EQ(2U, distStatus.getZoneInfoForShard(kShardId1).size());
+
+    auto& shard0ZoneAInfo = distStatus.getZoneInfoForShard(kShardId0).at("ZoneA");
+    ASSERT_EQ(2U, shard0ZoneAInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 10), shard0ZoneAInfo.firstChunkMinKey);
+    auto& shard0NoZoneInfo = distStatus.getZoneInfoForShard(kShardId0).at(ZoneInfo::kNoZoneName);
+    ASSERT_EQ(2U, shard0NoZoneInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(kSKeyPattern.globalMin(), shard0NoZoneInfo.firstChunkMinKey);
+
+    auto& shard1ZoneAInfo = distStatus.getZoneInfoForShard(kShardId1).at("ZoneA");
+    ASSERT_EQ(2U, shard1ZoneAInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 0), shard1ZoneAInfo.firstChunkMinKey);
+    auto& shard1NoZoneInfo = distStatus.getZoneInfoForShard(kShardId1).at(ZoneInfo::kNoZoneName);
+    ASSERT_EQ(2U, shard1NoZoneInfo.numChunks);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 20), shard1NoZoneInfo.firstChunkMinKey);
+
+    checkChunksOnShardForTag(distStatus, kShardId0, ZoneInfo::kNoZoneName, {chunks[0], chunks[4]});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneA", {chunks[2], chunks[6]});
+    checkChunksOnShardForTag(distStatus, kShardId0, "NotExistingZone", {});
+
+    checkChunksOnShardForTag(distStatus, kShardId1, ZoneInfo::kNoZoneName, {chunks[3], chunks[7]});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneA", {chunks[1], chunks[5]});
+    checkChunksOnShardForTag(distStatus, kShardId1, "NotExistingZone", {});
+}
+
+TEST(DistributionStatus, MultipleChunksMulitpleZoneRangesNotAligned) {
+    const auto chunks =
+        makeChunks({{kShardId0, {kSKeyPattern.globalMin(), BSON("x" << 0)}},     // Zone A
+                    {kShardId0, {BSON("x" << 0), BSON("x" << 10)}},              // Zone A
+                    {kShardId2, {BSON("x" << 10), BSON("x" << 20)}},             // No Zone
+                    {kShardId2, {BSON("x" << 20), BSON("x" << 30)}},             // Zone A
+                    {kShardId1, {BSON("x" << 30), BSON("x" << 40)}},             // No Zone
+                    {kShardId1, {BSON("x" << 40), BSON("x" << 50)}},             // Zone B
+                    {kShardId0, {BSON("x" << 50), BSON("x" << 60)}},             // No Zone
+                    {kShardId0, {BSON("x" << 60), BSON("x" << 70)}},             // Zone B
+                    {kShardId2, {BSON("x" << 70), kSKeyPattern.globalMax()}}});  // No zone
+    const auto cm = makeChunkManager(chunks);
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(
+        zoneInfo.addRangeToZone(ZoneRange(kSKeyPattern.globalMin(), BSON("x" << 15), "ZoneA")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 15), BSON("x" << 35), "ZoneA")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 40), BSON("x" << 55), "ZoneB")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 55), BSON("x" << 75), "ZoneB")));
+    const auto distStatus = makeDistStatus(cm, std::move(zoneInfo));
+
+    ASSERT_EQ(kNamespace, distStatus.nss());
+
+    ASSERT_EQ(4U, distStatus.totalChunksWithTag(ZoneInfo::kNoZoneName));
+    ASSERT_EQ(3U, distStatus.totalChunksWithTag("ZoneA"));
+    ASSERT_EQ(2U, distStatus.totalChunksWithTag("ZoneB"));
+    ASSERT_EQ(0U, distStatus.totalChunksWithTag("NotExistingZone"));
+
+    ASSERT_EQ(4U, distStatus.numberOfChunksInShard(kShardId0));
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShard(kShardId1));
+    ASSERT_EQ(3U, distStatus.numberOfChunksInShard(kShardId2));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId0, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneA"));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId0, "ZoneB"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId0, "NotExistingZone"));
+
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId1, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneA"));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId1, "ZoneB"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId1, "NotExistingZone"));
+
+    ASSERT_EQ(2U, distStatus.numberOfChunksInShardWithTag(kShardId2, ZoneInfo::kNoZoneName));
+    ASSERT_EQ(1U, distStatus.numberOfChunksInShardWithTag(kShardId2, "ZoneA"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId2, "ZoneB"));
+    ASSERT_EQ(0U, distStatus.numberOfChunksInShardWithTag(kShardId2, "NotExistingZone"));
+
+    ASSERT_EQ(3U, distStatus.getZoneInfoForShard(kShardId0).size());
+    ASSERT_EQ(2U, distStatus.getZoneInfoForShard(kShardId1).size());
+    ASSERT_EQ(2U, distStatus.getZoneInfoForShard(kShardId2).size());
+
+    checkChunksOnShardForTag(distStatus, kShardId0, ZoneInfo::kNoZoneName, {chunks[6]});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneA", {chunks[0], chunks[1]});
+    checkChunksOnShardForTag(distStatus, kShardId0, "ZoneB", {chunks[7]});
+    checkChunksOnShardForTag(distStatus, kShardId0, "NotExistingZone", {});
+
+    checkChunksOnShardForTag(distStatus, kShardId1, ZoneInfo::kNoZoneName, {chunks[4]});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneA", {});
+    checkChunksOnShardForTag(distStatus, kShardId1, "ZoneB", {chunks[5]});
+    checkChunksOnShardForTag(distStatus, kShardId1, "NotExistingZone", {});
+
+    checkChunksOnShardForTag(distStatus, kShardId2, ZoneInfo::kNoZoneName, {chunks[2], chunks[8]});
+    checkChunksOnShardForTag(distStatus, kShardId2, "ZoneA", {chunks[3]});
+    checkChunksOnShardForTag(distStatus, kShardId2, "ZoneB", {});
+    checkChunksOnShardForTag(distStatus, kShardId2, "NotExistingZone", {});
+}
+
+TEST(DistributionStatus, forEachChunkOnShardInZoneExitCondition) {
+    const auto chunks = makeChunks({{kShardId0, {kSKeyPattern.globalMin(), BSON("x" << 0)}},
+
+                                    {kShardId1, {BSON("x" << 0), BSON("x" << 10)}},   // ZoneA
+                                    {kShardId0, {BSON("x" << 10), BSON("x" << 20)}},  // ZoneA
+
+                                    {kShardId1, {BSON("x" << 20), BSON("x" << 30)}},
+                                    {kShardId0, {BSON("x" << 30), BSON("x" << 40)}},
+
+                                    {kShardId1, {BSON("x" << 40), BSON("x" << 50)}},  // ZoneA
+                                    {kShardId0, {BSON("x" << 50), BSON("x" << 60)}},  // ZoneA
+
+                                    {kShardId1, {BSON("x" << 60), kSKeyPattern.globalMax()}}});
+    const auto cm = makeChunkManager(chunks);
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 0), BSON("x" << 20), "ZoneA")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 40), BSON("x" << 60), "ZoneA")));
+    const auto distStatus = makeDistStatus(cm, std::move(zoneInfo));
+
+    const auto assertLoopStopAt =
+        [&](const ShardId& shardId, const std::string& zoneName, const size_t stopCount) {
+            size_t numChunkIterated{0};
+
+            const auto completed =
+                distStatus.forEachChunkOnShardInZone(shardId, zoneName, [&](const auto& chunk) {
+                    if (++numChunkIterated == stopCount) {
+                        return false;  // break
+                    }
+                    return true;  // continue
+                });
+
+            ASSERT(!completed) << "forEachChunkOnShardInZone loop did not stop";
+            ASSERT_EQ(stopCount, numChunkIterated);
+        };
+
+    assertLoopStopAt(kShardId0, ZoneInfo::kNoZoneName, 1);
+    assertLoopStopAt(kShardId0, ZoneInfo::kNoZoneName, 2);
+
+    assertLoopStopAt(kShardId1, ZoneInfo::kNoZoneName, 1);
+    assertLoopStopAt(kShardId1, ZoneInfo::kNoZoneName, 2);
+
+    assertLoopStopAt(kShardId0, "ZoneA", 1);
+    assertLoopStopAt(kShardId0, "ZoneA", 2);
+
+    assertLoopStopAt(kShardId1, "ZoneA", 1);
+    assertLoopStopAt(kShardId1, "ZoneA", 2);
+}
+
+TEST(ZoneInfo, AddTagRangeOverlap) {
     ZoneInfo zInfo;
 
     // Note that there is gap between 10 and 20 for which there is no tag
@@ -799,7 +1570,7 @@ TEST(DistributionStatus, AddTagRangeOverlap) {
               zInfo.addRangeToZone(ZoneRange(BSON("x" << 25), kSKeyPattern.globalMax(), "d")));
 }
 
-TEST(DistributionStatus, ChunkTagsSelectorWithRegularKeys) {
+TEST(ZoneInfo, ChunkTagsSelectorWithRegularKeys) {
     ZoneInfo zInfo;
     ASSERT_OK(zInfo.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 10), "a")));
     ASSERT_OK(zInfo.addRangeToZone(ZoneRange(BSON("x" << 10), BSON("x" << 20), "b")));
@@ -819,7 +1590,7 @@ TEST(DistributionStatus, ChunkTagsSelectorWithRegularKeys) {
                   zInfo.getZoneForChunk({BSON("x" << 40), kSKeyPattern.globalMax()}));
 }
 
-TEST(DistributionStatus, ChunkTagsSelectorWithMinMaxKeys) {
+TEST(ZoneInfo, ChunkTagsSelectorWithMinMaxKeys) {
 
     ZoneInfo zInfo;
     ASSERT_OK(zInfo.addRangeToZone(ZoneRange(kSKeyPattern.globalMin(), BSON("x" << -100), "a")));

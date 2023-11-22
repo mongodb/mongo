@@ -67,8 +67,23 @@ struct MigrateInfo {
     ChunkVersion version;
 };
 
+struct ShardZoneInfo {
+    ShardZoneInfo(size_t numChunks, size_t firstNormalizedZoneIdx, const BSONObj& firstChunkMinKey)
+        : numChunks(numChunks),
+          firstNormalizedZoneIdx(firstNormalizedZoneIdx),
+          firstChunkMinKey(firstChunkMinKey) {}
+
+    // Total number of chunks this shard has for this zone
+    size_t numChunks;
+    // Index in the vector of normalised zones of the first zone range that contains the first chunk
+    // for this shard in this zone
+    size_t firstNormalizedZoneIdx;
+    // minKey of the first chunk this shard has in this zone
+    BSONObj firstChunkMinKey;
+};
+
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
-typedef std::map<ShardId, StringMap<size_t>> ShardToZoneSizeMap;
+typedef StringMap<StringMap<ShardZoneInfo>> ShardZoneInfoMap;
 
 /**
  * Keeps track of zones for a collection.
@@ -175,15 +190,78 @@ public:
         return _chunkMngr;
     }
 
-    const std::vector<ZoneRange>& getNormalizedZones() const {
-        return _normalizedZones;
-    }
-
     const ZoneInfo& getZoneInfo() const {
         return _zoneInfo;
     }
 
-    const StringMap<size_t>& getChunksPerTagMap(const ShardId& shardId) const;
+    const StringMap<ShardZoneInfo>& getZoneInfoForShard(const ShardId& shardId) const;
+
+    /**
+     * Loop through each chunk on this shard within the given zone invoking 'handler' for each one
+     * of them.
+     *
+     * The iteration stops either when all the chunks have been visited (the method
+     * will return 'true') or the first time 'handler' returns 'false' (in which case the method
+     * will return 'false').
+     *
+     * Effectively, return of 'true' means all chunks were visited and none matched, and
+     * 'false' means the hanlder return 'false' before visiting all chunks.
+     */
+    template <typename Callable>
+    bool forEachChunkOnShardInZone(const ShardId& shardId,
+                                   const std::string& zoneName,
+                                   Callable&& handler) const {
+
+        bool shouldContinue = true;
+
+        const auto& shardZoneInfoMap = getZoneInfoForShard(shardId);
+        auto shardZoneInfoIt = shardZoneInfoMap.find(zoneName);
+        if (shardZoneInfoIt == shardZoneInfoMap.end()) {
+            return shouldContinue;
+        }
+        const auto& shardZoneInfo = shardZoneInfoIt->second;
+
+        // Start from the first normalized zone that contains chunks for this shard
+        const auto initialZoneIt = _normalizedZones.cbegin() + shardZoneInfo.firstNormalizedZoneIdx;
+
+        for (auto normalizedZoneIt = initialZoneIt; normalizedZoneIt < _normalizedZones.cend();
+             normalizedZoneIt++) {
+            const auto& zoneRange = *normalizedZoneIt;
+
+            const auto isFirstRange = (normalizedZoneIt == initialZoneIt);
+
+            if (isFirstRange) {
+                invariant(zoneRange.zone == zoneName,
+                          str::stream() << "Unexpected first normalized zone for shard '"
+                                        << shardId.toString() << "'. Expected '" << zoneName
+                                        << "' but found '" << zoneRange.zone << "'");
+            } else if (zoneRange.zone != zoneName) {
+                continue;
+            }
+
+            // For the first range in zone we have pre-cached the minKey of the first chunk,
+            // thus we can start iterating from that one.
+            // For the subsequent ranges in this zone we start iterating from the minKey of
+            // the range itself.
+            const auto firstKey = isFirstRange ? shardZoneInfo.firstChunkMinKey : zoneRange.min;
+
+            getChunkManager()->forEachOverlappingChunk(
+                firstKey, zoneRange.max, false /* isMaxInclusive */, [&](const auto& chunk) {
+                    if (chunk.getShardId() != shardId) {
+                        return true;  // continue
+                    }
+                    if (!handler(chunk)) {
+                        shouldContinue = false;
+                    };
+                    return shouldContinue;
+                });
+
+            if (!shouldContinue) {
+                break;
+            }
+        }
+        return shouldContinue;
+    }
 
     /**
      * Returns a BSON/string representation of this distribution status.
@@ -196,12 +274,23 @@ private:
     NamespaceString _nss;
 
     // Map that tracks how many chunks every shard is owning in each zone
-    // shardId -> zoneName -> numChunks
-    ShardToZoneSizeMap _shardToZoneSizeMap;
+    // shardId -> zoneName -> shardZoneInfo
+    ShardZoneInfoMap _shardZoneInfoMap;
 
     // Info for zones.
     ZoneInfo _zoneInfo;
 
+    // Normalized zone are calculated starting from the currently configured zone in `config.tags`
+    // and the chunks provided by @this._chunkManager.
+    //
+    // The normalization process is performed to guarantee the following properties:
+    //  - **All zone ranges are contiguous.** If there was a gap between two zones ranges we fill it
+    //  with a range associated to the special kNoZone.
+    //
+    //  - **Range boundaries always align with chunk boundaries.** If a zone range covers only
+    //  partially a chunk, boundaries of that zone will be shrunk so that the normalized zone won't
+    //  overlap with that chunk. Boundaries of a normalized zone will never fall in the middle of a
+    //  chunk.
     std::vector<ZoneRange> _normalizedZones;
 
     const ChunkManager* _chunkMngr;
