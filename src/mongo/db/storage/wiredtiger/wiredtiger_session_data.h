@@ -31,11 +31,9 @@
 
 #include <wiredtiger.h>
 
-#include "mongo/db/operation_context.h"
+#include "mongo/util/interruptible.h"
 
 namespace mongo {
-
-void failPointPauseBeforeStorageCompactCommand();
 
 /**
  * Sets up a WT_SESSION to have callback data with which to check for MDB layer interrupts.
@@ -44,11 +42,11 @@ void failPointPauseBeforeStorageCompactCommand();
 class SessionDataRAII {
 public:
     /**
-     * Allows WT operations running on this 'session' access to the MDB layer 'opCtx'.
+     * Allows WT operations running on this 'session' access to the MDB layer 'interruptible'.
      */
-    SessionDataRAII(WT_SESSION* session, OperationContext* opCtx) : _session(session) {
+    SessionDataRAII(WT_SESSION* session, Interruptible* interruptible) : _session(session) {
         invariant(!_session->app_private);
-        _session->app_private = opCtx;
+        _session->app_private = interruptible;
     }
 
     /**
