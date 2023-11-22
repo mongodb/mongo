@@ -47,7 +47,6 @@ MoveTimingHelper::MoveTimingHelper(OperationContext* opCtx,
                                    const BSONObj& min,
                                    const BSONObj& max,
                                    int totalNumSteps,
-                                   std::string* cmdErrmsg,
                                    const ShardId& toShard,
                                    const ShardId& fromShard)
     : _opCtx(opCtx),
@@ -56,7 +55,6 @@ MoveTimingHelper::MoveTimingHelper(OperationContext* opCtx,
       _to(toShard),
       _from(fromShard),
       _totalNumSteps(totalNumSteps),
-      _cmdErrmsg(cmdErrmsg),
       _nextStep(0) {
     _b.append("min", min);
     _b.append("max", max);
@@ -80,8 +78,8 @@ MoveTimingHelper::~MoveTimingHelper() {
             _b.append("note", "success");
         }
 
-        if (!_cmdErrmsg->empty()) {
-            _b.append("errmsg", *_cmdErrmsg);
+        if (!_cmdErrmsg.empty()) {
+            _b.append("errmsg", _cmdErrmsg);
         }
 
         ShardingLogging::get(_opCtx)->logChange(_opCtx,

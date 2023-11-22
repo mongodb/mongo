@@ -48,10 +48,13 @@ public:
                      const BSONObj& min,
                      const BSONObj& max,
                      int totalNumSteps,
-                     std::string* cmdErrmsg,
                      const ShardId& toShard,
                      const ShardId& fromShard);
     ~MoveTimingHelper();
+
+    void setCmdErrMsg(std::string cmdErrMsg) {
+        _cmdErrmsg = std::move(cmdErrMsg);
+    }
 
     void done(int step);
 
@@ -65,7 +68,7 @@ private:
     const ShardId _to;
     const ShardId _from;
     const int _totalNumSteps;
-    const std::string* _cmdErrmsg;
+    std::string _cmdErrmsg;
 
     int _nextStep;
     BSONObjBuilder _b;
