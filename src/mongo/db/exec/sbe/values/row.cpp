@@ -441,6 +441,14 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
     }
 }
 
+/**
+ * If non-null 'collator' is provided during serialization, then the encoding guarantees that values
+ * which are equal up to the collation will encode to the same result, allowing for collation-aware
+ * equality comparisons. However, the collator-aware encoded values are not always decodable and the
+ * key string equality no longer implies equality of the original values. Groups store an original
+ * copy of the group key alongside the encoded key string when there is a collation, so the key
+ * string does not need to be decodable.
+ */
 static void serializeValueIntoKeyString(key_string::Builder& buf,
                                         TypeTags tag,
                                         Value val,
@@ -529,6 +537,10 @@ static void serializeValueIntoKeyString(key_string::Builder& buf,
             break;
         }
         case TypeTags::bsonSymbol: {
+            // Note that the collation would have to apply to bsonSymbol values to match the
+            // behavior of the Classic engine when spilling groups to disk. bsonSymbol is
+            // deprecated, however, and SBE no longer provides strict correctness guarantees about
+            // computations on bsonSymbol values.
             buf.appendBool(true);
             buf.appendSymbol(getStringOrSymbolView(tag, val));
             break;
@@ -536,21 +548,34 @@ static void serializeValueIntoKeyString(key_string::Builder& buf,
         case TypeTags::ArrayMultiSet:
         case TypeTags::ArraySet:
         case TypeTags::Array: {
-            // TODO SERVER-61629: convert this to serialize the 'arr' directly instead of
-            // constructing a BSONArray.
-            BSONArrayBuilder builder;
-            bson::convertToBsonArr(builder, value::ArrayEnumerator{tag, val});
             buf.appendBool(true);
-            buf.appendArray(BSONArray(builder.done()));
+
+            if (collator) {
+                // Using 'hashValue()' guarantees that two arrays whose elements are equal up to the
+                // collation will translate to the same key string output.
+                buf.appendNumberLong(hashValue(tag, val, collator));
+            } else {
+                // TODO SERVER-61629: convert this to serialize the 'arr' directly instead of
+                // constructing a BSONArray.
+                BSONArrayBuilder builder;
+                bson::convertToBsonArr(builder, value::ArrayEnumerator{tag, val});
+                buf.appendArray(BSONArray(builder.done()));
+            }
             break;
         }
         case TypeTags::Object: {
-            // TODO SERVER-61629: convert this to serialize the 'obj' directly instead of
-            // constructing a BSONObj.
-            BSONObjBuilder builder;
-            bson::convertToBsonObj(builder, getObjectView(val));
             buf.appendBool(true);
-            buf.appendObject(builder.done());
+            if (collator) {
+                // Using 'hashValue()' guarantees that two objects whose elements are equal up to
+                // the collation will translate to the same key string output.
+                buf.appendNumberLong(hashValue(tag, val, collator));
+            } else {
+                // TODO SERVER-61629: convert this to serialize the 'obj' directly instead of
+                // constructing a BSONObj.
+                BSONObjBuilder builder;
+                bson::convertToBsonObj(builder, getObjectView(val));
+                buf.appendObject(builder.done());
+            }
             break;
         }
         case TypeTags::ObjectId: {
@@ -560,12 +585,24 @@ static void serializeValueIntoKeyString(key_string::Builder& buf,
         }
         case TypeTags::bsonObject: {
             buf.appendBool(true);
-            buf.appendObject(BSONObj(getRawPointerView(val)));
+            if (collator) {
+                // Using 'hashValue()' guarantees that two objects whose elements are equal up to
+                // the collation will translate to the same key string output.
+                buf.appendNumberLong(hashValue(tag, val, collator));
+            } else {
+                buf.appendObject(BSONObj(getRawPointerView(val)));
+            }
             break;
         }
         case TypeTags::bsonArray: {
             buf.appendBool(true);
-            buf.appendArray(BSONArray(BSONObj(getRawPointerView(val))));
+            if (collator) {
+                // Using 'hashValue()' guarantees that two arrays whose elements are equal up to the
+                // collation will translate to the same key string output.
+                buf.appendNumberLong(hashValue(tag, val, collator));
+            } else {
+                buf.appendArray(BSONArray(BSONObj(getRawPointerView(val))));
+            }
             break;
         }
         case TypeTags::bsonObjectId: {
