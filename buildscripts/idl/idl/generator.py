@@ -107,10 +107,18 @@ def _access_member(field):
     return member_name
 
 
+def _std_array_expr(value_type, elems):
+    # type: (str, List[str]) -> str
+    """Return a std::array<value_type, N>{elems} expression."""
+    elem_str = ', '.join(elems)
+    return f'std::array<{value_type}, {len(elems)}>{{{elem_str}}}'
+
+
 def _get_bson_type_check(bson_element, ctxt_name, ast_type):
     # type: (str, str, ast.Type) -> str
     """Get the C++ bson type check for a Type."""
-    bson_types = ast_type.bson_serialization_type
+    # Deduplicate the types in the array.
+    bson_types = list(set(ast_type.bson_serialization_type))
     if len(bson_types) == 1:
         if bson_types[0] in ['any', 'chain']:
             # Skip BSON validation for 'any' types since they are required to validate the
@@ -120,13 +128,14 @@ def _get_bson_type_check(bson_element, ctxt_name, ast_type):
             return None
 
         if not bson_types[0] == 'bindata':
-            return '%s.checkAndAssertType(%s, %s)' % (ctxt_name, bson_element,
-                                                      bson.cpp_bson_type_name(bson_types[0]))
-        return '%s.checkAndAssertBinDataType(%s, %s)' % (
+            return 'MONGO_likely(%s.checkAndAssertType(%s, %s))' % (
+                ctxt_name, bson_element, bson.cpp_bson_type_name(bson_types[0]))
+        return 'MONGO_likely(%s.checkAndAssertBinDataType(%s, %s))' % (
             ctxt_name, bson_element, bson.cpp_bindata_subtype_type_name(ast_type.bindata_subtype))
     else:
-        type_list = '{%s}' % (', '.join([bson.cpp_bson_type_name(b) for b in bson_types]))
-        return '%s.checkAndAssertTypes(%s, %s)' % (ctxt_name, bson_element, type_list)
+        return (
+            f'MONGO_likely({ctxt_name}.checkAndAssertTypes({bson_element}, '
+            f'{_std_array_expr("BSONType", [bson.cpp_bson_type_name(b) for b in bson_types])}))')
 
 
 def _get_required_fields(struct):
@@ -1383,7 +1392,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             with self._predicate('MONGO_likely(arrayFieldName == expectedFieldNumber)'):
                 check = _get_bson_type_check('arrayElement', 'arrayCtxt', ast_type)
-                check = "MONGO_likely(%s)" % (check) if check is not None else check
 
                 with self._predicate(check):
                     if ast_type.is_variant:
@@ -1456,11 +1464,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 self._writer.write_line('default:')
                 self._writer.indent()
-                expected_types = ', '.join(
-                    'BSONType::%s' % bson.cpp_bson_type_name(t.bson_serialization_type[0])
-                    for t in array_types)
+                expected_types = [
+                    bson.cpp_bson_type_name(t.bson_serialization_type[0]) for t in array_types
+                ]
                 self._writer.write_line(
-                    'ctxt.throwBadType(%s, {%s});' % (bson_element, expected_types))
+                    f'ctxt.throwBadType({bson_element},  {_std_array_expr("BSONType", expected_types)});'
+                )
                 self._writer.write_line('break;')
                 self._writer.unindent()
                 # End of inner switch.
@@ -1497,10 +1506,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self._writer.write_line('default:')
         self._writer.indent()
-        expected_types = ', '.join(
-            'BSONType::%s' % bson.cpp_bson_type_name(t.bson_serialization_type[0])
-            for t in scalar_types)
-        self._writer.write_line('ctxt.throwBadType(%s, {%s});' % (bson_element, expected_types))
+        expected_types = [
+            bson.cpp_bson_type_name(t.bson_serialization_type[0]) for t in array_types
+        ]
+        self._writer.write_line(f'ctxt.throwBadType({bson_element}, '
+                                f'{_std_array_expr("BSONType", expected_types)});')
         self._writer.write_line('break;')
         self._writer.unindent()
 
@@ -1615,8 +1625,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             predicate = None
             if check_type:
                 predicate = _get_bson_type_check(bson_element, 'ctxt', field_type)
-                if predicate:
-                    predicate = "MONGO_likely(%s)" % (predicate)
 
             with self._predicate(predicate):
 
