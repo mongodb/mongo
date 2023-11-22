@@ -117,14 +117,14 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
     }
     dhandle->cfg[1] = metaconf;
     dhandle->meta_base = base;
-    dhandle->meta_base_length = base == NULL ? 0 : strlen(base);
-#ifdef HAVE_DIAGNOSTIC
     /*  Save the original metadata value for further check to avoid writing corrupted data. */
-    if (base == NULL)
-        dhandle->orig_meta_base = NULL;
-    else
+    if (base != NULL) {
+        dhandle->meta_hash = __wt_hash_city64(base, strlen(base));
+        __wt_epoch(session, &dhandle->base_upd);
         WT_ERR(__wt_strdup(session, base, &dhandle->orig_meta_base));
-#endif
+        dhandle->orig_meta_hash = dhandle->meta_hash;
+        dhandle->orig_upd = dhandle->base_upd;
+    }
     return (0);
 
 err:
