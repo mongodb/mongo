@@ -65,7 +65,15 @@ function setUpData() {
 }
 
 function runReplacementUpdateTestsForHashedShardKey() {
-    // Make sure the chunk containing key {_id: -100} is on shard0.
+    // Make sure the chunk containing key {_id: -100} is on shard0; the chunk is migrated twice to
+    // ensure that the shard CSR has also a not-UNKOWN version. This will allow direct writes
+    // performed later in this test to work because the filtering metadata are set.
+    assert.commandWorked(mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: -100},
+        to: st.shard1.shardName,
+        _waitForDelete: true
+    }));
     assert.commandWorked(mongosDB.adminCommand({
         moveChunk: mongosColl.getFullName(),
         find: {_id: -100},
@@ -73,7 +81,15 @@ function runReplacementUpdateTestsForHashedShardKey() {
         _waitForDelete: true
     }));
 
-    // Make sure the chunk containing key {_id: -101} is on shard1.
+    // Make sure the chunk containing key {_id: 101} is on shard1; the chunk is migrated twice to
+    // ensure that the shard CSR has also a not-UNKOWN version. This will allow direct writes
+    // performed later in this test to work because the filtering metadata are set.
+    assert.commandWorked(mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {_id: 101},
+        to: st.shard0.shardName,
+        _waitForDelete: true
+    }));
     assert.commandWorked(mongosDB.adminCommand({
         moveChunk: mongosColl.getFullName(),
         find: {_id: 101},

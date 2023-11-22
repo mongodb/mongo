@@ -184,8 +184,8 @@ public:
                     requestToForward.setTimeseries(std::move(timeseriesOptions));
                 }
 
+                // TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
                 FixedFCVRegion fixedFcvRegion{opCtx};
-
                 auto coordinatorDoc = [&] {
                     if (feature_flags::gAuthoritativeShardCollection.isEnabled(
                             (*fixedFcvRegion).acquireFCVSnapshot())) {
@@ -197,7 +197,7 @@ public:
                         return doc.toBSON();
                     } else {
                         const DDLCoordinatorTypeEnum coordType =
-                            DDLCoordinatorTypeEnum::kCreateCollectionPre71Compatible;
+                            DDLCoordinatorTypeEnum::kCreateCollectionPre73Compatible;
                         auto doc = CreateCollectionCoordinatorDocumentLegacy();
                         doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
                         doc.setShardsvrCreateCollectionRequest(requestToForward);
