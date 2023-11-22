@@ -75,8 +75,6 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kWriteConcernTimeoutMigration);
 
-std::string kEmptyErrMsgForMoveTimingHelper;
-
 /*
  * Calculates the max or min bound perform split+move in case the chunk in question is splittable.
  * If the chunk is not splittable, returns the bound of the existing chunk for the max or min.Finds
@@ -164,7 +162,6 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                         _args.getMin(),
                         _args.getMax(),
                         6,  // Total number of steps
-                        &kEmptyErrMsgForMoveTimingHelper,
                         _args.getToShard(),
                         _args.getFromShard()) {
     invariant(!_opCtx->lockState()->isLocked());
