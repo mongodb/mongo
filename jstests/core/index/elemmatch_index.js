@@ -6,8 +6,6 @@
  *   assumes_read_concern_local,
  * ]
  */
-
-// adding temporary comment
 import {getOptimizer, getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.elemMatch_index;

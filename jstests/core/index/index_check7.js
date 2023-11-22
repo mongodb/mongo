@@ -44,5 +44,3 @@ switch (getOptimizer(explainResult)) {
     default:
         break
 }
-
-t.drop();

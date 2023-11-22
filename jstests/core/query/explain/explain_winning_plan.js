@@ -8,6 +8,8 @@
 //   assumes_against_mongod_not_mongos,
 // ]
 
+import {getOptimizer} from "jstests/libs/analyze_plan.js";
+
 const coll = db.explain_winning_plan;
 coll.drop();
 
@@ -43,7 +45,16 @@ assert.eq(explain.executionStats.nReturned, numDocs);
 // representing two candidate plans evaluated by the multi-planner.
 assert(explain.executionStats.hasOwnProperty("allPlansExecution"), explain);
 assert(Array.isArray(explain.executionStats.allPlansExecution), explain);
-assert.eq(explain.executionStats.allPlansExecution.length, 2, explain);
+
+switch (getOptimizer(explain)) {
+    case "classic":
+        assert.eq(explain.executionStats.allPlansExecution.length, 2, explain);
+        break;
+    case "CQF":
+        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+        break;
+}
 
 // Each candidate plan should have returned exactly 'maxResults' number of documents during the
 // trial period.

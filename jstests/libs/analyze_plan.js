@@ -228,6 +228,8 @@ export function getRejectedPlans(root) {
 export function hasRejectedPlans(root) {
     function sectionHasRejectedPlans(explainSection, optimizer = "classic") {
         if (optimizer == "CQF") {
+            // TODO SERVER-77719: The existence of alternative/rejected plans will be re-evaluated
+            // in the future.
             return true;
         }
 
@@ -255,6 +257,8 @@ export function hasRejectedPlans(root) {
         return cursorStages.find((cursorStage) => cursorStageHasRejectedPlans(cursorStage)) !==
             undefined;
     } else {
+        let optimizer = getOptimizer(root);
+
         // This is some sort of query explain.
         assert(root.hasOwnProperty("queryPlanner"), tojson(root));
         assert(root.queryPlanner.hasOwnProperty("winningPlan"), tojson(root));
@@ -262,15 +266,22 @@ export function hasRejectedPlans(root) {
             // SERVER-77719: Update regarding the expected behavior of the CQF optimizer. Currently
             // CQF explains are empty, when the optimizer returns alternative plans, we should
             // address this.
-            let optimizer = getOptimizer(root);
 
             // This is an unsharded explain.
             return sectionHasRejectedPlans(root.queryPlanner, optimizer);
         }
+
+        if ("SINGLE_SHARD" == root.queryPlanner.winningPlan.stage) {
+            var shards = root.queryPlanner.winningPlan.shards;
+            shards.forEach(function assertShardHasRejectedPlans(shard) {
+                sectionHasRejectedPlans(shard, optimizer);
+            });
+        }
+
         // This is a sharded explain. Each entry in the shards array contains a 'winningPlan' and
         // 'rejectedPlans'.
         return root.queryPlanner.winningPlan.shards.find(
-                   (shard) => sectionHasRejectedPlans(shard)) !== undefined;
+                   (shard) => sectionHasRejectedPlans(shard, optimizer)) !== undefined;
     }
 }
 
@@ -894,4 +905,15 @@ export function getNumberOfColumnScans(explain) {
     }
     const columnIndexScans = getPlanStages(getWinningPlan(explain.queryPlanner), stages[optimizer]);
     return columnIndexScans.length;
+}
+
+/*
+ * Returns whether a query is using a multikey index.
+ *
+ * This helper function can be used only for "classic" optimizer.
+ */
+export function isIxscanMultikey(winningPlan) {
+    // SERVER-77719: Update to expected this method to allow also use with CQF optimizer.
+    let ixscanStage = getPlanStage(winningPlan, "IXSCAN");
+    return ixscanStage.isMultiKey;
 }

@@ -17,6 +17,7 @@
  *   assumes_no_implicit_index_creation,
  * ]
  */
+import {getOptimizer} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
@@ -40,6 +41,12 @@ let assertPlanCacheField = function(
                   "Mismatch for field " + planCacheField + " when comparing " +
                       tojson(firstExplain) + " with " + tojson(secondExplain));
     };
+
+    // TODO SERVER-77719: Ensure that the test is valid for different combinations of optimizer used
+    // for with/without index cases.
+    if (!(getOptimizer(firstExplain) == getOptimizer(secondExplain))) {
+        return;
+    }
 
     // SERVER-56980: When running in a sharded environment, we group the values for 'planCacheField'
     // by shard. This is because in a multi-version environment, we want to ensure that we are

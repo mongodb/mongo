@@ -7,7 +7,7 @@
 //   # TODO SERVER-77719: Enable this check for Bonsai.
 //   cqf_experimental_incompatible
 // ]
-import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getOptimizer, getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.jstests_ord;
@@ -32,10 +32,20 @@ for (let i = 0; i < 1000; ++i) {
 // preliminary check here, using explain. However, this does not guarantee the query below will use
 // an ixscan, because the chosen plan may not be the same.
 const explainRes = assert.commandWorked(coll.find({$or: [{a: 1}, {b: 1}]}).explain());
-const orStages = getPlanStages(getWinningPlan(explainRes.queryPlanner), "OR");
-assert(orStages.length > 0, "Expected to find OR stage in explain: " + tojson(explainRes));
-assert(orStages.every(orStage => (getPlanStages(orStage, "IXSCAN").length > 0)),
-       "Expected the plan to be an OR which has (at least) one IXSCAN: " + tojson(explainRes));
+switch (getOptimizer(explainRes)) {
+    case "classic": {
+        const orStages = getPlanStages(getWinningPlan(explainRes.queryPlanner), "OR");
+        assert(orStages.length > 0, "Expected to find OR stage in explain: " + tojson(explainRes));
+        assert(
+            orStages.every(orStage => (getPlanStages(orStage, "IXSCAN").length > 0)),
+            "Expected the plan to be an OR which has (at least) one IXSCAN: " + tojson(explainRes));
+        break;
+    }
+    case "CQF":
+        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+        break;
+}
 
 // This query should match 180 out of 1180 total documents.
 const cursor = coll.find({$or: [{a: 1}, {b: 1}]}).batchSize(100);
