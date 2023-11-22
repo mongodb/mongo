@@ -133,7 +133,7 @@ def main():
         f'-v "{current_dir}/copybara.sky":/usr/src/app/copy.bara.sky',
         "-e COPYBARA_CONFIG='copy.bara.sky'",
         "-e COPYBARA_SUBCOMMAND='migrate'",
-        f"-e COPYBARA_OPTIONS='-v --last-rev=f70b17b --git-destination-url={git_destination_url_with_token}'",
+        f"-e COPYBARA_OPTIONS='-v --git-destination-url={git_destination_url_with_token}'",
         "copybara copybara",
     ]
 
