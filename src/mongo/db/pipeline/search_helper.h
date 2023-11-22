@@ -196,7 +196,7 @@ public:
 /**
  * A 'ServiceContext' decorator that allows enterprise to set its own version of the above class.
  */
-extern ServiceContext::Decoration<std::unique_ptr<SearchDefaultHelperFunctions>> getSearchHelpers;
+extern ServiceContext::Decoration<SearchDefaultHelperFunctions*> getSearchHelpers;
 
 extern FailPoint searchReturnEofImmediately;
 
