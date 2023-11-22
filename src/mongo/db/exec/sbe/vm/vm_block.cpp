@@ -640,6 +640,27 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
     invariant(rightTag == value::TypeTags::valueBlock);
     auto* rightValueBlock = value::bitcastTo<value::ValueBlock*>(rightVal);
 
+    auto leftRun = leftValueBlock->tryIsSingleRun();
+    auto rightRun = rightValueBlock->tryIsSingleRun();
+
+    if (leftRun || rightRun) {
+        if (!leftRun) {
+            std::swap(leftRun, rightRun);
+            swapStack();
+        }
+
+        // We always assume that the inputs are blocks of bools that can provide a count in O(1).
+        tassert(8256900,
+                "Mismatch on size",
+                *leftValueBlock->tryCount() == *rightValueBlock->tryCount());
+        if (value::bitcastTo<bool>(leftRun->val)) {
+            // and True is a noop.
+            return moveFromStack(0);
+        }
+        // and False returns a block of all falses.
+        return moveFromStack(1);
+    }
+
     auto blockOut = applyBoolBinOp<std::logical_and<>>(leftValueBlock, rightValueBlock);
     return {true,
             value::TypeTags::valueBlock,
@@ -657,6 +678,28 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
     auto [rightOwned, rightTag, rightVal] = getFromStack(0);
     invariant(rightTag == value::TypeTags::valueBlock);
     auto* rightValueBlock = value::bitcastTo<value::ValueBlock*>(rightVal);
+
+    auto leftRun = leftValueBlock->tryIsSingleRun();
+    auto rightRun = rightValueBlock->tryIsSingleRun();
+
+    if (leftRun || rightRun) {
+        if (!leftRun) {
+            std::swap(leftRun, rightRun);
+            swapStack();
+        }
+
+        // We always assume that the inputs are blocks of bools that can provide a count in O(1).
+        tassert(8256901,
+                "Mismatch on size",
+                *leftValueBlock->tryCount() == *rightValueBlock->tryCount());
+
+        if (value::bitcastTo<bool>(leftRun->val)) {
+            // or True returns a block of all trues.
+            return moveFromStack(1);
+        }
+        // or False is a noop.
+        return moveFromStack(0);
+    }
 
     auto blockOut = applyBoolBinOp<std::logical_or<>>(leftValueBlock, rightValueBlock);
     return {true,

@@ -74,8 +74,8 @@ public:
                 extracted.tags[i], extracted.vals[i], expected[i].first, expected[i].second);
             ASSERT_EQ(t, value::TypeTags::NumberInt32) << extracted;
             ASSERT_EQ(value::bitcastTo<int32_t>(v), 0)
-                << "Got " << extracted[i] << " expected " << expected[i] << " full extracted output"
-                << extracted;
+                << "Got " << extracted[i] << " expected " << expected[i]
+                << " full extracted output " << extracted;
         }
     }
 
@@ -86,6 +86,28 @@ public:
     void testCmpScalar(const std::vector<std::pair<value::TypeTags, value::Value>>& testValues,
                        EPrimBinary::Op,
                        StringData cmpFunctionName);
+
+    std::pair<std::vector<bool>, std::vector<bool>> naiveLogicalAndOr(
+        std::unique_ptr<value::ValueBlock> leftBlock,
+        std::unique_ptr<value::ValueBlock> rightBlock) {
+        auto left = leftBlock->extract();
+        auto right = rightBlock->extract();
+        ASSERT_EQ(left.count, right.count);
+
+        std::vector<bool> andRes;
+        std::vector<bool> orRes;
+
+        for (size_t i = 0; i < left.count; ++i) {
+            ASSERT_EQ(left.tags[i], value::TypeTags::Boolean);
+            ASSERT_EQ(right.tags[i], value::TypeTags::Boolean);
+            auto leftBool = value::bitcastTo<bool>(left.vals[i]);
+            auto rightBool = value::bitcastTo<bool>(right.vals[i]);
+            andRes.push_back(leftBool && rightBool);
+            orRes.push_back(leftBool || rightBool);
+        }
+
+        return std::pair{andRes, orRes};
+    }
 };
 
 TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
@@ -550,8 +572,12 @@ TEST_F(SBEBlockExpressionTest, BlockApplyMaskedLambdaTest) {
 TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
     value::ViewOfValueAccessor blockAccessorLeft;
     value::ViewOfValueAccessor blockAccessorRight;
+    value::ViewOfValueAccessor falseMonoBlockAccessor;
+    value::ViewOfValueAccessor trueMonoBlockAccessor;
     auto blockLeftSlot = bindAccessor(&blockAccessorLeft);
     auto blockRightSlot = bindAccessor(&blockAccessorRight);
+    auto falseMonoBlockSlot = bindAccessor(&falseMonoBlockAccessor);
+    auto trueMonoBlockSlot = bindAccessor(&trueMonoBlockAccessor);
 
     auto leftBlock = makeBoolBlock({true, false, true, false});
     blockAccessorLeft.reset(sbe::value::TypeTags::valueBlock,
@@ -560,6 +586,18 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
     auto rightBlock = makeBoolBlock({true, true, false, false});
     blockAccessorRight.reset(sbe::value::TypeTags::valueBlock,
                              value::bitcastFrom<value::ValueBlock*>(rightBlock.get()));
+
+    auto [fTag, fVal] = makeBool(false);
+    std::unique_ptr<value::ValueBlock> falseMonoBlock =
+        std::make_unique<value::MonoBlock>(*leftBlock->tryCount(), fTag, fVal);
+    falseMonoBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                                 value::bitcastFrom<value::ValueBlock*>(falseMonoBlock.get()));
+
+    auto [tTag, tVal] = makeBool(true);
+    std::unique_ptr<value::ValueBlock> trueMonoBlock =
+        std::make_unique<value::MonoBlock>(*leftBlock->tryCount(), tTag, tVal);
+    trueMonoBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                                value::bitcastFrom<value::ValueBlock*>(trueMonoBlock.get()));
 
     {
         auto expr = makeE<sbe::EFunction>(
@@ -583,6 +621,40 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
         value::ValueGuard guard(runTag, runVal);
 
         assertBlockOfBool(runTag, runVal, {true, true, true, false});
+    }
+
+    {
+        std::vector<value::SlotId> blockSlots{blockLeftSlot, falseMonoBlockSlot, trueMonoBlockSlot};
+        std::vector<std::unique_ptr<value::ValueBlock>> kBlocks;
+        kBlocks.push_back(leftBlock->clone());
+        kBlocks.push_back(falseMonoBlock->clone());
+        kBlocks.push_back(trueMonoBlock->clone());
+
+        for (size_t i = 0; i < blockSlots.size(); ++i) {
+            for (size_t j = 0; j < blockSlots.size(); ++j) {
+                auto andExpr = makeE<sbe::EFunction>(
+                    "valueBlockLogicalAnd",
+                    sbe::makeEs(makeE<EVariable>(blockSlots[i]), makeE<EVariable>(blockSlots[j])));
+                auto compiledAndExpr = compileExpression(*andExpr);
+
+                auto [andTag, andVal] = runCompiledExpression(compiledAndExpr.get());
+                value::ValueGuard andGuard(andTag, andVal);
+
+                auto orExpr = makeE<sbe::EFunction>(
+                    "valueBlockLogicalOr",
+                    sbe::makeEs(makeE<EVariable>(blockSlots[i]), makeE<EVariable>(blockSlots[j])));
+                auto compiledOrExpr = compileExpression(*orExpr);
+
+                auto [orTag, orVal] = runCompiledExpression(compiledOrExpr.get());
+                value::ValueGuard orGuard(orTag, orVal);
+
+                auto [andNaive, orNaive] =
+                    naiveLogicalAndOr(kBlocks[i]->clone(), kBlocks[j]->clone());
+
+                assertBlockOfBool(andTag, andVal, andNaive);
+                assertBlockOfBool(orTag, orVal, orNaive);
+            }
+        }
     }
 }
 

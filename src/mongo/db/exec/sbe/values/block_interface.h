@@ -126,6 +126,15 @@ struct DeblockedTagValStorage {
 };
 
 /**
+ * Struct representing a run of a single value.
+ */
+struct SingleRun {
+    TypeTags tag;
+    Value val;
+    size_t count;
+};
+
+/**
  * Interface for accessing a sequence of SBE Values independent of their backing storage.
  *
  * Currently we only support getting all of the deblocked values via 'extract()' but PM-3168 will
@@ -192,6 +201,14 @@ struct ValueBlock {
      * this can't be determined in O(1) time, return boost::none.
      */
     virtual boost::optional<bool> tryDense() const {
+        return boost::none;
+    }
+
+    /**
+     * Returns a SingleRun if the contents are just a single run of the same value without
+     * Nothings. boost::none if this cannot be determined in O(1) time or if it is not.
+     */
+    virtual boost::optional<SingleRun> tryIsSingleRun() const {
         return boost::none;
     }
 
@@ -264,6 +281,10 @@ public:
 
     boost::optional<bool> tryDense() const override {
         return _tag != TypeTags::Nothing;
+    }
+
+    boost::optional<SingleRun> tryIsSingleRun() const override {
+        return SingleRun{_tag, _val, _count};
     }
 
     std::unique_ptr<ValueBlock> map(const ColumnOp& op) override {
