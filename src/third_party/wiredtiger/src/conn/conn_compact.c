@@ -727,10 +727,12 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
     conn->background_compact.running = enable;
     __wt_free(session, conn->background_compact.config);
     conn->background_compact.config = stripped_config;
+    stripped_config = NULL;
     conn->background_compact.signalled = true;
     __wt_cond_signal(session, conn->background_compact.cond);
 
 err:
+    __wt_free(session, stripped_config);
     __wt_spin_unlock(session, &conn->background_compact.lock);
     return (ret);
 }
