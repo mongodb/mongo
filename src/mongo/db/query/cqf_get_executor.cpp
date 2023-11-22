@@ -158,27 +158,27 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
 
     std::pair<IndexDefinitions, MultikeynessTrie> result;
     std::string indexHintName;
-    bool skipAllIndexes = false;
+
+    // True if the query has a $natural hint, indicating that we must use a collection scan.
+    bool hasNaturalHint = false;
+
     if (indexHint) {
         const BSONElement element = indexHint->firstElement();
         const StringData fieldName = element.fieldNameStringData();
-        if (fieldName == "$natural"_sd) {
+        if (fieldName == query_request_helper::kNaturalSortField) {
             // Do not add indexes.
-            skipAllIndexes = true;
+            hasNaturalHint = true;
         } else if (fieldName == "$hint"_sd && element.type() == BSONType::String) {
             indexHintName = element.valueStringData().toString();
         }
 
-        disableScan = !skipAllIndexes;
+        disableScan = !hasNaturalHint;
     }
 
     const IndexCatalog& indexCatalog = *collection->getIndexCatalog();
 
     auto indexIterator =
         indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
-
-    const bool queryHasNaturalHint = indexHint && !indexHint->isEmpty() &&
-        indexHint->firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
 
     while (indexIterator->more()) {
         const IndexCatalogEntry& catalogEntry = *indexIterator->next();
@@ -196,32 +196,25 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
             continue;
         }
 
-        // If there is a $natural hint, we should not assert here as we will not use the index.
-        const bool isSpecialIndex =
-            descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
+        // Check for special indexes. We do not want to try to build index metadata for a special
+        // index (since we do not support those yet in CQF) but we should allow the query to go
+        // through CQF if there is a $natural hint.
+        if (descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
             descriptor.isSparse() || descriptor.getIndexType() != IndexType::INDEX_BTREE ||
-            !descriptor.collation().isEmpty();
-        if (!queryHasNaturalHint && isSpecialIndex) {
-            uasserted(ErrorCodes::InternalErrorNotSupported, "Unsupported index type");
-        }
-
-        // We do not want to try to build index metadata for a special index (since we do not
-        // support those yet in CQF) but we should allow the query to go through CQF if there is a
-        // $natural hint.
-        if (queryHasNaturalHint && isSpecialIndex) {
+            !descriptor.collation().isEmpty()) {
+            uassert(
+                ErrorCodes::InternalErrorNotSupported, "Unsupported index type", hasNaturalHint);
             continue;
         }
 
         if (indexHint) {
             if (indexHintName.empty()) {
-                if (!SimpleBSONObjComparator::kInstance.evaluate(descriptor.keyPattern() ==
-                                                                 *indexHint)) {
-                    // Index key pattern does not match hint.
-                    skipIndex = true;
-                }
-            } else if (indexHintName != descriptor.indexName()) {
-                // Index name does not match hint.
-                skipIndex = true;
+                // Index hint is a key pattern. Check if it matches this descriptor's key pattern.
+                skipIndex = SimpleBSONObjComparator::kInstance.evaluate(descriptor.keyPattern() !=
+                                                                        *indexHint);
+            } else {
+                // Index hint is an index name. Check if it matches the descriptor's name.
+                skipIndex = indexHintName != descriptor.indexName();
             }
         }
 
@@ -331,7 +324,7 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
             }
         }
         // For now we assume distribution is Centralized.
-        if (!skipIndex && !skipAllIndexes) {
+        if (!skipIndex && !hasNaturalHint) {
             result.first.emplace(descriptor.indexName(), std::move(indexDef));
         }
     }
@@ -864,7 +857,10 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 
     const auto& collection = collections.getMainCollection();
 
-    validateCommandOptions(canonicalQuery, collection, indexHint, involvedCollections);
+    const boost::optional<BSONObj>& hint =
+        (indexHint && !indexHint->isEmpty() ? indexHint : boost::none);
+
+    validateCommandOptions(canonicalQuery, collection, hint, involvedCollections);
 
     const bool requireRID = canonicalQuery ? canonicalQuery->getForceGenerateRecordId() : false;
     const bool collectionExists = static_cast<bool>(collection);
@@ -882,7 +878,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                      collection,
                                      involvedCollections,
                                      nss,
-                                     indexHint,
+                                     hint,
                                      scanProjName,
                                      uuidStr,
                                      scanDefName,

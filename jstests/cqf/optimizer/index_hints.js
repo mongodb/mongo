@@ -19,12 +19,30 @@ assert.commandWorked(t.insert({_id: 2, b: 2, a: [2]}));
 assert.commandWorked(t.insert({_id: 3, b: 3, a: 2}));
 assert.commandWorked(t.insert({_id: 4, b: 4, a: [1, 3]}));
 
+{
+    // Empty hint is ignored when there are no relevant indexes.
+    let res = t.explain("executionStats").find({a: 2}).hint({}).finish();
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
+
+    res = t.explain("executionStats").aggregate([{$match: {a: 2}}], {hint: {}});
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
+}
+
 assert.commandWorked(t.createIndex({a: 1}));
 assert.commandWorked(t.createIndex({b: 1}));
 
 // There are too few documents, and an index is not preferable.
 {
     let res = t.explain("executionStats").find({a: 2}).finish();
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
+}
+
+{
+    // Empty hint is ignored when there are relevant indexes that are not preferable.
+    let res = t.explain("executionStats").find({a: 2}).hint({}).finish();
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
+
+    res = t.explain("executionStats").aggregate([{$match: {a: 2}}], {hint: {}});
     assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }
 
@@ -61,6 +79,15 @@ for (let i = 0; i < 100; i++) {
 
 {
     let res = t.explain("executionStats").find({a: 2}).finish();
+    assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
+}
+
+{
+    // Empty hint is ignored when there are relevant indexes that are preferable.
+    let res = t.explain("executionStats").find({a: 2}).hint({}).finish();
+    assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
+
+    res = t.explain("executionStats").aggregate([{$match: {a: 2}}], {hint: {}});
     assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 }
 
