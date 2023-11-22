@@ -253,18 +253,18 @@ TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIs
 
 
     _manager->setFilteringMetadata(
-        cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none, false)->get(),
+        cloneMetadataPlusChunk(_manager->getActiveMetadata(boost::none, true)->get(),
                                {BSON("key" << 0), BSON("key" << 20)}));
 
     _manager->setFilteringMetadata(cloneMetadataPlusChunk(
-        _manager->getActiveMetadata(boost::none, false)->get(), rangeToClean));
+        _manager->getActiveMetadata(boost::none, true)->get(), rangeToClean));
 
     // Optional so that it can be reset.
     boost::optional<ScopedCollectionDescription> cursorOnMovedMetadata{
-        _manager->getActiveMetadata(boost::none, false)};
+        _manager->getActiveMetadata(boost::none, true)};
 
     _manager->setFilteringMetadata(cloneMetadataMinusChunk(
-        _manager->getActiveMetadata(boost::none, false)->get(), rangeToClean));
+        _manager->getActiveMetadata(boost::none, true)->get(), rangeToClean));
 
     auto notif = _manager->cleanUpRange(rangeToClean, false /*delayBeforeDeleting*/);
     ASSERT(!notif.isReady());
