@@ -73,7 +73,7 @@ JWKManager::JWKManager(std::unique_ptr<JWKSFetcher> fetcher)
       _isKeyModified(false) {}
 
 StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
-    auto currentValidators = _validators;
+    auto currentValidators = std::atomic_load(&_validators);  // NOLINT
     auto it = currentValidators->find(keyId.toString());
     if (it == currentValidators->end()) {
         // We were asked to handle an unknown keyId. Try refreshing, to see if the JWKS has been
@@ -92,7 +92,7 @@ StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
                                   << "': just-in-time refresh failed: " << loadKeysStatus.reason()};
         }
 
-        currentValidators = _validators;
+        currentValidators = std::atomic_load(&_validators);  // NOLINT
         it = currentValidators->find(keyId.toString());
 
         // If it still cannot be found, return an error.
@@ -167,7 +167,7 @@ void JWKManager::serialize(BSONObjBuilder* bob) const {
     std::vector<BSONObj> keyVector;
     keyVector.reserve(size());
 
-    auto currentKeys = _keyMaterial;
+    auto currentKeys = std::atomic_load(&_keyMaterial);  // NOLINT
     std::transform(currentKeys->begin(),
                    currentKeys->end(),
                    std::back_inserter(keyVector),
@@ -178,11 +178,12 @@ void JWKManager::serialize(BSONObjBuilder* bob) const {
 }
 
 bool JWKManager::_haveKeysBeenModified(const KeyMap& newKeyMaterial) const {
-    if (!_keyMaterial) {
+    auto currentKeyMaterial = std::atomic_load(&_keyMaterial);  // NOLINT
+    if (!currentKeyMaterial) {
         return false;
     }
-    const bool hasBeenModified =
-        std::any_of((*_keyMaterial).cbegin(), (*_keyMaterial).cend(), [&](const auto& entry) {
+    const bool hasBeenModified = std::any_of(
+        (*currentKeyMaterial).cbegin(), (*currentKeyMaterial).cend(), [&](const auto& entry) {
             auto newKey = newKeyMaterial.find(entry.first);
             if (newKey == newKeyMaterial.end()) {
                 // Key no longer exists in this JWKS.
