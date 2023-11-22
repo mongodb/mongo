@@ -234,7 +234,7 @@ void ShardingDDLCoordinatorService::waitForOngoingCoordinatorsToFinish(
     }
 }
 
-void ShardingDDLCoordinatorService::_afterStepDown() {
+void ShardingDDLCoordinatorService::_onServiceTermination() {
     stdx::lock_guard lg(_mutex);
     _state = State::kPaused;
     _numCoordinatorsToWait = 0;
