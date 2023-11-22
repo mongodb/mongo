@@ -1586,47 +1586,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 }  // getSlotBasedExecutor
 
 /**
- * Function which returns true if 'cq' uses features that are currently supported in SBE without
- * 'featureFlagSbeFull' being set; false otherwise.
- */
-bool shouldUseRegularSbe(const CanonicalQuery& cq) {
-    auto sbeCompatLevel = cq.getExpCtx()->sbeCompatibility;
-    // We shouldn't get here if there are expressions in the query which are completely unsupported
-    // by SBE.
-    tassert(7248600,
-            "Unexpected SBE compatibility value",
-            sbeCompatLevel != SbeCompatibility::notCompatible);
-    // The 'ExpressionContext' may indicate that there are expressions which are only supported in
-    // SBE when 'featureFlagSbeFull' is set, or fully supported regardless of the value of the
-    // feature flag. This function should only return true in the latter case.
-    if (cq.getExpCtx()->sbeCompatibility != SbeCompatibility::fullyCompatible) {
-        return false;
-    }
-    for (const auto& stage : cq.cqPipeline()) {
-        if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage->documentSource())) {
-            // Group stage wouldn't be pushed down if it's not supported in SBE.
-            tassert(7548611,
-                    "Unexpected SBE compatibility value",
-                    groupStage->sbeCompatibility() != SbeCompatibility::notCompatible);
-            if (groupStage->sbeCompatibility() != SbeCompatibility::fullyCompatible) {
-                return false;
-            }
-        }
-        if (auto windowStage =
-                dynamic_cast<DocumentSourceInternalSetWindowFields*>(stage->documentSource())) {
-            // Window stage wouldn't be pushed down if it's not supported in SBE.
-            tassert(7914600,
-                    "Unexpected SBE compatibility value",
-                    windowStage->sbeCompatibility() != SbeCompatibility::notCompatible);
-            if (windowStage->sbeCompatibility() != SbeCompatibility::fullyCompatible) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-/**
  * Attempts to create a slot-based executor for the query, if the query plan is eligible for SBE
  * execution. This function has three possible return values:
  *
@@ -1651,16 +1610,16 @@ attemptToGetSlotBasedExecutor(
         extractAndAttachPipelineStages(canonicalQuery.get(), true /* attachOnly */);
     }
 
-    // (Ignore FCV check): This is intentional because we always want to use this feature once the
-    // feature flag is enabled.
-    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
-    const bool canUseRegularSbe = shouldUseRegularSbe(*canonicalQuery);
+    // (Ignore FCV check): featureFlagSbeFull does not change the semantics of queries, so it can
+    // safely be enabled on some nodes and disabled on other nodes during upgrade/downgrade.
+    SbeCompatibility minRequiredCompatibility =
+        feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe()
+        ? SbeCompatibility::flagGuarded
+        : SbeCompatibility::fullyCompatible;
 
-    // If 'canUseRegularSbe' is true, then only the subset of SBE which is currently on by default
-    // is used by the query. If 'sbeFull' is true, then the server is configured to run any
-    // SBE-compatible query using SBE, even if the query uses features that are not on in SBE by
-    // default. Either way, try to construct an SBE plan executor.
-    if (canUseRegularSbe || sbeFull) {
+    // Try to construct an SBE plan executor if all the expressions in the CanonicalQuery's filter
+    // and projection are SBE compatible.
+    if (canonicalQuery->getExpCtx()->sbeCompatibility >= minRequiredCompatibility) {
         auto sbeYieldPolicy =
             PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, canonicalQuery->nss());
         SlotBasedPrepareExecutionHelper helper{
