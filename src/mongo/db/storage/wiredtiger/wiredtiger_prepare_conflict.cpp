@@ -169,7 +169,7 @@ int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx, std::function<in
         wiredTigerPrepareConflictLog(attempts);
 
         // Wait on the session cache to signal that a unit of work has been committed or aborted.
-        recoveryUnit->getSessionCache()->waitUntilPreparedUnitOfWorkCommitsOrAborts(opCtx,
+        recoveryUnit->getSessionCache()->waitUntilPreparedUnitOfWorkCommitsOrAborts(*opCtx,
                                                                                     lastCount);
     }
 }
