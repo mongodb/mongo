@@ -62,6 +62,8 @@ include:
 - filename: etc/evergreen_yml_components/variants/compile_static_analysis.yml
 - filename: etc/evergreen_yml_components/variants/amazon/build_dev.yml
 - filename: etc/evergreen_yml_components/variants/amazon/test_dev.yml
+- filename: etc/evergreen_yml_components/variants/ubuntu/build_dev.yml
+- filename: etc/evergreen_yml_components/variants/ubuntu/test_dev.yml
 - filename: etc/evergreen_yml_components/variants/config_shard.yml
 - filename: etc/evergreen_yml_components/perf_tasks.yml
 - filename: etc/evergreen_yml_components/variants/perf.yml
@@ -2802,35 +2804,6 @@ buildvariants:
   - name: .sasl .patch_build
   - name: external_auth_aws
   - name: external_auth_oidc
-
-- name: &enterprise-ubuntu2204-64-libvoidstar enterprise-ubuntu2204-64-libvoidstar
-  display_name: "~ Enterprise Ubuntu 22.04 w/ libvoidstar"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  run_on:
-  - ubuntu2204-large
-  stepback: false
-  expansions:
-    compile_variant: *enterprise-ubuntu2204-64-libvoidstar
-    # Do not set link-model=dynamic on this build. The antithesis image builder
-    # scripts cannot handle the shared library build
-    compile_flags: >-
-      --ssl
-      --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-      CCFLAGS="-fsanitize-coverage=trace-pc-guard"
-      LIBS="voidstar"
-    multiversion_platform: ubuntu2204
-    multiversion_edition: enterprise
-    repo_edition: enterprise
-    large_distro_name: ubuntu2204-large
-    scons_cache_scope: shared
-  tasks:
-  - name: compile_and_archive_dist_test_TG
-  - name: .antithesis
-  - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *enterprise-windows-nopush-template
   name: &enterprise-windows-benchmarks enterprise-windows-benchmarks

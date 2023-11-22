@@ -9,6 +9,7 @@ include:
 - filename: etc/evergreen_yml_components/variants/amazon/test_release.yml
 - filename: etc/evergreen_yml_components/variants/debian/test_release.yml
 - filename: etc/evergreen_yml_components/variants/suse/test_release.yml
+- filename: etc/evergreen_yml_components/variants/ubuntu/test_release.yml
 ### Comment out when using this file for a Rapid release branch. ###
 - filename: etc/evergreen_yml_components/variants/ibm.yml
 ### Uncomment when using this file for a LTS release branch. ###
