@@ -189,7 +189,7 @@ protected:
     void forceCheckpoint(bool background) {
         if (background) {
             // Checkpoint all of the data.
-            _opCtx.getServiceContext()->getStorageEngine()->checkpoint(&_opCtx);
+            _opCtx.getServiceContext()->getStorageEngine()->checkpoint();
         }
     }
 

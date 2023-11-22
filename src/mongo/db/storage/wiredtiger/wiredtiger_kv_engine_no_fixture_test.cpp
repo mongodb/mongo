@@ -318,7 +318,7 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
             logComponentSettings.clearMinimumLoggedSeverity(logv2::LogComponent::kStorageRecovery);
         });
 
-        kvEngine->checkpoint(opCtx.get());
+        kvEngine->checkpoint();
     }
 
     // Update the middle key with value C after taking checkpoint.

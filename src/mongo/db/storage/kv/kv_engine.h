@@ -260,7 +260,7 @@ public:
         return false;
     }
 
-    virtual void checkpoint(OperationContext* opCtx) {}
+    virtual void checkpoint() {}
 
     virtual StorageEngine::CheckpointIteration getCheckpointIteration() const {
         return StorageEngine::CheckpointIteration{0};

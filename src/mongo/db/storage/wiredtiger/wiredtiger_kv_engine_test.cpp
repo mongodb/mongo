@@ -208,7 +208,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 #else
 
     // Dropping a collection might fail if we haven't checkpointed the data.
-    _helper.getWiredTigerKVEngine()->checkpoint(opCtxPtr.get());
+    _helper.getWiredTigerKVEngine()->checkpoint();
 
     // Move the data file out of the way so the ident can be dropped. This not permitted on Windows
     // because the file cannot be moved while it is open. The implementation for orphan recovery is
@@ -263,7 +263,7 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     ASSERT(boost::filesystem::exists(*dataFilePath));
 
     // Dropping a collection might fail if we haven't checkpointed the data
-    _helper.getWiredTigerKVEngine()->checkpoint(opCtxPtr.get());
+    _helper.getWiredTigerKVEngine()->checkpoint();
 
     ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(opCtxPtr.get()->recoveryUnit(), ident));
 
@@ -599,7 +599,7 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
         // Perform a checkpoint. The goal here is create some activity in WiredTiger in order
         // to generate verbose messages (we don't really care about the checkpoint itself).
         startCapturingLogMessages();
-        _helper.getWiredTigerKVEngine()->checkpoint(opCtxRaii.get());
+        _helper.getWiredTigerKVEngine()->checkpoint();
         stopCapturingLogMessages();
         // In this initial case, we don't expect to capture any debug checkpoint messages. The
         // base severity for the checkpoint component should be at Log().
@@ -624,7 +624,7 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
 
         // Perform another checkpoint.
         startCapturingLogMessages();
-        _helper.getWiredTigerKVEngine()->checkpoint(opCtxRaii.get());
+        _helper.getWiredTigerKVEngine()->checkpoint();
         stopCapturingLogMessages();
 
         // This time we expect to detect WiredTiger checkpoint Debug() messages.

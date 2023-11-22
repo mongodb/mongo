@@ -830,7 +830,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(OperationContext* opCtx, const char*
     // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
     // the operation to succeed if it was the only reason to fail.
     if (rc == EBUSY) {
-        _checkpoint(opCtx, session);
+        _checkpoint(session);
         rc = (session->verify)(session, uri, nullptr);
     }
 
@@ -851,7 +851,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(OperationContext* opCtx, const char*
     rc = session->salvage(session, uri, nullptr);
     // Same reasoning for handling EBUSY errors as above.
     if (rc == EBUSY) {
-        _checkpoint(opCtx, session);
+        _checkpoint(session);
         rc = session->salvage(session, uri, nullptr);
     }
     auto status = wtRCToStatus(rc, session, "Salvage failed:");
@@ -910,7 +910,7 @@ Status WiredTigerKVEngine::_rebuildIdent(OperationContext* opCtx,
     // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
     // the operation to succeed if it was the only reason to fail.
     if (rc == EBUSY) {
-        _checkpoint(opCtx, session);
+        _checkpoint(session);
         rc = session->drop(session, uri, nullptr);
     }
     if (rc != 0) {
@@ -1866,7 +1866,7 @@ Status WiredTigerKVEngine::alterMetadata(OperationContext* opCtx,
     // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
     // the operation to succeed if it was the only reason to fail.
     if (ret == EBUSY) {
-        _checkpoint(opCtx, sessionPtr);
+        _checkpoint(sessionPtr);
         ret =
             sessionPtr->alter(sessionPtr, uriNullTerminated.c_str(), configNullTerminated.c_str());
     }
@@ -1976,7 +1976,7 @@ void WiredTigerKVEngine::_checkpoint(WT_SESSION* session, bool useTimestamp) {
                        "checkpointIteration"_attr = checkpointedIteration);
 }
 
-void WiredTigerKVEngine::_checkpoint(OperationContext* opCtx, WT_SESSION* session) try {
+void WiredTigerKVEngine::_checkpoint(WT_SESSION* session) try {
     // Ephemeral WiredTiger instances cannot do a checkpoint to disk as there is no disk backing
     // the data.
     if (_ephemeral) {
@@ -2055,10 +2055,10 @@ void WiredTigerKVEngine::_checkpoint(OperationContext* opCtx, WT_SESSION* sessio
     invariant(ErrorCodes::isShutdownError(exc.code()), exc.what());
 }
 
-void WiredTigerKVEngine::checkpoint(OperationContext* opCtx) {
+void WiredTigerKVEngine::checkpoint() {
     UniqueWiredTigerSession session = _sessionCache->getSession();
     WT_SESSION* s = session->getSession();
-    return _checkpoint(opCtx, s);
+    return _checkpoint(s);
 }
 
 void WiredTigerKVEngine::forceCheckpoint(bool useStableTimestamp) {

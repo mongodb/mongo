@@ -136,7 +136,7 @@ void Checkpointer::run() {
         pauseCheckpointThread.pauseWhileSet();
 
         const Date_t startTime = Date_t::now();
-        opCtx->getServiceContext()->getStorageEngine()->checkpoint(opCtx.get());
+        opCtx->getServiceContext()->getStorageEngine()->checkpoint();
 
         const auto secondsElapsed = durationCount<Seconds>(Date_t::now() - startTime);
         if (secondsElapsed >= 30) {

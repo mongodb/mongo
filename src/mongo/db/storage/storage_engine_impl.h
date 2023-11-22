@@ -346,7 +346,7 @@ public:
 
     void startTimestampMonitor() override;
 
-    void checkpoint(OperationContext* opCtx) override;
+    void checkpoint() override;
 
     StorageEngine::CheckpointIteration getCheckpointIteration() const override;
 

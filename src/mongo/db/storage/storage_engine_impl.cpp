@@ -1233,8 +1233,8 @@ std::shared_ptr<Ident> StorageEngineImpl::markIdentInUse(StringData ident) {
     return _dropPendingIdentReaper.markIdentInUse(ident);
 }
 
-void StorageEngineImpl::checkpoint(OperationContext* opCtx) {
-    _engine->checkpoint(opCtx);
+void StorageEngineImpl::checkpoint() {
+    _engine->checkpoint();
 }
 
 StorageEngine::CheckpointIteration StorageEngineImpl::getCheckpointIteration() const {

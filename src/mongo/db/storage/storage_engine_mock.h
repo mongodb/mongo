@@ -180,7 +180,7 @@ public:
     }
     void startTimestampMonitor() final {}
 
-    void checkpoint(OperationContext* opCtx) final {}
+    void checkpoint() final {}
 
     StorageEngine::CheckpointIteration getCheckpointIteration() const final {
         return StorageEngine::CheckpointIteration{0};

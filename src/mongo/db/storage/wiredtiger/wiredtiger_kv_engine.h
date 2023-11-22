@@ -160,7 +160,7 @@ public:
         return !isEphemeral();
     }
 
-    void checkpoint(OperationContext* opCtx) override;
+    void checkpoint() override;
 
     // Force a WT checkpoint, this will not update internal timestamps.
     void forceCheckpoint(bool useStableTimestamp);
@@ -470,7 +470,7 @@ private:
         StorageEngine::DropIdentCallback callback;
     };
 
-    void _checkpoint(OperationContext* opCtx, WT_SESSION* session);
+    void _checkpoint(WT_SESSION* session);
 
     void _checkpoint(WT_SESSION* session, bool useTimestamp);
 
