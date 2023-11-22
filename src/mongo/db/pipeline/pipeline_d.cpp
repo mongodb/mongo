@@ -260,7 +260,15 @@ bool pushDownPipelineStageIfCompatible(
     const CompatiblePipelineStages& allowedStages,
     bool isLastSource,
     std::vector<std::unique_ptr<InnerPipelineStageInterface>>& stagesForPushdown) {
-    if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage.get())) {
+    if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage.get())) {
+        if (!allowedStages.match || matchStage->sbeCompatibility() < minRequiredCompatibility) {
+            return false;
+        }
+
+        stagesForPushdown.emplace_back(
+            std::make_unique<InnerPipelineStageImpl>(matchStage, isLastSource));
+        return true;
+    } else if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage.get())) {
         if (!allowedStages.group || groupStage->doingMerge() ||
             groupStage->sbeCompatibility() < minRequiredCompatibility) {
             return false;
@@ -276,6 +284,14 @@ bool pushDownPipelineStageIfCompatible(
 
         stagesForPushdown.emplace_back(
             std::make_unique<InnerPipelineStageImpl>(lookupStage, isLastSource));
+        return true;
+    } else if (auto unwindStage = dynamic_cast<DocumentSourceUnwind*>(stage.get())) {
+        if (!allowedStages.unwind || unwindStage->sbeCompatibility() < minRequiredCompatibility) {
+            return false;
+        }
+
+        stagesForPushdown.emplace_back(
+            std::make_unique<InnerPipelineStageImpl>(unwindStage, isLastSource));
         return true;
     } else if (auto transformStage =
                    dynamic_cast<DocumentSourceSingleDocumentTransformation*>(stage.get())) {
@@ -294,14 +310,6 @@ bool pushDownPipelineStageIfCompatible(
             return true;
         }
         return false;
-    } else if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage.get())) {
-        if (!allowedStages.match || matchStage->sbeCompatibility() < minRequiredCompatibility) {
-            return false;
-        }
-
-        stagesForPushdown.emplace_back(
-            std::make_unique<InnerPipelineStageImpl>(matchStage, isLastSource));
-        return true;
     } else if (auto sortStage = dynamic_cast<DocumentSourceSort*>(stage.get())) {
         if (!allowedStages.sort || !isSortSbeCompatible(sortStage->getSortKeyPattern())) {
             return false;
@@ -346,16 +354,56 @@ bool pushDownPipelineStageIfCompatible(
         stagesForPushdown.emplace_back(
             std::make_unique<InnerPipelineStageImpl>(unpackBucketStage, isLastSource));
         return true;
-    } else if (auto unwindStage = dynamic_cast<DocumentSourceUnwind*>(stage.get())) {
-        if (!allowedStages.unwind || unwindStage->sbeCompatibility() < minRequiredCompatibility) {
-            return false;
-        }
-
-        stagesForPushdown.emplace_back(
-            std::make_unique<InnerPipelineStageImpl>(unwindStage, isLastSource));
-        return true;
     }
 
+    return false;
+}
+
+/**
+ * Prunes $addFields from 'stagesForPushdown' if it is the last stage, subject to additional
+ * conditions. (Must be called repeatedly until it returns false.) When splitting a pipeline between
+ * SBE and Classic DocumentSource stages, there is often a performance penalty for executing an
+ * $addFields in SBE only to immediately translate its output to MutableDocument form for the
+ * Classic DocumentSource execution phase. Instead, we keep the $addFields as a DocumentSource.
+ *
+ * 'alreadyPruned' tells whether the pipeline has had stages pruned away already.
+ *
+ * Returns true iff it pruned a stage.
+ */
+bool pruneTrailingAddFields(
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>>& stagesForPushdown,
+    bool alreadyPruned) {
+    // Push down the entire pipeline when possible. (It's not possible if 'alreadyPruned' is true.)
+    if (stagesForPushdown.empty() || (!alreadyPruned && stagesForPushdown.back()->isLastSource())) {
+        return false;
+    }
+
+    auto projectionStage =
+        dynamic_cast<DocumentSourceInternalProjection*>(stagesForPushdown.back()->documentSource());
+    if (projectionStage &&
+        projectionStage->projection().type() == projection_ast::ProjectType::kAddition) {
+        stagesForPushdown.pop_back();
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Prunes $unwind from 'stagesForPushdown' if it is the last stage. (Must be called repeatedly until
+ * it returns false.) This pruning is done because $unwind performance is bottlenecked by processing
+ * of EExpressions for sbe::ProjectStages in the SBE VM, which is slower than Classic's native C++
+ * projection implementation. Pushing $unwind down only has a performance benefit when doing so
+ * allows additional non-$unwind stages to be pushed down after it.
+ *
+ * Returns true iff it pruned a stage.
+ */
+bool pruneTrailingUnwind(
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>>& stagesForPushdown) {
+    if (!stagesForPushdown.empty() &&
+        dynamic_cast<DocumentSourceUnwind*>(stagesForPushdown.back()->documentSource())) {
+        stagesForPushdown.pop_back();
+        return true;
+    }
     return false;
 }
 
@@ -363,27 +411,31 @@ bool pushDownPipelineStageIfCompatible(
  * After copying as many pipeline stages as possible into the 'stagesForPushdown' pipeline, this
  * second pass takes off any stages that may not benefit from execution in SBE.
  */
-void reconsiderStagesForPushdown(
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>>& stagesForPushdown) {
-    // Always push down the entire pipeline when possible.
-    if (stagesForPushdown.empty() || stagesForPushdown.back()->isLastSource()) {
-        return;
-    }
-
-    // When splitting a pipeline between SBE and Classic DocumentSource stages, there is often a
-    // performance penalty for executing an $addFields in SBE only to immediately translate its
-    // output to MutableDocument form for the Classic DocumentSource execution phase. Instead, we
-    // keep the $addFields as a DocumentSource.
+void prunePushdownStages(
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>>& stagesForPushdown,
+    SbeCompatibility minRequiredCompatibility) {
+    bool pruned = false;       // have any stages been pruned?
+    bool prunedThisIteration;  // were any stages pruned in the current loop iteration?
     do {
-        auto projectionStage = dynamic_cast<DocumentSourceInternalProjection*>(
-            stagesForPushdown.back()->documentSource());
-        if (!projectionStage ||
-            projectionStage->projection().type() != projection_ast::ProjectType::kAddition) {
-            return;
+        prunedThisIteration = false;
+        if (SbeCompatibility::flagGuarded >= minRequiredCompatibility) {
+            // When 'minRequiredCompatibility' is permissive enough (because featureFlagSbeFull is
+            // enabled), do not remove trailing $addFields stages.
+        } else {
+            // Otherwise, remove trailing $addFields stages that we don't expect to improve
+            // performance when they execute in SBE.
+            if (pruneTrailingAddFields(stagesForPushdown, pruned)) {
+                prunedThisIteration = true;
+                pruned = true;
+            }
         }
 
-        stagesForPushdown.pop_back();
-    } while (!stagesForPushdown.empty());
+        // $unwind should not be the last stage pushed down as it is more expensive in SBE.
+        if (pruneTrailingUnwind(stagesForPushdown)) {
+            prunedThisIteration = true;
+            pruned = true;
+        };
+    } while (prunedThisIteration);
 }
 
 // Limit the number of aggregation pipeline stages that can be "pushed down" to the SBE stage
@@ -543,17 +595,11 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         }
     }
 
-    if (SbeCompatibility::flagGuarded >= minRequiredCompatibility) {
-        // When 'minRequiredCompatibility' is permissive enough (because featureFlagSbeFull is
-        // enabled), return 'stagesForPushdown' as is, pushing down as many stages as possible.
-    } else {
-        // Otherwise, "reconsider" stages that we don't expect to improve performance when they
-        // execute in SBE.
-        reconsiderStagesForPushdown(stagesForPushdown);
-    }
+    // Remove stage patterns where pushing down may degrade performance.
+    prunePushdownStages(stagesForPushdown, minRequiredCompatibility);
 
     return stagesForPushdown;
-}
+}  // findSbeCompatibleStagesForPushdown
 
 /**
  * Removes the first 'stagesToRemove' stages from the pipeline. This function is meant to be paired
