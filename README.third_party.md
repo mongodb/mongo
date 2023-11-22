@@ -30,7 +30,7 @@ a notice will be included in
 | [double-conversion]        | ???               | ???               |                      |               ???               |
 | [fmt]                      | BSD-2-Clause      | 7.1.3             |                      |                ✗                |
 | [GPerfTools]               | BSD-3-Clause      | 2.9.1             |                      |                ✗                |
-| [gRPC]                     | Apache-2.0        | 1.46.6            |                      |                ✗                |
+| [gRPC]                     | Apache-2.0        | 1.59.2            |                      |                ✗                |
 | [ICU4]                     | ICU               | 57.1              |          ✗           |                ✗                |
 | [immer]                    | BSL-1.0           | d98a68c           |                      |                ✗                |
 | [Intel Decimal FP Library] | BSD-3-Clause      | 2.0 Update 1      |                      |                ✗                |
@@ -45,7 +45,7 @@ a notice will be included in
 | [ocspbuilder]              | MIT               | 0.10.2            |                      |                                 |
 | [ocspresponder]            | Apache-2.0        | 0.5.0             |                      |                                 |
 | [pcre2]                    | BSD-3-Clause      | 10.40             |                      |                ✗                |
-| [protobuf]                 | BSD-3-Clause      | 3.19.5            |                      |                ✗                |
+| [protobuf]                 | BSD-3-Clause      | 4.25.0            |                      |                ✗                |
 | [re2]                      | BSD-3-Clause      | 2021-09-01        |                      |                ✗                |
 | [S2]                       | Apache-2.0        | Unknown           |          ✗           |                ✗                |
 | [SafeInt]                  | MIT               | 3.0.26            |                      |                                 |
