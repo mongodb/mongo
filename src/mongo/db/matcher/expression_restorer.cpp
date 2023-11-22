@@ -43,7 +43,7 @@ using boolean_simplification::Minterm;
 class MatchExpressionRestorer {
 public:
     MatchExpressionRestorer(const BitsetTreeNode& root,
-                            const std::vector<ExpressionBitInfo>& expressions)
+                            const BitsetTreeTransformResult::ExpressionList& expressions)
         : _root(root), _expressions(expressions) {}
 
     std::unique_ptr<MatchExpression> restore() const {
@@ -95,13 +95,13 @@ private:
     }
 
     const BitsetTreeNode& _root;
-    const std::vector<ExpressionBitInfo>& _expressions;
+    const BitsetTreeTransformResult::ExpressionList& _expressions;
 };
 }  // namespace
 
 std::unique_ptr<MatchExpression> restoreMatchExpression(
     const boolean_simplification::BitsetTreeNode& bitsetTree,
-    const std::vector<ExpressionBitInfo>& expressions) {
+    const BitsetTreeTransformResult::ExpressionList& expressions) {
     MatchExpressionRestorer restorer(bitsetTree, expressions);
     return restorer.restore();
 }
