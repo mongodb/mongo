@@ -48,7 +48,6 @@ public:
                      const boost::optional<BSONObj>& min,
                      const boost::optional<BSONObj>& max,
                      int totalNumSteps,
-                     std::string* cmdErrmsg,
                      const ShardId& toShard,
                      const ShardId& fromShard);
     ~MoveTimingHelper();
@@ -59,6 +58,10 @@ public:
 
     void setMax(const BSONObj& max) {
         _max.emplace(max);
+    }
+
+    void setCmdErrMsg(std::string cmdErrMsg) {
+        _cmdErrmsg = std::move(cmdErrMsg);
     }
 
     void done(int step);
@@ -75,7 +78,7 @@ private:
 
     boost::optional<BSONObj> _min, _max;
     const int _totalNumSteps;
-    const std::string* _cmdErrmsg;
+    std::string _cmdErrmsg;
 
     int _nextStep;
     BSONObjBuilder _b;

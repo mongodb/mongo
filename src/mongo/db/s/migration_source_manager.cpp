@@ -81,8 +81,6 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kWriteConcernTimeoutMigration);
 
-std::string kEmptyErrMsgForMoveTimingHelper;
-
 /**
  * Best-effort attempt to ensure the recipient shard has refreshed its routing table to
  * 'newCollVersion'. Fires and forgets an asychronous remote setShardVersion command.
@@ -179,7 +177,6 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                         _args.getMin(),
                         _args.getMax(),
                         6,  // Total number of steps
-                        &kEmptyErrMsgForMoveTimingHelper,
                         _args.getToShard(),
                         _args.getFromShard()) {
     invariant(!_opCtx->lockState()->isLocked());
