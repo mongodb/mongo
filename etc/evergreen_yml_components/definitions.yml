@@ -5524,6 +5524,16 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
+- <<: *gen_task_template
+  name: aggregation_unsplittable_collections_on_random_shard_passthrough
+  # TODO SERVER-83445 Enable on non-all-feature-flag variants.
+  tags: ["unsplittable_collections"]
+  depends_on:
+  - name: aggregation
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
 - <<: *task_template
   name: aggregation_column_store_index_passthrough
   # TODO SERVER-75026 Remove the 'feature_flag_guarded' tag and ensure this suite is run on all
@@ -6462,6 +6472,7 @@ tasks:
 
 - <<: *gen_task_template
   name: unsplittable_collections_created_on_any_shard_jscore_passthrough_gen
+  # TODO SERVER-83445 Enable on non-all-feature-flag variants.
   tags: ["unsplittable_collections"]
   commands:
   - func: "generate resmoke tasks"
