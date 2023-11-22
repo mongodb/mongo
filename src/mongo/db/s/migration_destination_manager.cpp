@@ -131,6 +131,7 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/producer_consumer_queue.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -1245,12 +1246,19 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     invariant(!_min.isEmpty());
     invariant(!_max.isEmpty());
 
-    boost::optional<MoveTimingHelper> timing;
     boost::optional<Timer> timeInCriticalSection;
+    boost::optional<MoveTimingHelper> timing;
+    mongo::ScopeGuard timingSetMsgGuard{[this, &timing] {
+        // Set the error message to MoveTimingHelper just before it is destroyed. The destructor
+        // sends that message (among other things) to the ShardingLogging.
+        if (timing) {
+            stdx::lock_guard<Latch> sl(_mutex);
+            timing->setCmdErrMsg(_errmsg);
+        }
+    }};
 
     if (!skipToCritSecTaken) {
-        timing.emplace(
-            outerOpCtx, "to", _nss, _min, _max, 8 /* steps */, &_errmsg, _toShard, _fromShard);
+        timing.emplace(outerOpCtx, "to", _nss, _min, _max, 8 /* steps */, _toShard, _fromShard);
 
         LOGV2(22000,
               "Starting receiving end of chunk migration",
