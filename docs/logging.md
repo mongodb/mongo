@@ -222,7 +222,7 @@ Fatal level log statements using `LOGV2_FATAL` perform `fassert` after logging,
 using the provided ID as assert id. `LOGV2_FATAL_NOTRACE` perform
 `fassertNoTrace` and `LOGV2_FATAL_CONTINUE` does not `fassert` allowing for
 continued execution. `LOGV2_FATAL_CONTINUE` is meant to be used when a fatal
-error has occured but a different way of halting execution is desired such as
+error has occurred but a different way of halting execution is desired such as
 `std::terminate` or `fassertFailedWithStatus`.
 
 `LOGV2_FATAL_OPTIONS` performs `fassert` by default like `LOGV2_FATAL` but this
@@ -520,7 +520,7 @@ implemented as a friend function in a class with the following signature:
 
 In some cases a loggable type might be composed as a hierarchy in the C++ type
 system which would lead to a very verbose structured log output as every level
-in the hierarcy needs a name when outputted as JSON. The attribute naming
+in the hierarchy needs a name when outputted as JSON. The attribute naming
 abstraction system can also be used to collapse such hierarchies. Instead of
 making a type loggable it can instead return one or more attributes from its
 members by using `multipleAttrs` in `logAttrs` functions.
