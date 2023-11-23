@@ -41,11 +41,11 @@ namespace shard_role_details {
  * Interface for locking.  Caller DOES NOT own pointer.
  */
 inline Locker* getLocker(OperationContext* opCtx) {
-    return opCtx->lockState();
+    return opCtx->lockState_DO_NOT_USE();
 }
 
 inline const Locker* getLocker(const OperationContext* opCtx) {
-    return opCtx->lockState();
+    return opCtx->lockState_DO_NOT_USE();
 }
 
 /**

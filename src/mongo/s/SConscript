@@ -436,6 +436,9 @@ env.Library(
         'service_entry_point_mongos.cpp',
         'sharding_uptime_reporter.cpp',
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/curop_metrics',
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
@@ -447,9 +450,6 @@ env.Library(
         'commands/cluster_commands_common',
         'load_balancer_support',
         'sharding_router_api',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
     ],
 )
 

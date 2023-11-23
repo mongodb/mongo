@@ -504,13 +504,14 @@ WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit(
     return oldState;
 }
 
-void OperationContext::setLockState(std::unique_ptr<Locker> locker) {
+void OperationContext::setLockState_DO_NOT_USE(std::unique_ptr<Locker> locker) {
     invariant(!_locker);
     invariant(locker);
     _locker = std::move(locker);
 }
 
-std::unique_ptr<Locker> OperationContext::swapLockState(std::unique_ptr<Locker> locker, WithLock) {
+std::unique_ptr<Locker> OperationContext::swapLockState_DO_NOT_USE(std::unique_ptr<Locker> locker,
+                                                                   WithLock clientLock) {
     invariant(_locker);
     invariant(locker);
     _locker.swap(locker);

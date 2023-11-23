@@ -1905,7 +1905,7 @@ bool CreateCollectionCoordinator::_validateCreateCollectionAlreadyCommitted(
 
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         {
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+            UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
             AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss())
                 ->clearFilteringMetadata(opCtx);

@@ -442,12 +442,6 @@ LockManager* LockManager::get(ServiceContext& service) {
 }
 
 // static
-LockManager* LockManager::get(OperationContext* opCtx) {
-    return get(opCtx->getServiceContext());
-}
-
-
-// static
 std::map<LockerId, BSONObj> LockManager::getLockToClientMap(ServiceContext* serviceContext) {
     std::map<LockerId, BSONObj> lockToClientMap;
 
@@ -465,7 +459,7 @@ std::map<LockerId, BSONObj> LockManager::getLockToClientMap(ServiceContext* serv
             client->reportState(infoBuilder);
 
             infoBuilder.append("opid", static_cast<int>(clientOpCtx->getOpID()));
-            LockerId lockerId = clientOpCtx->lockState()->getId();
+            LockerId lockerId = clientOpCtx->lockState_DO_NOT_USE()->getId();
             lockToClientMap.insert({lockerId, infoBuilder.obj()});
         }
     }

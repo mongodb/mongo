@@ -47,18 +47,18 @@ std::string formatPtr(const void* x) {
 }  // namespace
 
 void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker) {
-    opCtx->setLockState(std::move(locker));
+    opCtx->setLockState_DO_NOT_USE(std::move(locker));
 }
 
 std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Locker> newLocker) {
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    return opCtx->swapLockState(std::move(newLocker), lk);
+    return opCtx->swapLockState_DO_NOT_USE(std::move(newLocker), lk);
 }
 
 std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
                                    std::unique_ptr<Locker> newLocker,
                                    WithLock lk) {
-    return opCtx->swapLockState(std::move(newLocker), lk);
+    return opCtx->swapLockState_DO_NOT_USE(std::move(newLocker), lk);
 }
 
 void dumpLockManager() {

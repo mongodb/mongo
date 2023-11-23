@@ -49,7 +49,6 @@
 
 namespace mongo {
 
-class OperationContext;
 class ServiceContext;
 
 /**
@@ -68,7 +67,6 @@ public:
      */
     static LockManager* get(ServiceContext* service);
     static LockManager* get(ServiceContext& service);
-    static LockManager* get(OperationContext* opCtx);
 
     /**
      * Gets a mapping of lock to client info.

@@ -2318,7 +2318,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
         if (mongo::feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-            opCtx->lockState()->inAWriteUnitOfWork()) {
+            shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
             // Do not assign timestamps to non-replicated commands that have a wrapping
             // WriteUnitOfWork, as they will get the timestamp on that WUOW. Use cases include
             // secondary oplog application of prepared transactions.
