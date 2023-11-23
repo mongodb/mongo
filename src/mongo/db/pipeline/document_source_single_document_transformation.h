@@ -163,14 +163,6 @@ public:
                                                                                          newName);
     }
 
-    void setCreatedBySetWindowFields(bool val) {
-        createdBySetWindowFields = val;
-    }
-
-    bool isCreatedBySetWindowFields() const {
-        return createdBySetWindowFields;
-    }
-
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
@@ -190,11 +182,6 @@ private:
     // Cached stage options in case this DocumentSource is disposed before serialized (e.g. explain
     // with a sort which will auto-dispose of the pipeline).
     Document _cachedStageOptions;
-
-    // We set the createdBySetWindowFields flag to prevent an addFields stage from being pushed to
-    // SBE. TODO (SERVER-75103) : Once setWindowFields has been pushed to SBE, this should be
-    // removed.
-    bool createdBySetWindowFields = false;
 };
 
 }  // namespace mongo
