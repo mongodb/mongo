@@ -1721,11 +1721,12 @@ done:
 }
 
 /*
- * __cursor_chain_exceeded --
- *     Return if the update chain has exceeded the limit.
+ * __cursor_chain_needs_full_upd --
+ *     Return if the update chain needs to have a full update (rather than a modify) placed at the
+ *     head.
  */
 static bool
-__cursor_chain_exceeded(WT_CURSOR_BTREE *cbt)
+__cursor_chain_needs_full_upd(WT_CURSOR_BTREE *cbt)
 {
     WT_CURSOR *cursor;
     WT_PAGE *page;
@@ -1744,6 +1745,19 @@ __cursor_chain_exceeded(WT_CURSOR_BTREE *cbt)
     else if (CUR2BT(cbt)->type == BTREE_ROW && page->modify != NULL &&
       page->modify->mod_row_update != NULL)
         upd = page->modify->mod_row_update[cbt->slot];
+
+    /*
+     * Don't put a new update on top of an aborted update or non-aborted tombstone. Anything reading
+     * the update chain cannot tell the difference between (1) an aborted set of updates from a
+     * rolled-back transaction, and (2) an in-flight, uncommitted rollback.
+     *
+     * This becomes a problem when trying to construct full values from a sequence of modifies,
+     * since the deltas are calculated using normal visibility rules - but if we can't disambiguate
+     * those two cases, we can't know which transaction the aborted entries belong to, so we can't
+     * calculate a correct delta. (This is only a problem in read-uncommitted isolation.)
+     */
+    if (upd != NULL && (upd->txnid == WT_TXN_ABORTED || upd->type == WT_UPDATE_TOMBSTONE))
+        return (true);
 
     /*
      * Step through the modify operations at the beginning of the chain.
@@ -1842,7 +1856,7 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
      */
     overwrite = F_ISSET(cursor, WT_CURSTD_OVERWRITE);
     F_CLR(cursor, WT_CURSTD_OVERWRITE);
-    if (cursor->value.size <= 64 || __cursor_chain_exceeded(cbt))
+    if (cursor->value.size <= 64 || __cursor_chain_needs_full_upd(cbt))
         ret = __btcur_update(cbt, &cursor->value, WT_UPDATE_STANDARD);
     else
         ret = __btcur_update(cbt, modify, WT_UPDATE_MODIFY);
