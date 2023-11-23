@@ -236,6 +236,12 @@ struct __wt_cursor_btree {
      */
     enum { WT_CBT_RETRY_NOTSET = 0, WT_CBT_RETRY_INSERT, WT_CBT_RETRY_PAGE } iter_retry;
 
+    /*
+     * The random number state is used for random cursor operations. The random number can be seeded
+     * by the user or is randomly set based on the time and thread ID.
+     */
+    wt_shared WT_RAND_STATE rnd; /* Random number generation state */
+
 #ifdef HAVE_DIAGNOSTIC
     /* Check that cursor next/prev never returns keys out-of-order. */
     WT_ITEM *lastkey, _lastkey;

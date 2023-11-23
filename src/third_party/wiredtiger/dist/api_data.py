@@ -1602,6 +1602,9 @@ methods = {
         next_random_sample_size attempts to divide the object into \c next_random_sample_size
         equal-sized pieces, and each retrieval returns a record from one of those pieces. See
         @ref cursor_random for details'''),
+    Config('next_random_seed', '0', r'''
+        configure the cursor to set an initial random seed when using \c next_random configuration.
+        This is used for testing purposes only. See @ref cursor_random for details'''),
     Config('raw', 'false', r'''
         ignore the encodings for the key and value, manage data as if the formats were \c "u".
         See @ref cursor_raw for details''',

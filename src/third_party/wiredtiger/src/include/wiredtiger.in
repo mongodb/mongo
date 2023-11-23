@@ -1023,6 +1023,9 @@ struct __wt_session {
      * next_random and \c next_random_sample_size attempts to divide the object into \c
      * next_random_sample_size equal-sized pieces\, and each retrieval returns a record from one of
      * those pieces.  See @ref cursor_random for details., a string; default \c 0.}
+     * @config{next_random_seed, configure the cursor to set an initial random seed when using \c
+     * next_random configuration.  This is used for testing purposes only.  See @ref cursor_random
+     * for details., a string; default \c 0.}
      * @config{overwrite, configures whether the cursor's insert and update methods check the
      * existing state of the record.  If \c overwrite is \c false\, WT_CURSOR::insert fails with
      * ::WT_DUPLICATE_KEY if the record exists\, and WT_CURSOR::update fails with ::WT_NOTFOUND if

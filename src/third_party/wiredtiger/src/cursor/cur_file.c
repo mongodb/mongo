@@ -1024,6 +1024,12 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
      */
     WT_ERR(__wt_config_gets_def(session, cfg, "next_random", 0, &cval));
     if (cval.val != 0) {
+        WT_ERR(__wt_config_gets_def(session, cfg, "next_random_seed", 0, &cval));
+        if (cval.val != 0)
+            __wt_random_init_custom_seed(&cbt->rnd, (uint64_t)cval.val);
+        else
+            __wt_random_init_seed(session, &cbt->rnd);
+
         if (WT_CURSOR_RECNO(cursor))
             WT_ERR_MSG(
               session, ENOTSUP, "next_random configuration not supported for column-store objects");

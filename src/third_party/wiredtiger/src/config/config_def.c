@@ -1200,6 +1200,8 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor[] = {
     INT64_MAX, NULL},
   {"next_random_sample_size", "string", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_STRING,
     INT64_MIN, INT64_MAX, NULL},
+  {"next_random_seed", "string", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_STRING,
+    INT64_MIN, INT64_MAX, NULL},
   {"overwrite", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN, INT64_MIN,
     INT64_MAX, NULL},
   {"prefix_search", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN,
@@ -1224,7 +1226,7 @@ static const uint8_t confchk_WT_SESSION_open_cursor_jump[WT_CONFIG_JUMP_TABLE_SI
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 5, 7, 7,
-  7, 7, 7, 8, 8, 8, 8, 8, 10, 11, 12, 12, 15, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18};
+  7, 7, 7, 8, 8, 8, 8, 8, 11, 12, 13, 13, 16, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_prepare_transaction[] = {
   {"prepare_timestamp", "string", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_STRING,
@@ -3402,10 +3404,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "dump_version=false,release_evict=false),dump=,"
     "incremental=(consolidate=false,enabled=false,file=,"
     "force_stop=false,granularity=16MB,src_id=,this_id=),"
-    "next_random=false,next_random_sample_size=0,overwrite=true,"
-    "prefix_search=false,raw=false,read_once=false,readonly=false,"
-    "skip_sort_check=false,statistics=,target=",
-    confchk_WT_SESSION_open_cursor, 18, confchk_WT_SESSION_open_cursor_jump},
+    "next_random=false,next_random_sample_size=0,next_random_seed=0,"
+    "overwrite=true,prefix_search=false,raw=false,read_once=false,"
+    "readonly=false,skip_sort_check=false,statistics=,target=",
+    confchk_WT_SESSION_open_cursor, 19, confchk_WT_SESSION_open_cursor_jump},
   {"WT_SESSION.prepare_transaction", "prepare_timestamp=", confchk_WT_SESSION_prepare_transaction,
     1, confchk_WT_SESSION_prepare_transaction_jump},
   {"WT_SESSION.query_timestamp", "get=read", confchk_WT_SESSION_query_timestamp, 1,
