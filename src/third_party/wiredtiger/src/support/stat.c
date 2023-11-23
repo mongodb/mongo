@@ -1567,6 +1567,7 @@ static const char *const __stats_connection_desc[] = {
   "checkpoint: scrub dirty target",
   "checkpoint: scrub time (msecs)",
   "checkpoint: stop timing stress active",
+  "checkpoint: time spent on per-tree checkpoint work (usecs)",
   "checkpoint: total time (msecs)",
   "checkpoint: transaction checkpoints due to obsolete pages",
   "checkpoint: wait cycles while cache dirty level is decreasing",
@@ -2259,6 +2260,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing checkpoint_scrub_target */
     /* not clearing checkpoint_scrub_time */
     /* not clearing checkpoint_stop_stress_active */
+    stats->checkpoint_tree_duration = 0;
     /* not clearing checkpoint_time_total */
     stats->checkpoint_obsolete_applied = 0;
     stats->checkpoint_wait_reduce_dirty = 0;
@@ -2962,6 +2964,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->checkpoint_scrub_target += WT_STAT_READ(from, checkpoint_scrub_target);
     to->checkpoint_scrub_time += WT_STAT_READ(from, checkpoint_scrub_time);
     to->checkpoint_stop_stress_active += WT_STAT_READ(from, checkpoint_stop_stress_active);
+    to->checkpoint_tree_duration += WT_STAT_READ(from, checkpoint_tree_duration);
     to->checkpoint_time_total += WT_STAT_READ(from, checkpoint_time_total);
     to->checkpoint_obsolete_applied += WT_STAT_READ(from, checkpoint_obsolete_applied);
     to->checkpoint_wait_reduce_dirty += WT_STAT_READ(from, checkpoint_wait_reduce_dirty);
