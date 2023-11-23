@@ -321,6 +321,8 @@ class _StepdownThread(threading.Thread):
 
         secondaries = rs_fixture.get_secondaries()
 
+        self.logger.info("Stepping down primary on port %d of replica set '%s'", old_primary.port,
+                         rs_fixture.replset_name)
         if self._terminate:
             if not rs_fixture.stop_primary(old_primary, self._background_reconfig, self._kill):
                 return
@@ -333,7 +335,13 @@ class _StepdownThread(threading.Thread):
             def step_up_secondary():
                 while secondaries:
                     chosen = random.choice(secondaries)
+                    self.logger.info(
+                        "Chose secondary on port %d of replica set '%s' for step up attempt.",
+                        chosen.port, rs_fixture.replset_name)
                     if not rs_fixture.stepup_node(chosen, self._auth_options):
+                        self.logger.info(
+                            "Attempt to step up secondary on port %d of replica set '%s' failed.",
+                            chosen.port, rs_fixture.replset_name)
                         secondaries.remove(chosen)
                     else:
                         return chosen
