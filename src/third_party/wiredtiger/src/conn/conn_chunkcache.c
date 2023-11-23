@@ -156,10 +156,9 @@ __chunkcache_metadata_pop_work(WT_SESSION_IMPL *session, WT_CHUNKCACHE_METADATA_
     if ((*entryp = TAILQ_FIRST(&conn->chunkcache_metadataqh)) != NULL) {
         TAILQ_REMOVE(&conn->chunkcache_metadataqh, *entryp, q);
         --conn->chunkcache_queue_len;
+        WT_STAT_CONN_INCR(session, chunkcache_metadata_work_units_dequeued);
     }
     __wt_spin_unlock(session, &conn->chunkcache_metadata_lock);
-
-    WT_STAT_CONN_INCR(session, chunkcache_metadata_work_units_dequeued);
 }
 
 /*
