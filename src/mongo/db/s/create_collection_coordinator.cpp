@@ -1628,7 +1628,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 auto cri = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss()));
+                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                          nss()));
                 CreateCollectionResponse response{cri.getCollectionVersion()};
                 response.setCollectionUUID(cri.cm.getUUID());
                 _result = std::move(response);
