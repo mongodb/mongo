@@ -14,14 +14,15 @@
  * This file contains most of the code that allows WiredTiger to delete pages of data without
  * reading them into the cache.
  *
- * The way cursor truncate works is it explicitly reads the first and last pages of the truncate
+ * The way session truncate works is it explicitly reads the first and last pages of the truncate
  * range, then walks the tree with a flag so the tree walk code skips reading eligible pages within
  * the range and instead just marks them as deleted, by changing their WT_REF state to
  * WT_REF_DELETED. Pages ineligible for this fast path ("fast-truncate" or "fast-delete") include
- * pages already in the cache, having overflow items, containing prepared values, or belonging to
- * FLCS trees. Ineligible pages are read and have their rows updated/deleted individually
- * ("slow-truncate"). The transaction for the delete operation is stored in memory referenced by the
- * WT_REF.page_del field.
+ * pages that are already in the cache and can not be evicted, records in the pages that are
+ * not visible to the transaction, pages containing overflow items, pages containing prepared
+ * values, or pages that belong to FLCS trees. Ineligible pages are read and have their rows
+ * updated/deleted individually ("slow-truncate"). The transaction for the delete operation is
+ * stored in memory referenced by the WT_REF.page_del field.
  *
  * Future cursor walks of the tree will skip the deleted page based on the transaction stored for
  * the delete, but it gets more complicated if a read is done using a random key, or a cursor walk
@@ -32,15 +33,15 @@
  * process makes it appear as if the page was read and each individual row deleted, exactly as
  * would have happened if the page had been in the cache all along.
  *
- * There's an additional complication to support rollback of the page delete. When the page was
- * marked deleted, a pointer to the WT_REF was saved in the deleting session's transaction list and
- * the delete is unrolled by resetting the WT_REF_DELETED state back to WT_REF_DISK. However, if the
- * page has been instantiated by some reading thread, that's not enough; each individual row on the
- * page must have the delete operation reset. If the page split, the WT_UPDATE lists might have been
- * saved/restored during reconciliation and appear on multiple pages, and the WT_REF stored in the
- * deleting session's transaction list is no longer useful. For this reason, when the page is
- * instantiated by a read, a list of the WT_UPDATE structures on the page is stored in the
- * WT_PAGE_MODIFY.inst_updates field. That way the session resolving the delete can find all
+ * There's an additional complication to support transaction rollback of the page delete. When the
+ * page was marked deleted, a pointer to the WT_REF was saved in the deleting session's transaction
+ * list and the delete is unrolled by resetting the WT_REF_DELETED state back to WT_REF_DISK.
+ * However, if the page has been instantiated by some reading thread, that's not enough; each
+ * individual row on the page must have the delete operation reset. If the page split, the WT_UPDATE
+ * lists might have been saved/restored during reconciliation and appear on multiple pages, and the
+ * WT_REF stored in the deleting session's transaction list is no longer useful. For this reason,
+ * when the page is instantiated by a read, a list of the WT_UPDATE structures on the page is stored
+ * in the WT_PAGE_MODIFY.inst_updates field. That way the session resolving the delete can find all
  * WT_UPDATE structures that require update.
  *
  * There are two other ways pages can be marked deleted: if they reconcile empty, or if they are
@@ -172,7 +173,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      * checks as we do not track the aggregated commit timestamp.
      */
     if (!WT_IS_HS(session->dhandle) &&
-      !__wt_txn_visible(session, addr.ta.newest_txn,
+      !__wt_txn_snap_min_visible(session, addr.ta.newest_txn,
         WT_MAX(addr.ta.newest_start_durable_ts, addr.ta.newest_stop_durable_ts),
         WT_MAX(addr.ta.newest_start_durable_ts, addr.ta.newest_stop_durable_ts)))
         goto err;
