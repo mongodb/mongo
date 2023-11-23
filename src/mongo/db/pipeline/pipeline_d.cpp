@@ -709,12 +709,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     // Mark the metadata that's requested by the pipeline on the CQ.
     cq.getValue()->requestAdditionalMetadata(metadataRequested);
 
+    // Attempt to get a plan executor that uses a DISTINCT_SCAN to scan exactly one document for
+    // each group. It's the caller's responsibility to deal with an error to create such a plan.
     if (groupForDistinctScan) {
-        // When the pipeline includes a $group that groups by a single field
-        // (groupIdForDistinctScan), we use getExecutorDistinct() to attempt to get an executor that
-        // uses a DISTINCT_SCAN to scan exactly one document for each group. When that's not
-        // possible, we return nullptr, and the caller is responsible for trying again without
-        // passing a 'groupIdForDistinctScan' value.
         CanonicalDistinct canonicalDistinct(std::move(cq.getValue()),
                                             groupForDistinctScan->groupId());
 
@@ -723,26 +720,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         const bool flipDistinctScanDirection = groupForDistinctScan->expectedInput() ==
             GroupFromFirstDocumentTransformation::ExpectedInput::kLastDocument;
 
-        // Note that we request a "strict" distinct plan because:
-        // 1) We do not want to have to de-duplicate the results of the plan.
-        //
-        // 2) We not want a plan that will return separate values for each array element. For
-        // example, if we have a document {a: [1,2]} and group by "a" a DISTINCT_SCAN on an "a"
-        // index would produce one result for '1' and another for '2', which would be incorrect.
-        auto distinctExecutor =
-            getExecutorDistinct(&collections.getMainCollection(),
-                                plannerOpts.options | QueryPlannerParams::STRICT_DISTINCT_ONLY,
-                                &canonicalDistinct,
-                                flipDistinctScanDirection);
-        if (!distinctExecutor.isOK()) {
-            return distinctExecutor.getStatus().withContext(
-                "Unable to use distinct scan to optimize $group stage");
-        } else if (!distinctExecutor.getValue()) {
-            return {ErrorCodes::NoQueryExecutionPlans,
-                    "Unable to use distinct scan to optimize $group stage"};
-        } else {
-            return distinctExecutor;
-        }
+        // We have to request a "strict" distinct plan because:
+        // 1) $group with distinct semantics doesn't de-duplicate the results.
+        // 2) Non-strict parameter would allow use of multikey indexes for DISTINCT_SCAN, which
+        //    means that for {a: [1, 2]} two distinct values would be returned, but for group keys
+        //    arrays shouldn't be traversed.
+        return tryGetExecutorDistinct(&collections.getMainCollection(),
+                                      plannerOpts.options |
+                                          QueryPlannerParams::STRICT_DISTINCT_ONLY,
+                                      &canonicalDistinct,
+                                      flipDistinctScanDirection);
     }
 
     // Queries that can use SBE may push down compatible pipeline stages. 'getExecutorFind' will

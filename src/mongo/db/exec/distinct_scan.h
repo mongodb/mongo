@@ -106,13 +106,10 @@ struct DistinctParams {
 };
 
 /**
- * Used by the distinct command.  Executes a mutated index scan over the provided bounds.
- * However, rather than looking at every key in the bounds, it skips to the next value of the
- * _params.fieldNo-th indexed field.  This is because distinct only cares about distinct values
- * for that field, so there is no point in examining all keys with the same value for that
- * field.
- *
- * Only created through the getExecutorDistinct path.  See db/query/get_executor.cpp
+ * Executes an index scan over the provided bounds. However, rather than looking at every key in the
+ * bounds, it skips to the next value of the _params.fieldNo-th indexed field. This is because
+ * distinct only cares about distinct values for that field, so there is no point in examining all
+ * keys with the same value for that field.
  */
 class DistinctScan final : public RequiresIndexStage {
 public:

@@ -120,6 +120,60 @@ namespace {
 
 namespace dps = dotted_path_support;
 
+namespace {
+// This function might create a classic or SBE plan executor. It relies on some assumptions that are
+// specific to the distinct() command and shouldn't be blindly reused in other "distinct" contexts.
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCommand(
+    OperationContext* opCtx,
+    CanonicalDistinct canonicalDistinct,
+    VariantCollectionPtrOrAcquisition coll) {
+    const auto plannerOptions = QueryPlannerParams::DEFAULT;
+    const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
+    const auto& collectionPtr = coll.getCollectionPtr();
+
+    // If the collection doesn't exist 'getExecutor()' should create an EOF plan for it no matter
+    // the query.
+    if (!collectionPtr) {
+        return uassertStatusOK(getExecutor(opCtx,
+                                           coll,
+                                           canonicalDistinct.releaseQuery(),
+                                           nullptr /* extractAndAttachPipelineStages */,
+                                           yieldPolicy,
+                                           plannerOptions));
+    }
+
+    // Try creating a plan that does DISTINCT_SCAN.
+    auto executor = tryGetExecutorDistinct(coll, plannerOptions, &canonicalDistinct);
+    if (executor.isOK()) {
+        return std::move(executor.getValue());
+    }
+
+    // If there is no DISTINCT_SCAN plan, create whatever non-distinct plan is appropriate, because
+    // 'distinct()' command is capable of de-duplicating and unwinding its inputs. Note: In order to
+    // allow a covered DISTINCT_SCAN we've inserted a projection -- there is no point of keeping it
+    // if a DISTINCT_SCAN didn't bake out.
+    auto cq = canonicalDistinct.getQuery();
+    auto findCommand = std::make_unique<FindCommandRequest>(cq->getFindCommandRequest());
+    findCommand->setProjection(BSONObj());
+
+    auto cqWithoutProjection = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = makeExpressionContext(opCtx, *findCommand),
+        .parsedFind =
+            ParsedFindCommandParams{
+                .findCommand = std::move(findCommand),
+                .extensionsCallback = ExtensionsCallbackReal(opCtx, &collectionPtr->ns()),
+                .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures},
+        .explain = cq->getExplain()});
+
+    return uassertStatusOK(getExecutor(opCtx,
+                                       coll,
+                                       std::move(cqWithoutProjection),
+                                       nullptr /* extractAndAttachPipelineStages */,
+                                       yieldPolicy,
+                                       plannerOptions));
+}
+}  // namespace
+
 class DistinctCommand : public BasicCommand {
 public:
     DistinctCommand() : BasicCommand("distinct") {}
@@ -253,14 +307,12 @@ public:
                 opCtx, viewAggRequest, viewAggregation.getValue(), PrivilegeVector(), result);
         }
 
-        const auto& collection = collectionOrView->getCollectionPtr();
-
-        auto executor = uassertStatusOK(getExecutorDistinct(
-            collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &canonicalDistinct));
+        auto executor = createExecutorForDistinctCommand(
+            opCtx, std::move(canonicalDistinct), collectionOrView->getCollection());
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(executor.get(),
-                               collection,
+                               collectionOrView->getCollectionPtr(),
                                verbosity,
                                BSONObj(),
                                SerializationContext::stateCommandReply(serializationCtx),
@@ -372,27 +424,25 @@ public:
         uassertStatusOK(replCoord->checkCanServeReadsFor(
             opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
-        auto executor = getExecutorDistinct(
-            collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &canonicalDistinct);
-        uassertStatusOK(executor.getStatus());
+        auto executor = createExecutorForDistinctCommand(
+            opCtx, std::move(canonicalDistinct), collectionOrView->getCollection());
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setPlanSummary_inlock(
-                executor.getValue()->getPlanExplainer().getPlanSummary());
+            CurOp::get(opCtx)->setPlanSummary_inlock(executor->getPlanExplainer().getPlanSummary());
         }
 
         const auto key = cmdObj.getStringField(CanonicalDistinct::kKeyField);
 
         std::vector<BSONObj> distinctValueHolder;
-        BSONElementSet values(executor.getValue()->getCanonicalQuery()->getCollator());
+        BSONElementSet values(executor->getCanonicalQuery()->getCollator());
 
         const int kMaxResponseSize = BSONObjMaxUserSize - 4096;
 
         try {
             size_t listApproxBytes = 0;
             BSONObj obj;
-            while (PlanExecutor::ADVANCED == executor.getValue()->getNext(&obj, nullptr)) {
+            while (PlanExecutor::ADVANCED == executor->getNext(&obj, nullptr)) {
                 // Distinct expands arrays.
                 //
                 // If our query is covered, each value of the key should be in the index key and
@@ -420,7 +470,7 @@ public:
                 }
             }
         } catch (DBException& exception) {
-            auto&& explainer = executor.getValue()->getPlanExplainer();
+            auto&& explainer = executor->getPlanExplainer();
             auto&& [stats, _] =
                 explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
             LOGV2_WARNING(23797,
@@ -438,7 +488,7 @@ public:
 
         // Get summary information about the plan.
         PlanSummaryStats stats;
-        auto&& explainer = executor.getValue()->getPlanExplainer();
+        auto&& explainer = executor->getPlanExplainer();
         explainer.getSummaryStats(&stats);
         if (collection) {
             CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, stats);

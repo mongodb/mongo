@@ -2983,7 +2983,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
         !getDistinctNodeIndex(
             plannerParams.indices, canonicalDistinct->getKey(), collator, &distinctNodeIndex)) {
         // Not a "simple" DISTINCT_SCAN or no suitable index was found.
-        return {nullptr};
+        return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};
     }
 
     auto dn = std::make_unique<DistinctNode>(plannerParams.indices[distinctNodeIndex]);
@@ -3086,68 +3086,27 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
             return exec;
         }
     }
-
-    // Indicate that, although there was no error, we did not find a DISTINCT_SCAN solution.
-    return {nullptr};
-}
-
-/**
- * Makes a clone of 'cq' but without any projection, then runs getExecutor on the clone.
- */
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWithoutProjection(
-    OperationContext* opCtx,
-    VariantCollectionPtrOrAcquisition coll,
-    const CanonicalQuery* cq,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    size_t plannerOptions) {
-    const auto& collectionPtr = coll.getCollectionPtr();
-
-    auto findCommand = std::make_unique<FindCommandRequest>(cq->getFindCommandRequest());
-    findCommand->setProjection(BSONObj());
-
-    auto cqWithoutProjection = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx, *findCommand),
-        .parsedFind =
-            ParsedFindCommandParams{
-                .findCommand = std::move(findCommand),
-                .extensionsCallback = ExtensionsCallbackReal(opCtx, &collectionPtr->ns()),
-                .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures},
-        .explain = cq->getExplain()});
-
-    return getExecutor(opCtx,
-                       coll,
-                       std::move(cqWithoutProjection),
-                       nullptr /* extractAndAttachPipelineStages */,
-                       yieldPolicy,
-                       plannerOptions);
+    return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};
 }
 }  // namespace
 
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorDistinct(
     VariantCollectionPtrOrAcquisition coll,
     size_t plannerOptions,
     CanonicalDistinct* canonicalDistinct,
     bool flipDistinctScanDirection) {
     const auto& collectionPtr = coll.getCollectionPtr();
+    if (!collectionPtr) {
+        // The caller should create EOF plan for the appropriate engine.
+        return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};
+    }
 
-    auto expCtx = canonicalDistinct->getQuery()->getExpCtx();
-    OperationContext* opCtx = expCtx->opCtx;
+    OperationContext* opCtx = canonicalDistinct->getQuery()->getExpCtx()->opCtx;
     const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
 
-    // Assert that not eligible for bonsai
     uassert(ErrorCodes::InternalErrorNotSupported,
             "distinct command is not eligible for bonsai",
             !isEligibleForBonsai(*canonicalDistinct->getQuery(), opCtx, collectionPtr));
-
-    if (!collectionPtr) {
-        // Treat collections that do not exist as empty collections.
-        return plan_executor_factory::make(canonicalDistinct->releaseQuery(),
-                                           std::make_unique<WorkingSet>(),
-                                           std::make_unique<EOFStage>(expCtx.get()),
-                                           coll,
-                                           yieldPolicy,
-                                           plannerOptions);
-    }
 
     // TODO: check for idhack here?
 
@@ -3163,82 +3122,38 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     auto plannerParams = fillOutPlannerParamsForDistinct(
         opCtx, collectionPtr, plannerOptions, *canonicalDistinct, flipDistinctScanDirection);
 
-    // If there are no suitable indices for the distinct hack bail out now into regular planning
-    // with no projection.
+    // 'fillOutPlannerParamsForDistinct()' might consider as suitable an index that later might not
+    // pass all the necessary conditions for distinct scan, but if it fills no suitable indexes at
+    // all, it's for sure that distinct scan cannot be used.
     if (plannerParams.indices.empty()) {
-        if (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY) {
-            // STRICT_DISTINCT_ONLY indicates that we should not return any plan if we can't return
-            // a DISTINCT_SCAN plan.
-            return {nullptr};
-        } else {
-            // Note that, when not in STRICT_DISTINCT_ONLY mode, the caller doesn't care about the
-            // projection, only that the planner does not produce a FETCH if it's possible to cover
-            // the fields in the projection. That's definitely not possible in this case, so we
-            // dispense with the projection.
-            return getExecutorWithoutProjection(
-                opCtx, coll, canonicalDistinct->getQuery(), yieldPolicy, plannerOptions);
-        }
+        return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};
     }
-
-    //
-    // If we're here, we have an index that includes the field we're distinct-ing over.
-    //
 
     auto executorWithStatus =
         getExecutorForSimpleDistinct(opCtx, coll, plannerParams, yieldPolicy, canonicalDistinct);
-    if (!executorWithStatus.isOK() || executorWithStatus.getValue()) {
+    if (executorWithStatus != ErrorCodes::NoQueryExecutionPlans) {
         // We either got a DISTINCT plan or a fatal error.
         return executorWithStatus;
-    } else {
-        // A "simple" DISTINCT plan wasn't possible, but we can try again with the QueryPlanner.
     }
+    // A "simple" DISTINCT plan wasn't possible, but we can try again with the QueryPlanner.
 
     // Ask the QueryPlanner for a list of solutions that scan one of the indexes from
     // fillOutPlannerParamsForDistinct() (i.e., the indexes that include the distinct field).
     auto statusWithMultiPlanSolns =
         QueryPlanner::plan(*canonicalDistinct->getQuery(), plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
-        if (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY) {
-            return {nullptr};
-        } else {
-            return getExecutor(opCtx,
-                               coll,
-                               canonicalDistinct->releaseQuery(),
-                               nullptr /* extractAndAttachPipelineStages */,
-                               yieldPolicy,
-                               plannerOptions);
-        }
+        return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};
     }
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 
-    // See if any of the solutions can be rewritten using a DISTINCT_SCAN. Note that, if the
-    // STRICT_DISTINCT_ONLY flag is not set, we may get a DISTINCT_SCAN plan that filters out some
-    // but not all duplicate values of the distinct field, meaning that the output from this
-    // executor will still need deduplication.
-    executorWithStatus = getExecutorDistinctFromIndexSolutions(opCtx,
-                                                               coll,
-                                                               std::move(solutions),
-                                                               yieldPolicy,
-                                                               canonicalDistinct,
-                                                               flipDistinctScanDirection,
-                                                               plannerOptions);
-    if (!executorWithStatus.isOK() || executorWithStatus.getValue()) {
-        // We either got a DISTINCT plan or a fatal error.
-        return executorWithStatus;
-    } else if (!(plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY)) {
-        // We did not find a solution that we could convert to a DISTINCT_SCAN, so we fall back to
-        // regular planning. Note that, when not in STRICT_DISTINCT_ONLY mode, the caller doesn't
-        // care about the projection, only that the planner does not produce a FETCH if it's
-        // possible to cover the fields in the projection. That's definitely not possible in this
-        // case, so we dispense with the projection.
-        return getExecutorWithoutProjection(
-            opCtx, coll, canonicalDistinct->getQuery(), yieldPolicy, plannerOptions);
-    } else {
-        // We did not find a solution that we could convert to DISTINCT_SCAN, and the
-        // STRICT_DISTINCT_ONLY prohibits us from using any other kind of plan, so we return
-        // nullptr.
-        return {nullptr};
-    }
+    // See if any of the solutions can be rewritten using a DISTINCT_SCAN.
+    return getExecutorDistinctFromIndexSolutions(opCtx,
+                                                 coll,
+                                                 std::move(solutions),
+                                                 yieldPolicy,
+                                                 canonicalDistinct,
+                                                 flipDistinctScanDirection,
+                                                 plannerOptions);
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
