@@ -69,7 +69,8 @@ public:
     static boost::intrusive_ptr<DocumentSource> create(
         const FieldPath& fieldPath,
         const boost::intrusive_ptr<Expression>& expr,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        bool createdBySetWindowFields);
 
     /**
      * Parses a $addFields stage from the user-supplied BSON.
