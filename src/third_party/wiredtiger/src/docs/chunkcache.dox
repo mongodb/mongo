@@ -27,4 +27,24 @@ Newer content is more likely to be accessed again, so we insert freshly-flushed 
 This saves the chunkcache from having to read freshly-flushed data back from the object store soon after it was put there. When a tiered object is flushed and before it is deleted locally, we make an ingest call and the new or modified table will be inserted into the chunkcache.
 This function will also check for outdated pinned content in the chunk cache, ensuring the older versions of the pinned content can be cleaned up by chunk cache's eviction process.
 
+@section persistence Persisted content
+
+The chunk cache could contain a considerable quantity of content. This
+content would typically be on-disk, meaning it can be persisted across
+WiredTiger restarts. Doing this saves the user time (due to reduced latency
+when accessing data from disk, compared to networked block storage) and
+resources (as these block storage accesses are often associated with an API
+usage cost).
+
+This persistence is implemented with an additional WiredTiger internal file,
+named WiredTigerCC (where "CC" stands for "chunk cache"). This maintains the
+metadata necessary for WiredTiger to reuse chunk cache content on startup.
+This content could become stale, in which case a checksum failure is
+detected when we attempt to use it. This will result in a logged message and
+some data being re-fetched from block storage.
+
+The persisted chunk cache content is invalidated when a salvage operation is
+run, a WiredTiger upgrade changes the metadata format, or when any of the
+chunk cache capacity, chunk size, or number of buckets is changed.
+
 */

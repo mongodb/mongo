@@ -151,6 +151,7 @@ Valgrind
 WILLNEED
 WiredTiger
 WiredTiger's
+WiredTigerCC
 WiredTigerCheckpoint
 WiredTigerException
 WiredTigerHS
