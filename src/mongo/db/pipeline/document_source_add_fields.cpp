@@ -81,14 +81,17 @@ intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
     const FieldPath& fieldPath,
     const intrusive_ptr<Expression>& expr,
-    const intrusive_ptr<ExpressionContext>& expCtx) {
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    bool createdBySetWindowFields) {
 
     const bool isIndependentOfAnyCollection = false;
-    return make_intrusive<DocumentSourceSingleDocumentTransformation>(
+    auto docSrc = make_intrusive<DocumentSourceSingleDocumentTransformation>(
         expCtx,
         projection_executor::AddFieldsProjectionExecutor::create(expCtx, fieldPath, expr),
         kStageName,
         isIndependentOfAnyCollection);
+    docSrc->setCreatedBySetWindowFields(createdBySetWindowFields);
+    return docSrc;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::createFromBson(
