@@ -1656,7 +1656,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
                 std::erase_if(involvedShardIds, [&](auto&& shard) {
-                    return !std::binary_search(allShardIds.begin(), allShardIds.end(), shard);
+                    return std::find(allShardIds.begin(), allShardIds.end(), shard) ==
+                        allShardIds.end();
                 });
 
                 _doc.setShardIds(std::move(involvedShardIds));
