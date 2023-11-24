@@ -280,12 +280,6 @@ public:
     }
 
     /**
-     * Appends the specified range to the set of ranges tracked for this collection and checks if
-     * it overlaps with existing ranges.
-     */
-    Status addRangeToZone(const ZoneRange& range);
-
-    /**
      * Returns number of chunks in the specified shard.
      */
     size_t numberOfChunksInShard(const ShardId& shardId) const;
