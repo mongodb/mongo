@@ -897,7 +897,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                 2,
                                 {logv2::LogComponent::kShardMigrationPerf},
                                 "Starting post-migration commit refresh on the router");
-            targeterChanged = targeterChanged || targeter.refreshIfNeeded(opCtx);
+            targeterChanged |= targeter.refreshIfNeeded(opCtx);
             LOGV2_DEBUG_OPTIONS(4817407,
                                 2,
                                 {logv2::LogComponent::kShardMigrationPerf},

@@ -598,11 +598,11 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
         bool targeterChanged = false;
         try {
             for (auto& targeter : targeters) {
-                targeterChanged = targeterChanged || targeter->createCollectionIfNeeded(opCtx);
+                targeterChanged |= targeter->createCollectionIfNeeded(opCtx);
             }
             LOGV2_DEBUG(7298200, 2, "Refreshing all targeters for bulkWrite");
             for (auto& targeter : targeters) {
-                targeterChanged = targeterChanged || targeter->refreshIfNeeded(opCtx);
+                targeterChanged |= targeter->refreshIfNeeded(opCtx);
             }
             LOGV2_DEBUG(7298201,
                         2,
