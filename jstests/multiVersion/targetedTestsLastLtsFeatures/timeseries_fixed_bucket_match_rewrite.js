@@ -104,14 +104,16 @@ assert(unpackStage["eventFilter"], "Expected an eventFilter, but got: " + tojson
 
 // Downgrade the mongos binary.
 jsTestLog('downgrading mongos.');
-st.downgradeCluster('last-lts', {downgradeShards: false, downgradeConfigs: false});
+st.restartBinariesWithDowngradeBackCompat('latest');
+st.downgradeBinariesWithoutDowngradeBackCompat('last-lts',
+                                               {downgradeShards: false, downgradeConfigs: false});
 let mongosConn = st.s;
 testDB = mongosConn.getDB(dbName);
 coll = testDB[coll.getName()];
 
 // Downgrade the other shard's binary. We now have a mixed cluster.
 jsTestLog('downgrading other shard.');
-st.downgradeCluster('last-lts', {
+st.downgradeBinariesWithoutDowngradeBackCompat('last-lts', {
     downgradeShards: false,
     downgradeOneShard: st.rs1,
     downgradeMongos: false,
@@ -139,7 +141,7 @@ assert.eq(otherShardEntries.length, 1, otherShardEntries);
 
 // Downgrade the rest of the shards and the config server.
 jsTestLog('downgrading the rest of the shards and the config server.');
-st.downgradeCluster('last-lts', {downgradeMongos: false});
+st.downgradeBinariesWithoutDowngradeBackCompat('last-lts', {downgradeMongos: false});
 awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
 awaitRSClientHosts(st.s, st.rs1.getPrimary(), {ok: true, ismaster: true});
 

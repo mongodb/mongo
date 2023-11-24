@@ -343,7 +343,7 @@ function runTests(downgradeVersion) {
     // Downgrade the entire cluster to the 'downgradeVersion' binVersion.
     assert.commandWorked(st.s.getDB(dbName).adminCommand(
         {setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
-    st.downgradeCluster(downgradeVersion);
+    st.downgradeCluster('latest', downgradeVersion);
 
     // Refresh our reference to the sharded collection post-downgrade.
     shardedColl = st.s.getDB(dbName)[collName];
@@ -357,7 +357,7 @@ function runTests(downgradeVersion) {
 runTests('last-continuous');
 
 // Upgrade the entire cluster back to the latest version.
-st.upgradeCluster('latest', {waitUntilStable: true});
+st.upgradeCluster('latest', true);
 assert.commandWorked(
     st.s.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 

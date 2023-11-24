@@ -173,7 +173,7 @@ const resumeTokensLastLTS = getTokensForExpectedEvents(
 // TODO SERVER-82330: Validate that these tokens are indeed all v1 tokens.
 
 // Upgrade the cluster to 'latest' to allow testing v1 - v2 resume behaviour.
-st.upgradeCluster("latest", {waitUntilStable: true});
+st.upgradeCluster("latest", true);
 assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
 testDB = st.s.getDB(jsTestName());
@@ -205,7 +205,7 @@ const resumeTokensWithSplitLatest = getTokensForExpectedEvents(expectedSplitEven
 // Downgrade back to the original version.
 assert.commandWorked(
     st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
-st.downgradeCluster("last-lts", {waitUntilStable: true});
+st.downgradeCluster("latest", "last-lts", true);
 
 testDB = st.s.getDB(jsTestName());
 

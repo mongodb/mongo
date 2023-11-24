@@ -643,6 +643,14 @@ MongoRunner.mongoOptions = function(opts) {
         delete MongoRunner.savedOptions[opts.runId].waitForConnect;
     }
 
+    if (opts.removeOptions) {
+        for (const opt of opts.removeOptions) {
+            delete MongoRunner.savedOptions[opts.runId][opt];
+            delete opts[opt];
+        }
+    }
+    delete opts.removeOptions;
+
     if (jsTestOptions().networkMessageCompressors) {
         opts.networkMessageCompressors = jsTestOptions().networkMessageCompressors;
     }
@@ -987,6 +995,8 @@ MongoRunner.runningChildPids = function() {
  *     startClean {boolean}: same as cleanData.
  *     noCleanData {boolean}: Do not clean files (cleanData takes priority).
  *     binVersion {string}: version for binary (also see MongoRunner.binVersionSubs).
+ *     removeOptions {array(string)}: list of option names to remove from the command line before
+ *                                    running the new process. They are also not remembered.
  *
  *     @see MongoRunner.mongodOptions for other options
  *   }

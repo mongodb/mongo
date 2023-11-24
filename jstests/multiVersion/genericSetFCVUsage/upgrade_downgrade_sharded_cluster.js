@@ -176,7 +176,7 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     checkClusterAfterFCVDowngrade();
 
     jsTest.log('Downgrading binaries to version ' + oldVersion);
-    st.downgradeCluster(oldVersion);
+    st.downgradeCluster('latest', oldVersion);
 
     checkClusterAfterBinaryDowngrade(oldVersion);
 
