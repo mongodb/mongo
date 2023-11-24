@@ -882,6 +882,13 @@ tasks:
         vars:
           test_control: "ycsb-60GB"
 
+  - name: ycsb.load
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ycsb.load"
+
   - name: ycsb_60GB.long
     priority: 5
     commands:
@@ -4097,6 +4104,7 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: industry_benchmarks_w1
       - name: ycsb_60GB
+      - name: ycsb.load
       - name: ycsb_60GB.long
         cron: *high-value-workload-cron
       - name: industry_benchmarks_secondary_reads
