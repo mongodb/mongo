@@ -36,9 +36,12 @@ export function assertHistogramDiffEq(db, coll, lastHistogram, readDiff, writeDi
     // runs an extra "listIndex" command.
     let allowedDiff = 0;
     if (FixtureHelpers.isReplSet(db)) {
-        allowedDiff = 1;
+        // The checkDB command could be run multiple times in a short period of time.
+        allowedDiff = 3;
     }
-    assert.lte(Math.abs(diff.commands - commandDiff), allowedDiff, "miscounted histogram commands");
+    assert.lte(Math.abs(diff.commands - commandDiff),
+               allowedDiff,
+               "miscounted histogram commands:\n" + tojson(diff));
     return thisHistogram;
 }
 
@@ -86,8 +89,11 @@ export function assertTopDiffEq(db, coll, lastTop, key, expectedCountDiff) {
     // runs an extra "listIndexes" command.
     let allowedDiff = 0;
     if (FixtureHelpers.isReplSet(db)) {
-        allowedDiff = 1;
+        // The checkDB command could be run mutiple times in a short period of time.
+        allowedDiff = 3;
     }
-    assert.lte(diff.count - expectedCountDiff, allowedDiff, "top reports wrong count for " + key);
+    assert.lte(diff.count - expectedCountDiff,
+               allowedDiff,
+               "top reports wrong count for commands\n top results: " + tojson(thisTop));
     return thisTop;
 }
