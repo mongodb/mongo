@@ -105,6 +105,7 @@ public:
      */
     template <typename VisitorCtx, typename DS>
     void registerVisitorFunc(ConstVisitFunc f) {
+        using namespace fmt::literals;
         static_assert(std::is_polymorphic_v<VisitorCtx>,
                       "Visitor context must be polymorphic to ensure typeid returns dynamic types");
         DocumentSourceVisitorRegistryKey key{std::type_index(typeid(VisitorCtx)),
@@ -121,6 +122,7 @@ public:
      */
     ConstVisitFunc getConstVisitorFunc(DocumentSourceVisitorContextBase& visitorCtx,
                                        const DocumentSource& ds) const {
+        using namespace fmt::literals;
         DocumentSourceVisitorRegistryKey key{std::type_index(typeid(visitorCtx)),
                                              std::type_index(typeid(ds))};
         if (auto it = _constVisitorRegistry.find(key); it != _constVisitorRegistry.end()) {

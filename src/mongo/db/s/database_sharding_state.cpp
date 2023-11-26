@@ -217,6 +217,7 @@ void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
 }
 
 void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx) const {
+    using namespace fmt::literals;
     if (_dbName == DatabaseName::kConfig || _dbName == DatabaseName::kAdmin) {
         uassert(7393700,
                 "The config server is the primary shard for database: {}"_format(

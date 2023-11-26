@@ -48,6 +48,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
 namespace mongo::repl::shard_merge_utils {
+using namespace fmt::literals;
 void createImportDoneMarkerLocalCollection(OperationContext* opCtx, const UUID& migrationId) {
     LOGV2_DEBUG(
         7458505, 1, "Creating import done marker collection", "migrationId"_attr = migrationId);

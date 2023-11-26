@@ -182,6 +182,7 @@ getDataSizeInfoForCollections(OperationContext* opCtx,
     auto responsesFromShards = sharding_util::sendCommandToShards(
         opCtx, DatabaseName::kAdmin, reqObj, shardIds, executor, false /* throwOnError */);
 
+    using namespace fmt::literals;
     for (auto&& response : responsesFromShards) {
         try {
             const auto& shardId = response.shardId;

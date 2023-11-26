@@ -100,6 +100,7 @@
 MONGO_FAIL_POINT_DEFINE(overrideTransactionApiMaxRetriesToThree);
 
 namespace mongo {
+using namespace fmt::literals;
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 

@@ -38,6 +38,7 @@
 namespace mongo::transport::grpc {
 
 std::string GRPCSessionManager::getClientThreadName(const Session& session) const {
+    using namespace fmt::literals;
     const auto* s = checked_cast<const GRPCSession*>(&session);
     if (auto id = s->clientId()) {
         return "grpc{}-{}"_format(id->toString(), session.id());

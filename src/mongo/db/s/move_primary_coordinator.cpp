@@ -90,6 +90,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeCloningData);
 

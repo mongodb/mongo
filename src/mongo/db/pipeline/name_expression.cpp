@@ -54,6 +54,7 @@ std::string NameExpression::evaluate(ExpressionContext* expCtx, const Document& 
     }
     invariant(_expr);
 
+    using namespace fmt::literals;
     auto value = _expr->evaluate(doc, &expCtx->variables);
     uassert(8117101,
             "Expected string, but got {}"_format(typeName(value.getType())),

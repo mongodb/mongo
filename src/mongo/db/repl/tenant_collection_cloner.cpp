@@ -560,6 +560,7 @@ void TenantCollectionCloner::handleNextBatch(DBClientCursor& cursor) {
 
 
 void TenantCollectionCloner::insertDocuments(std::vector<BSONObj> docsToInsert) {
+    using namespace fmt::literals;
     invariant(docsToInsert.size(),
               "Document size can't be non-zero:: namespace: {}, tenantId: {}"_format(
                   toStringForLogging(_sourceNss), _tenantId));

@@ -206,6 +206,7 @@ BSONObj TimeseriesUpsertStage::_produceNewDocumentForInsert() {
     _getImmutablePaths();
 
     mutablebson::Document doc;
+    using namespace fmt::literals;
 
     if (_request.shouldUpsertSuppliedDocument()) {
         update::generateNewDocumentFromSuppliedDoc(opCtx(), _immutablePaths, &_request, doc);

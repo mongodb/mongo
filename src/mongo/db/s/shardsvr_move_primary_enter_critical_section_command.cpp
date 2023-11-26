@@ -70,6 +70,7 @@
 
 namespace mongo {
 namespace {
+using namespace fmt::literals;
 
 class ShardsvrMovePrimaryEnterCriticalSectionCommand final
     : public TypedCommand<ShardsvrMovePrimaryEnterCriticalSectionCommand> {

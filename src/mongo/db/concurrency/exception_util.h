@@ -108,6 +108,7 @@ template <ErrorCodes::Error ec>
  * modify that document, this exception will get thrown by one of them.
  */
 [[noreturn]] inline void throwWriteConflictException(StringData context) {
+    using namespace fmt::literals;
     error_details::throwExceptionFor<ErrorCodes::WriteConflict>(
         "Caused by :: {} :: Please retry your operation or multi-document transaction."_format(
             context));

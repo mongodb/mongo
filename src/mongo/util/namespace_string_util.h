@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <fmt/format.h>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -43,8 +42,6 @@
 #include "mongo/util/serialization_context.h"
 
 namespace mongo {
-
-using namespace fmt::literals;
 
 class NamespaceStringUtil {
 public:

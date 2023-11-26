@@ -74,6 +74,7 @@
 
 
 namespace mongo {
+using namespace fmt::literals;
 
 using std::vector;
 using ResolveRoleOption = AuthzManagerExternalStateLocal::ResolveRoleOption;
