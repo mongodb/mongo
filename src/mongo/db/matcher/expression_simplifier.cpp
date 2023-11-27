@@ -153,6 +153,12 @@ bool isExpressionValid(const MatchExpression* root) {
     return context.isExpressionValid();
 }
 
+bool containsNegations(const Maxterm& dnf) {
+    return std::any_of(dnf.minterms.begin(), dnf.minterms.end(), [](const Minterm& minterm) {
+        return minterm.mask != minterm.predicates;
+    });
+}
+
 boost::optional<Maxterm> quineMcCluskey(const BitsetTreeNode& tree,
                                         const ExpressionSimlifierSettings& settings) {
     auto maxterm = boolean_simplification::convertToDNF(tree, settings.maximumNumberOfMinterms);
@@ -162,12 +168,15 @@ boost::optional<Maxterm> quineMcCluskey(const BitsetTreeNode& tree,
         return boost::none;
     }
 
+    // The simplifications using Absorption law.
     maxterm->removeRedundancies();
 
     LOGV2_DEBUG(
         7767001, 5, "MatchExpression in DNF representation", "maxterm"_attr = maxterm->toString());
 
-    if (settings.applyQuineMcCluskey) {
+    // The simplifications using the Quine-McCluskey algorithm (x&y | x&~y = x). The QMC works only
+    // for expressions with negations.
+    if (settings.applyQuineMcCluskey && containsNegations(*maxterm)) {
         maxterm = boolean_simplification::quineMcCluskey(std::move(*maxterm));
     }
 
