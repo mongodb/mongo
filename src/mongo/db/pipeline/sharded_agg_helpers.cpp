@@ -1471,7 +1471,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         auto* mergePipeline = dispatchResults.splitPipeline->mergePipeline.get();
         auto specificMergeShardId = mergePipeline->needsSpecificShardMerger();
         auto mergeType = [&]() -> std::string {
-            if (mergePipeline->canRunOnMongos()) {
+            if (mergePipeline->canRunOnMongos() && !specificMergeShardId) {
                 if (mergeCtx->inMongos) {
                     return "mongos";
                 }
