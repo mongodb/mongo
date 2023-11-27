@@ -411,9 +411,9 @@ TEST_F(QueryPlannerTest,
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        R"--({fetch: {filter: {$and: [{$or:[{e:4},{d:3}]}, {c: 1}]}, 
-                      node: {ixscan: {pattern: {a: 1, b: 1}, 
-                                      filter: null, 
+        R"--({fetch: {filter: {$and: [{$or:[{e:4},{d:3}]}, {c: 1}]},
+                      node: {ixscan: {pattern: {a: 1, b: 1},
+                                      filter: null,
                                       bounds: {a: [[1,1,true,true]], b: [[2,2,true,true]]}}}}})--");
 }
 
@@ -2923,6 +2923,92 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationApplysToEachOrInTree) {
         "  ]}}"
         " }}"
         "]}}");
+}
+
+// This test was designed to reproduce SERVER-83091, a case in which an implementation error in the
+// lockstep $or enumeration algorithm could result in an infinite loop. This could happen only if
+// there were nested $or nodes and the inner $or hit the maximum number of plans that it is willing
+// to generate.
+TEST_F(QueryPlannerTest, LockstepOrEnumerationWithNestedOrWhereInnerOrHitsEnumerationLimit) {
+    // Disable the simplifier, since when enabled it will collapse nested $or nodes into a single
+    // $or. Similarly, turn on the failpoint to disable match expression simplification which would
+    // also eliminate the redundant $or.
+    RAIIServerParameterControllerForTest boolSimplificationController(
+        "internalQueryEnableBooleanExpressionsSimplifier", false);
+    FailPointEnableBlock failPoint("disableMatchExpressionOptimization");
+
+    // The repro depends on the inner $or hitting its enumeration limit. The original problem from
+    // SERVER-83091 can be reproduced with a simpler query if we lower the limit on the number of
+    // plans that the 'PlanEnumerator' is allowed to generate for any $or node.
+    RAIIServerParameterControllerForTest maxOrPlansController(
+        "internalQueryEnumerationMaxOrSolutions", 3);
+
+    params.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+
+    runQueryAsCommand(fromjson(R"(
+        {find: 'testns', filter: {
+            $or: [
+                {$or: [
+                    {a: 1, b: 2},
+                    {a: 3}
+                ]},
+                {c: 4}
+            ]
+        }})"));
+
+    // There are two plans, the only difference between the two being whether the nested $and
+    // {a: 1, b: 2} uses the index on "a" or the index on "b".
+    assertNumSolutions(2U);
+
+    // Plan using the {a: 1} index for the innermost conjunction.
+    assertSolutionExists(R"(
+    {
+        fetch: {
+            node: {
+                or: {
+                    nodes: [
+                        {
+                            or: {
+                                nodes: [
+                                    {fetch: {filter: {b: 2}, node: {ixscan: {pattern: {a: 1}}}}},
+                                    {ixscan: {pattern: {a: 1}}}
+                                ]
+                            }
+                        },
+                        {ixscan: {pattern: {c: 1}}}
+                    ]
+                }
+            }
+        }
+    }
+    )");
+
+    // Alternative plan using the {b: 1} index for the innermost conjunction.
+    assertSolutionExists(R"(
+    {
+        fetch: {
+            node: {
+                or: {
+                    nodes: [
+                        {
+                            or: {
+                                nodes: [
+                                    {fetch: {filter: {a: 1}, node: {ixscan: {pattern: {b: 1}}}}},
+                                    {ixscan: {pattern: {a: 1}}}
+                                ]
+                            }
+                        },
+                        {ixscan: {pattern: {c: 1}}}
+                    ]
+                }
+            }
+        }
+    }
+    )");
 }
 
 TEST_F(QueryPlannerTest, NoOrSolutionsIfMaxOrSolutionsIsZero) {
