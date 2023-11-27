@@ -228,6 +228,14 @@ Status _createView(OperationContext* opCtx,
                                         << nss.toStringForErrorMsg());
         }
 
+        // This is a top-level handler for collection creation name conflicts. New commands coming
+        // in, or commands that generated a WriteConflict must return a NamespaceExists error here
+        // on conflict.
+        Status statusNss = catalog::checkIfNamespaceExists(opCtx, nss);
+        if (!statusNss.isOK()) {
+            return statusNss;
+        }
+
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
             ->checkShardVersionOrThrow(opCtx);
 
