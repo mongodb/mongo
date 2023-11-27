@@ -135,8 +135,8 @@ void JournalFlusher::run() {
                 // Reset opCtx if we get an error.
                 stdx::lock_guard<Latch> lk(_opCtxMutex);
                 _uniqueCtx.reset();
+                setUpOpCtx();
             }
-            setUpOpCtx();
 
             // Can be caused by killOp or stepdown.
             if (ErrorCodes::isInterruption(e.code())) {
