@@ -166,7 +166,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
 
     // Setup the request for the child stage that should place the bucket to be unpacked into the
     // kResult slot.
-    PlanStageReqs childReqs = reqs.copy().clearAllFields().clearMRInfo().setResult();
+    PlanStageReqs childReqs = reqs.copy().clearAllFields().set(kResult);
     // Computing fields from 'meta' should have been pushed below unpacking as projection stages
     // over the buckets collection, so the child stage must be able to publish the slots.
     for (const auto& fieldName : unpackNode->bucketSpec.computedMetaProjFields()) {
@@ -287,13 +287,11 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             auto abt = abt::unwrap(eventFilterSbExpr.extractABT());
             // Prepare a temporary object to expose the block variables as scalar types.
             VariableTypes varTypes;
-
-            for (const TypedSlot& slot : outputs.getAllSlotsInOrder()) {
+            outputs.forEachSlot([&](const TypedSlot& slot) {
                 varTypes.emplace(getABTVariableName(slot.slotId),
                                  slot.typeSignature.exclude(TypeSignature::kBlockType)
                                      .exclude(TypeSignature::kCellType));
-            }
-
+            });
             constantFold(abt, _state, &varTypes);
 
             if (abt.is<optimizer::Constant>()) {
@@ -313,12 +311,10 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             } else {
                 Vectorizer vectorizer(_state.frameIdGenerator, Vectorizer::Purpose::Filter);
                 Vectorizer::VariableTypes bindings;
-
-                for (const TypedSlot& slot : outputs.getAllSlotsInOrder()) {
+                outputs.forEachSlot([&bindings](const TypedSlot& slot) {
                     bindings.emplace(getABTVariableName(slot.slotId),
                                      std::make_pair(slot.typeSignature, boost::none));
-                }
-
+                });
                 Vectorizer::Tree blockABT = vectorizer.vectorize(abt, bindings);
 
                 if (blockABT.expr.has_value() &&
@@ -416,18 +412,16 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     }
 
     // If the parent wants us to materialize kResult, create an object with all published fields.
-    if (reqs.hasResultOrMRInfo()) {
+    if (reqs.has(PlanStageSlots::kResult)) {
         std::vector<std::string> fieldNames;
         sbe::value::SlotVector fieldSlots;
-
-        for (auto&& p : outputs.getAllNamedSlotsInOrder()) {
-            auto& name = p.first;
-            auto& slot = p.second;
-            if (name.first == PlanStageSlots::kField) {
-                fieldNames.push_back(std::string{name.second});
-                fieldSlots.push_back(slot.slotId);
-            }
-        }
+        outputs.forEachSlot(
+            [&](const PlanStageSlots::UnownedSlotName& name, const TypedSlot& slot) {
+                if (name.first == PlanStageSlots::kField) {
+                    fieldNames.push_back(std::string{name.second});
+                    fieldSlots.push_back(slot.slotId);
+                }
+            });
 
         auto resultSlot = _slotIdGenerator.generate();
         outputs.set(kResult, resultSlot);
@@ -444,13 +438,13 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                                                   unpackNode->nodeId());
     } else {
         // As we are not producing a result record, we must fulfill all reqs in a way that would be
-        // equivalent to fetching the same fields from 'kResult', that is, we'll map the fields to
-        // the environtment's 'Nothing' slot.
-        auto nothingSlot =
-            TypedSlot{_state.env->getSlot(kNothingEnvSlotName), TypeSignature::kAnyScalarType};
-
-        auto reqsWithoutMakeResultInfo = reqs.copy().clearMRInfo().setResult();
-        outputs.setMissingRequiredNamedSlots(reqsWithoutMakeResultInfo, nothingSlot);
+        // equivalent to fetching the same fields from 'kResult', that is, we'll map the missing
+        // fields to the environtment's 'Nothing' slot.
+        reqs.forEachReq([&](const std::pair<PlanStageReqs::SlotType, StringData>& name) {
+            if (!outputs.has(name)) {
+                outputs.set(name, _state.env->getSlot(kNothingEnvSlotName));
+            }
+        });
     }
 
     return {std::move(stage), std::move(outputs)};

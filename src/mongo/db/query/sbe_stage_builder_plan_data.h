@@ -39,7 +39,6 @@
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/string_listset.h"
 
 namespace mongo::stage_builder {
 
