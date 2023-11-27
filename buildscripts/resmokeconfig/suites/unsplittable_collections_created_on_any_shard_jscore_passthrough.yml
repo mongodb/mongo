@@ -19,8 +19,7 @@ selector:
   - jstests/core/ddl/create_collection.js
   - jstests/core/failcommand_failpoint.js
   - jstests/core/views/views_collation.js
-  # TODO: SERVER-82791 Enable after fix
-  - jstests/core/views/views_creation.js
+
   # TODO: SERVER-82802 Enable after fixing system.js feature with collections living outside the primary
   - jstests/core/**/mr_stored.js
   - jstests/core/**/system_js_access.js
