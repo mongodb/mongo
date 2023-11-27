@@ -96,6 +96,7 @@ DEFAULTS = {
     "spawn_using": None,
     "stagger_jobs": None,
     "majority_read_concern": "on",
+    "enable_enterprise_tests": None,
     "storage_engine": None,
     "storage_engine_cache_size_gb": None,
     "suite_files": "with_server",
