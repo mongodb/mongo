@@ -238,8 +238,9 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 cloneData(opCtx);
 
-                // TODO (SERVER-71566): Temporary solution to cover the case of stepping down before
-                // actually entering the `kCatchup` phase.
+                // Hack to cover the case of stepping down before actually entering the `kCatchup`
+                // phase. Once the time required by the `kClone` phase will be reduced, this
+                // synchronization mechanism can be replaced using a critical section.
                 blockWrites(opCtx);
             }))
         .then(_buildPhaseHandler(Phase::kCatchup,

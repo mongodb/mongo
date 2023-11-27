@@ -155,21 +155,11 @@ private:
     /**
      * Blocks write operations on the database, causing them to fail with the
      * `MovePrimaryInProgress` error.
-     *
-     * TODO (SERVER-71566): This is a synchronization mechanism specifically designed for
-     * `movePrimary` operations. It will likely be replaced by the critical section once the time
-     * frame in which writes are blocked is reduced. Writes are already blocked in the `kCatchup`
-     * phase.
      */
     void blockWritesLegacy(OperationContext* opCtx) const;
 
     /**
      * Unblocks write operations on the database.
-     *
-     * TODO (SERVER-71566): This is a synchronization mechanism specifically designed for
-     * `movePrimary` operations. It will likely be replaced by the critical section once the time
-     * frame in which writes are blocked is reduced. Reads and writes are already unblocked in the
-    // `kExitCriticalSection` phase.
      */
     void unblockWritesLegacy(OperationContext* opCtx) const;
 
