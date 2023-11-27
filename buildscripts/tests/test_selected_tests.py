@@ -542,13 +542,6 @@ class TestGetTaskConfigs(unittest.TestCase):
 
 
 class RemoveRepoPathPrefix(unittest.TestCase):
-    def test_file_is_in_enterprise_modules(self):
-        filepath = under_test._remove_repo_path_prefix(
-            "src/mongo/db/modules/enterprise/src/file1.cpp")
-
-        self.assertEqual(filepath, "src/file1.cpp")
-
-    def test_file_is_not_in_enterprise_modules(self):
-        filepath = under_test._remove_repo_path_prefix("other_directory/src/file1.cpp")
-
-        self.assertEqual(filepath, "other_directory/src/file1.cpp")
+    def test_path_handling(self):
+        filepath = under_test._remove_repo_path_prefix("sample_directory/src/file1.cpp")
+        self.assertEqual(filepath, "sample_directory/src/file1.cpp")

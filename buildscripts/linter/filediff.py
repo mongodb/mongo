@@ -25,12 +25,10 @@ ENTERPRISE_REVISION_ENV_VAR = "ENTERPRISE_REV"
 def _get_repos_and_revisions() -> Tuple[List[Repo], RevisionMap]:
     """Get the repo object and a map of revisions to compare against."""
     modules = git.get_module_paths()
-    repos = [Repo(path) for path in modules]
-    revision_map = generate_revision_map(
-        repos, {
-            "mongo": os.environ.get(MONGO_REVISION_ENV_VAR),
-            "enterprise": os.environ.get(ENTERPRISE_REVISION_ENV_VAR)
-        })
+    repos = [Repo(path) for path in modules if os.path.exists(os.path.join(path, '.git'))]
+    revision_map = generate_revision_map(repos, {
+        "mongo": os.environ.get(MONGO_REVISION_ENV_VAR),
+    })
     return repos, revision_map
 
 

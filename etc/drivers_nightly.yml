@@ -86,7 +86,6 @@ variables:
   params:
     directory: src
     revisions: # for each module include revision as <module_name>: ${<module_name>_rev}
-      enterprise: ${enterprise_rev}
       mongo-java-driver: ${mongo-java-driver_rev}
       mongo-python-driver: ${mongo-python-driver_rev}
       drivers-evergreen-tools: ${drivers-evergreen-tools_rev}
@@ -711,11 +710,6 @@ axes:
 # be sure to add the module to 'git.get_project' revisions parameter
 # DRIVERS add your own git repo / branch here and add up top in 'git.get_project'
 modules:
-- name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
-  branch: v4.4
-
 # Shared by all drivers projects
 - name: drivers-evergreen-tools
   repo: git@github.com:mongodb-labs/drivers-evergreen-tools.git

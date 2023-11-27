@@ -257,8 +257,6 @@ variables:
   name: enterprise-windows-nopush-template
   run_on:
   - windows-vsCurrent-small
-  modules:
-  - enterprise
   expansions: &enterprise-windows-nopush-expansions-template
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
     exe: ".exe"
@@ -486,8 +484,6 @@ functions:
     command: git.get_project
     params:
       directory: ${git_project_directory|src}
-      revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
-        enterprise: ${enterprise_rev}
 
   "fetch artifacts": &fetch_artifacts
     command: s3.get
@@ -8761,10 +8757,6 @@ task_groups:
 # if a module is added and to be added to the manifest
 # be sure to add the module to git.get_project revisions parameter
 modules:
-- name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
-  branch: v4.4
 
 #######################################
 #            Buildvariants            #
@@ -8782,7 +8774,7 @@ buildvariants:
   run_on:
   - rhel62-small
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=off
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=off --modules=
     test_flags: >-
       --excludeWithAnyTags=requires_http_client
       --repeatSuites=10
@@ -8817,9 +8809,9 @@ buildvariants:
   - rhel62-large
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=off
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=off --modules=
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_http_client
+    test_flags: --excludeWithAnyTags=requires_http_client --enableEnterpriseTests=off
     max_sub_suites: 3
     large_distro_name: rhel62-medium
   tasks:
@@ -8859,13 +8851,13 @@ buildvariants:
   run_on:
   - rhel70-small
   expansions: &linux-64-required-duroff-expansions
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=off
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=off --modules=
     multiversion_platform: rhel70
     multiversion_edition: targeted
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
     # does not include replica set tests. Since transactions are only supported on replica sets, we
     # exclude those tests as well.
-    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_sharding,uses_transactions,requires_http_client
+    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_sharding,uses_transactions,requires_http_client --enableEnterpriseTests=off
     scons_cache_scope: shared
     large_distro_name: rhel70-medium
   tasks:
@@ -8895,10 +8887,10 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu1804
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -8937,10 +8929,10 @@ buildvariants:
   run_on:
   - ubuntu2204-small
   expansions:
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: ubuntu2204
     multiversion_edition: targeted
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -8973,8 +8965,6 @@ buildvariants:
 
 - name: enterprise-ubuntu1804-64
   display_name: Enterprise Ubuntu 18.04
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-test
   stepback: false
@@ -9028,8 +9018,6 @@ buildvariants:
 
 - name: enterprise-ubuntu2204-64
   display_name: Enterprise Ubuntu 22.04
-  modules:
-  - enterprise
   run_on:
   - ubuntu2204-small
   stepback: false
@@ -9076,7 +9064,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1604
     lang_environment: LANG=C
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: ubuntu1604
     multiversion_edition: targeted
     has_packages: true
@@ -9126,8 +9115,6 @@ buildvariants:
 
 - name: enterprise-ubuntu1604-arm64
   display_name: Enterprise Ubuntu 16.04 arm64
-  modules:
-  - enterprise
   run_on:
   - ubuntu1604-arm64-large
   expansions:
@@ -9167,8 +9154,6 @@ buildvariants:
 
 - name: enterprise-ubuntu1804-arm64
   display_name: Enterprise Ubuntu 18.04 arm64
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-arm64-build
   expansions:
@@ -9214,8 +9199,6 @@ buildvariants:
 
 - name: enterprise-ubuntu2204-arm64
   display_name: Enterprise Ubuntu 22.04 arm64
-  modules:
-  - enterprise
   run_on:
   - ubuntu2204-arm64-large
   expansions:
@@ -9260,8 +9243,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu1804
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling --enableEnterpriseTests=off
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -9284,8 +9267,8 @@ buildvariants:
   run_on:
   - ubuntu2204-arm64-large
   expansions:
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling --enableEnterpriseTests=off
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -9312,7 +9295,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu2004
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: ubuntu2004
     multiversion_edition: targeted
     has_packages: true
@@ -9349,8 +9333,6 @@ buildvariants:
 
 - name: enterprise-ubuntu2004-64
   display_name: Enterprise Ubuntu 20.04
-  modules:
-  - enterprise
   run_on:
   - ubuntu2004-small
   stepback: false
@@ -9399,8 +9381,6 @@ buildvariants:
 
 - name: enterprise-ubuntu2004-arm64
   display_name: Enterprise Ubuntu 20.04 arm64
-  modules:
-  - enterprise
   run_on:
   - ubuntu2004-arm64-large
   expansions:
@@ -9452,7 +9432,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2004
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -9472,8 +9453,6 @@ buildvariants:
 
 - name: enterprise-linux-64-amazon-ami
   display_name: "Enterprise Amazon Linux"
-  modules:
-  - enterprise
   run_on:
   - amazon1-2018-test
   expansions:
@@ -9529,7 +9508,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-amazon
-    compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: amazon
     multiversion_edition: targeted
     has_packages: true
@@ -9568,8 +9548,6 @@ buildvariants:
 
 - name: enterprise-amazon2
   display_name: "Enterprise Amazon Linux 2"
-  modules:
-  - enterprise
   run_on:
   - amazon2-test
   expansions:
@@ -9623,11 +9601,12 @@ buildvariants:
   expansions:
     test_flags: >-
       --excludeWithAnyTags=SERVER-34286
+      --enableEnterpriseTests=off
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: amazon
     multiversion_edition: targeted
     has_packages: true
@@ -9665,8 +9644,6 @@ buildvariants:
 
 - name: enterprise-amazon2-arm64
   display_name: "Enterprise Amazon Linux 2 arm64"
-  modules:
-  - enterprise
   run_on:
   - amazon2-arm64-small
   expansions:
@@ -9720,7 +9697,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -9753,8 +9731,6 @@ buildvariants:
   - name: .publish
 
 - name: tig-daily-cron
-  modules:
-  - enterprise
   display_name: "~ TIG Daily Cron"
   run_on:
   - rhel70-small
@@ -9774,14 +9750,14 @@ buildvariants:
   expansions:
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=on --win-version-min=win10 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=windows
+    compile_flags: --dbg=on --opt=on --win-version-min=win10 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=windows --modules=
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
     large_distro_name: windows-vsCurrent-large
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9837,8 +9813,6 @@ buildvariants:
 - name: enterprise-windows-required
   display_name: "! Enterprise Windows"
   batchtime: *batchtime_two_day
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -9880,8 +9854,6 @@ buildvariants:
 - name: enterprise-windows
   display_name: "* Enterprise Windows"
   batchtime: *batchtime_one_week
-  modules:
-    - enterprise
   run_on:
     - windows-vsCurrent-small
   expansions:
@@ -9953,8 +9925,6 @@ buildvariants:
 
 - name: enterprise-windows-inmem
   display_name: Enterprise Windows (inMemory)
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -10011,13 +9981,13 @@ buildvariants:
     multiversion_platform_42_or_later: windows_x86_64-2012plus
     multiversion_platform_44_or_later: windows
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    compile_flags: --ssl MONGO_DISTMOD=windows -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10 --modules=
     num_scons_link_jobs_available: 0.5
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
     large_distro_name: windows-vsCurrent-large
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10058,8 +10028,6 @@ buildvariants:
 
 - name: enterprise-windows-debug-unoptimized
   display_name: Enterprise Windows DEBUG (Unoptimized)
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -10098,9 +10066,9 @@ buildvariants:
     push_name: macos
     push_arch: x86_64
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --modules=
     resmoke_jobs_max: 6
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggregation !.auth !.encrypt !.unwind
@@ -10140,7 +10108,8 @@ buildvariants:
   expansions:
     resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
-    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --modules=
+    test_flags: --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
   - name: compile_build_tools_next_TG
@@ -10159,8 +10128,6 @@ buildvariants:
 
 - name: enterprise-macos
   display_name: Enterprise macOS
-  modules:
-  - enterprise
   run_on:
   - macos-1014
   expansions:
@@ -10198,7 +10165,7 @@ buildvariants:
   - macos-1014
   batchtime: *batchtime_one_week
   expansions:
-    test_flags: --excludeWithAnyTags=uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions --enableEnterpriseTests=off
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: >-
@@ -10206,6 +10173,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_macosx.vars
       -j$(sysctl -n hw.logicalcpu)
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
+      --modules=
     cdriver_cmake_osx_deployment_target: "10.12"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -10225,12 +10193,13 @@ buildvariants:
   run_on:
   - ubuntu1604-build
   expansions:
-    test_flags: --excludeWithAnyTags=uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions --enableEnterpriseTests=off
     # We need --allocator=system here to work around SERVER-27675
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
       -j$(grep -c ^processor /proc/cpuinfo)
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
+      --modules=
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_C_COMPILER=/opt/mongodbtoolchain/v3/bin/gcc
@@ -10248,8 +10217,6 @@ buildvariants:
 - name: enterprise-rhel-62-64-bit
   display_name: "! Enterprise RHEL 6.2"
   batchtime: *batchtime_two_day
-  modules:
-  - enterprise
   run_on:
   - rhel62-small
   expansions:
@@ -10356,8 +10323,6 @@ buildvariants:
 - name: enterprise-rhel-70-64-bit-store-fam-images-in-side-coll
   display_name: "Enterprise RHEL 7.0 (storeFindAndModifyImagesInSideCollection=True)"
   batchtime: *batchtime_one_week
-  modules:
-  - enterprise
   run_on:
   - rhel70-small
   expansions:
@@ -10455,8 +10420,6 @@ buildvariants:
 
 - name: enterprise-rhel-70-64-bit-large-txns-format
   display_name: "Enterprise RHEL 7.0 (large transactions format)"
-  modules:
-  - enterprise
   run_on:
   - rhel70-small
   batchtime: *batchtime_one_week
@@ -10524,8 +10487,6 @@ buildvariants:
 
 - name: enterprise-rhel-70-64-bit-majority-read-concern-off
   display_name: "Enterprise RHEL 7.0 (majority read concern off)"
-  modules:
-  - enterprise
   run_on:
   - rhel70-small
   expansions: &enterprise-rhel-70-64-bit-majority-read-concern-off-expansions
@@ -10605,8 +10566,6 @@ buildvariants:
 # currently only run on our daily builders.
 - name: enterprise-rhel-70-64-bit-multiversion
   display_name: "Enterprise RHEL 7.0 (implicit multiversion)"
-  modules:
-  - enterprise
   run_on:
   - rhel70-small
   expansions: &enterprise-rhel-70-64-bit-multiversion
@@ -10635,8 +10594,6 @@ buildvariants:
 
 - name: enterprise-rhel-70-64-bit-flow-control-off
   display_name: "Enterprise RHEL 7.0 (flow control off)"
-  modules:
-  - enterprise
   run_on:
   - rhel70-small
   batchtime: *batchtime_one_week
@@ -10713,8 +10670,6 @@ buildvariants:
 
 - name: enterprise-rhel-70-64-bit-single-phase-index-builds
   display_name: "Enterprise RHEL 7.0 (single phase index builds)"
-  modules:
-  - enterprise
   run_on:
   - rhel70-small
   expansions: &enterprise-rhel-70-64-bit-single-phase-index-builds
@@ -10748,8 +10703,6 @@ buildvariants:
 
 - name: enterprise-rhel-70-64-bit-coverage
   display_name: "~ Enterprise RHEL 7.0 DEBUG Code Coverage"
-  modules:
-    - enterprise
   run_on:
     - rhel70-large
   batchtime: *batchtime_one_week
@@ -10814,8 +10767,6 @@ buildvariants:
   name: enterprise-rhel-70-64-bit
   display_name: "! Enterprise RHEL 7.0"
   batchtime: *batchtime_two_day
-  modules:
-  - enterprise
   run_on:
   - rhel70-small
   expansions: &enterprise-rhel-70-64-bit-expansions-template
@@ -10877,8 +10828,6 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-template
   name: enterprise-rhel-80-64-bit
   display_name: "Enterprise RHEL 8.0"
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   expansions:
@@ -10928,8 +10877,6 @@ buildvariants:
 
 - name: enterprise-rhel-82-arm64
   display_name: "Enterprise RHEL 8.2 arm64"
-  modules:
-  - enterprise
   run_on:
   - rhel82-arm64-small
   expansions:
@@ -11033,8 +10980,6 @@ buildvariants:
 
 - name: enterprise-rhel-81-ppc64le
   display_name: Enterprise RHEL 8.1 PPC64LE
-  modules:
-  - enterprise
   run_on:
   - rhel81-power8-small
   batchtime: *batchtime_one_week
@@ -11088,7 +11033,8 @@ buildvariants:
   - ubuntu1604-test
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     scons_cache_scope: shared
   tasks:
   - name: compile_TG
@@ -11113,11 +11059,12 @@ buildvariants:
   expansions:
     resmoke_jobs_factor: 1
     disable_shared_scons_cache: true
-    compile_flags: MONGO_DISTMOD=ubuntu1604 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: MONGO_DISTMOD=ubuntu1604 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
       --excludeWithAnyTags=requires_os_access
+      --enableEnterpriseTests=off
   tasks:
   - name: compile_TG
     distros:
@@ -11135,7 +11082,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel62
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: rhel62
     multiversion_edition: targeted
     has_packages: true
@@ -11178,7 +11126,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel70
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: rhel70
     multiversion_edition: targeted
     has_packages: true
@@ -11222,7 +11171,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel80
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: rhel80
     multiversion_edition: targeted
     has_packages: true
@@ -11266,7 +11216,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-rhel82
-    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -11274,7 +11224,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: rhel82-arm64-large
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11305,7 +11255,8 @@ buildvariants:
   run_on:
   - rhel76-test
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
   tasks:
   - name: compile_TG
     distros:
@@ -11316,8 +11267,6 @@ buildvariants:
 
 - name: enterprise-rhel-71-ppc64le
   display_name: Enterprise RHEL 7.1 PPC64LE
-  modules:
-  - enterprise
   run_on:
   - rhel71-power8-test
   batchtime: *batchtime_one_week
@@ -11366,8 +11315,6 @@ buildvariants:
 
 - name: enterprise-rhel-72-s390x
   display_name: Enterprise RHEL 7.2 s390x
-  modules:
-  - enterprise
   run_on:
   - rhel72-zseries-test
   batchtime: *batchtime_one_week
@@ -11420,8 +11367,6 @@ buildvariants:
 
 - name: enterprise-ubuntu1604-64
   display_name: Enterprise Ubuntu 16.04
-  modules:
-  - enterprise
   run_on:
   - ubuntu1604-test
   expansions:
@@ -11467,8 +11412,6 @@ buildvariants:
 - name: enterprise-ubuntu-dynamic-1604-clang
   display_name: "! Shared Library Enterprise Ubuntu 16.04 (Clang)"
   batchtime: *batchtime_one_week
-  modules:
-  - enterprise
   run_on:
    - ubuntu1604-test
   expansions:
@@ -11495,8 +11438,6 @@ buildvariants:
 - name: enterprise-ubuntu-dynamic-1604-clang-tidy
   display_name: "* Enterprise Clang Tidy"
   batchtime: *batchtime_one_week
-  modules:
-  - enterprise
   run_on:
    - ubuntu1604-build
   expansions:
@@ -11520,7 +11461,8 @@ buildvariants:
    - ubuntu1604-test
   expansions:
     lang_environment: LANG=C
-    compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+    compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     # Unlike static builds, dynamic builds have no need to
     # constrain the number of link jobs. Unfortunately, --jlink=1
     # means one link job, not 100%. So this is a bit gross but set
@@ -11542,8 +11484,6 @@ buildvariants:
 
 - name: enterprise-suse12-64
   display_name: Enterprise SLES 12
-  modules:
-  - enterprise
   run_on:
   - suse12-sp5-small
   expansions:
@@ -11589,7 +11529,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: suse12
     multiversion_edition: targeted
     has_packages: true
@@ -11599,7 +11539,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: suse12-sp5-large
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11629,8 +11569,6 @@ buildvariants:
 
 - name: enterprise-suse15-64
   display_name: Enterprise SLES 15
-  modules:
-  - enterprise
   run_on:
   - suse15-test
   expansions:
@@ -11674,7 +11612,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-suse15
-    compile_flags: --ssl MONGO_DISTMOD=suse15 --use-libunwind=off -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=suse15 --use-libunwind=off -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: suse15
     multiversion_edition: targeted
     has_packages: true
@@ -11684,7 +11622,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: suse15-build
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11715,8 +11653,6 @@ buildvariants:
 
 - name: enterprise-debian92-64
   display_name: Enterprise Debian 9.2
-  modules:
-  - enterprise
   run_on:
   - debian92-test
   expansions:
@@ -11763,7 +11699,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-debian92
-    compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: debian92
     multiversion_edition: targeted
     has_packages: true
@@ -11773,7 +11709,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: debian92-build
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11801,8 +11737,6 @@ buildvariants:
 
 - name: enterprise-debian10-64
   display_name: Enterprise Debian 10
-  modules:
-  - enterprise
   run_on:
   - debian10-test
   expansions:
@@ -11849,7 +11783,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-debian10
-    compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: debian10
     multiversion_edition: targeted
     has_packages: true
@@ -11859,7 +11793,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: debian10-build
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11891,8 +11825,6 @@ buildvariants:
 
 - name: enterprise-rhel-62-benchmarks
   display_name: Enterprise RHEL 6.2 (Benchmarks)
-  modules:
-  - enterprise
   run_on:
   - rhel62-large
   expansions:
@@ -11903,8 +11835,6 @@ buildvariants:
 
 - name: enterprise-rhel-70-64-bit-inmem
   display_name: Enterprise RHEL 7.0 (inMemory)
-  modules:
-  - enterprise
   run_on:
   - rhel70-small
   expansions:
@@ -11969,8 +11899,8 @@ buildvariants:
   expansions:
     # Transactions are not explicitly supported on the ephemeralForTest storage engine.
     # Speculative majority reads are currently only allowed for change streams, which are only supported on WiredTiger.
-    test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions,requires_document_locking,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern,uses_change_streams,requires_sharding
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --storageEngine=ephemeralForTest --enableEnterpriseTests=off --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions,requires_document_locking,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern,uses_change_streams,requires_sharding
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: rhel70
     multiversion_edition: targeted
     scons_cache_scope: shared
@@ -12000,8 +11930,6 @@ buildvariants:
 
 - name: enterprise-rhel-71-ppc64le-inmem
   display_name: Enterprise RHEL 7.1 PPC64LE (inMemory) DEBUG
-  modules:
-  - enterprise
   run_on:
   - rhel71-power8-test
   batchtime: *batchtime_one_week
@@ -12036,8 +11964,6 @@ buildvariants:
 
 - name: enterprise-rhel-72-s390x-inmem
   display_name: Enterprise RHEL 7.2 s390x (inMemory) DEBUG
-  modules:
-  - enterprise
   run_on:
   - rhel72-zseries-test
   batchtime: *batchtime_one_week
@@ -12077,8 +12003,6 @@ buildvariants:
 
 - name: ubuntu1804-debug-asan
   display_name: ~ ASAN Enterprise Ubuntu 18.04 DEBUG
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-build
   stepback: false
@@ -12152,13 +12076,13 @@ buildvariants:
   expansions:
     lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --nostrip --modules=
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
+    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling --enableEnterpriseTests=off
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggfuzzer .common
@@ -12166,8 +12090,6 @@ buildvariants:
 
 - name: ubuntu1804-debug-ubsan
   display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-build
   stepback: false
@@ -12231,8 +12153,6 @@ buildvariants:
 - name: ubuntu1804-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
   batchtime: *batchtime_two_day
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-build
   stepback: true
@@ -12257,8 +12177,6 @@ buildvariants:
 
 - name: ubuntu1804-debug-aubsan-lite_fuzzer
   display_name: "{A,UB}SAN Enterprise Ubuntu 18.04 FUZZER"
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-build
   stepback: false
@@ -12280,8 +12198,6 @@ buildvariants:
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
   batchtime: *batchtime_one_week
-  modules:
-  - enterprise
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
@@ -12301,8 +12217,6 @@ buildvariants:
 - name: enterprise-ubuntu-no-latch-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (without Diagnostic Latches)"
   batchtime: *batchtime_one_week
-  modules:
-  - enterprise
   expansions:
     compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off
   tasks:
@@ -12313,8 +12227,6 @@ buildvariants:
 - name: enterprise-ubuntu-no-latch-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 DEBUG (Unoptimized)"
   batchtime: *batchtime_one_week
-  modules:
-  - enterprise
   expansions:
     compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --dbg=on --opt=off --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     scons_cache_scope: shared
@@ -12328,8 +12240,6 @@ buildvariants:
   batchtime: *batchtime_one_week
   run_on:
     - ubuntu1604-test
-  modules:
-  - enterprise
   expansions:
     scons_cache_scope: shared
     compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -12360,8 +12270,6 @@ buildvariants:
   batchtime: *batchtime_one_week
   run_on:
     - ubuntu1604-test
-  modules:
-  - enterprise
   expansions:
     scons_cache_scope: shared
     compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -12391,8 +12299,6 @@ buildvariants:
   batchtime: *batchtime_one_week
   run_on:
     - ubuntu1604-test
-  modules:
-  - enterprise
   expansions:
     scons_cache_scope: shared
     compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -12434,8 +12340,6 @@ buildvariants:
 
 - name: selected-tests
   display_name: "~ Selected Tests"
-  modules:
-    - enterprise
   run_on:
     - rhel62-small
   batchtime: *batchtime_one_week
@@ -12447,8 +12351,6 @@ buildvariants:
 
 - name: commit-queue
   display_name: "~ Commit Queue"
-  modules:
-  - enterprise
   run_on:
     - rhel62-small
   batchtime: *batchtime_one_week
@@ -12481,8 +12383,6 @@ buildvariants:
 ###########################################
 
 - name: copybara-sync-between-repos
-  modules:
-  - enterprise
   display_name: "* Copybara Sync Between Repos"
   activate: true
   run_on:
