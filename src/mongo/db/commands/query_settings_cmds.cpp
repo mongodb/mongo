@@ -90,8 +90,8 @@ void setClusterParameter(OperationContext* opCtx,
 QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& rhs) {
     QuerySettings querySettings = lhs;
 
-    if (rhs.getQueryEngineVersion()) {
-        querySettings.setQueryEngineVersion(rhs.getQueryEngineVersion());
+    if (rhs.getQueryFramework()) {
+        querySettings.setQueryFramework(rhs.getQueryFramework());
     }
 
     if (rhs.getIndexHints()) {

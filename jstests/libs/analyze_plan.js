@@ -795,38 +795,17 @@ export function assertFetchFilter({coll, predicate, expectedFilter, nReturned}) 
 }
 
 /**
- * Asserts that a pipeline runs with the engine that is passed in as a parameter.
+ * Recursively checks if a javascript object contains a nested property key. Note, this only
+ * recurses into other objects, array elements are ignored.
  */
-export function assertEngine(pipeline, engine, coll) {
-    const explain = coll.explain().aggregate(pipeline);
-    assert(explain.hasOwnProperty("explainVersion"), explain);
-    assert.eq(explain.explainVersion, engine === "sbe" ? "2" : "1", explain);
-}
-
-/**
- * Checks whether the explain output has a descendant with the given field.
- * Return true if there is such a stage anywhere in the hierarchy of the explain output.
- */
-function explainHasDescendant(explain, field) {
-    if (explain.hasOwnProperty("stages")) {
-        for (let j = 0; j < explain.stages.length; j++) {
-            let stageName = Object.keys(explain.stages[j]);
-            if (explainHasDescendant(explain.stages[j][stageName], field)) {
-                return true;
-            }
-        }
-    }
-
-    if (explain.hasOwnProperty("queryPlanner")) {
-        return explainHasDescendant(explain.queryPlanner, field);
-    }
-
-    if (explain.hasOwnProperty("winningPlan")) {
-        return explainHasDescendant(explain.winningPlan, field);
-    }
-
-    if (explain.hasOwnProperty(field)) {
+function hasNestedProperty(object, key) {
+    if (typeof object !== "object")
+        return false;
+    if (object.hasOwnProperty(key))
         return true;
+    for (const child of Object.values(object)) {
+        if (hasNestedProperty(child, key))
+            return true;
     }
     return false;
 }
@@ -837,32 +816,16 @@ function explainHasDescendant(explain, field) {
  * This helper function can be used for any optimizer.
  */
 export function getEngine(explain) {
-    if (explain.hasOwnProperty("explainVersion")) {
-        switch (explain.explainVersion) {
-            case "1":
-                return "classic";
-            case "2":
-                return "sbe";
-        }
-    }
+    const queryPlanner = {...getQueryPlanner(explain)};
+    return hasNestedProperty(queryPlanner, "slotBasedPlan") ? "sbe" : "classic";
+}
 
-    if (explain.hasOwnProperty("shards")) {
-        for (const shardName in explain.shards) {
-            return getEngine(explain.shards[shardName]);
-        }
-    }
-
-    // there are cases where explain outputs does not provide "explainVersion"
-    let hasSbePlan = explainHasDescendant(explain, "slotBasedPlan");
-
-    const winningPlan = getWinningPlanFromExplain(explain);
-    let propertyExists = winningPlan.hasOwnProperty("queryPlan");
-
-    if (propertyExists || hasSbePlan) {
-        return "sbe"
-    } else {
-        return "classic";
-    }
+/**
+ * Asserts that a pipeline runs with the engine that is passed in as a parameter.
+ */
+export function assertEngine(pipeline, engine, coll) {
+    const explain = coll.explain().aggregate(pipeline);
+    assert.eq(getEngine(explain), engine);
 }
 
 /**

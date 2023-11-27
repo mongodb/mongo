@@ -499,6 +499,7 @@ env.CppUnitTest(
         "query_planner_wildcard_index_test.cpp",
         "query_request_test.cpp",
         "query_settings_test.cpp",
+        "query_settings/query_framework_serialization_test.cpp",
         "query_settings/query_settings_manager_test.cpp",
         "query_settings/query_settings_validation_test.cpp",
         "query_solution_test.cpp",

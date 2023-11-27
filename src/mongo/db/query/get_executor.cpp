@@ -1748,7 +1748,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
             }
         }
 
-        bool shouldAttemptSBE = [&]() {
+        const bool shouldAttemptSBE = [&]() {
             // If the query is not SBE compatible, do not attempt to run it on SBE.
             if (!canonicalQuery->isSbeCompatible()) {
                 return false;
@@ -1756,8 +1756,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 
             // If query settings engine version is set, use it to determine which engine should be
             // used.
-            if (auto querySettingsEngineVersion = querySettings.getQueryEngineVersion()) {
-                return *querySettingsEngineVersion == query_settings::QueryEngineVersionEnum::kV2;
+            if (auto queryFramework = querySettings.getQueryFramework()) {
+                return *queryFramework == QueryFrameworkControlEnum::kTrySbeEngine;
             }
 
             return !canonicalQuery->getForceClassicEngine();

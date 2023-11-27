@@ -52,6 +52,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/parsed_find_command.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
@@ -111,7 +112,7 @@ public:
     static std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations(
         OperationContext* opCtx, boost::optional<TenantId> tenantId) {
         QuerySettings settings;
-        settings.setQueryEngineVersion(QueryEngineVersionEnum::kV2);
+        settings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
         settings.setIndexHints({{IndexHintSpec({IndexHint("a_1")})}});
         QueryInstance queryA = BSON("find" << kCollName << "$db" << kDbName << "filter"
                                            << BSON("a" << 2) << "$tenant" << TenantId{OID::gen()});
@@ -160,7 +161,7 @@ private:
 TEST_F(QuerySettingsManagerTest, QuerySettingsClusterParameterSerialization) {
     // Set query shape configuration.
     QuerySettings settings;
-    settings.setQueryEngineVersion(QueryEngineVersionEnum::kV2);
+    settings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
     QueryInstance query = BSON("find"
                                << "exampleColl"
                                << "$db"

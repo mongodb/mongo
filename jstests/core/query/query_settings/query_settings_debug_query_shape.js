@@ -14,7 +14,7 @@ const collName = jsTestName();
 const qsutils = new QuerySettingsUtils(db, collName);
 
 const settings = {
-    queryEngineVersion: "v1"
+    queryFramework: "classic"
 };
 
 // Creating the collection, because some sharding passthrough suites are failing when explain

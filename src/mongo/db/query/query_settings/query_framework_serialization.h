@@ -27,35 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_settings/query_settings_hash.h"
+#pragma once
 
+#include <string>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
-namespace mongo::query_settings {
+namespace mongo::query_settings::query_framework {
 
-size_t hash(const QuerySettings& querySettings) {
-    size_t hash = 0;
-    if (auto version = querySettings.getQueryFramework()) {
-        boost::hash_combine(hash, absl::Hash<QueryFrameworkControlEnum>{}(*version));
-    }
-    if (auto indexHints = querySettings.getIndexHints()) {
-        auto hashVectorOfHints = [&](const std::vector<IndexHint>& hints) {
-            for (const auto& hint : hints) {
-                boost::hash_combine(hash, hint.hash());
-            }
-        };
-        stdx::visit(OverloadedVisitor{
-                        [&](const std::vector<IndexHintSpec>& hintSpecs) {
-                            for (const auto& hintSpec : hintSpecs) {
-                                hashVectorOfHints(hintSpec.getAllowedIndexes());
-                            }
-                        },
-                        [&](const IndexHintSpec& hintSpec) {
-                            hashVectorOfHints(hintSpec.getAllowedIndexes());
-                        },
-                    },
-                    *indexHints);
-    }
-    return hash;
-}
-}  // namespace mongo::query_settings
+constexpr StringData kClassic = "classic"_sd;
+constexpr StringData kSbe = "sbe"_sd;
+
+/**
+ * Serializes the internal `QueryFrameworkControlEnum` values to the appropiate
+ * 'querySettings.queryFramework' user-facing strings.
+ */
+std::string serialize(QueryFrameworkControlEnum queryFramework);
+
+/**
+ * Parses the 'querySettings.queryFramework' user-facing strings as 'QueryFrameworkControlEnum'
+ * values.
+ */
+QueryFrameworkControlEnum parse(StringData queryFrameworkString);
+}  // namespace mongo::query_settings::query_framework

@@ -28,21 +28,25 @@
 
 global:
   cpp_namespace: "mongo::query_settings"
+  cpp_includes:
+    - "mongo/db/query/query_settings/query_framework_serialization.h"
+
 
 imports:
   - "mongo/db/basic_types.idl"
   - "mongo/db/query/index_hint.idl"
+  - "mongo/db/query/query_knobs.idl"
   - "mongo/db/query/query_shape/query_shape_hash.idl"
 
-enums:
-  QueryEngineVersion:
+types:
+  QueryFramework:
     description: >-
       Enum representing the query engine version as a combination of execution
       engine and optimizer being used when executing the query.
-    type: string
-    values:
-      kV1: "v1" # Classic + Multiplanner
-      kV2: "v2" # SBE + Multiplanner
+    bson_serialization_type : string
+    cpp_type: "mongo::QueryFrameworkControlEnum"
+    deserializer: "::mongo::query_settings::query_framework::parse"
+    serializer: "::mongo::query_settings::query_framework::serialize"
 
 structs:
   Namespace:
@@ -77,8 +81,8 @@ structs:
           variant: [IndexHintSpec, array<IndexHintSpec>]
         optional: true
         stability: unstable
-      queryEngineVersion:
-        type: QueryEngineVersion
+      queryFramework:
+        type: QueryFramework
         optional: true
         stability: unstable
 

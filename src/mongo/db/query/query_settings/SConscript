@@ -7,10 +7,12 @@ env = env.Clone()
 env.Library(
     target='query_settings',
     source=[
+        'query_framework_serialization.cpp',
         'query_settings.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/index_hint',
+        '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape_hash',
         '$BUILD_DIR/mongo/db/server_base',
     ],

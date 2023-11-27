@@ -27,35 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_settings/query_settings_hash.h"
+#include "mongo/db/query/query_settings/query_framework_serialization.h"
 
+#include <string>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
-namespace mongo::query_settings {
+namespace mongo::query_settings::query_framework {
 
-size_t hash(const QuerySettings& querySettings) {
-    size_t hash = 0;
-    if (auto version = querySettings.getQueryFramework()) {
-        boost::hash_combine(hash, absl::Hash<QueryFrameworkControlEnum>{}(*version));
+std::string serialize(QueryFrameworkControlEnum queryFramework) {
+    switch (queryFramework) {
+        case QueryFrameworkControlEnum::kForceClassicEngine:
+            return kClassic.toString();
+        case QueryFrameworkControlEnum::kTrySbeEngine:
+            return kSbe.toString();
+        default:
+            MONGO_UNREACHABLE;
     }
-    if (auto indexHints = querySettings.getIndexHints()) {
-        auto hashVectorOfHints = [&](const std::vector<IndexHint>& hints) {
-            for (const auto& hint : hints) {
-                boost::hash_combine(hash, hint.hash());
-            }
-        };
-        stdx::visit(OverloadedVisitor{
-                        [&](const std::vector<IndexHintSpec>& hintSpecs) {
-                            for (const auto& hintSpec : hintSpecs) {
-                                hashVectorOfHints(hintSpec.getAllowedIndexes());
-                            }
-                        },
-                        [&](const IndexHintSpec& hintSpec) {
-                            hashVectorOfHints(hintSpec.getAllowedIndexes());
-                        },
-                    },
-                    *indexHints);
-    }
-    return hash;
 }
-}  // namespace mongo::query_settings
+
+QueryFrameworkControlEnum parse(StringData queryFrameworkString) {
+    if (queryFrameworkString == kClassic)
+        return QueryFrameworkControlEnum::kForceClassicEngine;
+    if (queryFrameworkString == kSbe)
+        return QueryFrameworkControlEnum::kTrySbeEngine;
+    uasserted(ErrorCodes::BadValue,
+              str::stream() << "Invalid value for 'queryFramework': expected " << kClassic << " or "
+                            << kSbe << ", but got " << queryFrameworkString);
+}
+}  // namespace mongo::query_settings::query_framework

@@ -27,35 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_settings/query_settings_hash.h"
+#include "mongo/db/query/query_settings/query_framework_serialization.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
-namespace mongo::query_settings {
+namespace mongo::query_settings::query_framework {
 
-size_t hash(const QuerySettings& querySettings) {
-    size_t hash = 0;
-    if (auto version = querySettings.getQueryFramework()) {
-        boost::hash_combine(hash, absl::Hash<QueryFrameworkControlEnum>{}(*version));
-    }
-    if (auto indexHints = querySettings.getIndexHints()) {
-        auto hashVectorOfHints = [&](const std::vector<IndexHint>& hints) {
-            for (const auto& hint : hints) {
-                boost::hash_combine(hash, hint.hash());
-            }
-        };
-        stdx::visit(OverloadedVisitor{
-                        [&](const std::vector<IndexHintSpec>& hintSpecs) {
-                            for (const auto& hintSpec : hintSpecs) {
-                                hashVectorOfHints(hintSpec.getAllowedIndexes());
-                            }
-                        },
-                        [&](const IndexHintSpec& hintSpec) {
-                            hashVectorOfHints(hintSpec.getAllowedIndexes());
-                        },
-                    },
-                    *indexHints);
-    }
-    return hash;
+TEST(QueryFrameworkSerialization, TestSerialization) {
+    ASSERT_EQ(serialize(QueryFrameworkControlEnum::kTrySbeEngine), kSbe);
+    ASSERT_EQ(serialize(QueryFrameworkControlEnum::kForceClassicEngine), kClassic);
 }
-}  // namespace mongo::query_settings
+
+TEST(QueryFrameworkSerialization, TestDeserialization) {
+    ASSERT_EQ(parse(kSbe), QueryFrameworkControlEnum::kTrySbeEngine);
+    ASSERT_EQ(parse(kClassic), QueryFrameworkControlEnum::kForceClassicEngine);
+    ASSERT_THROWS_CODE(parse("cqf"), DBException, ErrorCodes::BadValue);
+}
+}  // namespace mongo::query_settings::query_framework

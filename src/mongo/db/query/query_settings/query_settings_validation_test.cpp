@@ -28,6 +28,7 @@
  */
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -76,7 +77,7 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeAppliedOnIdHack)
     const BSONObj representativeQ =
         fromjson("{find: 'someColl', filter: {_id: 123}, $db: 'testDb'}");
     QuerySettings querySettings;
-    querySettings.setQueryEngineVersion(QueryEngineVersionEnum::kV2);
+    querySettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
     checkQuerySettingsAreValid(expCtx, representativeQ, querySettings, 7746606);
 }
 
@@ -168,7 +169,7 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeAppliedWithEncry
         }
     )");
     QuerySettings querySettings;
-    querySettings.setQueryEngineVersion(QueryEngineVersionEnum::kV2);
+    querySettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
     querySettings.setIndexHints({{IndexHintSpec({IndexHint("sku")})}});
     checkQuerySettingsAreValid(expCtx, representativeQ, querySettings, 7746600);
 }
