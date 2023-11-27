@@ -48,6 +48,9 @@ public:
     }
 
     void add(Value value) override {
+        if (value.missing()) {
+            return;
+        }
         _memUsageBytes += value.getApproximateSize();
         _values.push_back(std::move(value));
     }
@@ -56,6 +59,10 @@ public:
      * This should only remove the first/lowest element in the window.
      */
     void remove(Value value) override {
+        if (value.missing()) {
+            return;
+        }
+
         tassert(5423801, "Can't remove from an empty WindowFunctionPush", _values.size() != 0);
         auto valToRemove = _values.front();
         tassert(
