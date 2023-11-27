@@ -10,6 +10,7 @@
 // Configure initial sharding cluster
 const st = new ShardingTest({});
 const mongos = st.s;
+const configDB = mongos.getDB("config");
 
 const dbName = "testCheckMetadataConsistencyDB";
 var dbCounter = 0;
@@ -268,8 +269,8 @@ function assertNoInconsistencies() {
     st.shardColl(db[kSourceCollName], {skey: 1});
 
     // Insert a RoutingTableRangeOverlap inconsistency
-    const collUuid = st.config.collections.findOne({_id: ns}).uuid;
-    assert.commandWorked(st.config.chunks.updateOne({uuid: collUuid}, {$set: {max: {skey: 10}}}));
+    const collUuid = configDB.collections.findOne({_id: ns}).uuid;
+    assert.commandWorked(configDB.chunks.updateOne({uuid: collUuid}, {$set: {max: {skey: 10}}}));
 
     // Insert a ZonesRangeOverlap inconsistency
     let entry = {
@@ -279,7 +280,7 @@ function assertNoInconsistencies() {
         max: {"skey": 100},
         tag: "a",
     };
-    assert.commandWorked(st.config.tags.insert(entry));
+    assert.commandWorked(configDB.tags.insert(entry));
     entry = {
         _id: {ns: ns, min: {"skey": 50}},
         ns: ns,
@@ -287,7 +288,7 @@ function assertNoInconsistencies() {
         max: {"skey": 150},
         tag: "a",
     };
-    assert.commandWorked(st.config.tags.insert(entry));
+    assert.commandWorked(configDB.tags.insert(entry));
 
     // Database level mode command
     let inconsistencies = db.checkMetadataConsistency().toArray();
@@ -363,7 +364,7 @@ function assertNoInconsistencies() {
     assert.eq(no_inconsistency.length, 0);
 
     // make the collection unsplittable
-    assert.commandWorked(st.config.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
+    assert.commandWorked(configDB.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
 
     let inconsistencies_chunks = db.checkMetadataConsistency().toArray();
     assert.eq(inconsistencies_chunks.length, 1);
@@ -393,7 +394,7 @@ function assertNoInconsistencies() {
     assert.eq(no_inconsistency.length, 0);
 
     // make the collection unsplittable and catch the inconsistency
-    assert.commandWorked(st.config.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
+    assert.commandWorked(configDB.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
 
     let inconsistencies_key = db.checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies_key.length);
