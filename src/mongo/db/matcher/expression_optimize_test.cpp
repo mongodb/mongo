@@ -130,8 +130,8 @@ TEST(ExpressionOptimizeTest, IsValidText) {
     // Invalid: TEXT inside NOR.
     ASSERT_NOT_OK(isValid("{$nor: [{$text: {$search: 's'}}, {a: 1}]}", *findCommand));
 
-    // Invalid: TEXT inside NOR.
-    ASSERT_NOT_OK(
+    // Valid: Boolean expression simplifier opens up $nor expressions.
+    ASSERT_OK(
         isValid("{$nor: ["
                 "    {$or: ["
                 "        {$text: {$search: 's'}},"
