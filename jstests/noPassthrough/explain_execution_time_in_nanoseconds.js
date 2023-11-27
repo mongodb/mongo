@@ -69,14 +69,16 @@ assert(executionStages.hasOwnProperty("executionTimeMillisEstimate"), executionS
 verifyStages(executionStages, isSBE);
 
 explainResult = coll.explain("executionStats").aggregate(pipeline);
-executionStages = explainResult.stages;
+executionStages = explainResult.hasOwnProperty("stages")
+    ? explainResult.stages
+    : [explainResult.executionStats.executionStages];
 isSBE = explainResult.explainVersion === "2";
 assert.neq(executionStages.length, 0, executionStages);
 for (let executionStage of executionStages) {
     assert(executionStage.hasOwnProperty("executionTimeMillisEstimate"), executionStage);
-    // "executionTimeMicros"/"executionTimeNanos" is only added to SBE stages, not to agg stages.
-    assert(!executionStage.hasOwnProperty("executionTimeMicros"), executionStage);
-    assert(!executionStage.hasOwnProperty("executionTimeNanos"), executionStage);
+    // "executionTimeMicros"/"executionTimeNanos" is added to SBE stages.
+    assert.eq(executionStage.hasOwnProperty("executionTimeMicros"), isSBE, executionStage);
+    assert.eq(executionStage.hasOwnProperty("executionTimeNanos"), isSBE, executionStage);
 
     if (executionStage.hasOwnProperty("$cursor")) {
         const stages = executionStage["$cursor"]["executionStats"]["executionStages"];

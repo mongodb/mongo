@@ -901,10 +901,9 @@ QueryPlannerAnalysis::determineLookupStrategy(
     bool allowDiskUse,
     const CollatorInterface* collator) {
     auto foreignCollItr = collectionsInfo.find(foreignCollName);
-    tassert(5842600,
-            str::stream() << "Expected collection info, but found none; target collection: "
-                          << foreignCollName.toStringForErrorMsg(),
-            foreignCollItr != collectionsInfo.end());
+    if (foreignCollItr == collectionsInfo.end()) {
+        return {EqLookupNode::LookupStrategy::kNonExistentForeignCollection, boost::none};
+    }
 
     // Check if an eligible index exists for indexed loop join strategy.
     const auto foreignIndex = [&]() -> boost::optional<IndexEntry> {

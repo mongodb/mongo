@@ -513,11 +513,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
     // which requires stages to be wrapped in an interface.
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> stagesForPushdown;
 
-    // This handles the case of unionWith against an unknown collection.
-    if (!collections.getMainCollection()) {
-        return {};
-    }
-
     // No pushdown if we're using the classic engine.
     if (cq->getForceClassicEngine()) {
         return {};
