@@ -6969,11 +6969,26 @@ boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
 }
 
 Value ExpressionConvert::serialize(const SerializationOptions& options) const {
+    // Since the 'to' field is a parameter from a set of valid values and not free user input,
+    // we want to avoid boiling it down to the representative value in the query shape. The first
+    // condition is so that we can keep serializing correctly whenever the 'to' field is an
+    // expression that gets resolved down to a string of a valid type, or its corresponding
+    // numerical value. If it's just the constant, we want to wrap it in a $const except when the
+    // serialization policy is debug.
+    auto constExpr = dynamic_cast<ExpressionConstant*>(_children[_kTo].get());
+    Value toField = Value();
+    if (!constExpr) {
+        toField = _children[_kTo]->serialize(options);
+    } else if (options.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString) {
+        toField = constExpr->getValue();
+    } else {
+        toField = Value(DOC("$const" << constExpr->getValue()));
+    }
     return Value(Document{
         {"$convert",
          Document{
              {"input", _children[_kInput]->serialize(options)},
-             {"to", _children[_kTo]->serialize(options)},
+             {"to", toField},
              {"onError", _children[_kOnError] ? _children[_kOnError]->serialize(options) : Value()},
              {"onNull",
               _children[_kOnNull] ? _children[_kOnNull]->serialize(options) : Value()}}}});
