@@ -1956,8 +1956,7 @@ struct UnpackTsBucketNode : public QuerySolutionNode {
         return children[0]->sortedByDiskLoc();
     }
 
-    // TODO SERVER-79699 & SERVER-79700: Return the sort set which should be translated from the
-    // child's sort set.
+    // TODO SERVER-79700: Return the sort set which should be translated from the child's sort set.
     const ProvidedSortSet& providedSorts() const final {
         return kEmptySet;
     }

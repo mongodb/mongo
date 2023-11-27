@@ -316,9 +316,6 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     }
     auto bucketSlot = childOutputs.get(kResult);
 
-    // TODO SERVER-79699: Handle the 'wholeBucketFilter'.
-
-
     // The 'TsBucketToCellBlockStage' and 'BlockToRowStage' together transform a single bucket into
     // a sequence of "rows" with fields, extracted from the bucket's data. The stages between these
     // two do block processing over the cells.
