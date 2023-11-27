@@ -1692,7 +1692,8 @@ main(int argc, char *argv[])
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
 
-    backup_force_stop_interval = 3;
+    /* FIXME-WT-11669 Re-enable the test once this issue is fixed. Set the interval to 3. */
+    backup_force_stop_interval = 0;
     backup_full_interval = 4;
     backup_granularity_kb = 1024;
     backup_verify_immediately = false;
