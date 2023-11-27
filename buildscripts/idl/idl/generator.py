@@ -1398,16 +1398,17 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         # _gen_variant_deserializer generates code to parse the variant into the variable "_" + field.cpp_name,
                         # so we create a local variable '_tmp'
                         # and change cpp_name (for the duration of the _gen_variant_deserializer call) to 'tmp' so we can pass '_tmp'
-                        # to values.emplace_back below.
+                        # to values.push_back below.
                         self._writer.write_line('%s _tmp;' % ast_type.cpp_type)
                         cpp_name = field.cpp_name
                         field.cpp_name = 'tmp'
                         array_value = self._gen_variant_deserializer(field, 'arrayElement', tenant)
                         field.cpp_name = cpp_name
+                        self._writer.write_line('values.push_back(std::move(%s));' % (array_value))
                     else:
                         array_value = self._gen_field_deserializer_expression(
                             'arrayElement', field, ast_type, tenant)
-                    self._writer.write_line('values.emplace_back(%s);' % (array_value))
+                        self._writer.write_line('values.push_back(%s);' % (array_value))
 
             with self._block('else {', '}'):
                 self._writer.write_line(
