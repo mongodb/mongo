@@ -186,7 +186,7 @@ if env.ToolchainIs('gcc'):
 
                 # because the source files are listed object file inputs to the static lib
                 # we need strip the cmake output dir, and the object file extension
-                print(found_target_lib)
+                print(f"Found library: {found_target_lib}")
                 for raw_source in raw_source_files:
                     path_elems = raw_source.split('/')
                     path_elems.remove('CMakeFiles')
