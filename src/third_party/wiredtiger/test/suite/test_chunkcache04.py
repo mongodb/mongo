@@ -36,7 +36,7 @@ from wtscenario import make_scenarios
 - Functional testing for the ingesting. Verify ingests are taking place with both pinned and unpinned chunks.
 - Verify that when ingesting new chunks with old pinned objects, we are releasing the pin on the old objects.
 '''
-class test_chunkcache4(wttest.WiredTigerTestCase):
+class test_chunkcache04(wttest.WiredTigerTestCase):
     rows = 10000
 
     format_values = [
