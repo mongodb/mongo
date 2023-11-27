@@ -273,8 +273,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     // First, check whether we can merge on the mongoS. If the merge pipeline MUST run on mongoS,
     // then ignore the internalQueryProhibitMergingOnMongoS parameter.
     if (mergePipeline->requiredToRunOnMongos() ||
-        (!internalQueryProhibitMergingOnMongoS.load() && mergePipeline->canRunOnMongos() &&
-         !mergePipeline->needsSpecificShardMerger())) {
+        (!internalQueryProhibitMergingOnMongoS.load() && mergePipeline->canRunOnMongos())) {
         return runPipelineOnMongoS(namespaces,
                                    batchSize,
                                    std::move(shardDispatchResults.splitPipeline->mergePipeline),

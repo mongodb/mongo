@@ -235,6 +235,8 @@ private:
 
     void waitWhileFailPointEnabled() override;
 
+    boost::optional<ShardId> _getMergeShardId() const;
+
     const NamespaceString _outputNs;
     boost::optional<MergeProcessor> _mergeProcessor;
 };

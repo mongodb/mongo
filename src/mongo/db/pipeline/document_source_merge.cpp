@@ -52,7 +52,6 @@
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/document_source_merge_spec.h"
-#include "mongo/db/pipeline/specific_shard_merger.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/explain_options.h"
@@ -60,6 +59,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
@@ -330,15 +330,13 @@ StageConstraints DocumentSourceMerge::constraints(Pipeline::SplitState pipeState
                             LookupRequirement::kNotAllowed,
                             UnionRequirement::kNotAllowed};
     if (pipeState == Pipeline::SplitState::kSplitForMerge) {
-        result.mergeShardId = determineSpecificMergeShard(pExpCtx->opCtx, getOutputNs());
+        result.mergeShardId = _getMergeShardId();
     }
     return result;
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distributedPlanLogic() {
-    return determineSpecificMergeShard(pExpCtx->opCtx, getOutputNs())
-        ? DocumentSourceWriter::distributedPlanLogic()
-        : boost::none;
+    return _getMergeShardId() ? DocumentSourceWriter::distributedPlanLogic() : boost::none;
 }
 
 Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
@@ -447,4 +445,23 @@ void DocumentSourceMerge::waitWhileFailPointEnabled() {
         },
         getOutputNs());
 }
+
+boost::optional<ShardId> DocumentSourceMerge::_getMergeShardId() const {
+    // If output collection resides on a single shard, we should route $merge to it to perform local
+    // writes. Note that this decision is inherently racy and subject to become stale. This is okay
+    // because either choice will work correctly, we are simply applying a heuristic optimization.
+    auto [cm, _] = uassertStatusOK(Grid::get(pExpCtx->opCtx)
+                                       ->catalogCache()
+                                       ->getCollectionRoutingInfo(pExpCtx->opCtx, getOutputNs()));
+    if (cm.hasRoutingTable()) {
+        if (cm.isUnsplittable()) {
+            return cm.getMinKeyShardIdWithSimpleCollation();
+        } else {
+            return boost::none;
+        }
+    } else {
+        return cm.dbPrimary();
+    }
+}
+
 }  // namespace mongo

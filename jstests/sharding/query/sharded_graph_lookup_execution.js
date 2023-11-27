@@ -3,11 +3,7 @@
  * include when the local collection is sharded and unsharded, when the $graphLookup can target
  * shards or is scatter-gather, and when the $graphLookup is not top-level.
  *
- * Shard targeting logic for $lookup changed in 7.3 and may not match the expected behavior in a
- * multiversion environment.
- * @tags: [
- *   requires_fcv_73,
- * ]
+ * @tags: [requires_fcv_51]
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
@@ -548,9 +544,9 @@ assertGraphLookupExecution(
             collName: airportsColl.getName(),
             fromCollName: airfieldsColl.getName(),
             // When executing the subpipeline, the "nested" $lookup stage contained in the view
-            // pipeline will be pushed down to the shards and will recursively target shards
-            // to execute the nested subpipelines.
-            toplevelExec: [0, 2],
+            // pipeline will stay on the merging half of the pipeline and execute on the merging
+            // node, targeting shards to execute the nested subpipelines.
+            toplevelExec: [0, 0],
             subpipelineExec: [1, 2]
         }
     ]);

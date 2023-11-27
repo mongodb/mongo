@@ -69,7 +69,6 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
-#include "mongo/db/pipeline/specific_shard_merger.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -491,8 +490,13 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
         // When the inner pipeline does not target a collection, it can run on any node.
         hostRequirement = HostTypeRequirement::kRunOnceAnyNode;
     } else {
-        // If the pipeline is unsplit, then this $lookup can run anywhere.
-        hostRequirement = HostTypeRequirement::kNone;
+        // If the pipeline is unsplit or this stage is on the merging part of the pipeline,
+        // when $lookup on sharded foreign collections is allowed, the foreign collection is
+        // sharded, and the stage is executing on mongos, the stage can run on mongos or any shard.
+        hostRequirement = (foreignShardedLookupAllowed() && pExpCtx->inMongos &&
+                           pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs))
+            ? HostTypeRequirement::kNone
+            : HostTypeRequirement::kPrimaryShard;
     }
 
     // By default, $lookup is allowed in a transaction and does not use disk.
@@ -510,13 +514,6 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
     if (hasPipeline()) {
         constraints = StageConstraints::getStrictestConstraints(
             _resolvedIntrospectionPipeline->getSources(), constraints);
-    }
-
-    // If this $lookup is on the merging half of the pipeline and the inner collection isn't
-    // sharded (that is, it is either unsplittable or untracked), then we should merge on the shard
-    // which owns the inner collection.
-    if (pipeState == Pipeline::SplitState::kSplitForMerge) {
-        constraints.mergeShardId = determineSpecificMergeShard(pExpCtx->opCtx, _fromNs);
     }
 
     constraints.canSwapWithMatch = true;

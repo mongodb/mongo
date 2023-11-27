@@ -4171,78 +4171,14 @@ TEST_F(PipelineOptimizationsShardMerger, Project) {
            false /*needsPrimaryShardMerger*/);
 };
 
-TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
-    const ChunkRange range = ChunkRange{BSON("_id" << MINKEY), BSON("_id" << MAXKEY)};
-    const UUID uuid = UUID::gen();
-    const OID epoch = OID::gen();
-    const Timestamp timestamp{1, 1};
-    auto fromCollNs = getLookupCollNs();
-    auto rt = RoutingTableHistory::makeNew(
-        fromCollNs,
-        uuid,
-        KeyPattern{BSON("right" << 1)},
-        true /* unsplittable */,
-        nullptr /* defaultCollator */,
-        false /* unique */,
-        epoch,
-        Timestamp(1, 1),
-        boost::none /* timeseriesFields */,
-        boost::none /* reshardingFields */,
-        true /* allowMigrations */,
-        {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), _myShardName}});
-
-    getCatalogCacheMock()->setCollectionReturnValue(
-        fromCollNs,
-        CollectionRoutingInfo{ChunkManager{_myShardName,
-                                           DatabaseVersion{UUID::gen(), timestamp},
-                                           makeStandaloneRoutingTableHistory(std::move(rt)),
-                                           timestamp},
-                              boost::none});
+TEST_F(PipelineOptimizationsShardMerger, LookUp) {
     doTest(
-        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* inputPipeJson */
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /*inputPipeJson*/
         ,
-        "[]" /* shardPipeJson */,
-        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* mergePipeJson */
+        "[]" /*shardPipeJson*/,
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /*mergePipeJson*/
         ,
-        false /* needsPrimaryShardMerger */,
-        _myShardName /* needsSpecificShardMerger */);
-};
-
-TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
-    const ChunkRange range = ChunkRange{BSON("_id" << MINKEY), BSON("_id" << MAXKEY)};
-    const UUID uuid = UUID::gen();
-    const OID epoch = OID::gen();
-    const Timestamp timestamp{1, 1};
-    auto fromCollNs = getLookupCollNs();
-    auto rt = RoutingTableHistory::makeNew(
-        fromCollNs,
-        uuid,
-        KeyPattern{BSON("right" << 1)},
-        false /* unsplittable */,
-        nullptr /* defaultCollator */,
-        false /* unique */,
-        epoch,
-        Timestamp(1, 1),
-        boost::none /* timeseriesFields */,
-        boost::none /* reshardingFields */,
-        true /* allowMigrations */,
-        {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), _myShardName}});
-
-    getCatalogCacheMock()->setCollectionReturnValue(
-        fromCollNs,
-        CollectionRoutingInfo{ChunkManager{_myShardName,
-                                           DatabaseVersion{UUID::gen(), timestamp},
-                                           makeStandaloneRoutingTableHistory(std::move(rt)),
-                                           timestamp},
-                              boost::none});
-    doTest(
-        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* inputPipeJson */
-        ,
-        "[]" /* shardPipeJson */,
-        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* mergePipeJson */
-        ,
-        false /* needsPrimaryShardMerger */,
-        boost::none /* needsSpecificShardMerger */);
+        true /*needsPrimaryShardMerger*/);
 };
 
 }  // namespace needsPrimaryShardMerger
