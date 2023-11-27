@@ -868,7 +868,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     auto lowKeySlot = slotIdGenerator.generate();
     auto highKeySlot = slotIdGenerator.generate();
     auto indexKeyPatternSlot = slotIdGenerator.generate();
-    auto [_, indexKeyPatternValue] =
+    auto [indexKeyPaternTag, indexKeyPatternValue] =
         copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(index.keyPattern.objdata()));
 
     auto makeNewKeyStringCall = [&](key_string::Discriminator discriminator) {
@@ -892,7 +892,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                          highKeySlot,
                          makeNewKeyStringCall(key_string::Discriminator::kExclusiveAfter),
                          indexKeyPatternSlot,
-                         makeConstant(value::TypeTags::bsonObject, indexKeyPatternValue));
+                         makeConstant(indexKeyPaternTag, indexKeyPatternValue));
 
     // To ensure that we compute index bounds for all local values, introduce loop join, where
     // unwinding of local values happens on the right side and index generation happens on the left

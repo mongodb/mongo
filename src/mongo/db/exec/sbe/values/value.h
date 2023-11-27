@@ -1835,7 +1835,7 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
         case TypeTags::StringBig:
             return makeBigString(getStringView(tag, val));
         case TypeTags::bsonString:
-            return makeBigString(getStringView(tag, val));
+            return makeNewString(getStringView(tag, val));
         case TypeTags::bsonSymbol:
             return makeNewBsonSymbol(getStringOrSymbolView(tag, val));
         case TypeTags::ObjectId: {
