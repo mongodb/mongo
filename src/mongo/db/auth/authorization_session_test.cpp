@@ -44,42 +44,20 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/crypto/sha1_block.h"
-#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/access_checks_gen.h"
-#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_contract.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_impl.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authorization_session_for_test.h"
-#include "mongo/db/auth/authorization_session_impl.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/auth/authorization_session_test_fixture.h"
 #include "mongo/db/auth/role_name.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/list_collections_gen.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -87,10 +65,7 @@
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/time_support.h"
@@ -99,185 +74,10 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
+
+using AuthorizationSessionTest = AuthorizationSessionTestFixture;
+
 namespace {
-
-class FailureCapableAuthzManagerExternalStateMock : public AuthzManagerExternalStateMock {
-public:
-    FailureCapableAuthzManagerExternalStateMock() = default;
-    ~FailureCapableAuthzManagerExternalStateMock() = default;
-
-    void setFindsShouldFail(bool enable) {
-        _findsShouldFail = enable;
-    }
-
-    Status findOne(OperationContext* opCtx,
-                   const NamespaceString& collectionName,
-                   const BSONObj& query,
-                   BSONObj* result) override {
-        if (_findsShouldFail && collectionName == NamespaceString::kAdminUsersNamespace) {
-            return Status(ErrorCodes::UnknownError,
-                          "findOne on admin.system.users set to fail in mock.");
-        }
-        return AuthzManagerExternalStateMock::findOne(opCtx, collectionName, query, result);
-    }
-
-private:
-    bool _findsShouldFail{false};
-};
-
-class AuthorizationSessionTest : public ServiceContextMongoDTest {
-public:
-    void setUp() {
-        gMultitenancySupport = true;
-        ServiceContextMongoDTest::setUp();
-
-        _session = transportLayer.createSession();
-        _client = getServiceContext()->getService()->makeClient("testClient", _session);
-        _opCtx = _client->makeOperationContext();
-        managerState->setAuthzVersion(_opCtx.get(), AuthorizationManager::schemaVersion26Final);
-
-        authzManager = AuthorizationManager::get(getServiceContext());
-        auto localSessionState = std::make_unique<AuthzSessionExternalStateMock>(authzManager);
-        sessionState = localSessionState.get();
-        authzSession = std::make_unique<AuthorizationSessionForTest>(
-            std::move(localSessionState),
-            AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});
-        authzManager->setAuthEnabled(true);
-        authzSession->startContractTracking();
-
-        credentials =
-            BSON("SCRAM-SHA-1" << scram::Secrets<SHA1Block>::generateCredentials(
-                                      "a", saslGlobalParams.scramSHA1IterationCount.load())
-                               << "SCRAM-SHA-256"
-                               << scram::Secrets<SHA256Block>::generateCredentials(
-                                      "a", saslGlobalParams.scramSHA256IterationCount.load()));
-
-        // assume tenantId is from security token with no expectPrefix
-        _sc = SerializationContext(SerializationContext::Source::Command,
-                                   SerializationContext::CallerType::Request,
-                                   SerializationContext::Prefix::Default,
-                                   true /* nonPrefixedTenantId */,
-                                   false /* authExpectTenantPrefix */);
-    }
-
-    void tearDown() override {
-        authzSession->logoutAllDatabases(_client.get(), "Ending AuthorizationSessionTest");
-        ServiceContextMongoDTest::tearDown();
-        gMultitenancySupport = false;
-    }
-
-    Status createUser(const UserName& username, const std::vector<RoleName>& roles) {
-        BSONObjBuilder userDoc;
-        userDoc.append("_id", username.getUnambiguousName());
-        username.appendToBSON(&userDoc);
-        userDoc.append("credentials", credentials);
-
-        BSONArrayBuilder rolesBSON(userDoc.subarrayStart("roles"));
-        for (const auto& role : roles) {
-            role.serializeToBSON(&rolesBSON);
-        }
-        rolesBSON.doneFast();
-
-        return managerState->insert(
-            _opCtx.get(),
-            NamespaceString::makeTenantUsersCollection(username.getTenant()),
-            userDoc.obj(),
-            {});
-    }
-
-    void assertLogout(const ResourcePattern& resource, ActionType action) {
-        ASSERT_FALSE(authzSession->isExpired());
-        ASSERT_EQ(authzSession->getAuthenticationMode(),
-                  AuthorizationSession::AuthenticationMode::kNone);
-        ASSERT_FALSE(authzSession->isAuthenticated());
-        ASSERT_EQ(authzSession->getAuthenticatedUser(), boost::none);
-        ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(resource, action));
-    }
-
-    void assertExpired(const ResourcePattern& resource, ActionType action) {
-        ASSERT_TRUE(authzSession->isExpired());
-        ASSERT_EQ(authzSession->getAuthenticationMode(),
-                  AuthorizationSession::AuthenticationMode::kNone);
-        ASSERT_FALSE(authzSession->isAuthenticated());
-        ASSERT_EQ(authzSession->getAuthenticatedUser(), boost::none);
-        ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(resource, action));
-    }
-
-    void assertActive(const ResourcePattern& resource, ActionType action) {
-        ASSERT_FALSE(authzSession->isExpired());
-        ASSERT_EQ(authzSession->getAuthenticationMode(),
-                  AuthorizationSession::AuthenticationMode::kConnection);
-        ASSERT_TRUE(authzSession->isAuthenticated());
-        ASSERT_NOT_EQUALS(authzSession->getAuthenticatedUser(), boost::none);
-        ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(resource, action));
-    }
-
-    void assertSecurityToken(const ResourcePattern& resource, ActionType action) {
-        ASSERT_FALSE(authzSession->isExpired());
-        ASSERT_EQ(authzSession->getAuthenticationMode(),
-                  AuthorizationSession::AuthenticationMode::kSecurityToken);
-        ASSERT_TRUE(authzSession->isAuthenticated());
-        ASSERT_NOT_EQUALS(authzSession->getAuthenticatedUser(), boost::none);
-        ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(resource, action));
-    }
-
-    void assertNotAuthorized(const ResourcePattern& resource, ActionType action) {
-        ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(resource, action));
-    }
-
-    AggregateCommandRequest buildAggReq(const NamespaceString& nss, const BSONArray& pipeline) {
-        return uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-            nss,
-            BSON("aggregate" << nss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                             << "$db" << nss.db_forTest()),
-            boost::none,
-            false /* apiStrict */,
-            _sc));
-    }
-
-    AggregateCommandRequest buildAggReq(const NamespaceString& nss,
-                                        const BSONArray& pipeline,
-                                        bool bypassDocValidation) {
-        return uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-            nss,
-            BSON("aggregate" << nss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                             << "bypassDocumentValidation" << bypassDocValidation << "$db"
-                             << nss.db_forTest()),
-            boost::none,
-            false /* apiStrict */,
-            _sc));
-    }
-
-private:
-    static Options createServiceContextOptions() {
-        Options o;
-        return o.useMockClock(true).useMockAuthzManagerExternalState(
-            std::make_unique<FailureCapableAuthzManagerExternalStateMock>());
-    }
-
-protected:
-    AuthorizationSessionTest() : ServiceContextMongoDTest(createServiceContextOptions()) {
-        managerState =
-            dynamic_cast<FailureCapableAuthzManagerExternalStateMock*>(_authzExternalState);
-        invariant(managerState);
-    }
-
-    ClockSourceMock* clockSource() {
-        return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
-    }
-
-protected:
-    FailureCapableAuthzManagerExternalStateMock* managerState;
-    transport::TransportLayerMock transportLayer;
-    std::shared_ptr<transport::Session> _session;
-    ServiceContext::UniqueClient _client;
-    ServiceContext::UniqueOperationContext _opCtx;
-    AuthzSessionExternalStateMock* sessionState;
-    AuthorizationManager* authzManager;
-    std::unique_ptr<AuthorizationSessionForTest> authzSession;
-    BSONObj credentials;
-    SerializationContext _sc;
-};
 
 const TenantId kTenantId1(OID("12345678901234567890aaaa"));
 const TenantId kTenantId2(OID("12345678901234567890aaab"));

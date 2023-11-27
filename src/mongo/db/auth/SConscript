@@ -524,13 +524,29 @@ env.Library(
 env.Library(
     target='oidc_protocol',
     source=[
-        "oauth_authorization_server_metadata.idl", "oauth_discovery_factory.cpp",
-        'oidc_protocol.idl'
+        "oauth_authorization_server_metadata.idl",
+        "oauth_discovery_factory.cpp",
+        'oidc_protocol.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/net/http_client',
+    ],
+)
+
+env.Library(
+    target='authorization_session_test_fixture',
+    source=[
+        'authorization_session_for_test.cpp',
+        'authorization_session_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        'auth',
+        'auth_impl_internal',
+        'authmocks',
     ],
 )
 
@@ -544,7 +560,6 @@ env.CppUnitTest(
         'auth_op_observer_test.cpp',
         "authentication_session_test.cpp",
         'authorization_manager_test.cpp',
-        'authorization_session_for_test.cpp',
         'authorization_session_test.cpp',
         'builtin_roles_test.cpp',
         'oauth_discovery_factory_test.cpp',
@@ -568,17 +583,13 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/oplog_interface_local',
         '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/net/mock_http_client',
         '$BUILD_DIR/mongo/util/net/network',
         'address_restriction',
-        'auth',
-        'auth_impl_internal',
         'auth_op_observer',
         'authentication_session',
-        'authmocks',
+        'authorization_session_test_fixture',
         'oidc_protocol',
         'saslauth',
         'security_file',
