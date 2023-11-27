@@ -14,23 +14,18 @@ const t = db.cqf_index_intersect;
 t.drop();
 
 const documents = [{a: 1, b: 1, c: 1}, {a: 3, b: 2, c: 1}];
-const nMatches = 300;
+const nMatches = 500;
 for (let i = 0; i < nMatches; i++) {
     documents.push({a: 3, b: 3, c: i});
-}
-documents.push({a: 4, b: 3, c: 2});
-documents.push({a: 5, b: 5, c: 2});
-
-for (let i = 1; i < nMatches + 1000; i++) {
-    documents.push({a: i + nMatches, b: i + nMatches, c: i + nMatches});
 }
 
 // Because a and b are both indexed fields and they have the same value in most documents, the
 // optimal plan will be to estimate their cardinality together due to their high correlation.
-// Instead, add around 1000 documents where a != b and neither is 3 to encourage a MergeJoin.
-for (let i = 4; i < 1000; i++) {
+// Instead, add around 12000 documents where a and b are not 3 to encourage a disjoint IndexScan.
+for (let i = 4; i < 4000; i++) {
     documents.push({a: 3, b: i, c: i});
     documents.push({a: i, b: 3, c: i});
+    documents.push({a: i + nMatches, b: i + nMatches, c: i + nMatches});
 }
 
 assert.commandWorked(t.insertMany(documents));
