@@ -20,6 +20,8 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.utils import globstar
 from buildscripts.resmokelib.utils import jscomment
 
+ENTERPRISE_TEST_DIR = os.path.normpath("src/mongo/db/modules/enterprise/jstests")
+
 ########################
 #  Test file explorer  #
 ########################
@@ -272,6 +274,13 @@ class _TestList(object):
         for path in paths.evaluated:
             self._filtered.discard(path)
 
+    def filter_enterprise_tests(self):
+        """Exclude tests that start with the enterprise module directory from the test list."""
+        self._filtered = {
+            test
+            for test in self._filtered if not os.path.normpath(test).startswith(ENTERPRISE_TEST_DIR)
+        }
+
     def match_tag_expression(self, tag_expression, get_tags):
         """Filter the test list to only include tests that match the tag expression.
 
@@ -511,6 +520,9 @@ class _Selector(object):
         # 5. Apply the include files last with force=True to take precedence over the tags.
         if self._tests_are_files and selector_config.include_files:
             test_list.include_files(selector_config.include_files)
+        # 6: Apply the enterprise tests filter
+        if self.get_enterprise_tests_status() == "off":
+            test_list.filter_enterprise_tests()
 
         return self.sort_tests(*test_list.get_tests())
 
@@ -525,6 +537,11 @@ class _Selector(object):
     def get_tags(test_file):  # pylint: disable=unused-argument
         """Retrieve the tags associated with the give test file."""
         return []
+
+    @staticmethod
+    def get_enterprise_tests_status() -> str:
+        """Get the status of enterprise tests from the configuration."""
+        return config.ENABLE_ENTERPRISE_TESTS
 
 
 class _JSTestSelectorConfig(_SelectorConfig):

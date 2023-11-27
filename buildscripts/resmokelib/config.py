@@ -105,6 +105,7 @@ DEFAULTS = {
     "shuffle": None,
     "stagger_jobs": None,
     "majority_read_concern": "on",
+    "enable_enterprise_tests": None,
     "shell_seed": None,
     "storage_engine": "wiredTiger",
     "storage_engine_cache_size_gb": None,
