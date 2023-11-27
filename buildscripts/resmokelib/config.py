@@ -101,6 +101,7 @@ DEFAULTS = {
     "stagger_jobs": None,
     "majority_read_concern": "on",
     "storage_engine": "wiredTiger",
+    "enable_enterprise_tests": None,
     "storage_engine_cache_size_gb": None,
     "suite_files": "with_server",
     "tag_files": [],
