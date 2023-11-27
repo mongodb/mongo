@@ -11,10 +11,6 @@ selector:
   - jstests/core/txns/**/*.js
   # TODO: SERVER-81495 Enable timeseries tests
   - jstests/core/timeseries/**/*.js
-  # TODO: SERVER-79876 Enable the following tests once unique indexes are enabled for unsplittable collections
-  - jstests/core/ddl/collmod_convert_index_uniqueness.js
-  - jstests/core/ddl/collmod_convert_to_unique_violations.js
-  - jstests/core/ddl/collmod_convert_to_unique_violations_size_limit.js
   # TODO: SERVER-83396 Enable once unsplittable collections are created through the create command
   - jstests/core/ddl/create_collection.js
   - jstests/core/failcommand_failpoint.js
@@ -67,15 +63,13 @@ selector:
   - jstests/core/query/plan_cache/plan_cache_list_plans.js
   - jstests/core/index/index_filter_commands.js
   - jstests/core/index/index_stats.js
-
+  # TODO: SERVER-83582 Enable after fix
+  - jstests/core/write/insert/insert_id_undefined.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
   # system.profile collection doesn't exist on mongos.
   - requires_profiling
-  # TODO: SERVER-83396 Remove no longer needed `assumes_no_implicit_collection_creation_after_drop`
-  # and `assumes_no_implicit_collection_creation_on_get_collection` tags
-  - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_collection_creation_on_get_collection
   # TODO: SERVER-81937 Enable transaction tests
   - uses_transactions

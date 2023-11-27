@@ -180,9 +180,9 @@ Status getOnlySupportedOnTimeseriesError(StringData fieldName) {
             str::stream() << "option only supported on a time-series collection: " << fieldName};
 }
 
-boost::optional<ShardKeyPattern> getShardKeyPattern(OperationContext* opCtx,
-                                                    const NamespaceStringOrUUID& nsOrUUID,
-                                                    const CollMod& cmd) {
+boost::optional<ShardKeyPattern> getShardKeyPatternIfSharded(OperationContext* opCtx,
+                                                             const NamespaceStringOrUUID& nsOrUUID,
+                                                             const CollMod& cmd) {
     if (!Grid::get(opCtx)->isInitialized()) {
         return boost::none;
     }
@@ -191,7 +191,12 @@ boost::optional<ShardKeyPattern> getShardKeyPattern(OperationContext* opCtx,
         const NamespaceString nss =
             CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
         if (auto catalogClient = Grid::get(opCtx)->catalogClient()) {
-            return ShardKeyPattern(catalogClient->getCollection(opCtx, nss).getKeyPattern());
+            auto coll = catalogClient->getCollection(opCtx, nss);
+            if (coll.getUnsplittable()) {
+                return boost::none;
+            } else {
+                return ShardKeyPattern(coll.getKeyPattern());
+            }
         }
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // The collection is unsharded or doesn't exist.
@@ -790,7 +795,7 @@ Status _collModInternal(OperationContext* opCtx,
     bool mayNeedKeyPatternForParsing =
         cmd.getIndex() && (cmd.getIndex()->getHidden() || cmd.getIndex()->getPrepareUnique());
     if (!mode && mayNeedKeyPatternForParsing) {
-        shardKeyPattern = getShardKeyPattern(opCtx, nsOrUUID, cmd);
+        shardKeyPattern = getShardKeyPatternIfSharded(opCtx, nsOrUUID, cmd);
     }
 
     if (cmd.getDryRun().value_or(false)) {
