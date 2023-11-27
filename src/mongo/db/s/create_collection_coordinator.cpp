@@ -445,11 +445,14 @@ void CreateCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
     const auto otherDoc = CreateCollectionCoordinatorDocument::parse(
         IDLParserContext("CreateCollectionCoordinatorDocument"), doc);
 
+    const auto& selfReq = _request.toBSON();
+    const auto& otherReq = otherDoc.getCreateCollectionRequest().toBSON();
+
     uassert(ErrorCodes::ConflictingOperationInProgress,
-            "Another create collection with different arguments is already running for the same "
-            "namespace",
-            SimpleBSONObjComparator::kInstance.evaluate(
-                _request.toBSON() == otherDoc.getCreateCollectionRequest().toBSON()));
+            str::stream() << "Another create collection with different arguments is already "
+                             "running for the same namespace: "
+                          << selfReq,
+            SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
 
 ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
