@@ -1107,6 +1107,11 @@ class RunPlugin(PluginInterface):
             metavar="ON|OFF", help=("Enable or disable majority read concern support."
                                     " Defaults to %(default)s."))
 
+        mongodb_server_options.add_argument(
+            "--enableEnterpriseTests", action="store", dest="enable_enterprise_tests", default="on",
+            choices=("on", "off"), metavar="ON|OFF",
+            help=("Enable or disable enterprise tests. Defaults to 'on'."))
+
         mongodb_server_options.add_argument("--flowControl", action="store", dest="flow_control",
                                             choices=("on", "off"), metavar="ON|OFF",
                                             help=("Enable or disable flow control."))
