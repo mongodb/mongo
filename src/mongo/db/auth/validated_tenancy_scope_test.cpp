@@ -112,6 +112,24 @@ protected:
     ServiceContext::UniqueClient client;
 };
 
+void assertIdenticalVTS(const ValidatedTenancyScope& a, const ValidatedTenancyScope& b) {
+    ASSERT_EQ(a.getOriginalToken(), b.getOriginalToken());
+    // Generally the following MUST be equal if the above is equal, else the VTS ctor has gone
+    // deeply wrong.
+    ASSERT_EQ(a.hasAuthenticatedUser(), b.hasAuthenticatedUser());
+    if (a.hasAuthenticatedUser()) {
+        auto aUser = a.authenticatedUser().toBSON(true);
+        auto bUser = b.authenticatedUser().toBSON(true);
+        ASSERT_BSONOBJ_EQ(aUser, bUser);
+    }
+    ASSERT_EQ(a.hasTenantId(), b.hasTenantId());
+    if (a.hasTenantId()) {
+        ASSERT_EQ(a.tenantId().toString(), b.tenantId().toString());
+    }
+    ASSERT_EQ(a.getExpiration().toString(), b.getExpiration().toString());
+    ASSERT_EQ(a.isFromAtlasProxy(), b.isFromAtlasProxy());
+}
+
 TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportOffWithoutTenantOK) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
     auto body = BSON("$db"
@@ -216,6 +234,23 @@ TEST_F(ValidatedTenancyScopeTestFixture, SecurityTokenHasPrefixExpectPrefix) {
     token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kDefault);
     ASSERT_THROWS_CODE(
         ValidatedTenancyScope::create(client.get(), body, token), DBException, 8154400);
+}
+
+TEST_F(ValidatedTenancyScopeTestFixture, VTSCreateFromOriginalToken) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
+                                                          "secret");
+
+    const TenantId kTenantId(OID::gen());
+    const auto body = BSON("ping" << 1);
+    UserName user("user", "admin", kTenantId);
+    const auto token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
+    const auto vts = ValidatedTenancyScope::create(client.get(), body, token);
+
+    // check that a VTS created from another VTS token are equal.
+    auto copyVts = ValidatedTenancyScope(client.get(), vts->getOriginalToken());
+    assertIdenticalVTS(*vts, copyVts);
 }
 
 }  // namespace
