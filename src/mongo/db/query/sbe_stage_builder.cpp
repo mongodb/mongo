@@ -601,7 +601,12 @@ void PlanStageSlots::setMissingRequiredNamedSlots(const PlanStageReqs& reqs,
 
 void PlanStageSlots::setAllRequiredNamedSlotsToNothing(StageBuilderState& state,
                                                        const PlanStageReqs& reqs) {
-    for (auto&& name : getRequiredNamesInOrder(reqs)) {
+    PlanStageReqs forwardingReqs = reqs.copyForChild();
+    if (reqs.getMRInfo()) {
+        forwardingReqs.clearMRInfo().setResult();
+    }
+
+    for (auto&& name : getRequiredNamesInOrder(forwardingReqs)) {
         auto slot =
             state.env->registerSlot(sbe::value::TypeTags::Nothing, 0, false, state.slotIdGenerator);
         set(name, slot);
