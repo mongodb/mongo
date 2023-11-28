@@ -516,12 +516,15 @@ public:
     }
 
     BSONObj findOne(const CollectionPtr& coll) {
-        auto optRecord = coll->getRecordStore()->getCursor(_opCtx)->next();
+        auto cursor = coll->getRecordStore()->getCursor(_opCtx);
+        auto optRecord = cursor->next();
         if (optRecord == boost::none) {
             // Print a stack trace to help disambiguate which `findOne` failed.
             printStackTrace();
             FAIL("Did not find any documents.");
         }
+
+        optRecord.value().data.makeOwned();
         return optRecord.value().data.toBson();
     }
 

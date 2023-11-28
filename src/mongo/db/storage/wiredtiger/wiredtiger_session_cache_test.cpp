@@ -114,19 +114,4 @@ TEST(WiredTigerSessionCacheTest, CheckSessionCacheCleanup) {
     ASSERT_EQUALS(sessionCache->getIdleSessionsCount(), 0U);
 }
 
-TEST(WiredTigerSessionCacheTest, ReleaseCursorDuringShutdown) {
-    WiredTigerSessionCacheHarnessHelper harnessHelper("");
-    WiredTigerSessionCache* sessionCache = harnessHelper.getSessionCache();
-    UniqueWiredTigerSession session = sessionCache->getSession();
-    // Simulates the cursor already being deleted during shutdown.
-    WT_CURSOR* cursor = nullptr;
-
-    sessionCache->shuttingDown();
-    ASSERT(sessionCache->isShuttingDown());
-
-    auto tableIdWeDontCareAbout = WiredTigerSession::genTableId();
-    // Skips actually trying to release the cursor to avoid the segmentation fault.
-    session->releaseCursor(tableIdWeDontCareAbout, cursor, "");
-}
-
 }  // namespace mongo

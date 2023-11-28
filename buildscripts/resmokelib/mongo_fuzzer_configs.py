@@ -129,7 +129,6 @@ def generate_mongod_parameters(rng, mode):
     ret["mirrorReads"] = {"samplingRate": rng.random()}
     ret["queryAnalysisWriterMaxMemoryUsageBytes"] = rng.randint(1, 100) * 1024 * 1024
     ret["syncdelay"] = rng.choice([60, rng.randint(15, 180)])
-    ret["wiredTigerCursorCacheSize"] = rng.randint(-100, 100)
     ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(0, 300)
     ret["storageEngineConcurrencyAdjustmentAlgorithm"] = rng.choices(
         ["throughputProbing", "fixedConcurrentTransactions"], weights=[10, 1])[0]

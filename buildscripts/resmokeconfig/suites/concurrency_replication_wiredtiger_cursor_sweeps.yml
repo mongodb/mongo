@@ -55,12 +55,6 @@ executor:
         enableTestCommands: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
         queryAnalysisWriterIntervalSecs: 1
-        # Setting this parameter to "1" disables cursor caching in WiredTiger, and sets the cache
-        # size to "1" in MongoDB. This forces all resources to be released when done.
-        wiredTigerCursorCacheSize: 1
-        # Lower the time after all references to a file in WiredTiger have been released before it
-        # is closed.
-        wiredTigerFileHandleCloseIdleTime: 1
         # Lower the interval at which WiredTiger checks for file handles to close.
         wiredTigerFileHandleCloseScanInterval: 1
         # Lower the number of files open before WiredTiger starts looking for cursors to close. At

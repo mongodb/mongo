@@ -168,12 +168,6 @@ public:
     WiredTigerSession* getSession();
 
     /**
-     * Enter a period of wait or computation during which there are no WT calls.
-     * Any non-relevant cached handles can be closed.
-     */
-    void beginIdle();
-
-    /**
      * Returns a session without starting a new WT txn on the session. Will not close any already
      * running session.
      */

@@ -52,20 +52,7 @@ namespace mongo {
 class WiredTigerKVEngine;
 class WiredTigerSessionCache;
 
-class WiredTigerCachedCursor {
-public:
-    WiredTigerCachedCursor(uint64_t id, uint64_t gen, WT_CURSOR* cursor, const std::string& config)
-        : _id(id), _gen(gen), _cursor(cursor), _config(config) {}
-
-    uint64_t _id;   // Source ID, assigned to each URI
-    uint64_t _gen;  // Generation, used to age out old cursors
-    WT_CURSOR* _cursor;
-    std::string _config;  // Cursor config. Do not serve cursors with different configurations
-};
-
 /**
- * This is a structure that caches 1 cursor for each uri.
- * The idea is that there is a pool of these somewhere.
  * NOT THREADSAFE
  */
 class WiredTigerSession {
@@ -75,22 +62,17 @@ public:
      *
      * @param conn WT connection
      * @param epoch In which session cache cleanup epoch was this session instantiated.
-     * @param cursorEpoch In which cursor cache cleanup epoch was this session instantiated.
      */
-    WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch = 0, uint64_t cursorEpoch = 0);
+    WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch = 0);
 
     /**
      * Creates a new WT session on the specified connection.
      *
      * @param conn WT connection
      * @param cache The WiredTigerSessionCache that owns this session.
-     * @param epoch In which session cache cleanup epoch was this session instantiated.
-     * @param cursorEpoch In which cursor cache cleanup epoch was this session instantiated.
+     * @param epoch In which session cache cleanup epoch was this session instantiated..
      */
-    WiredTigerSession(WT_CONNECTION* conn,
-                      WiredTigerSessionCache* cache,
-                      uint64_t epoch = 0,
-                      uint64_t cursorEpoch = 0);
+    WiredTigerSession(WT_CONNECTION* conn, WiredTigerSessionCache* cache, uint64_t epoch = 0);
 
     ~WiredTigerSession();
 
@@ -98,24 +80,13 @@ public:
         return _session;
     }
 
-    /**
-     * Gets a cursor on the table id 'id' with optional configuration, 'config'.
-     *
-     * This may return a cursor from the cursor cache and these cursors should *always* be released
-     * into the cache by calling releaseCursor().
-     */
-    WT_CURSOR* getCachedCursor(uint64_t id, const std::string& config);
-
 
     /**
-     * Create a new cursor and ignore the cache.
+     * Create a new cursor.
      *
      * The config string specifies optional arguments for the cursor. For example, when
      * the config contains 'read_once=true', this is intended for operations that will be
      * sequentially scanning large amounts of data.
-     *
-     * This will never return a cursor from the cursor cache, and these cursors should *never* be
-     * released into the cache by calling releaseCursor(). Use closeCursor() instead.
      */
     WT_CURSOR* getNewCursor(const std::string& uri, const char* config);
 
@@ -127,33 +98,12 @@ public:
     }
 
     /**
-     * Release a cursor into the cursor cache and close old cursors if the number of cursors in the
-     * cache exceeds wiredTigerCursorCacheSize.
-     * The exact cursor config that was used to create the cursor must be provided or subsequent
-     * users will retrieve cursors with incorrect configurations.
-     *
-     * Additionally calls into the WiredTigerKVEngine to see if the SizeStorer needs to be flushed.
-     * The SizeStorer gets flushed on a periodic basis.
-     */
-    void releaseCursor(uint64_t id, WT_CURSOR* cursor, const std::string& config);
-
-    /**
-     * Close a cursor without releasing it into the cursor cache.
+     * Close a cursor.
      */
     void closeCursor(WT_CURSOR* cursor);
 
-    /**
-     * Closes all cached cursors matching the uri.  If the uri is empty,
-     * all cached cursors are closed.
-     */
-    void closeAllCursors(const std::string& uri);
-
     int cursorsOut() const {
         return _cursorsOut;
-    }
-
-    int cachedCursors() const {
-        return _cursors.size();
     }
 
     static uint64_t genTableId();
@@ -182,9 +132,6 @@ private:
     friend class WiredTigerSessionCache;
     friend class WiredTigerKVEngine;
 
-    // The cursor cache is a list of pairs that contain an ID and cursor
-    typedef std::list<WiredTigerCachedCursor> CursorCache;
-
     // Used internally by WiredTigerSessionCache
     uint64_t _getEpoch() const {
         return _epoch;
@@ -193,7 +140,6 @@ private:
     const uint64_t _epoch;
     WiredTigerSessionCache* _cache;  // not owned
     WT_SESSION* _session;            // owned
-    CursorCache _cursors;            // owned
     uint64_t _cursorGen;
     int _cursorsOut;
     Date_t _idleExpireTime;
@@ -254,11 +200,6 @@ public:
     };
 
     /**
-     * Indicates that WiredTiger should be configured to cache cursors.
-     */
-    static bool isEngineCachingCursors();
-
-    /**
      * Returns a smart pointer to a previously released session for reuse, or creates a new session.
      * This method must only be called while holding the global lock to avoid races with
      * shuttingDown, but otherwise is thread safe.
@@ -280,12 +221,6 @@ public:
      * release.
      */
     void closeAll();
-
-    /**
-     * Closes all cached cursors matching the uri.  If the uri is empty,
-     * all cached cursors are closed.
-     */
-    void closeAllCursors(const std::string& uri);
 
     /**
      * Transitions the cache to shutting down mode. Any already released sessions are freed and
