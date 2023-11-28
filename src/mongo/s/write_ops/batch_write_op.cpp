@@ -771,7 +771,8 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
         if (!writeError) {
             if (!ordered || !lastError) {
                 if (writeOp.getWriteType() == WriteType::WithoutShardKeyWithId) {
-                    writeOp.noteWriteWithoutShardKeyWithIdResponse(*write, response.getN());
+                    writeOp.noteWriteWithoutShardKeyWithIdResponse(
+                        *write, response.getN(), /* bulkWriteReplyItem */ boost::none);
                 } else {
                     writeOp.noteWriteComplete(*write);
                 }
