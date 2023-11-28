@@ -48,3 +48,6 @@ build:local --legacy_important_outputs
 
 # try to import the bazelrc files if available
 try-import %workspace%/.bazelrc.local
+
+# in evergreen this will set the key/cert options for access to the cluster
+try-import %workspace%/.bazelrc.evergreen_engflow_creds

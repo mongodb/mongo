@@ -17,4 +17,10 @@ set -o verbose
 # Use `eval` to force evaluation of the environment variables in the echo statement:
 eval echo "Execution environment: Args: ${args} Target: ${target}"
 
-./bazelisk run ${args} ${target}
+source ./evergreen/bazel_RBE_supported.sh
+
+if bazel_rbe_supported; then
+  LOCAL_ARG=""
+else
+  LOCAL_ARG="--config=local"
+fi

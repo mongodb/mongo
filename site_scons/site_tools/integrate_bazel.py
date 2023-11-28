@@ -419,6 +419,9 @@ def generate(env: SCons.Environment.Environment) -> None:
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g
         ]
 
+        if normalized_os != "linux" or normalized_arch not in ["arm64", 'amd64']:
+            bazel_internal_flags.append('--config=local')
+
         Globals.bazel_base_build_command = [
             os.path.abspath("bazelisk"),
             'build',

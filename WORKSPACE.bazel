@@ -1,5 +1,9 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
+load("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
+
+setup_local_config_platform(name="local_config_platform")
+
 http_archive(
     name = "mongo_toolchain",
     build_file = "@//bazel/toolchains:mongo_toolchain.BUILD",

@@ -1,0 +1,11 @@
+bazel_rbe_supported() {
+
+  OS="$(uname)"
+  ARCH="$(uname -m)"
+
+  if [ "$OS" == "Linux" ] && { [ "$ARCH" == "aarch64" ] || [ "$ARCH" == "x86_64" ]; }; then
+    return 0
+  else
+    return 1
+  fi
+}

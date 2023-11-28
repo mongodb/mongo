@@ -162,6 +162,7 @@ variables:
   - func: "f_expansions_write"
   - func: "set up credentials"
   - func: "f_expansions_write"
+  - func: "get engflow creds"
 
 
 - &compile_task_group_template
@@ -451,6 +452,27 @@ functions:
       remote_file: ${mongo_venv}
       bucket: mciuploads
       extract_to: "."
+
+  "get engflow creds": &get_engflow_creds
+  - command: s3.get
+    params:
+      aws_key: ${engflow_key}
+      aws_secret: ${engflow_secret}
+      remote_file: engflow/engflow.key
+      bucket: serverengflow
+      local_file: "src/engflow.key"
+  - command: s3.get
+    params:
+      aws_key: ${engflow_key}
+      aws_secret: ${engflow_secret}
+      remote_file: engflow/engflow.cert
+      bucket: serverengflow
+      local_file: "src/engflow.cert"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/generate_evergreen_engflow_bazelrc.sh"
 
   "adjust venv": &adjust_venv
     command: subprocess.exec
@@ -2648,11 +2670,9 @@ tasks:
     vars:
       targets: >-
         build/fast/mongo/db/commands/libfsync_locked.a
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS=--config=local
         ICECC=
         --build-profile=fast
         --ninja=disabled
@@ -2682,11 +2702,9 @@ tasks:
     vars:
       targets: >-
         build/fast/mongo/db/commands/fsync_locked.lib
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS=--config=local
         ICECC=
         --build-profile=fast
         --ninja=disabled
@@ -2708,12 +2726,11 @@ tasks:
     vars:
       targets: >-
         build/fast/mongo/db/commands/libfsync_locked.a
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       # MacOS needs the sandbox_writable_path set to tmpdir to allow the bazel sandbox to write to /data/mci/{id}/tmp
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS="--config=local --subcommands --verbose_failures --sandbox_debug --sandbox_writable_path=$TMPDIR"
+        BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug --sandbox_writable_path=$TMPDIR"
         ICECC=
         --build-profile=fast
         --ninja=disabled
@@ -2754,11 +2771,9 @@ tasks:
     vars:
       targets: >-
         build/fast/third_party/unwind/libunwind.a
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS=--config=local
         ICECC=
         --build-profile=fast
         --ninja=disabled
@@ -2782,11 +2797,9 @@ tasks:
       targets: >-
         build/fast/mongo/platform/visibility_test1
       separate_debug: off
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS=--config=local
         ICECC=
         --build-profile=fast
         --ninja=disabled
@@ -2809,9 +2822,6 @@ tasks:
     vars:
       target: >-
         //src/mongo/platform:visibility_test1
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
-      args: >-
-        --config=local
 
 - name: run_bazel_program_windows
   tags: []
@@ -2825,11 +2835,9 @@ tasks:
     vars:
       target: >-
         //src/mongo/platform:visibility_test1
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       # TODO DEVPROD-2508 remove dbg flags when compilation_mode is synced with build_mode automatically
       # TODO DEVPROD-2513 remove "--copt /std:c++20" flag when toolchain sets this automatically
       args: >-
-        --config=local
         --compilation_mode=dbg
         --//bazel/config:build_mode=dbg
         --copt /std:c++20
@@ -3122,7 +3130,6 @@ tasks:
         --build-profile=fast
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS=--config=local
         CCACHE=
         ICECC=
   - *f_expansions_write
