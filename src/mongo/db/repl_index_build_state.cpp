@@ -198,6 +198,11 @@ bool ReplIndexBuildState::isAborted() const {
     return _indexBuildState.isAborted();
 }
 
+bool ReplIndexBuildState::isSettingUp() const {
+    stdx::unique_lock<Latch> lk(_mutex);
+    return _indexBuildState.isSettingUp();
+}
+
 std::string ReplIndexBuildState::getAbortReason() const {
     stdx::unique_lock<Latch> lk(_mutex);
     invariant(_indexBuildState.isAborted(),
