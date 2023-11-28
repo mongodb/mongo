@@ -78,6 +78,9 @@
 namespace mongo {
 namespace {
 
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+const int splitPoint = 0;
+
 auto initTargeterFullRange(const NamespaceString& nss, const ShardEndpoint& endpoint) {
     return MockNSTargeter(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 }
@@ -1914,9 +1917,6 @@ TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Update) {
     ASSERT_EQ(ErrorCodes::UnknownError, response.getErrDetailsAt(0).getStatus().code());
 }
 
-const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
-const int splitPoint = 0;
-
 class WriteWithoutShardKeyFixture : public RouterCatalogCacheTestFixture {
 public:
     void setUp() override {
@@ -2806,6 +2806,57 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneBroadcastNoMatchWithStaleDBEr
     batchOp.noteBatchResponse(*iterator->second, secondShardResp, nullptr);
 
     ASSERT(!batchOp.isFinished());
+}
+
+TEST_F(WriteWithoutShardKeyWithIdFixture,
+       UpdateOrDeleteInTransactionIsNotWriteWithoutShardKeyWithIdWriteType) {
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithIdWithoutShardKey", true};
+
+    std::vector<BatchedCommandRequest*> requests;
+
+    BatchedCommandRequest updateRequest([&] {
+        write_ops::UpdateCommandRequest updateOp(kNss);
+        // Op style update.
+        updateOp.setUpdates({buildUpdate(BSON("_id" << 1), BSON("$inc" << BSON("a" << 1)), false)});
+        return updateOp;
+    }());
+
+    BatchedCommandRequest deleteRequest([&] {
+        write_ops::DeleteCommandRequest deleteOp(kNss);
+        deleteOp.setDeletes({buildDelete(BSON("_id" << 1), false)});
+        return deleteOp;
+    }());
+
+    requests.emplace_back(&updateRequest);
+    requests.emplace_back(&deleteRequest);
+
+    makeCollectionRoutingInfo(kNss, _shardKeyPattern, nullptr, false, {BSON("x" << 0)}, {});
+    _criTargeter = CollectionRoutingInfoTargeter(getOpCtx(), kNss);
+
+    const TxnNumber kTxnNumber = 0;
+    getOpCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    getOpCtx()->setTxnNumber(kTxnNumber);
+    repl::ReadConcernArgs::get(getOpCtx()) =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    boost::optional<RouterOperationContextSession> _scopedSession(getOpCtx());
+
+    auto txnRouter = TransactionRouter::get(getOpCtx());
+    txnRouter.beginOrContinueTxn(
+        getOpCtx(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
+
+    for (auto request : requests) {
+        BatchWriteOp batchOp(getOpCtx(), *request);
+
+        std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+        auto status = batchOp.targetBatch(getCollectionRoutingInfoTargeter(), false, &targeted);
+        ASSERT_OK(status);
+        ASSERT_NE(status.getValue(), WriteType::WithoutShardKeyWithId);
+        // This should still be a broadcast
+        ASSERT_EQ(targeted.size(), 2);
+    }
+    _scopedSession.reset();
 }
 
 }  // namespace

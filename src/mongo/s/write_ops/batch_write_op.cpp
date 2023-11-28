@@ -445,7 +445,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             };
 
             if (!isMultiWrite && isNonTargetedWriteWithoutShardKeyWithExactId &&
-                !opCtx->inMultiDocumentTransaction() && batchMap.empty()) {
+                !TransactionRouter::get(opCtx) && batchMap.empty()) {
                 writeType = WriteType::WithoutShardKeyWithId;
                 writeOp.setWriteType(writeType);
             }
