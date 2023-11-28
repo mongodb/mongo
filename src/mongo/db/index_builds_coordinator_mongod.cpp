@@ -101,6 +101,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterAcquiringIndexBuildSlot);
+MONGO_FAIL_POINT_DEFINE(hangAfterRegisteringIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangBeforeInitializingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterSignalPrimaryForCommitReadiness);
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningIndexBuild);
@@ -362,6 +363,16 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         hangAfterAcquiringIndexBuildSlot.pauseWhileSet();
     }
 
+    ScopeGuard unregisterUnscheduledIndexBuild([&] {
+        auto replIndexBuildState = _getIndexBuild(buildUUID);
+        if (replIndexBuildState.isOK()) {
+            auto replState = invariant(replIndexBuildState);
+            if (replState->isSettingUp()) {
+                activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+            }
+        }
+    });
+
     if (indexBuildOptions.applicationMode == ApplicationMode::kStartupRepair) {
         // Two phase index build recovery goes though a different set-up procedure because we will
         // either resume the index build or the original index will be dropped first.
@@ -378,6 +389,11 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             return status;
         }
     } else {
+        if (MONGO_unlikely(hangAfterRegisteringIndexBuild.shouldFail())) {
+            LOGV2(8296700, "Hanging due to hangAfterRegisteringIndexBuild");
+            hangAfterRegisteringIndexBuild.pauseWhileSet(opCtx);
+        }
+
         auto statusWithOptionalResult =
             _filterSpecsAndRegisterBuild(opCtx, dbName, collectionUUID, specs, buildUUID, protocol);
         if (!statusWithOptionalResult.isOK()) {
@@ -400,8 +416,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                       "error"_attr = migrationStatus,
                       "buildUUID"_attr = buildUUID,
                       "collectionUUID"_attr = collectionUUID);
-                activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager,
-                                                       invariant(_getIndexBuild(buildUUID)));
                 return migrationStatus;
             }
 
@@ -412,8 +426,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                       "error"_attr = buildBlockedStatus,
                       "buildUUID"_attr = buildUUID,
                       "collectionUUID"_attr = collectionUUID);
-                activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager,
-                                                       invariant(_getIndexBuild(buildUUID)));
                 return buildBlockedStatus;
             }
         }
@@ -450,6 +462,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     // The thread pool task will be responsible for signalling the condition variable when the index
     // build thread is done running.
     onScopeExitGuard.dismiss();
+    unregisterUnscheduledIndexBuild.dismiss();
     _threadPool.schedule([this,
                           buildUUID,
                           dbName,
