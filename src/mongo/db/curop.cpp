@@ -88,6 +88,7 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -1855,10 +1856,19 @@ std::string OpDebug::getCollectionType(const NamespaceString& nss) const {
         const std::vector<NamespaceString>& dependencies = dependencyItr->second.first;
 
         auto nssIterInDeps = std::find(dependencies.begin(), dependencies.end(), nss);
-        tassert(7589000,
-                str::stream() << "The view with ns: " << nss.toStringForErrorMsg()
-                              << ", should have a valid dependency.",
-                nssIterInDeps != (dependencies.end() - 1) && nssIterInDeps != dependencies.end());
+
+        if (TestingProctor::instance().isEnabled()) {
+            invariant(nssIterInDeps != (dependencies.end() - 1) &&
+                          nssIterInDeps != dependencies.end(),
+                      str::stream() << "The view with ns: " << nss.toStringForErrorMsg()
+                                    << ", should have a valid dependency.");
+        } else {
+            tassert(7589000,
+                    str::stream() << "The view with ns: " << nss.toStringForErrorMsg()
+                                  << ", should have a valid dependency.",
+                    nssIterInDeps != (dependencies.end() - 1) &&
+                        nssIterInDeps != dependencies.end());
+        }
 
         // The underlying namespace for the view/timeseries collection is the next namespace in the
         // dependency chain. If the view depends on a timeseries buckets collection, then it is a
