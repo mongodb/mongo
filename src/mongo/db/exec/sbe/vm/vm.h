@@ -1770,12 +1770,12 @@ private:
      * directly passed in as C++ parameters -- instead the computed input values are passed via
      * the VM's stack.)
      */
-    void produceBsonObject(const MakeObjSpec* spec,
-                           MakeObjStackOffsets stackOffsets,
-                           const CodeFragment* code,
-                           UniqueBSONObjBuilder& bob,
-                           value::TypeTags rootTag,
-                           value::Value rootVal) {
+    MONGO_COMPILER_ALWAYS_INLINE void produceBsonObject(const MakeObjSpec* spec,
+                                                        MakeObjStackOffsets stackOffsets,
+                                                        const CodeFragment* code,
+                                                        UniqueBSONObjBuilder& bob,
+                                                        value::TypeTags rootTag,
+                                                        value::Value rootVal) {
         using TypeTags = value::TypeTags;
 
         const auto& fields = spec->fields;
