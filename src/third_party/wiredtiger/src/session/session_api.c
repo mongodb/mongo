@@ -475,6 +475,18 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
     }
 
     /*
+     * FIXME-WT-12021 Replace this debug option with the corresponding failpoint once this project
+     * is completed.
+     */
+    if ((ret = __wt_config_getones(
+           session, config, "debug.checkpoint_fail_before_turtle_update", &cval)) == 0) {
+        if (cval.val)
+            F_SET(session, WT_SESSION_DEBUG_CHECKPOINT_FAIL_BEFORE_TURTLE_UPDATE);
+        else
+            F_CLR(session, WT_SESSION_DEBUG_CHECKPOINT_FAIL_BEFORE_TURTLE_UPDATE);
+    }
+
+    /*
      * There is a session debug configuration which can be set to evict pages as they are released
      * and no longer needed.
      */

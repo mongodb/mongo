@@ -56,6 +56,8 @@ static const uint8_t confchk_WT_CONNECTION_load_extension_jump[WT_CONFIG_JUMP_TA
   1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
 
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_open_session_debug_subconfigs[] = {
+  {"checkpoint_fail_before_turtle_update", "boolean", NULL, NULL, NULL, 0, NULL,
+    WT_CONFIG_COMPILED_TYPE_BOOLEAN, INT64_MIN, INT64_MAX, NULL},
   {"release_evict_page", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN,
     INT64_MIN, INT64_MAX, NULL},
   {NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 0, 0, NULL}};
@@ -65,7 +67,7 @@ static const uint8_t
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2};
 
 static const char *confchk_isolation_choices[] = {
   "read-uncommitted", "read-committed", "snapshot", NULL};
@@ -87,7 +89,7 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_open_session[] = {
     INT64_MIN, INT64_MAX, NULL},
   {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_INT, 0,
     INT64_MAX, NULL},
-  {"debug", "category", NULL, NULL, confchk_WT_CONNECTION_open_session_debug_subconfigs, 1,
+  {"debug", "category", NULL, NULL, confchk_WT_CONNECTION_open_session_debug_subconfigs, 2,
     confchk_WT_CONNECTION_open_session_debug_subconfigs_jump, WT_CONFIG_COMPILED_TYPE_CATEGORY,
     INT64_MIN, INT64_MAX, NULL},
   {"ignore_cache_size", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN,
@@ -1262,7 +1264,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_reconfigure[] = {
     INT64_MIN, INT64_MAX, NULL},
   {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_INT, 0,
     INT64_MAX, NULL},
-  {"debug", "category", NULL, NULL, confchk_WT_CONNECTION_open_session_debug_subconfigs, 1,
+  {"debug", "category", NULL, NULL, confchk_WT_CONNECTION_open_session_debug_subconfigs, 2,
     confchk_WT_CONNECTION_open_session_debug_subconfigs_jump, WT_CONFIG_COMPILED_TYPE_CATEGORY,
     INT64_MIN, INT64_MAX, NULL},
   {"ignore_cache_size", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN,
@@ -3288,7 +3290,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     confchk_WT_CONNECTION_load_extension, 4, confchk_WT_CONNECTION_load_extension_jump},
   {"WT_CONNECTION.open_session",
     "cache_cursors=true,cache_max_wait_ms=0,"
-    "debug=(release_evict_page=false),ignore_cache_size=false,"
+    "debug=(checkpoint_fail_before_turtle_update=false,"
+    "release_evict_page=false),ignore_cache_size=false,"
     "isolation=snapshot,prefetch=(enabled=false)",
     confchk_WT_CONNECTION_open_session, 6, confchk_WT_CONNECTION_open_session_jump},
   {"WT_CONNECTION.query_timestamp", "get=all_durable", confchk_WT_CONNECTION_query_timestamp, 1,
@@ -3414,7 +3417,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     confchk_WT_SESSION_query_timestamp_jump},
   {"WT_SESSION.reconfigure",
     "cache_cursors=true,cache_max_wait_ms=0,"
-    "debug=(release_evict_page=false),ignore_cache_size=false,"
+    "debug=(checkpoint_fail_before_turtle_update=false,"
+    "release_evict_page=false),ignore_cache_size=false,"
     "isolation=snapshot,prefetch=(enabled=false)",
     confchk_WT_SESSION_reconfigure, 6, confchk_WT_SESSION_reconfigure_jump},
   {"WT_SESSION.rename", "", NULL, 0, NULL}, {"WT_SESSION.reset", "", NULL, 0, NULL},

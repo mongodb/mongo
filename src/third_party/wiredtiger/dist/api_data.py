@@ -1105,6 +1105,9 @@ session_config = [
         configure debug specific behavior on a session. Generally only used for internal testing
         purposes.''',
         type='category', subconfig=[
+        Config('checkpoint_fail_before_turtle_update', 'false', r'''
+            Fail before writing a turtle file at the end of a checkpoint.''',
+            type='boolean'),
         Config('release_evict_page', 'false', r'''
             Configure the session to evict the page when it is released and no longer needed.''',
             type='boolean'),

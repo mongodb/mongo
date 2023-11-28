@@ -503,6 +503,12 @@ void op_cursor(void *);
 void op_drop(void *);
 bool testutil_is_flag_set(const char *);
 bool testutil_is_dir_store(TEST_OPTS *);
+void testutil_backup_create_full(
+  WT_CONNECTION *, const char *, const char *, const char *, bool, uint32_t, int *);
+void testutil_backup_create_incremental(WT_CONNECTION *, const char *, const char *, const char *,
+  const char *, const char *, bool, int *, int *, int *);
+void testutil_backup_force_stop(WT_SESSION *);
+void testutil_backup_force_stop_conn(WT_CONNECTION *);
 void testutil_build_dir(TEST_OPTS *, char *, int);
 void testutil_clean_test_artifacts(const char *);
 void testutil_cleanup(TEST_OPTS *);
