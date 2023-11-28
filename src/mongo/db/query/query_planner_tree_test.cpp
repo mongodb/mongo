@@ -32,6 +32,7 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -2881,6 +2882,89 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationApplysToEachOrInTree) {
         "  ]}}"
         " }}"
         "]}}");
+}
+
+// This test was designed to reproduce SERVER-83091, a case in which an implementation error in the
+// lockstep $or enumeration algorithm could result in an infinite loop. This could happen only if
+// there were nested $or nodes and the inner $or hit the maximum number of plans that it is willing
+// to generate.
+TEST_F(QueryPlannerTest, LockstepOrEnumerationWithNestedOrWhereInnerOrHitsEnumerationLimit) {
+    // Disable match expression optimixation, since when enabled it will collapse nested $or nodes
+    // into a single $or.
+    FailPointEnableBlock failPoint("disableMatchExpressionOptimization");
+
+    // The repro depends on the inner $or hitting its enumeration limit. The original problem from
+    // SERVER-83091 can be reproduced with a simpler query if we lower the limit on the number of
+    // plans that the 'PlanEnumerator' is allowed to generate for any $or node.
+    RAIIServerParameterControllerForTest maxOrPlansController(
+        "internalQueryEnumerationMaxOrSolutions", 3);
+
+    params.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+
+    runQueryAsCommand(fromjson(R"(
+        {find: 'testns', filter: {
+            $or: [
+                {$or: [
+                    {a: 1, b: 2},
+                    {a: 3}
+                ]},
+                {c: 4}
+            ]
+        }})"));
+
+    // There are two plans, the only difference between the two being whether the nested $and
+    // {a: 1, b: 2} uses the index on "a" or the index on "b".
+    assertNumSolutions(2U);
+
+    // Plan using the {a: 1} index for the innermost conjunction.
+    assertSolutionExists(R"(
+    {
+        fetch: {
+            node: {
+                or: {
+                    nodes: [
+                        {
+                            or: {
+                                nodes: [
+                                    {fetch: {filter: {b: 2}, node: {ixscan: {pattern: {a: 1}}}}},
+                                    {ixscan: {pattern: {a: 1}}}
+                                ]
+                            }
+                        },
+                        {ixscan: {pattern: {c: 1}}}
+                    ]
+                }
+            }
+        }
+    }
+    )");
+
+    // Alternative plan using the {b: 1} index for the innermost conjunction.
+    assertSolutionExists(R"(
+    {
+        fetch: {
+            node: {
+                or: {
+                    nodes: [
+                        {
+                            or: {
+                                nodes: [
+                                    {fetch: {filter: {a: 1}, node: {ixscan: {pattern: {b: 1}}}}},
+                                    {ixscan: {pattern: {a: 1}}}
+                                ]
+                            }
+                        },
+                        {ixscan: {pattern: {c: 1}}}
+                    ]
+                }
+            }
+        }
+    }
+    )");
 }
 
 TEST_F(QueryPlannerTest, NoOrSolutionsIfMaxOrSolutionsIsZero) {
