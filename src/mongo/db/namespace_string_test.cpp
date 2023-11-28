@@ -127,6 +127,32 @@ TEST(NamespaceStringTest, IsCollectionlessCursorNamespace) {
     ASSERT_FALSE(NamespaceString{"$cmd.listCollections"}.isCollectionlessCursorNamespace());
 }
 
+TEST(NamespaceStringTest, IsLegalClientSystemNamespace) {
+    const auto& currentFCV = serverGlobalParams.featureCompatibility;
+
+    // Generally speaking *.system.* collections are not valid client namespaces,
+    ASSERT_FALSE(NamespaceString{"admin.system.randomness"}.isLegalClientSystemNS(currentFCV));
+    ASSERT_FALSE(NamespaceString{"test.system.randomness"}.isLegalClientSystemNS(currentFCV));
+
+    // *.system.buckets.* is permitted, provided the collection name is valid.
+    ASSERT_TRUE(NamespaceString{"test.system.buckets.1234"}.isLegalClientSystemNS(currentFCV));
+    ASSERT_TRUE(NamespaceString{"test.system.buckets.abcde"}.isLegalClientSystemNS(currentFCV));
+
+    // admin.system.new_users may have been created during a migration from MongoDB 2.4-2.6
+    // It is no longer used by mongod, however clients with adequate permissions should still
+    // be able to drop it, perform backups, etc..
+    ASSERT_TRUE(NamespaceString{"admin.system.new_users"}.isLegalClientSystemNS(currentFCV));
+
+    // *.system.users is always permitted because in 2.4 and earlier's auth schema,
+    // users were stored in an individual database's db.system.users collection.
+    ASSERT_TRUE(NamespaceString{"admin.system.users"}.isLegalClientSystemNS(currentFCV));
+    ASSERT_TRUE(NamespaceString{"test.system.users"}.isLegalClientSystemNS(currentFCV));
+
+    // By contrast, .system.roles is only allowed in the admin database.
+    ASSERT_TRUE(NamespaceString{"admin.system.roles"}.isLegalClientSystemNS(currentFCV));
+    ASSERT_FALSE(NamespaceString{"test.system.roles"}.isLegalClientSystemNS(currentFCV));
+}
+
 TEST(NamespaceStringTest, IsDropPendingNamespace) {
     ASSERT_TRUE(NamespaceString{"test.system.drop.0i0t-1.foo"}.isDropPendingNamespace());
     ASSERT_TRUE(NamespaceString{"test.system.drop.1234567i8t9.foo"}.isDropPendingNamespace());

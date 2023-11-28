@@ -158,6 +158,8 @@ bool NamespaceString::isLegalClientSystemNS(
             return true;
         if (coll() == "system.backup_users")
             return true;
+        if (coll() == "system.new_users")
+            return true;
     } else if (db() == kConfigDb) {
         if (coll() == "system.sessions")
             return true;
