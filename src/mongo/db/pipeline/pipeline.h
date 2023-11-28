@@ -325,10 +325,10 @@ public:
     bool needsAllShardHosts() const;
 
     /**
-     * Returns true if the pipeline can run on mongoS, but is not obliged to; that is, it can run
-     * either on mongoS or on a shard.
+     * Returns Status::OK() if the pipeline can run on mongoS, but is not obliged to; that is, it
+     * can run either on mongoS or on a shard.
      */
-    bool canRunOnMongos() const;
+    Status canRunOnMongos() const;
 
     /**
      * Returns true if this pipeline must only run on mongoS. Can be called on unsplit or merge
@@ -521,12 +521,6 @@ private:
      * in optimizePipeline().
      */
     void stitch();
-
-    /**
-     * Returns Status::OK if the pipeline can run on mongoS, or an error with a message explaining
-     * why it cannot.
-     */
-    Status _pipelineCanRunOnMongoS() const;
 
     /**
      * Asserts whether operation contexts associated with this pipeline are consistent across

@@ -273,7 +273,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     // First, check whether we can merge on the mongoS. If the merge pipeline MUST run on mongoS,
     // then ignore the internalQueryProhibitMergingOnMongoS parameter.
     if (mergePipeline->requiredToRunOnMongos() ||
-        (!internalQueryProhibitMergingOnMongoS.load() && mergePipeline->canRunOnMongos())) {
+        (!internalQueryProhibitMergingOnMongoS.load() && mergePipeline->canRunOnMongos().isOK())) {
         return runPipelineOnMongoS(namespaces,
                                    batchSize,
                                    std::move(shardDispatchResults.splitPipeline->mergePipeline),
@@ -698,7 +698,9 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
 
     // We should never receive a pipeline which cannot run on mongoS.
     invariant(!expCtx->explain);
-    invariant(pipeline->canRunOnMongos());
+    uassertStatusOKWithContext(pipeline->canRunOnMongos(),
+                               "pipeline is required to run on mongoS, but cannot");
+
 
     // Verify that the first stage can produce input for the remainder of the pipeline.
     uassert(ErrorCodes::IllegalOperation,
