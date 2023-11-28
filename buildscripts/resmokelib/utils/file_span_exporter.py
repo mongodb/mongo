@@ -15,10 +15,9 @@ logger = getLogger(__name__)
 
 class FileSpanExporter(SpanExporter):
     """
-    FileSpanExporter is an implementation of :class:`SpanExporter` that sends spans to a file.
-
-    This class is responsible for a file handle.
-    It correctly closes the file handle on shutdown.
+    FileSpanExporter is an implementation of :class:`SpanExporter` that sends spans to files in directory.
+    
+    These files are in JSON format by default.
     """
 
     def __init__(

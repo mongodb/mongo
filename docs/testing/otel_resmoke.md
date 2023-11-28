@@ -1,5 +1,5 @@
 # Open telemetry (OTel) in resmoke
-OTel is one of two systems we use to capture metrics from resmoke. For mongo-tooling-metrics please see the documentation [here](README.md)
+OTel is one of two systems we use to capture metrics from resmoke. For mongo-tooling-metrics please see the documentation [here](README.md).
 
 ## What Do We Capture
 Using OTel we capture the following things
@@ -13,14 +13,14 @@ To see this visually navigate to the [resmoke dataset](https://ui.honeycomb.io/m
 ## A look at source code
 
 ### Configuration
-The bulk of configuration is done in the 
-`_set_up_tracing(...)` in [configure_resmoke.py#L162](https://github.com/10gen/mongo/blob/6d36ac392086df85844870eef1d773f35020896c/buildscripts/resmokelib/configure_resmoke.py#L162). This is documented as part of `_set_up_tracing(...)` method linked earlier.
+The bulk of configuration is done in the
+`_set_up_tracing(...)` method in [configure_resmoke.py#L164](https://github.com/10gen/mongo/blob/976ce50f6134789e73c639848b35f10040f0ff4a/buildscripts/resmokelib/configure_resmoke.py#L164). This method includes documentation on how it works.
 
 ## BatchedBaggageSpanProcessor
-See documentation [batched_baggage_span_processor.py#L8](https://github.com/mongodb/mongo/blob/9b85dd2a7feac4e21f41ebbd5e556d3fcda8d707/buildscripts/resmokelib/utils/batched_baggage_span_processor.py#L8)
+See documentation [batched_baggage_span_processor.py#L8](https://github.com/mongodb/mongo/blob/976ce50f6134789e73c639848b35f10040f0ff4a/buildscripts/resmokelib/utils/batched_baggage_span_processor.py#L8)
 
 ## FileSpanExporter
-See documentation [file_span_exporter.py#L11](https://github.com/10gen/mongo/blob/6d36ac392086df85844870eef1d773f35020896c/buildscripts/resmokelib/utils/file_span_exporter.py#L11)
+See documentation [file_span_exporter.py#L16](https://github.com/10gen/mongo/blob/976ce50f6134789e73c639848b35f10040f0ff4a/buildscripts/resmokelib/utils/file_span_exporter.py#L16)
 
 ## Capturing Data
 We mostly capture data by using a decorator on methods. Example taken from [job.py#L200](https://github.com/10gen/mongo/blob/6d36ac392086df85844870eef1d773f35020896c/buildscripts/resmokelib/testing/job.py#L200)
