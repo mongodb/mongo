@@ -6637,6 +6637,7 @@ tasks:
     - func: "generate resmoke tasks"
       vars:
         use_large_distro: "true"
+        resmoke_jobs_max: 1
 
 - <<: *gen_task_template
   name: shard_split_jscore_passthrough_gen
