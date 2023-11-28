@@ -162,6 +162,13 @@ TEST_F(NamespaceStringTest, IsCollectionlessCursorNamespace) {
 }
 
 TEST_F(NamespaceStringTest, IsLegalClientSystemNamespace) {
+    // Generally speaking *.system.* collections are not valid client namespaces,
+    ASSERT_FALSE(
+        makeNamespaceString(boost::none, "admin.system.randomness").isLegalClientSystemNS());
+    ASSERT_FALSE(
+        makeNamespaceString(boost::none, "test.system.randomness").isLegalClientSystemNS());
+
+    // *.system.buckets.* is permitted, provided the collection name is valid.
     ASSERT_TRUE(
         makeNamespaceString(boost::none, "test.system.buckets.1234").isLegalClientSystemNS());
     ASSERT_TRUE(
@@ -171,6 +178,20 @@ TEST_F(NamespaceStringTest, IsLegalClientSystemNamespace) {
     ASSERT_FALSE(
         makeNamespaceString(boost::none, "test.system.buckets.a234$").isLegalClientSystemNS());
     ASSERT_FALSE(makeNamespaceString(boost::none, "test.system.buckets.").isLegalClientSystemNS());
+
+    // admin.system.new_users may have been created during a migration from MongoDB 2.4-2.6
+    // It is no longer used by mongod, however clients with adequate permissions should still
+    // be able to drop it, perform backups, etc..
+    ASSERT_TRUE(makeNamespaceString(boost::none, "admin.system.new_users").isLegalClientSystemNS());
+
+    // *.system.users is always permitted because in 2.4 and earlier's auth schema,
+    // users were stored in an individual database's db.system.users collection.
+    ASSERT_TRUE(makeNamespaceString(boost::none, "admin.system.users").isLegalClientSystemNS());
+    ASSERT_TRUE(makeNamespaceString(boost::none, "test.system.users").isLegalClientSystemNS());
+
+    // By contrast, .system.roles is only allowed in the admin database.
+    ASSERT_TRUE(makeNamespaceString(boost::none, "admin.system.roles").isLegalClientSystemNS());
+    ASSERT_FALSE(makeNamespaceString(boost::none, "test.system.roles").isLegalClientSystemNS());
 }
 
 TEST_F(NamespaceStringTest, IsDropPendingNamespace) {
