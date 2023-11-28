@@ -748,4 +748,6 @@ last-lts:
     ticket: SERVER-79049
   - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
     ticket: SERVER-86253
+  - test_file: jstests/replsets/log_wt_stats_during_secondary_oplog_application.js
+    ticket: SERVER-78509
   suites: null

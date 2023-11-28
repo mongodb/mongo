@@ -30,6 +30,32 @@ checkLog = (function() {
      * is found in the logs. Note: this function does not throw an exception, so the return
      * value should not be ignored.
      */
+    const getLogMessage = function(conn, msg) {
+        const logMessages = getGlobalLog(conn);
+        if (logMessages === null) {
+            return null;
+        }
+        if (msg instanceof RegExp) {
+            for (let logMsg of logMessages) {
+                if (logMsg.search(msg) != -1) {
+                    return logMsg;
+                }
+            }
+        } else {
+            for (let logMsg of logMessages) {
+                if (logMsg.includes(msg)) {
+                    return logMsg;
+                }
+            }
+        }
+        return null;
+    };
+
+    /*
+     * Calls the 'getLog' function on the provided connection 'conn' to see if the provided msg
+     * is found in the logs. Note: this function does not throw an exception, so the return
+     * value should not be ignored.
+     */
     const checkContainsOnce = function(conn, msg) {
         const logMessages = getGlobalLog(conn);
         if (logMessages === null) {
@@ -182,6 +208,29 @@ checkLog = (function() {
             timeoutMillis,
             retryIntervalMS,
             {runHangAnalyzer: false});
+    };
+
+    /*
+     * Calls the 'getLog' function at regular intervals on the provided connection 'conn' until
+     * the provided 'msg' is found in the logs and returned, or it times out. Throws an exception on
+     * timeout.
+     */
+    let containsLog = function(conn, msg, timeoutMillis = 5 * 60 * 1000, retryIntervalMS = 300) {
+        // Don't run the hang analyzer because we don't expect contains() to always succeed.
+        let logMsg = null;
+        assert.soon(
+            function() {
+                logMsg = getLogMessage(conn, msg);
+                if (logMsg) {
+                    return true;
+                }
+                return false;
+            },
+            'Could not find log entries containing the following message: ' + msg,
+            timeoutMillis,
+            retryIntervalMS,
+            {runHangAnalyzer: false});
+        return logMsg;
     };
 
     let containsJson = function(conn, id, attrsDict, timeoutMillis = 5 * 60 * 1000) {
@@ -423,12 +472,14 @@ checkLog = (function() {
 
     return {
         getGlobalLog: getGlobalLog,
+        getLogMessage: getLogMessage,
         checkContainsOnce: checkContainsOnce,
         checkContainsOnceJson: checkContainsOnceJson,
         checkContainsWithCountJson: checkContainsWithCountJson,
         checkContainsWithAtLeastCountJson: checkContainsWithAtLeastCountJson,
         checkContainsOnceJsonStringMatch: checkContainsOnceJsonStringMatch,
         contains: contains,
+        containsLog: containsLog,
         containsJson: containsJson,
         containsRelaxedJson: containsRelaxedJson,
         containsWithCount: containsWithCount,
