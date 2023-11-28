@@ -253,7 +253,10 @@ public:
                                  const BSONObj& cmdObj) const final {
         auto* authzSession = AuthorizationSession::get(opCtx->getClient());
         const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
-        IDLParserContext ctxt("ListCollection", apiStrict, dbName.tenantId());
+        IDLParserContext ctxt("ListCollection",
+                              apiStrict,
+                              auth::ValidatedTenancyScope::get(opCtx),
+                              dbName.tenantId());
         auto request = ListCollections::parse(ctxt, cmdObj);
         return authzSession->checkAuthorizedToListCollections(request).getStatus();
     }

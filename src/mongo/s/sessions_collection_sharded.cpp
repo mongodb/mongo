@@ -194,11 +194,12 @@ LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
         toSend =
             OpMsgRequest::fromDBAndBody(NamespaceString::kLogicalSessionsNamespace.dbName(), toSend)
                 .body;
-        auto findCommand = query_request_helper::makeFromFindCommand(
-            toSend,
-            static_cast<const NamespaceString&>(NamespaceString::kLogicalSessionsNamespace),
-            SerializationContext::stateDefault(),
-            apiStrict);
+        auto findCommand =
+            query_request_helper::makeFromFindCommand(toSend,
+                                                      auth::ValidatedTenancyScope::get(opCtx),
+                                                      boost::none,
+                                                      SerializationContext::stateDefault(),
+                                                      apiStrict);
         auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = makeExpressionContext(opCtx, *findCommand),
             .parsedFind = ParsedFindCommandParams{

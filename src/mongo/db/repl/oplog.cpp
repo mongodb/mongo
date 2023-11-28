@@ -1021,11 +1021,16 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& entry = *op;
           const auto& cmd = entry.getObject();
           auto opMsg = OpMsgRequestBuilder::create(entry.getNss().dbName(), cmd);
-
+          const auto tenantId = entry.getNss().tenantId();
+          const auto vts = tenantId
+              ? boost::make_optional(auth::ValidatedTenancyScope(
+                    *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+              : boost::none;
           auto collModCmd =
               CollMod::parse(IDLParserContext("collModOplogEntry",
                                               false /* apiStrict */,
-                                              entry.getNss().tenantId(),
+                                              vts,
+                                              tenantId,
                                               SerializationContext::stateStorageRequest()),
                              opMsg.body);
           const auto nssOrUUID([&collModCmd, &entry, mode]() -> NamespaceStringOrUUID {
@@ -1128,11 +1133,13 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
           const auto& entry = *op;
+          const auto tenantId = entry.getNss().tenantId();
+          const auto vts = tenantId
+              ? boost::make_optional(auth::ValidatedTenancyScope(
+                    *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+              : boost::none;
           auto importEntry = mongo::ImportCollectionOplogEntry::parse(
-              IDLParserContext("importCollectionOplogEntry",
-                               false /* apiStrict */,
-                               entry.getNss().tenantId(),
-                               SerializationContext::stateStorageRequest()),
+              IDLParserContext("importCollectionOplogEntry", false /* apiStrict */, vts, tenantId),
               entry.getObject());
           applyImportCollection(opCtx,
                                 importEntry.getImportUUID(),

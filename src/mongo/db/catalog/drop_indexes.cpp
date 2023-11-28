@@ -630,6 +630,7 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
     auto cmdObjWithDb = bob.obj();
     auto parsed = DropIndexes::parse(IDLParserContext{"dropIndexes",
                                                       false /* apiStrict */,
+                                                      auth::ValidatedTenancyScope::get(opCtx),
                                                       nss.tenantId(),
                                                       SerializationContext::stateStorageRequest()},
                                      cmdObjWithDb);

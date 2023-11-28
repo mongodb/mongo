@@ -111,8 +111,13 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(
     if (spec.type() == BSONType::String) {
         targetNss = NamespaceStringUtil::deserialize(defaultDb, spec.valueStringData());
     } else {
+        const auto tenantId = defaultDb.tenantId();
+        const auto vts = tenantId
+            ? boost::make_optional(auth::ValidatedTenancyScope(
+                  *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+            : boost::none;
         mergeSpec = DocumentSourceMergeSpec::parse(
-            IDLParserContext(kStageName, false /* apiStrict */, defaultDb.tenantId(), sc),
+            IDLParserContext(kStageName, false /* apiStrict */, vts, tenantId, sc),
             spec.embeddedObject());
         targetNss = mergeSpec.getTargetNss();
         if (targetNss.coll().empty()) {

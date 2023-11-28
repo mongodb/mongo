@@ -77,11 +77,16 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
             specElem.type() == BSONType::Object);
 
     // TODO SERVER-77056: add assertion to validate pExpCtx->serializationCtxt != stateDefault()
-
+    const auto tenantId = pExpCtx->ns.tenantId();
+    const auto vts = tenantId
+        ? boost::make_optional(auth::ValidatedTenancyScope(
+              *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+        : boost::none;
     auto spec = DocumentSourceCollStatsSpec::parse(
         IDLParserContext(kStageName,
                          false /* apiStrict */,
-                         pExpCtx->ns.tenantId(),
+                         vts,
+                         tenantId,
                          SerializationContext::stateCommandReply(pExpCtx->serializationCtxt)),
         specElem.embeddedObject());
 

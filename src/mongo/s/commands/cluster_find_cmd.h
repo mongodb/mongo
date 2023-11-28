@@ -288,7 +288,8 @@ public:
             OperationContext* opCtx, NamespaceString nss, BSONObj cmdObj) {
             auto findCommand = query_request_helper::makeFromFindCommand(
                 std::move(cmdObj),
-                std::move(nss),
+                auth::ValidatedTenancyScope::get(opCtx),
+                nss.tenantId(),
                 SerializationContext::stateDefault(),
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
             if (!findCommand->getReadConcern()) {

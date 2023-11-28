@@ -59,10 +59,13 @@ RepresentativeQueryInfo createRepresentativeInfoFind(
     const QueryInstance& queryInstance,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::optional<TenantId>& tenantId) {
-    auto findCommandRequest = std::make_unique<FindCommandRequest>(FindCommandRequest::parse(
-        IDLParserContext(
-            "findCommandRequest", false /* apiStrict */, tenantId, kSerializationContext),
-        queryInstance));
+    auto findCommandRequest = std::make_unique<FindCommandRequest>(
+        FindCommandRequest::parse(IDLParserContext("findCommandRequest",
+                                                   false /* apiStrict */,
+                                                   auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                                                   tenantId,
+                                                   kSerializationContext),
+                                  queryInstance));
 
     // Populate encryption information.
     auto& encryptionInformation = findCommandRequest->getEncryptionInformation();
@@ -104,8 +107,11 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(
     const boost::optional<TenantId>& tenantId) {
     auto distinctCommandRequest =
         std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
-            IDLParserContext(
-                "distinctCommandRequest", false /* apiStrict */, tenantId, kSerializationContext),
+            IDLParserContext("distinctCommandRequest",
+                             false /* apiStrict */,
+                             auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                             tenantId,
+                             kSerializationContext),
             queryInstance));
 
     auto parsedDistinctCommand =
@@ -145,8 +151,11 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::optional<TenantId>& tenantId) {
     auto aggregateCommandRequest = AggregateCommandRequest::parse(
-        IDLParserContext(
-            "aggregateCommandRequest", false /* apiStrict */, tenantId, kSerializationContext),
+        IDLParserContext("aggregateCommandRequest",
+                         false /* apiStrict */,
+                         auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                         tenantId,
+                         kSerializationContext),
         queryInstance);
     // Add the aggregate command request to the expression context for the parsed pipeline
     // to be able to get the involved namespaces.

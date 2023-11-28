@@ -89,29 +89,4 @@ void appendNamespaceShape(BSONObjBuilder& bob,
     bob.append("coll", opts.serializeIdentifier(nss.coll()));
 }
 
-NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt,
-                                          const SerializationContext& serializationContext) {
-    tassert(7632900, "cmdNs must be an object.", cmdNsElt.type() == BSONType::Object);
-    // cmdNs is internally built from structured requests and can be deserialized as storage.
-    auto cmdNs = query_shape::CommandNamespace::parse(
-        IDLParserContext("cmdNs", false /*apiStrict*/, boost::none), cmdNsElt.embeddedObject());
-
-    boost::optional<TenantId> tenantId = cmdNs.getTenantId().map(TenantId::parseFromString);
-
-    if (cmdNs.getColl().has_value()) {
-        tassert(7632903,
-                "Exactly one of 'uuid' and 'coll' can be defined.",
-                !cmdNs.getUuid().has_value());
-        return NamespaceStringUtil::deserialize(
-            tenantId, cmdNs.getDb(), cmdNs.getColl().value(), SerializationContext::stateDefault());
-    } else {
-        tassert(7632904,
-                "Exactly one of 'uuid' and 'coll' can be defined.",
-                !cmdNs.getColl().has_value());
-        UUID uuid = uassertStatusOK(UUID::parse(cmdNs.getUuid().value().toString()));
-        return NamespaceStringOrUUID(
-            DatabaseNameUtil::deserialize(tenantId, cmdNs.getDb(), serializationContext), uuid);
-    }
-}
-
 }  // namespace mongo::shape_helpers

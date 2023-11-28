@@ -93,10 +93,12 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand);
  * Returns a heap allocated FindCommandRequest on success or an error if 'cmdObj' is not well
  * formed.
  */
-std::unique_ptr<FindCommandRequest> makeFromFindCommand(const BSONObj& cmdObj,
-                                                        boost::optional<NamespaceString> nss,
-                                                        const SerializationContext& sc,
-                                                        bool apiStrict);
+std::unique_ptr<FindCommandRequest> makeFromFindCommand(
+    const BSONObj& cmdObj,
+    const boost::optional<auth::ValidatedTenancyScope>& vts,
+    const boost::optional<TenantId>& tenantId,
+    const SerializationContext& sc,
+    bool apiStrict);
 
 std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
     const BSONObj& cmdObj,
@@ -150,6 +152,7 @@ TailableModeEnum getTailableMode(const FindCommandRequest& findCommand);
  * Asserts whether the cursor response adhere to the format defined in IDL.
  */
 void validateCursorResponse(const BSONObj& outputAsBson,
+                            const boost::optional<auth::ValidatedTenancyScope>& vts,
                             boost::optional<TenantId> tenantId,
                             const SerializationContext& serializationContext);
 

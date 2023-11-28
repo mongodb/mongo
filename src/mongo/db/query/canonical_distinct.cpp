@@ -275,11 +275,13 @@ CanonicalDistinct CanonicalDistinct::parseFromBSON(
     const auto serializationContext = vts != boost::none
         ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
         : SerializationContext::stateCommandRequest();
-
-    auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
-        IDLParserContext(
-            "distinctCommandRequest", false /* apiStrict */, nss.tenantId(), serializationContext),
-        cmdObj));
+    auto distinctCommand = std::make_unique<DistinctCommandRequest>(
+        DistinctCommandRequest::parse(IDLParserContext("distinctCommandRequest",
+                                                       false /* apiStrict */,
+                                                       vts,
+                                                       nss.tenantId(),
+                                                       serializationContext),
+                                      cmdObj));
 
     auto expCtx = CanonicalDistinct::makeExpressionContext(
         opCtx, nss, *distinctCommand, defaultCollator, verbosity);

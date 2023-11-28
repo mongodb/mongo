@@ -213,7 +213,11 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(
     AnyCursorResponse response;
     try {
         static constexpr bool apiStrict = false;
-        IDLParserContext idlCtx("CursorResponse", apiStrict, tenantId, serializationContext);
+        const auto vts = tenantId
+            ? boost::make_optional(auth::ValidatedTenancyScope(
+                  *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+            : boost::none;
+        IDLParserContext idlCtx("CursorResponse", apiStrict, vts, tenantId, serializationContext);
         response = AnyCursorResponse::parse(idlCtx, cmdResponse);
     } catch (const DBException& e) {
         return e.toStatus();

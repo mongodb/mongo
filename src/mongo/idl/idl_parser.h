@@ -48,6 +48,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/compiler.h"
@@ -292,30 +293,35 @@ public:
     explicit IDLParserContext(StringData fieldName) : IDLParserContext{fieldName, false} {}
 
     IDLParserContext(StringData fieldName, bool apiStrict)
-        : IDLParserContext{fieldName, apiStrict, boost::none} {}
+        : IDLParserContext{fieldName, apiStrict, boost::none, boost::none} {}
 
     IDLParserContext(StringData fieldName,
                      bool apiStrict,
+                     const boost::optional<auth::ValidatedTenancyScope>& vts,
                      boost::optional<TenantId> tenantId,
                      const SerializationContext& serializationContext = SerializationContext())
         : _serializationContext(serializationContext),
           _currentField(fieldName),
           _apiStrict(apiStrict),
           _tenantId(std::move(tenantId)),
-          _predecessor(nullptr) {}
+          _predecessor(nullptr),
+          _validatedTenancyScope(vts) {}
 
     IDLParserContext(StringData fieldName, const IDLParserContext* predecessor)
-        : IDLParserContext(fieldName, predecessor, boost::none, SerializationContext()) {}
+        : IDLParserContext(
+              fieldName, predecessor, boost::none, boost::none, SerializationContext()) {}
 
     IDLParserContext(StringData fieldName,
                      const IDLParserContext* predecessor,
-                     boost::optional<TenantId> tenantId,
-                     const SerializationContext& serializationContext)
+                     const boost::optional<auth::ValidatedTenancyScope>& vts,
+                     const SerializationContext& serializationContext,
+                     boost::optional<TenantId> tenantId)
         : _serializationContext(serializationContext),
           _currentField(fieldName),
           _apiStrict(predecessor->_apiStrict),
           _tenantId(tenantId),
-          _predecessor(predecessor) {
+          _predecessor(predecessor),
+          _validatedTenancyScope(vts) {
         assertTenantIdMatchesPredecessor(predecessor);
     }
 
@@ -443,6 +449,8 @@ public:
 
     const SerializationContext& getSerializationContext() const;
 
+    const boost::optional<auth::ValidatedTenancyScope>& getValidatedTenancyScope() const;
+
 private:
     /**
      * See comment on getElementPath below.
@@ -494,6 +502,8 @@ private:
     // This provides a singly linked list of parent pointers, and use to produce a full path to a
     // field with an error.
     const IDLParserContext* _predecessor;
+
+    const boost::optional<auth::ValidatedTenancyScope> _validatedTenancyScope;
 };
 
 /**

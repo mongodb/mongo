@@ -56,8 +56,6 @@ int64_t optionalSize(boost::optional<T> optionalVal) {
 BSONObj extractHintShape(BSONObj hintObj, const SerializationOptions& opts);
 BSONObj extractMinOrMaxShape(BSONObj obj, const SerializationOptions& opts);
 
-NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt,
-                                          const SerializationContext& serializationContext);
 void appendNamespaceShape(BSONObjBuilder& bob,
                           const NamespaceString& nss,
                           const SerializationOptions& opts);

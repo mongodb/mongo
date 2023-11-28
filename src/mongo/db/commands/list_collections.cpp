@@ -550,6 +550,7 @@ public:
                         firstBatch.push_back(ListCollectionsReplyItem::parse(
                             IDLParserContext("ListCollectionsReplyItem",
                                              false /* apiStrict*/,
+                                             auth::ValidatedTenancyScope::get(opCtx),
                                              cursorNss.tenantId(),
                                              respSerializationContext),
                             nextDoc));

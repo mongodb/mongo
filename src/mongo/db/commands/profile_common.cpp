@@ -66,7 +66,7 @@ Status ProfileCmdBase::checkAuthForOperation(OperationContext* opCtx,
         : SerializationContext::stateCommandRequest();
 
     auto request = ProfileCmdRequest::parse(
-        IDLParserContext("profile", false /*apiStrict*/, dbName.tenantId(), sc), cmdObj);
+        IDLParserContext("profile", false /*apiStrict*/, vts, dbName.tenantId(), sc), cmdObj);
     const auto profilingLevel = request.getCommandParameter();
 
     if (profilingLevel < 0 && !request.getSlowms() && !request.getSampleRate()) {
@@ -94,9 +94,8 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
     const auto sc = vts != boost::none
         ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
         : SerializationContext::stateCommandRequest();
-
     auto request = ProfileCmdRequest::parse(
-        IDLParserContext("profile", false /*apiStrict*/, dbName.tenantId(), sc), cmdObj);
+        IDLParserContext("profile", false /*apiStrict*/, vts, dbName.tenantId(), sc), cmdObj);
     const auto profilingLevel = request.getCommandParameter();
 
     // Validate arguments before making changes.

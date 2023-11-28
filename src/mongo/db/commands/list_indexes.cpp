@@ -372,6 +372,7 @@ public:
                         IDLParserContext(
                             "ListIndexesReplyItem",
                             false /* apiStrict */,
+                            auth::ValidatedTenancyScope::get(opCtx),
                             nss.tenantId(),
                             SerializationContext::stateCommandReply(serializationContext)),
                         nextDoc));

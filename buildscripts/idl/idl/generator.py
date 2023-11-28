@@ -1315,9 +1315,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """
         serialization_context = "getSerializationContext()"
         if ast_type.is_struct:
-            self._writer.write_line(
-                'IDLParserContext tempContext(%s, &ctxt, %s, %s);' %
-                (_get_field_constant_name(field), tenant, serialization_context))
+            validated_tenancy_scope = 'ctxt.getValidatedTenancyScope()'
+            if 'request' in tenant:
+                validated_tenancy_scope = 'request.validatedTenancyScope'
+            self._writer.write_line('IDLParserContext tempContext(%s, &ctxt, %s, %s, %s);' %
+                                    (_get_field_constant_name(field), validated_tenancy_scope,
+                                     serialization_context, tenant))
             self._writer.write_line('const auto localObject = %s.Obj();' % (element_name))
             return '%s::parse(tempContext, localObject)' % (ast_type.cpp_type, )
         elif ast_type.deserializer and 'BSONElement::' in ast_type.deserializer:
@@ -1341,9 +1344,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 # For fields which are enums, pass a IDLParserContext
                 if ast_type.is_enum:
+                    validated_tenancy_scope = 'ctxt.getValidatedTenancyScope()'
+                    if 'request' in tenant:
+                        validated_tenancy_scope = 'request.validatedTenancyScope'
                     self._writer.write_line(
-                        'IDLParserContext tempContext(%s, &ctxt, %s, %s);' %
-                        (_get_field_constant_name(field), tenant, serialization_context))
+                        'IDLParserContext tempContext(%s, &ctxt, %s, %s, %s);' %
+                        (_get_field_constant_name(field), validated_tenancy_scope,
+                         serialization_context, tenant))
                     return common.template_args("${method_name}(tempContext, ${expression})",
                                                 method_name=method_name, expression=expression)
 
@@ -1377,9 +1384,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         cpp_type = cpp_type_info.get_type_name()
 
         self._writer.write_line('DecimalCounter<std::uint32_t> expectedFieldNumber{0};')
-        self._writer.write_line(
-            'const IDLParserContext arrayCtxt(%s, &ctxt, %s, getSerializationContext());' %
-            (_get_field_constant_name(field), tenant))
+        validated_tenancy_scope = 'ctxt.getValidatedTenancyScope()'
+        if 'request' in tenant:
+            validated_tenancy_scope = 'request.validatedTenancyScope'
+        self._writer.write_line('const IDLParserContext arrayCtxt(%s, &ctxt, %s, %s, %s);' %
+                                (_get_field_constant_name(field), validated_tenancy_scope,
+                                 "getSerializationContext()", tenant))
         self._writer.write_line('std::vector<%s> values;' % (cpp_type))
         self._writer.write_empty_line()
 
@@ -1682,9 +1692,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             # Either we are deserializing BSON Objects or IDL structs
             if field.type.is_struct:
-                self._writer.write_line(
-                    'IDLParserContext tempContext(%s, &ctxt, %s, getSerializationContext());' %
-                    (_get_field_constant_name(field), tenant))
+                validated_tenancy_scope = 'ctxt.getValidatedTenancyScope()'
+                if 'request' in tenant:
+                    validated_tenancy_scope = 'request.validatedTenancyScope'
+                self._writer.write_line('IDLParserContext tempContext(%s, &ctxt, %s, %s, %s);' %
+                                        (_get_field_constant_name(field), validated_tenancy_scope,
+                                         "getSerializationContext()", tenant))
                 array_value = '%s::parse(tempContext, sequenceObject)' % (field.type.cpp_type, )
             elif field.type.is_variant:
                 self._writer.write_line('%s _tmp;' % field.type.cpp_type)

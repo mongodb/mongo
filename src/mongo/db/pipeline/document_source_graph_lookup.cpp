@@ -106,8 +106,13 @@ NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
     }
 
     // Valdate the db and coll names.
+    const auto tenantId = defaultDb.tenantId();
+    const auto vts = tenantId
+        ? boost::make_optional(auth::ValidatedTenancyScope(
+              *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+        : boost::none;
     auto spec = NamespaceSpec::parse(
-        IDLParserContext{elem.fieldNameStringData(), false /* apiStrict */, defaultDb.tenantId()},
+        IDLParserContext{elem.fieldNameStringData(), false /* apiStrict */, vts, tenantId},
         elem.embeddedObject());
 
     auto nss = NamespaceStringUtil::deserialize(spec.getDb().value_or(DatabaseName()),

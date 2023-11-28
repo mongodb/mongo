@@ -157,8 +157,12 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     Timer cmdTimer;
 
-    auto parsedMr = MapReduceCommandRequest::parse(
-        IDLParserContext("mapReduce", false /* apiStrict */, dbName.tenantId()), cmd);
+    auto parsedMr =
+        MapReduceCommandRequest::parse(IDLParserContext("mapReduce",
+                                                        false /* apiStrict */,
+                                                        auth::ValidatedTenancyScope::get(opCtx),
+                                                        dbName.tenantId()),
+                                       cmd);
     auto curop = CurOp::get(opCtx);
     curop->beginQueryPlanningTimer();
     auto expCtx = makeExpressionContext(opCtx, parsedMr, verbosity);

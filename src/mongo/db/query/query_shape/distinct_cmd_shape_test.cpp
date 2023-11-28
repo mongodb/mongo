@@ -45,7 +45,11 @@ BSONObj distinctJsonToShapeBSON(const char* json,
 
     auto distinct = fromjson(json);
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
-        IDLParserContext("distinctCommandRequest", false /* apiStrict */, boost::none), distinct));
+        IDLParserContext("distinctCommandRequest",
+                         false /* apiStrict */,
+                         auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                         boost::none),
+        distinct));
     auto pd = parsed_distinct_command::parse(
         expCtx, std::move(distinct), std::move(distinctCommand), ExtensionsCallbackNoop(), {});
     auto shape = std::make_unique<DistinctCmdShape>(*pd, expCtx);
@@ -58,7 +62,11 @@ QueryShapeHash distinctQueryShapeHash(const char* json,
 
     auto distinct = fromjson(json);
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
-        IDLParserContext("distinctCommandRequest", false /* apiStrict */, boost::none), distinct));
+        IDLParserContext("distinctCommandRequest",
+                         false /* apiStrict */,
+                         auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                         boost::none),
+        distinct));
     auto pd = parsed_distinct_command::parse(
         expCtx, std::move(distinct), std::move(distinctCommand), ExtensionsCallbackNoop(), {});
     auto shape = std::make_unique<DistinctCmdShape>(*pd, expCtx);

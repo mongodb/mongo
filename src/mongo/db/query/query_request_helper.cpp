@@ -213,12 +213,15 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
     return Status::OK();
 }
 
-std::unique_ptr<FindCommandRequest> makeFromFindCommand(const BSONObj& cmdObj,
-                                                        boost::optional<NamespaceString> nss,
-                                                        const SerializationContext& sc,
-                                                        bool apiStrict) {
+std::unique_ptr<FindCommandRequest> makeFromFindCommand(
+    const BSONObj& cmdObj,
+    const boost::optional<auth::ValidatedTenancyScope>& vts,
+    const boost::optional<TenantId>& tenantId,
+    const SerializationContext& sc,
+    bool apiStrict) {
     auto findCommand = std::make_unique<FindCommandRequest>(FindCommandRequest::parse(
-        IDLParserContext("FindCommandRequest", apiStrict, nss ? nss->tenantId() : boost::none, sc),
+        IDLParserContext(
+            "FindCommandRequest", apiStrict, vts, tenantId ? tenantId : boost::none, sc),
         cmdObj));
 
     addMetaProjection(findCommand.get());
@@ -236,7 +239,11 @@ std::unique_ptr<FindCommandRequest> makeFromFindCommand(const BSONObj& cmdObj,
 
 std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
     const BSONObj& cmdObj, boost::optional<NamespaceString> nss, bool apiStrict) {
-    return makeFromFindCommand(cmdObj, nss, SerializationContext::stateDefault(), apiStrict);
+    return makeFromFindCommand(cmdObj,
+                               boost::none /*vts*/,
+                               nss ? nss->tenantId() : boost::none,
+                               SerializationContext::stateDefault(),
+                               apiStrict);
 }
 
 bool isTextScoreMeta(BSONElement elt) {
@@ -282,12 +289,14 @@ TailableModeEnum getTailableMode(const FindCommandRequest& findCommand) {
 }
 
 void validateCursorResponse(const BSONObj& outputAsBson,
+                            const boost::optional<auth::ValidatedTenancyScope>& vts,
                             boost::optional<TenantId> tenantId,
                             const SerializationContext& serializationContext) {
     if (getTestCommandsEnabled()) {
         CursorInitialReply::parse(
             IDLParserContext("CursorInitialReply",
                              false /* apiStrict */,
+                             vts,
                              tenantId,
                              SerializationContext::stateCommandReply(serializationContext)),
             outputAsBson);

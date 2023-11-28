@@ -287,6 +287,7 @@ public:
             if (!_aggregationRequest.getExplain() && !_aggregationRequest.getExchange()) {
                 query_request_helper::validateCursorResponse(
                     reply->getBodyBuilder().asTempObj(),
+                    auth::ValidatedTenancyScope::get(opCtx),
                     _aggregationRequest.getNamespace().tenantId(),
                     _aggregationRequest.getSerializationContext());
             }

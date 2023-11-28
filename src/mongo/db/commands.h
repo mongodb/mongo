@@ -1208,6 +1208,7 @@ private:
         return RequestType::parse(
             IDLParserContext(RequestType::kCommandName,
                              APIParameters::get(opCtx).getAPIStrict().value_or(false),
+                             auth::ValidatedTenancyScope::get(opCtx),
                              dbName.tenantId()),
             cmdObj);
     }

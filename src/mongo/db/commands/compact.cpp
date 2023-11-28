@@ -105,7 +105,7 @@ public:
 
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto params = CompactCommand::parse(
-            IDLParserContext("compact", false /*apiStrict*/, dbName.tenantId(), sc), cmdObj);
+            IDLParserContext("compact", false /*apiStrict*/, vts, dbName.tenantId(), sc), cmdObj);
         bool force = params.getForce() && *params.getForce();
 
         uassert(ErrorCodes::IllegalOperation,

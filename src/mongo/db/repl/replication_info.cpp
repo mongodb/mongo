@@ -410,9 +410,8 @@ public:
         const auto sc = vts != boost::none
             ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
             : SerializationContext::stateCommandRequest();
-
-        auto cmd = HelloCommand::parse(IDLParserContext("hello", apiStrict, dbName.tenantId(), sc),
-                                       cmdObj);
+        auto cmd = HelloCommand::parse(
+            IDLParserContext("hello", apiStrict, vts, dbName.tenantId(), sc), cmdObj);
 
         shardWaitInHello.execute(
             [&](const BSONObj& customArgs) { _handleHelloFailPoint(customArgs, opCtx, cmdObj); });

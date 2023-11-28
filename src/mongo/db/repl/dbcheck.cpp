@@ -983,7 +983,8 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
         opTime = entry.getOpTime();
     }
     const auto type = OplogEntries_parse(IDLParserContext("type"), cmd.getStringField("type"));
-    const IDLParserContext ctx("o", false /*apiStrict*/, entry.getTid());
+    const IDLParserContext ctx(
+        "o", false /*apiStrict*/, auth::ValidatedTenancyScope::get(opCtx), entry.getTid());
     switch (type) {
         case OplogEntriesEnum::Batch: {
             const auto invocation = DbCheckOplogBatch::parse(ctx, cmd);

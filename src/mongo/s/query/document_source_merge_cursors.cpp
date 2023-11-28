@@ -135,7 +135,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
             elem.type() == BSONType::Object);
     auto ownedObj = elem.embeddedObject().getOwned();
     auto armParams = AsyncResultsMergerParams::parse(
-        IDLParserContext(kStageName, false /*apiStrict*/, expCtx->ns.tenantId()), ownedObj);
+        IDLParserContext(kStageName,
+                         false /*apiStrict*/,
+                         auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                         expCtx->ns.tenantId()),
+        ownedObj);
     return new DocumentSourceMergeCursors(expCtx, std::move(armParams), std::move(ownedObj));
 }
 

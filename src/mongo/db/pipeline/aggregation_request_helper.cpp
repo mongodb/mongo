@@ -130,8 +130,13 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
     AggregateCommandRequest request(nss);
     // TODO SERVER-75930: tenantId in VTS isn't properly detected by call to parse(IDLParseContext&,
     // BSONObj&)
+    const auto tenantId = nss.tenantId();
+    const auto vts = tenantId
+        ? boost::make_optional(auth::ValidatedTenancyScope(
+              *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+        : boost::none;
     request = AggregateCommandRequest::parse(
-        IDLParserContext("aggregate", apiStrict, nss.tenantId(), serializationContext),
+        IDLParserContext("aggregate", apiStrict, vts, tenantId, serializationContext),
         cmdObjChanged ? cmdObjBob.obj() : cmdObj);
 
     if (explainVerbosity) {

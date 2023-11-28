@@ -4387,8 +4387,11 @@ TEST(IDLParserContext, TestConstructorWithPredecessorAndDifferentTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     const auto tenantId = TenantId(OID::gen());
-    const auto otherTenantId = TenantId(OID::gen());
-    IDLParserContext ctxt("root", false, tenantId);
+    const auto vts =
+        auth::ValidatedTenancyScope(tenantId,
+                                    auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                                    auth::ValidatedTenancyScope::TenantForTestingTag{});
+    IDLParserContext ctxt("root", false, vts, tenantId);
 
     auto nsInfoStructBSON = [&](const char* ns) {
         BSONObjBuilder builder;
@@ -4402,6 +4405,8 @@ TEST(IDLParserContext, TestConstructorWithPredecessorAndDifferentTenant) {
             .append("$db", "admin")
             .append("field2", BSON_ARRAY(nsInfoStructBSON("a.b") << nsInfoStructBSON("c.d")))
             .obj();
+
+    const auto otherTenantId = TenantId(OID::gen());
     ASSERT_THROWS_CODE(
         CommandWithNamespaceStruct::parse(ctxt, makeOMRWithTenant(testDoc, otherTenantId)),
         DBException,
@@ -4489,9 +4494,16 @@ TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_Parse) {
         for (bool featureFlag : {false, true}) {
             RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
                                                                        featureFlag);
-            boost::optional<TenantId> tenantId =
-                multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
-            IDLParserContext ctxt("root", false, tenantId);
+            boost::optional<auth::ValidatedTenancyScope> vts = boost::none;
+            boost::optional<TenantId> tenantId = boost::none;
+            if (multitenancySupport) {
+                tenantId = boost::make_optional(TenantId(OID::gen()));
+                vts = auth::ValidatedTenancyScope(
+                    *tenantId,
+                    auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                    auth::ValidatedTenancyScope::TenantForTestingTag{});
+            }
+            IDLParserContext ctxt("root", false, vts, tenantId);
 
             const std::string ns1 = "db.coll1";
             const std::string ns2 = "a.b";
@@ -4545,9 +4557,16 @@ TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_Parse) {
         for (bool featureFlag : {false, true}) {
             RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
                                                                        featureFlag);
-            boost::optional<TenantId> tenantId =
-                multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
-            IDLParserContext ctxt("root", false, tenantId);
+            boost::optional<auth::ValidatedTenancyScope> vts = boost::none;
+            boost::optional<TenantId> tenantId = boost::none;
+            if (multitenancySupport) {
+                tenantId = TenantId(OID::gen());
+                vts = auth::ValidatedTenancyScope(
+                    *tenantId,
+                    auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                    auth::ValidatedTenancyScope::TenantForTestingTag{});
+            }
+            IDLParserContext ctxt("root", false, vts, tenantId);
 
             const std::string ns1 = "db.coll1";
             const std::string ns2 = "a.b";

@@ -63,8 +63,12 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
                 !elem.valueStringData().empty());
         return NamespaceStringUtil::deserialize(tenantId, "", elem.valueStringData(), sc);
     }
+    const auto vts = tenantId
+        ? boost::make_optional(auth::ValidatedTenancyScope(
+              *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+        : boost::none;
     auto spec = NamespaceSpec::parse(
-        IDLParserContext(elem.fieldNameStringData(), false /* apiStrict */, tenantId, sc),
+        IDLParserContext(elem.fieldNameStringData(), false /* apiStrict */, vts, tenantId, sc),
         elem.embeddedObject());
     auto coll = spec.getColl();
     uassert(5786801,

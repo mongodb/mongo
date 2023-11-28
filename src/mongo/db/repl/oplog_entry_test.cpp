@@ -257,7 +257,10 @@ TEST(OplogEntryTest, ParseReplOperationIncludesTidField) {
         BSONObjBuilder{}.append("_id", 1).obj());
     BSONObj oplogBson = op.toBSON();
 
-    auto replOp = ReplOperation::parse(IDLParserContext("ReplOperation", false, tid), oplogBson);
+    using VTS = auth::ValidatedTenancyScope;
+    const auto vts = VTS(tid, VTS::TenantProtocol::kDefault, VTS::TenantForTestingTag{});
+    auto replOp =
+        ReplOperation::parse(IDLParserContext("ReplOperation", false, vts, tid), oplogBson);
     ASSERT(replOp.getTid());
     ASSERT_EQ(replOp.getTid(), tid);
     ASSERT_EQ(replOp.getNss(), nssWithTid);

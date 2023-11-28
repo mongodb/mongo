@@ -908,8 +908,10 @@ public:
             // documents.
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementDocUnitsReturned(toStringForLogging(nss), docUnitsReturned);
-            query_request_helper::validateCursorResponse(
-                result->getBodyBuilder().asTempObj(), nss.tenantId(), respSc);
+            query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj(),
+                                                         auth::ValidatedTenancyScope::get(opCtx),
+                                                         nss.tenantId(),
+                                                         respSc);
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {
@@ -952,7 +954,8 @@ public:
 
             auto findCommand = query_request_helper::makeFromFindCommand(
                 request.body,
-                std::move(nss),
+                auth::ValidatedTenancyScope::get(opCtx),
+                nss.tenantId(),
                 reqSc,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
 

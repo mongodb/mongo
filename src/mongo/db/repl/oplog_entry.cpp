@@ -363,8 +363,12 @@ StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {
 
     try {
         MutableOplogEntry oplogEntry;
-        oplogEntry.parseProtected(IDLParserContext("OplogEntryBase", false /* apiStrict */, tid),
-                                  object);
+        const auto vts = tid
+            ? boost::make_optional(auth::ValidatedTenancyScope(
+                  *tid, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+            : boost::none;
+        oplogEntry.parseProtected(
+            IDLParserContext("OplogEntryBase", false /* apiStrict */, vts, tid), object);
         return oplogEntry;
     } catch (...) {
         return exceptionToStatus();
@@ -420,7 +424,10 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
     if (_raw.hasElement("tid"))
         tid = TenantId::parseFromBSON(_raw["tid"]);
 
-    parseProtected(IDLParserContext("OplogEntryBase", false /* apiStrict */, tid), _raw);
+    const auto vts = tid ? boost::make_optional(auth::ValidatedTenancyScope(
+                               *tid, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+                         : boost::none;
+    parseProtected(IDLParserContext("OplogEntryBase", false /* apiStrict */, vts, tid), _raw);
 
     // Parse command type from 'o' and 'o2' fields.
     if (isCommand()) {

@@ -202,8 +202,12 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              const BSONObj& cmd,
                              BSONObjBuilder& result,
                              boost::optional<ExplainOptions::Verbosity> verbosity) {
-    auto parsedMr = MapReduceCommandRequest::parse(
-        IDLParserContext("mapReduce", false /* apiStrict */, dbName.tenantId()), cmd);
+    auto parsedMr =
+        MapReduceCommandRequest::parse(IDLParserContext("mapReduce",
+                                                        false /* apiStrict */,
+                                                        auth::ValidatedTenancyScope::get(opCtx),
+                                                        dbName.tenantId()),
+                                       cmd);
     stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
     auto resolvedOutNss = parsedMr.getOutOptions().getDatabaseName()
         ? NamespaceStringUtil::deserialize(boost::none,

@@ -875,16 +875,19 @@ public:
             }
 
             if (getTestCommandsEnabled()) {
-                validateResult(reply, nss.tenantId());
+                validateResult(opCtx, reply, nss.tenantId());
             }
         }
 
-        void validateResult(rpc::ReplyBuilderInterface* reply, boost::optional<TenantId> tenantId) {
+        void validateResult(OperationContext* opCtx,
+                            rpc::ReplyBuilderInterface* reply,
+                            boost::optional<TenantId> tenantId) {
             auto ret = reply->getBodyBuilder().asTempObj();
 
             // We need to copy the serialization context from the request to the reply object
             CursorGetMoreReply::parse(IDLParserContext("CursorGetMoreReply",
                                                        false /* apiStrict */,
+                                                       auth::ValidatedTenancyScope::get(opCtx),
                                                        tenantId,
                                                        SerializationContext::stateCommandReply(
                                                            _cmd.getSerializationContext())),
