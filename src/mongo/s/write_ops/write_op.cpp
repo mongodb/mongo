@@ -236,6 +236,11 @@ size_t WriteOp::getNumTargeted() {
 void WriteOp::_updateOpState() {
     std::vector<ChildWriteOp const*> childErrors;
     std::vector<BulkWriteReplyItem const*> childSuccesses;
+    // Stores the result of a child update/delete that is in _Deferred state.
+    // While we could have many of these, they will always be identical (indicating an update/
+    // delete that matched and updated/deleted 0 documents) and thus as an optimization we
+    // only save off and use the first one.
+    boost::optional<BulkWriteReplyItem const*> deferredChildSuccess;
 
     bool isRetryError = true;
     bool hasPendingChild = false;
@@ -261,6 +266,9 @@ void WriteOp::_updateOpState() {
 
         if (childOp.state == WriteOpState_Completed && childOp.bulkWriteReplyItem.has_value()) {
             childSuccesses.push_back(&childOp.bulkWriteReplyItem.value());
+        } else if (childOp.state == WriteOpState_Deferred && !deferredChildSuccess &&
+                   childOp.bulkWriteReplyItem.has_value()) {
+            deferredChildSuccess = &childOp.bulkWriteReplyItem.value();
         }
     }
 
@@ -278,6 +286,8 @@ void WriteOp::_updateOpState() {
             // previous replies before we retry targeting this operation. This is because it is
             // possible to only target shards in _successfulShardSet on retry and as a result, we
             // may transition to Completed immediately after that.
+            // Note we do *not* include childDeferredSuccesses here, because staleness errors
+            // invalidate previous deferred responses.
             _bulkWriteReplyItem = combineBulkWriteReplyItems(childSuccesses);
         }
         _state = WriteOpState_Ready;
@@ -289,6 +299,11 @@ void WriteOp::_updateOpState() {
         // but there are still ops that have not yet finished.
         return;
     } else {
+        // If we made it here, we finished all the child ops and thus this deferred
+        // response is now a final response.
+        if (deferredChildSuccess) {
+            childSuccesses.push_back(deferredChildSuccess.value());
+        }
         _bulkWriteReplyItem = combineBulkWriteReplyItems(childSuccesses);
         _state = WriteOpState_Completed;
     }
@@ -330,14 +345,19 @@ void WriteOp::noteWriteError(const TargetedWrite& targetedWrite,
     _updateOpState();
 }
 
-void WriteOp::noteWriteWithoutShardKeyWithIdResponse(const TargetedWrite& targetedWrite, int n) {
+void WriteOp::noteWriteWithoutShardKeyWithIdResponse(
+    const TargetedWrite& targetedWrite,
+    int n,
+    boost::optional<const BulkWriteReplyItem&> bulkWriteReplyItem) {
     dassert(n == 0 || n == 1);
+    invariant(!bulkWriteReplyItem || bulkWriteReplyItem->getN() == n);
     const WriteOpRef& ref = targetedWrite.writeOpRef;
     auto& currentChildOp = _childOps[ref.second];
     if (n == 0) {
         // Defer the completion of this child WriteOp until later when we are sure that we do not
         // need to retry them due to StaleConfig or StaleDBVersion.
         currentChildOp.state = WriteOpState_Deferred;
+        currentChildOp.bulkWriteReplyItem = bulkWriteReplyItem;
         _updateOpState();
     } else {
         for (auto& childOp : _childOps) {
@@ -358,7 +378,7 @@ void WriteOp::noteWriteWithoutShardKeyWithIdResponse(const TargetedWrite& target
                 childOp.error = boost::none;
             }
         }
-        noteWriteComplete(targetedWrite);
+        noteWriteComplete(targetedWrite, bulkWriteReplyItem);
     }
 }
 
@@ -384,8 +404,12 @@ void WriteOp::setWriteType(WriteType writeType) {
     _writeType = writeType;
 }
 
-WriteType WriteOp::getWriteType() {
+WriteType WriteOp::getWriteType() const {
     return _writeType;
+}
+
+const std::vector<ChildWriteOp>& WriteOp::getChildWriteOps_forTest() const {
+    return _childOps;
 }
 
 boost::optional<BulkWriteReplyItem> WriteOp::combineBulkWriteReplyItems(

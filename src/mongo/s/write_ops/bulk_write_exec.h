@@ -183,7 +183,9 @@ public:
      * Saves all the write concern errors received from all the shards so that they can
      * be concatenated into a single error when mongos responds to the client.
      */
-    void saveWriteConcernError(ShardId shardId, BulkWriteWriteConcernError wcError);
+    void saveWriteConcernError(ShardId shardId,
+                               BulkWriteWriteConcernError wcError,
+                               const TargetedWriteBatch& writeBatch);
     void saveWriteConcernError(ShardWCError shardWCError);
     std::vector<ShardWCError> getWriteConcernErrors() const {
         return _wcErrors;
@@ -292,6 +294,20 @@ public:
         return _aborted;
     }
 
+    /**
+     * Indicates whether the current round of executing child batches should be terminated.
+     * See _shouldStopCurrentRound for details.
+     */
+    bool shouldStopCurrentRound() const {
+        return _shouldStopCurrentRound;
+    }
+
+    /**
+     * Finalizes/resets state after executing (or attempting to execute) a write without shard key
+     * with _id.
+     */
+    void finishExecutingWriteWithoutShardKeyWithId();
+
 private:
     // The OperationContext the client bulkWrite request is run on.
     OperationContext* const _opCtx;
@@ -310,6 +326,19 @@ private:
     // A list of write concern errors from all shards.
     std::vector<ShardWCError> _wcErrors;
 
+    // Optionally stores a vector of write concern errors from all shards encountered during
+    // the current round of execution. This is used only in the specific case where we are
+    // processing a write of type WriteType::WriteWithoutShardKeyWithId, and is necessary because
+    // if we see a staleness error we restart the broadcasting protocol and do not care about
+    // results or WC errors from previous rounds of the protocol. Thus we temporarily save the
+    // errors here, and at the end of each round of execution we check if the operation specified
+    // by the opIdx has reached a terminal state. If so, these errors are final and will be moved
+    // to _wcErrors. If the op is not in a terminal state, we must be restarting the protocol and
+    // therefore we discard the errors.
+    // We always process WriteWithoutShardKeyWithId writes in their own round and thus there is
+    // only ever a single op in consideration here.
+    boost::optional<std::pair<int /* opIdx */, std::vector<ShardWCError>>> _deferredWCErrors;
+
     // Statement ids for the ops that had already been executed, thus were not executed in this
     // bulkWrite.
     boost::optional<std::vector<StmtId>> _retriedStmtIds;
@@ -324,6 +353,13 @@ private:
     // - Any error encountered while in a transaction besides WouldChangeOwningShard.
     // - A local error indicating that this process is shutting down.
     bool _aborted = false;
+
+    // Set to true if we encounter some condition that means we should stop the current round of
+    // targeting/executing write(s) in this request. This is currently used in the case where we are
+    // broadcasting a multi:false update/delete without shard key with _id and we receive a response
+    // indicating a document was updated on one shard, and therefore as an optimization we do not
+    // need to wait to hear back from any other shards.
+    bool _shouldStopCurrentRound = false;
 
     // Summary fields.
     int _nInserted = 0;
