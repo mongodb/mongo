@@ -4240,8 +4240,8 @@ TEST_F(PipelineMustRunOnMongoSTest, UnsplittableMongoSPipelineAssertsIfDisallowe
     pipeline->optimizePipeline();
 
     // The entire pipeline must run on mongoS, but $sort cannot do so when 'allowDiskUse' is true.
-    ASSERT_THROWS_CODE(
-        pipeline->requiredToRunOnMongos(), AssertionException, ErrorCodes::IllegalOperation);
+    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+    ASSERT_NOT_OK(pipeline->canRunOnMongos());
 }
 
 DEATH_TEST_F(PipelineMustRunOnMongoSTest,
@@ -4304,9 +4304,8 @@ TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStageP
     auto splitPipeline = sharded_agg_helpers::splitPipeline(std::move(pipeline));
 
     // The merge pipeline must run on mongoS, but $out needs to run on  the primary shard.
-    ASSERT_THROWS_CODE(splitPipeline.mergePipeline->requiredToRunOnMongos(),
-                       AssertionException,
-                       ErrorCodes::IllegalOperation);
+    ASSERT_TRUE(splitPipeline.mergePipeline->requiredToRunOnMongos());
+    ASSERT_NOT_OK(splitPipeline.mergePipeline->canRunOnMongos());
 }
 
 TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShardSideOfSplit) {
@@ -4325,8 +4324,8 @@ TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShar
     // mongoS. However, the pipeline *cannot* run on mongoS and *must* split at
     // $_internalSplitPipeline due to the latter's 'anyShard' requirement. The mongoS stage would
     // end up on the shard side of this split, and so it asserts.
-    ASSERT_THROWS_CODE(
-        pipeline->requiredToRunOnMongos(), AssertionException, ErrorCodes::IllegalOperation);
+    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+    ASSERT_NOT_OK(pipeline->canRunOnMongos());
 }
 
 TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineRunsUnsplitOnMongoSIfSplitpointIsEligible) {

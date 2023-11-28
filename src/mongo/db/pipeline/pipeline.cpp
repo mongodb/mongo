@@ -521,10 +521,6 @@ bool Pipeline::needsShard() const {
     });
 }
 
-bool Pipeline::canRunOnMongos() const {
-    return _pipelineCanRunOnMongoS().isOK();
-}
-
 bool Pipeline::requiredToRunOnMongos() const {
     invariant(_splitState != SplitState::kSplitForShards);
 
@@ -540,13 +536,10 @@ bool Pipeline::requiredToRunOnMongos() const {
         // If a mongoS-only stage occurs before a splittable stage, or if the pipeline is already
         // split, this entire pipeline must run on mongoS.
         if (hostRequirement == HostTypeRequirement::kMongoS) {
-            // Verify that the remainder of this pipeline can run on mongoS.
-            auto mongosRunStatus = _pipelineCanRunOnMongoS();
-
-            uassertStatusOKWithContext(mongosRunStatus,
-                                       str::stream() << stage->getSourceName()
-                                                     << " must run on mongoS, but cannot");
-
+            LOGV2_DEBUG(8346100,
+                        1,
+                        "stage {stage} is required to run on mongoS",
+                        "stage"_attr = stage->getSourceName());
             return true;
         }
     }
@@ -740,7 +733,7 @@ DepsTracker Pipeline::getDependenciesForContainer(
     return deps;
 }
 
-Status Pipeline::_pipelineCanRunOnMongoS() const {
+Status Pipeline::canRunOnMongos() const {
     for (auto&& stage : _sources) {
         auto constraints = stage->constraints(_splitState);
         auto hostRequirement = constraints.resolvedHostTypeRequirement(pCtx);
