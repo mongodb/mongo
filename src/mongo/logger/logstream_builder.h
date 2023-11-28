@@ -216,6 +216,8 @@ public:
         // support enum class
         if constexpr (std::is_enum_v<T>) {
             stream() << static_cast<typename std::underlying_type<T>::type>(x);
+        } else if constexpr (std::is_fundamental_v<T>) {
+            stream() << x;
         } else {
             stream() << x.toString();
         }

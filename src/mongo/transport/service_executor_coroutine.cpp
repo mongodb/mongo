@@ -2,7 +2,9 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <thread>
+#include <tuple>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/server_parameters.h"
@@ -12,9 +14,15 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 
+#ifndef EXT_TX_PROC_ENABLED
+#define EXT_TX_PROC_ENABLED
+#endif
+
 namespace mongo {
 
-extern thread_local uint16_t localThreadId;
+extern thread_local int16_t localThreadId;
+extern std::function<std::pair<std::function<void()>, std::function<void(int16_t)>>(int16_t)>
+    getTxServiceFunctors;
 
 namespace transport {
 namespace {
@@ -56,6 +64,10 @@ void ThreadGroup::tick() {
     _tickCnt.fetch_add(1, std::memory_order_consume);
 }
 
+void ThreadGroup::setTxServiceFunctors(int16_t id) {
+    std::tie(_txProcessorExec, _updateExtProc) = getTxServiceFunctors(id);
+}
+
 bool ThreadGroup::isBusy() const {
     return (_ongoingCoroutineCnt > 0) || (_taskQueueSize.load(std::memory_order_relaxed) > 0) ||
         (_resumeQueueSize.load(std::memory_order_relaxed) > 0);
@@ -63,18 +75,18 @@ bool ThreadGroup::isBusy() const {
 
 void ThreadGroup::trySleep() {
     // If there are tasks in the , does not sleep.
-    if (isBusy()) {
-        return;
-    }
+    // if (isBusy()) {
+    //     return;
+    // }
 
     // MONGO_LOG(0) << "idle";
     // wait for kTrySleepTimeOut at most
-    _tickCnt.store(0, std::memory_order_release);
-    while (_tickCnt.load(std::memory_order_relaxed) < kTrySleepTimeOut) {
-        if (isBusy()) {
-            return;
-        }
-    }
+    // _tickCnt.store(0, std::memory_order_release);
+    // while (_tickCnt.load(std::memory_order_relaxed) < kTrySleepTimeOut) {
+    //     if (isBusy()) {
+    //         return;
+    //     }
+    // }
 
     // Sets the sleep flag before entering the critical section. std::memory_order_relaxed is
     // good enough, because the following mutex ensures that this instruction happens before the
@@ -91,9 +103,15 @@ void ThreadGroup::trySleep() {
     }
 
     MONGO_LOG(0) << "sleep";
+#ifdef EXT_TX_PROC_ENABLED
+    _updateExtProc(-1);
+#endif
     _sleepCV.wait(lk, [this] { return isBusy(); });
 
     // Woken up from sleep.
+#ifdef EXT_TX_PROC_ENABLED
+    _updateExtProc(1);
+#endif
     _isSleep.store(false, std::memory_order_relaxed);
 }
 
@@ -119,32 +137,34 @@ Status ServiceExecutorCoroutine::start() {
     }
 
     for (size_t i = 0; i < _reservedThreads; i++) {
-        auto status = _startWorker(i);
+        auto status = _startWorker(static_cast<int16_t>(i));
         if (!status.isOK()) {
             return status;
         }
     }
 
-    _backgroundTimeService = std::thread([this]() {
-        while (_stillRunning.load(std::memory_order_relaxed)) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            for (auto& tg : _threadGroups) {
-                tg.tick();
-            }
-        }
-    });
+    // _backgroundTimeService = std::thread([this]() {
+    //     while (_stillRunning.load(std::memory_order_relaxed)) {
+    //         std::this_thread::sleep_for(std::chrono::seconds(1));
+    //         for (auto& tg : _threadGroups) {
+    //             tg.tick();
+    //         }
+    //     }
+    // });
 
     return Status::OK();
 }
 
-Status ServiceExecutorCoroutine::_startWorker(uint16_t groupId) {
+Status ServiceExecutorCoroutine::_startWorker(int16_t groupId) {
     MONGO_LOG(0) << "Starting new worker thread for " << _name << " service executor. "
                  << " group id: " << groupId;
 
     return launchServiceWorkerThread([this, threadGroupId = groupId] {
         localThreadId = threadGroupId;
+
         std::string threadName("thread_group_" + std::to_string(threadGroupId));
-        StringData threadNameSD("mongod");
+        StringData threadNameSD(threadName);
+        setThreadName(threadNameSD);
 
         std::unique_lock<stdx::mutex> lk(_mutex);
         _numRunningWorkerThreads.addAndFetch(1);
@@ -155,48 +175,61 @@ Status ServiceExecutorCoroutine::_startWorker(uint16_t groupId) {
         lk.unlock();
 
         ThreadGroup& threadGroup = _threadGroups[threadGroupId];
+
+#ifdef EXT_TX_PROC_ENABLED
+        threadGroup.setTxServiceFunctors(threadGroupId);
+        MONGO_LOG(0) << "threadGroup._updateExtProc(1)";
+        threadGroup._updateExtProc(1);
+#endif
         std::array<Task, kTaskBatchSize> taskBulk;
+        size_t idleCnt = 0;
+        std::chrono::steady_clock::time_point idleStartTime;
         while (_stillRunning.load(std::memory_order_relaxed)) {
             if (!_stillRunning.load(std::memory_order_relaxed)) {
                 break;
             }
 
             size_t cnt = 0;
+            // process resume task
             if (threadGroup._resumeQueueSize.load(std::memory_order_relaxed) > 0) {
                 cnt = threadGroup._resumeQueue.try_dequeue_bulk(taskBulk.begin(), taskBulk.size());
                 threadGroup._resumeQueueSize.fetch_sub(cnt);
-                // for (size_t idx = 0; idx < cnt; ++idx) {
-                //     _localWorkQueue.emplace_back(std::move(task_bulk[idx]));
-                // }
                 for (size_t i = 0; i < cnt; ++i) {
                     setThreadName(threadNameSD);
                     taskBulk[i]();
                 }
             }
 
+            // process normal task
             if (cnt == 0 && threadGroup._taskQueueSize.load(std::memory_order_relaxed) > 0) {
                 cnt = threadGroup._taskQueue.try_dequeue_bulk(taskBulk.begin(), taskBulk.size());
                 threadGroup._taskQueueSize.fetch_sub(cnt);
-                // for (size_t idx = 0; idx < cnt; ++idx) {
-                //     _localWorkQueue.emplace_back(std::move(task_bulk[idx]));
-                // }
                 for (size_t i = 0; i < cnt; ++i) {
                     setThreadName(threadNameSD);
                     taskBulk[i]();
                 }
             }
-
+#ifdef EXT_TX_PROC_ENABLED
+            // process as a TxProcessor
+            (threadGroup._txProcessorExec)();
+#endif
             if (cnt == 0) {
-                threadGroup.trySleep();
-                continue;
+                if (idleCnt == 0) {
+                    idleStartTime = std::chrono::steady_clock::now();
+                }
+                idleCnt++;
+                if ((idleCnt & kIdleCycle) == 0) {
+                    // check timeout
+                    auto interval = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                        std::chrono::steady_clock::now() - idleStartTime)
+                                        .count();
+                    if (interval > kIdleTimeoutMs) {
+                        threadGroup.trySleep();
+                    }
+                }
+            } else {
+                idleCnt = 0;
             }
-
-            // while (!_localWorkQueue.empty() && _stillRunning.load(std::memory_order_relaxed)) {
-            //     // _localRecursionDepth = 1;
-            //     setThreadName(threadNameSD);
-            //     _localWorkQueue.front()();
-            //     _localWorkQueue.pop_front();
-            // }
         }
 
         LOG(3) << "Exiting worker thread in " << _name << " service executor";

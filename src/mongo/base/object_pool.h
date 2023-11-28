@@ -1,13 +1,9 @@
 #pragma once
 
-// #include <glog/logging.h>
-
-#include "mongo/db/modules/monograph/tx_service/include/circular_queue.h"
 #include <memory>
+#include "mongo/db/modules/monograph/tx_service/include/circular_queue.h"
 
 namespace mongo {
-extern thread_local uint16_t localThreadId;
-
 template <typename T>
 class ObjectPool {
 public:
@@ -104,7 +100,6 @@ public:
 
 private:
     static constexpr size_t kDefaultCapacity{32};
-    static constexpr size_t kMaxThreadNum{64};
     static thread_local CircularQueue<std::unique_ptr<T>> _localPool;
 };
 

@@ -27,16 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/monograph_read_write_lock.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <mutex>
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/stats/top.h"
-
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -46,7 +48,7 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-extern thread_local uint16_t localThreadId;
+extern thread_local int16_t localThreadId;
 
 namespace {
 
@@ -83,20 +85,23 @@ void Top::record(OperationContext* opCtx,
                  long long micros,
                  bool command,
                  Command::ReadWriteType readWriteType) {
-    if (ns[0] == '?')
+    if (ns[0] == '?') {
         return;
+    }
 
     auto hashedNs = UsageMap::HashedKey(ns);
-    // stdx::lock_guard<SimpleMutex> lk(_lock);
+
 
     if ((command || logicalOp == LogicalOp::opQuery) && ns == _lastDropped) {
-        SyncAllThreadsLock lk(_usageLockVector);
+        std::scoped_lock<std::mutex> lock(_lastDroppedMutex);
         _lastDropped = "";
         return;
     }
 
-    ThreadlocalLock lk(_usageLockVector[localThreadId]);
-    CollectionData& coll = _usageVector[localThreadId][hashedNs];
+    int16_t id = localThreadId + 1;
+
+    std::scoped_lock<std::mutex> lock(_usageMutexVector[id]);
+    CollectionData& coll = _usageVector[id][hashedNs];
     _record(opCtx, coll, logicalOp, lockType, micros, readWriteType);
 }
 
@@ -146,15 +151,15 @@ void Top::_record(OperationContext* opCtx,
 }
 
 void Top::collectionDropped(StringData ns, bool databaseDropped) {
-    // stdx::lock_guard<SimpleMutex> lk(_lock);
-    SyncAllThreadsLock lk(_usageLockVector);
-    for (auto& usage : _usageVector) {
-        usage.erase(ns);
+    for (size_t i = 0; i < _usageVector.size(); ++i) {
+        std::scoped_lock<std::mutex> lock(_usageMutexVector[i]);
+        _usageVector[i].erase(ns);
     }
-    // _usage.erase(ns);
+
     if (!databaseDropped) {
         // If a collection drop occurred, there will be a subsequent call to record for this
         // collection namespace which must be ignored. This does not apply to a database drop.
+        std::scoped_lock<std::mutex> lock(_lastDroppedMutex);
         _lastDropped = ns.toString();
     }
 }
@@ -224,26 +229,28 @@ void Top::incrementGlobalLatencyStats(OperationContext* opCtx,
                                       Command::ReadWriteType readWriteType) {
     // stdx::lock_guard<SimpleMutex> guard(_lock);
     // MONGO_UNREACHABLE;
-    ThreadlocalLock lk(_histogramLockVector[localThreadId]);
-    _incrementHistogram(opCtx, latency, &_histogramVector[localThreadId], readWriteType);
+    int16_t id = localThreadId + 1;
+    std::scoped_lock<std::mutex> lk(_histogramMutexVector[id]);
+    _incrementHistogram(opCtx, latency, &_histogramVector[id], readWriteType);
 }
 
 void Top::appendGlobalLatencyStats(bool includeHistograms, BSONObjBuilder* builder) {
-    // stdx::lock_guard<SimpleMutex> guard(_lock);
-    // MONGO_UNREACHABLE;
     OperationLatencyHistogram globalHistogramStats;
-    SyncAllThreadsLock lk(_histogramLockVector);
-    for (const auto& histogram : _histogramVector) {
-        globalHistogramStats += histogram;
+
+    for (size_t i = 0; i < _histogramVector.size(); ++i) {
+        std::scoped_lock<std::mutex> lock(_histogramMutexVector[i]);
+        globalHistogramStats += _histogramVector[i];
     }
+
     globalHistogramStats.append(includeHistograms, builder);
 }
 
 void Top::incrementGlobalTransactionLatencyStats(uint64_t latency) {
     // stdx::lock_guard<SimpleMutex> guard(_lock);
     // MONGO_UNREACHABLE;
-    ThreadlocalLock lk(_histogramLockVector[localThreadId]);
-    _histogramVector[localThreadId].increment(latency, Command::ReadWriteType::kTransaction);
+    int16_t id = localThreadId + 1;
+    std::scoped_lock<std::mutex> lk(_histogramMutexVector[id]);
+    _histogramVector[id].increment(latency, Command::ReadWriteType::kTransaction);
 }
 
 void Top::_incrementHistogram(OperationContext* opCtx,
@@ -259,9 +266,9 @@ void Top::_incrementHistogram(OperationContext* opCtx,
 
 Top::UsageMap Top::_mergeUsageVector() {
     UsageMap all;
-    SyncAllThreadsLock lk(_usageLockVector);
-    for (const auto& usage : _usageVector) {
-        for (const auto& [k, v] : usage) {
+    for (size_t i = 0; i < _usageVector.size(); ++i) {
+        std::scoped_lock<std::mutex> lock(_usageMutexVector[i]);
+        for (const auto& [k, v] : _usageVector[i]) {
             if (all.find(k) == all.end()) {
                 all[k] = v;
             } else {
@@ -269,6 +276,7 @@ Top::UsageMap Top::_mergeUsageVector() {
             }
         }
     }
+
     return all;
 }
 }  // namespace mongo

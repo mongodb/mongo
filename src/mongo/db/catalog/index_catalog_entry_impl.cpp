@@ -26,21 +26,19 @@
  *    it in the license file.
  */
 
-
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+
+#include <algorithm>
+#include <cstddef>
+#include <mutex>
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/catalog/index_catalog_entry_impl.h"
-
-#include <algorithm>
-
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/collection_info_cache_impl.h"
+#include "mongo/db/catalog/collection_info_cache.h"
 #include "mongo/db/catalog/head_manager.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/catalog/index_catalog_entry_impl.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/expression.h"
@@ -52,12 +50,11 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/concurrency/monograph_read_write_lock.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
-extern thread_local uint16_t localThreadId;
+extern thread_local int16_t localThreadId;
 
 MONGO_REGISTER_SHIM(IndexCatalogEntry::makeImpl)
 (IndexCatalogEntry* const this_,
@@ -105,23 +102,21 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
       _headManager(stdx::make_unique<HeadManagerImpl>(this_)),
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(_catalogIsReady(opCtx)),
-      _indexMultikeyPathsVector{serverGlobalParams.reservedThreadNum},
       _prefix(collection->getIndexPrefix(opCtx, _descriptor->indexName())) {
     _descriptor->_cachedEntry = this_;
-
-
     _head = _catalogHead(opCtx);
 
-    {
-        // stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-        SyncAllThreadsLock lk(_lockVector);
+    // {
+    //     std::scoped_lock<std::mutex> lock(_globalIndexMultikeyPathsMutex);
+    //     _isMultikey.store(_catalogIsMultikey(opCtx, &_globalIndexMultikeyPaths));
+    //     _indexTracksPathLevelMultikeyInfo = !_globalIndexMultikeyPaths.empty();
+    // }
 
-        bool isMutilkey;
-        for (auto& indexMultikeyPaths : _indexMultikeyPathsVector) {
-            isMutilkey = _catalogIsMultikey(opCtx, &indexMultikeyPaths);
-        }
-        _isMultikey.store(isMutilkey);
-        _indexTracksPathLevelMultikeyInfo = !_indexMultikeyPathsVector.front().empty();
+    for (size_t i = 0; i < _localIndexMultikeyPathsVector.size(); ++i) {
+        std::scoped_lock<std::mutex> lock(_localIndexMultikeyPathsMutexVector[i]);
+        _isMultikey.store(_catalogIsMultikey(opCtx, &_localIndexMultikeyPathsVector[i]));
+        // _isMultikey.store(_catalogIsMultikey(opCtx, &_globalIndexMultikeyPaths));
+        _indexTracksPathLevelMultikeyInfo = !_localIndexMultikeyPathsVector[i].empty();
     }
 
     if (BSONElement collationElement = _descriptor->getInfoElement("collation")) {
@@ -219,15 +214,18 @@ bool IndexCatalogEntryImpl::isMultikey(OperationContext* opCtx) const {
 }
 
 MultikeyPaths IndexCatalogEntryImpl::getMultikeyPaths(OperationContext* opCtx) const {
-    // stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-    ThreadlocalLock lk(_lockVector[localThreadId]);
-
     auto session = OperationContextSession::get(opCtx);
+
+    // read local
+    int16_t id = localThreadId + 1;
+    std::unique_lock<std::mutex> lock(_localIndexMultikeyPathsMutexVector[id]);
+    MultikeyPaths ret = _localIndexMultikeyPathsVector[id];
+    lock.unlock();
+
     if (!session || !session->inMultiDocumentTransaction()) {
-        return _indexMultikeyPathsVector[localThreadId];
+        return ret;
     }
 
-    MultikeyPaths ret = _indexMultikeyPathsVector[localThreadId];
     for (const MultikeyPathInfo& path : session->getMultikeyPathInfo()) {
         if (path.nss == NamespaceString(_ns) && path.indexName == _descriptor->indexName()) {
             MultikeyPathTracker::mergeMultikeyPaths(&ret, path.multikeyPaths);
@@ -272,14 +270,19 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     }
 
     if (_indexTracksPathLevelMultikeyInfo) {
-        // stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-        ThreadlocalLock lk(_lockVector[localThreadId]);
-        invariant(multikeyPaths.size() == _indexMultikeyPathsVector.front().size());
+        assert(localThreadId >= 0);
+
+        // read local
+        int16_t id = localThreadId + 1;
+        std::scoped_lock<std::mutex> lock(_localIndexMultikeyPathsMutexVector[id]);
+        const auto& indexMultikeyPaths = _localIndexMultikeyPathsVector[id];
+
+        invariant(multikeyPaths.size() == indexMultikeyPaths.size());
 
         bool newPathIsMultikey = false;
         for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-            if (!std::includes(_indexMultikeyPathsVector.front()[i].begin(),
-                               _indexMultikeyPathsVector.front()[i].end(),
+            if (!std::includes(indexMultikeyPaths[i].begin(),
+                               indexMultikeyPaths[i].end(),
                                multikeyPaths[i].begin(),
                                multikeyPaths[i].end())) {
                 // If 'multikeyPaths' contains a new path component that causes this index to be
@@ -342,11 +345,24 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
         _isMultikey.store(true);
 
         if (_indexTracksPathLevelMultikeyInfo) {
-            // stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-            SyncAllThreadsLock lk(_lockVector);
-            for (auto& indexMultikeyPaths : _indexMultikeyPathsVector) {
+
+            // update all
+            // {
+            //     int16_t id = localThreadId + 1;
+            //     std::scoped_lock<std::mutex> lock(_localIndexMultikeyPathsMutexVector[id]);
+            //     // std::scoped_lock<std::mutex> lock(_globalIndexMultikeyPathsMutex);
+            //     for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+            //         _globalIndexMultikeyPaths[i].insert(multikeyPaths[i].begin(),
+            //                                             multikeyPaths[i].end());
+            //     }
+            // }
+
+            for (size_t threadId = 0; threadId < _localIndexMultikeyPathsVector.size();
+                 ++threadId) {
+                std::scoped_lock<std::mutex> lock(_localIndexMultikeyPathsMutexVector[threadId]);
                 for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-                    indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
+                    _localIndexMultikeyPathsVector[threadId][i].insert(multikeyPaths[i].begin(),
+                                                                       multikeyPaths[i].end());
                 }
             }
         }

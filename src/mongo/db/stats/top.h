@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include "mongo/db/modules/monograph/tx_service/include/spinlock.h"
+#include <mutex>
+#include <vector>
+
 #include "mongo/db/server_options.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/operation_latency_histogram.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
-#include <vector>
 
 namespace mongo {
 
@@ -61,7 +61,7 @@ public:
             time += micros;
         }
 
-        void operator +=(const UsageData& other) {
+        void operator+=(const UsageData& other) {
             time += other.time;
             count += other.count;
         }
@@ -77,17 +77,17 @@ public:
         CollectionData() {}
         CollectionData(const CollectionData& older, const CollectionData& newer);
 
-        void operator +=(const CollectionData& other){
-            total+=other.total;
-            readLock+=other.readLock;
-            writeLock+=other.writeLock;
-            queries+=other.queries;
-            getmore+=other.getmore;
-            insert+=other.insert;
-            update+=other.update;
-            remove+=other.remove;
-            commands+=other.commands;
-            opLatencyHistogram+=other.opLatencyHistogram;
+        void operator+=(const CollectionData& other) {
+            total += other.total;
+            readLock += other.readLock;
+            writeLock += other.writeLock;
+            queries += other.queries;
+            getmore += other.getmore;
+            insert += other.insert;
+            update += other.update;
+            remove += other.remove;
+            commands += other.commands;
+            opLatencyHistogram += other.opLatencyHistogram;
         }
 
         UsageData total;
@@ -111,8 +111,8 @@ public:
     };
 
     // typedef StringMap<CollectionData> UsageMap;
-    using UsageMap=StringMap<CollectionData>;
-    
+    using UsageMap = StringMap<CollectionData>;
+
 
 public:
     void record(OperationContext* opCtx,
@@ -169,14 +169,15 @@ private:
                              Command::ReadWriteType readWriteType);
 
     UsageMap _mergeUsageVector();
-    
-    // mutable SimpleMutex _lock;
-    std::vector<OperationLatencyHistogram> _histogramVector{serverGlobalParams.reservedThreadNum};
-    std::vector<txservice::SimpleSpinlock> _histogramLockVector{serverGlobalParams.reservedThreadNum};
 
-    // UsageMap _usage;
-    std::vector<UsageMap> _usageVector{serverGlobalParams.reservedThreadNum};
-    std::vector<txservice::SimpleSpinlock> _usageLockVector{serverGlobalParams.reservedThreadNum};
+    std::vector<std::mutex> _histogramMutexVector{serverGlobalParams.reservedThreadNum + 1};
+    std::vector<OperationLatencyHistogram> _histogramVector{serverGlobalParams.reservedThreadNum +
+                                                            1};
+
+    std::vector<std::mutex> _usageMutexVector{serverGlobalParams.reservedThreadNum + 1};
+    std::vector<UsageMap> _usageVector{serverGlobalParams.reservedThreadNum + 1};
+
+    std::mutex _lastDroppedMutex;
     std::string _lastDropped;
 };
 

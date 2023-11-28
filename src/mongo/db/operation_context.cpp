@@ -420,6 +420,7 @@ RecoveryUnit* OperationContext::releaseRecoveryUnit() {
 WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit(
     RecoveryUnit* unit, WriteUnitOfWork::RecoveryUnitState state) {
     _recoveryUnit.reset(unit);
+    _recoveryUnit->setOperationContext(this);
     WriteUnitOfWork::RecoveryUnitState oldState = _ruState;
     _ruState = state;
     return oldState;
@@ -428,6 +429,7 @@ WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit(
 WriteUnitOfWork::RecoveryUnitState OperationContext::resetRecoveryUnit(
     WriteUnitOfWork::RecoveryUnitState state) {
     _recoveryUnit->reset();
+    _recoveryUnit->setOperationContext(this);
     WriteUnitOfWork::RecoveryUnitState oldState = _ruState;
     _ruState = state;
     return oldState;

@@ -64,6 +64,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual void setOperationContext(OperationContext* opCtx) {}
+
     /**
      * These should be called through WriteUnitOfWork rather than directly.
      *

@@ -28,18 +28,16 @@
 
 #pragma once
 
+#include <atomic>
+#include <memory>
+#include <mutex>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/server_options.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
-
-#include "mongo/db/modules/monograph/tx_service/include/spinlock.h"
 
 namespace mongo {
 
@@ -50,9 +48,6 @@ class OperationContext;
  * Registry of opened databases.
  */
 class DatabaseHolderImpl : public DatabaseHolder::Impl {
-    friend class ThreadLocalLock;
-    friend class WriteLock;
-
 public:
     DatabaseHolderImpl() = default;
 
@@ -92,11 +87,14 @@ public:
 
 private:
     std::set<std::string> _getNamesWithConflictingCasing_inlock(StringData name);
-    // typedef StringMap<Database*> DBs;
-    using DBCache = StringMap<Database*>;
+    using DBMap = StringMap<std::shared_ptr<Database>>;
 
-    // mutable SimpleMutex _m;
-    mutable std::vector<txservice::SimpleSpinlock> _lockVector{serverGlobalParams.reservedThreadNum};
-    std::vector<DBCache> _dbCaches{serverGlobalParams.reservedThreadNum};
+    mutable std::vector<std::mutex> _dbMapMutexVector{serverGlobalParams.reservedThreadNum + 1};
+    std::vector<DBMap> _dbMapVector{
+        serverGlobalParams.reservedThreadNum +
+        1};  // the first is used for other threads while the rest is used for thread group
+
+    // mutable std::mutex _globalDBMapMutex;
+    // DBMap _globalDBMap;  // used for other threads
 };
 }  // namespace mongo

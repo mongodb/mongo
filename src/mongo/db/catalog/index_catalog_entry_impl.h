@@ -28,21 +28,20 @@
 
 #pragma once
 
-#include "mongo/db/modules/monograph/tx_service/include/spinlock.h"
-#include "mongo/db/server_options.h"
-#include <boost/optional.hpp>
+#include <mutex>
 #include <string>
 
-#include "mongo/base/owned_pointer_vector.h"
+#include <boost/optional.hpp>
+
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -229,9 +228,11 @@ private:
     // causes the index to be multikey.
     // MultikeyPaths _indexMultikeyPaths;
 
-    mutable std::vector<txservice::SimpleSpinlock> _lockVector{
-        serverGlobalParams.reservedThreadNum};
-    std::vector<MultikeyPaths> _indexMultikeyPathsVector{serverGlobalParams.reservedThreadNum};
+
+    mutable std::vector<std::mutex> _localIndexMultikeyPathsMutexVector{
+        1 + serverGlobalParams.reservedThreadNum};
+    std::vector<MultikeyPaths> _localIndexMultikeyPathsVector{1 +
+                                                              serverGlobalParams.reservedThreadNum};
 
     // KVPrefix used to differentiate between index entries in different logical indexes sharing the
     // same underlying sorted data interface.

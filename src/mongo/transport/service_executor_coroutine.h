@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
-#include <stdint.h>
+#include <string_view>
 
 #include "mongo/base/status.h"
 #include "mongo/platform/atomic_word.h"
@@ -14,7 +14,7 @@
 #include "mongo/transport/service_executor_task_names.h"
 
 #include "mongo/db/modules/monograph/tx_service/include/moodycamelqueue.h"
-#include <string_view>
+
 
 namespace mongo {
 namespace transport {
@@ -41,8 +41,12 @@ public:
      */
     void tick();
 
+    void setTxServiceFunctors(int16_t id);
+
 private:
     bool isBusy() const;
+
+    // uint16_t id;
 
     moodycamel::ConcurrentQueue<Task> _taskQueue;
     std::atomic<size_t> _taskQueueSize{0};
@@ -57,6 +61,9 @@ private:
 
     std::atomic<uint64_t> _tickCnt{0};
     static constexpr uint64_t kTrySleepTimeOut = 5;
+
+    std::function<void()> _txProcessorExec;
+    std::function<void(int16_t)> _updateExtProc;
 };
 
 /**
@@ -92,13 +99,11 @@ public:
     void appendStats(BSONObjBuilder* bob) const override;
 
 private:
-    Status _startWorker(uint16_t groupId);
+    Status _startWorker(int16_t groupId);
 
     // static thread_local std::deque<Task> _localWorkQueue;
     // static thread_local int _localRecursionDepth;
     // static thread_local int64_t _localThreadIdleCounter;
-
-    static constexpr size_t kTaskBatchSize{100};
 
     std::atomic<bool> _stillRunning{false};
 
@@ -108,11 +113,15 @@ private:
 
     AtomicUInt32 _numRunningWorkerThreads{0};
 
-    constexpr static std::string_view _name{"coroutine"};
     const size_t _reservedThreads;
 
     std::vector<ThreadGroup> _threadGroups;
     std::thread _backgroundTimeService;
+
+    constexpr static std::string_view _name{"coroutine"};
+    constexpr static size_t kTaskBatchSize{100};
+    constexpr static uint32_t kIdleCycle = (1 << 10) - 1;  // 2^n-1
+    constexpr static uint32_t kIdleTimeoutMs = 1000;
 };
 
 }  // namespace transport
