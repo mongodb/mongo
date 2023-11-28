@@ -453,6 +453,19 @@ functions:
             mkdir -p mongodb/feature_flags
             cp ./all_feature_flags.txt mongodb/feature_flags
           fi
+  generate server params list:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
+            set -o errexit
+            set -o verbose
+            source "${workdir}/compile_venv/bin/activate"
+            python ./buildscripts/idl/gen_all_server_params_list.py
+            mkdir -p mongodb/server_params
+            cp ./all_server_params.txt mongodb/server_params
+          fi
   compile mongodb:
     - command: shell.exec
       params:
@@ -615,6 +628,7 @@ tasks:
       - func: "compile prep"
       - func: "compile mongo tools"
       - func: "generate feature flag list"
+      - func: "generate server params list"
       - func: "compile mongodb"
       - func: "download jstests"
       - func: "package binary"
@@ -634,6 +648,7 @@ tasks:
       - func: "compile prep"
       - func: "compile mongo tools"
       - func: "generate feature flag list"
+      - func: "generate server params list"
       - func: "download mongodb"
       - func: "download jstests"
       - func: "package binary"
