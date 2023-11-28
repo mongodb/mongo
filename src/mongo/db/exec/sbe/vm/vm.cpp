@@ -4295,7 +4295,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfCP(ArityT
     byteIndex = startByteIndex;
     for (codePointIndex = startCodePointIndex; codePointIndex < endCodePointIndex;
          ++codePointIndex) {
-        if (str.substr(byteIndex, substr.size()).compare(substr) == 0) {
+        if (str.substr(byteIndex, substr.size()) == substr) {
             return {
                 false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(codePointIndex)};
         }

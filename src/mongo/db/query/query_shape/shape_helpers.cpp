@@ -44,7 +44,7 @@ BSONObj shapifyFlatObj(BSONObj obj, const SerializationOptions& opts, bool value
 
     BSONObjBuilder bob;
     for (BSONElement elem : obj) {
-        if (hintSpecialField.compare(elem.fieldNameStringData()) == 0) {
+        if (hintSpecialField == elem.fieldNameStringData()) {
             if (elem.type() == BSONType::String) {
                 bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
             } else if (elem.type() == BSONType::Object) {
@@ -56,7 +56,7 @@ BSONObj shapifyFlatObj(BSONObj obj, const SerializationOptions& opts, bool value
         }
 
         // $natural doesn't need to be redacted.
-        if (elem.fieldNameStringData().compare(query_request_helper::kNaturalSortField) == 0) {
+        if (elem.fieldNameStringData() == query_request_helper::kNaturalSortField) {
             bob.append(elem);
             continue;
         }

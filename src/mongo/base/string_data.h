@@ -240,7 +240,7 @@ public:
     }
 
     /**
-     * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'v' in
+     * Returns <0, 0, or >0 if 'this' is less, equal, or greater than 'v' in
      * lexicographical order.
      */
     constexpr int compare(StringData v) const noexcept {

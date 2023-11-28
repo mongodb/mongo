@@ -46,9 +46,9 @@ public:
     /**
      * Compares two string values, applying a weak order (i.e. allowing ties).
      * Returns:
-     *   -1 if `left < right`
+     *   <0 if `left < right`
      *    0 if `left == right`
-     *   +1 if `left > right`
+     *   >0 if `left > right`
      */
     virtual int compare(StringData left, StringData right) const = 0;
 

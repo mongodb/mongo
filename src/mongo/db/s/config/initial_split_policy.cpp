@@ -752,7 +752,7 @@ std::vector<BSONObj> SamplingBasedSplitPolicy::createRawPipeline(const ShardKeyP
     for (auto&& fieldRef : shardKeyFields) {
         // If the shard key includes a hashed field and current fieldRef is the hashed field.
         if (shardKey.isHashedPattern() &&
-            fieldRef->dottedField().compare(shardKey.getHashedField().fieldNameStringData()) == 0) {
+            fieldRef->dottedField() == shardKey.getHashedField().fieldNameStringData()) {
             arrayToObjectBuilder.emplace_back(
                 Doc{{"k", V{fieldRef->dottedField()}},
                     {"v", Doc{{"$toHashedIndexKey", V{"$" + fieldRef->dottedField()}}}}});
