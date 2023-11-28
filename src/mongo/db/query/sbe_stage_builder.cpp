@@ -777,15 +777,22 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
     }
 }
 
-void SlotBasedStageBuilder::analyzeTree() {
+void SlotBasedStageBuilder::analyzeTree(const QuerySolutionNode* root) {
     using DfsItem = std::pair<const QuerySolutionNode*, size_t>;
 
     absl::InlinedVector<DfsItem, 32> dfs;
-    dfs.emplace_back(DfsItem(_root, 0));
+    dfs.emplace_back(DfsItem(root, 0));
 
     while (!dfs.empty()) {
         auto& dfsBack = dfs.back();
         auto node = dfsBack.first;
+
+        // skip if already analyzed this subtree
+        if (_analysis.count(node)) {
+            dfs.pop_back();
+            continue;
+        }
+
         auto childIdx = dfsBack.second;
 
         if (childIdx < node->children.size()) {
@@ -904,8 +911,6 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
 
     _root = root;
     ON_BLOCK_EXIT([&] { _root = nullptr; });
-
-    analyzeTree();
 
     auto [stage, outputs] = buildTree();
 
@@ -2976,6 +2981,7 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto pn = static_cast<const ProjectionNode*>(root);
     const auto& projection = pn->proj;
+    auto isSimpleProjection = projection.isSimple();
 
     bool isInclusion = projection.type() == projection_ast::ProjectType::kInclusion;
     auto childAllowedFields = getAllowedFieldSet(root->children[0].get());
@@ -3025,10 +3031,22 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
 
     const bool reqResult = reqs.has(kResult) || produceDefaultMRInfo;
 
+    std::vector<std::string> nothingPaths;
+    std::vector<std::string> passthruPaths;
+    std::vector<std::string> updatedPaths;
+    std::vector<std::string> resultPaths;
+
     // Map the parent's required fields onto the outputs of this projection.
-    auto [nothingPaths, passthruPaths, updatedPaths, resultPaths] =
-        mapRequiredFieldsToProjectionOutputs(
-            reqFields, isInclusion, childAllowedFields, paths, nodes, mrInfoModifys, mrInfoDrops);
+    if (!reqFields.empty() || !mrInfoModifys.empty() || !mrInfoDrops.empty()) {
+        std::tie(nothingPaths, passthruPaths, updatedPaths, resultPaths) =
+            mapRequiredFieldsToProjectionOutputs(reqFields,
+                                                 isInclusion,
+                                                 childAllowedFields,
+                                                 paths,
+                                                 nodes,
+                                                 mrInfoModifys,
+                                                 mrInfoDrops);
+    }
 
     // Eliminate parts of the projection that are known to be no-ops.
     if (!childAllowedFields.getList().empty() ||
@@ -3053,7 +3071,7 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
         }
     }
 
-    auto updatedPathSet = StringSet(updatedPaths.begin(), updatedPaths.end());
+    StringSet updatedPathSet(updatedPaths.begin(), updatedPaths.end());
 
     std::vector<std::string> resultFields;
     StringSet resultFieldSet;
@@ -3086,9 +3104,11 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
     boost::optional<std::vector<std::string>> inputPlanSingleFields;
 
     StringMap<Expression*> updatedPathsExprMap;
-    for (size_t i = 0; i < nodes.size(); ++i) {
-        if (updatedPathSet.count(paths[i])) {
-            updatedPathsExprMap.emplace(paths[i], nodes[i].getExpr());
+    if (!updatedPathSet.empty()) {
+        for (size_t i = 0; i < nodes.size(); ++i) {
+            if (updatedPathSet.count(paths[i])) {
+                updatedPathsExprMap.emplace(paths[i], nodes[i].getExpr());
+            }
         }
     }
 
@@ -3184,14 +3204,20 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
     if (makeResult && !childMakeResult && !useCoveredProjection && !useInputPlanWithoutObj) {
         // Verify that the effects of this projection's descendants would be compatible with
         // the MakeResultInfo req that this node would issue.
-        auto effects = ProjectionEffects(isInclusion, paths, nodes);
+        boost::optional<ProjectionEffects> effectsOpt;
 
-        effects = ProjectionEffects(effects.getNonDroppedFieldSet(),
-                                    effects.getModifiedOrCreatedFieldSet(),
-                                    FieldSet::makeEmptySet() /* createdFieldSet */,
-                                    effects.getFieldList());
-
-        effects.compose(ProjectionEffects(childAllowedFields));
+        auto getProjectionEffects = [&] {
+            if (!effectsOpt) {
+                ProjectionEffects effects(isInclusion, paths, nodes);
+                effects = ProjectionEffects(effects.getNonDroppedFieldSet(),
+                                            effects.getModifiedOrCreatedFieldSet(),
+                                            FieldSet::makeEmptySet() /* createdFieldSet */,
+                                            effects.getFieldList());
+                effects.compose(ProjectionEffects(childAllowedFields));
+                effectsOpt.emplace(effects);
+            }
+            return *effectsOpt;
+        };
 
         bool canUseMakeResultInfo = true;
         bool descendantCanUseMakeResultInfo = false;
@@ -3209,6 +3235,7 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
             auto descPn = static_cast<const ProjectionNode*>(desc);
             auto [descPaths, descNodes] = getProjectNodes(descPn->proj);
             bool descIsInclusion = descPn->proj.type() == projection_ast::ProjectType::kInclusion;
+            auto effects = getProjectionEffects();
             auto effectsWithDesc = effects;
             effectsWithDesc.compose(ProjectionEffects(descIsInclusion, descPaths, descNodes));
             // Check if this descendant would be able to support the MakeResultInfo req that it
@@ -3304,7 +3331,9 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
     auto planType = BuildProjectionPlan::kDoNotMakeResult;
 
     if (makeResult) {
-        if (childMakeResult) {
+        if (childMakeResult && isSimpleProjection) {
+            planType = BuildProjectionPlan::kUseSimpleProjection;
+        } else if (childMakeResult) {
             planType = BuildProjectionPlan::kUseChildResult;
         } else if (useCoveredProjection) {
             planType = BuildProjectionPlan::kUseCoveredProjection;
@@ -3364,6 +3393,28 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         for (auto&& nothingPath : plan->projNothingInputFields) {
             outputs.set(std::make_pair(PlanStageSlots::kField, nothingPath), nothingSlot);
         }
+    }
+
+    if (planType == BuildProjectionPlan::kUseSimpleProjection) {
+        const auto childResultSlot = outputs.get(kResult).slotId;
+
+        auto behaviour = isInclusion ? sbe::MakeBsonObjStage::FieldBehavior::keep
+                                     : sbe::MakeBsonObjStage::FieldBehavior::drop;
+        auto resultSlot = _slotIdGenerator.generate();
+        outputs.set(kResult, TypedSlot{resultSlot, TypeSignature::kObjectType});
+
+        stage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(stage),
+                                                  resultSlot,
+                                                  childResultSlot,
+                                                  behaviour,
+                                                  std::move(plan->paths),
+                                                  std::vector<std::string>{},
+                                                  sbe::makeSV(),
+                                                  true,
+                                                  false,
+                                                  root->nodeId());
+        outputs.clearNonRequiredSlotsAndInfos(reqs);
+        return {std::move(stage), std::move(outputs)};
     }
 
     std::unique_ptr<sbe::MakeObjInputPlan> inputPlan;

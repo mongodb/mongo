@@ -818,6 +818,7 @@ private:
 struct BuildProjectionPlan {
     enum Type {
         kDoNotMakeResult,
+        kUseSimpleProjection,
         kUseChildResult,
         kUseCoveredProjection,
         kUseInputPlanWithoutObj,
@@ -894,7 +895,7 @@ public:
     PlanType build(const QuerySolutionNode* root) final;
 
 private:
-    void analyzeTree();
+    void analyzeTree(const QuerySolutionNode* node);
 
     QsnAnalysis analyze(const QuerySolutionNode* node);
 
@@ -906,11 +907,13 @@ private:
         return _analysis.find(node.get())->second;
     }
 
-    const FieldSet& getAllowedFieldSet(const QuerySolutionNode* node) const {
+    const FieldSet& getAllowedFieldSet(const QuerySolutionNode* node) {
+        analyzeTree(node);
         return getAnalysis(node).allowedFieldSet;
     }
 
-    const FieldSet& getAllowedFieldSet(const std::unique_ptr<QuerySolutionNode>& node) const {
+    const FieldSet& getAllowedFieldSet(const std::unique_ptr<QuerySolutionNode>& node) {
+        analyzeTree(node.get());
         return getAnalysis(node).allowedFieldSet;
     }
 
