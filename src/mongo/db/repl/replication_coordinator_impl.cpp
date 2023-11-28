@@ -943,6 +943,11 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) 
 
 void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
                                          StorageEngine::LastShutdownState lastShutdownState) {
+    // Initialize the cached pointer to the oplog collection. We want to do this even as standalone
+    // so accesses to the cached pointer in replica set nodes started as standalone still work
+    // (mainly AutoGetOplog). In case the oplog doesn't exist, it is just initialized to null.
+    acquireOplogCollectionForLogging(opCtx);
+
     if (!_settings.isReplSet()) {
         if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
             uassert(ErrorCodes::InvalidOptions,
@@ -982,9 +987,6 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
 
     invariant(_settings.isReplSet());
     invariant(!ReplSettings::shouldRecoverFromOplogAsStandalone());
-
-    // Initialize the cached pointer to the oplog collection.
-    acquireOplogCollectionForLogging(opCtx);
 
     _storage->initializeStorageControlsForReplication(opCtx->getServiceContext());
 

@@ -376,8 +376,6 @@ void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opC
     // We support only recovery from stable checkpoints during initial sync.
     invariant(!_duringInitialSync || recoveryTS);
 
-    // Initialize the cached pointer to the oplog collection.
-    acquireOplogCollectionForLogging(opCtx);
     boost::optional<Timestamp> stableTimestamp = boost::none;
     if (recoveryTS || startupRecoveryForRestore) {
         if (startupRecoveryForRestore && !recoveryTS) {
@@ -427,9 +425,6 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
         LOGV2_FATAL_NOTRACE(31399,
                             "Cannot use 'recoverToOplogTimestamp' without a stable checkpoint");
     }
-
-    // Initialize the cached pointer to the oplog collection.
-    acquireOplogCollectionForLogging(opCtx);
 
     // This may take an IS lock on the oplog collection.
     _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, &recoveryTS);
