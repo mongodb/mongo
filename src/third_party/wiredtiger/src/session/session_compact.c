@@ -339,14 +339,17 @@ __compact_worker(WT_SESSION_IMPL *session)
             if (ret == EBUSY) {
                 if (__wt_cache_stuck(session)) {
                     WT_STAT_CONN_INCR(session, session_table_compact_fail_cache_pressure);
-                    WT_ERR_MSG(session, EBUSY, "compaction halted by eviction pressure");
+                    WT_ERR_MSG(session, EBUSY,
+                      "Compaction halted at data handle %s by eviction pressure. Returning EBUSY.",
+                      session->op_handle[i]->name);
                 }
                 ret = 0;
                 another_pass = true;
 
-                __wt_verbose_info(session, WT_VERB_COMPACT, "%s",
-                  "Data handle compaction failed with EBUSY but the cache is not stuck. "
-                  "Will give it another go.");
+                __wt_verbose_info(session, WT_VERB_COMPACT,
+                  "The compaction of the data handle %s returned EBUSY due to an in-progress "
+                  "conflicting checkpoint. Compaction of this data handle will be retried.",
+                  session->op_handle[i]->name);
             }
         }
         if (!another_pass)
