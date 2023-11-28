@@ -1026,4 +1026,6 @@ last-lts:
     ticket: SERVER-77427
   - test_file: jstests/sharding/query/sharded_lookup_execution.js
     ticket: SERVER-77427
+  - test_file: jstests/replsets/log_wt_stats_during_secondary_oplog_application.js
+    ticket: SERVER-78509
   suites: null
