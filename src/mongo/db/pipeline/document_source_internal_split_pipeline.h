@@ -63,6 +63,10 @@ public:
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        return DepsTracker::State::SEE_NEXT;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,

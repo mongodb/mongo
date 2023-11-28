@@ -87,6 +87,9 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasSearchScoreDetails() && other.hasSearchScoreDetails()) {
         setSearchScoreDetails(other.getSearchScoreDetails());
     }
+    if (!hasSearchSequenceToken() && other.hasSearchSequenceToken()) {
+        setSearchSequenceToken(other.getSearchSequenceToken());
+    }
     if (!hasTimeseriesBucketMinTime() && other.hasTimeseriesBucketMinTime()) {
         setTimeseriesBucketMinTime(other.getTimeseriesBucketMinTime());
     }
@@ -129,6 +132,9 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     if (other.hasSearchScoreDetails()) {
         setSearchScoreDetails(other.getSearchScoreDetails());
     }
+    if (other.hasSearchSequenceToken()) {
+        setSearchSequenceToken(other.getSearchSequenceToken());
+    }
     if (other.hasTimeseriesBucketMinTime()) {
         setTimeseriesBucketMinTime(other.getTimeseriesBucketMinTime());
     }
@@ -163,6 +169,7 @@ size_t DocumentMetadataFields::getApproximateSize() const {
     size += _holder->indexKey.objsize();
     size += _holder->searchScoreDetails.objsize();
     size += _holder->searchSortValues.objsize();
+    size -= sizeof(_holder->searchSequenceToken);
     return size;
 }
 
@@ -209,6 +216,10 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
     if (hasSearchScoreDetails()) {
         buf.appendNum(static_cast<char>(MetaType::kSearchScoreDetails + 1));
         getSearchScoreDetails().appendSelfToBufBuilder(buf);
+    }
+    if (hasSearchSequenceToken()) {
+        buf.appendNum(static_cast<char>(MetaType::kSearchSequenceToken + 1));
+        getSearchSequenceToken().serializeForSorter(buf);
     }
     if (hasTimeseriesBucketMinTime()) {
         buf.appendNum(static_cast<char>(MetaType::kTimeseriesBucketMinTime + 1));
@@ -268,6 +279,9 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
         } else if (marker == static_cast<char>(MetaType::kVectorSearchScore) + 1) {
             out->setVectorSearchScore(buf.read<LittleEndian<double>>());
+        } else if (marker == static_cast<char>(MetaType::kSearchSequenceToken) + 1) {
+            out->setSearchSequenceToken(
+                Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
@@ -329,6 +343,8 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "timeseries bucket max time";
         case DocumentMetadataFields::kSearchSortValues:
             return "$search sort values";
+        case DocumentMetadataFields::kSearchSequenceToken:
+            return "$search sequence token";
         case DocumentMetadataFields::kVectorSearchScore:
             return "$vectorSearch distance";
         default:
