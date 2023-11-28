@@ -427,6 +427,8 @@ last-continuous:
     ticket: SERVER-82984
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_replace.js
     ticket: SERVER-82984
+  - test_file: jstests/core/timeseries/timeseries_project_pushdown.js
+    ticket: SERVER-82447
   suites: null
 last-lts:
   all:
@@ -900,4 +902,6 @@ last-lts:
     ticket: SERVER-82984
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_replace.js
     ticket: SERVER-82984
+  - test_file: jstests/core/timeseries/timeseries_project_pushdown.js
+    ticket: SERVER-82447
   suites: null
