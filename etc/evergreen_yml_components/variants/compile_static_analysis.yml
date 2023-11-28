@@ -25,14 +25,6 @@ variables:
     - enterprise
   stepback: false
 
-- &amazon2-x86-compile-params  # Essential set of compile parameters used for Linux dev variants.
-  run_on:
-  - amazon2-xlarge
-  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  modules:
-    - enterprise
-  stepback: false
-
 - &linux-x86-dynamic-compile-expansions
   scons_cache_scope: shared
   scons_cache_mode: all
@@ -44,38 +36,10 @@ variables:
     --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     --link-model=dynamic
 
-- &amazon2-x86-compile-expansions
-  scons_cache_scope: shared
-  scons_cache_mode: all
-  has_packages: false
-  compile_flags: >-
-    --ssl
-    MONGO_DISTMOD=amazon2
-    -j$(grep -c ^processor /proc/cpuinfo)
-    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/variants/compile_static_analysis.yml
 # - etc/evergreen_yml_components/variants/amazon/build_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux-arm64-static-compile-params  # Essential set of compile parameters used for Linux dev variants.
-  run_on:
-  - amazon2-arm64-xlarge
-  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  modules:
-    - enterprise
-  stepback: false
-
-- &amazon-linux2-arm64-compile-expansions
-  scons_cache_scope: shared
-  scons_cache_mode: all
-  has_packages: false
-  compile_flags: >-
-    --ssl
-    MONGO_DISTMOD=amazon2
-    -j$(grep -c ^processor /proc/cpuinfo)
-    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-
 # If you add anything to san_options, make sure the appropriate changes are
 # also made to SConstruct.
 # and also to the san_options in evergreen.yml and sanitizer.yml
@@ -106,24 +70,6 @@ buildvariants:
     - name: server_selection_json_test_TG
       distros:
       - rhel80-large
-
-- <<: *amazon2-x86-compile-params
-  name: &amazon2-x86-compile amazon2-x86-compile #static compile
-  display_name: "Amazon2 x86 Static Compile"
-  expansions:
-    <<: *amazon2-x86-compile-expansions
-    compile_variant: *amazon2-x86-compile
-  tasks:
-    - name: compile_and_package_serial_no_unittests_TG
-
-- <<: *linux-arm64-static-compile-params
-  name: &amazon-linux2-arm64-compile amazon-linux2-arm64-compile
-  display_name: "Amazon Linux2 Arm64 Static Compile"
-  expansions:
-    <<: *amazon-linux2-arm64-compile-expansions
-    compile_variant: *amazon-linux2-arm64-compile
-  tasks:
-    - name: compile_and_package_serial_no_unittests_TG
 
 - <<: *generic_linux_compile_params
   name: &linux-x86-dynamic-compile-future-tag-multiversion linux-x86-dynamic-compile-future-tag-multiversion

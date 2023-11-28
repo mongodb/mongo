@@ -3,7 +3,6 @@ stepback: false
 
 include:
   - filename: etc/evergreen_yml_components/variants/task_generation.yml
-  - filename: etc/evergreen_yml_components/variants/compile_static_analysis.yml
   - filename: etc/evergreen_yml_components/definitions.yml
   - filename: etc/evergreen_yml_components/perf_tasks.yml
   - filename: etc/evergreen_yml_components/variants/perf.yml
@@ -968,6 +967,44 @@ buildvariants:
       - "amazon2023.0-arm64-large"
     tasks:
       - name: compile_mongocrypt_shlib
+
+  - name: amazon2-x86-compile
+    display_name: "Amazon2 x86 Static Compile"
+    expansions:
+      compile_variant: amazon2-x86-compile
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    run_on:
+    - amazon2-xlarge
+    modules:
+      - enterprise
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+
+  - name: amazon-linux2-arm64-compile
+    display_name: "Amazon Linux2 Arm64 Static Compile"
+    expansions:
+      compile_variant: amazon-linux2-arm64-compile
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    run_on:
+    - amazon2-arm64-xlarge
+    modules:
+      - enterprise
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
 
   - name: linux-intel-standalone-classic-query-engine
     display_name: Linux Intel Standalone (Classic Query Engine)
@@ -2170,27 +2207,6 @@ buildvariants:
       mongodb_setup_release: 2022-11
       mongodb_setup: shard-one-node-default-sharding
       infrastructure_provisioning_release: 2022-11
-      infrastructure_provisioning: single
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: "-arm64"
-    run_on:
-      - "rhel70-perf-single"
-    depends_on: *_compile_amazon_linux2_arm64
-    tasks: *1nodetasks
-
-  - name: perf-1-node-replSet.arm.aws.2023-09
-    display_name: PERF 1-Node ReplSet ARM AWS 2023-09
-    # Leave off for now
-    activate: false
-    modules: *modules
-    expansions:
-      mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica
-      infrastructure_provisioning_release: 2023-09
       infrastructure_provisioning: single
       workload_setup: 2022-11
       platform: linux
