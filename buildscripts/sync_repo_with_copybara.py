@@ -116,6 +116,8 @@ def main():
         expansions["app_id_copybara_syncer"], expansions["private_key_copybara_syncer"],
         expansions["installation_id_copybara_syncer"])
 
+
+
     # Create the mongodb-bot.gitconfig file as necessary.
     create_mongodb_bot_gitconfig()
 
