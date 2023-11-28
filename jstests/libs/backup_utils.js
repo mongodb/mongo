@@ -1,7 +1,7 @@
 import {Thread} from "jstests/libs/parallelTester.js";
 
 export function backupData(mongo, destinationDirectory) {
-    let backupCursor = openBackupCursor(mongo);
+    let backupCursor = openBackupCursor(mongo.getDB("admin"));
     let metadata = getBackupCursorMetadata(backupCursor);
     copyBackupCursorFiles(
         backupCursor, /*namespacesToSkip=*/[], metadata.dbpath, destinationDirectory);
@@ -9,12 +9,15 @@ export function backupData(mongo, destinationDirectory) {
     return metadata;
 }
 
-export function openBackupCursor(mongo) {
+export function openBackupCursor(db, backupOptions, aggregateOptions) {
     // Opening a backup cursor can race with taking a checkpoint, resulting in a transient
     // error. Retry until it succeeds.
+    backupOptions = backupOptions || {};
+    aggregateOptions = aggregateOptions || {};
+
     while (true) {
         try {
-            return mongo.getDB("admin").aggregate([{$backupCursor: {}}]);
+            return db.aggregate([{$backupCursor: backupOptions}], aggregateOptions);
         } catch (exc) {
             jsTestLog({"Failed to open a backup cursor, retrying.": exc});
         }
