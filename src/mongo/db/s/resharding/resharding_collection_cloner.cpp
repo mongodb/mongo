@@ -650,6 +650,7 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
                                                    false /* eligibleForSampling */,
                                                    std::move(pipeline),
                                                    boost::none /* explain */,
+                                                   boost::none /* cri */,
                                                    ShardTargetingPolicy::kAllowed,
                                                    readConcern,
                                                    std::move(designatedHostsMap),

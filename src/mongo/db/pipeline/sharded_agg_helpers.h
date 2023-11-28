@@ -177,6 +177,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     bool eligibleForSampling,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
+    boost::optional<CollectionRoutingInfo> cri = boost::none,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none,
     AsyncRequestsSender::ShardHostMap designatedHostsMap = {},
