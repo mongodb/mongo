@@ -153,6 +153,11 @@ Status finishAndLogApply(OperationContext* opCtx,
 
             attrs.add("duration", Milliseconds(opDuration));
 
+            // Obtain storage specific statistics and log them if they exist.
+            CurOp::get(opCtx)->debug().storageStats =
+                opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
+            CurOp::get(opCtx)->debug().reportStorageStats(&attrs);
+
             LOGV2(51801, "Applied op", attrs);
         }
     }

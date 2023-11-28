@@ -238,6 +238,8 @@ public:
                 const ResourceConsumption::OperationMetrics* operationMetrics,
                 logv2::DynamicAttributes* pAttrs) const;
 
+    void reportStorageStats(logv2::DynamicAttributes* pAttrs) const;
+
     /**
      * Appends information about the current operation to "builder"
      *
