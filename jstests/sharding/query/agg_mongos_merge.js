@@ -6,13 +6,14 @@
  * - Non-splittable streaming stages, e.g. $match, $project, $unwind.
  * - Blocking stages in cases where 'allowDiskUse' is false, e.g. $group, $bucketAuto.
  *
+ * Shard targeting logic for $lookup changed in 7.3 and may not match the expected behavior in a
+ * multiversion environment.
  * @tags: [
- *   requires_profiling,
+ *   requires_fcv_73,
  * ]
  */
 
 import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
-import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 
@@ -135,10 +136,11 @@ function assertMergeBehaviour(
                   "Expected merge on the primary shard, but " + foundMessage());
     }
     else {
-        assert.eq(mergeType, "anyShard", "unknown merge type: " + mergeType);
+        assert(mergeType === "anyShard" || mergeType === "specificShard",
+               "unknown merge type: " + mergeType);
         assert.eq(primaryShardMergeCount + nonPrimaryShardMergeCount,
                   1,
-                  "Expected merge on any shard, but " + foundMessage());
+                  "Expected merge on some shard, but " + foundMessage());
     }
 }
 
@@ -245,9 +247,13 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
         expectedCount: 1
     });
 
-    // Test that $facet is merged on mongoD if any pipeline requires a primary shard merge,
+    // Test that $facet is merged on mongoS if no pipeline has a specific host type requirement,
     // regardless of 'allowDiskUse'.
-    assertMergeOnMongoD({
+    // TODO SERVER-79580: Ideally, we should be merging on the owner of 'unshardedColl' (that is,
+    // shard0). This doesn't happen because not all stages (including $facet) are aware of
+    // 'StageConstraints::mergeShardId'. As such, we should determine which stages that take
+    // subpipeline(s) need to propagate 'mergeShardId' when computing 'constraints'.
+    assertMergeOnMongoS({
             testName: "agg_mongos_merge_facet_pipe_needs_primary_shard_disk_use_" + allowDiskUse,
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -268,7 +274,6 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
                   }
                 }
             ],
-            mergeType: "primaryShard",
             allowDiskUse: allowDiskUse,
             expectedCount: 1
         });
@@ -321,7 +326,7 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
             }
             }
         ],
-        mergeType: "primaryShard",
+        mergeType: "specificShard",
         allowDiskUse: allowDiskUse,
         expectedCount: 400
     });
