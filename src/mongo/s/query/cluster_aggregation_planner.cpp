@@ -736,7 +736,8 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                                    pipelineDataSource,
                                                    eligibleForSampling,
                                                    std::move(targeter.pipeline),
-                                                   expCtx->explain);
+                                                   expCtx->explain,
+                                                   targeter.cri);
 
     // Check for valid usage of SEARCH_META. We wait until after we've dispatched pipelines to the
     // shards in the event that we need to resolve any views.

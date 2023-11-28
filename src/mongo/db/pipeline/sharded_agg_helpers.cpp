@@ -308,7 +308,7 @@ std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expC
         return {*mergeShardId};
     }
 
-    invariant(cri);
+    tassert(8361100, "Need CollectionRoutingInfo to target sharded query", cri);
     return getTargetedShardsForQuery(expCtx, cri->cm, shardQuery, collation);
 }
 
@@ -1301,15 +1301,20 @@ DispatchShardPipelineResults dispatchShardPipeline(
     bool eligibleForSampling,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
+    boost::optional<CollectionRoutingInfo> cri,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     AsyncRequestsSender::ShardHostMap designatedHostsMap,
     stdx::unordered_map<ShardId, BSONObj> resumeTokenMap,
     std::set<ShardId> shardsToSkip) {
     const auto& expCtx = pipeline->getContext();
-    auto executionNsRoutingInfo = getCollectionRoutingInfoForTargeting(expCtx, pipelineDataSource);
-    TargetingResults targeting = targetPipeline(
-        expCtx, pipeline.get(), pipelineDataSource, shardTargetingPolicy, executionNsRoutingInfo);
+
+    // Only acquire CollectionRoutingInfo if we do not already have one.
+    if (!cri) {
+        cri = getCollectionRoutingInfoForTargeting(expCtx, pipelineDataSource);
+    }
+    TargetingResults targeting =
+        targetPipeline(expCtx, pipeline.get(), pipelineDataSource, shardTargetingPolicy, cri);
     auto& shardIds = targeting.shardIds;
     for (const auto& shard : shardsToSkip) {
         shardIds.erase(shard);
@@ -1324,7 +1329,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                          targeting,
                                          pipelineDataSource == PipelineDataSource::kChangeStream,
                                          eligibleForSampling,
-                                         executionNsRoutingInfo,
+                                         cri,
                                          std::move(pipeline),
                                          std::move(explain),
                                          std::move(readConcern),
