@@ -13,7 +13,60 @@ http_archive(
         "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2204-arm64/c8946f1ee23987ed32481a2f571d0ee38f86667b/bazel_v4_toolchain_builder_ubuntu2204_arm64_c8946f1ee23987ed32481a2f571d0ee38f86667b_23_10_25_04_25_33.tar.gz",
     ],
 )
+register_toolchains("@mongo_toolchain//:mongo_toolchain")
 
-register_toolchains(
-    "@mongo_toolchain//:mongo_toolchain",
+load("//bazel/toolchains:python_toolchain.bzl", "setup_mongo_python_toolchains")
+[register_toolchains(toolchain) for toolchain in setup_mongo_python_toolchains()]
+
+http_archive(
+    name = "rules_python",
+    sha256 = "8c8fe44ef0a9afc256d1e75ad5f448bb59b81aba149b8958f02f7b3a98f5d9b4",
+    strip_prefix = "rules_python-0.13.0",
+    url = "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.13.0.tar.gz",
+)
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "aspect_bazel_lib",
+    sha256 = "e3151d87910f69cf1fc88755392d7c878034a69d6499b287bcfc00b1cf9bb415",
+    strip_prefix = "bazel-lib-1.32.1",
+    url = "https://github.com/aspect-build/bazel-lib/releases/download/v1.32.1/bazel-lib-v1.32.1.tar.gz",
+)
+
+# aspect rules rely on skylib, so this function will download dependency
+load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
+aspect_bazel_lib_dependencies()
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "platforms",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
+        "https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
+    ],
+    sha256 = "8150406605389ececb6da07cbcb509d5637a3ab9a24bc69b1101531367d89d74",
+)
+
+# Poetry rules for managing Python dependencies
+
+http_archive(
+    name = "rules_poetry",
+    strip_prefix = "rules_poetry-04f2b93c83587ab377bf5a724eaafd63b4ff5930",
+    urls = ["https://github.com/mongodb-forks/rules_poetry/archive/04f2b93c83587ab377bf5a724eaafd63b4ff5930.tar.gz"],
+)
+
+load("@rules_poetry//rules_poetry:defs.bzl", "poetry_deps")
+
+poetry_deps()
+
+load("@rules_poetry//rules_poetry:poetry.bzl", "poetry")
+
+poetry(
+    name = "poetry",
+    lockfile = "//:poetry.lock",
+    pyproject = "//:pyproject.toml",
+    python_interpreter_target_default="@py_host//:bin/python3",
+    python_interpreter_target_mac="@py_host//:bin/python3",
+    python_interpreter_target_win="@py_host//:python.exe",
 )

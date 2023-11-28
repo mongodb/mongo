@@ -6,6 +6,10 @@ build --enable_platform_specific_config=true
 # This makes builds more hermetic by preventing environment variables from leaking into the execution of rules
 build --incompatible_strict_action_env=true
 
+# allows us to use python rules. This is needed because of the bug:
+# https://github.com/bazelbuild/bazel/issues/4327
+build --nobuild_runfile_links
+
 # This supports the "crosstool" feature (aka building from our toolchain).
 # Currently the only platform with a custom toolchain config is linux, use the default
 # toolchain_suite elsewhere.

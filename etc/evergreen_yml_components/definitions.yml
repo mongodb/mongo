@@ -147,7 +147,7 @@ variables:
 
 - &compile_bazel_task_group_template
   name: compile_bazel_task_group_template
-  max_hosts: 1
+  max_hosts: -1
   tasks: []
   setup_group_can_fail_task: true
   setup_group:
@@ -1368,6 +1368,17 @@ functions:
       - "src/evergreen/bazel_compile.sh"
 
   "bazel compile (clang)":
+  - *get_version_expansions
+  - *apply_version_expansions
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/bazel_compile.sh"
+
+  "bazel compile (msvc)":
   - *get_version_expansions
   - *apply_version_expansions
   - *f_expansions_write
@@ -2690,6 +2701,19 @@ tasks:
       targets: src/mongo/db/commands:fsync_locked
       compiler: clang
 
+- name: bazel_py_hello_world
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
+  - func: "fetch bazel"
+  - func: "bazel compile (gcc)"
+    vars:
+      targets: //bazel:py_hello_world
+      compiler: gcc
+
 - name: compile_bazel_dist_test_windows
   tags: []
   depends_on:
@@ -2739,6 +2763,7 @@ tasks:
   - func: "verify build output present"
     vars:
       output: build/fast/mongo/db/commands/libfsync_locked.a
+
 
 # Validates that the bazel mongo toolchain can be used to compile targets that
 # contain C and asssembly source code files.
@@ -9367,11 +9392,13 @@ task_groups:
   - compile_bazel_program
   - compile_ninja_bazel
   - run_bazel_program
+  - bazel_py_hello_world
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_windows_TG
   tasks:
   - compile_bazel_dist_test_windows
+  - bazel_py_hello_world
   - run_bazel_program_windows
   - compile_ninja_bazel
 
@@ -9379,6 +9406,7 @@ task_groups:
   name: compile_bazel_macos_TG
   tasks:
   - compile_bazel_dist_test_macos
+  - bazel_py_hello_world
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG

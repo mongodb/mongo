@@ -1,0 +1,16 @@
+# TODO SERVER-80633 remove this when we have rules which use the toolchain
+load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel:mongo_src_rules.bzl", "run_python_buildscript")
+
+run_python_buildscript(
+    name = "py_hello_world",            # label for this target
+    script = "hello_world.py",          # entry point script to execute
+    outputs = [":hello_world.txt"],      # generated outputs
+    args = [                            # args
+        "--output-file", 
+        "$(execpath :hello_world.txt)", 
+        "--hello-target", 
+        "World"
+    ],
+    py_deps = [dependency("networkx")], # pip dependencies
+)
