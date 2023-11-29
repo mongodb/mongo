@@ -1166,7 +1166,7 @@ void assertReadConcernSupported(const CollectionPtr& coll,
                                 const repl::ReadConcernArgs& readConcernArgs,
                                 const RecoveryUnit::ReadSource& readSource) {
     const auto readConcernLevel = readConcernArgs.getLevel();
-    NamespaceString ns = coll->ns();
+    const auto& ns = coll->ns();
 
     // Pre-images and change collection tables prune old content using untimestamped truncates. A
     // read establishing a snapshot at a point in time (PIT) may see data inconsistent with that
