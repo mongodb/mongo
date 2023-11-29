@@ -586,7 +586,8 @@ class GDBDumper(Dumper):
                                str(pinfo.pidv))
 
     @TRACER.start_as_current_span("core_analyzer.analyze_cores")
-    def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str) -> Report:
+    def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str,
+                      multiversion_dir: str) -> Report:
         core_files = find_files(f"*.{self.get_dump_ext()}", core_file_dir)
         analyze_cores_span = get_default_current_span()
         if not core_files:
@@ -612,7 +613,8 @@ class GDBDumper(Dumper):
                 try:
                     exit_code, status = self.analyze_core(
                         core_file_path=core_file_path, install_dir=install_dir,
-                        analysis_dir=analysis_dir, tmp_dir=tmp_dir, logger=logger)
+                        analysis_dir=analysis_dir, tmp_dir=tmp_dir, logger=logger,
+                        multiversion_dir=multiversion_dir)
                 except Exception:
                     logger.exception("Exception occured while analyzing core")
                     exit_code = 1
@@ -641,6 +643,7 @@ class GDBDumper(Dumper):
         return report
 
     def analyze_core(self, core_file_path: str, install_dir: str, analysis_dir: str, tmp_dir: str,
+                     multiversion_dir: str,
                      logger: logging.Logger) -> Tuple[int, str]:  # returns (exit_code, test_status)
         cmds = []
         dbg = self._find_debugger()
@@ -653,8 +656,9 @@ class GDBDumper(Dumper):
         call([dbg, "--version"], logger)
         lib_dir = None
 
-        binary_name = self.get_binary_from_core_dump(core_file_path)
-        binary_files = find_files(binary_name, install_dir)
+        binary_name, bin_version = self.get_binary_from_core_dump(core_file_path)
+        search_dir = multiversion_dir if bin_version else install_dir
+        binary_files = find_files(binary_name, search_dir)
 
         if not binary_files:
             # This can sometimes happen because coredumps can appear from non-mongo processes
@@ -665,7 +669,7 @@ class GDBDumper(Dumper):
             logger.error("More than one file found in %s matching %s", install_dir, binary_name)
             return 1, "fail"
 
-        binary_path = binary_files[0]
+        binary_path = os.path.realpath(os.path.abspath(binary_files[0]))
         lib_dir = os.path.abspath(os.path.join(os.path.dirname(binary_files[0]), "..", "lib"))
 
         basename = os.path.basename(core_file_path)
@@ -742,7 +746,11 @@ class GDBDumper(Dumper):
         binary_path = regex.group(1)
         binary_name = binary_path.split(" ")[0]
         binary_name = binary_name.split("/")[-1]
-        return binary_name
+        regex = re.match(r"[a-zA-Z]+-([0-9]{1,2}\.[0-9])", binary_name)
+        bin_version = None
+        if regex:
+            bin_version = regex.group(1)
+        return binary_name, bin_version
 
     @staticmethod
     def _find_gcore():

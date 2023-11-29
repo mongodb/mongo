@@ -26,6 +26,7 @@ class CoreAnalyzer(Subcommand):
     def execute(self):
         base_dir = self.options.working_dir
         current_span = get_default_current_span({"failed_task_id": self.task_id})
+        dumpers = dumper.get_dumpers(self.root_logger, None)
 
         if self.task_id:
             skip_download = False
@@ -37,8 +38,10 @@ class CoreAnalyzer(Subcommand):
                         self.root_logger.info(
                             "Files from task id provided were already on disk, skipping download.")
 
-            if not skip_download and not download_task_artifacts(self.root_logger, self.task_id,
-                                                                 base_dir, self.execution):
+            multiversion_dir = os.path.join(base_dir, "multiversion")
+            if not skip_download and not download_task_artifacts(
+                    self.root_logger, self.task_id, base_dir, dumpers.dbg, multiversion_dir,
+                    self.execution):
                 self.root_logger.error("Artifacts were not found.")
                 current_span.set_attributes({
                     "core_analyzer_execute_error": "Artifacts were not found.",
@@ -56,10 +59,11 @@ class CoreAnalyzer(Subcommand):
             install_dir = self.options.install_dir or os.path.join(os.path.curdir, "build",
                                                                    "install")
             core_dump_dir = self.options.core_dir or os.path.curdir
+            multiversion_dir = self.options.multiversion_dir or os.path.curdir
 
         analysis_dir = os.path.join(base_dir, "analysis")
-        dumpers = dumper.get_dumpers(self.root_logger, None)
-        report = dumpers.dbg.analyze_cores(core_dump_dir, install_dir, analysis_dir)
+        report = dumpers.dbg.analyze_cores(core_dump_dir, install_dir, analysis_dir,
+                                           multiversion_dir)
 
         if self.options.generate_report:
             with open("report.json", "w") as file:
@@ -111,6 +115,9 @@ class CoreAnalyzerPlugin(PluginInterface):
 
         parser.add_argument("--install-dir", '-b', action="store", type=str, default=None,
                             help="Directory that contains binaires and debugsymbols.")
+
+        parser.add_argument("--multiversion-dir", '-m', action="store", type=str, default=None,
+                            help="Directory that contains multiversion binaries and debugsymbols.")
 
         parser.add_argument("--core-dir", '-c', action="store", type=str, default=None,
                             help="Directory that contains core dumps.")

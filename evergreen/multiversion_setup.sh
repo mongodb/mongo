@@ -34,7 +34,8 @@ base_command="db-contrib-tool setup-repro-env"
 evergreen_args="--installDir /data/install \
   --linkDir /data/multiversion \
   --platform $platform \
-  --architecture $architecture"
+  --architecture $architecture \
+  --evgVersionsFile multiversion-downloads.json"
 local_args="--edition $edition \
   --fallbackToMaster \
   --resmokeCmd \"python buildscripts/resmoke.py\" \

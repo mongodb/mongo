@@ -181,6 +181,7 @@ variables:
   - func: "attach report"
   - func: "attach artifacts"
   - func: "attach local resmoke invocation"
+  - func: "attach multiversion download links"
   - func: "kill processes"
   - func: "save mongo coredumps"
   - func: "generate hang analyzer tasks"
@@ -2616,6 +2617,19 @@ functions:
       permissions: public-read
       content_type: text/plain
       display_name: Resmoke.py Invocation for Local Usage
+
+  "attach multiversion download links":
+    command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/multiversion-downloads.json
+      remote_file: ${project}/${build_variant}/${revision}/multiversion-downloads-${task_id}-${execution}.json
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/json
+      display_name: Multiversion download links
 
   "attach multiversion exclude tags":
     command: s3.put

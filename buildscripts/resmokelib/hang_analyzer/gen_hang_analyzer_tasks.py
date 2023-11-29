@@ -23,6 +23,8 @@ from buildscripts.resmokelib.utils import evergreen_conn
 
 GENERATED_TASK_PREFIX = "core_analysis"
 RANDOM_STRING_LENGTH = 5
+LOCAL_BIN_DIR = os.path.join("dist-test", "bin")
+MULTIVERSION_BIN_DIR = os.path.normpath("/data/multiversion")
 
 
 def get_generated_task_name(current_task_name: str, execution: str) -> str:
@@ -138,18 +140,18 @@ def generate(expansions_file: str = "../expansions.yml",
     # See if any core dumps were uploaded for this task
     has_known_core_dumps = False
     dumpers = dumper.get_dumpers(None, None)
-    bin_dir = "dist-test/bin"
-    if not os.path.exists(bin_dir):
+    if not os.path.exists(LOCAL_BIN_DIR):
         raise RuntimeError("binary directory not found, skipping task generation")
 
-    binary_files = os.listdir(bin_dir)
     for artifact in task_info.artifacts:
         regex = re.search(r"Core Dump [0-9]+ \((.*)\.gz\)", artifact.name)
         if not regex:
             continue
 
         core_file = regex.group(1)
-        binary_name = dumpers.dbg.get_binary_from_core_dump(core_file)
+        binary_name, bin_version = dumpers.dbg.get_binary_from_core_dump(core_file)
+        dir_to_check = MULTIVERSION_BIN_DIR if bin_version else LOCAL_BIN_DIR
+        binary_files = os.listdir(dir_to_check)
         if binary_name in binary_files:
             has_known_core_dumps = True
             break

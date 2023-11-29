@@ -111,6 +111,7 @@ post:
 - func: "attach report"
 - func: "attach task errors"
 - func: "attach artifacts"
+- func: "attach multiversion download links"
 - func: "save ec2 task artifacts"
 - func: "attach wiki page"
 - func: "upload docker compose"

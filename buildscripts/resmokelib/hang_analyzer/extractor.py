@@ -2,6 +2,7 @@
 import concurrent.futures
 import glob
 import gzip
+import json
 from logging import Logger
 import os
 from pathlib import Path
@@ -18,6 +19,7 @@ from retry import retry
 from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
 
+from buildscripts.resmokelib.hang_analyzer.dumper import Dumper
 from buildscripts.resmokelib.setup_multiversion.download import DownloadError
 from buildscripts.resmokelib.run import compare_start_time
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import _DownloadOptions, SetupMultiversion
@@ -55,7 +57,8 @@ def run_with_retries(root_logger: Logger, func: Callable[..., bool], timeout_sec
 
 
 @TRACER.start_as_current_span("core_analyzer.download_core_dumps")
-def download_core_dumps(root_logger: Logger, task: Task, download_dir: str) -> bool:
+def download_core_dumps(root_logger: Logger, task: Task, download_dir: str, debugger: Dumper,
+                        multiversion_versions: set) -> bool:
     root_logger.info("Looking for core dumps")
     artifacts = task.artifacts
     core_dumps_found = 0
@@ -103,6 +106,10 @@ def download_core_dumps(root_logger: Logger, task: Task, download_dir: str) -> b
                         f"Done extracting core dump {extracted_name} to {extract_path}")
                     os.remove(file_name)
 
+                    _, bin_version = debugger.get_binary_from_core_dump(extract_path)
+                    if bin_version:
+                        multiversion_versions.add(bin_version)
+
                 download_core_dump(artifact)
                 core_dumps_found += 1
 
@@ -135,20 +142,27 @@ def download_core_dumps(root_logger: Logger, task: Task, download_dir: str) -> b
 
 
 @TRACER.start_as_current_span("core_analyzer.download_multiversion_artifact")
-def download_multiversion_artifact(root_logger: Logger, task: Task,
-                                   download_options: _DownloadOptions, download_dir: str,
-                                   name: str) -> bool:
-    current_span = get_default_current_span({"downloaded_artifact_type": name})
+def download_multiversion_artifact(root_logger: Logger, version_id: str, variant: str,
+                                   download_options: _DownloadOptions, download_dir: str, name: str,
+                                   bin_version: str = None) -> bool:
+    current_span = get_default_current_span(
+        {"downloaded_artifact_type": name, "version": bin_version if bin_version else "current"})
     try:
         root_logger.info("Downloading %s", name)
         multiversion_setup = SetupMultiversion(download_options=download_options,
-                                               ignore_failed_push=True)
-        urlinfo = multiversion_setup.get_urls(version=task.version_id,
-                                              buildvariant_name=task.build_variant)
-        install_dir = os.path.join(download_dir, "install")
-        os.makedirs(install_dir, exist_ok=True)
-        multiversion_setup.download_and_extract_from_urls(
-            urlinfo.urls, bin_suffix=None, install_dir=install_dir, skip_symlinks=True)
+                                               ignore_failed_push=True,
+                                               link_dir=os.path.abspath(download_dir))
+        urlinfo = multiversion_setup.get_urls(version=version_id, buildvariant_name=variant)
+        if bin_version:
+            install_dir = os.path.abspath(os.path.join(download_dir, bin_version, "install"))
+            os.makedirs(install_dir, exist_ok=True)
+            multiversion_setup.download_and_extract_from_urls(
+                urlinfo.urls, bin_suffix=bin_version, install_dir=install_dir, skip_symlinks=False)
+        else:
+            install_dir = os.path.abspath(os.path.join(download_dir, "install"))
+            os.makedirs(install_dir, exist_ok=True)
+            multiversion_setup.download_and_extract_from_urls(
+                urlinfo.urls, bin_suffix=None, install_dir=install_dir, skip_symlinks=True)
         root_logger.info("Downloaded %s", name)
         return True
     except Exception as ex:
@@ -319,9 +333,9 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
 
 
 @TRACER.start_as_current_span("core_analyzer.download_task_artifacts")
-def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str,
-                            execution: Optional[int] = None, retry_secs: int = 10,
-                            download_timeout_secs: int = 30 * 60) -> bool:
+def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str, debugger: Dumper,
+                            multiversion_dir: str, execution: Optional[int] = None,
+                            retry_secs: int = 10, download_timeout_secs: int = 30 * 60) -> bool:
     if os.path.exists(download_dir):
         # quick sanity check to ensure we don't delete a repo
         if os.path.exists(os.path.join(download_dir, ".git")):
@@ -342,22 +356,26 @@ def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str
     debugsymbols_download_options = _DownloadOptions(db=False, ds=True, da=False, dv=False)
 
     all_downloaded = True
+    multiversion_versions = set()
     with OtelThreadPoolExecutor() as executor:
         futures = []
         futures.append(
             executor.submit(run_with_retries, root_logger=root_logger, func=download_core_dumps,
                             timeout_secs=download_timeout_secs, retry_secs=retry_secs,
-                            task=task_info, download_dir=download_dir))
+                            task=task_info, download_dir=download_dir, debugger=debugger,
+                            multiversion_versions=multiversion_versions))
         futures.append(
             executor.submit(run_with_retries, func=download_multiversion_artifact,
                             timeout_secs=download_timeout_secs, retry_secs=retry_secs,
-                            root_logger=root_logger, task=task_info,
+                            root_logger=root_logger, version_id=task_info.version_id,
+                            variant=task_info.build_variant,
                             download_options=binary_download_options, download_dir=download_dir,
                             name="binaries"))
         futures.append(
             executor.submit(run_with_retries, func=download_multiversion_artifact,
                             timeout_secs=download_timeout_secs, retry_secs=retry_secs,
-                            root_logger=root_logger, task=task_info,
+                            root_logger=root_logger, version_id=task_info.version_id,
+                            variant=task_info.build_variant,
                             download_options=debugsymbols_download_options,
                             download_dir=download_dir, name="debugsymbols"))
 
@@ -370,8 +388,59 @@ def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str
                 all_downloaded = False
                 break
 
+    if multiversion_versions:
+
+        @retry(tries=3, delay=5)
+        def get_multiversion_download_links(task: Task) -> Optional[dict]:
+            for artifact in task.artifacts:
+                if artifact.name != "Multiversion download links":
+                    continue
+
+                with urllib.request.urlopen(artifact.url) as url:
+                    return json.load(url)
+            return None
+
+        multiversion_downloads = get_multiversion_download_links(task_info)
+        if not multiversion_downloads:
+            raise RuntimeError("Multiversion core dumps were found without download links.")
+
+        with OtelThreadPoolExecutor() as executor:
+            futures = []
+            for version in multiversion_versions:
+                version_downloads = multiversion_downloads[version]
+                version_id = version_downloads["evg_version_id"]
+                variant = version_downloads["evg_build_variant"]
+                futures.append(
+                    executor.submit(run_with_retries, func=download_multiversion_artifact,
+                                    timeout_secs=download_timeout_secs, retry_secs=retry_secs,
+                                    root_logger=root_logger, version_id=version_id, variant=variant,
+                                    download_options=binary_download_options,
+                                    download_dir=multiversion_dir, name=f"binaries-{version}",
+                                    bin_version=version))
+                futures.append(
+                    executor.submit(run_with_retries, func=download_multiversion_artifact,
+                                    timeout_secs=download_timeout_secs, retry_secs=retry_secs,
+                                    root_logger=root_logger, version_id=version_id, variant=variant,
+                                    download_options=debugsymbols_download_options,
+                                    download_dir=multiversion_dir, name=f"debugsymbols-{version}",
+                                    bin_version=version))
+
+            for future in concurrent.futures.as_completed(futures):
+                if not future.result():
+                    current_span.set_status(StatusCode.ERROR,
+                                            "Errors occured while fetching old version artifacts")
+                    current_span.set_attribute(
+                        "download_task_artifacts_error",
+                        "Errors occured while fetching old version artifacts")
+                    root_logger.error("Errors occured while fetching old version artifacts")
+                    all_downloaded = False
+                    break
+
     if all_downloaded and sys.platform.startswith("linux"):
         post_install_gdb_optimization(download_dir, root_logger)
+
+        for version in multiversion_versions:
+            post_install_gdb_optimization(os.path.join(multiversion_dir, version), root_logger)
 
     return all_downloaded
 
