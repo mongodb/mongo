@@ -6562,6 +6562,7 @@ tasks:
     - func: "fetch artifacts"
 
 - name: publish_packages
+  run_on: rhel70-small
   tags: ["publish"]
   # This should prevent this task from running in patch builds, where we
   # don't want to publish packages.
@@ -7467,8 +7468,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - ubuntu1804-small
 
 - name: enterprise-ubuntu1804-64
   display_name: Enterprise Ubuntu 18.04
@@ -7517,8 +7516,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - ubuntu1804-small
 
 - name: ubuntu1604
   display_name: SSL Ubuntu 16.04
@@ -7583,8 +7580,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - ubuntu1604-small
 
 - name: enterprise-ubuntu1604-arm64
   display_name: Enterprise Ubuntu 16.04 arm64
@@ -7632,8 +7627,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - ubuntu1604-test
 
 - name: enterprise-ubuntu1804-arm64
   display_name: Enterprise Ubuntu 18.04 arm64
@@ -7680,8 +7673,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - ubuntu1804-test
 
 - name: ubuntu1804-arm64
   display_name: SSL Ubuntu 18.04 arm64
@@ -7711,8 +7702,6 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
-    distros:
-    - ubuntu1804-test
 
 - name: enterprise-linux-64-amazon-ami
   display_name: "Enterprise Amazon Linux"
@@ -7767,8 +7756,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - amazon1-2018-small
 
 - name: amazon
   display_name: SSL Amazon Linux
@@ -7821,8 +7808,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - amazon1-2018-small
 
 - name: enterprise-amazon2
   display_name: "Enterprise Amazon Linux 2"
@@ -7880,8 +7865,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - amazon2-small
 
 - name: enterprise-amazon2-arm64
   display_name: "Enterprise Amazon Linux 2 ARM64"
@@ -7939,8 +7922,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - amazon2-small
 
 - name: amazon2
   display_name: SSL Amazon Linux 2
@@ -7997,8 +7978,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - amazon2-small
 
 - name: amazon2-arm64
   display_name: SSL Amazon Linux 2 ARM64
@@ -8054,8 +8033,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - amazon2-small
 
 - name: tig-daily-cron
   modules:
@@ -8691,8 +8668,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - rhel62-small
 
 - name: enterprise-rhel-70-64-bit-store-fam-images-in-side-coll
   display_name: "Enterprise RHEL 7.0 (storeFindAndModifyImagesInSideCollection=True)"
@@ -9174,8 +9149,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - rhel70-small
 
 - &enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit
@@ -9235,8 +9208,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - rhel80-small
 
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
@@ -9326,8 +9297,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - rhel62-small
 
 - name: rhel70
   display_name: SSL RHEL 7.0
@@ -9379,8 +9348,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - rhel70-small
 
 - name: rhel80
   display_name: SSL RHEL 8.0
@@ -9432,8 +9399,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - rhel80-small
 
 # This variant compiles on RHEL 7.0 and runs tests on RHEL 7.6
 - name: rhel76_compile_rhel70
@@ -9507,8 +9472,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel70-small
 
 - name: enterprise-rhel-81-ppc64le
   display_name: Enterprise RHEL 8.1 PPC64LE
@@ -9566,8 +9529,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel70-small
 
 - name: enterprise-rhel-72-s390x
   display_name: Enterprise RHEL 7.2 s390x
@@ -9623,8 +9584,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel70-small
 
 ###########################################
 #          Ubuntu buildvariants           #
@@ -9680,8 +9639,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - ubuntu1604-small
 
 
 - name: enterprise-ubuntu-dynamic-1604-clang
@@ -9768,8 +9725,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - suse12-sp5-small
 
 - name: suse12
   display_name: SSL SUSE 12
@@ -9820,8 +9775,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - suse12-sp5-small
 
 - name: enterprise-suse15-64
   display_name: Enterprise SLES 15
@@ -9864,8 +9817,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - suse15-small
 
 - name: suse15
   display_name: SSL SUSE 15
@@ -9912,8 +9863,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - suse15-small
 
 ###########################################
 #          Debian buildvariants           #
@@ -9967,8 +9916,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - debian92-small
 
 - name: enterprise-debian10-64
   display_name: Enterprise Debian 10
@@ -10019,8 +9966,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - debian10-small
 
 - name: debian92
   display_name: SSL Debian 9.2
@@ -10075,8 +10020,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - debian92-small
 
 - name: debian10
   display_name: Debian 10
@@ -10131,8 +10074,6 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: .publish
-    distros:
-    - debian10-small
 
 ################################
 # storage engine buildvariants #
