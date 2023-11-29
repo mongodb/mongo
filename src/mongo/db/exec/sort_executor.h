@@ -166,6 +166,7 @@ public:
         _stats.spills += _sorter->stats().spilledRanges();
         _stats.totalDataSizeBytes += _sorter->stats().bytesSorted();
         _stats.spilledDataStorageSize += spilledDataStorageSize();
+        _stats.memoryUsageBytes = 0;
         _sorter.reset();
     }
 
