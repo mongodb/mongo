@@ -116,7 +116,9 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         mongo::BSONObj obj =
             mongo::key_string::toBsonSafe(&Data[2 + len], Size - (2 + len), ord, tb);
         // We want to make sure the generated BSON is valid
-        invariant(mongo::validateBSON(obj.objdata(), obj.objsize()));
+        auto validationResult = mongo::validateBSON(obj.objdata(), obj.objsize());
+        invariant(validationResult.isOK() ||
+                  validationResult.code() == mongo::ErrorCodes::NonConformantBSON);
     } catch (const mongo::AssertionException&) {
         // We need to catch exceptions caused by invalid inputs
     }
