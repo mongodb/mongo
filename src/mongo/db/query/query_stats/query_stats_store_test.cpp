@@ -54,7 +54,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_shape/query_shape.h"
@@ -966,7 +965,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
         shapified);
 
     // Add the fields that shouldn't be abstracted.
-    acr.setExplain(ExplainOptions::Verbosity::kExecStats);
     acr.setAllowDiskUse(false);
     acr.setHint(BSON("z" << 1 << "c" << 1));
     acr.setCollation(BSON("locale"
@@ -1027,7 +1025,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "collectionType": "collection",
@@ -1103,7 +1100,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "collectionType": "collection",
@@ -1182,7 +1178,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "comment": "?string",
@@ -1268,7 +1263,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "comment": "?",
