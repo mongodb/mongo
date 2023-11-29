@@ -7242,12 +7242,11 @@ tasks:
     vars:
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_simultaneous_replication_wiredtiger_cursor_sweeps
-  tags: ["concurrency", "repl", "cursor_sweeps"]
+- <<: *gen_task_template
+  name: concurrency_simultaneous_replication_wiredtiger_cursor_sweeps_gen
+  tags: ["concurrency", "large", "repl", "cursor_sweeps", "random_name"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
       resmoke_jobs_max: 1
 
