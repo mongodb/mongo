@@ -1036,16 +1036,15 @@ ShardsvrCreateCollectionRequest patchedRequestForChangeStream(
  * 3. Inserts an entry into config.placementHistory with the sublist of shards that will host
  * one or more chunks of the new collection
  */
-boost::optional<CreateCollectionResponse> commit(
-    OperationContext* opCtx,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const ShardsvrCreateCollectionRequest& request,
-    boost::optional<InitialSplitPolicy::ShardCollectionConfig>& initialChunks,
-    const boost::optional<UUID>& collectionUUID,
-    const NamespaceString& nss,
-    const boost::optional<mongo::TranslatedRequestParams>& translatedRequestParams,
-    bool skipBestEffortParticipantsRefresh,
-    std::function<OperationSessionInfo(OperationContext*)> newSessionBuilder) {
+void commit(OperationContext* opCtx,
+            const std::shared_ptr<executor::TaskExecutor>& executor,
+            const ShardsvrCreateCollectionRequest& request,
+            boost::optional<InitialSplitPolicy::ShardCollectionConfig>& initialChunks,
+            const boost::optional<UUID>& collectionUUID,
+            const NamespaceString& nss,
+            const std::set<ShardId>& shardsHoldingData,
+            const boost::optional<mongo::TranslatedRequestParams>& translatedRequestParams,
+            std::function<OperationSessionInfo(OperationContext*)> newSessionBuilder) {
     LOGV2_DEBUG(5277906, 2, "Create collection commit", logAttrs(nss));
 
     if (MONGO_unlikely(failAtCommitCreateCollectionCoordinator.shouldFail())) {
@@ -1063,12 +1062,6 @@ boost::optional<CreateCollectionResponse> commit(
     if (request.getUnsplittable())
         coll.setUnsplittable(request.getUnsplittable());
 
-    auto shardsHoldingData = std::set<ShardId>();
-    for (const auto& chunk : initialChunks->chunks) {
-        const auto& chunkShardId = chunk.getShard();
-        shardsHoldingData.emplace(chunkShardId);
-    }
-
     const auto& placementVersion = initialChunks->chunks.back().getVersion();
 
     if (request.getTimeseries()) {
@@ -1085,92 +1078,13 @@ boost::optional<CreateCollectionResponse> commit(
         coll.setUnique(*request.getUnique());
     }
 
-    const auto patchedRequestBSONObj =
-        patchedRequestForChangeStream(request, *translatedRequestParams).toBSON();
-
-    try {
-        notifyChangeStreamsOnShardCollection(opCtx,
-                                             nss,
-                                             *collectionUUID,
-                                             patchedRequestBSONObj,
-                                             CommitPhase::kPrepare,
-                                             shardsHoldingData);
-
-        updateCollectionMetadataInTransaction(opCtx,
-                                              executor,
-                                              initialChunks->chunks,
-                                              coll,
-                                              placementVersion,
-                                              shardsHoldingData,
-                                              newSessionBuilder(opCtx));
-
-        notifyChangeStreamsOnShardCollection(
-            opCtx, nss, *collectionUUID, patchedRequestBSONObj, CommitPhase::kSuccessful);
-
-        LOGV2_DEBUG(5277907, 2, "Collection successfully committed", logAttrs(nss));
-
-        forceShardFilteringMetadataRefresh(opCtx, nss);
-    } catch (const DBException& ex) {
-        LOGV2(5277908,
-              "Failed to obtain collection's placement version, so it will be recovered",
-              logAttrs(nss),
-              "error"_attr = redact(ex));
-
-        // If the refresh fails, then set the placement version to UNKNOWN and let a future
-        // operation to refresh the metadata.
-
-        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        {
-            UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
-            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
-                ->clearFilteringMetadata(opCtx);
-        }
-
-        notifyChangeStreamsOnShardCollection(
-            opCtx, nss, *collectionUUID, patchedRequestBSONObj, CommitPhase::kAborted);
-
-        throw;
-    }
-
-    if (!skipBestEffortParticipantsRefresh) {
-        // Best effort refresh to warm up cache of all involved shards so we can have a cluster
-        // ready to receive operations.
-        auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        auto dbPrimaryShardId = ShardingState::get(opCtx)->shardId();
-
-        for (const auto& shardid : shardsHoldingData) {
-            if (shardid == dbPrimaryShardId) {
-                continue;
-            }
-
-            auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardid));
-            shard->runFireAndForgetCommand(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                BSON("_flushRoutingTableCacheUpdates"
-                     << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
-        }
-    }
-
-    LOGV2(5277901,
-          "Created initial chunk(s)",
-          logAttrs(nss),
-          "numInitialChunks"_attr = initialChunks->chunks.size(),
-          "initialCollectionPlacementVersion"_attr = initialChunks->collPlacementVersion());
-
-    auto result = CreateCollectionResponse(ShardVersionFactory::make(
-        placementVersion, boost::optional<CollectionIndexes>(boost::none)));
-    result.setCollectionUUID(collectionUUID);
-
-    LOGV2(5458701,
-          "Collection created",
-          logAttrs(nss),
-          "UUID"_attr = result.getCollectionUUID(),
-          "placementVersion"_attr = result.getCollectionVersion());
-
-    return result;
+    updateCollectionMetadataInTransaction(opCtx,
+                                          executor,
+                                          initialChunks->chunks,
+                                          coll,
+                                          placementVersion,
+                                          shardsHoldingData,
+                                          newSessionBuilder(opCtx));
 }
 
 }  // namespace
@@ -1368,15 +1282,102 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                                          std::make_move_iterator(involvedShards.end())},
                     nss());
 
-                _result = commit(opCtx,
-                                 **executor,
-                                 _request,
-                                 _initialChunks,
-                                 _collectionUUID,
-                                 nss(),
-                                 _doc.getTranslatedRequestParams(),
-                                 false /* skipBestEffortParticipantsRefresh */,
-                                 [this](OperationContext* opCtx) { return getNewSession(opCtx); });
+                const auto patchedRequestBSONObj =
+                    patchedRequestForChangeStream(_request, *_doc.getTranslatedRequestParams())
+                        .toBSON();
+
+                try {
+                    notifyChangeStreamsOnShardCollection(opCtx,
+                                                         nss(),
+                                                         *_collectionUUID,
+                                                         patchedRequestBSONObj,
+                                                         CommitPhase::kPrepare,
+                                                         involvedShards);
+
+                    commit(opCtx,
+                           **executor,
+                           _request,
+                           _initialChunks,
+                           _collectionUUID,
+                           nss(),
+                           involvedShards,
+                           _doc.getTranslatedRequestParams(),
+                           [this](OperationContext* opCtx) { return getNewSession(opCtx); });
+
+                    notifyChangeStreamsOnShardCollection(opCtx,
+                                                         nss(),
+                                                         *_collectionUUID,
+                                                         patchedRequestBSONObj,
+                                                         CommitPhase::kSuccessful);
+
+                    LOGV2_DEBUG(5277907, 2, "Collection successfully committed", logAttrs(nss()));
+
+                    forceShardFilteringMetadataRefresh(opCtx, nss());
+                } catch (const DBException& ex) {
+                    LOGV2(
+                        5277908,
+                        "Failed to obtain collection's placement version, so it will be recovered",
+                        logAttrs(nss()),
+                        "error"_attr = redact(ex));
+
+                    // If the refresh fails, then set the placement version to UNKNOWN and let a
+                    // future operation to refresh the metadata.
+
+                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+                    {
+                        UninterruptibleLockGuard noInterrupt(  // NOLINT.
+                            shard_role_details::getLocker(opCtx));
+                        AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
+                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
+                                                                                             nss())
+                            ->clearFilteringMetadata(opCtx);
+                    }
+
+                    notifyChangeStreamsOnShardCollection(opCtx,
+                                                         nss(),
+                                                         *_collectionUUID,
+                                                         patchedRequestBSONObj,
+                                                         CommitPhase::kAborted);
+
+                    throw;
+                }
+
+                // Best effort refresh to warm up cache of all involved shards so we can have a
+                // cluster ready to receive operations.
+                auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+                auto dbPrimaryShardId = ShardingState::get(opCtx)->shardId();
+
+                for (const auto& shardid : involvedShards) {
+                    if (shardid == dbPrimaryShardId) {
+                        continue;
+                    }
+
+                    auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardid));
+                    shard->runFireAndForgetCommand(
+                        opCtx,
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                        DatabaseName::kAdmin,
+                        BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(
+                                 nss(), SerializationContext::stateDefault())));
+                }
+
+                LOGV2(5277901,
+                      "Created initial chunk(s)",
+                      logAttrs(nss()),
+                      "numInitialChunks"_attr = _initialChunks->chunks.size(),
+                      "initialCollectionPlacementVersion"_attr =
+                          _initialChunks->collPlacementVersion());
+
+                _result = CreateCollectionResponse(
+                    ShardVersionFactory::make(_initialChunks->chunks.back().getVersion(),
+                                              boost::optional<CollectionIndexes>(boost::none)));
+                _result->setCollectionUUID(_collectionUUID);
+
+                LOGV2(5458701,
+                      "Collection created",
+                      logAttrs(nss()),
+                      "UUID"_attr = _result->getCollectionUUID(),
+                      "placementVersion"_attr = _result->getCollectionVersion());
 
                 // End of the critical section, from now on, read and writes are permitted.
                 exitCriticalSectionsOnCoordinator(opCtx, true, _critSecReason, originalNss());
@@ -1544,15 +1545,25 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                  [this, executor = executor, anchor = shared_from_this()] {
                                      _commitOnShardingCatalog(executor);
                                  }))
+        .then(_buildPhaseHandler(Phase::kSetPostCommitMetadata,
+                                 [this, executor = executor, anchor = shared_from_this()] {
+                                     _setPostCommitMetadata(executor);
+                                 }))
         .then(_buildPhaseHandler(Phase::kExitCriticalSection,
                                  [this, token, executor = executor, anchor = shared_from_this()] {
                                      _exitCriticalSection(executor, token);
                                  }))
         .then([this, anchor = shared_from_this()] {
-            if (!_result) {
-                // In case of stepdown from previous phases, the _result will not be set. We need to
-                // recreate it, so once the future is completed, the shardsvr command can retrieve
-                // correctly the response.
+            if (_firstExecution) {
+                const auto& placementVersion = _initialChunks->chunks.back().getVersion();
+                CreateCollectionResponse response{ShardVersionFactory::make(
+                    placementVersion, boost::optional<CollectionIndexes>(boost::none))};
+                response.setCollectionUUID(_uuid);
+                _result = std::move(response);
+            } else {
+                // Recover metadata from the config server if the coordinator was resumed after
+                // releasing the critical section: a migration could potentially have committed
+                // changing the placement version.
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -1719,11 +1730,7 @@ void CreateCollectionCoordinator::_createCollectionOnParticipants(
         _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
 
         broadcastDropCollection(opCtx, nss(), **executor, getNewSession(opCtx));
-    }
 
-    // If _uuid field is not present, it indicates that there has been a retryable error on one of
-    // the previous phases.
-    if (!_uuid) {
         _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
     }
 
@@ -1739,21 +1746,25 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
     if (!_firstExecution) {
         _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
 
-        if (_validateCreateCollectionAlreadyCommitted(opCtx)) {
+        // Check if a previous request already created and committed the collection.
+        const auto shardKeyPattern =
+            ShardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
+        if (sharding_ddl_util::checkIfCollectionAlreadyTrackedWithOptions(
+                opCtx,
+                nss(),
+                shardKeyPattern.toBSON(),
+                _doc.getTranslatedRequestParams()->getCollation(),
+                _request.getUnique().value_or(false),
+                _request.getUnsplittable().value_or(false))) {
             return;
         }
-    }
 
-    // If any field is not present, it indicates that there has been a retryable error on one of
-    // the previous phases. It is needed to re-calculate the value of all volatile fields.
-    if (!_uuid || !_collectionEmpty || !_initialChunks) {
         _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
 
         _collectionEmpty = checkIfCollectionIsEmpty(opCtx, nss());
 
         // Re-calculate initial chunk distribution given the set of shards with the critical section
         // taken.
-        ShardKeyPattern shardKeyPattern{_doc.getTranslatedRequestParams()->getKeyPattern()};
         try {
             const auto splitPolicy = create_collection_util::createPolicy(
                 opCtx,
@@ -1777,17 +1788,58 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
         }
     }
 
-    _result = commit(opCtx,
-                     **executor,
-                     _request,
-                     _initialChunks,
-                     _uuid,
-                     nss(),
-                     _doc.getTranslatedRequestParams(),
-                     true /* skipBestEffortParticipantsRefresh */,
-                     [this](OperationContext* opCtx) { return getNewSession(opCtx); });
+    std::set<ShardId> involvedShards;
+    for (const auto& chunk : _initialChunks->chunks) {
+        involvedShards.emplace(chunk.getShard());
+    }
+
+    const auto patchedRequestBSONObj =
+        patchedRequestForChangeStream(_request, *_doc.getTranslatedRequestParams()).toBSON();
+
+    notifyChangeStreamsOnShardCollection(
+        opCtx, nss(), *_uuid, patchedRequestBSONObj, CommitPhase::kPrepare, involvedShards);
+
+    commit(opCtx,
+           **executor,
+           _request,
+           _initialChunks,
+           _uuid,
+           nss(),
+           involvedShards,
+           _doc.getTranslatedRequestParams(),
+           [this](OperationContext* opCtx) { return getNewSession(opCtx); });
 
     logEndCreateCollection(opCtx, originalNss(), _result, _collectionEmpty, _initialChunks);
+}
+
+void CreateCollectionCoordinator::_setPostCommitMetadata(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    auto opCtxHolder = cc().makeOperationContext();
+    auto* opCtx = opCtxHolder.get();
+    getForwardableOpMetadata().setOn(opCtx);
+
+    if (!_firstExecution) {
+        _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
+
+        _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
+    }
+
+    // Ensure that the change stream event gets emitted at least once.
+    notifyChangeStreamsOnShardCollection(
+        opCtx,
+        nss(),
+        *_uuid,
+        patchedRequestForChangeStream(_request, *_doc.getTranslatedRequestParams()).toBSON(),
+        CommitPhase::kSuccessful);
+
+    // Install new filtering metadata or clear it.
+    try {
+        forceShardFilteringMetadataRefresh(opCtx, nss());
+    } catch (const DBException&) {
+        AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss())
+            ->clearFilteringMetadata(opCtx);
+    }
 }
 
 void CreateCollectionCoordinator::_exitCriticalSection(
@@ -1808,46 +1860,6 @@ void CreateCollectionCoordinator::_exitCriticalSection(
     exitCriticalSectionsOnCoordinator(opCtx, _firstExecution, _critSecReason, originalNss());
 }
 
-bool CreateCollectionCoordinator::_validateCreateCollectionAlreadyCommitted(
-    OperationContext* opCtx) {
-    const auto shardKeyPattern =
-        ShardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
-    const auto& collation = _doc.getTranslatedRequestParams()->getCollation();
-
-    // Check if the collection was already sharded by a past request
-    if (auto createCollectionResponseOpt =
-            sharding_ddl_util::checkIfCollectionAlreadyTrackedWithOptions(
-                opCtx,
-                nss(),
-                shardKeyPattern.toBSON(),
-                collation,
-                _request.getUnique().value_or(false),
-                _request.getUnsplittable().value_or(false))) {
-        // A previous request already created and committed the collection but there was a stepdown
-        // after the commit.
-
-        // Ensure that the change stream event gets emitted at least once.
-        notifyChangeStreamsOnShardCollection(
-            opCtx,
-            nss(),
-            *createCollectionResponseOpt->getCollectionUUID(),
-            patchedRequestForChangeStream(_request, *_doc.getTranslatedRequestParams()).toBSON(),
-            CommitPhase::kSuccessful);
-
-        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        {
-            UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
-            AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss())
-                ->clearFilteringMetadata(opCtx);
-        }
-
-        return true;
-    }
-
-    return false;
-}
-
 ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
@@ -1860,6 +1872,19 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
 
             _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                 opCtx, getNewSession(opCtx), **executor);
+
+            if (_doc.getPhase() >= Phase::kCommitOnShardingCatalog) {
+                _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
+
+                // Notify change streams to abort the shard collection.
+                notifyChangeStreamsOnShardCollection(
+                    opCtx,
+                    nss(),
+                    *_uuid,
+                    patchedRequestForChangeStream(_request, *_doc.getTranslatedRequestParams())
+                        .toBSON(),
+                    CommitPhase::kAborted);
+            }
 
             if (_doc.getPhase() >= Phase::kEnterCriticalSection) {
                 _exitCriticalSectionsOnParticipants(

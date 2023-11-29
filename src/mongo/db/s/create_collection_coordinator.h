@@ -217,9 +217,11 @@ private:
     void _createCollectionOnParticipants(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-    // Commits the create collection operation to the sharding catalog within a transaction. After
-    // that, it clears the filtering metadata on the primary shard.
+    // Commits the create collection operation to the sharding catalog within a transaction.
     void _commitOnShardingCatalog(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    // Ensure that the change stream event gets emitted and install the new filtering metadata.
+    void _setPostCommitMetadata(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     // Exit from the critical section on all the shards, unblocking reads and writes. On the
     // participant shards, it is set to clear the filtering metadata after exiting the critical
@@ -233,8 +235,6 @@ private:
                                              std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                              const CancellationToken& token);
 
-    bool _validateCreateCollectionAlreadyCommitted(OperationContext* opCtx);
-
     mongo::ShardsvrCreateCollectionRequest _request;
 
     const BSONObj _critSecReason;
@@ -242,8 +242,8 @@ private:
     // Set on successful completion of the coordinator
     boost::optional<CreateCollectionResponse> _result;
 
-    // The fields below are only populated for the first execution, they will not be present if it
-    // is not the first run.
+    // The fields below are populated on the first execution. They will need to be re-calculated on
+    // following executions of the coordinator in case of error.
     boost::optional<UUID> _uuid;
     boost::optional<bool> _collectionEmpty;
     boost::optional<InitialSplitPolicy::ShardCollectionConfig> _initialChunks;
