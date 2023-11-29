@@ -297,6 +297,7 @@ env.Library(
         'server_options_base.idl',
         'server_options_general.idl',
         'server_options_nongeneral.idl',
+        'server_options_upgrade_downgrade.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',

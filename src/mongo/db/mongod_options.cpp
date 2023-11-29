@@ -73,6 +73,7 @@
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
+#include "mongo/db/server_options_upgrade_downgrade_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
@@ -124,6 +125,7 @@ Status addMongodOptions(moe::OptionSection* options) try {
     uassertStatusOK(addMongodLegacyOptions(options));
     uassertStatusOK(addKeyfileServerOption(options));
     uassertStatusOK(addClusterAuthModeServerOption(options));
+    uassertStatusOK(addServerUpgradeDowngradeOptions(options));
 
     return Status::OK();
 } catch (const AssertionException& ex) {

@@ -120,3 +120,8 @@ feature_flags:
         cpp_varname: gFeatureFlagOIDCInternalAuthorization
         default: true
         shouldBeFCVGated: false
+    featureFlag80MakeAllDeploymentsShardedClusters:
+        description: "Enable upgradeBackCompat and downgradeBackCompat CLI parameters"
+        cpp_varname: gfeatureFlag80MakeAllDeploymentsShardedClusters
+        default: false
+        shouldBeFCVGated: false
