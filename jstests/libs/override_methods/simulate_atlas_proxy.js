@@ -25,8 +25,9 @@ const originalRunCommand = Mongo.prototype.runCommand;
 const originalCloseMethod = Mongo.prototype.close;
 
 // Save a reference to the connection created at shell startup. This will be used as a proxy for
-// multiple internal routing connections for the lifetime of the test execution.
-const initialConn = db.getMongo();
+// multiple internal routing connections for the lifetime of the test execution. If there is no
+// initial connection, then we will not perform connection routing when using this override.
+const initialConn = (typeof db !== 'undefined') ? db.getMongo() : undefined;
 
 const testTenantMigrationDB = "testTenantMigration";
 // For shard merge we need to use the local DB that is not blocked by tenant access blockers.
