@@ -128,6 +128,131 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
+- name: amazon2-openssl111
+  display_name: "Amazon Linux 2 (openssl 1.1.1)"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - amazon2-openssl111-small
+  expansions:
+    test_flags: >-
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-amazon2-openssl111
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
+    multiversion_platform: amazon2
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: amazon2-openssl111-large
+    compile_variant: amazon2
+  tasks:
+  - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - amazon2-openssl111-large
+  - name: .aggfuzzer .common !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
+  - name: .auth !.audit !.multiversion
+  - name: sharding_auth_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: multiversion_gen
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.csrs !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+  - name: .sharding .txns
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-amazon2-openssl111
+  display_name: "Enterprise Amazon Linux 2 (openssl 1.1.1)"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - amazon2-openssl111-small
+  expansions:
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
+    test_flags: >-
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source,requires_latch_analyzer
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-amazon2-openssl111
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    compile_variant: enterprise-amazon2
+  tasks:
+  - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - amazon2-openssl111-large
+  - name: .aggfuzzer .common !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
+  - name: audit
+  - name: .auth !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.aggregation
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: .replica_sets .common
+  - name: sasl
+  - name: serial_run
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns !.csrs
+  - name: slow1_gen
+  - name: .stitch
+  - name: .crypt
+  - name: .publish_crypt
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+  - name: generate_buildid_to_debug_symbols_mapping
+
 - name: amazon2-arm64
   display_name: Amazon Linux 2 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -306,11 +431,189 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
+- name: amazon2-arm64-openssl111
+  display_name: Amazon Linux 2 arm64 (openssl 1.1.1)
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - amazon2-arm64-openssl111-small
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: aarch64-amazon2-openssl111
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: aarch64
+    packager_distro: amazon2
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: amazon2-arm64-openssl111-large
+    compile_variant: amazon2-arm64
+  tasks:
+  - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: aggregation !.feature_flag_guarded
+  - name: .auth !.audit !.multiversion
+  - name: sharding_auth_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu1804-arm64-build
+  - name: .publish
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-amazon2-arm64-openssl111
+  display_name: "Enterprise Amazon Linux 2 arm64 (openssl 1.1.1)"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - amazon2-arm64-openssl111-small
+  expansions:
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: aarch64-enterprise-amazon2-openssl111
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
+    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+    has_packages: true
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise
+    multiversion_architecture: aarch64
+    packager_script: packager_enterprise.py
+    packager_arch: aarch64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    compile_variant: enterprise-amazon2-arm64
+  tasks:
+  - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: test_api_version_compatibility
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.feature_flag_guarded
+  - name: audit
+  - name: .auth
+  - name: .causally_consistent !.sharding
+  - name: .change_streams
+  - name: .change_stream_fuzzer
+  - name: .misc_js
+  - name: .concurrency !.large !.ubsan !.no_txns
+  - name: .concurrency .large !.ubsan !.no_txns
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: .config_fuzzer !.large
+  - name: .config_fuzzer .large
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: disk_wiredtiger
+  - name: .encrypt
+  - name: idl_tests
+  - name: initial_sync_fuzzer_gen
+  - name: jsCore
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: .jscore .common !jsCore !.feature_flag_guarded
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
+  - name: libunwind_tests
+  - name: .multi_shard
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: .query_fuzzer !.feature_flag_guarded
+  - name: .read_write_concern .large
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: .read_write_concern !.large
+  - name: .replica_sets !.encrypt !.auth
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: .read_only
+  - name: .rollbackfuzzer
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_pinned_connections_auth
+  - name: search_ssl
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: .sharding .txns
+  - name: .sharding .common
+  - name: .stitch
+  - name: .crypt
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: .publish_crypt
+  - name: secondary_reads_passthrough_gen
+  - name: server_discovery_and_monitoring_json_test_TG
+  - name: .serverless
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: server_selection_json_test_TG
+    distros:
+    - amazon2-arm64-openssl111-large
+  - name: test_packages
+    distros:
+    - ubuntu1804-arm64-build
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
+  - name: .publish
+  - name: generate_buildid_to_debug_symbols_mapping
+
 - name: amazon2023
   display_name: Amazon Linux 2023
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - amazon2023.0-small
+
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org

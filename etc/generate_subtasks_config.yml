@@ -1,12 +1,16 @@
 build_variant_large_distro_exceptions:
   - amazon
   - amazon2
+  - amazon2-openssl111
+  - amazon2-arm64-openssl111
   - amazon2023
   - amazon2023-arm64
   - debian11
   - debian12
   - enterprise-amazon2
+  - enterprise-amazon2-openssl111
   - enterprise-amazon2-arm64
+  - enterprise-amazon2-arm64-openssl111
   - enterprise-amazon2023
   - enterprise-amazon2023-lto
   - enterprise-amazon2023-arm64
