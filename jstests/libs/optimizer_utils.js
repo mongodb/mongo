@@ -1,4 +1,4 @@
-import {getQueryPlanner} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, isAggregationPlan} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 /**
@@ -43,25 +43,19 @@ export function checkCascadesFeatureFlagEnabled(theDB) {
  * Given the result of an explain command, returns whether the bonsai optimizer was used.
  */
 export function usedBonsaiOptimizer(explain) {
-    function isCQF(queryPlanner) {
-        return queryPlanner.queryFramework === "cqf";
-    }
-
-    // This section handles the explain output for aggregations against sharded colls.
     if (explain.hasOwnProperty("shards")) {
+        // This section handles the explain output for aggregations against sharded colls.
         for (let shardName of Object.keys(explain.shards)) {
-            if (!isCQF(getQueryPlanner(explain.shards[shardName]))) {
+            if (explain.shards[shardName].queryPlanner.queryFramework !== "cqf") {
                 return false;
             }
         }
         return true;
-    }
-
-    // This section handles the explain output for find queries against sharded colls.
-    if (explain.hasOwnProperty("queryPlanner") &&
-        explain.queryPlanner.winningPlan.hasOwnProperty("shards")) {
-        for (let shardName of Object.keys(explain.queryPlanner.winningPlan.shards)) {
-            if (!isCQF(explain.shards[shardName])) {
+    } else if (explain.hasOwnProperty("queryPlanner") &&
+               explain.queryPlanner.winningPlan.hasOwnProperty("shards")) {
+        // This section handles the explain output for find queries against sharded colls.
+        for (let shardExplain of explain.queryPlanner.winningPlan.shards) {
+            if (shardExplain.queryFramework !== "cqf") {
                 return false;
             }
         }
@@ -69,7 +63,7 @@ export function usedBonsaiOptimizer(explain) {
     }
 
     // This section handles the explain output for unsharded queries.
-    return explain.hasOwnProperty("queryPlanner") && isCQF(explain.queryPlanner);
+    return explain.hasOwnProperty("queryPlanner") && explain.queryPlanner.queryFramework === "cqf";
 }
 
 /**
