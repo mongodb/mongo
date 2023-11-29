@@ -67,6 +67,7 @@
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/collection_uuid_mismatch.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query_analysis_sampler_util.h"
@@ -715,13 +716,21 @@ RawResponsesResult appendRawResponses(
         // The first error is a CollectionUUIDMismatchInfo but it doesn't contain an actual
         // namespace. It's possible that the actual namespace is unsharded, in which case only the
         // error from the primary shard will contain this information. Iterate through the errors to
-        // see if this is the case.
+        // see if this is the case. Note that this can fail with unsplittable collections as we
+        // might only contact the owning shard and not have any errors from the primary shard.
+        bool hasFoundCollectionName = false;
         for (const auto& error : genericErrorsReceived) {
             if (error.second.code() == ErrorCodes::CollectionUUIDMismatch &&
                 error.second.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection()) {
                 firstError = error.second;
+                hasFoundCollectionName = true;
                 break;
             }
+        }
+        // If we didn't find the error here we must contact the primary shard manually to populate
+        // the CollectionUUIDMismatch with the correct collection name.
+        if (!hasFoundCollectionName) {
+            firstError = populateCollectionUUIDMismatch(opCtx, firstError);
         }
     }
 

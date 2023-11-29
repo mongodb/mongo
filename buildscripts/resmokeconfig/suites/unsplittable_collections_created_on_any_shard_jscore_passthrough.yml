@@ -23,8 +23,6 @@ selector:
   - jstests/core/**/where_system_js.js
   - jstests/core/loadserverscripts.js
   - jstests/core/storefunc.js
-  # TODO: SERVER-82806 Enable after fix
-  - jstests/core/ddl/collection_uuid_index_commands.js
   # TODO: SERVER-83399 Enable after fix
   - src/mongo/db/modules/enterprise/jstests/fle2/cleanup_collection.js
   - src/mongo/db/modules/enterprise/jstests/fle2/compact_collection.js
