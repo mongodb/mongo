@@ -72,6 +72,7 @@ __checkpoint_flush_tier_wait(WT_SESSION_IMPL *session, const char **cfg)
 static int
 __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
 {
+    WT_BTREE *btree;
     WT_CKPT ckpt;
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
@@ -87,6 +88,7 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
     cursor = NULL;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_CHECKPOINT));
 
     /*
      * For supporting splits and merge:
@@ -96,11 +98,10 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
      * - Move the objects.
      */
     conn->flush_state = 0;
-
-    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_CHECKPOINT));
     conn->flush_ckpt_complete = false;
     /* Flushing is part of a checkpoint, use the session's checkpoint time. */
     conn->flush_most_recent = session->current_ckpt_sec;
+    /* Storing the last flush timestamp here for the future and for debugging. */
     conn->flush_ts = conn->txn_global.last_ckpt_timestamp;
     /*
      * It would be more efficient to return here if no tiered storage is enabled in the system. If
@@ -131,7 +132,7 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
                 WT_ERR(__wt_config_getones(session, value, "flush_time", &cval));
 
                 /* If nothing has changed, there's nothing to do. */
-                if (ckpt_time == 0 || (uint64_t)cval.val > ckpt_time) {
+                if (ckpt_time == 0 || (uint64_t)cval.val >= ckpt_time) {
                     WT_STAT_CONN_INCR(session, flush_tier_skipped);
                     continue;
                 }
@@ -140,10 +141,22 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
             WT_ERR(__wt_session_get_dhandle(session, key, NULL, NULL, 0));
             /*
              * When we call wt_tiered_switch the session->dhandle points to the tiered: entry and
-             * the arg is the config string that is currently in the metadata.
+             * the arg is the config string that is currently in the metadata. Also, mark the tree
+             * dirty to ensure it participates in the checkpoint process, even if clean. Skip the
+             * trees still open for bulk insertion, we fake checkpoints for them, i.e. we never
+             * really write a checkpoint to the disk - so no point switching just yet.
              */
+            btree = S2BT(session);
+            if (btree->original) {
+                WT_STAT_CONN_INCR(session, flush_tier_skipped);
+                WT_ERR(__wt_session_release_dhandle(session));
+                continue;
+            }
             WT_ERR(__wt_tiered_switch(session, value));
             WT_STAT_CONN_INCR(session, flush_tier_switched);
+            __wt_tree_modify_set(session);
+            btree->flush_most_recent_secs = session->current_ckpt_sec;
+            btree->flush_most_recent_ts = conn->txn_global.last_ckpt_timestamp;
             WT_ERR(__wt_session_release_dhandle(session));
         }
     }
@@ -885,6 +898,11 @@ __txn_checkpoint_can_skip(
     if (cval.len != 0)
         return (0);
 
+    /* Never skip if flushing objects. */
+    WT_RET(__wt_config_gets(session, cfg, "flush_tier.enabled", &cval));
+    if (cval.len != 0)
+        return (0);
+
     /*
      * If the checkpoint is using timestamps, and the stable timestamp hasn't been updated since the
      * last checkpoint there is nothing more that could be written. Except when a non timestamped
@@ -1535,7 +1553,15 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
         WT_WITH_CHECKPOINT_LOCK(session, ret = __txn_checkpoint_wrapper(session, cfg));
     else
         WT_WITH_CHECKPOINT_LOCK_NOWAIT(session, ret, ret = __txn_checkpoint_wrapper(session, cfg));
+    /*
+     * If this checkpoint is flushing objects, a failure can leave a tree's block manager pointing
+     * to incorrect blocks. Currently we can not recover from this situation. Panic!
+     */
+    if (ret != 0 && flush)
+        WT_IGNORE_RET(
+          __wt_panic(session, ret, "checkpoint can not fail when flush_tier is enabled"));
     WT_ERR(ret);
+
     if (flush && flush_sync)
         WT_ERR(__checkpoint_flush_tier_wait(session, cfg));
 err:

@@ -1633,8 +1633,8 @@ extern int __wt_tiered_name_str(WT_SESSION_IMPL *session, const char *name, uint
   uint32_t flags, const char **retp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_tiered_put_flush(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_tiered_put_flush(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id,
+  uint64_t generation) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_tiered_put_flush_finish(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_tiered_put_remove_local(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
@@ -2012,7 +2012,8 @@ extern void __wt_thread_group_start_one(
   WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, bool is_locked);
 extern void __wt_thread_group_stop_one(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group);
 extern void __wt_tiered_flush_work_wait(WT_SESSION_IMPL *session, uint32_t timeout);
-extern void __wt_tiered_get_flush(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entryp);
+extern void __wt_tiered_get_flush(
+  WT_SESSION_IMPL *session, uint64_t generation, WT_TIERED_WORK_UNIT **entryp);
 extern void __wt_tiered_get_flush_finish(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entryp);
 extern void __wt_tiered_get_remove_local(
   WT_SESSION_IMPL *session, uint64_t now, WT_TIERED_WORK_UNIT **entryp);

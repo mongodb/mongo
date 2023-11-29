@@ -106,6 +106,22 @@ __bm_checkpoint(
 
     if (!bm->is_multi_handle)
         return (0);
+
+    /*
+     * For tiered tables, if we postponed switching to a new file, this is the right time to make
+     * that happen since eviction is disabled at the moment and we are the exclusive writers.
+     */
+    if (bm->next_block != NULL) {
+        WT_ASSERT(session, bm->prev_block == NULL);
+        __wt_writelock(session, &bm->handle_array_lock);
+        bm->prev_block = bm->block;
+        bm->block = bm->next_block;
+        bm->next_block = NULL;
+        __wt_writeunlock(session, &bm->handle_array_lock);
+        __wt_verbose(session, WT_VERB_TIERED, "block manager switched from %s to %s",
+          bm->prev_block->name, bm->block->name);
+    }
+
     /*
      * For tiered tables, we need to fsync any previous active files to ensure the full checkpoint
      * is persisted. We wait until now because there may have been in-progress writes to old files.
@@ -204,7 +220,15 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, s
 static int
 __bm_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool failed)
 {
-    return (__wt_block_checkpoint_resolve(session, bm->block, failed));
+    WT_DECL_RET;
+
+    /* If we have made a switch from the older file, resolve the older one instead. */
+    if (bm->prev_block != NULL) {
+        if ((ret = __wt_block_checkpoint_resolve(session, bm->prev_block, failed)) == 0)
+            bm->prev_block = NULL;
+        return (ret);
+    } else
+        return (__wt_block_checkpoint_resolve(session, bm->block, failed));
 }
 
 /*
@@ -604,27 +628,18 @@ __bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid)
 
     WT_RET(__wt_blkcache_get_handle(session, bm, objectid, false, &block));
 
-    __wt_verbose(
-      session, WT_VERB_TIERED, "block manager switching from %s to %s", current->name, block->name);
+    __wt_verbose(session, WT_VERB_TIERED, "block manager scheduling a switch from %s to %s",
+      current->name, block->name);
 
     /* This will be the new writable object. Load its checkpoint */
     WT_RET(__wt_block_checkpoint_load(session, block, NULL, 0, NULL, &root_addr_size, false));
 
-    /* The previous object must by synced to disk as part of the next checkpoint. */
-    current->sync_on_checkpoint = true;
-
     /*
-     * Switch the active handle. We take the handle table lock to coordinate with a reader who is
-     * concurrently trying to read the old active handle.
-     *
-     * FIXME: it should not be possible for a thread of control to copy the WT_BM value in the btree
-     * layer, sleep until after a subsequent switch and a subsequent a checkpoint that would discard
-     * the WT_BM it copied, but it would be worth thinking through those scenarios in detail to be
-     * sure there aren't any races.
+     * We don't do the actual switch just yet. Eviction is active and might write to the file in
+     * parallel. We postpone the switch to later when the block manager writes the checkpoint.
      */
-    __wt_writelock(session, &bm->handle_array_lock);
-    bm->block = block;
-    __wt_writeunlock(session, &bm->handle_array_lock);
+    WT_ASSERT(session, bm->next_block == NULL && bm->prev_block == NULL);
+    bm->next_block = block;
 
     return (0);
 }
@@ -648,7 +663,18 @@ __bm_switch_object_readonly(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t object
 static int
 __bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, bool block)
 {
-    return (__wt_fsync(session, bm->block->fh, block));
+    /*
+     * If a tiered switch was scheduled, it should have happened by now. If we somehow miss it, we
+     * will leave a dangling switch. Tiered server might incorrectly attempt to flush an active file
+     * in such a case.
+     */
+    WT_ASSERT_ALWAYS(session, bm->next_block == NULL, "Missed switching the local file");
+
+    /* If we have made a switch from the older file, sync the older one instead. */
+    if (bm->prev_block != NULL)
+        return (__wt_fsync(session, bm->prev_block->fh, block));
+    else
+        return (__wt_fsync(session, bm->block->fh, block));
 }
 
 /*
