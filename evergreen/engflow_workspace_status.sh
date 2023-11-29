@@ -11,9 +11,4 @@ else
   status="modified"
 fi
 echo BUILD_SCM_STATUS $status
-
-REMOTE=$(git remote)
-REMOTE_URL=$(git remote get-url $REMOTE)
-if [[ $? == 0 ]]; then
-  echo BUILD_SCM_REMOTE $REMOTE_URL
-fi
+echo BUILD_SCM_REMOTE git@github.com:10gen/mongo.git
