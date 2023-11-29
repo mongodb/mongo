@@ -1073,6 +1073,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         LOGV2_DEBUG(7844803,
                     3,
                     "could not find any keys in index",
+                    "endPosition"_attr = maxKey,
                     "lookupStartKeyStringBson"_attr =
                         key_string::toBsonSafe(lookupStart.getBuffer(),
                                                lookupStart.getSize(),

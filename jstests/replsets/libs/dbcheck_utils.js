@@ -58,12 +58,18 @@ export const awaitDbCheckCompletion = (replSet, db, waitForHealthLogDbCheckStop 
 };
 
 // Clear health log and insert nDocs documents.
-export const resetAndInsert = (replSet, db, collName, nDocs) => {
+export const resetAndInsert = (replSet, db, collName, nDocs, docSuffix = null) => {
     db[collName].drop();
     clearHealthLog(replSet);
 
-    assert.commandWorked(
-        db[collName].insertMany([...Array(nDocs).keys()].map(x => ({a: x})), {ordered: false}));
+    if (docSuffix) {
+        assert.commandWorked(db[collName].insertMany(
+            [...Array(nDocs).keys()].map(x => ({a: x.toString() + docSuffix})), {ordered: false}));
+    } else {
+        assert.commandWorked(
+            db[collName].insertMany([...Array(nDocs).keys()].map(x => ({a: x})), {ordered: false}));
+    }
+
     replSet.awaitReplication();
     assert.eq(db.getCollection(collName).find({}).count(), nDocs);
 };
