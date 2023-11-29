@@ -28,7 +28,6 @@
  */
 
 
-#include <cstdio>
 #include <cstdlib>
 #include <fmt/format.h>
 #include <iostream>
@@ -51,27 +50,6 @@ namespace mongo::unittest {
 namespace fs = ::boost::filesystem;
 
 using namespace fmt::literals;
-
-/**
- * Executes a shell command and forwards it's output to the current process output.
- * The output pipe of the subprocess is explictly captured to discourage the child process
- * from using interactive pagination, that otherwise might happen if the test process is
- * executed in interactive shell.
- */
-bool executeCommand(const std::string& cmd) {
-    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd.c_str(), "r"), pclose);
-    std::array<char, 128> buffer;
-    if (!pipe) {
-        return false;
-    }
-
-    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-        fputs(buffer.data(), stdout);
-    }
-
-    fflush(stdout);
-    return true;
-}
 
 void GoldenTestContext::printTestHeader(HeaderFormat format) {
     switch (format) {
@@ -98,10 +76,8 @@ void GoldenTestContext::onError(const std::string& message,
     auto diff_cmd = unittest::GoldenTestEnvironment::getInstance()->diffCmd(
         getExpectedOutputPath().string(), getActualOutputPath().string());
     std::cout << std::flush;
-
-    if (!executeCommand(diff_cmd)) {
-        LOGV2_ERROR(8336201, "Failed to execute diff command", "diff_cmd"_attr = diff_cmd);
-    }
+    int status = std::system(diff_cmd.c_str());
+    (void)status;
 
     throw TestAssertionFailureException(_testInfo->file().toString(), _testInfo->line(), message);
 }
