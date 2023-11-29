@@ -102,9 +102,10 @@ boost::intrusive_ptr<Expression> substituteInExpr(boost::intrusive_ptr<Expressio
 
 /**
  * Returns a vector of top-level dependencies where each index i in the vector corresponds to the
- * dependencies from the ith expression according to 'orderToProcess'.
+ * dependencies from the ith expression according to 'orderToProcess'. Will return boost::none if
+ * any expression needs the whole document.
  */
-std::vector<OrderedPathSet> getTopLevelDeps(
+boost::optional<std::vector<OrderedPathSet>> getTopLevelDeps(
     const std::vector<std::string>& orderToProcess,
     const StringMap<boost::intrusive_ptr<Expression>>& expressions,
     const StringMap<std::unique_ptr<ProjectionNode>>& children) {
@@ -118,6 +119,10 @@ std::vector<OrderedPathSet> getTopLevelDeps(
             auto childIt = children.find(field);
             tassert(6657000, "Unable to calculate dependencies", childIt != children.end());
             childIt->second->reportDependencies(&deps);
+        }
+
+        if (deps.needWholeDocument) {
+            return boost::none;
         }
 
         OrderedPathSet ops{deps.fields.begin(), deps.fields.end()};
@@ -153,8 +158,14 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
         return {BSONObj{}, false};
     }
 
-    std::vector<OrderedPathSet> topLevelDeps =
+    boost::optional<std::vector<OrderedPathSet>> topLevelDeps =
         getTopLevelDeps(_orderToProcessAdditionsAndChildren, _expressions, _children);
+
+    // If one of the expression requires the whole document, then we should not extract the
+    // projection and topLevelDeps will not hold any field names.
+    if (!topLevelDeps) {
+        return {BSONObj{}, false};
+    }
 
     // Auxiliary vector with extracted computed projections: <name, expression, replacement
     // strategy>. If the replacement strategy flag is true, the expression is replaced with a
@@ -183,12 +194,12 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
         // same projection depend on. If the extracted $addFields were to be placed before this
         // projection, the dependency with the common name would be shadowed by the computed
         // projection.
-        if (computedExprDependsOnField(topLevelDeps, field, i)) {
+        if (computedExprDependsOnField(topLevelDeps.get(), field, i)) {
             replaceWithProjField = false;
             continue;
         }
 
-        const auto& topLevelFieldNames = topLevelDeps[i];
+        const auto& topLevelFieldNames = topLevelDeps.get()[i];
         if (topLevelFieldNames.size() == 1 && topLevelFieldNames.count(oldName.toString()) == 1) {
             // Substitute newName for oldName in the expression.
             StringMap<std::string> renames;
@@ -241,8 +252,14 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
         return {BSONObj{}, false};
     }
 
-    std::vector<OrderedPathSet> topLevelDeps =
+    boost::optional<std::vector<OrderedPathSet>> topLevelDeps =
         getTopLevelDeps(_orderToProcessAdditionsAndChildren, _expressions, _children);
+
+    // If one of the expression requires the whole document, then we should not extract the
+    // projection and topLevelDeps will not hold any field names.
+    if (!topLevelDeps) {
+        return {BSONObj{}, false};
+    }
 
     // Auxiliary vector with extracted computed projections: <name, expression>.
     // To preserve the original fields order, only projections at the beginning of the
@@ -264,11 +281,11 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
         // same projection depend on. If the extracted $addFields were to be placed before this
         // projection, the dependency with the common name would be shadowed by the computed
         // projection.
-        if (computedExprDependsOnField(topLevelDeps, field, i)) {
+        if (computedExprDependsOnField(topLevelDeps.get(), field, i)) {
             break;
         }
 
-        auto& topLevelFieldNames = topLevelDeps[i];
+        auto& topLevelFieldNames = topLevelDeps.get()[i];
         if (topLevelFieldNames.size() == 1 && topLevelFieldNames.count(oldName.toString()) == 1) {
             // Substitute newName for oldName in the expression.
             StringMap<std::string> renames;
