@@ -310,6 +310,7 @@ roles:
               actions: &hostManagerRoleClusterActions
                   - applicationMessage # clusterManager gets this also
                   - auditConfigure
+                  - compact
                   - connPoolSync
                   - dropConnections
                   - logRotate

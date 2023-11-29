@@ -429,6 +429,10 @@ public:
                                              Timestamp requestedTimestamp,
                                              bool roundUpIfTooOld) override;
 
+    Status autoCompact(OperationContext* opCtx,
+                       bool enable,
+                       boost::optional<int64_t> freeSpaceTargetMB) override;
+
 private:
     StatusWith<Timestamp> _pinOldestTimestamp(WithLock,
                                               const std::string& requestingServiceName,

@@ -240,6 +240,7 @@ let viewsCommandTests = {
         skipSharded: true,
     },
     authenticate: {skip: isUnrelated},
+    autoCompact: {skip: isUnrelated},
     autoSplitVector: {
         command: {
             splitVector: "test.view",

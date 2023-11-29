@@ -2768,4 +2768,39 @@ void WiredTigerKVEngine::sizeStorerPeriodicFlush() {
     }
 }
 
+Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
+                                       bool enable,
+                                       boost::optional<int64_t> freeSpaceTargetMB) {
+    dassert(shard_role_details::getLocker(opCtx)->isWriteLocked());
+
+    WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
+    if (cache->isEphemeral()) {
+        return Status::OK();
+    }
+
+    WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
+    opCtx->recoveryUnit()->abandonSnapshot();
+
+    StringBuilder config;
+    if (enable) {
+        config << "background=true,timeout=0";
+    } else {
+        config << "background=false";
+    }
+
+    if (freeSpaceTargetMB && enable) {
+        config << ",free_space_target=" << std::to_string(*freeSpaceTargetMB) << "MB";
+    }
+    int ret = s->compact(s, nullptr, config.str().c_str());
+
+    if (ret == EBUSY) {
+        StringBuilder msg;
+        msg << "Auto compact failed to " << (enable ? "start" : "stop") << ", resource busy";
+        return Status(ErrorCodes::ObjectIsBusy, msg.str());
+    }
+    uassertStatusOK(wtRCToStatus(ret, s));
+
+    return Status::OK();
+}
+
 }  // namespace mongo

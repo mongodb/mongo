@@ -84,7 +84,7 @@ public:
 
     std::string help() const override {
         return "compact collection\n"
-               "warning: this operation locks the database and is slow. you can cancel with "
+               "warning: this operation has blocking behaviour and is slow. You can cancel with "
                "killOp()\n"
                "{ compact : <collection_name>, [force:<bool>], [freeSpaceTargetMB:<int64_t>] }\n"
                "  force - allows to run on a replica set primary\n";
@@ -128,5 +128,7 @@ public:
         return true;
     }
 };
+
 MONGO_REGISTER_COMMAND(CompactCmd).forShard();
+
 }  // namespace mongo

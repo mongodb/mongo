@@ -229,6 +229,12 @@ public:
     }
 
     void dump() const final {}
+
+    Status autoCompact(OperationContext* opCtx,
+                       bool enable,
+                       boost::optional<int64_t> freeSpaceTargetMB) final {
+        return Status::OK();
+    }
 };
 
 }  // namespace mongo

@@ -407,6 +407,10 @@ public:
 
     void dump() const override;
 
+    virtual Status autoCompact(OperationContext* opCtx,
+                               bool enable,
+                               boost::optional<int64_t> freeSpaceTargetMB) override;
+
 private:
     using CollIter = std::list<std::string>::iterator;
 

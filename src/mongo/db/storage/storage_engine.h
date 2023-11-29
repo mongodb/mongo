@@ -727,6 +727,16 @@ public:
      * Instructs the storage engine to dump its internal state.
      */
     virtual void dump() const = 0;
+
+    /**
+     * Toggles auto compact for a database. Auto compact periodically iterates through all of
+     * the files available and runs compaction if they are eligible. If the freeSpaceTargetMB is
+     * provided, compaction only proceeds if the free storage space available is greater than
+     * the provided value.
+     */
+    virtual Status autoCompact(OperationContext* opCtx,
+                               bool enable,
+                               boost::optional<int64_t> freeSpaceTargetMB) = 0;
 };
 
 }  // namespace mongo

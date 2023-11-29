@@ -332,6 +332,7 @@ export const TenantMigrationConcurrentWriteUtil = {
         appendOplogNote: {skip: isNotRunOnUserDatabase},
         applyOps: {skip: isNotSupportedInServerless},
         authenticate: {skip: isAuthCommand},
+        autoCompact: {skip: isNotSupportedInServerless},
         buildInfo: {skip: isNotWriteCommand},
         captrunc: {skip: isNotSupportedInServerless},
         checkShardingIndex: {skip: isNotRunOnUserDatabase},
