@@ -41,6 +41,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/utils/abt_compare.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/util/assert_util.h"
@@ -120,7 +121,15 @@ void ConstEval::removeUnusedEvalNodes() {
     _inlinedDefs.clear();
 }
 
-void ConstEval::transport(ABT& n, const Variable& var) {
+ConstEval::Nullability ConstEval::transport(ABT& n, const Constant& c) {
+    // Non-nothing constants are non-nullable.
+    if (c.isNothing()) {
+        return Nullability::kNullable;
+    }
+    return Nullability::kNonNullable;
+}
+
+ConstEval::Nullability ConstEval::transport(ABT& n, const Variable& var) {
     auto def = _env.getDefinition(var);
 
     if (!def.definition.empty()) {
@@ -135,6 +144,9 @@ void ConstEval::transport(ABT& n, const Variable& var) {
         if (auto constant = def.definition.cast<Constant>(); constant && !_inRefBlock) {
             // If we find the definition and it is a simple constant then substitute the variable.
             swapAndUpdate(n, def.definition.copy());
+            if (!constant->isNothing()) {
+                return Nullability::kNonNullable;
+            }
         } else if (auto variable = def.definition.cast<Variable>(); variable && !_inRefBlock) {
             // This is a indirection to another variable. So we can skip, but first remember that we
             // inlined this variable so that we won't try to replace it with a common expression and
@@ -164,13 +176,20 @@ void ConstEval::transport(ABT& n, const Variable& var) {
             }
         }
     }
+    // Variables that don't have a non-nothing constant definition are nullable.
+    return Nullability::kNullable;
 }
 
 void ConstEval::prepare(ABT&, const Let& let) {
     _letRefs[&let] = {};
 }
 
-void ConstEval::transport(ABT& n, const Let& let, ABT& bind, ABT& in) {
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            Let& let,
+                                            ConstEval::Nullability,
+                                            ConstEval::Nullability inNullability) {
+    auto& in = let.in();
+
     auto& letRefs = _letRefs[&let];
     if (letRefs.size() == 0) {
         // The bind expressions has not been referenced so it is dead code and the whole let
@@ -197,9 +216,20 @@ void ConstEval::transport(ABT& n, const Let& let, ABT& bind, ABT& in) {
         _changed = true;
     }
     _letRefs.erase(&let);
+    // Let's nullability is a function only of the nullability of the in expression.
+    // Ex: n == let x='a' (bind expr) in x+2 (in expr)
+    // While the bind expr is non-nullable, the in expr determines the final nullability because it
+    // may evaluate to Nothing with mixed types.
+    return inNullability;
 }
 
-void ConstEval::transport(ABT& n, const LambdaApplication& app, ABT& lam, ABT& arg) {
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            LambdaApplication& app,
+                                            ConstEval::Nullability,
+                                            ConstEval::Nullability) {
+    auto& lam = app.getLambda();
+    auto& arg = app.getArgument();
+
     // If the 'lam' expression is LambdaAbstraction then we can do the inplace beta reduction.
     // TODO - missing alpha conversion so for now assume globally unique names.
     if (auto lambda = lam.cast<LambdaAbstraction>(); lambda) {
@@ -209,14 +239,20 @@ void ConstEval::transport(ABT& n, const LambdaApplication& app, ABT& lam, ABT& a
 
         swapAndUpdate(n, std::move(result));
     }
+    // Applying the lambda abstraction over an arg could return a Nullable output regardless of the
+    // arg's nullability.
+    return Nullability::kNullable;
 }
 
-void ConstEval::transport(ABT& n, const UnaryOp& op, ABT& child) {
+ConstEval::Nullability ConstEval::transport(ABT& n, UnaryOp& op, ConstEval::Nullability) {
+    auto& child = op.getChild();
+
     switch (op.op()) {
         case Operations::Not: {
             if (const auto childConst = child.cast<Constant>();
                 childConst && childConst->isValueBool()) {
                 swapAndUpdate(n, Constant::boolean(!childConst->getValueBool()));
+                return Nullability::kNonNullable;
             }
             break;
         }
@@ -226,12 +262,35 @@ void ConstEval::transport(ABT& n, const UnaryOp& op, ABT& child) {
         default:
             break;
     }
+    // If the child is not a boolean constant, return nullable.
+    // Not will return Nothing on a non-logical input. Neg will return Nothing if the child op is
+    // not a comparison or can't be negated (i.e. EqMember)
+    return Nullability::kNullable;
 }
 
 // Specific transport for binary operation
 // The const correctness is probably wrong (as const ABT& lhs, const ABT& rhs does not work for
 // some reason but we can fix it later).
-void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            BinaryOp& op,
+                                            ConstEval::Nullability lhsNullability,
+                                            ConstEval::Nullability rhsNullability) {
+    auto& lhs = op.getLeftChild();
+    auto& rhs = op.getRightChild();
+
+    // Determine the tightest claim we can make about Nullability given lhs and rhs nullability.
+    // For comparison and logical ops:
+    // - If either lhs or rhs is nullable, the binary op output is nullable.
+    // - If both lhs and rhs are non-nullable, the binary op output is non-nullable.
+    // Arithmetic ops may return Nothing even if both inputs are non-nullable.
+    // - For example, exprs with mixed types like 5 + "a" would return Nothing even though the
+    // arguments are non-nullable.
+    auto defaultNullability = [&]() {
+        if (lhsNullability == Nullability::kNullable || rhsNullability == Nullability::kNullable) {
+            return Nullability::kNullable;
+        }
+        return Nullability::kNonNullable;
+    };
 
     switch (op.op()) {
         case Operations::Add: {
@@ -245,6 +304,9 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
                 auto [_, resultType, resultValue] =
                     sbe::value::genericAdd(lhsTag, lhsValue, rhsTag, rhsValue);
                 swapAndUpdate(n, make<Constant>(resultType, resultValue));
+                if (resultType != sbe::value::TypeTags::Nothing) {
+                    return Nullability::kNonNullable;
+                }
             }
             break;
         }
@@ -261,6 +323,9 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
                 auto [_, resultType, resultValue] =
                     sbe::value::genericSub(lhsTag, lhsValue, rhsTag, rhsValue);
                 swapAndUpdate(n, make<Constant>(resultType, resultValue));
+                if (resultType != sbe::value::TypeTags::Nothing) {
+                    return Nullability::kNonNullable;
+                }
             }
             break;
         }
@@ -277,6 +342,9 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
                 auto [_, resultType, resultValue] =
                     sbe::value::genericMul(lhsTag, lhsValue, rhsTag, rhsValue);
                 swapAndUpdate(n, make<Constant>(resultType, resultValue));
+                if (resultType != sbe::value::TypeTags::Nothing) {
+                    return Nullability::kNonNullable;
+                }
             }
             break;
         }
@@ -295,28 +363,55 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
                             swapAndUpdate(n,
                                           Constant::boolean(lhsBool ||
                                                             sbe::value::bitcastTo<bool>(rhsValue)));
+                            return Nullability::kNonNullable;
                         }
                     } else {
                         // Right side is not constant.
                         if (lhsBool) {
                             // true || rhs -> true.
                             swapAndUpdate(n, Constant::boolean(true));
+                            return Nullability::kNonNullable;
                         } else {
                             // false || rhs -> rhs.
                             swapAndUpdate(n, std::exchange(rhs, make<Blackhole>()));
+                            return rhsNullability;
                         }
+                    }
+                }
+            }
+
+            // Given SBE short-circuiting semantics, we can interrogate the lhs and perform
+            // optimizations if we know it is non-nullable.
+            // For the disjunctive case, we short-circuit the lhs on Nothing and on True, and fall
+            // through for all other values (False, 5, "a").
+            // - In 5 || true, we fall through and return the final true.
+            // - In 5 || false, we fall through and return the final false.
+            if (lhsNullability == Nullability::kNonNullable) {
+                if (const auto* rhsConst = rhs.cast<Constant>()) {
+                    if (const auto [rhsTag, rhsValue] = rhsConst->get();
+                        rhsTag == sbe::value::TypeTags::Boolean) {
+                        const bool rhsBool = sbe::value::bitcastTo<bool>(rhsValue);
+                        if (rhsBool) {
+                            // non-nothing lhs || true -> true.
+                            swapAndUpdate(n, Constant::boolean(true));
+                        } else if (!lhs.is<Constant>()) {
+                            // non-const, non-nothing lhs || false -> lhs.
+                            swapAndUpdate(n, std::exchange(lhs, make<Blackhole>()));
+                        }
+                        return Nullability::kNonNullable;
                     }
                 }
             } else if (const auto* rhsConst = rhs.cast<Constant>()) {
                 // Left side is not constant and right side is a "false" constant.
                 if (const auto [rhsTag, rhsValue] = rhsConst->get();
                     rhsTag == sbe::value::TypeTags::Boolean &&
-                    !sbe::value::bitcastTo<bool>(rhsValue)) {
+                    !sbe::value::bitcastTo<bool>(rhsValue) && !lhs.is<Constant>()) {
                     // x || false -> x.
                     swapAndUpdate(n, std::exchange(lhs, make<Blackhole>()));
+                    return lhsNullability;
                 }
             }
-            break;
+            return defaultNullability();
         }
 
         case Operations::And: {
@@ -333,36 +428,66 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
                             swapAndUpdate(n,
                                           Constant::boolean(lhsBool &&
                                                             sbe::value::bitcastTo<bool>(rhsValue)));
+                            return Nullability::kNonNullable;
                         }
                     } else {
                         // Right side is not constant.
                         if (lhsBool) {
                             // true && rhs -> rhs.
                             swapAndUpdate(n, std::exchange(rhs, make<Blackhole>()));
+                            return rhsNullability;
                         } else {
                             // false && rhs -> false.
                             swapAndUpdate(n, Constant::boolean(false));
+                            return Nullability::kNonNullable;
                         }
+                    }
+                }
+            }
+
+            // Given SBE short-circuiting semantics, we can interrogate the lhs and perform
+            // optimizations if we know it is non-nullable.
+            // For the conjunctive case, we short-circuit the lhs on Nothing and on False, and fall
+            // through for all other values (True, 5, "a").
+            // - In 5 && false, we fall through and return the final false.
+            // - In 5 && true, we fall through and return the final true.
+            if (lhsNullability == Nullability::kNonNullable) {
+                if (const auto* rhsConst = rhs.cast<Constant>()) {
+                    if (const auto [rhsTag, rhsValue] = rhsConst->get();
+                        rhsTag == sbe::value::TypeTags::Boolean) {
+                        const bool rhsBool = sbe::value::bitcastTo<bool>(rhsValue);
+                        if (rhsBool) {
+                            if (!lhs.is<Constant>()) {
+                                // non-const, non-nothing lhs && true -> lhs.
+                                swapAndUpdate(n, std::exchange(lhs, make<Blackhole>()));
+                            }
+                        } else {
+                            // non-nothing lhs && false -> false.
+                            swapAndUpdate(n, Constant::boolean(false));
+                        }
+                        return Nullability::kNonNullable;
                     }
                 }
             } else if (const auto* rhsConst = rhs.cast<Constant>()) {
                 // Left side is not constant and right side is a "true" constant.
                 if (const auto [rhsTag, rhsValue] = rhsConst->get();
                     rhsTag == sbe::value::TypeTags::Boolean &&
-                    sbe::value::bitcastTo<bool>(rhsValue)) {
+                    sbe::value::bitcastTo<bool>(rhsValue) && !lhs.is<Constant>()) {
                     // x && true -> x.
                     swapAndUpdate(n, std::exchange(lhs, make<Blackhole>()));
+                    return lhsNullability;
                 }
             }
-            break;
+            return defaultNullability();
         }
 
         case Operations::Eq: {
             auto cmpVal = cmpEqFast(lhs, rhs);
             if (cmpVal != CmpResult::kIncomparable) {
                 swapAndUpdate(n, Constant::boolean(cmpVal == CmpResult::kTrue));
+                return Nullability::kNonNullable;
             }
-            break;
+            return defaultNullability();
         }
 
         case Operations::Lt:
@@ -377,14 +502,16 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
                 } else {
                     swapAndUpdate(n, Constant::boolean(cmpVal == CmpResult::kTrue));
                 }
+                return Nullability::kNonNullable;
             }
-            break;
+            return defaultNullability();
         }
 
         case Operations::FillEmpty:
             if (const auto* lhsConst = lhs.cast<Constant>()) {
                 if (auto [tag, val] = lhsConst->get(); tag != sbe::value::TypeTags::Nothing) {
                     swapAndUpdate(n, std::exchange(lhs, make<Blackhole>()));
+                    return Nullability::kNonNullable;
                 }
             }
             break;
@@ -393,14 +520,20 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
             // Not implemented.
             break;
     }
+    return Nullability::kNullable;
 }
 
-void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args) {
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            FunctionCall& op,
+                                            std::vector<ConstEval::Nullability> argsNullability) {
+    auto& args = op.nodes();
+
     if (op.name() == "exists") {
         if (args.size() == 1 && args[0].is<Constant>()) {
             // We can simplify exists(constant).
             const bool v = args[0].cast<Constant>()->get().first != sbe::value::TypeTags::Nothing;
             swapAndUpdate(n, Constant::boolean(v));
+            return Nullability::kNonNullable;
         }
     } else if (op.name() == "newArray") {
         bool allConstants = true;
@@ -424,6 +557,7 @@ void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args
 
             auto [tag, val] = sbe::value::makeCopyArray(array);
             swapAndUpdate(n, make<Constant>(tag, val));
+            return Nullability::kNonNullable;
         }
     } else if (op.name() == "traverseP") {
         // TraverseP with an identity lambda. Replace with the input.
@@ -431,6 +565,8 @@ void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args
             if (const auto* varPtr = lambdaPtr->getBody().cast<Variable>();
                 varPtr != nullptr && varPtr->name() == lambdaPtr->varName()) {
                 swapAndUpdate(n, args.front());
+                // Return the nullability value of the input.
+                return argsNullability.front();
             }
         }
     } else if (op.name() == "isArray") {
@@ -439,6 +575,7 @@ void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args
             const bool v = tag == sbe::value::TypeTags::Array ||
                 tag == sbe::value::TypeTags::ArraySet || tag == sbe::value::TypeTags::ArrayMultiSet;
             swapAndUpdate(n, Constant::boolean(v));
+            return Nullability::kNonNullable;
         }
     }
     // The isInListData check currently only pertains to parameterized InMatchExpressions, whose
@@ -452,11 +589,23 @@ void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args
         if (args.size() == 1 && args[0].is<Constant>()) {
             const auto tag = args[0].cast<Constant>()->get().first;
             swapAndUpdate(n, Constant::boolean(tag == sbe::value::TypeTags::inListData));
+            return Nullability::kNonNullable;
         }
+    } else if (op.name() == kParameterFunctionName) {
+        return Nullability::kNonNullable;
     }
+    return Nullability::kNullable;
 }
 
-void ConstEval::transport(ABT& n, const If& op, ABT& cond, ABT& thenBranch, ABT& elseBranch) {
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            If& op,
+                                            ConstEval::Nullability condNullability,
+                                            ConstEval::Nullability thenNullability,
+                                            ConstEval::Nullability elseNullability) {
+    auto& cond = op.getCondChild();
+    auto& thenBranch = op.getThenChild();
+    auto& elseBranch = op.getElseChild();
+
     if (const auto* condConst = cond.cast<Constant>()) {
         // If the condition is a boolean constant we can simplify.
         if (const auto [condTag, condValue] = condConst->get();
@@ -464,9 +613,11 @@ void ConstEval::transport(ABT& n, const If& op, ABT& cond, ABT& thenBranch, ABT&
             if (sbe::value::bitcastTo<bool>(condValue)) {
                 // If true then x else y -> x.
                 swapAndUpdate(n, std::exchange(thenBranch, make<Blackhole>()));
+                return thenNullability;
             } else {
                 // If false then x else y -> y.
                 swapAndUpdate(n, std::exchange(elseBranch, make<Blackhole>()));
+                return elseNullability;
             }
         }
     } else if (thenBranch.is<Constant>() && elseBranch.is<Constant>()) {
@@ -481,16 +632,20 @@ void ConstEval::transport(ABT& n, const If& op, ABT& cond, ABT& thenBranch, ABT&
                     if (v2) {
                         // if (x) then true else true -> true.
                         swapAndUpdate(n, Constant::boolean(true));
+                        return Nullability::kNonNullable;
                     } else {
                         // if (x) then true else false -> (x).
                         swapAndUpdate(n, std::move(cond));
+                        return condNullability;
                     }
                 } else if (v2) {
                     // If (x) then false else true -> !(x).
                     swapAndUpdate(n, make<UnaryOp>(Operations::Not, std::move(cond)));
+                    return condNullability;
                 } else {
                     // if (x) then false else false -> false.
                     swapAndUpdate(n, Constant::boolean(false));
+                    return Nullability::kNonNullable;
                 }
             }
         }
@@ -501,63 +656,110 @@ void ConstEval::transport(ABT& n, const If& op, ABT& cond, ABT& thenBranch, ABT&
             n,
             make<If>(std::move(condNot->getChild()), std::move(elseBranch), std::move(thenBranch)));
     }
+    return Nullability::kNullable;
 }
 
-void ConstEval::transport(ABT& n, const EvalPath& op, ABT& path, ABT& input) {
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            EvalPath& op,
+                                            ConstEval::Nullability pathNullability,
+                                            ConstEval::Nullability) {
+    auto& path = op.getPath();
+
     if (const auto* pathConstPtr = path.cast<PathConstant>()) {
         // PathConst does not depend on its parent, so replace with the PathConst's child.
         swapAndUpdate(n, pathConstPtr->getConstant());
+        return pathNullability;
     }
+    return Nullability::kNullable;
 }
 
-void ConstEval::transport(ABT& n, const EvalFilter& op, ABT& path, ABT& input) {
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            EvalFilter& op,
+                                            ConstEval::Nullability pathNullability,
+                                            ConstEval::Nullability) {
+    auto& path = op.getPath();
+
     if (const auto* pathConstPtr = path.cast<PathConstant>()) {
         // PathConst does not depend on its parent, so replace with the PathConst's child.
         swapAndUpdate(n, pathConstPtr->getConstant());
+        return pathNullability;
     }
+    return Nullability::kNullable;
 }
 
 void ConstEval::prepare(ABT&, const PathTraverse&) {
     ++_inCostlyCtx;
 }
 
-void ConstEval::transport(ABT&, const PathTraverse&, ABT&) {
+ConstEval::Nullability ConstEval::transport(ABT&,
+                                            const PathTraverse&,
+                                            ConstEval::Nullability nullability) {
     --_inCostlyCtx;
+    return nullability;
 }
 
 template <bool v>
-static void constEvalComposition(ABT& n, ABT& lhs, ABT& rhs) {
+static ConstEval::Nullability constEvalComposition(ABT& n,
+                                                   ABT& lhs,
+                                                   ABT& rhs,
+                                                   ConstEval::Nullability lhsNullability,
+                                                   ConstEval::Nullability rhsNullability) {
     ABT c = make<PathConstant>(Constant::boolean(v));
     if (lhs == c || rhs == c) {
         std::swap(n, c);
-        return;
+        return ConstEval::Nullability::kNonNullable;
     }
 
     c = make<PathConstant>(Constant::boolean(!v));
     if (lhs == c) {
         n = std::move(rhs);
+        return rhsNullability;
     } else if (rhs == c) {
         n = std::move(lhs);
+        return lhsNullability;
     }
+    return ConstEval::Nullability::kNullable;
 }
 
-void ConstEval::transport(ABT& n, const PathComposeM& op, ABT& lhs, ABT& rhs) {
-    constEvalComposition<false>(n, lhs, rhs);
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            PathComposeM& op,
+                                            ConstEval::Nullability lhsNullability,
+                                            ConstEval::Nullability rhsNullability) {
+    auto& lhs = op.getPath1();
+    auto& rhs = op.getPath2();
+
+    return constEvalComposition<false>(n, lhs, rhs, lhsNullability, rhsNullability);
 }
 
-void ConstEval::transport(ABT& n, const PathComposeA& op, ABT& lhs, ABT& rhs) {
-    constEvalComposition<true>(n, lhs, rhs);
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            PathComposeA& op,
+                                            ConstEval::Nullability lhsNullability,
+                                            ConstEval::Nullability rhsNullability) {
+    auto& lhs = op.getPath1();
+    auto& rhs = op.getPath2();
+
+    return constEvalComposition<true>(n, lhs, rhs, lhsNullability, rhsNullability);
 }
 
 void ConstEval::prepare(ABT&, const LambdaAbstraction&) {
     ++_inCostlyCtx;
 }
 
-void ConstEval::transport(ABT&, const LambdaAbstraction&, ABT&) {
+ConstEval::Nullability ConstEval::transport(ABT&,
+                                            const LambdaAbstraction&,
+                                            ConstEval::Nullability) {
     --_inCostlyCtx;
+    // The lambda abstraction expression is always non-nothing.
+    return Nullability::kNonNullable;
 }
 
-void ConstEval::transport(ABT& n, const FilterNode& op, ABT& child, ABT& expr) {
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            FilterNode& op,
+                                            ConstEval::Nullability,
+                                            ConstEval::Nullability) {
+    auto& child = op.getChild();
+    auto& expr = op.getFilter();
+
     if (expr == Constant::boolean(true)) {
         // Remove trivially true filter.
 
@@ -567,9 +769,15 @@ void ConstEval::transport(ABT& n, const FilterNode& op, ABT& child, ABT& expr) {
         // Replace the filter node itself with the extracted child.
         swapAndUpdate(n, std::move(result));
     }
+    return Nullability::kNullable;
 }
 
-void ConstEval::transport(ABT& n, const EvaluationNode& op, ABT& child, ABT& expr) {
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            EvaluationNode& op,
+                                            ConstEval::Nullability,
+                                            ConstEval::Nullability) {
+    auto& child = op.getChild();
+
     if (_noRefProj.erase(&op)) {
         // The evaluation node is unused so replace it with its own child.
         if (_erasedProj) {
@@ -615,6 +823,7 @@ void ConstEval::transport(ABT& n, const EvaluationNode& op, ABT& child, ABT& exp
             }
         }
     }
+    return Nullability::kNullable;
 }
 
 void ConstEval::prepare(ABT&, const References& refs) {
@@ -622,9 +831,13 @@ void ConstEval::prepare(ABT&, const References& refs) {
     invariant(!_inRefBlock);
     _inRefBlock = true;
 }
-void ConstEval::transport(ABT& n, const References& op, std::vector<ABT>&) {
+
+ConstEval::Nullability ConstEval::transport(ABT& n,
+                                            const References& op,
+                                            std::vector<ConstEval::Nullability>) {
     invariant(_inRefBlock);
     _inRefBlock = false;
+    return Nullability::kNullable;
 }
 
 void ConstEval::swapAndUpdate(ABT& n, ABT newN) {

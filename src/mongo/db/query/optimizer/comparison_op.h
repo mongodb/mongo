@@ -35,6 +35,7 @@
 namespace mongo::optimizer {
 
 #define PATHSYNTAX_OPNAMES(F)                                                                      \
+    /* Binary Operations */                                                                        \
     /* comparison operations */                                                                    \
     F(Eq)                                                                                          \
     F(EqMember)                                                                                    \
@@ -56,14 +57,11 @@ namespace mongo::optimizer {
     F(Lte)                                                                                         \
     F(Cmp3w)                                                                                       \
                                                                                                    \
-    /* binary operations */                                                                        \
+    /* arithmetic operations */                                                                    \
     F(Add)                                                                                         \
     F(Sub)                                                                                         \
     F(Mult)                                                                                        \
     F(Div)                                                                                         \
-                                                                                                   \
-    /* unary operations */                                                                         \
-    F(Neg)                                                                                         \
                                                                                                    \
     /* Nothing-handling */                                                                         \
     F(FillEmpty)                                                                                   \
@@ -71,7 +69,10 @@ namespace mongo::optimizer {
     /* logical operations */                                                                       \
     F(And)                                                                                         \
     F(Or)                                                                                          \
-    F(Not)
+    F(Not) /* unary operation */                                                                   \
+                                                                                                   \
+    /* Unary Operations */                                                                         \
+    F(Neg)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(Operations, PATHSYNTAX_OPNAMES);
 #undef PATHSYNTAX_OPNAMES

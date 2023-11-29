@@ -40,6 +40,7 @@
 
 
 namespace mongo::optimizer::unit_test_abt_literals {
+using namespace sbe::value;
 
 /**
  * The functions in this file aim to simplify and shorten the manual construction of ABTs for
@@ -371,6 +372,11 @@ inline auto _spoolc(StringData type, int64_t spoolId, ProjectionNameVector pns) 
         getEnumByName<SpoolConsumerType>(type, SpoolConsumerTypeEnumString::arr_),
         spoolId,
         std::move(pns))};
+}
+
+inline auto getParam(TypeTags typeTag) {
+    return _fn(
+        kParameterFunctionName, "0"_cint64, ExprHolder{Constant::int32(static_cast<int>(typeTag))});
 }
 
 /**

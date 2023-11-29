@@ -228,7 +228,15 @@ public:
         return get<0>();
     }
 
+    ABT& getLeftChild() {
+        return get<0>();
+    }
+
     const ABT& getRightChild() const {
+        return get<1>();
+    }
+
+    ABT& getRightChild() {
         return get<1>();
     }
 };
@@ -256,11 +264,23 @@ public:
         return get<0>();
     }
 
+    ABT& getCondChild() {
+        return get<0>();
+    }
+
     const ABT& getThenChild() const {
         return get<1>();
     }
 
+    ABT& getThenChild() {
+        return get<1>();
+    }
+
     const ABT& getElseChild() const {
+        return get<2>();
+    }
+
+    ABT& getElseChild() {
         return get<2>();
     }
 };
@@ -293,7 +313,16 @@ public:
         return get<0>();
     }
 
+    ABT& bind() {
+        return get<0>();
+    }
+
+
     const ABT& in() const {
+        return get<1>();
+    }
+
+    ABT& in() {
         return get<1>();
     }
 };
@@ -353,7 +382,15 @@ public:
         return get<0>();
     }
 
+    ABT& getLambda() {
+        return get<0>();
+    }
+
     const ABT& getArgument() const {
+        return get<1>();
+    }
+
+    ABT& getArgument() {
         return get<1>();
     }
 };

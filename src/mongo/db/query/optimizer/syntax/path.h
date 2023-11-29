@@ -405,7 +405,15 @@ public:
         return get<0>();
     }
 
+    ABT& getPath1() {
+        return get<0>();
+    }
+
     const ABT& getPath2() const {
+        return get<1>();
+    }
+
+    ABT& getPath2() {
         return get<1>();
     }
 };

@@ -32,12 +32,15 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/ce/sampling_executor.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -73,7 +76,50 @@ std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
 std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
     const std::string& pipelineStr, NamespaceString nss, OperationContext* opCtx);
 
-using ABTSBE = sbe::EExpressionTestFixture;
+class ABTSBE : public sbe::EExpressionTestFixture {
+protected:
+    ABT constFold(ABT tree) {
+        auto env = VariableEnvironment::build(tree);
+        ConstEval{env}.optimize(tree);
+        return tree;
+    }
+    // Helper that lowers and compiles an ABT expression and returns the evaluated result.
+    // If the expression contains a variable, it will be bound to a slot along with its definition
+    // before lowering.
+    std::pair<sbe::value::TypeTags, sbe::value::Value> evalExpr(
+        const ABT& tree,
+        boost::optional<
+            std::pair<ProjectionName, std::pair<sbe::value::TypeTags, sbe::value::Value>>> var) {
+        auto env = VariableEnvironment::build(tree);
+
+        SlotVarMap map;
+        sbe::value::OwnedValueAccessor accessor;
+        auto slotId = bindAccessor(&accessor);
+        if (var) {
+            auto& projName = var.get().first;
+            map[projName] = slotId;
+
+            auto [tag, val] = var.get().second;
+            accessor.reset(tag, val);
+        }
+
+        sbe::InputParamToSlotMap inputParamToSlotMap;
+        auto expr =
+            SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+                .optimize(tree);
+
+        auto compiledExpr = compileExpression(*expr);
+        return runCompiledExpression(compiledExpr.get());
+    }
+
+    void assertEqualValues(std::pair<sbe::value::TypeTags, sbe::value::Value> res,
+                           std::pair<sbe::value::TypeTags, sbe::value::Value> resConstFold) {
+        auto [tag, val] = sbe::value::compareValue(
+            res.first, res.second, resConstFold.first, resConstFold.second);
+        ASSERT_EQ(tag, sbe::value::TypeTags::NumberInt32);
+        ASSERT_EQ(val, 0);
+    }
+};
 
 // Create a pipeline based on the given string, use a DocumentSourceQueue as input initialized with
 // the provided documents encoded as json strings, and return the results as BSON.

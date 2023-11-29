@@ -101,11 +101,6 @@ TEST(ConstEvalTest, FoldRedundantExists) {
         exists);
 }
 
-ExprHolder getParam(TypeTags typeTag) {
-    return _fn(
-        kParameterFunctionName, "0"_cint64, ExprHolder{Constant::int32(static_cast<int>(typeTag))});
-}
-
 TEST(ConstEvalTest, FoldIsInListDataForConstants) {
     ABT abt = make<FunctionCall>("isInListData", makeSeq(Constant::int32(1)));
     ConstEval::constFold(abt);
@@ -294,6 +289,130 @@ TEST(ConstEvalTest, GetParamNaN) {
     ConstEval::constFold(abt);
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
         "Const [1]\n",
+        abt);
+}
+
+TEST(ConstEvalTest, AndOrFoldNonNothingLhs) {
+    /* OR */
+    // non-nullable lhs (getParam) || true -> true.
+    ABT abt = _binary("Or", getParam(TypeTags::Boolean), _cbool(true))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    // non-nullable lhs (binary op) || true -> true.
+    abt = _binary("Or",
+                  _binary("Gt", getParam(TypeTags::NumberInt32), getParam(TypeTags::NumberInt32)),
+                  _cbool(true))
+              ._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    // non-nullable lhs (const) || true -> true.
+    abt = _binary("Or", _cNaN(), _cbool(true))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    // non-nullable lhs (getParam) || false -> lhs.
+    abt = _binary("Or", getParam(TypeTags::Boolean), _cbool(false))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "FunctionCall [getParam]\n"
+        "|   Const [6]\n"
+        "Const [0]\n",
+        abt);
+
+    // nullable lhs (variable) || false -> lhs.
+    abt = _binary("Or", _binary("Lte", "x"_var, "2"_cint64), _cbool(false))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "BinaryOp [Lte]\n"
+        "|   Const [2]\n"
+        "Variable [x]\n",
+        abt);
+
+    // nullable lhs (variable) || true -> no change.
+    abt = _binary("Or", _binary("Lte", "x"_var, "2"_cint64), _cbool(true))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "BinaryOp [Or]\n"
+        "|   Const [true]\n"
+        "BinaryOp [Lte]\n"
+        "|   Const [2]\n"
+        "Variable [x]\n",
+        abt);
+
+    // nothing lhs (const) || true -> no change.
+    abt = _binary("Or", _cnothing(), _cbool(true))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "BinaryOp [Or]\n"
+        "|   Const [true]\n"
+        "Const [Nothing]\n",
+        abt);
+
+    /* AND */
+    // non-nullable lhs (binary op) && false -> false.
+    abt = _binary("And", _binary("Gt", getParam(TypeTags::NumberInt32), "2"_cint64), _cbool(false))
+              ._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    // non-nullable lhs (const) && false -> false.
+    abt = _binary("And", _cnull(), _cbool(false))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    // non-nullable lhs (getParam) && true -> lhs.
+    abt = _binary("And", getParam(TypeTags::Boolean), _cbool(true))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "FunctionCall [getParam]\n"
+        "|   Const [6]\n"
+        "Const [0]\n",
+        abt);
+
+    // non-nullable lhs (binary op) && true -> lhs.
+    abt = _binary("And", _binary("Lt", getParam(TypeTags::NumberDecimal), "2"_cint64), _cbool(true))
+              ._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "BinaryOp [Lt]\n"
+        "|   Const [2]\n"
+        "FunctionCall [getParam]\n"
+        "|   Const [13]\n"
+        "Const [0]\n",
+        abt);
+
+    // nullable lhs (if) && true -> lhs.
+    abt = _binary("And", _if("x"_var, "y"_var, "z"_var), _cbool(true))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "If []\n"
+        "|   |   Variable [z]\n"
+        "|   Variable [y]\n"
+        "Variable [x]\n",
+        abt);
+
+    // nullable lhs (if) && false -> no change.
+    abt = _binary("And", _if("x"_var, "y"_var, "z"_var), _cbool(false))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "BinaryOp [And]\n"
+        "|   Const [false]\n"
+        "If []\n"
+        "|   |   Variable [z]\n"
+        "|   Variable [y]\n"
+        "Variable [x]\n",
         abt);
 }
 }  // namespace

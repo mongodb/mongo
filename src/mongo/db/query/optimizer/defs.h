@@ -389,7 +389,8 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(ScanOrder, SCAN_ORDER);
 #undef SCAN_ORDER
 
 /*
- * Type for storing mapping between query parameter IDs and Constants.
+ * Type for storing mapping between query parameter IDs and Constants. Parameters always have a
+ * mapping to their associated Constant and will never be Nothing.
  */
 using QueryParameterMap = opt::unordered_map<int32_t, Constant>;
 

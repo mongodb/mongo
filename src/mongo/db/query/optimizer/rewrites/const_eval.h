@@ -73,40 +73,67 @@ public:
           _erasedProj(erasedProj),
           _renamedProj(renamedProj) {}
 
+    // Nullability is a type annotation for ABTs, which refers to whether an expression can produce
+    // a Nothing value when evaluated. In many cases we can prove that an expression can never
+    // return Nothing, which allows us to perform more optimizations.
+    enum class Nullability {
+        // Expression not guaranteed to produce a value.
+        // While Nodes do not return values in the way expressions do, we define them as Nullable
+        // for the purpose of this analysis for convenience of writing a single transport.
+        kNullable = 0,
+        kNonNullable,
+    };
+
     // The default noop transport. Note the first ABT& parameter.
     template <typename T, typename... Ts>
-    void transport(ABT&, const T&, Ts&&...) {}
+    Nullability transport(ABT&, const T&, Ts&&...) {
+        return Nullability::kNullable;
+    }
 
-    void transport(ABT& n, const Variable& var);
+    Nullability transport(ABT& n, const Constant& c);
+    Nullability transport(ABT& n, const Variable& var);
 
     void prepare(ABT&, const Let& let);
-    void transport(ABT& n, const Let& let, ABT&, ABT& in);
-    void transport(ABT& n, const LambdaApplication& app, ABT& lam, ABT& arg);
+    Nullability transport(ABT& n, Let& let, Nullability, Nullability inNullability);
+    Nullability transport(ABT& n, LambdaApplication& app, Nullability, Nullability);
     void prepare(ABT&, const LambdaAbstraction&);
-    void transport(ABT&, const LambdaAbstraction&, ABT&);
+    Nullability transport(ABT&, const LambdaAbstraction&, Nullability);
 
-    void transport(ABT& n, const UnaryOp& op, ABT& child);
+    Nullability transport(ABT& n, UnaryOp& op, Nullability);
     // Specific transport for binary operation
     // The const correctness is probably wrong (as const ABT& lhs, const ABT& rhs does not work for
     // some reason but we can fix it later).
-    void transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs);
-    void transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args);
-    void transport(ABT& n, const If& op, ABT& cond, ABT& thenBranch, ABT& elseBranch);
+    Nullability transport(ABT& n,
+                          BinaryOp& op,
+                          Nullability lhsNullability,
+                          Nullability rhsNullability);
+    Nullability transport(ABT& n, FunctionCall& op, std::vector<Nullability> argsNullability);
+    Nullability transport(ABT& n,
+                          If& op,
+                          Nullability condNullability,
+                          Nullability thenNullability,
+                          Nullability elseNullability);
 
-    void transport(ABT& n, const EvalPath& op, ABT& path, ABT& input);
-    void transport(ABT& n, const EvalFilter& op, ABT& path, ABT& input);
+    Nullability transport(ABT& n, EvalPath& op, Nullability pathNullability, Nullability);
+    Nullability transport(ABT& n, EvalFilter& op, Nullability pathNullability, Nullability);
 
-    void transport(ABT& n, const FilterNode& op, ABT& child, ABT& expr);
-    void transport(ABT& n, const EvaluationNode& op, ABT& child, ABT& expr);
+    Nullability transport(ABT& n, FilterNode& op, Nullability, Nullability);
+    Nullability transport(ABT& n, EvaluationNode& op, Nullability, Nullability);
 
     void prepare(ABT&, const PathTraverse&);
-    void transport(ABT&, const PathTraverse&, ABT&);
+    Nullability transport(ABT&, const PathTraverse&, Nullability nullability);
 
-    void transport(ABT& n, const PathComposeM& op, ABT& lhs, ABT& rhs);
-    void transport(ABT& n, const PathComposeA& op, ABT& lhs, ABT& rhs);
+    Nullability transport(ABT& n,
+                          PathComposeM& op,
+                          Nullability lhsNullability,
+                          Nullability rhsNullability);
+    Nullability transport(ABT& n,
+                          PathComposeA& op,
+                          Nullability lhsNullability,
+                          Nullability rhsNullability);
 
     void prepare(ABT&, const References& refs);
-    void transport(ABT& n, const References& op, std::vector<ABT>&);
+    Nullability transport(ABT& n, const References& op, std::vector<Nullability>);
 
     // The tree is passed in as NON-const reference as we will be updating it.
     bool optimize(ABT& n);

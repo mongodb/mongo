@@ -43,6 +43,8 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
@@ -452,6 +454,120 @@ TEST_F(ABTSBE, LowerComparisonCollation) {
     checkCmp3w("ABC", "abc", 0);
     checkCmp3w("aCC", "abb", 1);
     checkCmp3w("AbX", "aBy", -1);
+}
+
+// The following nullability tests verify that ConstEval, which performs rewrites and
+// simplifications based on the nullability value of expressions, does not change the result of the
+// evaluation of And and Or. eval(E) == eval(constEval(E))
+
+TEST_F(ABTSBE, NonNullableLhsOrTrueConstFold) {
+    // E = non-nullable lhs (resolvable variable) || true
+    // eval(E) == eval(constEval(E))
+    auto tree = _binary("Or", _binary("Gt", "x"_var, "5"_cint32), _cbool(true))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var =
+        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(ABTSBE, NonNullableLhsOrFalseConstFold) {
+    // E = non-nullable lhs (resolvable variable) || false
+    // eval(E) == eval(constEval(E))
+    auto tree = _binary("Or", _binary("Gt", "x"_var, "5"_cint32), _cbool(false))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var =
+        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(ABTSBE, NullableLhsOrTrueConstFold) {
+    // E = nullable lhs (Nothing) || true
+    // eval(E) == eval(constEval(E))
+    auto tree = _binary("Or", _cnothing(), _cbool(true))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var = boost::none;
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(ABTSBE, NullableLhsOrFalseConstFold) {
+    // E = nullable lhs (Nothing) || false
+    // eval(E) == eval(constEval(E))
+    auto tree = _binary("Or", _cnothing(), _cbool(false))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var = boost::none;
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(ABTSBE, NonNullableLhsAndFalseConstFold) {
+    // E = non-nullable lhs (resolvable variable) && false
+    // eval(E) == eval(constEval(E))
+    auto tree = _binary("And", _binary("Gt", "x"_var, "5"_cint32), _cbool(false))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var =
+        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(ABTSBE, NonNullableLhsAndTrueConstFold) {
+    // E = non-nullable lhs (resolvable variable) && true
+    // eval(E) == eval(constEval(E))
+    auto tree = _binary("And", _binary("Gt", "x"_var, "5"_cint32), _cbool(true))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var =
+        std::make_pair(ProjectionName{"x"_sd}, sbe::value::makeValue(mongo::Value((int32_t)1)));
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(ABTSBE, NullableLhsAndFalseConstFold) {
+    // E = nullable lhs (Nothing) && false
+    // eval(E) == eval(constEval(E))
+    auto tree = _binary("And", _cnothing(), _cbool(false))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var = boost::none;
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
+}
+
+TEST_F(ABTSBE, NullableLhsAndTrueConstFold) {
+    // E = nullable lhs (Nothing) && true
+    // eval(E) == eval(constEval(E))
+    auto tree = _binary("And", _cnothing(), _cbool(true))._n;
+    auto treeConstFold = constFold(tree);
+
+    auto var = boost::none;
+    auto res = evalExpr(tree, var);
+    auto resConstFold = evalExpr(treeConstFold, var);
+
+    assertEqualValues(res, resConstFold);
 }
 
 TEST_F(NodeSBE, Lower1) {
