@@ -5,7 +5,7 @@
  * @tags: [
  *   requires_timeseries,
  *   featureFlagTimeseriesUpdatesSupport,
- *   __TEMPORARILY_DISABLED__,  # TODO (SERVER-79954): Enable this test.
+ *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
  * ]
  */
 

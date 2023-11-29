@@ -5,6 +5,7 @@
  * @tags: [
  *   requires_timeseries,
  *   featureFlagTimeseriesUpdatesSupport,
+ *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
  * ]
  */
 

@@ -6,6 +6,7 @@
  *   requires_replication,
  *   requires_timeseries,
  *   featureFlagTimeseriesUpdatesSupport,
+ *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
  * ]
  */
 const rst = new ReplSetTest({

@@ -35,8 +35,16 @@ export function runTimeseriesRetryDeleteAndUpdateTest(
 
         const coll = testDB.getCollection('timeseries_retry_delete_and_update_' + collCount++);
         coll.drop();
-        assert.commandWorked(testDB.createCollection(
-            coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+        if (conn.isMongos()) {
+            assert.commandWorked(testDB.runCommand({
+                createUnsplittableCollection: coll.getName(),
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName}
+            }));
+        } else {
+            assert.commandWorked(testDB.createCollection(
+                coll.getName(),
+                {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+        }
         setUpCollection(testDB, coll, metaFieldName);
 
         assert.commandWorked(testDB.runCommand({
