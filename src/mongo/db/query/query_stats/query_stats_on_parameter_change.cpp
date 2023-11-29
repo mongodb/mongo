@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats/util.h"
+#include "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
 
 #include <climits>
 #include <utility>

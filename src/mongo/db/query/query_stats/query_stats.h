@@ -148,11 +148,18 @@ const auto queryStatsStoreDecoration =
 
 const auto queryStatsRateLimiter =
     ServiceContext::declareDecoration<std::unique_ptr<RateLimiting>>();
+
 /**
  * Acquire a reference to the global queryStats store.
  */
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
 
+/**
+ * Indicates whether or not query stats is enabled via the feature flags. If
+ * requiresFullQueryStatsFeatureFlag is true, it will only return true if featureFlagQueryStats is
+ * enabled. Otherwise, it will return true if either featureFlagQueryStats or
+ * featureFlagQueryStatsFindCommand is enabled.
+ */
 bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag);
 
 /**

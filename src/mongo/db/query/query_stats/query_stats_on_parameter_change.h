@@ -53,9 +53,9 @@ Status validateQueryStatsStoreSize(const std::string& str, const boost::optional
 Status onQueryStatsSamplingRateUpdate(int samplingRate);
 
 /**
- *  An interface used to modify the queryStats store when query setParameters are modified. This is
- *  done via an interface decorating the 'ServiceContext' in order to avoid a link-time dependency
- *  of the query knobs library on the queryStats code.
+ * An interface used to modify the queryStats store when query setParameters are modified. This is
+ * done via an interface decorating the 'ServiceContext' in order to avoid a link-time dependency of
+ * the query knobs library on the queryStats code.
  */
 class OnParamChangeUpdater {
 public:
@@ -75,26 +75,9 @@ public:
 };
 
 /**
- * A stub implementation that does not allow changing any parameters - to be used if the queryStats
- * store is disabled and cannot be re-enabled without restarting, as with a feature flag.
- */
-class NoChangesAllowedTelemetryParamUpdater : public OnParamChangeUpdater {
-public:
-    void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
-        uasserted(7373500,
-                  "Cannot configure queryStats store - it is currently disabled and a restart is "
-                  "required to activate.");
-    }
-
-    void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) {
-        uasserted(7506200,
-                  "Cannot configure queryStats store - it is currently disabled and a restart is "
-                  "required to activate.");
-    }
-};
-
-/**
- * Decorated accessor to the 'OnParamChangeUpdater' stored in 'ServiceContext'.
+ * Decorated accessor to the 'OnParamChangeUpdater' stored in 'ServiceContext'. Again, this is done
+ * via a decoration and interface to avoid a link-time dependency from the query knobs library on
+ * the queryStats code.
  */
 extern const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater>>
     queryStatsStoreOnParamChangeUpdater;
