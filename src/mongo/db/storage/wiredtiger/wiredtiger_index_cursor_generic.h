@@ -93,6 +93,13 @@ protected:
         metricsCollector.incrementOneIdxEntryRead(cursor->internal_uri, key->size);
     }
 
+    void getKeyValue(WT_CURSOR* cursor, WT_ITEM* key, WT_ITEM* value) {
+        invariantWTOK(cursor->get_raw_key_value(cursor, key, value), cursor->session);
+
+        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
+        metricsCollector.incrementOneIdxEntryRead(cursor->internal_uri, key->size);
+    }
+
     OperationContext* _opCtx;
     const bool _forward;
 

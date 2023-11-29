@@ -1113,7 +1113,7 @@ protected:
     // Called after _key has been filled in, ie a new key to be processed has been fetched.
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
-    virtual void updateIdAndTypeBits() {
+    virtual void updateIdAndTypeBits(const char* newValueData, size_t newValueSize) {
         if (_rsKeyFormat == KeyFormat::Long) {
             _id = key_string::decodeRecordIdLongAtEnd(_key.getBuffer(), _key.getSize());
         } else {
@@ -1122,14 +1122,7 @@ protected:
         }
         invariant(!_id.isNull());
 
-        WT_CURSOR* c = _cursor->get();
-        WT_ITEM item;
-        // Can't get WT_ROLLBACK and hence won't throw an exception.
-        // Don't expect WT_PREPARE_CONFLICT either.
-        auto ret = c->get_value(c, &item);
-        invariant(ret != WT_ROLLBACK && ret != WT_PREPARE_CONFLICT);
-        invariantWTOK(ret, c->session);
-        BufReader br(item.data, item.size);
+        BufReader br(newValueData, newValueSize);
         _typeBits.resetFromBuffer(&br);
     }
 
@@ -1273,7 +1266,10 @@ protected:
      * be called after a restore that did not restore to original state since that does not
      * logically move the cursor until the following call to next().
      */
-    void updatePosition(const char* newKeyData, size_t newKeySize) {
+    void updatePosition(const char* newKeyData,
+                        size_t newKeySize,
+                        const char* newValueData,
+                        size_t newValueSize) {
         // Store (a copy of) the new item data as the current key for this cursor.
         _key.resetFromBuffer(newKeyData, newKeySize);
 
@@ -1281,7 +1277,7 @@ protected:
         if (_eof)
             return;
 
-        updateIdAndTypeBits();
+        updateIdAndTypeBits(newValueData, newValueSize);
     }
 
     void checkKeyIsOrdered(const char* newKeyData, size_t newKeySize) {
@@ -1320,9 +1316,13 @@ protected:
 
         WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
-        getKey(c, &item);
+        WT_ITEM value;
+        getKeyValue(c, &item, &value);
 
-        updatePosition(static_cast<const char*>(item.data), item.size);
+        updatePosition(static_cast<const char*>(item.data),
+                       item.size,
+                       static_cast<const char*>(value.data),
+                       value.size);
     }
 
     void advanceNext() {
@@ -1348,11 +1348,15 @@ protected:
 
         WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
-        getKey(c, &item);
+        WT_ITEM value;
+        getKeyValue(c, &item, &value);
 
         checkKeyIsOrdered(static_cast<const char*>(item.data), item.size);
 
-        updatePosition(static_cast<const char*>(item.data), item.size);
+        updatePosition(static_cast<const char*>(item.data),
+                       item.size,
+                       static_cast<const char*>(value.data),
+                       value.size);
     }
 
     boost::optional<KeyStringEntry> getKeyStringEntry() {
@@ -1435,7 +1439,7 @@ public:
     // Called after _key has been filled in, ie a new key to be processed has been fetched.
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
-    void updateIdAndTypeBits() override {
+    void updateIdAndTypeBits(const char* newValueData, size_t newValueSize) override {
         LOGV2_TRACE_INDEX(
             20096, "Unique Index KeyString: [{keyString}]", "keyString"_attr = _key.toString());
 
@@ -1448,11 +1452,11 @@ public:
             key_string::getKeySize(_key.getBuffer(), _key.getSize(), _ordering, _typeBits);
 
         if (_key.getSize() == keySize) {
-            _updateIdAndTypeBitsFromValue();
+            _updateIdAndTypeBitsFromValue(newValueData, newValueSize);
         } else {
             // The RecordId is in the key at the end. This implementation is provided by the
             // base class, let us just invoke that functionality here.
-            WiredTigerIndexCursorBase::updateIdAndTypeBits();
+            WiredTigerIndexCursorBase::updateIdAndTypeBits(newValueData, newValueSize);
         }
     }
 
@@ -1497,22 +1501,11 @@ private:
     // Called after _key has been filled in, ie a new key to be processed has been fetched.
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
-    void _updateIdAndTypeBitsFromValue() {
+    void _updateIdAndTypeBitsFromValue(const char* newValueData, size_t newValueSize) {
         // Old-format unique index keys always use the Long format.
         invariant(_rsKeyFormat == KeyFormat::Long);
 
-        // We assume that cursors can only ever see unique indexes in their "pristine" state,
-        // where no duplicates are possible. The cases where dups are allowed should hold
-        // sufficient locks to ensure that no cursor ever sees them.
-        WT_CURSOR* c = _cursor->get();
-        WT_ITEM item;
-        // Can't get WT_ROLLBACK and hence won't throw an exception.
-        // Don't expect WT_PREPARE_CONFLICT either.
-        auto ret = c->get_value(c, &item);
-        invariant(ret != WT_ROLLBACK && ret != WT_PREPARE_CONFLICT);
-        invariantWTOK(ret, c->session);
-
-        BufReader br(item.data, item.size);
+        BufReader br(newValueData, newValueSize);
         _id = key_string::decodeRecordIdLong(&br);
         _typeBits.resetFromBuffer(&br);
 
@@ -1564,17 +1557,11 @@ public:
     // Called after _key has been filled in, i.e. a new key to be processed has been fetched.
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
-    void updateIdAndTypeBits() override {
+    void updateIdAndTypeBits(const char* newValueData, size_t newValueSize) override {
         // _id index keys always use the Long format.
         invariant(_rsKeyFormat == KeyFormat::Long);
 
-        WT_CURSOR* c = _cursor->get();
-        WT_ITEM item;
-        auto ret = c->get_value(c, &item);
-        invariant(ret != WT_ROLLBACK && ret != WT_PREPARE_CONFLICT);
-        invariantWTOK(ret, c->session);
-
-        BufReader br(item.data, item.size);
+        BufReader br(newValueData, newValueSize);
         _id = key_string::decodeRecordIdLong(&br);
         _typeBits.resetFromBuffer(&br);
 

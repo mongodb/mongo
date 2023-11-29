@@ -464,8 +464,9 @@ private:
 
         auto* c = _cursor->get();
         WT_ITEM key;
+        WT_ITEM value;
         out.emplace();
-        c->get_key(c, &key);
+        c->get_raw_key_value(c, &key, &value);
         size_t nullByteSize = 1;
         invariant(key.size >= 1);
         // If we end up reserving more values, like kRowIdPath, this check should be changed to
@@ -474,8 +475,6 @@ private:
             nullByteSize = 0;
             out->path = PathView("\xFF"_sd);
         } else {
-            WT_ITEM value;
-            c->get_value(c, &value);
             out->path = PathView(static_cast<const char*>(key.data));
             out->value = CellView(static_cast<const char*>(value.data), value.size);
         }
