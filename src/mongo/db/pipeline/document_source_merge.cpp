@@ -83,9 +83,6 @@ using WhenMatched = MergeStrategyDescriptor::WhenMatched;
 using WhenNotMatched = MergeStrategyDescriptor::WhenNotMatched;
 
 constexpr auto kStageName = DocumentSourceMerge::kStageName;
-constexpr auto kDefaultWhenMatched = WhenMatched::kMerge;
-constexpr auto kDefaultWhenNotMatched = WhenNotMatched::kInsert;
-
 const auto kDefaultPipelineLet = BSON("new"
                                       << "$$ROOT");
 
@@ -217,13 +214,15 @@ DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
                                          boost::optional<std::vector<BSONObj>> pipeline,
                                          std::set<FieldPath> mergeOnFields,
                                          boost::optional<ChunkVersion> collectionPlacementVersion)
-    : DocumentSourceWriter(kStageName.rawData(), outputNs, expCtx), _outputNs(std::move(outputNs)) {
+    : DocumentSourceWriter(kStageName.rawData(), outputNs, expCtx),
+      _outputNs(std::move(outputNs)),
+      _mergeOnFields(std::move(mergeOnFields)),
+      _mergeOnFieldsIncludesId(_mergeOnFields.count("_id") == 1) {
     _mergeProcessor.emplace(expCtx,
                             whenMatched,
                             whenNotMatched,
                             std::move(letVariables),
                             std::move(pipeline),
-                            std::move(mergeOnFields),
                             std::move(collectionPlacementVersion));
 }
 
@@ -378,7 +377,7 @@ Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
     spec.setWhenNotMatched(descriptor.mode.second);
     spec.setOn([&]() {
         std::vector<std::string> mergeOnFields;
-        for (const auto& path : _mergeProcessor->getMergeOnFields()) {
+        for (const auto& path : _mergeOnFields) {
             mergeOnFields.push_back(path.fullPath());
         }
         return mergeOnFields;
@@ -389,7 +388,8 @@ Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
 
 std::pair<DocumentSourceMerge::BatchObject, int> DocumentSourceMerge::makeBatchObject(
     Document doc) const {
-    auto batchObject = _mergeProcessor->makeBatchObject(std::move(doc));
+    auto batchObject =
+        _mergeProcessor->makeBatchObject(std::move(doc), _mergeOnFields, _mergeOnFieldsIncludesId);
     auto upsertType = _mergeProcessor->getMergeStrategyDescriptor().upsertType;
 
     tassert(6628901, "_writeSizeEstimator should be initialized", _writeSizeEstimator);
@@ -408,11 +408,10 @@ void DocumentSourceMerge::flush(BatchedCommandRequest bcr, BatchedObjects batch)
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
         // A DuplicateKey error could be due to a collision on the 'on' fields or on any other
         // unique index.
-        const auto& mergeOnFields = _mergeProcessor->getMergeOnFields();
         auto dupKeyPattern = ex->getKeyPattern();
         bool dupKeyFromMatchingOnFields =
-            (static_cast<size_t>(dupKeyPattern.nFields()) == mergeOnFields.size()) &&
-            std::all_of(mergeOnFields.begin(), mergeOnFields.end(), [&](auto onField) {
+            (static_cast<size_t>(dupKeyPattern.nFields()) == _mergeOnFields.size()) &&
+            std::all_of(_mergeOnFields.begin(), _mergeOnFields.end(), [&](auto onField) {
                 return dupKeyPattern.hasField(onField.fullPath());
             });
 

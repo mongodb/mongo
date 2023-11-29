@@ -120,7 +120,6 @@ public:
                    MergeStrategyDescriptor::WhenNotMatched whenNotMatched,
                    boost::optional<BSONObj> letVariables,
                    boost::optional<std::vector<BSONObj>> pipeline,
-                   std::set<FieldPath> mergeOnFields,
                    boost::optional<ChunkVersion> collectionPlacementVersion);
 
     const MergeStrategyDescriptor& getMergeStrategyDescriptor() const {
@@ -135,15 +134,13 @@ public:
         return _pipeline;
     }
 
-    const auto& getMergeOnFields() const {
-        return _mergeOnFields;
-    }
-
     const auto& getCollectionPlacementVersion() const {
         return _collectionPlacementVersion;
     }
 
-    MongoProcessInterface::BatchObject makeBatchObject(Document doc) const;
+    MongoProcessInterface::BatchObject makeBatchObject(Document doc,
+                                                       const std::set<FieldPath>& mergeOnFieldPaths,
+                                                       bool mergeOnFieldPathsIncludeId) const;
 
     void flush(const NamespaceString& outputNs,
                BatchedCommandRequest bcr,
@@ -198,15 +195,6 @@ private:
 
     // A custom pipeline to compute a new version of merging documents.
     boost::optional<std::vector<BSONObj>> _pipeline;
-
-    // Holds the fields used for uniquely identifying documents. There must exist a unique index
-    // with this key pattern. Default is "_id" for unsharded collections, and "_id" plus the shard
-    // key for sharded collections.
-    std::set<FieldPath> _mergeOnFields;
-
-    // True if '_mergeOnFields' contains the _id. We store this as a separate boolean to avoid
-    // repeated lookups into the set.
-    bool _mergeOnFieldsIncludesId;
 
     boost::optional<ChunkVersion> _collectionPlacementVersion;
 };

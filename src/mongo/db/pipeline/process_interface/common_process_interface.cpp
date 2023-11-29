@@ -187,7 +187,7 @@ std::vector<FieldPath> CommonProcessInterface::collectDocumentKeyFieldsActingAsR
     const auto [cm, _] =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
     if (cm.isSharded()) {
-        return _shardKeyToDocumentKeyFields(cm.getShardKeyPattern().getKeyPatternFields());
+        return shardKeyToDocumentKeyFields(cm.getShardKeyPattern().getKeyPatternFields());
     }
 
     // We have no evidence this collection is sharded, so the document key is just _id.
@@ -237,8 +237,8 @@ boost::optional<ShardVersion> CommonProcessInterface::refreshAndGetCollectionVer
     return cri.cm.isSharded() ? boost::make_optional(cri.getCollectionVersion()) : boost::none;
 }
 
-std::vector<FieldPath> CommonProcessInterface::_shardKeyToDocumentKeyFields(
-    const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) const {
+std::vector<FieldPath> CommonProcessInterface::shardKeyToDocumentKeyFields(
+    const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) {
     std::vector<FieldPath> result;
     bool gotId = false;
     for (auto& field : keyPatternFields) {

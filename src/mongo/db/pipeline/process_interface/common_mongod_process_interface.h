@@ -142,7 +142,7 @@ public:
 
     bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          const NamespaceString& nss,
-                                         const std::set<FieldPath>& fieldPaths) const;
+                                         const std::set<FieldPath>& fieldPaths) const override;
 
     std::unique_ptr<ResourceYielder> getResourceYielder(StringData cmdName) const final;
 

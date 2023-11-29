@@ -91,6 +91,8 @@ namespace mongo {
 class DocumentSourceMerge final : public DocumentSourceWriter<MongoProcessInterface::BatchObject> {
 public:
     static constexpr StringData kStageName = "$merge"_sd;
+    static constexpr auto kDefaultWhenMatched = MergeStrategyDescriptor::WhenMatched::kMerge;
+    static constexpr auto kDefaultWhenNotMatched = MergeStrategyDescriptor::WhenNotMatched::kInsert;
 
     /**
      * A "lite parsed" $merge stage to disallow passthrough from mongos even if the source
@@ -236,6 +238,16 @@ private:
     void waitWhileFailPointEnabled() override;
 
     const NamespaceString _outputNs;
+
+    // Holds the fields used for uniquely identifying documents. There must exist a unique index
+    // with this key pattern. Default is "_id" for unsharded collections, and "_id" plus the shard
+    // key for sharded collections.
+    std::set<FieldPath> _mergeOnFields;
+
+    // True if '_mergeOnFields' contains the _id. We store this as a separate boolean to avoid
+    // repeated lookups into the set.
+    bool _mergeOnFieldsIncludesId;
+
     boost::optional<MergeProcessor> _mergeProcessor;
 };
 

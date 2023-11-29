@@ -291,7 +291,7 @@ public:
 
     bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>&,
                                          const NamespaceString&,
-                                         const std::set<FieldPath>& fieldPaths) const;
+                                         const std::set<FieldPath>& fieldPaths) const override;
 
     void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>&,
                                       const NamespaceString&,
