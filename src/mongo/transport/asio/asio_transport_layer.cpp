@@ -717,7 +717,7 @@ StatusWith<std::shared_ptr<AsioSession>> AsioTransportLayer::_doSyncConnect(
                         "connect (sync) TCP fast open",
                         logv2::LogSeverity::Info(),
                         ec);
-        if (tcpFastOpenIsConfigured) {
+        if (ec && tcpFastOpenIsConfigured) {
             return errorCodeToStatus(ec, "syncConnect tcpFastOpenIsConfigured");
         }
         ec = std::error_code();
@@ -906,7 +906,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                             "connect (async) TCP fast open",
                             logv2::LogSeverity::Info(),
                             ec);
-            if (tcpFastOpenIsConfigured) {
+            if (ec && tcpFastOpenIsConfigured) {
                 return futurize(ec);
             }
 #endif
@@ -1248,7 +1248,7 @@ Status AsioTransportLayer::setup() {
                             "acceptor TCP fast open",
                             logv2::LogSeverity::Info(),
                             ec);
-            if (tcpFastOpenIsConfigured) {
+            if (ec && tcpFastOpenIsConfigured) {
                 return errorCodeToStatus(ec, "setup tcpFastOpenIsConfigured");
             }
             ec = std::error_code();
