@@ -70,7 +70,7 @@ HostAndPort parseGRPCFormattedURI(StringData uri) {
         return HostAndPort("", 0);
     }
 
-    // gRPC URIs can be prefixed with a schme (e.g. "unix:///blah.sock"). If this URI contains a
+    // gRPC URIs can be prefixed with a scheme (e.g. "unix:///blah.sock"). If this URI contains a
     // scheme, find the end of it and begin parsing from that point onward.
     for (auto scheme : constants::kUriSchemes) {
         if (uri.starts_with(scheme)) {
