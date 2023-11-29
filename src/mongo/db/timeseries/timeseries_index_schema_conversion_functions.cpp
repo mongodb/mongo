@@ -537,9 +537,9 @@ bool isHintIndexKey(const BSONObj& obj) {
     return true;
 }
 
-boost::optional<BSONObj> getIndexSupportingReopeningQuery(OperationContext* opCtx,
-                                                          const IndexCatalog* indexCatalog,
-                                                          const TimeseriesOptions& tsOptions) {
+bool collectionHasIndexSupportingReopeningQuery(OperationContext* opCtx,
+                                                const IndexCatalog* indexCatalog,
+                                                const TimeseriesOptions& tsOptions) {
     const std::string controlTimeField =
         timeseries::kControlMinFieldNamePrefix.toString() + tsOptions.getTimeField();
 
@@ -573,12 +573,11 @@ boost::optional<BSONObj> getIndexSupportingReopeningQuery(OperationContext* opCt
             }
             index++;
             if (index == expectedPrefix.size()) {
-                return BSON("$hint" << indexDesc->indexName());
+                return true;
             }
         }
     }
-
-    return boost::none;
+    return false;
 }
 
 }  // namespace mongo::timeseries

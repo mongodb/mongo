@@ -615,26 +615,22 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                         // collection before performing the query. Without the index we
                         // will perform a full collection scan which could cause us to
                         // take a performance hit.
-                        if (auto index = getIndexSupportingReopeningQuery(
+                        if (collectionHasIndexSupportingReopeningQuery(
                                 opCtx, bucketsColl->getIndexCatalog(), timeSeriesOptions)) {
 
                             // Run an aggregation to find a suitable bucket to reopen.
                             AggregateCommandRequest aggRequest(bucketsColl->ns(), *pipeline);
-                            aggRequest.setHint(index);
 
-                            auto swCursor = 
+                            auto cursor = uassertStatusOK(
                                     DBClientCursor::fromAggregationRequest(&client,
                                                                            aggRequest,
                                                                            false /* secondaryOk
                                                                            */, false /*
-                                                                           useExhaust*/);
-                            if (swCursor.isOK()) {
-                                auto& cursor = swCursor.getValue();
-                                if (cursor->more()) {
-                                    suitableBucket = cursor->next();
-                                }
-                            }
+                                                                           useExhaust*/));
 
+                            if (cursor->more()) {
+                                suitableBucket = cursor->next();
+                            }
                             reopeningContext->queriedBucket = true;
                         }
                     }
