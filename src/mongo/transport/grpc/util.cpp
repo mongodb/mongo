@@ -75,6 +75,7 @@ HostAndPort parseGRPCFormattedURI(StringData uri) {
     for (auto scheme : constants::kUriSchemes) {
         if (uri.starts_with(scheme)) {
             uri = uri.substr(scheme.size());
+            break;
         }
     }
 
