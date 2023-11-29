@@ -222,11 +222,12 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
                     reply.setUpserted(
                         IDLAnyTypeOwned(upsertDetails[0]->getUpsertedID().firstElement()));
                     replyInfo.summaryFields.nUpserted += 1;
+                } else {
+                    replyInfo.summaryFields.nMatched += response.getN();
                 }
 
                 reply.setNModified(response.getNModified());
                 replyInfo.summaryFields.nModified += response.getNModified();
-                replyInfo.summaryFields.nMatched += response.getN();
             } else {
                 replyInfo.summaryFields.nDeleted += response.getN();
             }
@@ -1140,7 +1141,7 @@ void BulkWriteOp::noteWriteOpFinalResponse(
             _nDeleted += reply.getN().value_or(0);
         } else {
             _nModified += reply.getNModified().value_or(0);
-            _nMatched += reply.getN().value_or(0);
+            _nMatched += reply.getUpserted() ? 0 : reply.getN().value_or(0);
             _nUpserted += reply.getUpserted() ? 1 : 0;
         }
         writeOp.setOpComplete(reply);

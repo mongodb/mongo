@@ -217,12 +217,13 @@ public:
         } else {
             auto replyItem = BulkWriteReplyItem(currentOpIdx);
             replyItem.setN(writeResult.results[0].getValue().getN());
-            _summaryFields.nMatched += *replyItem.getN();
             replyItem.setNModified(writeResult.results[0].getValue().getNModified());
             _summaryFields.nModified += *replyItem.getNModified();
             if (auto idElement = writeResult.results[0].getValue().getUpsertedId().firstElement()) {
                 replyItem.setUpserted(write_ops::Upserted(0, idElement));
                 _summaryFields.nUpserted += 1;
+            } else {
+                _summaryFields.nMatched += *replyItem.getN();
             }
             _addReply(replyItem);
         }
@@ -240,7 +241,6 @@ public:
             replyItem.setUpserted(upserted);
             replyItem.setN(1);
             _summaryFields.nUpserted += 1;
-            _summaryFields.nMatched += 1;
         } else {
             replyItem.setN(numMatched);
             _summaryFields.nMatched += numMatched;

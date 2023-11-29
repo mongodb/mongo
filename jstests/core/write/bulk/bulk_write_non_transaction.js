@@ -165,7 +165,7 @@ res = db.adminCommand({
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
 summaryFieldsValidator(
-    res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 1, nModified: 0, nUpserted: 1});
+    res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 1});
 
 cursorEntryValidator(res.cursor.firstBatch[0],
                      {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
