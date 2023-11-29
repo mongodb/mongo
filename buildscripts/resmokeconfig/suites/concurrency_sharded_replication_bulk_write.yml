@@ -100,6 +100,7 @@ selector:
   # starts to error. However, once this feature flag is marked as not being FCV gated that will
   # not be a problem.
   - jstests/concurrency/fsm_workloads/random_internal_transactions_setFCV_operations.js
+  - jstests/concurrency/fsm_workloads/random_DDL_CRUD_setFCV_operations.js
 
   exclude_with_any_tags:
   - requires_replication

@@ -288,7 +288,9 @@ export const $config = (function() {
                 // Check if insert succeeded
                 var res = db.adminCommand(bulkWriteCmd);
                 assert.commandWorked(res);
-                assert.eq(res.nErrors, 0);
+                assert.eq(res.nErrors,
+                          0,
+                          "BulkWrite - Insert errored when not expected to: " + tojson(res));
 
                 jsTestLog('BulkWrite - Update tid:' + tid + ' currentTid:' + this.tid +
                           ' collection:' + collNames);
@@ -323,7 +325,9 @@ export const $config = (function() {
                     }
                 }
                 assert.commandWorked(res);
-                assert.eq(res.nErrors, 0);
+                assert.eq(res.nErrors,
+                          0,
+                          "BulkWrite - Update errored when not expected to: " + tojson(res));
 
                 // Delete Data
                 jsTestLog('BulkWrite - Remove tid:' + tid + ' currentTid:' + this.tid +
@@ -339,7 +343,9 @@ export const $config = (function() {
                 };
                 res = db.adminCommand(bulkWriteCmd);
                 assert.commandWorked(res);
-                assert.eq(res.nErrors, 0);
+                assert.eq(res.nErrors,
+                          0,
+                          "BulkWrite - Delete errored when not expected to: " + tojson(res));
                 // Check guarantees IF NO CONCURRENT DROP is running.
                 assert.eq(countDocuments(coll, {generation: generation}), 0);
             } finally {
