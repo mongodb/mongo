@@ -18,7 +18,7 @@ import {
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Use the workload name as the database name, since the workload name is assumed to be
     // unique.
-    $config.data.uniqueDBName = 'findAndModify_update_queue';
+    $config.data.uniqueDBName = jsTestName();
 
     $config.data.newDocForInsert = function newDocForInsert(i) {
         return {_id: i, rand: Random.rand(), counter: 0};

@@ -14,7 +14,7 @@ export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
-        prefix: 'rename_collection_dbname_chain'
+        prefix: jsTestName()
     };
 
     var states = (function() {
