@@ -42,6 +42,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -178,11 +179,18 @@ public:
      */
     explicit ResumeToken(const ResumeTokenData& resumeValue);
 
-    Document toDocument() const;
+    /**
+     * Convenience method to represent the ResumeToken as a Document.
+     * Provides support for specifying SerializationOptions, as this method is used to service the
+     * toBSON().
+     */
+    Document toDocument(const SerializationOptions& options = {}) const;
 
-    BSONObj toBSON() const {
-        return toDocument().toBson();
-    }
+    /**
+     * Serialization to BSONObj. Provides support for specifying SerializationOptions,
+     * as ResumeToken requires a "query_shape: custom" specification in its IDL uses.
+     */
+    BSONObj toBSON(const SerializationOptions& options = {}) const;
 
     ResumeTokenData getData() const;
 

@@ -528,6 +528,7 @@ env.Library(
         'document_source_union_with.idl',
         'document_source_set_variable_from_subpipeline.idl',
         'exchange_spec.idl',
+        'resume_token.idl',
         'resume_token.cpp',
         'storage_stats_spec.idl',
     ],

@@ -203,8 +203,8 @@ Value DocumentSourceChangeStreamCheckInvalidate::serialize(const SerializationOp
     if (_startAfterInvalidate) {
         spec.setStartAfterInvalidate(ResumeToken(*_startAfterInvalidate));
     }
-    return Value(
-        Document{{DocumentSourceChangeStreamCheckInvalidate::kStageName, spec.toBSON(opts)}});
+    builder.append(DocumentSourceChangeStreamCheckInvalidate::kStageName, spec.toBSON(opts));
+    return Value(builder.obj());
 }
 
 }  // namespace mongo
