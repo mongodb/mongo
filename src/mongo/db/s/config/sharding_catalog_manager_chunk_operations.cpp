@@ -441,10 +441,8 @@ unsigned int getHistoryWindowInSeconds() {
         return secs;
     }
 
-    // TODO SERVER-73295 review hardcoded 10 seconds minimum history
-    return std::max(
-        std::max(minSnapshotHistoryWindowInSeconds.load(), gTransactionLifetimeLimitSeconds.load()),
-        10);
+    return std::max(minSnapshotHistoryWindowInSeconds.load(),
+                    gTransactionLifetimeLimitSeconds.load());
 }
 
 void logMergeToChangelog(OperationContext* opCtx,
