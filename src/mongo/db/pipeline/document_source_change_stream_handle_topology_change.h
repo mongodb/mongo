@@ -68,6 +68,8 @@ class DocumentSourceChangeStreamHandleTopologyChange final : public DocumentSour
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamHandleTopologyChange"_sd;
 
+    static boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChange> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
     /**
      * Creates a new stage which will establish a new cursor and add it to the cursors being merged
      * by 'mergeCursorsStage' whenever a new shard is detected by a change stream.

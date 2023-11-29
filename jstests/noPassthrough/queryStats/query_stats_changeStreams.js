@@ -44,19 +44,17 @@ function runTest(conn) {
 
 {
     // Test on a sharded cluster.
-    // TODO SERVER-81313 This causes the change stream to fail to re-parse due to an issue with a
-    // ResumeToken.
-    // const st = new ShardingTest({
-    //     mongos: 1,
-    //     shards: 1,
-    //     config: 1,
-    //     rs: {nodes: 1},
-    //     mongosOptions: {
-    //         setParameter: {
-    //             internalQueryStatsRateLimit: -1,
-    //         }
-    //     },
-    // });
-    // runTest(st.s);
-    // st.stop();
+    const st = new ShardingTest({
+        mongos: 1,
+        shards: 1,
+        config: 1,
+        rs: {nodes: 1},
+        mongosOptions: {
+            setParameter: {
+                internalQueryStatsRateLimit: -1,
+            }
+        },
+    });
+    runTest(st.s);
+    st.stop();
 }

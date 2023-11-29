@@ -4490,8 +4490,20 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckInvali
         })",
         docSource->serialize(SerializationOptions{}).getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$_internalChangeStreamCheckInvalidate":{"startAfterInvalidate":"?object"}})",
+        R"({"$_internalChangeStreamCheckInvalidate":{"startAfterInvalidate":{
+                    "_data": "?string"
+                }}})",
         redact(*docSource));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamCheckInvalidate":{"startAfterInvalidate":{
+                        "_data": "820000000000000000292904"
+                    }}})",
+        docSource
+            ->serialize(SerializationOptions{
+                .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue})
+            .getDocument()
+            .toBson());
 }
 
 TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckResumability) {
@@ -4514,8 +4526,24 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckResuma
         })",
         docSource->serialize(SerializationOptions{}).getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$_internalChangeStreamCheckResumability":{"resumeToken":"?object"}})",
+        R"({"$_internalChangeStreamCheckResumability":{
+                "resumeToken": {
+                    "_data": "?string"
+                }
+            }})",
         redact(*docSource));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamCheckResumability":{
+                "resumeToken": {
+                    "_data": "820000000000000000292904"
+                }
+            }})",
+        docSource
+            ->serialize(SerializationOptions{
+                .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue})
+            .getDocument()
+            .toBson());
 }
 
 TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckTopologyChange) {
@@ -4551,7 +4579,9 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamEnsureResum
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$_internalChangeStreamEnsureResumeTokenPresent": {
-                "resumeToken": "?object"
+                "resumeToken": {
+                    "_data": "?string"
+                }
             }
         })",
         redact(*docSource));
@@ -4610,12 +4640,30 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamTransform) 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$_internalChangeStreamTransform": {
-                "resumeAfter": "?object",
+                "resumeAfter": {
+                    "_data": "?string"
+                },
                 "fullDocument": "default",
                 "fullDocumentBeforeChange": "off"
             }
         })",
         redact(*docSource));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalChangeStreamTransform": {
+                "resumeAfter": {
+                    "_data": "820000000000000000292904"
+                },
+                "fullDocument": "default",
+                "fullDocumentBeforeChange": "off"
+            }
+        })",
+        docSource
+            ->serialize(SerializationOptions{
+                .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue})
+            .getDocument()
+            .toBson());
 }
 
 // For DocumentSource types which contain an arbitrarily internal
