@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/cqf_fast_paths.h"
+#include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/cqf_fast_paths_utils.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
@@ -174,18 +175,50 @@ const ExecTreeGenerator* getFastPathExecTreeGenerator(const BSONObj& filter) {
 }
 
 /**
- * Implements fast path SBE plan generation for an empty query.
+ * Implements fast path SBE plan generation for a query without projections and predicates - a
+ * simple collection scan.
  */
 class EmptyQueryExecTreeGenerator : public ExecTreeGenerator {
 public:
     ExecTreeResult generateExecTree(const ExecTreeGeneratorParams& params) const override {
-        // TODO SERVER-80582
-        MONGO_UNIMPLEMENTED_TASSERT(8321504);
+        sbe::value::SlotIdGenerator ids;
+        auto staticData = std::make_unique<stage_builder::PlanStageStaticData>(
+            stage_builder::PlanStageStaticData{.resultSlot = ids.generate()});
+
+        // TODO SERVER-83628: respect the scanOrder
+        auto sbePlan = sbe::makeS<sbe::ScanStage>(
+            params.collectionUuid,
+            staticData->resultSlot,
+            boost::none /*scanRidSlot*/,
+            boost::none /*recordIdSlot*/,
+            boost::none /*snapshotIdSlot*/,
+            boost::none /*indexIdentSlot*/,
+            boost::none /*indexKeySlot*/,
+            boost::none /*indexKeyPatternSlot*/,
+            std::vector<std::string>{} /*fieldnames*/,
+            sbe::value::SlotVector{},
+            boost::none /*seekRecordIdSlot*/,
+            boost::none /*minRecordIdSlot*/,
+            boost::none /*maxRecordIdSlot*/,
+            true /*forwardScan*/,
+            params.yieldPolicy,
+            0 /*PlanNodeId*/,
+            sbe::ScanCallbacks{{}, {}, {}},
+            gDeprioritizeUnboundedUserCollectionScans.load() /*lowPriority*/
+        );
+
+        stage_builder::PlanStageData data{
+            stage_builder::Environment{std::make_unique<sbe::RuntimeEnvironment>()},
+            std::move(staticData)};
+
+        return {std::move(sbePlan), std::move(data)};
     }
 
     virtual BSONObj generateExplain() const override {
-        // TODO SERVER-80582
-        MONGO_UNIMPLEMENTED_TASSERT(8321505);
+        return BSON("stage"
+                    << "FASTPATH"
+                    << "type"
+                    << "emptyFind");
     }
 };
 

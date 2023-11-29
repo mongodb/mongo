@@ -1,16 +1,22 @@
 /**
  * This test verifies that the optimizer fast path is not used for queries against sharded
  * collections.
+ * @tags: [
+ *  requires_fcv_73,
+ * ]
  */
 import {planHasStage} from "jstests/libs/analyze_plan.js";
 
 const bonsaiSettings = {
     internalQueryFrameworkControl: "tryBonsai",
     featureFlagCommonQueryFramework: true,
-    // TODO SERVER-80582: Uncomment this setting. Some sharding code calls empty find on an
-    // unsharded collection internally, which causes this test to fail as that fast path is not
-    // implemented yet. internalCascadesOptimizerDisableFastPath: false,
+    internalCascadesOptimizerDisableFastPath: false,
 };
+
+function assertNotUsingFastPath(explainCmd) {
+    const explain = assert.commandWorked(explainCmd);
+    assert(!planHasStage(db, explain, "FASTPATH"));
+}
 
 const st = new ShardingTest({
     shards: 2,
@@ -36,11 +42,6 @@ assert.commandWorked(coll.insertMany([...Array(100).keys()].map(i => {
 })));
 
 st.shardColl(coll.getName(), {_id: 1}, {_id: 50}, {_id: 51});
-
-function assertNotUsingFastPath(explainCmd) {
-    const explain = assert.commandWorked(explainCmd);
-    assert(!planHasStage(db, explain, "FASTPATH"));
-}
 
 {
     // Empty find on a sharded collection should not use fast path.

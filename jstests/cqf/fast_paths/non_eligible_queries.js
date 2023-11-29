@@ -10,12 +10,12 @@ import {
 } from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
-    jsTestLog("Skipping test because the optimizer is not enabled");
+    jsTestLog("Skipping test because the Bonsai optimizer is not enabled.");
     quit();
 }
 
 if (!checkFastPathEnabled(db)) {
-    jsTestLog("Skipping test because fast paths are not enabled");
+    jsTestLog("Skipping test because fast paths are not enabled.");
     quit();
 }
 
