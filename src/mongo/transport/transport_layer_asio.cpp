@@ -680,7 +680,7 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
                         "connect (sync) TCP fast open",
                         logv2::LogSeverity::Info(),
                         ec);
-        if (tcpFastOpenIsConfigured) {
+        if (ec && tcpFastOpenIsConfigured) {
             return errorCodeToStatus(ec);
         }
         ec = std::error_code();
@@ -840,7 +840,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
                             "connect (async) TCP fast open",
                             logv2::LogSeverity::Info(),
                             ec);
-            if (tcpFastOpenIsConfigured) {
+            if (ec && tcpFastOpenIsConfigured) {
                 return futurize(ec);
             }
 #endif
@@ -1173,7 +1173,7 @@ Status TransportLayerASIO::setup() {
                             "acceptor TCP fast open",
                             logv2::LogSeverity::Info(),
                             ec);
-            if (tcpFastOpenIsConfigured) {
+            if (ec && tcpFastOpenIsConfigured) {
                 return errorCodeToStatus(ec);
             }
             ec = std::error_code();
