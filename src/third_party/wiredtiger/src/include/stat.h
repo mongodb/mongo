@@ -587,7 +587,7 @@ struct __wt_connection_stats {
     int64_t checkpoint_handle_skipped;
     int64_t checkpoint_handle_walked;
     int64_t checkpoint_time_recent;
-    int64_t checkpoints;
+    int64_t checkpoints_api;
     int64_t checkpoints_compact;
     int64_t checkpoint_sync;
     int64_t checkpoint_presync;
@@ -606,9 +606,14 @@ struct __wt_connection_stats {
     int64_t checkpoint_prep_total;
     int64_t checkpoint_state;
     int64_t checkpoint_scrub_target;
-    int64_t checkpoint_scrub_time;
+    int64_t checkpoint_scrub_max;
+    int64_t checkpoint_scrub_min;
+    int64_t checkpoint_scrub_recent;
+    int64_t checkpoint_scrub_total;
     int64_t checkpoint_stop_stress_active;
     int64_t checkpoint_tree_duration;
+    int64_t checkpoints_total_failed;
+    int64_t checkpoints_total_succeed;
     int64_t checkpoint_time_total;
     int64_t checkpoint_obsolete_applied;
     int64_t checkpoint_wait_reduce_dirty;

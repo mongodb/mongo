@@ -392,8 +392,11 @@ conn_stats = [
     CheckpointStat('checkpoint_prep_running', 'prepare currently running', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_prep_total', 'prepare total time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_presync', 'number of handles visited after writes complete'),
+    CheckpointStat('checkpoint_scrub_max', 'scrub max time (msecs)', 'no_clear,no_scale'),
+    CheckpointStat('checkpoint_scrub_min', 'scrub min time (msecs)', 'no_clear,no_scale'),
+    CheckpointStat('checkpoint_scrub_recent', 'scrub most recent time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_scrub_target', 'scrub dirty target', 'no_clear,no_scale'),
-    CheckpointStat('checkpoint_scrub_time', 'scrub time (msecs)', 'no_clear,no_scale'),
+    CheckpointStat('checkpoint_scrub_total', 'scrub total time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_skipped', 'checkpoints skipped because database was clean'),
     CheckpointStat('checkpoint_state', 'progress state', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_stop_stress_active', 'stop timing stress active', 'no_clear,no_scale'),
@@ -404,8 +407,10 @@ conn_stats = [
     CheckpointStat('checkpoint_time_total', 'total time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_tree_duration', 'time spent on per-tree checkpoint work (usecs)'),
     CheckpointStat('checkpoint_wait_reduce_dirty', 'wait cycles while cache dirty level is decreasing'),
-    CheckpointStat('checkpoints', 'number of checkpoints started'),
+    CheckpointStat('checkpoints_api', 'number of checkpoints started by api'),
     CheckpointStat('checkpoints_compact', 'number of checkpoints started by compaction'),
+    CheckpointStat('checkpoints_total_failed', 'total failed number of checkpoints'),
+    CheckpointStat('checkpoints_total_succeed', 'total succeed number of checkpoints'),
 
     ##########################################
     # Chunk cache statistics

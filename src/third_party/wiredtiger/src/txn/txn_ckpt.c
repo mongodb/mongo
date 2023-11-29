@@ -500,8 +500,6 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
     double current_dirty, prev_dirty;
     uint64_t bytes_written_start, bytes_written_total;
     uint64_t cache_size, max_write;
-    uint64_t time_start, time_stop;
-    uint64_t total_ms;
 
     conn = S2C(session);
     cache = conn->cache;
@@ -510,7 +508,6 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
     if (cache->eviction_checkpoint_target < DBL_EPSILON)
         return;
 
-    time_start = __wt_clock(session);
     bytes_written_start = cache->bytes_written;
 
     /*
@@ -530,7 +527,7 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
 
     /* Set the dirty trigger to the target value. */
     cache->eviction_scrub_target = cache->eviction_checkpoint_target;
-    WT_STAT_CONN_SET(session, checkpoint_scrub_target, 0);
+    WT_STAT_CONN_SET(session, checkpoint_scrub_target, (int64_t)cache->eviction_scrub_target);
 
     /* Wait while the dirty level is going down. */
     for (;;) {
@@ -552,10 +549,6 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
         if (bytes_written_total > max_write)
             break;
     }
-
-    time_stop = __wt_clock(session);
-    total_ms = WT_CLOCKDIFF_MS(time_stop, time_start);
-    WT_STAT_CONN_SET(session, checkpoint_scrub_time, total_ms);
 }
 
 /*
@@ -603,7 +596,7 @@ __checkpoint_stats(WT_SESSION_IMPL *session)
 
     /* Compute end-to-end timer statistics for checkpoint. */
     __wt_epoch(session, &stop);
-    msec = WT_TIMEDIFF_MS(stop, conn->ckpt_timer_scrub_end);
+    msec = WT_TIMEDIFF_MS(stop, conn->ckpt_timer_start);
 
     if (msec > conn->ckpt_time_max)
         conn->ckpt_time_max = msec;
@@ -611,6 +604,16 @@ __checkpoint_stats(WT_SESSION_IMPL *session)
         conn->ckpt_time_min = msec;
     conn->ckpt_time_recent = msec;
     conn->ckpt_time_total += msec;
+
+    /* Compute timer statistics for the scrub. */
+    msec = WT_TIMEDIFF_MS(conn->ckpt_timer_scrub_end, conn->ckpt_timer_start);
+
+    if (msec > conn->ckpt_scrub_max)
+        conn->ckpt_scrub_max = msec;
+    if (msec < conn->ckpt_scrub_min)
+        conn->ckpt_scrub_min = msec;
+    conn->ckpt_scrub_recent = msec;
+    conn->ckpt_scrub_total += msec;
 
     /* Compute timer statistics for the checkpoint prepare. */
     msec = WT_TIMEDIFF_MS(conn->ckpt_prep_end, conn->ckpt_prep_start);
@@ -1349,6 +1352,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
             conn->txn_global.last_ckpt_timestamp = WT_TS_NONE;
     }
 
+    WT_STAT_CONN_INCR(session, checkpoints_total_succeed);
+
 err:
     /*
      * Reset the timer so that next checkpoint tracks the progress only if configured.
@@ -1366,8 +1371,10 @@ err:
      * so what ends up on disk is not consistent.
      */
     failed = ret != 0;
-    if (failed)
+    if (failed) {
         conn->modified = true;
+        WT_STAT_CONN_INCR(session, checkpoints_total_failed);
+    }
 
     session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
     if (tracking)

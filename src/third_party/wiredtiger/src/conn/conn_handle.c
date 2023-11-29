@@ -88,6 +88,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
     conn->ckpt_prep_min = UINT64_MAX;
     conn->ckpt_time_min = UINT64_MAX;
+    conn->ckpt_scrub_min = UINT64_MAX;
 
     return (0);
 }
