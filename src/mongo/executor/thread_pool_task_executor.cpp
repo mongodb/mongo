@@ -592,23 +592,30 @@ void ThreadPoolTaskExecutor::signalEvent_inlock(const EventHandle& event,
 
 void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
                                                      stdx::unique_lock<Latch> lk) {
-    scheduleIntoPool_inlock(fromQueue, fromQueue->begin(), fromQueue->end(), std::move(lk));
+    boost::optional<WorkQueue::iterator> begin{fromQueue->begin()};
+    boost::optional<WorkQueue::iterator> end{fromQueue->end()};
+    scheduleIntoPool_inlock(fromQueue, begin, end, std::move(lk));
 }
 
 void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
-                                                     const WorkQueue::iterator& iter,
+                                                     boost::optional<WorkQueue::iterator> iter,
                                                      stdx::unique_lock<Latch> lk) {
-    scheduleIntoPool_inlock(fromQueue, iter, std::next(iter), std::move(lk));
+    boost::optional<WorkQueue::iterator> nextIter{std::next(*iter)};
+    scheduleIntoPool_inlock(fromQueue, iter, nextIter, std::move(lk));
 }
 
 void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
-                                                     const WorkQueue::iterator& begin,
-                                                     const WorkQueue::iterator& end,
+                                                     boost::optional<WorkQueue::iterator>& begin,
+                                                     boost::optional<WorkQueue::iterator>& end,
                                                      stdx::unique_lock<Latch> lk) {
     dassert(fromQueue != &_poolInProgressQueue);
-    std::vector<std::shared_ptr<CallbackState>> todo(begin, end);
-    _poolInProgressQueue.splice(_poolInProgressQueue.end(), *fromQueue, begin, end);
-
+    std::vector<std::shared_ptr<CallbackState>> todo(*begin, *end);
+    _poolInProgressQueue.splice(_poolInProgressQueue.end(), *fromQueue, *begin, *end);
+    // Destroy the iterators while holding the lock to accommodate for a possible data race in the
+    // debug implementation of `std::list`. See SERVER-83453 for more context on why we need to
+    // destroy the iterators while holding the lock.
+    begin.reset();
+    end.reset();
     lk.unlock();
 
     if (MONGO_unlikely(scheduleIntoPoolSpinsUntilThreadPoolTaskExecutorShutsDown.shouldFail())) {
