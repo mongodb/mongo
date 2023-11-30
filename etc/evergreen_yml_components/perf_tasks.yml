@@ -475,10 +475,13 @@ tasks:
 
   - name: dbcheck
     priority: 5
+    exec_timeout_secs: 43200 # 12 hours
     commands:
       - func: f_dsi_run_workload
+        timeout_secs: 43200 # 12 hours
         vars:
           test_control: "dbcheck"
+          additional_tfvars: "tags: {expire-on-delta: 12}" # increase host expiration to 12 hours.
 
   - name: misc_workloads
     priority: 5
