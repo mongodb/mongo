@@ -193,6 +193,7 @@ export function getAllPlanStages(root) {
  * Asserts that no more than one stage is a match.
  */
 export function getPlanStage(root, stage) {
+    assert(stage, "Stage was not defined in getPlanStage.")
     var planStageList = getPlanStages(root, stage);
 
     if (planStageList.length === 0) {
@@ -341,6 +342,7 @@ export function getShardQueryPlans(root) {
  * structure matches expected format.
  */
 export function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
+    assert(stage, "Stage was not defined in getAggPlanStages.");
     let results = [];
 
     function getDocumentSources(docSourceArray) {
@@ -434,6 +436,7 @@ export function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
  * will be used to lookup the given 'stage', even if 'executionStats' section is available.
  */
 export function getAggPlanStage(root, stage, useQueryPlannerSection = false) {
+    assert(stage, "Stage was not defined in getAggPlanStage.")
     let planStageList = getAggPlanStages(root, stage, useQueryPlannerSection);
 
     if (planStageList.length === 0) {
@@ -465,6 +468,7 @@ export function aggPlanHasStage(root, stage) {
  * on one node's query plan, an error will be thrown.
  */
 export function planHasStage(db, root, stage) {
+    assert(stage, "Stage was not defined in planHasStage.")
     const matchingStages = getPlanStages(root, stage);
 
     // If we are executing against a mongos, we may get more than one occurrence of the stage.

@@ -6,6 +6,7 @@
 // ]
 import {orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 import {
+    getOptimizer,
     getWinningPlan,
     isAggregationPlan,
     isQueryPlan,
@@ -56,19 +57,31 @@ function assertResultsMatch({
             result = getWinningPlan(explain.stages[0].$cursor.queryPlanner);
         }
 
-        // Check that $project uses the query system.
-        assert.eq(expectProjectToCoalesce,
-                  planHasStage(db, result, "PROJECTION_DEFAULT") ||
-                      planHasStage(db, result, "PROJECTION_COVERED") ||
-                      planHasStage(db, result, "PROJECTION_SIMPLE"),
-                  explain);
+        let optimizer = getOptimizer(explain);
 
-        if (!pipelineOptimizedAway) {
-            // Check that $project was removed from pipeline and pushed to the query system.
-            explain.stages.forEach(function(stage) {
-                if (stage.hasOwnProperty("$project"))
-                    assert.neq(removedProjectStage, stage["$project"], explain);
-            });
+        switch (optimizer) {
+            case "classic": {
+                // Check that $project uses the query system.
+                assert.eq(expectProjectToCoalesce,
+                          planHasStage(db, result, "PROJECTION_DEFAULT") ||
+                              planHasStage(db, result, "PROJECTION_COVERED") ||
+                              planHasStage(db, result, "PROJECTION_SIMPLE"),
+                          explain);
+
+                if (!pipelineOptimizedAway) {
+                    // Check that $project was removed from pipeline and pushed to the query system.
+                    explain.stages.forEach(function(stage) {
+                        if (stage.hasOwnProperty("$project"))
+                            assert.neq(removedProjectStage, stage["$project"], explain);
+                    });
+                }
+                break;
+            }
+            case "CQF": {
+                // TODO SERVER-77719: Implement the assertion for projection optimization rules for
+                // CQF.
+                break;
+            }
         }
     }
 
