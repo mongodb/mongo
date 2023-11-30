@@ -101,7 +101,12 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
              ResourcePattern::forClusterResource(opMsg.getValidatedTenantId()),
              ActionType::internal))) {
         auto opKey = uassertStatusOK(UUID::parse(clientOperationKeyElem));
-        opCtx->setOperationKey(std::move(opKey));
+        {
+            // We must obtain the client lock to set the OperationKey on the operation context as
+            // it may be concurrently read by CurrentOp.
+            stdx::lock_guard lg(*opCtx->getClient());
+            opCtx->setOperationKey(std::move(opKey));
+        }
         failIfOperationKeyMismatch.execute([&](const BSONObj& data) {
             tassert(7446600,
                     "OperationKey in request does not match test provided OperationKey",
