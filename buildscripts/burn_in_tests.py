@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Command line utility for determining what jstests have been added or modified."""
+"""Command line utility for determining what jstests have been added or modified test."""
 import copy
 import datetime
 import logging
