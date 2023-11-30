@@ -346,6 +346,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/update/update_common',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
+        '$BUILD_DIR/mongo/util/caching',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'client/shard_interface',
         'common_s',
