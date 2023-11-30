@@ -279,14 +279,10 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     // The shapification process will bloat the input query over the 16 MB memory limit. Assert
     // that calling registerRequest() doesn't throw and that the opDebug isn't registered with a
     // key hash (thus metrics won't be tracked for this query).
-    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(
-        opCtx.get(),
-        nss,
-        [&]() {
-            return std::make_unique<query_stats::FindKey>(
-                expCtx, *parsedFind, query_shape::CollectionType::kCollection);
-        },
-        /*requiresFullQueryStatsFeatureFlag*/ false));
+    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
+        return std::make_unique<query_stats::FindKey>(
+            expCtx, *parsedFind, query_shape::CollectionType::kCollection);
+    }));
     auto& opDebug = CurOp::get(*opCtx)->debug();
     ASSERT_EQ(opDebug.queryStatsKeyHash, boost::none);
 }

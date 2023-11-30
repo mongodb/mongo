@@ -68,13 +68,6 @@ feature_flags:
       version: 7.2
       shouldBeFCVGated: true
 
-    featureFlagQueryStatsFindCommand:
-      description: "Feature flag for enabling queryStats collection for the find command."
-      cpp_varname: gFeatureFlagQueryStatsFindCommand
-      default: true
-      version: 7.1
-      shouldBeFCVGated: true
-
     featureFlagQueryStatsDataBearingNodes:
       description: "Feature flag for enabling aggregation of queryStats from data bearing nodes."
       cpp_varname: gFeatureFlagQueryStatsDataBearingNodes

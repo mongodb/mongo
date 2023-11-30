@@ -6,11 +6,7 @@
 // This test specifically tests error handling when the feature flag is not on.
 // Set sampling rate to -1.
 let options = {
-    setParameter: {
-        internalQueryStatsRateLimit: -1,
-        featureFlagQueryStatsFindCommand: false,
-        featureFlagQueryStats: false
-    },
+    setParameter: {internalQueryStatsRateLimit: -1, featureFlagQueryStats: false},
 };
 const conn = MongoRunner.runMongod(options);
 assert.neq(null, conn, 'failed to start mongod');

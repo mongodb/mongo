@@ -299,15 +299,11 @@ public:
         void registerRequestForQueryStats(const boost::intrusive_ptr<ExpressionContext> expCtx,
                                           const ParsedFindCommand& parsedFind) {
             if (!_didDoFLERewrite) {
-                query_stats::registerRequest(
-                    expCtx->opCtx,
-                    expCtx->ns,
-                    [&]() {
-                        // This callback is either never invoked or invoked immediately within
-                        // registerRequest, so use-after-move of parsedFind isn't an issue.
-                        return std::make_unique<query_stats::FindKey>(expCtx, parsedFind);
-                    },
-                    /*requiresFullQueryStatsFeatureFlag*/ false);
+                query_stats::registerRequest(expCtx->opCtx, expCtx->ns, [&]() {
+                    // This callback is either never invoked or invoked immediately within
+                    // registerRequest, so use-after-move of parsedFind isn't an issue.
+                    return std::make_unique<query_stats::FindKey>(expCtx, parsedFind);
+                });
             }
         }
 

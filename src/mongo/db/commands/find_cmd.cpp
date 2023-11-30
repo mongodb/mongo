@@ -235,14 +235,10 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     // It is important to do this before canonicalizing and optimizing the query, each of which
     // would alter the query shape.
     if (!(collection && collection.get()->getCollectionOptions().encryptedFieldConfig)) {
-        query_stats::registerRequest(
-            opCtx,
-            nss,
-            [&]() {
-                return std::make_unique<query_stats::FindKey>(
-                    expCtx, *parsedRequest, collOrViewAcquisition.getCollectionType());
-            },
-            /*requiresFullQueryStatsFeatureFlag*/ false);
+        query_stats::registerRequest(opCtx, nss, [&]() {
+            return std::make_unique<query_stats::FindKey>(
+                expCtx, *parsedRequest, collOrViewAcquisition.getCollectionType());
+        });
     }
 
     expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedRequest, nss));

@@ -70,14 +70,10 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     // First call to registerRequest() should be rate limited.
     queryStatsRateLimiter(opCtx->getServiceContext()) =
         std::make_unique<RateLimiting>(0, Seconds{1});
-    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(
-        opCtx.get(),
-        nss,
-        [&]() {
-            return std::make_unique<query_stats::FindKey>(
-                expCtx, *parsedFind, query_shape::CollectionType::kCollection);
-        },
-        /*requiresFullQueryStatsFeatureFlag*/ false));
+    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
+        return std::make_unique<query_stats::FindKey>(
+            expCtx, *parsedFind, query_shape::CollectionType::kCollection);
+    }));
 
     // Since the query was rate limited, no key should have been created.
     ASSERT_NULL(opDebug.queryStatsKey);
@@ -86,14 +82,10 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     // Second call should not be rate limited.
     queryStatsRateLimiter(opCtx->getServiceContext()).get()->setSamplingRate(INT_MAX);
 
-    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(
-        opCtx.get(),
-        nss,
-        [&]() {
-            return std::make_unique<query_stats::FindKey>(
-                expCtx, *parsedFind, query_shape::CollectionType::kCollection);
-        },
-        /*requiresFullQueryStatsFeatureFlag*/ false));
+    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
+        return std::make_unique<query_stats::FindKey>(
+            expCtx, *parsedFind, query_shape::CollectionType::kCollection);
+    }));
 
     // queryStatsKey should not be created for previously rate limited query.
     ASSERT_NULL(opDebug.queryStatsKey);

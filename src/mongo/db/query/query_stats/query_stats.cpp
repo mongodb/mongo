@@ -72,6 +72,13 @@ CounterMetric queryStatsEvictedMetric("queryStats.numEvicted");
 CounterMetric queryStatsRateLimitedRequestsMetric("queryStats.numRateLimitedRequests");
 CounterMetric queryStatsStoreWriteErrorsMetric("queryStats.numQueryStatsStoreWriteErrors");
 
+/**
+ * Indicates whether or not query stats is enabled via the feature flag.
+ */
+bool isQueryStatsFeatureEnabled() {
+    return feature_flags::gFeatureFlagQueryStats.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
 
 /**
  * Cap the queryStats store size.
@@ -105,7 +112,7 @@ void assertConfigurationAllowed() {
             "Cannot configure queryStats store. The feature flag is not enabled. Please restart "
             "and specify the feature flag, or upgrade the feature compatibility version to one "
             "where it is enabled by default.",
-            isQueryStatsFeatureEnabled(/* requiresFullQueryStatsFeatureFlag = */ false));
+            isQueryStatsFeatureEnabled());
 }
 
 class QueryStatsOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
@@ -168,14 +175,12 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
 /**
  * Top-level checks for whether queryStats collection is enabled. If this returns false, we must go
  * no further.
- * TODO SERVER-79494 Remove requiresFullQueryStatsFeatureFlag parameter.
  */
-bool isQueryStatsEnabled(const ServiceContext* serviceCtx, bool requiresFullQueryStatsFeatureFlag) {
+bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
     // During initialization, FCV may not yet be setup but queries could be run. We can't
     // check whether queryStats should be enabled without FCV, so default to not recording
     // those queries.
-    return isQueryStatsFeatureEnabled(requiresFullQueryStatsFeatureFlag) &&
-        queryStatsStoreDecoration(serviceCtx)->getMaxSize() > 0;
+    return isQueryStatsFeatureEnabled() && queryStatsStoreDecoration(serviceCtx)->getMaxSize() > 0;
 }
 
 /**
@@ -213,19 +218,10 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
 
 }  // namespace
 
-bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag) {
-    return feature_flags::gFeatureFlagQueryStats.isEnabled(
-               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-        (!requiresFullQueryStatsFeatureFlag &&
-         feature_flags::gFeatureFlagQueryStatsFindCommand.isEnabled(
-             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-}
-
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<Key>(void)> makeKey,
-                     bool requiresFullQueryStatsFeatureFlag) {
-    if (!isQueryStatsEnabled(opCtx->getServiceContext(), requiresFullQueryStatsFeatureFlag)) {
+                     std::function<std::unique_ptr<Key>(void)> makeKey) {
+    if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         return;
     }
 
@@ -284,8 +280,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
     uassert(6579000,
             "Query stats is not enabled without the feature flag on and a cache size greater than "
             "0 bytes",
-            isQueryStatsEnabled(opCtx->getServiceContext(),
-                                /*requiresFullQueryStatsFeatureFlag*/ false));
+            isQueryStatsEnabled(opCtx->getServiceContext()));
     return queryStatsStoreDecoration(opCtx->getServiceContext())->getQueryStatsStore();
 }
 
