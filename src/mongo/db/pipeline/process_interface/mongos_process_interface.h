@@ -106,7 +106,8 @@ public:
     }
 
     boost::optional<BSONObj> getCatalogEntry(OperationContext* opCtx,
-                                             const NamespaceString& ns) const final {
+                                             const NamespaceString& ns,
+                                             const boost::optional<UUID>& collUUID) const final {
         MONGO_UNREACHABLE;
     }
 

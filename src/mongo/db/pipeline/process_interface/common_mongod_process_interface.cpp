@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -309,34 +310,33 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
 }
 
 boost::optional<BSONObj> CommonMongodProcessInterface::getCatalogEntry(
-    OperationContext* opCtx, const NamespaceString& ns) const {
-    Lock::GlobalLock globalLock{opCtx, MODE_IS};
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const boost::optional<UUID>& collUUID) const {
 
-    auto rs = DurableCatalog::get(opCtx)->getRecordStore();
-    if (!rs) {
+    // Perform an AutoGetCollection. This will verify that the collection still exists at the given
+    // read concern. If it doesn't and the aggregation has specified a UUID then this acquisition
+    // will fail.
+    AutoGetCollectionForRead coll{opCtx, ns};
+    const auto& collPtr = coll.getCollection();
+    checkCollectionUUIDMismatch(opCtx, ns, collPtr, collUUID);
+
+    if (!collPtr) {
         return boost::none;
     }
 
-    auto cursor = rs->getCursor(opCtx);
-    while (auto record = cursor->next()) {
-        auto obj = record->data.toBson();
-        if (NamespaceString{obj.getStringField("ns")} != ns) {
-            continue;
-        }
+    auto obj = DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, collPtr->getCatalogId());
 
-        BSONObjBuilder builder;
-        builder.append("db", ns.db());
-        builder.append("name", ns.coll());
-        builder.append("type", "collection");
-        if (auto shardName = getShardName(opCtx); !shardName.empty()) {
-            builder.append("shard", shardName);
-        }
-        builder.appendElements(obj);
-
-        return builder.obj();
+    BSONObjBuilder builder;
+    builder.append("db", ns.db());
+    builder.append("name", ns.coll());
+    builder.append("type", "collection");
+    if (auto shardName = getShardName(opCtx); !shardName.empty()) {
+        builder.append("shard", shardName);
     }
+    builder.appendElements(obj);
 
-    return boost::none;
+    return builder.obj();
 }
 
 void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,
