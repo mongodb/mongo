@@ -10,7 +10,7 @@ env.Library(
     target='test_commands_enabled',
     source=[
         'test_commands_enabled.cpp',
-        'test_commands_enabled.idl',
+        env.BazelIdlc('test_commands_enabled.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
@@ -78,7 +78,7 @@ env.Library(
         'fle2_compact.cpp',
         'fle2_compact.idl',
         'generic.cpp',
-        'generic.idl',
+        env.BazelIdlc('generic.idl')[0],
         'hashcmd.cpp',
         'kill_all_sessions_by_pattern_command.cpp',
         'kill_all_sessions_command.cpp',

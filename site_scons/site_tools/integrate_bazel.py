@@ -316,6 +316,10 @@ def create_program_builder(env: SCons.Environment.Environment) -> None:
     env['BUILDERS']['BazelProgram'] = create_bazel_builder(env['BUILDERS']["Program"])
 
 
+def create_idlc_builder(env: SCons.Environment.Environment) -> None:
+    env['BUILDERS']['BazelIdlc'] = create_bazel_builder(env['BUILDERS']["Idlc"])
+
+
 def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
     # create a json file which contains all the relevant info from this generation
     # that bazel will need to construct the correct command line for any given targets
@@ -442,6 +446,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         # === Builders ===
         create_library_builder(env)
         create_program_builder(env)
+        create_idlc_builder(env)
 
         if env.GetOption('ninja') == "disabled":
 
@@ -461,3 +466,4 @@ def generate(env: SCons.Environment.Environment) -> None:
     else:
         env['BUILDERS']['BazelLibrary'] = env['BUILDERS']['Library']
         env['BUILDERS']['BazelProgram'] = env['BUILDERS']['Program']
+        env['BUILDERS']['BazelIdlc'] = env['BUILDERS']['Idlc']

@@ -1,0 +1,5 @@
+filegroup(
+    name = "idlc",
+    srcs = ["idlc.py", "__init__.py"] + glob(["**/idl/*.py"]),
+    visibility=["//visibility:public"],
+)

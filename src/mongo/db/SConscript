@@ -59,7 +59,7 @@ env.SConscript(
 env.Library(
     target='server_base',
     source=[
-        'basic_types.idl',
+        env.BazelIdlc('basic_types.idl')[0],
         'cluster_role.cpp',
         'feature_compatibility_version_document.idl',
         'feature_compatibility_version_parser.cpp',

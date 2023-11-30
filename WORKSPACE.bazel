@@ -26,19 +26,6 @@ http_archive(
 )
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-http_archive(
-    name = "aspect_bazel_lib",
-    sha256 = "e3151d87910f69cf1fc88755392d7c878034a69d6499b287bcfc00b1cf9bb415",
-    strip_prefix = "bazel-lib-1.32.1",
-    url = "https://github.com/aspect-build/bazel-lib/releases/download/v1.32.1/bazel-lib-v1.32.1.tar.gz",
-)
-
-# aspect rules rely on skylib, so this function will download dependency
-load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
-aspect_bazel_lib_dependencies()
-
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 http_archive(
     name = "platforms",
     urls = [
@@ -48,12 +35,22 @@ http_archive(
     sha256 = "8150406605389ececb6da07cbcb509d5637a3ab9a24bc69b1101531367d89d74",
 )
 
-# Poetry rules for managing Python dependencies
+# We need skylib to be able to use config_setting_group in rule_poetry below
+# https://github.com/bazelbuild/bazel-skylib/blob/main/docs/selects_doc.md#selectsconfig_setting_group
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "cd55a062e763b9349921f0f5db8c3933288dc8ba4f76dd9416aac68acee3cb94",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
+    ],
+)
 
+# Poetry rules for managing Python dependencies
 http_archive(
     name = "rules_poetry",
-    strip_prefix = "rules_poetry-04f2b93c83587ab377bf5a724eaafd63b4ff5930",
-    urls = ["https://github.com/mongodb-forks/rules_poetry/archive/04f2b93c83587ab377bf5a724eaafd63b4ff5930.tar.gz"],
+    strip_prefix = "rules_poetry-fc645faf7fb2e7f6c8fce968801e2a63dc1332bb",
+    urls = ["https://github.com/mongodb-forks/rules_poetry/archive/fc645faf7fb2e7f6c8fce968801e2a63dc1332bb.tar.gz"],
 )
 
 load("@rules_poetry//rules_poetry:defs.bzl", "poetry_deps")

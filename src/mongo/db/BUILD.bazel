@@ -1,0 +1,8 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "idl_generator")
+
+package(default_visibility = ["//visibility:public"])
+
+idl_generator(
+    name = "basic_types_gen",
+    src = "basic_types.idl"
+)
