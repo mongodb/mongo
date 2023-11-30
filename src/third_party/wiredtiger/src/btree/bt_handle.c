@@ -324,7 +324,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
         maj_version = cval.val;
         WT_RET(__wt_config_gets(session, cfg, "version.minor", &cval));
         min_version = cval.val;
-        __wt_verbose(session, WT_VERB_VERSION, "%" PRId64 ".%" PRId64, maj_version, min_version);
+        __wt_verbose(session, WT_VERB_VERSION, "btree version: %" PRId64 ".%" PRId64, maj_version,
+          min_version);
     }
 
     /* Get the file ID. */
