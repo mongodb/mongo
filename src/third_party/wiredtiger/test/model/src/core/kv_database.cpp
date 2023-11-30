@@ -64,6 +64,17 @@ kv_database::create_table(const char *name)
 kv_checkpoint_ptr
 kv_database::create_checkpoint(const char *name)
 {
+    return create_checkpoint(name, txn_snapshot(), _stable_timestamp);
+}
+
+/*
+ * kv_database::create_checkpoint --
+ *     Create a checkpoint from custom metadata. Throw an exception if the name is not unique.
+ */
+kv_checkpoint_ptr
+kv_database::create_checkpoint(
+  const char *name, kv_transaction_snapshot_ptr snapshot, timestamp_t stable_timestamp)
+{
     std::lock_guard lock_guard(_checkpoints_lock);
 
     /* Use the default checkpoint name, if it is not specified. */
@@ -79,8 +90,7 @@ kv_database::create_checkpoint(const char *name)
     }
 
     /* Create the checkpoint. */
-    kv_checkpoint_ptr ckpt =
-      std::make_shared<kv_checkpoint>(name, txn_snapshot(), _stable_timestamp);
+    kv_checkpoint_ptr ckpt = std::make_shared<kv_checkpoint>(name, snapshot, stable_timestamp);
 
     /* Remember it. */
     _checkpoints[ckpt_name] = ckpt;
@@ -159,7 +169,7 @@ kv_database::txn_snapshot_nolock(txn_id_t do_not_exclude)
         if (state != kv_transaction_state::committed && state != kv_transaction_state::rolled_back)
             active_txn_ids.insert(p.first);
     }
-    return std::make_shared<kv_transaction_snapshot>(
+    return std::make_shared<kv_transaction_snapshot_by_exclusion>(
       _last_transaction_id, std::move(active_txn_ids));
 }
 

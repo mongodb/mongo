@@ -127,9 +127,10 @@ test_checkpoint(void)
     testutil_assert(table->get(ckpt1, key2, 15) == model::NONE);
     testutil_assert(table->get(ckpt1, key3, 15) == model::NONE);
 
-    /* Add two more keys; check that only that committed data are included. */
+    /* Add two more keys; check that only that the latest committed data are included. */
     txn1 = database.begin_transaction();
     txn2 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key4, value3));
     testutil_check(table->insert(txn1, key4, value4));
     testutil_check(table->insert(txn2, key5, value5));
     txn1->commit(40);
@@ -139,6 +140,13 @@ test_checkpoint(void)
     testutil_assert(table->get(ckpt2, key4) == value4);
     testutil_assert(table->get(ckpt2, key5) == model::NONE);
     txn2->commit(50);
+
+    /* Check contains_any. */
+    testutil_assert(!table->contains_any(ckpt2, key4, value1));
+    testutil_assert(!table->contains_any(ckpt2, key4, value2));
+    testutil_assert(table->contains_any(ckpt2, key4, value3));
+    testutil_assert(table->contains_any(ckpt2, key4, value4));
+    testutil_assert(!table->contains_any(ckpt2, key5, value5));
 
     /* Test with prepared transactions. */
     txn1 = database.begin_transaction();
@@ -217,8 +225,9 @@ test_checkpoint_wt(void)
     WT_SESSION *session2;
     const char *uri = "table:table";
 
-    testutil_recreate_dir(home);
-    testutil_wiredtiger_open(opts, home, ENV_CONFIG, nullptr, &conn, false, false);
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "checkpoint";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
@@ -260,9 +269,10 @@ test_checkpoint_wt(void)
     wt_model_ckpt_assert(table, uri, "ckpt1", key2, 15);
     wt_model_ckpt_assert(table, uri, "ckpt1", key3, 15);
 
-    /* Add two more keys; check that only that committed data are included. */
+    /* Add two more keys; check that only that the latest committed data are included. */
     wt_model_txn_begin_both(txn1, session1);
     wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, key4, value3);
     wt_model_txn_insert_both(table, uri, txn1, session1, key4, value4);
     wt_model_txn_insert_both(table, uri, txn2, session2, key5, value5);
     wt_model_txn_commit_both(txn1, session1, 40);
@@ -300,6 +310,12 @@ test_checkpoint_wt(void)
     wt_model_set_stable_timestamp_both(65); /* Advance the timestamp to the very end. */
     testutil_assert(table->verify_noexcept(conn));
 
+    /* Verify checkpoints. */
+    testutil_assert(table->verify_noexcept(conn, database.checkpoint("ckpt1")));
+    testutil_assert(table->verify_noexcept(conn, database.checkpoint("ckpt2")));
+    testutil_assert(table->verify_noexcept(conn, database.checkpoint("ckpt3")));
+    testutil_assert(table->verify_noexcept(conn, database.checkpoint("ckpt4")));
+
     /* Clean up. */
     testutil_check(session->close(session, nullptr));
     testutil_check(session1->close(session1, nullptr));
@@ -307,7 +323,7 @@ test_checkpoint_wt(void)
     testutil_check(conn->close(conn, nullptr));
 
     /* Reopen the database. We must do this for debug log printing to work. */
-    testutil_wiredtiger_open(opts, home, ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
 
     /* Verify using the debug log. */
@@ -316,13 +332,190 @@ test_checkpoint_wt(void)
     testutil_assert(db_from_debug_log.table("table")->verify_noexcept(conn));
 
     /* Print the debug log to JSON. */
-    std::string tmp_json = create_tmp_file(home, "debug-log-", ".json");
+    std::string tmp_json = create_tmp_file(test_home.c_str(), "debug-log-", ".json");
     wt_print_debug_log(conn, tmp_json.c_str());
 
     /* Verify using the debug log JSON. */
     model::kv_database db_from_debug_log_json;
     model::debug_log_parser::from_json(db_from_debug_log_json, tmp_json.c_str());
     testutil_assert(db_from_debug_log_json.table("table")->verify_noexcept(conn));
+
+    /* Verify checkpoints. */
+    testutil_assert(db_from_debug_log.table("table")->verify_noexcept(
+      conn, db_from_debug_log.checkpoint("ckpt1")));
+    testutil_assert(db_from_debug_log.table("table")->verify_noexcept(
+      conn, db_from_debug_log.checkpoint("ckpt2")));
+    testutil_assert(db_from_debug_log.table("table")->verify_noexcept(
+      conn, db_from_debug_log.checkpoint("ckpt3")));
+    testutil_assert(db_from_debug_log.table("table")->verify_noexcept(
+      conn, db_from_debug_log.checkpoint("ckpt4")));
+
+    /* Verify checkpoints - using the debug log JSON. */
+    testutil_assert(db_from_debug_log_json.table("table")->verify_noexcept(
+      conn, db_from_debug_log_json.checkpoint("ckpt1")));
+    testutil_assert(db_from_debug_log_json.table("table")->verify_noexcept(
+      conn, db_from_debug_log_json.checkpoint("ckpt2")));
+    testutil_assert(db_from_debug_log_json.table("table")->verify_noexcept(
+      conn, db_from_debug_log_json.checkpoint("ckpt3")));
+    testutil_assert(db_from_debug_log_json.table("table")->verify_noexcept(
+      conn, db_from_debug_log_json.checkpoint("ckpt4")));
+
+    /* Clean up. */
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+}
+
+/*
+ * test_checkpoint_restart_wt --
+ *     Check loading checkpoints with database restarts.
+ */
+static void
+test_checkpoint_restart_wt(void)
+{
+    model::kv_database database;
+    model::kv_table_ptr table = database.create_table("table");
+
+    /* Keys. */
+    const model::data_value key1("Key 1");
+    const model::data_value key2("Key 2");
+    const model::data_value key3("Key 3");
+    const model::data_value key4("Key 4");
+
+    /* Values. */
+    const model::data_value value1("Value 1");
+    const model::data_value value2("Value 2");
+    const model::data_value value3("Value 3");
+    const model::data_value value4("Value 4");
+    const model::data_value value5("Value 5");
+
+    /* Create the test's home directory and database. */
+    WT_CONNECTION *conn;
+    WT_SESSION *session, *session2;
+    const char *uri = "table:table";
+
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "checkpoint-restart";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    testutil_check(
+      session->create(session, uri, "key_format=S,value_format=S,log=(enabled=false)"));
+
+    /* Transaction. */
+    model::kv_transaction_ptr txn;
+
+    /* Add some data. */
+    wt_model_txn_begin_both(txn, session);
+    wt_model_txn_insert_both(table, uri, txn, session, key1, value1);
+    wt_model_txn_commit_both(txn, session, 10);
+    wt_model_txn_begin_both(txn, session);
+    wt_model_txn_insert_both(table, uri, txn, session, key2, value2);
+    wt_model_txn_commit_both(txn, session, 20);
+
+    /* Create a named checkpoint. */
+    wt_model_set_stable_timestamp_both(15);
+    wt_model_ckpt_create_both("ckpt1");
+
+    /* Add some data. */
+    wt_model_txn_begin_both(txn, session);
+    wt_model_txn_insert_both(table, uri, txn, session, key3, value3);
+    wt_model_txn_commit_both(txn, session, 30);
+    wt_model_txn_begin_both(txn, session);
+    wt_model_txn_insert_both(table, uri, txn, session, key4, value4);
+    wt_model_txn_commit_both(txn, session, 40);
+
+    /* Create a named checkpoint. */
+    wt_model_set_stable_timestamp_both(35);
+    wt_model_ckpt_create_both("ckpt2");
+
+    /* Create a nameless checkpoint and restart. */
+    wt_model_set_stable_timestamp_both(40);
+    wt_model_ckpt_create_both(nullptr);
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+
+    /* Add some data. */
+    wt_model_txn_begin_both(txn, session);
+    wt_model_txn_insert_both(table, uri, txn, session, key1, value2);
+    wt_model_txn_commit_both(txn, session, 50);
+    wt_model_txn_begin_both(txn, session);
+    wt_model_txn_insert_both(table, uri, txn, session, key2, value3);
+    wt_model_txn_commit_both(txn, session, 60);
+
+    /* Create a named checkpoint. */
+    wt_model_set_stable_timestamp_both(55);
+    wt_model_ckpt_create_both("ckpt3");
+
+    /* Add some data. */
+    wt_model_txn_begin_both(txn, session);
+    wt_model_txn_insert_both(table, uri, txn, session, key3, value4);
+    wt_model_txn_commit_both(txn, session, 70);
+
+    /* Add some data. Take a checkpoint while a transaction is still running. */
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
+    wt_model_txn_begin_both(txn, session2);
+    wt_model_txn_insert_both(table, uri, txn, session2, key4, value5);
+    wt_model_set_stable_timestamp_both(75);
+    wt_model_ckpt_create_both("ckpt4");
+    wt_model_txn_commit_both(txn, session2, 80);
+    testutil_check(session2->close(session2, nullptr));
+
+    /* Create a nameless checkpoint and restart. */
+    wt_model_set_stable_timestamp_both(80);
+    wt_model_ckpt_create_both(nullptr);
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+
+    /* Add some data - use prepared transactions. */
+    wt_model_txn_begin_both(txn, session);
+    wt_model_txn_insert_both(table, uri, txn, session, key1, value3);
+    wt_model_txn_prepare_both(txn, session, 90);
+    wt_model_txn_commit_both(txn, session, 94, 98);
+    wt_model_txn_begin_both(txn, session);
+    wt_model_txn_insert_both(table, uri, txn, session, key2, value4);
+    wt_model_txn_prepare_both(txn, session, 100);
+    wt_model_txn_commit_both(txn, session, 104, 108);
+
+    /* Create a named checkpoint. */
+    wt_model_set_stable_timestamp_both(95);
+    wt_model_ckpt_create_both("ckpt5");
+
+    /* Add some data - use prepared transactions. */
+    wt_model_txn_begin_both(txn, session);
+    wt_model_txn_insert_both(table, uri, txn, session, key3, value5);
+    wt_model_txn_prepare_both(txn, session, 110);
+    wt_model_txn_commit_both(txn, session, 114, 118);
+    wt_model_txn_begin_both(txn, session);
+    wt_model_txn_insert_both(table, uri, txn, session, key4, value1);
+    wt_model_txn_prepare_both(txn, session, 120);
+    wt_model_txn_commit_both(txn, session, 124, 128);
+
+    /* Create a named checkpoint. */
+    wt_model_set_stable_timestamp_both(115);
+    wt_model_ckpt_create_both("ckpt6");
+
+    /* Create a nameless checkpoint and restart. */
+    wt_model_set_stable_timestamp_both(129);
+    wt_model_ckpt_create_both(nullptr);
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+
+    /* Verify using the debug log. */
+    model::kv_database db_from_debug_log;
+    model::debug_log_parser::from_debug_log(db_from_debug_log, conn);
+    model::kv_table_ptr t = db_from_debug_log.table("table");
+    testutil_assert(t->verify_noexcept(conn));
+    testutil_assert(t->verify_noexcept(conn, db_from_debug_log.checkpoint("ckpt1")));
+    testutil_assert(t->verify_noexcept(conn, db_from_debug_log.checkpoint("ckpt2")));
+    testutil_assert(t->verify_noexcept(conn, db_from_debug_log.checkpoint("ckpt3")));
+    testutil_assert(t->verify_noexcept(conn, db_from_debug_log.checkpoint("ckpt4")));
+    testutil_assert(t->verify_noexcept(conn, db_from_debug_log.checkpoint("ckpt5")));
+    testutil_assert(t->verify_noexcept(conn, db_from_debug_log.checkpoint("ckpt6")));
 
     /* Clean up. */
     testutil_check(session->close(session, nullptr));
@@ -371,6 +564,7 @@ main(int argc, char *argv[])
 
     testutil_parse_end_opt(opts);
     testutil_work_dir_from_path(home, sizeof(home), opts->home);
+    testutil_recreate_dir(home);
 
     /*
      * Tests.
@@ -379,6 +573,7 @@ main(int argc, char *argv[])
         ret = EXIT_SUCCESS;
         test_checkpoint();
         test_checkpoint_wt();
+        test_checkpoint_restart_wt();
     } catch (std::exception &e) {
         std::cerr << "Test failed with exception: " << e.what() << std::endl;
         ret = EXIT_FAILURE;

@@ -124,7 +124,8 @@ public:
      *     Create a new instance.
      */
     inline kv_update(const data_value &value, timestamp_t timestamp) noexcept
-        : _value(value), _commit_timestamp(timestamp), _txn_id(k_txn_none)
+        : _value(value), _commit_timestamp(timestamp), _durable_timestamp(timestamp),
+          _txn_id(k_txn_none), _wt_txn_id(k_txn_none), _wt_base_write_gen(k_write_gen_none)
     {
     }
 
@@ -135,7 +136,8 @@ public:
     inline kv_update(const data_value &value, kv_transaction_ptr txn) noexcept
         : _value(value), _commit_timestamp(txn ? txn->commit_timestamp() : k_timestamp_none),
           _durable_timestamp(txn ? txn->durable_timestamp() : k_timestamp_none), _txn(txn),
-          _txn_id(txn ? txn->id() : k_txn_none)
+          _txn_id(txn ? txn->id() : k_txn_none), _wt_txn_id(k_txn_none),
+          _wt_base_write_gen(k_write_gen_none)
     {
     }
 
@@ -328,6 +330,38 @@ public:
         _txn.reset();
     }
 
+    /*
+     * kv_update::set_wt_metadata --
+     *     If this update was imported from WiredTiger, remember the corresponding transaction
+     *     metadata.
+     */
+    inline void
+    set_wt_transaction_metadata(txn_id_t wt_txn_id, write_gen_t wt_base_write_gen)
+    {
+        _wt_txn_id = wt_txn_id;
+        _wt_base_write_gen = wt_base_write_gen;
+    }
+
+    /*
+     * kv_update::wt_txn_id --
+     *     Get the WiredTiger transaction ID, if available.
+     */
+    inline txn_id_t
+    wt_txn_id() const
+    {
+        return _wt_txn_id;
+    }
+
+    /*
+     * kv_update::wt_base_write_gen --
+     *     Get the WiredTiger base write generation number, if available.
+     */
+    inline write_gen_t
+    wt_base_write_gen() const
+    {
+        return _wt_base_write_gen;
+    }
+
 private:
     timestamp_t _commit_timestamp;
     timestamp_t _durable_timestamp;
@@ -342,6 +376,10 @@ private:
      */
     txn_id_t _txn_id;
     kv_transaction_ptr _txn;
+
+    /* Transaction information for updates imported from WiredTiger's debug log. */
+    txn_id_t _wt_txn_id;
+    write_gen_t _wt_base_write_gen;
 };
 
 } /* namespace model */

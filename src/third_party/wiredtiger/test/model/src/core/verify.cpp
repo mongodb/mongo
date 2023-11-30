@@ -47,7 +47,7 @@ kv_table_verify_cursor::has_next()
     auto i = _iterator;
 
     /* Skip over any deleted items. */
-    while (i != _data.end() && !i->second.exists())
+    while (i != _data.end() && !i->second.exists_opt(_ckpt))
         i++;
 
     return i != _data.end();
@@ -65,7 +65,7 @@ kv_table_verify_cursor::verify_next(const data_value &key, const data_value &val
         return false;
 
     /* Skip over any deleted items. */
-    while (_iterator != _data.end() && !_iterator->second.exists())
+    while (_iterator != _data.end() && !_iterator->second.exists_opt(_ckpt))
         _iterator++;
     if (_iterator == _data.end())
         return false;
@@ -79,16 +79,16 @@ kv_table_verify_cursor::verify_next(const data_value &key, const data_value &val
         return false;
 
     /* Check the value. */
-    return i->second.contains_any(value);
+    return _ckpt ? i->second.contains_any(_ckpt, value) : i->second.contains_any(value);
 }
 
 /*
  * kv_table_verifier::verify --
- *     Verify the table by comparing a WiredTiger table against the model. Throw an exception on
- *     error.
+ *     Verify the table by comparing a WiredTiger table against the model, with or without using a
+ *     checkpoint. Throw an exception on error.
  */
 void
-kv_table_verifier::verify(WT_CONNECTION *connection)
+kv_table_verifier::verify(WT_CONNECTION *connection, kv_checkpoint_ptr ckpt)
 {
     WT_SESSION *session = nullptr;
     WT_CURSOR *wt_cursor = nullptr;
@@ -100,6 +100,7 @@ kv_table_verifier::verify(WT_CONNECTION *connection)
 
     /* Get the model cursor. */
     kv_table_verify_cursor model_cursor = _table.verify_cursor();
+    model_cursor.set_checkpoint(ckpt);
 
     try {
         /* Get the database cursor. */
@@ -110,8 +111,13 @@ kv_table_verifier::verify(WT_CONNECTION *connection)
         /* Automatically close the session at the end of the block. */
         wiredtiger_session_guard session_guard(session);
 
+        /* Create the WiredTiger cursor config and open the cursor. */
+        std::string cursor_config;
+        if (ckpt)
+            cursor_config += std::string("checkpoint=") + ckpt->name();
         std::string uri = std::string("table:") + _table.name();
-        ret = session->open_cursor(session, uri.c_str(), nullptr, nullptr, &wt_cursor);
+        ret =
+          session->open_cursor(session, uri.c_str(), nullptr, cursor_config.c_str(), &wt_cursor);
         if (ret != 0)
             throw wiredtiger_exception(session, ret);
 
@@ -127,7 +133,7 @@ kv_table_verifier::verify(WT_CONNECTION *connection)
             if (!model_cursor.verify_next(key, value)) {
                 std::ostringstream ss;
                 ss << "\"" << key << "=" << value
-                   << "\" is not the next key-value pair in the model.";
+                   << "\" is not the next key-value pair in the model";
                 throw verify_exception(ss.str());
             }
         }

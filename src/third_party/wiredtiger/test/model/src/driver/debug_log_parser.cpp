@@ -46,6 +46,16 @@ namespace model {
  *     Parse the given log entry.
  */
 static void
+from_json(const json &j, debug_log_parser::commit_header &out)
+{
+    j.at("txnid").get_to(out.txnid);
+}
+
+/*
+ * from_json --
+ *     Parse the given log entry.
+ */
+static void
 from_json(const json &j, debug_log_parser::row_put &out)
 {
     j.at("fileid").get_to(out.fileid);
@@ -74,6 +84,25 @@ from_json(const json &j, debug_log_parser::txn_timestamp &out)
     j.at("commit_ts").get_to(out.commit_ts);
     j.at("durable_ts").get_to(out.durable_ts);
     j.at("prepare_ts").get_to(out.prepare_ts);
+}
+
+/*
+ * from_debug_log --
+ *     Parse the given debug log entry.
+ */
+static int
+from_debug_log(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
+  debug_log_parser::commit_header &out)
+{
+    int ret;
+    uint64_t txnid;
+    WT_UNUSED(session);
+
+    if ((ret = __wt_vunpack_uint(pp, WT_PTRDIFF(end, *pp), &txnid)) != 0)
+        return ret;
+
+    out.txnid = txnid;
+    return 0;
 }
 
 /*
@@ -165,7 +194,7 @@ debug_log_parser::table_by_fileid(uint64_t fileid)
  *     Apply the given operation to the model.
  */
 void
-debug_log_parser::metadata_apply(const row_put &op)
+debug_log_parser::metadata_apply(kv_transaction_ptr txn, const row_put &op)
 {
     std::string key =
       std::get<std::string>(data_value::unpack(op.key.c_str(), op.key.length(), "S"));
@@ -229,12 +258,86 @@ debug_log_parser::metadata_apply(const row_put &op)
 
     /* Special handling for the system prefix. */
     else if (starts_with(key, "system:")) {
-        /* We don't currently need to handle this. */
+
+        /* Set the base write generation. */
+        if (key == "system:checkpoint_base_write_gen") {
+            _base_write_gen = m->get_uint64("base_write_gen");
+        }
+
+        /* Handle checkpoints. */
+        else if (starts_with(key, "system:checkpoint") || starts_with(key, "system:oldest")) {
+            /*
+             * WiredTiger uses the following naming conventions:
+             *     - system:checkpoint, system:checkpoint_snapshot, system:oldest, etc., for
+             *       nameless checkpoints
+             *     - system:checkpoint.NAME, system:checkpoint_snapshot.NAME, etc., for named
+             *       checkpoints
+             *
+             * We don't need to handle these kinds of metadata differently as the config strings
+             * within them have different names, so we just build one unified configuration map from
+             * all of them.
+             */
+
+            /* If this is a named checkpoint, the name follows the '.' character. */
+            size_t p = key.find('.');
+            std::string ckpt_name = p == std::string::npos ? WT_CHECKPOINT : key.substr(p + 1);
+
+            /* Accumulate checkpoint metadata for future handling. */
+            auto &ckpt_metadata_map = _txn_ckpt_metadata[txn->id()];
+            auto i = ckpt_metadata_map.find(ckpt_name);
+            if (i == ckpt_metadata_map.end())
+                ckpt_metadata_map[ckpt_name] = m;
+            else
+                ckpt_metadata_map[ckpt_name] = config_map::merge(ckpt_metadata_map[ckpt_name], m);
+        }
+
+        /* Unsupported system URI. */
+        else
+            throw model_exception("Unsupported metadata system URI: " + key);
     }
 
     /* Otherwise this is an unsupported URI type. */
     else
         throw model_exception("Unsupported metadata URI: " + key);
+}
+
+/*
+ * debug_log_parser::metadata_checkpoint_apply --
+ *     Handle the given checkpoint metadata operation.
+ */
+void
+debug_log_parser::metadata_checkpoint_apply(
+  const std::string &name, std::shared_ptr<config_map> config)
+{
+    /* Get the stable timestamp. */
+    timestamp_t stable_timestamp = config->contains("checkpoint_timestamp") ?
+      config->get_uint64_hex("checkpoint_timestamp") :
+      k_timestamp_none;
+
+    /* Get the write generation number. */
+    write_gen_t write_gen = config->get_uint64("write_gen");
+
+    /* Get the transaction snapshot. */
+    kv_transaction_snapshot_ptr snapshot;
+    if (config->contains("snapshot_min")) {
+        if (!config->contains("snapshot_max"))
+            throw model_exception(
+              "The checkpoint metadata contain snapshot_min but not snapshot_max");
+        txn_id_t snapshot_min = config->get_uint64("snapshot_min");
+        txn_id_t snapshot_max = config->get_uint64("snapshot_max");
+        std::shared_ptr<std::vector<uint64_t>> snapshot_ids;
+        if (config->contains("snapshots"))
+            snapshot_ids = config->get_array_uint64("snapshots");
+        else
+            snapshot_ids = std::make_shared<std::vector<uint64_t>>();
+        snapshot = std::make_shared<kv_transaction_snapshot_wt>(
+          write_gen, snapshot_min, snapshot_max, *snapshot_ids);
+    } else
+        snapshot = std::make_shared<kv_transaction_snapshot_wt>(
+          write_gen, k_txn_max, k_txn_max, std::vector<uint64_t>());
+
+    /* Create the checkpoint. */
+    _database.create_checkpoint(name.c_str(), snapshot, stable_timestamp);
 }
 
 /*
@@ -246,7 +349,7 @@ debug_log_parser::apply(kv_transaction_ptr txn, const row_put &op)
 {
     /* Handle metadata operations. */
     if (op.fileid == 0) {
-        metadata_apply(op);
+        metadata_apply(txn, op);
         return;
     }
 
@@ -310,6 +413,46 @@ debug_log_parser::apply(kv_transaction_ptr txn, const txn_timestamp &op)
 }
 
 /*
+ * debug_log_parser::begin_transaction --
+ *     Begin a transaction.
+ */
+kv_transaction_ptr
+debug_log_parser::begin_transaction(const debug_log_parser::commit_header &op)
+{
+    if (_base_write_gen == k_write_gen_none)
+        throw model_exception("The base write generation is not set");
+
+    kv_transaction_ptr txn = _database.begin_transaction();
+    txn->set_wt_metadata(op.txnid, _base_write_gen);
+    return txn;
+}
+
+/*
+ * debug_log_parser::commit_transaction --
+ *     Commit/finalize a transaction.
+ */
+void
+debug_log_parser::commit_transaction(kv_transaction_ptr txn)
+{
+    kv_transaction_state txn_state = txn->state();
+    if (txn_state != kv_transaction_state::in_progress &&
+      txn_state != kv_transaction_state::prepared && txn_state != kv_transaction_state::committed)
+        throw model_exception("The transaction is in an unexpected state");
+
+    /* Commit the transaction if it has not yet been committed. */
+    if (txn_state != kv_transaction_state::committed)
+        txn->commit();
+
+    /* Process the checkpoint metadata, if there are any associated with the transaction. */
+    auto i = _txn_ckpt_metadata.find(txn->id());
+    if (i != _txn_ckpt_metadata.end()) {
+        for (auto p : i->second)
+            metadata_checkpoint_apply(p.first, p.second);
+        _txn_ckpt_metadata.erase(i);
+    }
+}
+
+/*
  * from_debug_log_helper_args --
  *     Arguments for the helper function.
  */
@@ -341,16 +484,17 @@ from_debug_log_helper(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, W
     /* Process supported record types. */
     switch (rec_type) {
     case WT_LOGREC_COMMIT: {
+        const uint8_t **pp = &p;
+
         /* The commit entry, which contains the list of operations in the transaction. */
-        uint64_t txnid;
-        if ((ret = __wt_vunpack_uint(&p, WT_PTRDIFF(rec_end, p), &txnid)) != 0)
+        debug_log_parser::commit_header commit;
+        if ((ret = from_debug_log(session, pp, rec_end, commit)) != 0)
             return ret;
 
         /* Start the transaction. */
-        kv_transaction_ptr txn = args.database.begin_transaction();
+        kv_transaction_ptr txn = args.parser.begin_transaction(commit);
 
         /* Iterate over the list of operations. */
-        const uint8_t **pp = &p;
         while (*pp < rec_end && **pp) {
             uint32_t op_type, op_size;
 
@@ -388,8 +532,7 @@ from_debug_log_helper(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, W
             }
         }
 
-        if (txn->state() != kv_transaction_state::committed)
-            txn->commit();
+        args.parser.commit_transaction(txn);
         break;
     }
 
@@ -458,7 +601,8 @@ debug_log_parser::from_json(kv_database &database, const char *path)
         /* The commit entry contains full description of a transaction, including all
          * operations. */
         if (log_entry_type == "commit") {
-            kv_transaction_ptr txn = database.begin_transaction();
+            /* Begin the transaction. */
+            kv_transaction_ptr txn = parser.begin_transaction(log_entry.get<commit_header>());
 
             /* Replay all operations. */
             for (auto &op_entry : log_entry.at("ops")) {
@@ -495,8 +639,8 @@ debug_log_parser::from_json(kv_database &database, const char *path)
                 throw model_exception("Unsupported operation \"" + op_type + "\"");
             }
 
-            if (txn->state() != kv_transaction_state::committed)
-                txn->commit();
+            /* Commit/finalize the transaction. */
+            parser.commit_transaction(txn);
             continue;
         }
 

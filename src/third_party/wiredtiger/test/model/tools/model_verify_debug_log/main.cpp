@@ -63,6 +63,7 @@ usage(const char *progname)
 {
     fprintf(stderr, "usage: %s [OPTIONS]\n\n", progname);
     fprintf(stderr, "Options:\n");
+    fprintf(stderr, "  -c NAME    specify the checkpoint to verify\n");
     fprintf(stderr, "  -h HOME    specify the database directory\n");
     fprintf(stderr, "  -j PATH    load the debug log from a JSON file\n");
     fprintf(stderr, "  -?         show this message\n");
@@ -75,9 +76,10 @@ usage(const char *progname)
 int
 main(int argc, char *argv[])
 {
-    const char *debug_log_json, *home, *progname;
+    const char *checkpoint, *debug_log_json, *home, *progname;
     int ch, ret;
 
+    checkpoint = nullptr;
     debug_log_json = nullptr;
     home = nullptr;
     progname = argv[0];
@@ -86,8 +88,11 @@ main(int argc, char *argv[])
      * Parse the command-line arguments.
      */
     __wt_optwt = 1;
-    while ((ch = __wt_getopt(progname, argc, argv, "h:j:?")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "c:h:j:?")) != EOF)
         switch (ch) {
+        case 'c':
+            checkpoint = __wt_optarg;
+            break;
         case 'h':
             home = __wt_optarg;
             break;
@@ -146,12 +151,24 @@ main(int argc, char *argv[])
     }
 
     /*
+     * Get the checkpoint, if applicable.
+     */
+    model::kv_checkpoint_ptr ckpt;
+    try {
+        if (checkpoint != nullptr)
+            ckpt = db.checkpoint(checkpoint);
+    } catch (std::exception &e) {
+        std::cerr << "Failed to get the checkpoint: " << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    /*
      * Verify the database.
      */
     try {
         for (auto &t : tables) {
             std::cout << "Verifying table: " << t << std::endl;
-            db.table(t)->verify(conn);
+            db.table(t)->verify(conn, ckpt);
         }
     } catch (std::exception &e) {
         std::cerr << "Verification failed: " << e.what() << std::endl;

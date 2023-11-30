@@ -60,6 +60,13 @@ public:
     kv_checkpoint_ptr create_checkpoint(const char *name = nullptr);
 
     /*
+     * kv_database::create_checkpoint --
+     *     Create a checkpoint from custom metadata. Throw an exception if the name is not unique.
+     */
+    kv_checkpoint_ptr create_checkpoint(
+      const char *name, kv_transaction_snapshot_ptr snapshot, timestamp_t stable_timestamp);
+
+    /*
      * kv_database::create_table --
      *     Create and return a new table. Throw an exception if the name is not unique.
      */

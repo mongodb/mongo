@@ -30,6 +30,7 @@
 #define MODEL_UTIL_H
 
 #include <cstring>
+#include <iomanip>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -133,7 +134,8 @@ private:
  *     A configuration map.
  */
 class config_map {
-    using value_t = std::variant<std::string, std::shared_ptr<config_map>>;
+    using value_t = std::variant<std::string, std::shared_ptr<std::vector<std::string>>,
+      std::shared_ptr<config_map>>;
 
 public:
     /*
@@ -141,6 +143,22 @@ public:
      *     Parse config map from a string.
      */
     static config_map from_string(const char *str, const char **end = NULL);
+
+    /*
+     * config_map::merge --
+     *     Merge two config maps.
+     */
+    static config_map merge(const config_map &a, const config_map &b);
+
+    /*
+     * config_map::merge --
+     *     Merge two config maps.
+     */
+    inline static std::shared_ptr<config_map>
+    merge(std::shared_ptr<config_map> a, std::shared_ptr<config_map> b)
+    {
+        return std::make_shared<config_map>(merge(*a, *b));
+    }
 
     /*
      * config_map::from_string --
@@ -160,6 +178,34 @@ public:
     contains(const char *key) const noexcept
     {
         return _map.find(key) != _map.end();
+    }
+
+    /*
+     * config_map::get_array --
+     *     Get the corresponding array value. Throw an exception on error.
+     */
+    inline std::shared_ptr<std::vector<std::string>>
+    get_array(const char *key) const
+    {
+        return std::get<std::shared_ptr<std::vector<std::string>>>(_map.find(key)->second);
+    }
+
+    /*
+     * config_map::get_array_uint64 --
+     *     Get the corresponding array value, as integers. Throw an exception on error.
+     */
+    inline std::shared_ptr<std::vector<uint64_t>>
+    get_array_uint64(const char *key) const
+    {
+        std::shared_ptr<std::vector<uint64_t>> r = std::make_shared<std::vector<uint64_t>>();
+        std::shared_ptr<std::vector<std::string>> a = get_array(key);
+        for (const std::string &s : *a) {
+            std::istringstream stream(s);
+            uint64_t v;
+            stream >> v;
+            r->push_back(v);
+        }
+        return r;
     }
 
     /*
@@ -195,12 +241,31 @@ public:
         return v;
     }
 
+    /*
+     * config_map::get_uint64_hex --
+     *     Get the corresponding hexadecimal integer value. Throw an exception on error.
+     */
+    inline uint64_t
+    get_uint64_hex(const char *key) const
+    {
+        std::istringstream stream(std::get<std::string>(_map.find(key)->second));
+        uint64_t v;
+        stream >> std::hex >> v;
+        return v;
+    }
+
 private:
     /*
      * config_map::config_map --
      *     Create a new instance of the config map.
      */
     inline config_map() noexcept {};
+
+    /*
+     * config_map::parse_array --
+     *     Parse an array.
+     */
+    static std::shared_ptr<std::vector<std::string>> parse_array(const char *str, const char **end);
 
 private:
     std::unordered_map<std::string, value_t> _map;
