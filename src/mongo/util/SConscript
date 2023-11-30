@@ -182,6 +182,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/util/procparser" if env.TargetOSIs('linux') else [],
     ],
     LIBDEPS_PRIVATE=[
         'pcre_wrapper',

@@ -88,6 +88,7 @@
 #include "mongo/util/errno_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/pcre.h"
+#include "mongo/util/procparser.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 
@@ -825,6 +826,29 @@ int ProcessInfo::getResidentSize() {
     return (int)((p.getResidentSizeInPages() * getPageSize()) / (1024.0 * 1024));
 }
 
+void collectPressureStallInfo(BSONObjBuilder& builder) {
+
+    auto parsePressureFile = [](StringData key, StringData filename, BSONObjBuilder& bob) {
+        BSONObjBuilder psiParseBuilder;
+        auto status = procparser::parseProcPressureFile(key, filename, &psiParseBuilder);
+        if (status.isOK()) {
+            bob.appendElements(psiParseBuilder.obj());
+        }
+        return status.isOK();
+    };
+
+    BSONObjBuilder psiBuilder;
+    bool parseStatus = false;
+
+    parseStatus |= parsePressureFile("memory", "/proc/pressure/memory"_sd, psiBuilder);
+    parseStatus |= parsePressureFile("cpu", "/proc/pressure/cpu"_sd, psiBuilder);
+    parseStatus |= parsePressureFile("io", "/proc/pressure/io"_sd, psiBuilder);
+
+    if (parseStatus) {
+        builder.append("pressure"_sd, psiBuilder.obj());
+    }
+}
+
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
@@ -863,6 +887,9 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
 
     // Append the number of thread in use
     appendNumber("threads", p._nlwp);
+
+    // Append Pressure Stall Information (PSI)
+    collectPressureStallInfo(info);
 }
 
 /**
