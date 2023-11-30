@@ -85,7 +85,9 @@ public:
         repl::ReadConcernArgs readConcernArgs;
 
         // Only set for transactions with snapshot level read concern.
-        boost::optional<LogicalTime> atClusterTime;
+        boost::optional<LogicalTime> atClusterTimeForSnapshotReadConcern;
+
+        boost::optional<LogicalTime> placementConflictTimeForNonSnapshotReadConcern;
     };
 
     /**
@@ -384,11 +386,12 @@ public:
          */
         BSONObj attachTxnFieldsIfNeeded(OperationContext* opCtx,
                                         const ShardId& shardId,
-                                        const BSONObj& cmdObj);
+                                        const BSONObj& cmdObj,
+                                        const StringData& dbName);
 
         /**
-         * Processes the transaction metadata in the response from the participant if the response
-         * indicates the operation succeeded.
+         * Processes the transaction metadata in the response from the participant if the
+         * response indicates the operation succeeded.
          */
         void processParticipantResponse(OperationContext* opCtx,
                                         const ShardId& shardId,
@@ -449,6 +452,11 @@ public:
          * timestamp has been selected for this transaction before calling this function.
          */
         LogicalTime getSelectedAtClusterTime() const;
+
+        /**
+         * Returns the placement conflict timestamp chosen for this transaction.
+         */
+        LogicalTime getPlacementConflictTime() const;
 
         /**
          * Sets the atClusterTime for the current transaction to the latest time in the router's
@@ -552,14 +560,6 @@ public:
          * shard.
          */
         BSONObj _handOffCommitToCoordinator(OperationContext* opCtx);
-
-        /**
-         * Sets the given logical time as the atClusterTime for the transaction to be the greater of
-         * the given time and the user's afterClusterTime, if one was provided.
-         */
-        void _setAtClusterTime(OperationContext* opCtx,
-                               const boost::optional<LogicalTime>& afterClusterTime,
-                               LogicalTime candidateTime);
 
         /**
          * Throws NoSuchTransaction if the response from abortTransaction failed with a code other
@@ -667,6 +667,14 @@ public:
          */
         bool _errorAllowsRetryOnStaleShardOrDb(const Status& status) const;
 
+        /**
+         * Check if the routing table has a higher timestamp than this transaction's
+         * placement conflict timestamp.
+         */
+        void _checkForPlacementConflict(OperationContext* opCtx,
+                                        const ShardId& shardId,
+                                        const NamespaceString& nss);
+
         TransactionRouter::PrivateState& p() {
             return _tr->_p;
         }
@@ -718,7 +726,9 @@ private:
         // The cluster time of the timestamp all participant shards in the current transaction with
         // snapshot level read concern must read from. Only set for transactions running with
         // snapshot level read concern.
-        boost::optional<AtClusterTime> atClusterTime;
+        boost::optional<AtClusterTime> atClusterTimeForSnapshotReadConcern;
+
+        boost::optional<AtClusterTime> placementConflictTimeForNonSnapshotReadConcern;
 
         // String representing the reason a transaction aborted. Either the string name of the error
         // code that led to an implicit abort or "abort" if the client sent abortTransaction.

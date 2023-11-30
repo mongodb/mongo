@@ -218,6 +218,10 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 1}, to: st.shard1.shardName}));
 flushRoutersAndRefreshShardMetadata(st, {ns});
 
+// Refresh the routing table on mongos1 so it knows about the above chunk migration before running
+// other commands.
+assert.eq(2, st.s1.getDB(dbName)[collName].find().itcount());
+
 let expectedStats = new ExpectedTransactionServerStatus();
 
 let nextSkey = 0;

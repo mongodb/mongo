@@ -61,6 +61,10 @@ public:
         return _maxKeyString;
     }
 
+    const ShardId& getShardId() const {
+        return _shardId;
+    }
+
     const ShardId& getShardIdAt(const boost::optional<Timestamp>& ts) const;
 
     /**

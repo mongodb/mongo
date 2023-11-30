@@ -310,7 +310,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateBasic) {
         expectedShardIds.insert(shardId);
     }
     std::set<ShardId> shardIds;
-    rt.getAllShardIds(&shardIds);
+    rt->getAllShardIds(&shardIds);
     ASSERT(expectedShardIds == shardIds);
 
     // Validate all shard maxValidAfter
@@ -320,67 +320,9 @@ TEST_F(RoutingTableHistoryTest, RandomCreateBasic) {
         return it != expectedShardsMaxValidAfter.end() ? it->second : Timestamp{0, 0};
     };
     for (const auto& [shardId, _] : expectedShardVersions) {
-        ASSERT_EQ(rt.getMaxValidAfter(shardId), expectedMaxValidAfter(shardId));
+        ASSERT_GTE(rt->getMaxValidAfter(shardId), expectedMaxValidAfter(shardId));
     }
-    ASSERT_EQ(rt.getMaxValidAfter(ShardId{"shard-without-chunks"}), (Timestamp{0, 0}));
-}
-
-/*
- * Test replacement of timestamp
- */
-TEST_F(RoutingTableHistoryTest, RandomUpdateReplacingTimestamp) {
-    const auto chunks = genRandomChunkVector();
-    const auto expectedShardVersions = calculateShardVersions(chunks);
-    const auto expectedCollVersion = calculateCollVersion(expectedShardVersions);
-
-    // Create a new routing table from the randomly generated chunks
-    auto initialRt = makeNewRt(chunks);
-
-    const auto timestamp = Timestamp(123, 0);
-    auto rt = initialRt.makeUpdatedReplacingTimestamp(timestamp);
-
-    auto chunkWithTimestamp = chunks;
-
-    for (auto& chunk : chunkWithTimestamp) {
-        const auto& oldVersion = chunk.getVersion();
-        chunk.setVersion(ChunkVersion(
-            oldVersion.majorVersion(), oldVersion.minorVersion(), oldVersion.epoch(), timestamp));
-    }
-
-    // Checks basic getter of routing table return correct values
-    ASSERT_EQ(kNss, rt.nss());
-    ASSERT_EQ(ShardKeyPattern(getShardKeyPattern()).toString(), rt.getShardKeyPattern().toString());
-    ASSERT_EQ(chunks.size(), rt.numChunks());
-
-    // Check that chunks have correct info
-    size_t i = 0;
-    rt.forEachChunk([&](const auto& chunkInfo) {
-        assertEqualChunkInfo(ChunkInfo{chunkWithTimestamp[i++]}, *chunkInfo);
-        return true;
-    });
-    ASSERT_EQ(i, chunks.size());
-
-    // Checks collection version is correct
-    ASSERT_EQ(expectedCollVersion, rt.getVersion());
-
-    // Checks timestamp is correct
-    ASSERT(timestamp == rt.getVersion().getTimestamp());
-
-    // Checks version for each chunk
-    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
-        ASSERT_EQ(shardVersion, rt.getVersion(shardId));
-        ASSERT(timestamp == rt.getVersion(shardId).getTimestamp());
-    }
-
-    ASSERT_EQ(expectedShardVersions.size(), rt.getNShardsOwningChunks());
-
-    std::set<ShardId> expectedShardIds;
-    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
-        expectedShardIds.insert(shardId);
-    }
-    std::set<ShardId> shardIds;
-    rt.getAllShardIds(&shardIds);
-    ASSERT(expectedShardIds == shardIds);
+    ASSERT_EQ(rt->getMaxValidAfter(ShardId{"shard-without-chunks"}), (Timestamp{0, 0}));
 }
 
 /*
@@ -661,10 +603,10 @@ TEST_F(RoutingTableHistoryTest, RandomUpdate) {
         return it != expectedShardsMaxValidAfter.end() ? it->second : Timestamp{0, 0};
     };
     for (const auto& [shardId, _] : expectedShardVersions) {
-        ASSERT_EQ(rt.getMaxValidAfter(shardId), expectedMaxValidAfter(shardId))
+        ASSERT_GTE(rt->getMaxValidAfter(shardId), expectedMaxValidAfter(shardId))
             << "For shardid " << shardId;
     }
-    ASSERT_EQ(rt.getMaxValidAfter(ShardId{"shard-without-chunks"}), (Timestamp{0, 0}));
+    ASSERT_EQ(rt->getMaxValidAfter(ShardId{"shard-without-chunks"}), (Timestamp{0, 0}));
 }
 
 /*
