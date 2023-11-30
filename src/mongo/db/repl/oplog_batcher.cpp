@@ -287,6 +287,13 @@ OplogBatcher::BatchAction OplogBatcher::_getBatchActionForEntry(const OplogEntry
         }
     }
 
+    // The DBCheck oplog shouldn't be batched with any preceding oplog to ensure that DBCheck is
+    // reading from a consistent snapshot. However, it can be batched with any subsequent oplog that
+    // is batchable.
+    if (entry.getCommandType() == OplogEntry::CommandType::kDbCheck) {
+        return OplogBatcher::BatchAction::kStartNewBatch;
+    }
+
     bool processIndividually = (entry.getCommandType() != OplogEntry::CommandType::kApplyOps) ||
         entry.shouldPrepare() || entry.isSingleOplogEntryTransactionWithCommand() ||
         entry.isEndOfLargeTransaction();

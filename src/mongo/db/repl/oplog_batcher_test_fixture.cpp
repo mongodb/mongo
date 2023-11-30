@@ -218,6 +218,37 @@ OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss, boost::option
 }
 
 /**
+ * Generates a dbcheck batch oplog entry with the given number used for the timestamp.
+ */
+OplogEntry makeDBCheckBatchEntry(int t, const NamespaceString& nss, boost::optional<UUID> uuid) {
+    BSONObj oField =
+        BSON("dbCheck" << nss.ns_forTest() << "type"
+                       << "batch"
+                       << "md5"
+                       << "9e6d9948e85826fa992fd5c819d02dd6"
+                       << "minKey" << 1 << "maxKey" << 3 << "readTimestamp" << Timestamp(t, 1));
+    return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
+                              OpTypeEnum::kCommand,        // op type
+                              nss,                         // namespace
+                              uuid,                        // uuid
+                              boost::none,                 // fromMigrate
+                              boost::none,                 // checkExistenceForDiffInsert
+                              OplogEntry::kOplogVersion,   // version
+                              oField,                      // o
+                              boost::none,                 // o2
+                              {},                          // sessionInfo
+                              boost::none,                 // upsert
+                              Date_t() + Seconds(t),       // wall clock time
+                              {},                          // statement ids
+                              boost::none,    // optime of previous write within same transaction
+                              boost::none,    // pre-image optime
+                              boost::none,    // post-image optime
+                              boost::none,    // ShardId of resharding recipient
+                              boost::none,    // _id
+                              boost::none)};  // needsRetryImage
+}
+
+/**
  * Generates an update oplog entry with the given number used for the timestamp, and the given
  * pre- and post- image optimes.
  */
