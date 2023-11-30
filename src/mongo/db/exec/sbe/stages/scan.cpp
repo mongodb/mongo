@@ -434,13 +434,6 @@ void ScanStage::open(bool reOpen) {
     _open = true;
 }
 
-value::OwnedValueAccessor* ScanStage::getFieldAccessor(StringData name) {
-    if (size_t pos = _scanFieldNames.findPos(name); pos != StringListSet::npos) {
-        return &_scanFieldAccessors[pos];
-    }
-    return nullptr;
-}
-
 PlanState ScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 

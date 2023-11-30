@@ -191,7 +191,13 @@ private:
     // Only for a clustered collection scan, this sets '_maxRecordId' to the upper scan bound.
     void setMaxRecordId();
 
-    value::OwnedValueAccessor* getFieldAccessor(StringData name);
+    MONGO_COMPILER_ALWAYS_INLINE
+    value::OwnedValueAccessor* getFieldAccessor(StringData name) {
+        if (size_t pos = _scanFieldNames.findPos(name); pos != StringListSet::npos) {
+            return &_scanFieldAccessors[pos];
+        }
+        return nullptr;
+    }
 
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;

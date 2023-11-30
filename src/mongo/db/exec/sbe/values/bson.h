@@ -88,7 +88,7 @@ inline const char* advance(const char* be, size_t fieldNameSize) {
 }
 
 inline auto fieldNameAndLength(const char* be) noexcept {
-    return StringData{be + 1};
+    return StringData{be + 1, strlen(be + 1)};
 }
 
 inline const char* fieldNameRaw(const char* be) noexcept {
