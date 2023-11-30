@@ -39,19 +39,22 @@ const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTe
 
 const securityToken1 =
     _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant1}, kVTSKey);
+
+primary._setSecurityToken(_createTenantToken({tenant: kTenant1}));
 assert.commandWorked(primary.getDB('$external').runCommand({
     createUser: "userTenant1",
-    '$tenant': kTenant1,
     roles: [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
 }));
 
 const securityToken2 =
     _createSecurityToken({user: "userTenant2", db: '$external', tenant: kTenant2}, kVTSKey);
+
+primary._setSecurityToken(_createTenantToken({tenant: kTenant2}));
 assert.commandWorked(primary.getDB('$external').runCommand({
     createUser: "userTenant2",
-    '$tenant': kTenant2,
     roles: [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
 }));
+primary._setSecurityToken(undefined);
 
 // Logout the root user to avoid multiple authentication.
 primaryConn.getDB("admin").logout();
