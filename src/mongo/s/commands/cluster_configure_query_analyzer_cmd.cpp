@@ -65,16 +65,11 @@ namespace analyze_shard_key {
 namespace {
 
 /**
- * Returns a new command object with shard version and database version appended to it based on
- * the given routing info.
+ * Returns a new command object with database version appended to it based on the given routing
+ * info.
  */
-BSONObj makeVersionedCmdObj(const CollectionRoutingInfo& cri,
-                            const BSONObj& unversionedCmdObj,
-                            ShardId shardId) {
-    auto versionedCmdObj = appendShardVersion(unversionedCmdObj,
-                                              cri.cm.isSharded() ? cri.getShardVersion(shardId)
-                                                                 : ShardVersion::UNSHARDED());
-    return appendDbVersionIfPresent(versionedCmdObj, cri.cm.dbVersion());
+BSONObj makeVersionedCmdObj(const CollectionRoutingInfo& cri, const BSONObj& unversionedCmdObj) {
+    return appendDbVersionIfPresent(unversionedCmdObj, cri.cm.dbVersion());
 }
 
 class ConfigureQueryAnalyzerCmd : public TypedCommand<ConfigureQueryAnalyzerCmd> {
@@ -97,15 +92,14 @@ public:
             auto shard =
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
             auto versionedCmdObj = makeVersionedCmdObj(
-                cri,
-                CommandHelpers::filterCommandRequestForPassthrough(request().toBSON({})),
-                primaryShardId);
+                cri, CommandHelpers::filterCommandRequestForPassthrough(request().toBSON({})));
             auto swResponse = shard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 DatabaseName::kAdmin,
                 versionedCmdObj,
                 Shard::RetryPolicy::kIdempotent);
+
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swResponse));
 
             auto response = ConfigureQueryAnalyzerResponse::parse(

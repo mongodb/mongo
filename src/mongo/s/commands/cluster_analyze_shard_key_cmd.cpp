@@ -77,20 +77,6 @@ namespace analyze_shard_key {
 
 namespace {
 
-/**
- * Returns a new command object with shard version and/or database version appended to it based on
- * the given routing info.
- */
-BSONObj makeVersionedCmdObj(const CollectionRoutingInfo& cri,
-                            const BSONObj& unversionedCmdObj,
-                            ShardId shardId) {
-    if (cri.cm.isSharded()) {
-        return appendShardVersion(unversionedCmdObj, cri.getShardVersion(shardId));
-    }
-    auto versionedCmdObj = appendShardVersion(unversionedCmdObj, ShardVersion::UNSHARDED());
-    return appendDbVersionIfPresent(versionedCmdObj, cri.cm.dbVersion());
-}
-
 class AnalyzeShardKeyCmd : public TypedCommand<AnalyzeShardKeyCmd> {
 public:
     using Request = AnalyzeShardKey;
@@ -109,7 +95,7 @@ public:
             auto primaryShardId = cri.cm.dbPrimary();
 
             std::set<ShardId> candidateShardIds;
-            if (cri.cm.isSharded()) {
+            if (cri.cm.hasRoutingTable()) {
                 cri.cm.getAllShardIds(&candidateShardIds);
             } else {
                 candidateShardIds.insert(primaryShardId);
@@ -153,19 +139,20 @@ public:
                         "Cannot analyze a shard key for a collection in a fixed database",
                         !cri.cm.dbVersion().isFixed());
 
-                // Build a versioned command for the selected shard.
-                auto versionedCmdObj = makeVersionedCmdObj(cri, unversionedCmdObj, shardId);
-
+                auto expCtx = makeExpressionContextWithDefaultsForTargeter(
+                    opCtx, nss, cri, BSONObj(), boost::none, boost::none, boost::none);
                 // Execute the command against the shard.
-                auto shard =
-                    uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-                auto swResponse =
-                    shard->runCommandWithFixedRetryAttempts(opCtx,
-                                                            request().getReadPreference(),
-                                                            DatabaseName::kAdmin,
-                                                            versionedCmdObj,
-                                                            Shard::RetryPolicy::kIdempotent);
-                auto status = Shard::CommandResponse::getEffectiveStatus(swResponse);
+                auto requests =
+                    buildVersionedRequests(expCtx, nss, cri, {shardId}, unversionedCmdObj);
+                invariant(requests.size() == 1);
+
+                auto response = std::move(gatherResponses(opCtx,
+                                                          DatabaseName::kAdmin,
+                                                          request().getReadPreference(),
+                                                          Shard::RetryPolicy::kIdempotent,
+                                                          requests)
+                                              .front());
+                auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
 
                 if (status == ErrorCodes::CollectionIsEmptyLocally) {
                     uassert(ErrorCodes::IllegalOperation,
@@ -185,9 +172,10 @@ public:
                 }
 
                 uassertStatusOK(status);
-                auto response = AnalyzeShardKeyResponse::parse(
-                    IDLParserContext("clusterAnalyzeShardKey"), swResponse.getValue().response);
-                return response;
+                auto parsedResponse =
+                    AnalyzeShardKeyResponse::parse(IDLParserContext("clusterAnalyzeShardKey"),
+                                                   response.swResponse.getValue().data);
+                return parsedResponse;
             }
         }
 
