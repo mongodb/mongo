@@ -108,7 +108,7 @@ void assertConfigurationAllowed() {
             isQueryStatsFeatureEnabled(/* requiresFullQueryStatsFeatureFlag = */ false));
 }
 
-class TelemetryOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
+class QueryStatsOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
         assertConfigurationAllowed();
@@ -137,7 +137,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         // configuration setParameter command is run).
 
         query_stats_util::queryStatsStoreOnParamChangeUpdater(serviceCtx) =
-            std::make_unique<TelemetryOnParamChangeUpdaterImpl>();
+            std::make_unique<QueryStatsOnParamChangeUpdaterImpl>();
         size_t size = getQueryStatsStoreSize();
         auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(serviceCtx);
         // Initially the queryStats store used the same number of partitions as the plan cache, that
@@ -312,7 +312,7 @@ void writeQueryStats(OperationContext* opCtx,
 
     // Otherwise we didn't find an existing entry. Try to create one.
     tassert(7315200,
-            "key cannot be null when writing a new entry to the telemetry store",
+            "key cannot be null when writing a new entry to the queryStats store",
             key != nullptr);
     size_t numEvicted =
         queryStatsStore.put(*queryStatsKeyHash, QueryStatsEntry(std::move(key)), partitionLock);

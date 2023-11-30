@@ -12,12 +12,12 @@ const conn = MongoRunner.runMongod({
 assert.neq(null, conn, 'failed to start mongod');
 const testDB = conn.getDB('test');
 
-// Pipeline to read telemetry store should fail without feature flag turned on.
+// Pipeline to read queryStats store should fail without feature flag turned on.
 assert.commandFailedWithCode(
     testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
     ErrorCodes.QueryFeatureNotAllowed);
 
-// Pipeline, with a filter, to read telemetry store fails without feature flag turned on.
+// Pipeline, with a filter, to read queryStats store fails without feature flag turned on.
 assert.commandFailedWithCode(testDB.adminCommand({
     aggregate: 1,
     pipeline: [{$queryStats: {}}, {$match: {"key.queryShape.find": {$eq: "###"}}}],

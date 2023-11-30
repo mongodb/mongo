@@ -55,7 +55,7 @@ std::pair<ServiceContext*, OnParamChangeUpdater*> getUpdater(const Client& clien
     tassert(7106500, "ServiceContext must be non null", serviceCtx);
 
     auto updater = queryStatsStoreOnParamChangeUpdater(serviceCtx).get();
-    tassert(7106501, "Telemetry store size updater must be non null", updater);
+    tassert(7106501, "queryStats store size updater must be non null", updater);
     return {serviceCtx, updater};
 }
 }  // namespace

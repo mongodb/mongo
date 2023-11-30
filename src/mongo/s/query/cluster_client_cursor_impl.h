@@ -203,7 +203,7 @@ private:
     // profiler.
     bool _shouldOmitDiagnosticInformation = false;
 
-    // If boost::none, telemetry should not be collected for this cursor.
+    // If boost::none, queryStats should not be collected for this cursor.
     boost::optional<std::size_t> _queryStatsKeyHash;
 
     // The Key used by query stats to generate the query stats store key.

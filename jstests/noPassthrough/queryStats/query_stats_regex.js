@@ -1,10 +1,10 @@
 /**
- * Test that telemetry works properly for a find command that uses regex.
+ * Test that queryStats works properly for a find command that uses regex.
  * @tags: [requires_fcv_71]
  */
 import {getQueryStats} from "jstests/libs/query_stats_utils.js";
 
-// Turn on the collecting of telemetry metrics.
+// Turn on the collecting of queryStats metrics.
 let options = {
     setParameter: {internalQueryStatsRateLimit: -1},
 };

@@ -1,5 +1,5 @@
 /**
- * Test the telemetry related serverStatus metrics.
+ * Test the queryStats related serverStatus metrics.
  * @tags: [requires_fcv_72]
  */
 (function() {
@@ -81,8 +81,8 @@ function evictionTest(conn, testDB, coll, testOptions) {
 }
 
 /**
- * Test serverStatus metric which counts the number of requests for which telemetry is not collected
- * due to rate-limiting.
+ * Test serverStatus metric which counts the number of requests for which queryStats is not
+ * collected due to rate-limiting.
  *
  * testOptions must include `samplingRate` and `numRequests` number fields;
  *  e.g., { samplingRate: -1, numRequests: 20 }
@@ -104,19 +104,19 @@ function countRateLimitedRequestsTest(conn, testDB, coll, testOptions) {
         testDB.serverStatus().metrics.queryStats.numRateLimitedRequests;
 
     if (testOptions.samplingRate === 0) {
-        // Telemetry should not be collected for any requests.
+        // queryStats should not be collected for any requests.
         assert.eq(numRateLimitedRequestsAfter, testOptions.numRequests);
     } else if (testOptions.samplingRate >= testOptions.numRequests) {
-        // Telemetry should be collected for all requests.
+        // queryStats should be collected for all requests.
         assert.eq(numRateLimitedRequestsAfter, 0);
     } else {
-        // Telemetry should be collected for some but not all requests.
+        // queryStats should be collected for some but not all requests.
         assert.gt(numRateLimitedRequestsAfter, 0);
         assert.lt(numRateLimitedRequestsAfter, testOptions.numRequests);
     }
 }
 
-function telemetryStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
+function queryStatsStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
     assert.eq(testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes, 0);
     let halfWayPointSize;
     // Only using three digit numbers (eg 100, 101) means the string length will be the same for all
@@ -129,19 +129,19 @@ function telemetryStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
                 testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
         }
     }
-    // Confirm that telemetry store has grown and size is non-zero.
+    // Confirm that queryStats store has grown and size is non-zero.
     assert.gt(halfWayPointSize, 0);
     const fullSize = testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
     assert.gt(fullSize, 0);
-    // Make sure the final telemetry store size is twice as much as the halfway point size (+/- 5%)
+    // Make sure the final queryStats store size is twice as much as the halfway point size (+/- 5%)
     assert(fullSize >= halfWayPointSize * 1.95 && fullSize <= halfWayPointSize * 2.05,
            tojson({fullSize, halfWayPointSize}));
 }
 
-function telemetryStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
+function queryStatsStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
     const debugBuild = testDB.adminCommand('buildInfo').debug;
     if (debugBuild) {
-        jsTestLog("Skipping telemetry store write errors test because debug build will tassert.");
+        jsTestLog("Skipping queryStats store write errors test because debug build will tassert.");
         return;
     }
 
@@ -200,7 +200,7 @@ function queryStatsAggregationStageTest(conn, testDB, coll) {
 }
 
 /**
- * In this configuration, we insert enough entries into the telemetry store to trigger LRU
+ * In this configuration, we insert enough entries into the queryStats store to trigger LRU
  * eviction.
  */
 runTestWithMongodOptions({
@@ -209,7 +209,7 @@ runTestWithMongodOptions({
                          evictionTest,
                          {resetCacheSize: false});
 /**
- * In this configuration, eviction is triggered only when the telemetry store size is reset.
+ * In this configuration, eviction is triggered only when the queryStats store size is reset.
  *
  * Use an 8MB upper limit since our estimated size of the query stats entry is pretty rough and
  * meant to give us some wiggle room so we don't have to keep adjusting this test as we tweak it.
@@ -240,22 +240,22 @@ runTestWithMongodOptions({
                          {samplingRate: 10, numRequests: 20});
 
 /**
- * Sample all queries and assert that the size of telemetry store is equal to num entries * entry
+ * Sample all queries and assert that the size of queryStats store is equal to num entries * entry
  * size
  */
 runTestWithMongodOptions({
     setParameter: {internalQueryStatsRateLimit: -1},
 },
-                         telemetryStoreSizeEstimateTest);
+                         queryStatsStoreSizeEstimateTest);
 
 /**
- * Use a very small telemetry store size and assert that errors in writing to the telemetry store
+ * Use a very small queryStats store size and assert that errors in writing to the queryStats store
  * are tracked.
  */
 runTestWithMongodOptions({
     setParameter: {internalQueryStatsCacheSize: "0.00001MB", internalQueryStatsRateLimit: -1},
 },
-                         telemetryStoreWriteErrorsTest);
+                         queryStatsStoreWriteErrorsTest);
 
 /**
  * Tests that $queryStats has expected effects (or no effect) on counters.
