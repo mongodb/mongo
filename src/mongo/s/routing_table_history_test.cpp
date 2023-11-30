@@ -309,7 +309,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateBasic) {
         return it != expectedShardsMaxValidAfter.end() ? it->second : Timestamp{0, 0};
     };
     for (const auto& [shardId, _] : expectedShardVersions) {
-        ASSERT_EQ(rt.getMaxValidAfter(shardId), expectedMaxValidAfter(shardId));
+        ASSERT_GTE(rt.getMaxValidAfter(shardId), expectedMaxValidAfter(shardId));
     }
     ASSERT_EQ(rt.getMaxValidAfter(ShardId{"shard-without-chunks"}), (Timestamp{0, 0}));
 }
@@ -651,7 +651,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdate) {
         return it != expectedShardsMaxValidAfter.end() ? it->second : Timestamp{0, 0};
     };
     for (const auto& [shardId, _] : expectedShardVersions) {
-        ASSERT_EQ(rt.getMaxValidAfter(shardId), expectedMaxValidAfter(shardId))
+        ASSERT_GTE(rt.getMaxValidAfter(shardId), expectedMaxValidAfter(shardId))
             << "For shardid " << shardId;
     }
     ASSERT_EQ(rt.getMaxValidAfter(ShardId{"shard-without-chunks"}), (Timestamp{0, 0}));

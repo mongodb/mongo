@@ -39,7 +39,9 @@ namespace mongo {
 namespace {
 
 std::vector<AsyncRequestsSender::Request> attachTxnDetails(
-    OperationContext* opCtx, const std::vector<AsyncRequestsSender::Request>& requests) {
+    OperationContext* opCtx,
+    const std::vector<AsyncRequestsSender::Request>& requests,
+    const StringData& dbName) {
     auto txnRouter = TransactionRouter::get(opCtx);
     if (!txnRouter) {
         return requests;
@@ -51,7 +53,7 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     for (auto request : requests) {
         newRequests.emplace_back(
             request.shardId,
-            txnRouter.attachTxnFieldsIfNeeded(opCtx, request.shardId, request.cmdObj));
+            txnRouter.attachTxnFieldsIfNeeded(opCtx, request.shardId, request.cmdObj, dbName));
     }
 
     return newRequests;
@@ -84,7 +86,7 @@ MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender
       _ars(std::make_unique<AsyncRequestsSender>(opCtx,
                                                  std::move(executor),
                                                  dbName,
-                                                 attachTxnDetails(opCtx, requests),
+                                                 attachTxnDetails(opCtx, requests, dbName),
                                                  readPreference,
                                                  retryPolicy)) {}
 

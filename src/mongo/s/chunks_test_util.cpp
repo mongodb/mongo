@@ -292,11 +292,13 @@ void performRandomChunkOperations(std::vector<ChunkType>* chunksPtr, size_t numO
         collVersion.incMinor();
         const ChunkRange leftRange{chunkToSplit.getMin(), splitKey};
         ChunkType leftChunk{chunkToSplit.getNS(), leftRange, collVersion, chunkToSplit.getShard()};
+        leftChunk.setHistory(chunkToSplit.getHistory());
 
         collVersion.incMinor();
         const ChunkRange rightRange{splitKey, chunkToSplit.getMax()};
         ChunkType rightChunk{
             chunkToSplit.getNS(), rightRange, collVersion, chunkToSplit.getShard()};
+        rightChunk.setHistory(chunkToSplit.getHistory());
 
         auto it = chunks.erase(chunkToSplitIt);
         it = chunks.insert(it, std::move(rightChunk));
@@ -320,6 +322,7 @@ void performRandomChunkOperations(std::vector<ChunkType>* chunksPtr, size_t numO
         collVersion.incMinor();
         const ChunkRange mergedRange{firstChunk.getMin(), std::prev(lastChunkIt)->getMax()};
         ChunkType mergedChunk{firstChunk.getNS(), mergedRange, collVersion, firstChunk.getShard()};
+        mergedChunk.setHistory({ChunkHistory{Timestamp{Date_t::now()}, firstChunk.getShard()}});
 
         auto it = chunks.erase(firstChunkIt, lastChunkIt);
         it = chunks.insert(it, mergedChunk);

@@ -596,6 +596,7 @@ assert = (function() {
                 msg,
                 "[" + tojson(error.code) + "] != [" + tojson(expectedCode) + "] are not equal"));
         }
+        return error;
     };
 
     assert.doesNotThrow = function(func, params, msg) {
