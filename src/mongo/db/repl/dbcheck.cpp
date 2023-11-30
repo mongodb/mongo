@@ -574,7 +574,6 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
     }
 
     if (_missingIndexKeys.size() > 0) {
-        // TODO (SERVER-81117): Determine if this is the correct error code to return.
         return Status(ErrorCodes::NoSuchKey, "Document has missing index keys");
     }
     return Status::OK();
@@ -597,7 +596,6 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
         });
 
         if (!collPtr->getRecordStore()->findRecord(opCtx, currentRecordId, &record)) {
-            // TODO (SERVER-81117): Determine if this is the correct error code to return.
             const auto msg = "Error fetching record from record id";
             const auto status = Status(ErrorCodes::KeyNotFound, msg);
             const auto logEntry =
@@ -659,7 +657,6 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
 
         BSONObj currentObj = record.toBson();
         if (!currentObj.hasField("_id")) {
-            // TODO (SERVER-81117): Determine if this is the correct error code to return.
             return Status(ErrorCodes::NoSuchKey,
                           "Document with record ID " + currentRecordId.toString() + " missing _id");
         }

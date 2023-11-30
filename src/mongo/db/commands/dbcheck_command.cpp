@@ -729,7 +729,7 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
                         "indexName"_attr = indexName,
                         logAttrs(_info.nss),
                         "uuid"_attr = _info.uuid);
-            Status status = Status(ErrorCodes::KeyNotFound,
+            Status status = Status(ErrorCodes::NoSuchKey,
                                    "could not create batch bounds because of error while batching");
             const auto logEntry = dbCheckErrorHealthLogEntry(
                 _info.nss,
@@ -1230,7 +1230,7 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
                     "uuid"_attr = _info.uuid);
 
         Status status =
-            Status(ErrorCodes::KeyNotFound,
+            Status(ErrorCodes::NoSuchKey,
                    str::stream() << "cannot find document from recordId "
                                  << recordId.toStringHumanReadable() << " from index " << indexName
                                  << " for ns " << _info.nss.toStringForErrorMsg());
@@ -1306,7 +1306,7 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
                 logAttrs(_info.nss),
                 "uuid"_attr = _info.uuid);
     Status status =
-        Status(ErrorCodes::KeyNotFound,
+        Status(ErrorCodes::NoSuchKey,
                str::stream() << "found index key entry with corresponding document and "
                                 "key string set that does not contain expected keystring "
                              << keyStringBson << " from index " << indexName << " for ns "
@@ -1589,7 +1589,7 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
 
     if (!status.isOK()) {
         // dbCheck should still continue if we get an error fetching a record.
-        if (status.code() == ErrorCodes::KeyNotFound) {
+        if (status.code() == ErrorCodes::NoSuchKey) {
             std::unique_ptr<HealthLogEntry> healthLogEntry =
                 dbCheckErrorHealthLogEntry(_info.nss,
                                            _info.uuid,
