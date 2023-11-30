@@ -75,10 +75,25 @@ assert.soon(
             tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
     });
 
-// killCursors does not block behind the pending MODE_X lock.
-assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
-
-assert.commandWorked(session.commitTransaction_forTesting());
+// killCursors does not block behind the pending MODE_X lock. It is possible that due to ticket
+// exhaustion we end up detecting a deadlocked state, where the drop operation is waiting for
+// an X collection lock but cannot acquire it because IX locks are being held by the killCursor
+// operation, in which case we fail the killCursor command. If there was an error running the
+// command below we should ensure that is a TransientTransactionError with a code of LockTimeOut,
+// and ensure that the transaction was successfully rolled back.
+res = sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]});
+if (res.ok) {
+    assert.commandWorked(session.commitTransaction_forTesting());
+} else {
+    const isTransientTxnError =
+        res.hasOwnProperty("errorLabels") && res.errorLabels.includes("TransientTransactionError");
+    const isLockTimeout = res.hasOwnProperty("code") && ErrorCodes.LockTimeout === res.code;
+    assert(isTransientTxnError, res);
+    assert(isLockTimeout, res);
+    // The transaction should have implicitly been aborted.
+    assert.commandFailedWithCode(sessionDb.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
+}
 
 // Once the transaction has committed, the drop can proceed.
 awaitDrop();
