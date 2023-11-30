@@ -59,6 +59,9 @@ struct DbCheckCollectionInfo {
     WriteConcernOptions writeConcern;
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters;
     DataThrottle dataThrottle;
+
+    // Returns the BSON representation of this object.
+    BSONObj toBSON() const;
 };
 
 /**

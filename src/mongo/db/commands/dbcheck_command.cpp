@@ -140,6 +140,40 @@ repl::OpTime _logOp(OperationContext* opCtx,
         });
 }
 
+/**
+ * Initializes currentOp for dbcheck background job.
+ */
+void _initializeCurOp(OperationContext* opCtx, boost::optional<DbCheckCollectionInfo> info) {
+    if (!info) {
+        return;
+    }
+
+    stdx::unique_lock<Client> lk(*opCtx->getClient());
+    auto curOp = CurOp::get(opCtx);
+    curOp->setNS_inlock(info->nss);
+    curOp->setOpDescription_inlock(info->toBSON());
+    curOp->ensureStarted();
+}
+
+BSONObj DbCheckCollectionInfo::toBSON() const {
+    BSONObjBuilder builder;
+    builder.append("dbcheck",
+                   NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+    uuid.appendToBuilder(&builder, "uuid");
+    if (secondaryIndexCheckParameters) {
+        builder.append("secondaryIndexCheckParameters", secondaryIndexCheckParameters->toBSON());
+    }
+
+    builder.append("start", start);
+    builder.append("end", end);
+    builder.append("maxDocsPerBatch", maxDocsPerBatch);
+    builder.append("maxBatchTimeMillis", maxBatchTimeMillis);
+    builder.append("maxCount", maxCount);
+    builder.append("maxSize", maxSize);
+    builder.append(WriteConcernOptions::kWriteConcernField, writeConcern.toBSON());
+    return builder.obj();
+}
+
 DbCheckStartAndStopLogger::DbCheckStartAndStopLogger(OperationContext* opCtx,
                                                      boost::optional<DbCheckCollectionInfo> info)
     : _info(info), _opCtx(opCtx) {
@@ -460,6 +494,8 @@ void DbCheckJob::run() {
         info = _run->front();
     }
     DbCheckStartAndStopLogger startStop(opCtx, info);
+    _initializeCurOp(opCtx, info);
+    ON_BLOCK_EXIT([opCtx] { CurOp::get(opCtx)->done(); });
 
     if (MONGO_unlikely(hangBeforeProcessingDbCheckRun.shouldFail())) {
         LOGV2(7949000, "Hanging dbcheck due to failpoint 'hangBeforeProcessingDbCheckRun'");
