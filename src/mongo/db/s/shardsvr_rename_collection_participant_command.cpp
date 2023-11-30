@@ -50,10 +50,10 @@
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/rename_collection_participant_service.h"
 #include "mongo/db/s/sharded_rename_collection_gen.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/namespace_string_util.h"
@@ -106,7 +106,7 @@ public:
                     txnParticipant);
 
             auto const shardingState = ShardingState::get(opCtx);
-            uassertStatusOK(shardingState->canAcceptShardedCommands());
+            shardingState->assertCanAcceptShardedCommands();
             auto const& req = request();
 
             const NamespaceString& fromNss = ns();
@@ -204,7 +204,7 @@ public:
                     txnParticipant);
 
             auto const shardingState = ShardingState::get(opCtx);
-            uassertStatusOK(shardingState->canAcceptShardedCommands());
+            shardingState->assertCanAcceptShardedCommands();
 
             const NamespaceString& fromNss = ns();
             const auto& req = request();

@@ -36,16 +36,15 @@
 
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -54,7 +53,12 @@ const auto getShardingState = ServiceContext::declareDecoration<ShardingState>()
 
 }  // namespace
 
-ShardingState::ShardingState() = default;
+ShardingState::ShardingState() {
+    auto [promise, future] = makePromiseFuture<RecoveredClusterRole>();
+    _promise = std::move(promise);
+    _future = std::move(future).tapAll(
+        [this](auto sw) { _awaitClusterRoleRecoveryPromise.setFrom(std::move(sw)); });
+}
 
 ShardingState::~ShardingState() = default;
 
@@ -66,88 +70,76 @@ ShardingState* ShardingState::get(OperationContext* operationContext) {
     return ShardingState::get(operationContext->getServiceContext());
 }
 
-void ShardingState::setInitialized(ShardId shardId, OID clusterId) {
+void ShardingState::setRecoveryCompleted(RecoveredClusterRole role) {
+    LOGV2(
+        22081, "Sharding status of the node recovered successfully", "role"_attr = role.toString());
     stdx::unique_lock<Latch> ul(_mutex);
-    invariant(_getInitializationState() == InitializationState::kNew);
+    invariant(!_future.isReady());
 
-    _shardId = std::move(shardId);
-    _clusterId = std::move(clusterId);
-    _initializationStatus = Status::OK();
-
-    _initializationState.store(static_cast<uint32_t>(InitializationState::kInitialized));
-    _initStateChangedCV.notify_all();
+    _promise.emplaceValue(std::move(role));
 }
 
-void ShardingState::setInitialized(Status failedStatus) {
+void ShardingState::setRecoveryFailed(Status failedStatus) {
     invariant(!failedStatus.isOK());
-    LOGV2(22082, "Failed to initialize sharding components", "error"_attr = failedStatus);
+    LOGV2(22082, "Sharding status of the node failed to recover", "error"_attr = failedStatus);
 
     stdx::unique_lock<Latch> ul(_mutex);
-    invariant(_getInitializationState() == InitializationState::kNew);
+    invariant(!_future.isReady());
 
-    _initializationStatus = std::move(failedStatus);
-    _initializationState.store(static_cast<uint32_t>(InitializationState::kError));
-    _initStateChangedCV.notify_all();
+    _promise.setError(
+        {ErrorCodes::ManualInterventionRequired,
+         str::stream()
+             << "This instance's sharding role failed to initialize and will remain in this state "
+                "until the process is restarted. In addition some manual intervention might be "
+                "required, which would require the node to be started in maintenance mode."
+             << causedBy(failedStatus)});
 }
 
-boost::optional<Status> ShardingState::initializationStatus() {
+SharedSemiFuture<ShardingState::RecoveredClusterRole> ShardingState::awaitClusterRoleRecovery() {
+    return _awaitClusterRoleRecoveryPromise.getFuture();
+}
+
+boost::optional<ClusterRole> ShardingState::pollClusterRole() const {
     stdx::unique_lock<Latch> ul(_mutex);
-    if (_getInitializationState() == InitializationState::kNew)
+    if (!_future.isReady())
         return boost::none;
 
-    return _initializationStatus;
+    const auto& role = uassertStatusOK(_future.getNoThrow());
+    return role.role;
 }
 
 bool ShardingState::enabled() const {
-    return _getInitializationState() == InitializationState::kInitialized;
+    const auto role = pollClusterRole();
+    return role && (role->has(ClusterRole::ConfigServer) || role->has(ClusterRole::ShardServer));
 }
 
-Status ShardingState::canAcceptShardedCommands() const {
-    if (!serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-        return {ErrorCodes::NoShardingEnabled,
-                "Cannot accept sharding commands if node does not have shard role"};
-    }
+void ShardingState::assertCanAcceptShardedCommands() const {
+    if (pollClusterRole())
+        return;
 
-    if (!enabled()) {
-        return {ErrorCodes::ShardingStateNotInitialized,
-                "Cannot accept sharding commands if sharding state has not "
-                "been initialized with a shardIdentity document"};
-    }
-
-    return Status::OK();
+    uasserted(ErrorCodes::ShardingStateNotInitialized,
+              "Cannot accept sharding commands if sharding state has not been initialized with a "
+              "shardIdentity document");
 }
 
-ShardId ShardingState::shardId() {
-    if (!enabled()) {
-        return ShardId();
-    }
-    return _shardId;
-}
-
-OID ShardingState::clusterId() {
-    invariant(enabled());
-    return _clusterId;
-}
-
-void ShardingState::clearForTests() {
+ShardId ShardingState::shardId() const {
     stdx::unique_lock<Latch> ul(_mutex);
-    _initializationState.store(static_cast<uint32_t>(InitializationState::kNew));
-    _initStateChangedCV.notify_all();
+    if (!_future.isReady())
+        return ShardId();
+
+    const auto& role = _future.get();
+    return role.shardId;
 }
 
-void ShardingState::waitUntilEnabled(OperationContext* opCtx) {
-    stdx::unique_lock ul(_mutex);
+OID ShardingState::clusterId() const {
+    invariant(_future.isReady());
+    const auto& role = _future.get();
+    return role.clusterId;
+}
 
-    // If an error occurred earlier, wait for it to succeed or get cleared.
-    opCtx->waitForConditionOrInterrupt(_initStateChangedCV, ul, [this] {
-        return _getInitializationState() != InitializationState::kError;
-    });
-
-    opCtx->waitForConditionOrInterrupt(_initStateChangedCV, ul, [this] {
-        return _getInitializationState() != InitializationState::kNew;
-    });
-
-    uassertStatusOK(_initializationStatus);
+std::string ShardingState::RecoveredClusterRole::toString() const {
+    return str::stream() << clusterId << " : " << role << " : " << configShardConnectionString
+                         << " : " << shardId;
 }
 
 }  // namespace mongo

@@ -117,6 +117,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/storage/key_string',
@@ -796,7 +797,7 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="coll_mod_command_idl",
+    target='coll_mod_command_idl',
     source=[
         'coll_mod.idl',
     ],
@@ -817,6 +818,8 @@ env.Library(
         'dbcommands.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/pipeline/document_sources_idl',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'server_base',
@@ -872,7 +875,6 @@ env.Library(
         'concurrency/lock_manager',
         'generic_cursor',
         'index_commands_idl',
-        'pipeline/change_stream_pre_and_post_images_options',
         'prepare_conflict_tracker',
         'query/common_query_enums_and_helpers',
         'repl/read_concern_args',
@@ -931,7 +933,6 @@ env.Library(
         's/shard_key_index_util.cpp',
         's/sharding_api_d_params.idl',
         's/sharding_migration_critical_section.cpp',
-        's/sharding_state.cpp',
         's/sharding_statistics.cpp',
         's/sharding_write_router.cpp',
         's/transaction_coordinator_curop.cpp',
@@ -1436,8 +1437,10 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'catalog/catalog_helpers',
         'catalog/index_key_validate',
+        'coll_mod_command_idl',
         'commands/fsync_locked',
         'commands/server_status_core',
+        'index_commands_idl',
         'ops/write_ops',
         'query_exec',
         'record_id_helpers',

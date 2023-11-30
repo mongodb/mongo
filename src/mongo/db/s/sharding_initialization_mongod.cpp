@@ -83,7 +83,6 @@
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
@@ -115,6 +114,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_initialization.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -512,19 +512,14 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
         return;
     }
 
-    auto initializationStatus = shardingState->initializationStatus();
-    uassert(ErrorCodes::ManualInterventionRequired,
-            str::stream() << "Server's sharding metadata manager failed to initialize and will "
-                             "remain in this state until the instance is manually reset"
-                          << causedBy(*initializationStatus),
-            !initializationStatus);
-
     try {
         _initFunc(opCtx, shardIdentity);
-        shardingState->setInitialized(shardIdentity.getShardName().toString(),
-                                      shardIdentity.getClusterId());
+        shardingState->setRecoveryCompleted({shardIdentity.getClusterId(),
+                                             serverGlobalParams.clusterRole,
+                                             shardIdentity.getConfigsvrConnectionString(),
+                                             ShardId(shardIdentity.getShardName().toString())});
     } catch (const DBException& ex) {
-        shardingState->setInitialized(ex.toStatus());
+        shardingState->setRecoveryFailed(ex.toStatus());
     }
 
     if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&

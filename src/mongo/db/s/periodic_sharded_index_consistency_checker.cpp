@@ -53,7 +53,6 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -63,6 +62,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -114,7 +114,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
 
             // TODO: SERVER-82965 Remove wait
             try {
-                ShardingState::get(opCtx)->waitUntilEnabled(opCtx);
+                ShardingState::get(opCtx)->awaitClusterRoleRecovery().get(opCtx);
             } catch (DBException&) {
                 return;
             }

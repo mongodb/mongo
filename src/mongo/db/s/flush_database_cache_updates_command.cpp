@@ -55,7 +55,6 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/logv2/log.h"
@@ -68,6 +67,7 @@
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/request_types/flush_database_cache_updates_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
@@ -158,7 +158,7 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             auto const shardingState = ShardingState::get(opCtx);
-            uassertStatusOK(shardingState->canAcceptShardedCommands());
+            shardingState->assertCanAcceptShardedCommands();
 
             uassert(ErrorCodes::IllegalOperation,
                     "Can't issue _flushDatabaseCacheUpdates from 'eval'",

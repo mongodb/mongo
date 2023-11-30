@@ -49,7 +49,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
 #include "mongo/db/s/sharding_index_catalog_util.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_session_pool.h"
@@ -58,6 +57,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -97,7 +97,7 @@ public:
                     format(FMT_STRING("{} command not enabled"), definition()->getName()),
                     feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
@@ -180,7 +180,7 @@ public:
                     format(FMT_STRING("{} command not enabled"), definition()->getName()),
                     feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());

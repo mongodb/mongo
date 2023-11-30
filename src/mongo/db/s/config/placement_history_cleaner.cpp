@@ -50,7 +50,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -62,6 +61,7 @@
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -132,7 +132,7 @@ void PlacementHistoryCleaner::runOnce(Client* client, size_t minPlacementHistory
 
     // TODO: SERVER-82965 remove wait
     try {
-        ShardingState::get(opCtx)->waitUntilEnabled(opCtx);
+        ShardingState::get(opCtx)->awaitClusterRoleRecovery().get(opCtx);
     } catch (const DBException&) {
         return;
     }

@@ -40,8 +40,8 @@ structs:
       is_command_reply: true
       fields:
         historicalPlacement: HistoricalPlacement
-commands:
 
+commands:
     clusterResetPlacementHistory:
         command_name: resetPlacementHistory
         cpp_name: ClusterResetPlacementHistory

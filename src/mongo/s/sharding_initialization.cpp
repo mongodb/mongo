@@ -239,17 +239,6 @@ Status initializeGlobalShardingState(
     return Status::OK();
 }
 
-void loadCWWCFromConfigServerForReplication(OperationContext* opCtx) {
-    if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
-        // Cluster wide read/write concern in a sharded cluster lives on the config server, so a
-        // config server node's local cache will be correct and explicitly checking for a default
-        // write concern via remote command is unnecessary.
-        return;
-    }
-
-    repl::ReplicationCoordinator::get(opCtx)->recordIfCWWCIsSetOnConfigServerOnStartup(opCtx);
-}
-
 Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx,
                                           ShardingCatalogClient* catalogClient) {
     while (!globalInShutdownDeprecated()) {
@@ -274,8 +263,14 @@ Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx,
                     opCtx, catalogClient, repl::ReadConcernLevel::kMajorityReadConcern));
             }
 
-            // Assert will be raised on failure to talk to config server.
-            loadCWWCFromConfigServerForReplication(opCtx);
+            // Cluster wide read/write concern in a sharded cluster lives on the config server, so a
+            // config server node's local cache will be correct and explicitly checking for a
+            // default write concern via remote command is unnecessary.
+            if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
+                // Assert will be raised on failure to talk to config server.
+                repl::ReplicationCoordinator::get(opCtx)->recordIfCWWCIsSetOnConfigServerOnStartup(
+                    opCtx);
+            }
 
             return Status::OK();
         } catch (const DBException& ex) {

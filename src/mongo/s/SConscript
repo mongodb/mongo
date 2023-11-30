@@ -150,8 +150,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/executor/scoped_task_executor',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
-        '$BUILD_DIR/mongo/s/client/shard_interface',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
+        'client/shard_interface',
+        'client/sharding_client',
         'coreshard',
         'mongos_server_parameters',
     ],
@@ -202,7 +202,6 @@ env.Library(
     ],
 )
 
-# Sharding code needed by both mongos and mongod.
 env.Library(
     target='common_s',
     source=[
@@ -215,8 +214,8 @@ env.Library(
         'catalog/type_collection.idl',
         'catalog/type_config_version.cpp',
         'catalog/type_database.idl',
-        'catalog/type_index_catalog.idl',
         'catalog/type_index_catalog.cpp',
+        'catalog/type_index_catalog.idl',
         'catalog/type_mongos.cpp',
         'catalog/type_namespace_placement.idl',
         'catalog/type_shard.cpp',
@@ -286,30 +285,31 @@ env.Library(
         'would_change_owning_shard_exception.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'analyze_shard_key_common',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/coll_mod_command_idl',
         '$BUILD_DIR/mongo/db/commands/cluster_server_parameter_cmds_idl',
         '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/commands/set_user_write_block_mode_idl',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/index_commands_idl',
-        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
-        '$BUILD_DIR/mongo/executor/async_rpc_error_info',
-        '$BUILD_DIR/mongo/rpc/message',
-        '$BUILD_DIR/mongo/util/caching',
-        'analyze_shard_key_common',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/matcher/path',
         '$BUILD_DIR/mongo/db/metadata_consistency_types_idl',
         '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        '$BUILD_DIR/mongo/executor/async_rpc_error_info',
+        '$BUILD_DIR/mongo/rpc/message',
+        '$BUILD_DIR/mongo/util/caching',
     ],
 )
 
@@ -322,7 +322,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/operation_time_tracker',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
+        'client/sharding_client',
         'sharding_router_api',
     ],
 )
@@ -336,8 +336,9 @@ env.Library(
         'client/config_shard_wrapper.cpp',
         'client/shard_factory.cpp',
         'client/shard_registry.cpp',
-        'sharding_index_catalog_cache.cpp',
         'grid.cpp',
+        'sharding_index_catalog_cache.cpp',
+        'sharding_state.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
@@ -369,28 +370,18 @@ env.Library(
 )
 
 env.Library(
-    target='mongos_hello_response',
-    source=[
-        'mongos_hello_response.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/rpc/metadata',
-    ],
-)
-
-env.Library(
     target='mongos_topology_coordinator',
     source=[
+        'mongos_hello_response.cpp',
         'mongos_topology_coordinator.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/fail_point',
-        'mongos_hello_response',
     ],
 )
 

@@ -131,6 +131,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/duplicate_key_error_info',
         '$BUILD_DIR/mongo/db/storage/key_string',
         'collection_crud',
+        'collection_options',
         'validate_state',
     ],
 )
@@ -323,6 +324,7 @@ env.Benchmark(
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/service_context_non_d',
         'collection_catalog',
+        'collection_options',
     ],
 )
 
@@ -542,6 +544,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/coll_mod_command_idl',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
@@ -655,13 +658,16 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='db_collection_query_info_test', source=[
+    target='db_collection_query_info_test',
+    source=[
         '$BUILD_DIR/mongo/db/query/collection_query_info_test.cpp',
-    ], LIBDEPS=[
+    ],
+    LIBDEPS=[
         '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
         'collection_query_info',
-    ])
+    ],
+)
 
 if wiredtiger:
     env.CppUnitTest(
@@ -694,11 +700,13 @@ if wiredtiger:
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/auth/authmocks',
+            '$BUILD_DIR/mongo/db/coll_mod_command_idl',
             '$BUILD_DIR/mongo/db/commands/create_command',
             '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
             '$BUILD_DIR/mongo/db/concurrency/exception_util',
             '$BUILD_DIR/mongo/db/index/index_access_method',
             '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
+            '$BUILD_DIR/mongo/db/index_commands_idl',
             '$BUILD_DIR/mongo/db/multitenancy',
             '$BUILD_DIR/mongo/db/op_observer/op_observer',
             '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',

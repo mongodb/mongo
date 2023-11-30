@@ -53,7 +53,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
@@ -61,6 +60,7 @@
 #include "mongo/s/index_version.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/uuid.h"
@@ -115,7 +115,7 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
         result.append(
             "configServer",

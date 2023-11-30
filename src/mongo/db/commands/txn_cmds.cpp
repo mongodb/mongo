@@ -47,7 +47,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -60,6 +59,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -166,8 +166,8 @@ public:
                 txnParticipant.commitPreparedTransaction(
                     opCtx, optionalCommitTimestamp.value(), {});
             } else {
-                if (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
-                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+                if (auto role = ShardingState::get(opCtx)->pollClusterRole(); role &&
+                    (role->has(ClusterRole::ConfigServer) || role->has(ClusterRole::ShardServer))) {
                     TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
                         opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter);
                 }
@@ -271,11 +271,12 @@ public:
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &hangBeforeAbortingTxn, opCtx, "hangBeforeAbortingTxn");
 
-            if (!MONGO_unlikely(dontRemoveTxnCoordinatorOnAbort.shouldFail()) &&
-                (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
-                 serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer))) {
-                TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
-                    opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter);
+            if (!MONGO_unlikely(dontRemoveTxnCoordinatorOnAbort.shouldFail())) {
+                if (auto role = ShardingState::get(opCtx)->pollClusterRole(); role &&
+                    (role->has(ClusterRole::ConfigServer) || role->has(ClusterRole::ShardServer))) {
+                    TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
+                        opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter);
+                }
             }
 
             txnParticipant.abortTransaction(opCtx);

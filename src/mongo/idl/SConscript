@@ -201,6 +201,7 @@ env.Benchmark(
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/rpc/message',
         'idl_parser',
     ],
 )

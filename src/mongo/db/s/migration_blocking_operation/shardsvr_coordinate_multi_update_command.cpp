@@ -31,8 +31,8 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/request_types/coordinate_multi_update_gen.h"
+#include "mongo/s/sharding_state.h"
 
 namespace mongo {
 namespace {
@@ -68,7 +68,7 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
         }
 
     private:

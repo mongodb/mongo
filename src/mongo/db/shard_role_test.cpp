@@ -66,7 +66,6 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -84,6 +83,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/unittest/assert.h"
@@ -114,7 +114,7 @@ void installDatabaseMetadata(OperationContext* opCtx,
                              const DatabaseVersion& dbVersion) {
     AutoGetDb autoDb(opCtx, dbName, MODE_X, {}, {});
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-    scopedDss->setDbInfo(opCtx, {dbName, ShardId("this"), dbVersion});
+    scopedDss->setDbInfo(opCtx, {dbName, ShardId("ShardRoleTest"), dbVersion});
 }
 
 void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
@@ -182,7 +182,7 @@ protected:
     void setUp() override;
     void tearDown() override;
 
-    const ShardId thisShardId{"this"};
+    const ShardId thisShardId{"ShardRoleTest"};
 
     const DatabaseName dbNameTestDb = DatabaseName::createDatabaseName_forTest(boost::none, "test");
     const DatabaseVersion dbVersionTestDb{UUID::gen(), Timestamp(1, 0)};
@@ -235,7 +235,12 @@ void ShardRoleTest::setUp() {
 
     repl::createOplog(_opCtx.get());
 
-    ShardingState::get(getServiceContext())->setInitialized(ShardId("this"), OID::gen());
+    const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
+    ShardingState::get(getServiceContext())
+        ->setRecoveryCompleted({OID::gen(),
+                                ClusterRole::ShardServer,
+                                ConnectionString(kConfigHostAndPort),
+                                ShardId("ShardRoleTest")});
 
     // Setup test collections and metadata
     installDatabaseMetadata(opCtx(), dbNameTestDb, dbVersionTestDb);
@@ -675,7 +680,7 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithIncorrectPlacementVersionThrows) {
         ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
         ASSERT_EQ(ShardVersion::UNSHARDED(), exInfo->getVersionReceived());
         ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionWanted());
-        ASSERT_EQ(ShardId("this"), exInfo->getShardId());
+        ASSERT_EQ(ShardId("ShardRoleTest"), exInfo->getShardId());
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
     };
 
@@ -718,7 +723,7 @@ TEST_F(ShardRoleTest, AcquireShardedCollWhenShardDoesNotKnowThePlacementVersionT
         ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
         ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionReceived());
         ASSERT_EQ(boost::none, exInfo->getVersionWanted());
-        ASSERT_EQ(ShardId("this"), exInfo->getShardId());
+        ASSERT_EQ(ShardId("ShardRoleTest"), exInfo->getShardId());
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
     };
 
@@ -759,7 +764,7 @@ TEST_F(ShardRoleTest, AcquireShardedCollWhenCriticalSectionIsActiveThrows) {
             ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
             ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionReceived());
             ASSERT_EQ(boost::none, exInfo->getVersionWanted());
-            ASSERT_EQ(ShardId("this"), exInfo->getShardId());
+            ASSERT_EQ(ShardId("ShardRoleTest"), exInfo->getShardId());
             ASSERT_TRUE(exInfo->getCriticalSectionSignal().is_initialized());
         };
         ASSERT_THROWS_WITH_CHECK(acquireCollection(opCtx(),
@@ -1020,7 +1025,7 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsWithIncorrectPlacementConcernThr
             ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
             ASSERT_EQ(ShardVersion::UNSHARDED(), exInfo->getVersionReceived());
             ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionWanted());
-            ASSERT_EQ(ShardId("this"), exInfo->getShardId());
+            ASSERT_EQ(ShardId("ShardRoleTest"), exInfo->getShardId());
             ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
         });
 }
@@ -1320,7 +1325,7 @@ TEST_F(ShardRoleTest,
                                  ASSERT_EQ(shardVersionShardedCollection1,
                                            exInfo->getVersionReceived());
                                  ASSERT_EQ(newShardVersion, exInfo->getVersionWanted());
-                                 ASSERT_EQ(ShardId("this"), exInfo->getShardId());
+                                 ASSERT_EQ(ShardId("ShardRoleTest"), exInfo->getShardId());
                                  ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
                              });
 
@@ -2101,7 +2106,7 @@ DEATH_TEST_F(ShardRoleTest,
                                  ASSERT_EQ(shardVersionShardedCollection1,
                                            exInfo->getVersionReceived());
                                  ASSERT_EQ(newShardVersion, exInfo->getVersionWanted());
-                                 ASSERT_EQ(ShardId("this"), exInfo->getShardId());
+                                 ASSERT_EQ(ShardId("ShardRoleTest"), exInfo->getShardId());
                                  ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
                              });
 

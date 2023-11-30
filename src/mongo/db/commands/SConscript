@@ -143,6 +143,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_settings/utils',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'cluster_server_parameter_cmds_idl',
         'set_cluster_parameter_impl',
     ])
 
@@ -204,7 +205,6 @@ env.Library(
         '$BUILD_DIR/mongo/executor/egress_connection_closer_manager',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         '$BUILD_DIR/mongo/util/ntservice',
@@ -275,6 +275,7 @@ env.Library(
         'feature_compatibility_version.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
@@ -339,7 +340,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/pipeline/change_stream_pre_and_post_images_options',
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_options',
@@ -350,7 +350,11 @@ env.Library(
 
 env.Library(
     target='bulk_write_parser',
-    source=['bulk_write.idl', 'bulk_write_parser.cpp', 'bulk_write_crud_op.cpp'],
+    source=[
+        'bulk_write.idl',
+        'bulk_write_parser.cpp',
+        'bulk_write_crud_op.cpp',
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/fle_fields',
         '$BUILD_DIR/mongo/db/commands',
@@ -498,6 +502,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
         '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
         '$BUILD_DIR/mongo/db/change_stream_serverless_helpers',
+        '$BUILD_DIR/mongo/db/coll_mod_command_idl',
         '$BUILD_DIR/mongo/db/command_can_run_here',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
@@ -544,7 +549,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         '$BUILD_DIR/mongo/executor/async_request_executor',
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
-        '$BUILD_DIR/mongo/s/grid',
         '$BUILD_DIR/mongo/s/query_analysis_sampler',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/util/log_and_backoff',
@@ -718,12 +722,14 @@ env.Library(
         '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
         '$BUILD_DIR/mongo/db/change_stream_state',
         '$BUILD_DIR/mongo/db/cluster_transaction_api',
+        '$BUILD_DIR/mongo/db/coll_mod_command_idl',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/exec/stagedebug_cmd',
         '$BUILD_DIR/mongo/db/fle_crud_mongod',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/db/index_commands_idl',
         '$BUILD_DIR/mongo/db/introspect',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',

@@ -75,7 +75,6 @@ protected:
     static const HostAndPort kConfigHostAndPort;
 
     const ShardId _myShardName{"myShardName"};
-    OID _clusterId;
 
     std::unique_ptr<CatalogCacheLoader> _catalogCacheLoader;
 };

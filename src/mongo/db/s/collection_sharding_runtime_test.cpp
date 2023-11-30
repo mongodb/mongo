@@ -70,7 +70,6 @@
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/vector_clock.h"
@@ -85,6 +84,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_version_factory.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
@@ -309,7 +309,6 @@ public:
     const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID kCollUUID = UUID::gen();
     const std::string kShardKey = "x";
-    const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
     const std::vector<ShardType> kShardList = {ShardType(_myShardName.toString(), "Host0:12345")};
 
     void setUp() override {

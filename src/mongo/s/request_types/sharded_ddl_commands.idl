@@ -416,7 +416,6 @@ structs:
                 optional: false
 
 commands:
-
     _shardsvrCreateCollection:
         command_name: _shardsvrCreateCollection
         cpp_name: ShardsvrCreateCollection

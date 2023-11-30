@@ -58,7 +58,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/s/transaction_coordinator_structures.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -76,6 +75,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -117,7 +117,7 @@ public:
         Response typedRun(OperationContext* opCtx) {
             if (!getTestCommandsEnabled() &&
                 !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+                ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             }
 
             // If a node has majority read concern disabled, replication must use the legacy
@@ -315,7 +315,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             // Only config servers or initialized shard servers can act as transaction coordinators.
             if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+                ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             }
 
             const auto& cmd = request();

@@ -50,7 +50,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -60,6 +59,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/clone_catalog_data_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/str.h"
@@ -163,7 +163,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto shardingState = ShardingState::get(opCtx);
-        uassertStatusOK(shardingState->canAcceptShardedCommands());
+        shardingState->assertCanAcceptShardedCommands();
 
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "_shardsvrCloneCatalogData can only be run on shard servers",

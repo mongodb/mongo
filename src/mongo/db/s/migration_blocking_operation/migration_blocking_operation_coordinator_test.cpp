@@ -32,7 +32,6 @@
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_external_state_for_test.h"
-#include "mongo/db/s/sharding_state.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

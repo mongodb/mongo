@@ -62,7 +62,6 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -76,6 +75,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/admission_context.h"
@@ -158,7 +158,7 @@ Status refreshDbMetadata(OperationContext* opCtx,
                          CancellationToken cancellationToken) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
-    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
     ScopeGuard resetRefreshFutureOnError([&] {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
@@ -257,7 +257,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
                          boost::optional<DatabaseVersion> receivedDbVersion) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
-    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
     using namespace fmt::literals;
     tassert(ErrorCodes::IllegalOperation,
@@ -538,7 +538,7 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
                                           boost::optional<ChunkVersion> chunkVersionReceived) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
-    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
     Timer t{};
     ScopeGuard finishTiming([&] {
@@ -648,7 +648,7 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
     }
 
     auto* const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->canAcceptShardedCommands());
+    shardingState->assertCanAcceptShardedCommands();
 
     try {
         const auto [cm, _] = uassertStatusOK(
@@ -679,7 +679,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     }
 
     auto* const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->canAcceptShardedCommands());
+    shardingState->assertCanAcceptShardedCommands();
 
     const auto [cm, _] = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
