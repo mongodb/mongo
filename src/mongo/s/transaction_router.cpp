@@ -43,6 +43,7 @@
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/txn_retry_counter_too_old_info.h"
@@ -70,6 +71,11 @@ using namespace fmt::literals;
 // TODO SERVER-39704: Remove this fail point once the router can safely retry within a transaction
 // on stale version and snapshot errors.
 MONGO_FAIL_POINT_DEFINE(enableStaleVersionAndSnapshotRetriesWithinTransactions);
+// This failpoint is used to skip the conflictPlacementTimestamp check for unittests in
+// transaction_router_test.cpp. The check involves fetching of the catalog cache, which the existing
+// unittests are not set up to do.
+MONGO_FAIL_POINT_DEFINE(skipConflictPlacementTimestampCheck);
+
 
 const char kCoordinatorField[] = "coordinator";
 const char kReadConcernLevelSnapshotName[] = "snapshot";
@@ -259,6 +265,34 @@ std::string actionTypeToString(TransactionRouter::TransactionActions action) {
     MONGO_UNREACHABLE;
 }
 
+/**
+ * Sets the given logical time as the atClusterTime for the transaction to be the greater of
+ * the given time and the user's afterClusterTime, if one was provided.
+ */
+void setAtClusterTime(const LogicalSessionId& lsid,
+                      const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+                      StmtId latestStmtId,
+                      TransactionRouter::AtClusterTime* atClusterTime,
+                      const boost::optional<LogicalTime>& afterClusterTime,
+                      const LogicalTime& candidateTime) {
+    // If the user passed afterClusterTime, the chosen time must be greater than or equal to it.
+    if (afterClusterTime && *afterClusterTime > candidateTime) {
+        atClusterTime->setTime(*afterClusterTime, latestStmtId);
+        return;
+    }
+
+    LOGV2_DEBUG(22888,
+                2,
+                "Setting global snapshot timestamp for transaction",
+                "sessionId"_attr = lsid,
+                "txnNumber"_attr = txnNumberAndRetryCounter.getTxnNumber(),
+                "txnRetryCounter"_attr = txnNumberAndRetryCounter.getTxnRetryCounter(),
+                "globalSnapshotTimestamp"_attr = candidateTime,
+                "latestStmtId"_attr = latestStmtId);
+
+    atClusterTime->setTime(candidateTime, latestStmtId);
+}
+
 }  // unnamed namespace
 
 TransactionRouter::TransactionRouter() = default;
@@ -350,7 +384,8 @@ void TransactionRouter::Observer::_reportTransactionState(OperationContext* opCt
     }
 
     if (_atClusterTimeHasBeenSet()) {
-        builder->append("globalReadTimestamp", o().atClusterTime->getTime().asTimestamp());
+        builder->append("globalReadTimestamp",
+                        o().atClusterTimeForSnapshotReadConcern->getTime().asTimestamp());
     }
 
     const auto& timingStats = o().metricsTracker->getTimingStats();
@@ -408,7 +443,8 @@ void TransactionRouter::Observer::_reportTransactionState(OperationContext* opCt
 }
 
 bool TransactionRouter::Observer::_atClusterTimeHasBeenSet() const {
-    return o().atClusterTime.is_initialized() && o().atClusterTime->timeHasBeenSet();
+    return o().atClusterTimeForSnapshotReadConcern &&
+        o().atClusterTimeForSnapshotReadConcern->timeHasBeenSet();
 }
 
 const LogicalSessionId& TransactionRouter::Observer::_sessionId() const {
@@ -455,7 +491,7 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     BSONObjBuilder newCmd = mustStartTransaction
         ? appendFieldsForStartTransaction(std::move(cmd),
                                           sharedOptions.readConcernArgs,
-                                          sharedOptions.atClusterTime,
+                                          sharedOptions.atClusterTimeForSnapshotReadConcern,
                                           !hasStartTxn)
         : BSONObjBuilder(std::move(cmd));
 
@@ -589,12 +625,17 @@ bool TransactionRouter::AtClusterTime::canChange(StmtId currentStmtId) const {
 }
 
 bool TransactionRouter::Router::mustUseAtClusterTime() const {
-    return o().atClusterTime.is_initialized();
+    return o().atClusterTimeForSnapshotReadConcern.is_initialized();
 }
 
 LogicalTime TransactionRouter::Router::getSelectedAtClusterTime() const {
-    invariant(o().atClusterTime);
-    return o().atClusterTime->getTime();
+    invariant(o().atClusterTimeForSnapshotReadConcern);
+    return o().atClusterTimeForSnapshotReadConcern->getTime();
+}
+
+LogicalTime TransactionRouter::Router::getPlacementConflictTime() const {
+    invariant(o().placementConflictTimeForNonSnapshotReadConcern);
+    return o().placementConflictTimeForNonSnapshotReadConcern->getTime();
 }
 
 const boost::optional<ShardId>& TransactionRouter::Router::getCoordinatorId() const {
@@ -605,21 +646,55 @@ const boost::optional<ShardId>& TransactionRouter::Router::getRecoveryShardId() 
     return p().recoveryShardId;
 }
 
+void TransactionRouter::Router::_checkForPlacementConflict(OperationContext* opCtx,
+                                                           const ShardId& shardId,
+                                                           const NamespaceString& nss) {
+    // Check if the current routing table is aware of a data placement change that
+    // is more recent than the timestamp the current transaction started with. If
+    // so, we throw a MigrationConflict error to force the client to retry so the
+    // storage engine uses an up to date snapshot.
+    const auto cm =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+    if (cm.isSharded() &&
+        (getPlacementConflictTime().asTimestamp() < cm.getMaxValidAfter(shardId))) {
+        uasserted(ErrorCodes::MigrationConflict,
+                  str::stream() << "Collection " << nss
+                                << " has undergone a catalog change operation at time "
+                                << cm.getMaxValidAfter(shardId)
+                                << " and no longer satisfies the "
+                                   "requirements for the current transaction which requires "
+                                << getPlacementConflictTime().asTimestamp()
+                                << ". Transaction will be aborted.");
+    }
+}
+
 BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opCtx,
                                                            const ShardId& shardId,
-                                                           const BSONObj& cmdObj) {
+                                                           const BSONObj& cmdObj,
+                                                           const StringData& dbName) {
+    // Skip the placement check if we are not running a transaction or if we are using snapshot read
+    // concern.
+    if (!(opCtx->isRetryableWrite() || _atClusterTimeHasBeenSet() ||
+          MONGO_unlikely(skipConflictPlacementTimestampCheck.shouldFail()))) {
+        // For commands only against a db and not a collection, skip the placementConflict check.
+        if (auto nss = NamespaceString(CommandHelpers::parseNsFromCommand(dbName, cmdObj));
+            nsIsFull(nss.toString())) {
+            _checkForPlacementConflict(opCtx, shardId, nss);
+        }
+    }
+
     RouterTransactionsMetrics::get(opCtx)->incrementTotalRequestsTargeted();
     if (auto txnPart = getParticipant(shardId)) {
-        LOGV2_DEBUG(
-            22883,
-            4,
-            "{sessionId}:{txnNumber} Sending transaction fields to existing participant: {shardId}",
-            "Attaching transaction fields to request for existing participant shard",
-            "sessionId"_attr = _sessionId(),
-            "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
-            "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
-            "shardId"_attr = shardId,
-            "request"_attr = redact(cmdObj));
+        LOGV2_DEBUG(22883,
+                    4,
+                    "{sessionId}:{txnNumber} Sending transaction fields to existing "
+                    "participant: {shardId}",
+                    "Attaching transaction fields to request for existing participant shard",
+                    "sessionId"_attr = _sessionId(),
+                    "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                    "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
+                    "shardId"_attr = shardId,
+                    "request"_attr = redact(cmdObj));
         return txnPart->attachTxnFieldsIfNeeded(cmdObj, false);
     }
 
@@ -634,7 +709,8 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
                 "shardId"_attr = shardId,
                 "request"_attr = redact(cmdObj));
     if (!p().isRecoveringCommit) {
-        // Don't update participant stats during recovery since the participant list isn't known.
+        // Don't update participant stats during recovery since the participant list isn't
+        // known.
         RouterTransactionsMetrics::get(opCtx)->incrementTotalContactedParticipants();
     }
 
@@ -642,9 +718,10 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
 }
 
 void TransactionRouter::Router::_verifyParticipantAtClusterTime(const Participant& participant) {
-    const auto& participantAtClusterTime = participant.sharedOptions.atClusterTime;
+    const auto& participantAtClusterTime =
+        participant.sharedOptions.atClusterTimeForSnapshotReadConcern;
     invariant(participantAtClusterTime);
-    invariant(*participantAtClusterTime == o().atClusterTime->getTime());
+    invariant(*participantAtClusterTime == o().atClusterTimeForSnapshotReadConcern->getTime());
 }
 
 const TransactionRouter::Participant* TransactionRouter::Router::getParticipant(
@@ -653,7 +730,7 @@ const TransactionRouter::Participant* TransactionRouter::Router::getParticipant(
     if (iter == o().participants.end())
         return nullptr;
 
-    if (o().atClusterTime) {
+    if (o().atClusterTimeForSnapshotReadConcern) {
         _verifyParticipantAtClusterTime(iter->second);
     }
 
@@ -675,8 +752,10 @@ TransactionRouter::Participant& TransactionRouter::Router::_createParticipant(
         o().txnNumberAndRetryCounter,
         o().apiParameters,
         o().readConcernArgs,
-        o().atClusterTime ? boost::optional<LogicalTime>(o().atClusterTime->getTime())
-                          : boost::none,
+        o().atClusterTimeForSnapshotReadConcern
+            ? boost::optional<LogicalTime>(o().atClusterTimeForSnapshotReadConcern->getTime())
+            : boost::none,
+        boost::none,
         isInternalSessionForRetryableWrite(_sessionId())};
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -863,7 +942,8 @@ void TransactionRouter::Router::onViewResolutionError(OperationContext* opCtx,
 
 bool TransactionRouter::Router::canContinueOnSnapshotError() const {
     if (MONGO_unlikely(enableStaleVersionAndSnapshotRetriesWithinTransactions.shouldFail())) {
-        return o().atClusterTime && o().atClusterTime->canChange(p().latestStmtId);
+        return o().atClusterTimeForSnapshotReadConcern &&
+            o().atClusterTimeForSnapshotReadConcern->canChange(p().latestStmtId);
     }
 
     return false;
@@ -884,7 +964,8 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const S
         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
         "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
         "error"_attr = redact(status),
-        "previousGlobalSnapshotTimestamp"_attr = o().atClusterTime->getTime());
+        "previousGlobalSnapshotTimestamp"_attr =
+            o().atClusterTimeForSnapshotReadConcern->getTime());
 
     // The transaction must be restarted on all participants because a new read timestamp will be
     // selected, so clear all pending participants. Snapshot errors are only retryable on the first
@@ -896,45 +977,37 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const S
     stdx::lock_guard<Client> lk(*opCtx->getClient());
 
     // Reset the global snapshot timestamp so the retry will select a new one.
-    o(lk).atClusterTime.reset();
-    o(lk).atClusterTime.emplace();
+    o(lk).atClusterTimeForSnapshotReadConcern.reset();
+    o(lk).atClusterTimeForSnapshotReadConcern.emplace();
 }
 
 void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx) {
-    if (!o().atClusterTime || !o().atClusterTime->canChange(p().latestStmtId)) {
-        return;
-    }
-
     const auto defaultTime = VectorClock::get(opCtx)->getTime();
-    _setAtClusterTime(opCtx,
-                      repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
-                      defaultTime.clusterTime());
-}
 
-void TransactionRouter::Router::_setAtClusterTime(
-    OperationContext* opCtx,
-    const boost::optional<LogicalTime>& afterClusterTime,
-    LogicalTime candidateTime) {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
-
-    // If the user passed afterClusterTime, the chosen time must be greater than or equal to it.
-    if (afterClusterTime && *afterClusterTime > candidateTime) {
-        o(lk).atClusterTime->setTime(*afterClusterTime, p().latestStmtId);
-        return;
+    if (o().atClusterTimeForSnapshotReadConcern) {
+        if (o().atClusterTimeForSnapshotReadConcern->canChange(p().latestStmtId)) {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            setAtClusterTime(_sessionId(),
+                             o(lk).txnNumberAndRetryCounter,
+                             p().latestStmtId,
+                             o(lk).atClusterTimeForSnapshotReadConcern.get_ptr(),
+                             repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
+                             defaultTime.clusterTime());
+        }
+    } else if (o().placementConflictTimeForNonSnapshotReadConcern) {
+        // The placementConflictTimestamp is chosen to be the latest VectorClock time known, which
+        // should be regularly gossiped. This will ensure that we are not in a state where a mongos
+        // repeatedly chooses a stale timestamp and throw MigrationConflict errors.
+        if (o().placementConflictTimeForNonSnapshotReadConcern->canChange(p().latestStmtId)) {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            setAtClusterTime(_sessionId(),
+                             o(lk).txnNumberAndRetryCounter,
+                             p().latestStmtId,
+                             o(lk).placementConflictTimeForNonSnapshotReadConcern.get_ptr(),
+                             repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
+                             defaultTime.clusterTime());
+        }
     }
-
-    LOGV2_DEBUG(22888,
-                2,
-                "{sessionId}:{txnNumber} Setting global snapshot timestamp to "
-                "{globalSnapshotTimestamp} on statement {latestStmtId}",
-                "Setting global snapshot timestamp for transaction",
-                "sessionId"_attr = _sessionId(),
-                "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
-                "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
-                "globalSnapshotTimestamp"_attr = candidateTime,
-                "latestStmtId"_attr = p().latestStmtId);
-
-    o(lk).atClusterTime->setTime(candidateTime, p().latestStmtId);
 }
 
 void TransactionRouter::Router::_continueTxn(OperationContext* opCtx,
@@ -1451,7 +1524,8 @@ void TransactionRouter::Router::_resetRouterState(
         p().recoveryShardId.reset();
         o(lk).apiParameters = {};
         o(lk).readConcernArgs = {};
-        o(lk).atClusterTime.reset();
+        o(lk).atClusterTimeForSnapshotReadConcern.reset();
+        o(lk).placementConflictTimeForNonSnapshotReadConcern.reset();
         o(lk).abortCause = std::string();
         o(lk).metricsTracker.emplace(opCtx->getServiceContext());
         p().terminationInitiated = false;
@@ -1482,13 +1556,16 @@ void TransactionRouter::Router::_resetRouterStateForStartTransaction(
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        o(lk).apiParameters = APIParameters::get(opCtx);
-        o(lk).readConcernArgs = readConcernArgs;
-    }
+        auto& osw = o(lk);
 
-    if (o().readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        o(lk).atClusterTime.emplace();
+        osw.apiParameters = APIParameters::get(opCtx);
+        osw.readConcernArgs = readConcernArgs;
+
+        if (osw.readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+            osw.atClusterTimeForSnapshotReadConcern.emplace();
+        } else {
+            osw.placementConflictTimeForNonSnapshotReadConcern.emplace();
+        }
     }
 
     LOGV2_DEBUG(22889,
@@ -1518,7 +1595,8 @@ BSONObj TransactionRouter::Router::_commitWithRecoveryToken(OperationContext* op
         auto rawCoordinateCommit = coordinateCommitCmd.toBSON(
             BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
 
-        return attachTxnFieldsIfNeeded(opCtx, recoveryShardId, rawCoordinateCommit);
+        return attachTxnFieldsIfNeeded(
+            opCtx, recoveryShardId, rawCoordinateCommit, coordinateCommitCmd.getDbName());
     }();
 
     auto recoveryShard = uassertStatusOK(shardRegistry->getShard(opCtx, recoveryShardId));
@@ -1555,7 +1633,7 @@ void TransactionRouter::Router::_logSlowTransaction(OperationContext* opCtx,
 
     std::string globalReadTimestampTemp;
     if (_atClusterTimeHasBeenSet()) {
-        globalReadTimestampTemp = o().atClusterTime->getTime().toString();
+        globalReadTimestampTemp = o().atClusterTimeForSnapshotReadConcern->getTime().toString();
         attrs.add("globalReadTimestamp", globalReadTimestampTemp);
     }
 

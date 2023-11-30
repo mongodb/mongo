@@ -222,7 +222,8 @@ private:
     ChunkMap _makeUpdated(ChunkVector&& changedChunks) const;
 
     void _updateShardVersionFromDiscardedChunk(const ChunkInfo& chunk);
-    void _updateShardVersionFromUpdateChunk(const ChunkInfo& chunk);
+    void _updateShardVersionFromUpdateChunk(const ChunkInfo& chunk,
+                                            const ShardVersionMap& oldShardVersions);
     void _commitUpdatedChunkVector(std::shared_ptr<ChunkVector>&& chunkVectorPtr,
                                    bool checkMaxKeyConsistency);
     void _mergeAndCommitUpdatedChunkVector(ChunkVectorMap::const_iterator pos,
