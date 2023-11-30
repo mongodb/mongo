@@ -137,11 +137,14 @@ def generate(expansions_file: str = "../expansions.yml",
         )
         return
 
+    # LOCAL_BIN_DIR does not exists on non-resmoke tasks, so return early as there is no work to be done.
+    if not os.path.exists(LOCAL_BIN_DIR):
+        print(f"Skipping task generation because binary directory not found: {LOCAL_BIN_DIR}")
+        return
+
     # See if any core dumps were uploaded for this task
     has_known_core_dumps = False
     dumpers = dumper.get_dumpers(None, None)
-    if not os.path.exists(LOCAL_BIN_DIR):
-        raise RuntimeError("binary directory not found, skipping task generation")
 
     for artifact in task_info.artifacts:
         regex = re.search(r"Core Dump [0-9]+ \((.*)\.gz\)", artifact.name)
