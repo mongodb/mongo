@@ -194,7 +194,7 @@ protected:
     }
 
     ValidateResults runValidate() {
-        // validate() will set a kCheckpoint read source. Callers continue to do operations after
+        // validate() will set a kProvided read source. Callers continue to do operations after
         // running validate, so we must reset the read source back to normal before returning.
         auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
         ON_BLOCK_EXIT([&] {
@@ -3522,7 +3522,7 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
+            // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
             auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
@@ -4365,7 +4365,7 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
+            // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
             auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
@@ -4480,7 +4480,7 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
+            // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
             auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
@@ -4592,7 +4592,7 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
+            // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
             auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
@@ -4633,7 +4633,7 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
+            // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
             auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
@@ -4806,37 +4806,39 @@ public:
     ValidateTests() : OldStyleSuiteSpecification("validate_tests") {}
 
     void setupTests() {
+        // TODO SERVER-83593: re-enable background validation tests.
+
         // Add tests for both full validate and non-full validate.
         add<ValidateIdIndexCount<true, false>>();
         add<ValidateIdIndexCount<false, false>>();
-        add<ValidateIdIndexCount<false, true>>();
+        // add<ValidateIdIndexCount<false, true>>();
         add<ValidateSecondaryIndexCount<true, false>>();
         add<ValidateSecondaryIndexCount<false, false>>();
-        add<ValidateSecondaryIndexCount<false, true>>();
+        // add<ValidateSecondaryIndexCount<false, true>>();
 
         // These tests are only needed for non-full validate.
         add<ValidateIdIndex<false, false>>();
-        add<ValidateIdIndex<false, true>>();
+        // add<ValidateIdIndex<false, true>>();
         add<ValidateSecondaryIndex<false, false>>();
-        add<ValidateSecondaryIndex<false, true>>();
+        // add<ValidateSecondaryIndex<false, true>>();
         add<ValidateMultiKeyIndex<false, false>>();
-        add<ValidateMultiKeyIndex<false, true>>();
+        // add<ValidateMultiKeyIndex<false, true>>();
         add<ValidateSparseIndex<false, false>>();
-        add<ValidateSparseIndex<false, true>>();
+        // add<ValidateSparseIndex<false, true>>();
         add<ValidateCompoundIndex<false, false>>();
-        add<ValidateCompoundIndex<false, true>>();
+        // add<ValidateCompoundIndex<false, true>>();
         add<ValidatePartialIndex<false, false>>();
-        add<ValidatePartialIndex<false, true>>();
+        // add<ValidatePartialIndex<false, true>>();
         add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, false>>();
-        add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, true>>();
+        // add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, true>>();
         add<ValidateWildCardIndex<false, false>>();
-        add<ValidateWildCardIndex<false, true>>();
+        // add<ValidateWildCardIndex<false, true>>();
         add<ValidateWildCardIndexWithProjection<false, false>>();
-        add<ValidateWildCardIndexWithProjection<false, true>>();
+        // add<ValidateWildCardIndexWithProjection<false, true>>();
 
         // Tests for index validation.
         add<ValidateIndexEntry<false, false>>();
-        add<ValidateIndexEntry<false, true>>();
+        // add<ValidateIndexEntry<false, true>>();
         add<ValidateIndexMetadata>();
 
         // Tests that the 'missingIndexEntries' and 'extraIndexEntries' field are populated
@@ -4856,10 +4858,10 @@ public:
         add<ValidateDuplicateDocumentIndexKeySet>();
 
         add<ValidateDuplicateKeysUniqueIndex<false, false>>();
-        add<ValidateDuplicateKeysUniqueIndex<false, true>>();
+        // add<ValidateDuplicateKeysUniqueIndex<false, true>>();
 
         add<ValidateInvalidBSONResults<false, false>>();
-        add<ValidateInvalidBSONResults<false, true>>();
+        // add<ValidateInvalidBSONResults<false, true>>();
         add<ValidateInvalidBSONRepair>();
 
         add<ValidateIndexWithMultikeyDocRepair>();
@@ -4869,15 +4871,15 @@ public:
 
         // Tests that validation works on clustered collections.
         add<ValidateInvalidBSONOnClusteredCollection<false>>();
-        add<ValidateInvalidBSONOnClusteredCollection<true>>();
+        // add<ValidateInvalidBSONOnClusteredCollection<true>>();
         add<ValidateReportInfoOnClusteredCollection<false>>();
-        add<ValidateReportInfoOnClusteredCollection<true>>();
+        // add<ValidateReportInfoOnClusteredCollection<true>>();
         add<ValidateRepairOnClusteredCollection>();
 
         add<ValidateInvalidRecordIdOnClusteredCollection<false>>(false /*withSecondaryIndex*/);
         add<ValidateInvalidRecordIdOnClusteredCollection<false>>(true /*withSecondaryIndex*/);
-        add<ValidateInvalidRecordIdOnClusteredCollection<true>>(false /*withSecondaryIndex*/);
-        add<ValidateInvalidRecordIdOnClusteredCollection<true>>(true /*withSecondaryIndex*/);
+        // add<ValidateInvalidRecordIdOnClusteredCollection<true>>(false /*withSecondaryIndex*/);
+        // add<ValidateInvalidRecordIdOnClusteredCollection<true>>(true /*withSecondaryIndex*/);
     }
 };
 

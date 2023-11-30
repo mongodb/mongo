@@ -1,15 +1,15 @@
 /**
- * Tests that an in-progress background validation gets interrupted when certain DDL operations are
- * executed.
- *
- * Dropping an index, the collection or database that are part of the ongoing background validation
- * should cause the validation to be interrupted. Renaming the collection across databases should
- * also interrupt, but same database collection renames should not. Operations that are not part of
- * the ongoing background validation, like creating new indexes or inserting documents should not
- * cause the validation to be interrupted.
+ * Tests that an in-progress background validation succeeds when DDL operations are executed against
+ * the collection.
  *
  * @tags: [requires_persistence]
  */
+const rst = new ReplSetTest({nodes: 1});
+rst.startSet();
+rst.initiate();
+
+const primary = rst.getPrimary();
+
 const dbName = "background_validation_with_ddl_ops";
 const dbNameRename = "background_validation_with_ddl_ops_rename";
 const collName = "test";
@@ -18,27 +18,27 @@ let testDb, testColl;
 
 const setFailpoint = () => {
     assert.commandWorked(testDb.adminCommand(
-        {configureFailPoint: "hangDuringYieldingLocksForValidation", mode: "alwaysOn"}));
+        {configureFailPoint: "hangDuringValidationInitialization", mode: "alwaysOn"}));
 };
 
 const unsetFailpoint = () => {
     assert.commandWorked(testDb.adminCommand(
-        {configureFailPoint: "hangDuringYieldingLocksForValidation", mode: "off"}));
+        {configureFailPoint: "hangDuringValidationInitialization", mode: "off"}));
 };
 
 const waitUntilFailpoint = () => {
     checkLog.contains(testDb.getMongo(),
-                      "Hanging on fail point 'hangDuringYieldingLocksForValidation'");
+                      "Hanging on fail point 'hangDuringValidationInitialization'");
 };
 
 const resetCollection = () => {
     // Clear the log to get rid of any existing fail point logging that will be used to hang on.
-    testDb = db.getSiblingDB(dbName);
+    testDb = primary.getDB(dbName);
     assert.commandWorked(testDb.adminCommand({clearLog: 'global'}));
 
     testColl = testDb.getCollection(collName);
     testColl.drop();
-    db.getSiblingDB(dbNameRename).getCollection(collName).drop();
+    primary.getDB(dbNameRename).getCollection(collName).drop();
 
     assert.commandWorked(testColl.createIndex({x: 1}));
 
@@ -55,18 +55,18 @@ const resetCollection = () => {
 };
 
 /**
- * Collection validation fails due to dropped index that was being validated.
+ * Collection validation succeeds when dropping an index being validated.
  */
 resetCollection();
 
-let awaitFailedValidationDueToIndexDrop;
+let awaitValidation;
 try {
     setFailpoint();
-    awaitFailedValidationDueToIndexDrop = startParallelShell(function() {
-        assert.commandFailedWithCode(db.getSiblingDB("background_validation_with_ddl_ops")
-                                         .runCommand({validate: "test", background: true}),
-                                     ErrorCodes.Interrupted);
-    });
+    awaitValidation = startParallelShell(function() {
+        let res = assert.commandWorked(db.getSiblingDB("background_validation_with_ddl_ops")
+                                           .runCommand({validate: "test", background: true}));
+        assert(res.valid);
+    }, primary.port);
 
     waitUntilFailpoint();
     assert.commandWorked(testColl.dropIndex({x: 1}));
@@ -74,21 +74,20 @@ try {
     unsetFailpoint();
 }
 
-awaitFailedValidationDueToIndexDrop();
+awaitValidation();
 
 /**
- * Collection validation fails due to dropped collection that was being validated.
+ * Collection validation succeeds when dropping the collection being validated.
  */
 resetCollection();
 
-let awaitFailedValidationDueToCollectionDrop;
 try {
     setFailpoint();
-    awaitFailedValidationDueToCollectionDrop = startParallelShell(function() {
-        assert.commandFailedWithCode(db.getSiblingDB("background_validation_with_ddl_ops")
-                                         .runCommand({validate: "test", background: true}),
-                                     ErrorCodes.Interrupted);
-    });
+    awaitValidation = startParallelShell(function() {
+        let res = assert.commandWorked(db.getSiblingDB("background_validation_with_ddl_ops")
+                                           .runCommand({validate: "test", background: true}));
+        assert(res.valid);
+    }, primary.port);
 
     waitUntilFailpoint();
     assert.eq(true, testColl.drop());
@@ -96,21 +95,20 @@ try {
     unsetFailpoint();
 }
 
-awaitFailedValidationDueToCollectionDrop();
+awaitValidation();
 
 /**
- * Collection validation fails due to being renamed across databases while being validated.
+ * Collection validation succeeds when the collection being validated is renamed.
  */
 resetCollection();
 
-let awaitFailedValidationDueToCrossDBCollectionRename;
 try {
     setFailpoint();
-    awaitFailedValidationDueToCrossDBCollectionRename = startParallelShell(function() {
-        assert.commandFailedWithCode(db.getSiblingDB("background_validation_with_ddl_ops")
-                                         .runCommand({validate: "test", background: true}),
-                                     ErrorCodes.Interrupted);
-    });
+    awaitValidation = startParallelShell(function() {
+        let res = assert.commandWorked(db.getSiblingDB("background_validation_with_ddl_ops")
+                                           .runCommand({validate: "test", background: true}));
+        assert(res.valid);
+    }, primary.port);
 
     waitUntilFailpoint();
     assert.commandWorked(testDb.adminCommand({
@@ -122,21 +120,21 @@ try {
     unsetFailpoint();
 }
 
-awaitFailedValidationDueToCrossDBCollectionRename();
+awaitValidation();
 
 /**
- * Collection validation fails due to database being dropped.
+ * Collection validation succeeds when dropping the database the collection being validated is part
+ * of.
  */
 resetCollection();
 
-let awaitFailedValidationDueToDatabaseDrop;
 try {
     setFailpoint();
-    awaitFailedValidationDueToDatabaseDrop = startParallelShell(function() {
-        assert.commandFailedWithCode(db.getSiblingDB("background_validation_with_ddl_ops")
-                                         .runCommand({validate: "test", background: true}),
-                                     ErrorCodes.Interrupted);
-    });
+    awaitValidation = startParallelShell(function() {
+        let res = assert.commandWorked(db.getSiblingDB("background_validation_with_ddl_ops")
+                                           .runCommand({validate: "test", background: true}));
+        assert(res.valid);
+    }, primary.port);
 
     waitUntilFailpoint();
     assert.commandWorked(testDb.dropDatabase());
@@ -144,7 +142,7 @@ try {
     unsetFailpoint();
 }
 
-awaitFailedValidationDueToDatabaseDrop();
+awaitValidation();
 
 /**
  * Collection validation succeeds when running operations that do not affect ongoing background
@@ -152,13 +150,12 @@ awaitFailedValidationDueToDatabaseDrop();
  */
 resetCollection();
 
-let awaitPassedValidation;
 try {
     setFailpoint();
-    awaitPassedValidation = startParallelShell(function() {
+    awaitValidation = startParallelShell(function() {
         assert.commandWorked(db.getSiblingDB("background_validation_with_ddl_ops")
                                  .runCommand({validate: "test", background: true}));
-    });
+    }, primary.port);
 
     waitUntilFailpoint();
 
@@ -184,4 +181,6 @@ try {
     unsetFailpoint();
 }
 
-awaitPassedValidation();
+awaitValidation();
+
+rst.stopSet();

@@ -10,14 +10,15 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
-const forceCheckpoint = () => {
-    assert.commandWorked(db.fsyncLock());
-    assert.commandWorked(db.fsyncUnlock());
-};
+const rst = new ReplSetTest({nodes: 1});
+rst.startSet();
+rst.initiate();
+
+const primary = rst.getPrimary();
 
 const dbName = "test_db_background_validation";
 const collName = "test_coll_background_validation";
-const testDB = db.getSiblingDB(dbName);
+const testDB = primary.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 testColl.drop();
 
@@ -40,7 +41,7 @@ for (let i = 0; i < numDocs; ++i) {
 assert.commandFailedWithCode(testColl.validate({background: true, full: true}),
                              ErrorCodes.InvalidOptions);
 
-forceCheckpoint();
+assert.commandWorked(testDB.adminCommand({fsync: 1}));
 
 // Check that {backround:true} is successful.
 let res = testColl.validate({background: true});
@@ -53,7 +54,7 @@ assert(res.valid, "Validate cmd with {background:true} failed: " + tojson(res));
 
 // Set a failpoint in the background validation code to pause validation while holding a collection
 // lock.
-let failPoint = configureFailPoint(db, "pauseCollectionValidationWithLock");
+let failPoint = configureFailPoint(primary, "pauseCollectionValidationWithLock");
 
 // Start an asynchronous thread to run collection validation with {background:true}.
 let awaitValidateCommand = startParallelShell(function() {
@@ -64,7 +65,7 @@ let awaitValidateCommand = startParallelShell(function() {
                          "asynchronous background validate command failed: " + tojson(validateRes));
     assert(validateRes.valid,
            "asynchronous background validate command was not valid: " + tojson(validateRes));
-});
+}, primary.port);
 
 // Wait for background validation command to start.
 failPoint.wait();
@@ -100,3 +101,5 @@ assert.eq(
     res.keysPerIndex.b_1, numDocs, "Expected " + numDocs + " b_1 index records: " + tojson(res));
 assert.eq(
     res.keysPerIndex.c_1, numDocs, "Expected " + numDocs + " c_1 index records: " + tojson(res));
+
+rst.stopSet();

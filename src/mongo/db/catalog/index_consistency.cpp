@@ -836,16 +836,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
         if (numKeys % kInterruptIntervalNumRecords == 0) {
             // Periodically checks for interrupts and yields.
             opCtx->checkForInterrupt();
-
-            const std::string indexIdent = index->getIdent();
-            _validateState->yield(opCtx);
-
-            // After yielding, the latest instance of the collection is fetched and can be different
-            // from the collection instance prior to yielding. For this reason we need to refresh
-            // the index entry pointer.
-            descriptor = _validateState->getCollection()->getIndexCatalog()->findIndexByIdent(
-                opCtx, indexIdent);
-            index = descriptor->getEntry();
+            _validateState->yieldCursors(opCtx);
         }
 
         try {

@@ -1832,10 +1832,9 @@ There are two forms of validation, foreground and background.
 from running. The benefit of this is that we're not validating a potentially stale snapshot and that
 allows us to perform corrective operations such as fixing the collection's fast count.
 
-* Background validation only uses intent locks on the collection and reads using a timestamp in
+* Background validation runs lock-free on the collection and reads using a timestamp in
 order to have a consistent view across the collection and its indexes. This mode allows CRUD
-operations to be performed without being blocked. Background validation also periodically yields its
-locks to allow operations that require exclusive locks to run, such as dropping the collection.
+operations to be performed without being blocked.
 
 Additionally, users can specify that they'd like to perform a `full` validation.
 * Storage engines run custom validation hooks on the
@@ -1896,7 +1895,7 @@ Additionally, users can specify that they'd like to perform a `full` validation.
 * [Initializes all the cursors](https://github.com/mongodb/mongo/blob/07765dda62d4709cddc9506ea378c0d711791b57/src/mongo/db/catalog/validate_state.cpp#L144-L205)
   on the `RecordStore` and `SortedDataInterface` of each index in the `ValidateState` object.
     + We choose a read timestamp (`ReadSource`) based on the validation mode: `kNoTimestamp`
-    for foreground validation and `kCheckpoint` for background validation.
+    for foreground validation and `kProvided` for background validation.
 * Traverses the `RecordStore` using the `ValidateAdaptor` object.
     + [Validates each record and adds the document's index key set to the IndexConsistency objects](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L61-L140)
       for consistency checks at later stages.

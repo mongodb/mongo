@@ -831,7 +831,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
             // Periodically checks for interrupts and yields.
             opCtx->checkForInterrupt();
-            _validateState->yield(opCtx);
+            _validateState->yieldCursors(opCtx);
 
             if (interruptIntervalNumBytes >= kInterruptIntervalNumBytes) {
                 interruptIntervalNumBytes = 0;

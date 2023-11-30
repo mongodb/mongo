@@ -382,14 +382,6 @@ void _reportValidationResults(OperationContext* opCtx,
             _printIndexSpec(opCtx, validateState, indexName);
         }
 
-        if (validateState->getSkippedIndexes().contains(indexName)) {
-            // Index internal state was checked and cleared, so it was reported in indexResultsMap,
-            // but we did not verify the index contents against the collection, so we should exclude
-            // it from this report.
-            --nIndexes;
-            continue;
-        }
-
         BSONObjBuilder bob(indexDetails.subobjStart(indexName));
         bob.appendBool("valid", vr.valid);
 
@@ -558,16 +550,6 @@ Status validate(OperationContext* opCtx,
     // constructor fail the cmd, as opposed to returning OK with valid:false.
     ValidateState validateState(opCtx, nss, mode, repairMode, additionalOptions, logDiagnostics);
 
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    // Check whether we are allowed to read from this node after acquiring our locks. If we are
-    // in a state where we cannot read, we should not run validate.
-    uassertStatusOK(replCoord->checkCanServeReadsFor(
-        opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
-
-    output->append("ns", NamespaceStringUtil::serialize(validateState.nss(), sc));
-
-    validateState.uuid().appendToBuilder(output, "uuid");
-
     // Foreground validation needs to ignore prepare conflicts, or else it would deadlock.
     // Repair mode cannot use ignore-prepare because it needs to be able to do writes, and there is
     // no danger of deadlock for this mode anyway since it is only used at startup (or in standalone
@@ -601,6 +583,19 @@ Status validate(OperationContext* opCtx,
         invariant(oldPrepareConflictBehavior == PrepareConflictBehavior::kEnforce);
     }
 
+    Status status = validateState.initializeCollection(opCtx);
+    uassertStatusOK(status);
+
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    // Check whether we are allowed to read from this node after acquiring our locks. If we are
+    // in a state where we cannot read, we should not run validate.
+    uassertStatusOK(replCoord->checkCanServeReadsFor(
+        opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
+
+    output->append("ns", NamespaceStringUtil::serialize(validateState.nss(), sc));
+
+    validateState.uuid().appendToBuilder(output, "uuid");
+
     try {
         invariant(!validateState.isFullIndexValidation() ||
                   shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
@@ -621,8 +616,6 @@ Status validate(OperationContext* opCtx,
             return Status::OK();
         }
 
-        // Validate in-memory catalog information with persisted info prior to setting the read
-        // source to kCheckpoint otherwise we'd use a checkpointed MDB catalog file.
         _validateCatalogEntry(opCtx, &validateState, results);
 
         if (validateState.isMetadataValidation()) {
@@ -640,8 +633,6 @@ Status validate(OperationContext* opCtx,
             return Status::OK();
         }
 
-        // Open all cursors at once before running non-full validation code so that all steps of
-        // validation during background validation use the same view of the data.
         validateState.initializeCursors(opCtx);
 
         // Validate the record store.
@@ -718,18 +709,6 @@ Status validate(OperationContext* opCtx,
                       "corruption found",
                       logAttrs(validateState.nss()),
                       logAttrs(validateState.uuid()));
-    } catch (ExceptionFor<ErrorCodes::CursorNotFound>&) {
-        invariant(validateState.isBackground());
-        string warning = str::stream()
-            << "Collection validation with {background: true} validates"
-            << " the latest checkpoint (data in a snapshot written to disk in a consistent"
-            << " way across all data files). During this validation, some tables have not yet been"
-            << " checkpointed.";
-        results->warnings.push_back(warning);
-
-        // Nothing to validate, so it must be valid.
-        results->valid = true;
-        return Status::OK();
     } catch (const DBException& e) {
         if (!opCtx->checkForInterruptNoAssert().isOK() || e.code() == ErrorCodes::Interrupted) {
             LOGV2_OPTIONS(5160301,

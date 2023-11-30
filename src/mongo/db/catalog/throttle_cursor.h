@@ -82,13 +82,6 @@ public:
         _cursor->reattachToOperationContext(opCtx);
     }
 
-    /**
-     *  Return the checkpoint ID for checkpoint cursors, otherwise 0.
-     */
-    uint64_t getCheckpointId() const {
-        return _cursor->getCheckpointId();
-    }
-
 private:
     std::unique_ptr<SeekableRecordCursor> _cursor;
     DataThrottle* _dataThrottle;
@@ -110,13 +103,6 @@ public:
 
     boost::optional<IndexKeyEntry> next(OperationContext* opCtx);
     boost::optional<KeyStringEntry> nextKeyString(OperationContext* opCtx);
-
-    /**
-     *  Return the checkpoint ID for checkpoint cursors, otherwise 0.
-     */
-    uint64_t getCheckpointId() const {
-        return _cursor->getCheckpointId();
-    }
 
     void save() {
         _cursor->save();

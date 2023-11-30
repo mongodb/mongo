@@ -82,19 +82,7 @@ int64_t ColumnIndexConsistency::traverseIndex(OperationContext* opCtx,
         if (numIndexEntries % kInterruptIntervalNumRecords == 0) {
             // Periodically checks for interrupts and yields.
             opCtx->checkForInterrupt();
-
-            // Make a copy of the ident as the IndexCatalogEntry pointer may be invalidated after
-            // yielding.
-            const std::string indexIdent = index->getIdent();
-            _validateState->yield(opCtx);
-
-            // After yielding, the latest instance of the collection is fetched and can be different
-            // from the collection instance prior to yielding. For this reason we need to refresh
-            // the index entry pointer.
-            index = _validateState->getCollection()
-                        ->getIndexCatalog()
-                        ->findIndexByIdent(opCtx, indexIdent)
-                        ->getEntry();
+            _validateState->yieldCursors(opCtx);
         }
 
         if (_firstPhase) {

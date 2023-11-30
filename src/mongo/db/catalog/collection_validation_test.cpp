@@ -107,7 +107,7 @@ private:
     };
 };
 
-// Background validation opens checkpoint cursors which requires reading from the disk.
+// Calling verify() is not possible on an ephemeral instance.
 class CollectionValidationDiskTest : public CollectionValidationTest {
 protected:
     CollectionValidationDiskTest() : CollectionValidationTest(Options{}.ephemeral(false)) {}
@@ -179,53 +179,6 @@ ValidateResults omitTransientWarnings(const ValidateResults& results) {
         }
     }
     return copy;
-}
-
-/**
- * Calls validate on collection nss with {background:true} and verifies the results.
- * If 'runForegroundAsWell' is set, then foregroundValidate() above will be run in addition.
- *
- * Returns the list of validation results.
- */
-std::vector<std::pair<BSONObj, ValidateResults>> backgroundValidate(const NamespaceString& nss,
-                                                                    OperationContext* opCtx,
-                                                                    bool valid,
-                                                                    int numRecords,
-                                                                    int numInvalidDocuments,
-                                                                    int numErrors,
-                                                                    bool runForegroundAsWell) {
-    std::vector<std::pair<BSONObj, ValidateResults>> res;
-    if (runForegroundAsWell) {
-        res = foregroundValidate(nss, opCtx, valid, numRecords, numInvalidDocuments, numErrors);
-    }
-
-    // This function will force a checkpoint, so background validation can then read from that
-    // checkpoint.
-    // Set 'stableCheckpoint' to false, so we checkpoint ALL data, not just up to WT's
-    // stable_timestamp.
-    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx, /*stableTimestamp*/ false);
-
-    ValidateResults validateResults;
-    BSONObjBuilder output;
-    ASSERT_OK(CollectionValidation::validate(opCtx,
-                                             nss,
-                                             CollectionValidation::ValidateMode::kBackground,
-                                             CollectionValidation::RepairMode::kNone,
-                                             /*additionalOptions=*/{},
-                                             &validateResults,
-                                             &output,
-                                             /*logDiagnostics=*/false));
-    BSONObj obj = output.obj();
-
-    ASSERT_EQ(validateResults.valid, valid);
-    ASSERT_EQ(validateResults.errors.size(), static_cast<long unsigned int>(numErrors));
-
-    ASSERT_EQ(obj.getIntField("nrecords"), numRecords);
-    ASSERT_EQ(obj.getIntField("nInvalidDocuments"), numInvalidDocuments);
-
-    res.push_back({std::make_pair(obj, validateResults)});
-
-    return res;
 }
 
 /**
@@ -436,18 +389,13 @@ protected:
      * collection (which now has a corrupted column-store index) and the validation results are
      * returned.
      *
-     * Note: passing 'doBackgroundValidation = true' performs both foreground and background
-     *       validations. However, this can only be done in unit-tests that have a single call to
-     *       this method.
-     *
      * Returns the list of validation results.
      */
     std::vector<std::pair<BSONObj, ValidateResults>> validateIndexCorruptions(
         const NamespaceString& nss,
         const int numFields,
         const int numDocs,
-        const std::vector<InjectedCorruption> corruptions,
-        const bool doBackgroundValidation = false) {
+        const std::vector<InjectedCorruption> corruptions) {
         return runColumnStoreIndexTest(
             nss,
             /* insertDocsFn */
@@ -543,31 +491,8 @@ protected:
             /* postCheckFn */
             [&](OperationContext* opCtx,
                 int numRecords) -> std::vector<std::pair<BSONObj, ValidateResults>> {
-                auto serviceContext = opCtx->getServiceContext();
-
                 // Confirm there is an expected validation error
                 std::vector<std::pair<BSONObj, ValidateResults>> results;
-
-                if (doBackgroundValidation) {
-                    // Background validation must be done in a separate thread due to the
-                    // assumptions made in its implementation.
-                    stdx::thread runBackgroundValidate =
-                        stdx::thread([&serviceContext, &numRecords, &nss, &results] {
-                            ThreadClient tc("BackgroundValidate-thread",
-                                            serviceContext->getService());
-                            auto threadOpCtx = tc->makeOperationContext();
-                            auto bgResults = backgroundValidate(nss,
-                                                                threadOpCtx.get(),
-                                                                /*valid*/ false,
-                                                                /*numRecords*/ numRecords,
-                                                                /*numInvalidDocuments*/ 0,
-                                                                /*numErrors*/ 1,
-                                                                /*runForegroundAsWell*/ false);
-                            results.insert(results.end(), bgResults.begin(), bgResults.end());
-                        });
-                    // Make sure the background validation finishes successfully.
-                    runBackgroundValidate.join();
-                }
 
                 const auto fgResults = foregroundValidate(nss,
                                                           opCtx,
@@ -661,15 +586,6 @@ TEST_F(CollectionValidationTest, ValidateEmpty) {
                        /*numInvalidDocuments*/ 0,
                        /*numErrors*/ 0);
 }
-TEST_F(CollectionValidationDiskTest, BackgroundValidateEmpty) {
-    backgroundValidate(kNss,
-                       operationContext(),
-                       /*valid*/ true,
-                       /*numRecords*/ 0,
-                       /*numInvalidDocuments*/ 0,
-                       /*numErrors*/ 0,
-                       /*runForegroundAsWell*/ true);
-}
 
 // Verify calling validate() on a nonempty collection with different validation levels.
 TEST_F(CollectionValidationTest, Validate) {
@@ -681,16 +597,6 @@ TEST_F(CollectionValidationTest, Validate) {
                        /*numInvalidDocuments*/ 0,
                        /*numErrors*/ 0);
 }
-TEST_F(CollectionValidationDiskTest, BackgroundValidate) {
-    auto opCtx = operationContext();
-    backgroundValidate(kNss,
-                       opCtx,
-                       /*valid*/ true,
-                       /*numRecords*/ insertDataRange(opCtx, 0, 5),
-                       /*numInvalidDocuments*/ 0,
-                       /*numErrors*/ 0,
-                       /*runForegroundAsWell*/ true);
-}
 
 // Verify calling validate() on a collection with an invalid document.
 TEST_F(CollectionValidationTest, ValidateError) {
@@ -701,16 +607,6 @@ TEST_F(CollectionValidationTest, ValidateError) {
                        /*numRecords*/ setUpInvalidData(opCtx),
                        /*numInvalidDocuments*/ 1,
                        /*numErrors*/ 1);
-}
-TEST_F(CollectionValidationDiskTest, BackgroundValidateError) {
-    auto opCtx = operationContext();
-    backgroundValidate(kNss,
-                       opCtx,
-                       /*valid*/ false,
-                       /*numRecords*/ setUpInvalidData(opCtx),
-                       /*numInvalidDocuments*/ 1,
-                       /*numErrors*/ 1,
-                       /*runForegroundAsWell*/ true);
 }
 
 // Verify calling validate() with enforceFastCount=true.
@@ -750,45 +646,6 @@ void waitUntilValidateFailpointHasBeenReached() {
         sleepmillis(100);  // a fairly arbitrary sleep period.
     }
     ASSERT(CollectionValidation::getIsValidationPausedForTest());
-}
-
-TEST_F(CollectionValidationDiskTest, BackgroundValidateRunsConcurrentlyWithWrites) {
-    auto opCtx = operationContext();
-    auto serviceContext = opCtx->getServiceContext();
-
-    // Set up some data in the collection so that we can validate it.
-    int numRecords = insertDataRange(opCtx, 0, 5);
-
-    stdx::thread runBackgroundValidate;
-    int numRecords2;
-    {
-        // Set a failpoint in the collection validation code and then start a parallel operation to
-        // run background validation in parallel.
-        FailPointEnableBlock failPoint("pauseCollectionValidationWithLock");
-        runBackgroundValidate = stdx::thread([&serviceContext, &numRecords] {
-            ThreadClient tc("BackgroundValidateConcurrentWithCRUD-thread",
-                            serviceContext->getService());
-            auto threadOpCtx = tc->makeOperationContext();
-            backgroundValidate(
-                kNss, threadOpCtx.get(), true, numRecords, 0, 0, /*runForegroundAsWell*/ false);
-        });
-
-        // Wait until validate starts and hangs mid-way on a failpoint, then do concurrent writes,
-        // which should succeed and not affect the background validation.
-        waitUntilValidateFailpointHasBeenReached();
-        numRecords2 = insertDataRange(opCtx, 5, 15);
-    }
-
-    // Make sure the background validation finishes successfully.
-    runBackgroundValidate.join();
-
-    // Run regular foreground collection validation to make sure everything is OK.
-    foregroundValidate(kNss,
-                       opCtx,
-                       /*valid*/ true,
-                       /*numRecords*/ numRecords + numRecords2,
-                       0,
-                       0);
 }
 
 /**
@@ -951,10 +808,9 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleInvalidIndexEntryCSI) {
                           corruptedDocIndex,
                           /* Update the current index entry with an invalid value. */
                           ReplacementFault("WRONG_" + std::to_string(corruptedFldIndex) + "_" +
-                                           std::to_string(corruptedDocIndex))}},
-                        /* doBackgroundValidation */ true);
+                                           std::to_string(corruptedDocIndex))}});
 
-                    ASSERT_EQ(results.size(), 3);
+                    ASSERT_EQ(results.size(), 2);
 
                     for (const auto& result : results) {
                         const auto& validateResults = result.second;
@@ -1074,10 +930,9 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleExtraIndexEntry) {
                       corruptedDocIndex,
                       /* Insert an extra index entry. */
                       InsertionFault("WRONG_" + std::to_string(corruptedFldIndex) + "_" +
-                                     std::to_string(corruptedDocIndex))}},
-                    /* doBackgroundValidation */ true);
+                                     std::to_string(corruptedDocIndex))}});
 
-                ASSERT_EQ(results.size(), 3);
+                ASSERT_EQ(results.size(), 2);
 
                 for (const auto& result : results) {
                     const auto& validateResults = result.second;
@@ -1161,10 +1016,9 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleMissingIndexEntryCSI) {
                                                  {{corruptedFldIndex,
                                                    corruptedDocIndex,
                                                    /* Remove the existing index entry. */
-                                                   DeletionFault()}},
-                                                 /* doBackgroundValidation */ true);
+                                                   DeletionFault()}});
 
-                    ASSERT_EQ(results.size(), 3);
+                    ASSERT_EQ(results.size(), 2);
 
                     for (const auto& result : results) {
                         const auto& validateResults = result.second;
@@ -1262,10 +1116,9 @@ TEST_F(CollectionValidationColumnStoreIndexTest, MultipleInvalidIndexEntryCSI) {
          {/* corruptedFldIndex */ 2,
           /* corruptedDocIndex */ 33,
           /* Update the current index entry with an invalid value. */
-          ReplacementFault()}},
-        /* doBackgroundValidation */ true);
+          ReplacementFault()}});
 
-    ASSERT_EQ(results.size(), 3);
+    ASSERT_EQ(results.size(), 2);
 
     for (const auto& result : results) {
         const auto& validateResults = result.second;

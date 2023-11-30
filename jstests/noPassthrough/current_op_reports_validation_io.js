@@ -9,9 +9,12 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 const dbName = "test";
 const collName = "currentOpValidation";
 
-const conn = MongoRunner.runMongod();
+const rst = new ReplSetTest({nodes: 1});
+rst.startSet();
+rst.initiate();
 
-let db = conn.getDB(dbName);
+const primary = rst.getPrimary();
+let db = primary.getDB(dbName);
 let coll = db.getCollection(collName);
 
 coll.drop();
@@ -41,7 +44,7 @@ const awaitValidation = startParallelShell(() => {
         db.getSiblingDB(TestData.dbName).getCollection(TestData.collName).validate({
             background: true
         }));
-}, conn.port);
+}, primary.port);
 
 pauseFailPoint.wait();
 
@@ -54,7 +57,7 @@ assert(curOp.inprog.length == 1);
 assert(curOp.inprog[0].hasOwnProperty("dataThroughputLastSecond") &&
        curOp.inprog[0].hasOwnProperty("dataThroughputAverage"));
 
-curOp = conn.getDB("admin").aggregate([{$currentOp: {}}, {$match: curOpFilter}]).toArray();
+curOp = primary.getDB("admin").aggregate([{$currentOp: {}}, {$match: curOpFilter}]).toArray();
 assert(curOp.length == 1);
 assert(curOp[0].hasOwnProperty("dataThroughputLastSecond") &&
        curOp[0].hasOwnProperty("dataThroughputAverage"));
@@ -68,4 +71,4 @@ assert.commandWorked(db.adminCommand({setParameter: 1, maxValidateMBperSec: 0}))
 
 awaitValidation();
 
-MongoRunner.stopMongod(conn);
+rst.stopSet();

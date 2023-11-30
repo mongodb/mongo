@@ -8,13 +8,15 @@
 // To prevent the checkpoint thread from running during this test, change its frequency to the
 // largest possible value using the 'syncdelay' parameter.
 const kMaxSyncDelaySecs = 3600;
-let conn = MongoRunner.runMongod({syncdelay: kMaxSyncDelaySecs});
-assert.neq(null, conn, "mongod was unable to start up");
+const rst = new ReplSetTest({nodes: 1, nodeOptions: {syncdelay: kMaxSyncDelaySecs}});
+rst.startSet();
+rst.initiate();
 
 const dbName = "test";
 const collName = "background_validation_checkpoint_existence";
 
-const db = conn.getDB(dbName);
+const primary = rst.getPrimary();
+const db = primary.getDB(dbName);
 
 const forceCheckpoint = () => {
     assert.commandWorked(db.adminCommand({fsync: 1}));
@@ -28,14 +30,12 @@ for (let i = 0; i < 5; i++) {
 }
 
 // The collection has not been checkpointed yet, so there is nothing to validate.
-let res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
-assert.eq(true, res.valid, res);
-assert.eq(false, res.hasOwnProperty("nrecords"), res);
-assert.eq(false, res.hasOwnProperty("nIndexes"), res);
+assert.commandFailedWithCode(db.runCommand({validate: collName, background: true}),
+                             ErrorCodes.NamespaceNotFound);
 
 forceCheckpoint();
 
-res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
+let res = assert.commandWorked(db.runCommand({validate: collName, background: true}));
 assert.eq(true, res.valid, res);
 assert.eq(true, res.hasOwnProperty("nrecords"), res);
 assert.eq(true, res.hasOwnProperty("nIndexes"), res);
@@ -54,4 +54,4 @@ res = assert.commandWorked(db.runCommand({validate: collName, background: true})
 assert.eq(true, res.valid, res);
 assert.eq(2, res.nIndexes, res);
 
-MongoRunner.stopMongod(conn);
+rst.stopSet();

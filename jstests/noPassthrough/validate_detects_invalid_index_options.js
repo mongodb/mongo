@@ -5,12 +5,15 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
-const conn = MongoRunner.runMongod();
+const rst = new ReplSetTest({nodes: 1});
+rst.startSet();
+rst.initiate();
 
 const dbName = "test";
 const collName = jsTestName();
 
-const db = conn.getDB(dbName);
+const primary = rst.getPrimary();
+const db = primary.getDB(dbName);
 const coll = db.getCollection(collName);
 
 // In earlier versions of the server, users were able to add invalid index options when creating an
@@ -27,7 +30,7 @@ let validateRes = assert.commandWorked(db.runCommand({validate: collName}));
 assert(!validateRes.valid);
 
 // Ensure that $collStats info gets logged when validation fails.
-checkLog.containsJson(conn, 7463200);
+checkLog.containsJson(primary, 7463200);
 
 // Forces a checkpoint to make the background validation see the data.
 assert.commandWorked(db.adminCommand({fsync: 1}));
@@ -39,7 +42,7 @@ validateRes = assert.commandWorked(db.runCommand({validate: collName, metadata: 
 assert(!validateRes.valid);
 
 // Validation of metadata complete for collection. Problems detected.
-checkLog.containsJson(conn, 5980501);
+checkLog.containsJson(primary, 5980501);
 
 // Cannot use { metadata: true } with any other options.
 assert.commandFailedWithCode(db.runCommand({validate: collName, metadata: true, background: true}),
@@ -59,6 +62,6 @@ validateRes = assert.commandWorked(db.runCommand({validate: collName, metadata: 
 assert(validateRes.valid);
 
 // Validation of metadata complete for collection. No problems detected.
-checkLog.containsJson(conn, 5980500);
+checkLog.containsJson(primary, 5980500);
 
-MongoRunner.stopMongod(conn);
+rst.stopSet();

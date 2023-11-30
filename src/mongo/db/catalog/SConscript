@@ -691,7 +691,6 @@ if wiredtiger:
             'multi_index_block_test.cpp',
             'rename_collection_test.cpp',
             'throttle_cursor_test.cpp',
-            'validate_state_test.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/auth/authmocks',

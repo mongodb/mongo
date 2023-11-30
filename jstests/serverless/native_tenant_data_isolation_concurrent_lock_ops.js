@@ -249,7 +249,7 @@ function waitForLock(nss, resource, expectedLockMode) {
     checkConcurrentLockDifferentTenant(primary,
                                        kTenant,
                                        kOtherTenant,
-                                       "hangDuringHoldingLocksForValidation",
+                                       "hangDuringValidationInitialization",
                                        "Collection",
                                        collValidateThreadFunc,
                                        "X" /*Not a background validation*/);

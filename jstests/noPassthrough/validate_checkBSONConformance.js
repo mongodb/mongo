@@ -1,13 +1,18 @@
 /*
  * Tests the usage of 'checkBSONConformance' option of the validate command.
- *
- * @tags: [requires_fcv_62]
  */
+const rst = new ReplSetTest({nodes: 1});
+rst.startSet();
+rst.initiate();
 
+const primary = rst.getPrimary();
+
+const db = primary.getDB("test");
 const collName = "validate_checkBSONConformance";
 const coll = db.getCollection(collName);
-coll.drop();
 assert.commandWorked(coll.insert({a: 1}));
+
+assert.commandWorked(db.adminCommand({fsync: 1}));
 
 assert.commandFailedWithCode(
     db.runCommand({validate: collName, checkBSONConformance: true, metadata: true}),
@@ -32,3 +37,5 @@ assert.commandFailedWithCode(
 
 assert.commandWorked(
     db.runCommand({validate: collName, checkBSONConformance: true, enforceFastCount: true}));
+
+rst.stopSet();
