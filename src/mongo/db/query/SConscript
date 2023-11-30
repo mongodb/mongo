@@ -450,6 +450,7 @@ env.CppUnitTest(
         "classic_stage_builder_test.cpp",
         "count_command_test.cpp",
         "cqf_fast_paths_test.cpp",
+        "cqf_fast_paths_utils_test.cpp",
         "cursor_response_test.cpp",
         "query_shape/distinct_cmd_shape_test.cpp",
         "query_shape/find_cmd_shape_test.cpp",

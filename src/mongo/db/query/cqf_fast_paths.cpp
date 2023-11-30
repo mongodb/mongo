@@ -28,29 +28,23 @@
  */
 
 #include "mongo/db/query/cqf_fast_paths.h"
+#include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/cqf_fast_paths_utils.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/sbe_shared_helpers.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::optimizer::fast_path {
 namespace {
-
-/**
- * Holds all information required to construct SBE plans for queries that have a fast path
- * implementation.
- */
-struct ExecTreeGeneratorParams {
-    const UUID collectionUuid;
-    PlanYieldPolicy* yieldPolicy;
-    const BSONObj& filter;
-};
-
-using ExecTreeResult = std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>;
 
 /**
  * Interface for implementing a fast path for a simple query of certain shape. Responsible for SBE
@@ -117,6 +111,14 @@ bool canUseFastPath(const bool hasIndexHint,
         // The current fast path implementations only deal with collection scans.
         return false;
     }
+    if (!collections.getMainCollection()) {
+        // TODO SERVER-83267: Enable once we have a fast path for non-existent collections.
+        return false;
+    }
+    if (!collections.getMainCollection()->getCollectionOptions().collation.isEmpty()) {
+        // TODO SERVER-83716: The current fast path implementations don't support collation.
+        return false;
+    }
     if (canonicalQuery) {
         const auto& findRequest = canonicalQuery->getFindCommandRequest();
         if (canonicalQuery->getProj() || canonicalQuery->getSortPattern() ||
@@ -135,10 +137,6 @@ bool canUseFastPath(const bool hasIndexHint,
             // with a simple predicate.
             return false;
         }
-    }
-    if (!collections.getMainCollection()) {
-        // TODO SERVER-83267: Enable once we have a fast path for non-existent collections.
-        return false;
     }
     const bool isSharded = collections.isAcquisition()
         ? collections.getMainAcquisition().getShardingDescription().isSharded()
@@ -224,7 +222,278 @@ public:
 
 REGISTER_FAST_PATH_EXEC_TREE_GENERATOR(Empty, {}, std::make_unique<EmptyQueryExecTreeGenerator>());
 
+// Work around https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85282. These could be defined inside
+// 'EExprBuilder' but GCC doesn't allow template specializations in non-namespace scopes.
+namespace eexpr_helper {
+using CaseValuePair =
+    std::pair<std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::EExpression>>;
+
+template <typename... Ts>
+std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(Ts... cases);
+
+template <typename... Ts>
+std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(CaseValuePair headCase, Ts... rest) {
+    return sbe::makeE<sbe::EIf>(std::move(headCase.first),
+                                std::move(headCase.second),
+                                buildMultiBranchConditional(std::move(rest)...));
+}
+
+template <>
+std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
+    std::unique_ptr<sbe::EExpression> defaultCase) {
+    return defaultCase;
+}
+}  // namespace eexpr_helper
+
+/**
+ * Exposes required SBE helper functions to 'sbe_helper::generateComparisonExpr'. Note that this
+ * class is stateless and doesn't support collation.
+ */
+struct EExprBuilder {
+    using CaseValuePair = eexpr_helper::CaseValuePair;
+
+    template <typename... Args>
+    static inline std::unique_ptr<sbe::EExpression> makeFunction(StringData name, Args&&... args) {
+        return sbe::makeE<sbe::EFunction>(name, sbe::makeEs(std::forward<Args>(args)...));
+    }
+
+    static inline auto makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
+        return sbe::makeE<sbe::EConstant>(tag, val);
+    }
+
+    static inline auto makeNullConstant() {
+        return makeConstant(sbe::value::TypeTags::Null, 0);
+    }
+
+    static inline auto makeBoolConstant(bool boolVal) {
+        auto val = sbe::value::bitcastFrom<bool>(boolVal);
+        return makeConstant(sbe::value::TypeTags::Boolean, val);
+    }
+
+    static inline auto makeInt32Constant(int32_t num) {
+        auto val = sbe::value::bitcastFrom<int32_t>(num);
+        return makeConstant(sbe::value::TypeTags::NumberInt32, val);
+    }
+
+    static std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e) {
+        return sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot, std::move(e));
+    }
+
+    std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId) {
+        return sbe::makeE<sbe::EVariable>(slotId);
+    }
+
+    static std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
+                                                          std::unique_ptr<sbe::EExpression> lhs,
+                                                          std::unique_ptr<sbe::EExpression> rhs) {
+        return sbe::makeE<sbe::EPrimBinary>(binaryOp, std::move(lhs), std::move(rhs));
+    }
+
+    static constexpr auto makeBinaryOpWithCollation = makeBinaryOp;
+
+    static std::unique_ptr<sbe::EExpression> generateNullOrMissing(
+        std::unique_ptr<sbe::EExpression> expr) {
+        return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
+                            makeFunction("typeMatch",
+                                         expr->clone(),
+                                         makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
+                                                           getBSONTypeMask(BSONType::Undefined))),
+                            makeBoolConstant(true));
+    }
+
+    static std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(
+        std::unique_ptr<sbe::EExpression> e) {
+        return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(false));
+    }
+
+    static std::unique_ptr<sbe::EExpression> makeLocalLambda(
+        sbe::FrameId frameId, std::unique_ptr<sbe::EExpression> expr) {
+        return sbe::makeE<sbe::ELocalLambda>(frameId, std::move(expr));
+    }
+
+    template <typename... Args>
+    static inline std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(Args&&... args) {
+        return eexpr_helper::buildMultiBranchConditional(std::forward<Args>(args)...);
+    }
+
+    static std::unique_ptr<sbe::EExpression> cloneExpr(
+        const std::unique_ptr<sbe::EExpression>& expr) {
+        return expr->clone();
+    }
+};
+
+/**
+ * Implements fast path SBE plan generation for a query with a single comparison predicate on a
+ * top-level field.
+ */
+class SingleFieldQueryExecTreeGenerator final : public ExecTreeGenerator {
+public:
+    SingleFieldQueryExecTreeGenerator(Operations op) : _op(op) {}
+
+    ExecTreeResult generateExecTree(const ExecTreeGeneratorParams& params) const override {
+        const auto props = makeSinglePredicateCollScanProps(params.filter);
+
+        sbe::value::SlotIdGenerator ids;
+        auto staticData = std::make_unique<stage_builder::PlanStageStaticData>(
+            stage_builder::PlanStageStaticData{.resultSlot = ids.generate()});
+
+        const auto fieldSlotId = ids.generate();
+        sbe::value::SlotVector scanFieldSlots{fieldSlotId};
+        std::vector<std::string> scanFieldNames{props.fieldName.value().toString()};
+
+        const PlanNodeId planNodeId{0};
+
+        auto scanStage = sbe::makeS<sbe::ScanStage>(
+            params.collectionUuid,
+            staticData->resultSlot,
+            boost::none /*scanRidSlot*/,
+            boost::none,
+            boost::none,
+            boost::none,
+            boost::none,
+            boost::none,
+            scanFieldNames,
+            scanFieldSlots,
+            boost::none /*seekRecordIdSlot*/,
+            boost::none /*minRecordIdSlot*/,
+            boost::none /*maxRecordIdSlot*/,
+            true /*forwardScan*/,
+            params.yieldPolicy,
+            planNodeId,
+            sbe::ScanCallbacks{{}, {}, {}},
+            gDeprioritizeUnboundedUserCollectionScans.load() /*lowPriority*/);
+
+        const sbe::FrameId cmpFrameId{0};
+        const sbe::value::SlotId varId{0};
+
+        auto comparisonExpr = generateComparisonExpr(
+            props.constant, sbe::makeE<sbe::EVariable>(cmpFrameId, varId, true /*move*/));
+
+        auto lambdaExpr = EExprBuilder::makeLocalLambda(cmpFrameId, std::move(comparisonExpr));
+
+        auto traverseExpr = EExprBuilder::makeFunction(
+            "traverseF",
+            sbe::makeE<sbe::EVariable>(fieldSlotId),
+            std::move(lambdaExpr),
+            EExprBuilder::makeConstant(sbe::value::TypeTags::Boolean, false));
+
+        auto sbePlan = sbe::makeS<sbe::FilterStage<false>>(
+            std::move(scanStage), std::move(traverseExpr), planNodeId);
+
+        stage_builder::PlanStageData data{
+            stage_builder::Environment{std::make_unique<sbe::RuntimeEnvironment>()},
+            std::move(staticData)};
+
+        return {std::move(sbePlan), std::move(data)};
+    }
+
+    BSONObj generateExplain() const override {
+        return BSON("stage"
+                    << "FASTPATH"
+                    << "type"
+                    << "singlePredicateCollScan");
+    }
+
+private:
+    const Operations _op;
+
+    /**
+     * Holds properties of a single MQL predicate. These are extracted from a BSON
+     * representing the query filter.
+     */
+    struct SinglePredicateCollScanProps {
+        optimizer::FieldNameType fieldName;
+        // We don't necessarily have to depend on ABT here, but 'Constant' is convenient
+        // for holding and appropriately deleting the SBE value.
+        optimizer::Constant constant;
+    };
+
+    SinglePredicateCollScanProps makeSinglePredicateCollScanProps(const BSONObj& filter) const {
+        const auto& elem = filter.firstElement();
+
+        // Note that the constructor of 'FieldNameType' copies the contents of the string view, so
+        // this is safe even if the filter doesn't outlive the props.
+        const optimizer::FieldNameType fieldName{elem.fieldNameStringData()};
+
+        const auto makeConstant = [](const BSONElement& elem) {
+            auto [tag, val] = sbe::bson::convertFrom<true /*View*/>(
+                elem.rawdata(), elem.rawdata() + elem.size(), elem.fieldNameSize() - 1);
+
+            ABT constant = optimizer::Constant::createFromCopy(tag, val);
+            return *constant.cast<optimizer::Constant>();
+        };
+        const auto constant = [&] {
+            // We assume the predicate is either:
+            // - '{field: value}'
+            // - '{field: {$op: value}}'
+            if (elem.isABSONObj()) {
+                for (auto&& child : elem.Obj()) {
+                    tassert(8217102,
+                            "Expected predicate on top-level field.",
+                            child.fieldName()[0] == '$');
+                    return makeConstant(child);
+                }
+            }
+            return makeConstant(elem);
+        }();
+
+        return {fieldName, std::move(constant)};
+    }
+
+    std::unique_ptr<sbe::EExpression> generateComparisonExpr(
+        const optimizer::Constant& constant, std::unique_ptr<sbe::EExpression> inputExpr) const {
+        EExprBuilder builder{};
+
+        const auto sbeOp = getEPrimBinaryOp(_op);
+        const auto [tag, val] = constant.get();
+
+        sbe_helper::ValueExpressionFn<std::unique_ptr<sbe::EExpression>> makeValExpr =
+            [](sbe::value::TypeTags tag, sbe::value::Value val) {
+                auto [copyTag, copyVal] = sbe::value::copyValue(tag, val);
+                return sbe::makeE<sbe::EConstant>(copyTag, copyVal);
+            };
+
+        return sbe_helper::generateComparisonExpr(
+            builder, tag, val, sbeOp, std::move(inputExpr), std::move(makeValExpr));
+    }
+};
+
+// Matches, for example, '{a: 1}'.
+REGISTER_FAST_PATH_EXEC_TREE_GENERATOR(
+    Eq1, BSON("ignore" << 0), std::make_unique<SingleFieldQueryExecTreeGenerator>(Operations::Eq));
+// Matches, for example, '{a: {$eq: 1}}'.
+REGISTER_FAST_PATH_EXEC_TREE_GENERATOR(
+    Eq2,
+    BSON("ignore" << BSON("$eq" << 0)),
+    std::make_unique<SingleFieldQueryExecTreeGenerator>(Operations::Eq));
+// Matches, for example, '{a: {$lt: 1}}'.
+REGISTER_FAST_PATH_EXEC_TREE_GENERATOR(
+    Lt,
+    BSON("ignore" << BSON("$lt" << 0)),
+    std::make_unique<SingleFieldQueryExecTreeGenerator>(Operations::Lt));
+// Matches, for example, '{a: {$lte: 1}}'.
+REGISTER_FAST_PATH_EXEC_TREE_GENERATOR(
+    Lte,
+    BSON("ignore" << BSON("$lte" << 0)),
+    std::make_unique<SingleFieldQueryExecTreeGenerator>(Operations::Lte));
+// Matches, for example, '{a: {$gt: 1}}'.
+REGISTER_FAST_PATH_EXEC_TREE_GENERATOR(
+    Gt,
+    BSON("ignore" << BSON("$gt" << 0)),
+    std::make_unique<SingleFieldQueryExecTreeGenerator>(Operations::Gt));
+// Matches, for example, '{a: {$gte: 1}}'.
+REGISTER_FAST_PATH_EXEC_TREE_GENERATOR(
+    Gte,
+    BSON("ignore" << BSON("$gte" << 0)),
+    std::make_unique<SingleFieldQueryExecTreeGenerator>(Operations::Gte));
 }  // namespace
+
+ExecTreeResult getFastPathExecTreeForTest(const ExecTreeGeneratorParams& params) {
+    auto generator = getFastPathExecTreeGenerator(params.filter);
+    tassert(8217103, "Filter is not eligible for a fast path.", generator);
+
+    return generator->generateExecTree(params);
+}
 
 boost::optional<ExecParams> tryGetSBEExecutorViaFastPath(
     OperationContext* opCtx,

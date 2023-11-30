@@ -1,0 +1,83 @@
+# Golden test output of FastPathPlanGeneration/SinglePredicateOnTopLevelField
+
+==== VARIATION: equals int ====
+-- INPUT:
+filter = { a: 1 }
+-- OUTPUT:
+[0] filter {traverseF(s2, lambda(l0.0) { ((move(l0.0) == 1) ?: false) }, false)} 
+[0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 
+
+==== VARIATION: $eq int ====
+-- INPUT:
+filter = { a: { $eq: 1 } }
+-- OUTPUT:
+[0] filter {traverseF(s2, lambda(l0.0) { ((move(l0.0) == 1) ?: false) }, false)} 
+[0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 
+
+==== VARIATION: $eq NaN ====
+-- INPUT:
+filter = { a: { $eq: nan.0 } }
+-- OUTPUT:
+[0] filter {traverseF(s2, lambda(l0.0) { (isNaN(move(l0.0)) ?: false) }, false)} 
+[0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 
+
+==== VARIATION: $eq null ====
+-- INPUT:
+filter = { a: { $eq: null } }
+-- OUTPUT:
+[0] filter {traverseF(s2, lambda(l0.0) { ((
+    if (typeMatch(move(l0.0), 1088) ?: true) 
+    then null 
+    else move(l0.0) 
+== null) ?: false) }, false)} 
+[0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 
+
+==== VARIATION: $lt int ====
+-- INPUT:
+filter = { a: { $lt: 1 } }
+-- OUTPUT:
+[0] filter {traverseF(s2, lambda(l0.0) { ((move(l0.0) < 1) ?: false) }, false)} 
+[0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 
+
+==== VARIATION: $lt NaN ====
+-- INPUT:
+filter = { a: { $lt: nan.0 } }
+-- OUTPUT:
+[0] filter {traverseF(s2, lambda(l0.0) { false }, false)} 
+[0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 
+
+==== VARIATION: $lt null ====
+-- INPUT:
+filter = { a: { $lt: null } }
+-- OUTPUT:
+[0] filter {traverseF(s2, lambda(l0.0) { ((
+    if (typeMatch(move(l0.0), 1088) ?: true) 
+    then null 
+    else move(l0.0) 
+< null) ?: false) }, false)} 
+[0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 
+
+==== VARIATION: $lte int ====
+-- INPUT:
+filter = { a: { $lte: 1 } }
+-- OUTPUT:
+[0] filter {traverseF(s2, lambda(l0.0) { ((move(l0.0) <= 1) ?: false) }, false)} 
+[0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 
+
+==== VARIATION: $lte NaN ====
+-- INPUT:
+filter = { a: { $lte: nan.0 } }
+-- OUTPUT:
+[0] filter {traverseF(s2, lambda(l0.0) { (isNaN(move(l0.0)) ?: false) }, false)} 
+[0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 
+
+==== VARIATION: $lte null ====
+-- INPUT:
+filter = { a: { $lte: null } }
+-- OUTPUT:
+[0] filter {traverseF(s2, lambda(l0.0) { ((
+    if (typeMatch(move(l0.0), 1088) ?: true) 
+    then null 
+    else move(l0.0) 
+<= null) ?: false) }, false)} 
+[0] scan s1 none none none none none none none lowPriority [s2 = a] @"00000000-0000-0000-0000-000000000000" true false 

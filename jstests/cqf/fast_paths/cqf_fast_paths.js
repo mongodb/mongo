@@ -83,3 +83,71 @@ assert.commandWorked(coll.insertMany([...Array(numRecords).keys()].map(i => {
     assert(!isBonsaiFastPathPlan(db, explain));
     assert.eq(0, explain.executionStats.nReturned);
 }
+{
+    // Find with equality check on a top-level field should use fast path.
+    let explain = runWithParams(
+        paramObj, () => assert.commandWorked(coll.explain("executionStats").find({a: 1}).finish()));
+    assert(isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+
+    explain = runWithParams(
+        paramObj,
+        () => assert.commandWorked(coll.explain("executionStats").find({nonexistent: 1}).finish()));
+    assert(isBonsaiFastPathPlan(db, explain));
+    assert.eq(0, explain.executionStats.nReturned);
+}
+{
+    // Agg with equality check on a top-level field should use fast path.
+    let explain = runWithParams(
+        paramObj,
+        () => assert.commandWorked(coll.explain("executionStats").aggregate([{$match: {a: 1}}])));
+    assert(isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+
+    explain =
+        runWithParams(paramObj,
+                      () => assert.commandWorked(
+                          coll.explain("executionStats").aggregate([{$match: {nonexistent: 1}}])));
+    assert(isBonsaiFastPathPlan(db, explain));
+    assert.eq(0, explain.executionStats.nReturned);
+}
+
+// Test single predicate fast path with different constants and comparison ops.
+const constantValues = [
+    NaN,
+    null,
+    "str",
+    {b: 1},
+    [{}, {}],
+    123,
+    1.23,
+    [1, 2, 3],
+    [1, 2, [3, 4]],
+    new Date(),
+];
+
+const comparisonOps = ["$eq", "$lt", "$lte", "$gt", "$gte"];
+
+for (const value of constantValues) {
+    for (const op of comparisonOps) {
+        const predicate = {[op]: value};
+        jsTestLog(`Testing single predicate fast path with predicate ${tojson(predicate)}`);
+
+        {
+            // Find with single predicate on a top-level field should use fast path.
+            const explain = runWithParams(
+                paramObj,
+                () => assert.commandWorked(
+                    coll.explain("executionStats").find({a: {...predicate}}).finish()));
+            assert(isBonsaiFastPathPlan(db, explain));
+        }
+        {
+            // Agg with single predicate on a top-level field should use fast path.
+            const explain = runWithParams(
+                paramObj,
+                () => assert.commandWorked(
+                    coll.explain("executionStats").aggregate([{$match: {a: {...predicate}}}])));
+            assert(isBonsaiFastPathPlan(db, explain));
+        }
+    }
+}

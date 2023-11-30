@@ -5,18 +5,13 @@
  *  requires_fcv_73,
  * ]
  */
-import {planHasStage} from "jstests/libs/analyze_plan.js";
+import {isBonsaiFastPathPlan} from "jstests/libs/analyze_plan.js";
 
 const bonsaiSettings = {
     internalQueryFrameworkControl: "tryBonsai",
     featureFlagCommonQueryFramework: true,
     internalCascadesOptimizerDisableFastPath: false,
 };
-
-function assertNotUsingFastPath(explainCmd) {
-    const explain = assert.commandWorked(explainCmd);
-    assert(!planHasStage(db, explain, "FASTPATH"));
-}
 
 const st = new ShardingTest({
     shards: 2,
@@ -46,17 +41,17 @@ st.shardColl(coll.getName(), {_id: 1}, {_id: 50}, {_id: 51});
 {
     // Empty find on a sharded collection should not use fast path.
     const explain = coll.explain().find().finish();
-    assertNotUsingFastPath(explain);
+    assert(!isBonsaiFastPathPlan(db, explain));
 }
 {
     // Pipeline with empty match on a sharded collection should not use fast path.
     const explain = coll.explain().aggregate([{$match: {}}]);
-    assertNotUsingFastPath(explain);
+    assert(!isBonsaiFastPathPlan(db, explain));
 }
 {
     // Empty aggregate on a sharded collection should not use fast path.
     const explain = coll.explain().aggregate([]);
-    assertNotUsingFastPath(explain);
+    assert(!isBonsaiFastPathPlan(db, explain));
 }
 
 st.stop();

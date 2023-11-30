@@ -36,7 +36,13 @@
 namespace mongo::stage_builder {
 class SbExprBuilder {
 public:
+    using CaseValuePair = SbExpr::CaseValuePair;
+
     SbExprBuilder(StageBuilderState& state) : _state(state) {}
+
+    SbExpr cloneExpr(const SbExpr& expr) {
+        return expr.clone();
+    }
 
     SbExpr makeVariable(SbVar var) {
         return var;

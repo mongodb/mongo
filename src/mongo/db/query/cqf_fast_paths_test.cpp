@@ -32,116 +32,101 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/query/cqf_fast_paths_utils.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/query/cqf_fast_paths.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/golden_test.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::optimizer::fast_path {
 namespace {
+unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/exec/sbe"};
 
-bool filterMatchesPattern(BSONObj& filter, BSONObj& pattern) {
-    return FilterComparator::kInstance.compare(filter, pattern) == 0;
+ExecTreeGeneratorParams makeParams(const BSONObj& filter) {
+    const auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+    return {collUuid, nullptr, filter};
 }
 
-TEST(CqfFastPathsTest, FilterComparatorMatchesEqOnTopLevelField) {
-    auto filter = fromjson("{a: \"123\"}");
-    auto pattern = BSON("ignored" << 0);
-    ASSERT_TRUE(filterMatchesPattern(filter, pattern));
+void verifySbePlan(unittest::GoldenTestContext& gctx,
+                   const std::string& name,
+                   const BSONObj& filter) {
+    auto& stream = gctx.outStream();
 
-    filter = fromjson("{a: {\"$eq\": \"123\"}}");
-    pattern = BSON("ignored" << BSON("$eq" << 0));
-    ASSERT_TRUE(filterMatchesPattern(filter, pattern));
+    stream << std::endl;
+    stream << "==== VARIATION: " << name << " ====" << std::endl;
+    stream << "-- INPUT:" << std::endl;
+    stream << "filter = " << filter.toString() << std::endl;
+    stream << "-- OUTPUT:" << std::endl;
+
+    auto params = makeParams(filter);
+    auto [sbePlan, data] = getFastPathExecTreeForTest(std::move(params));
+
+    sbe::DebugPrinter printer;
+    stream << printer.print(*sbePlan) << std::endl;
 }
 
-TEST(CqfFastPathsTest, FilterComparatorMatchesEqObj) {
-    auto filter = fromjson("{a: {\"$eq\": {b: \"123\", c: 123}}}");
-    auto pattern = BSON("ignored" << BSON("$eq" << 0));
-    ASSERT_TRUE(filterMatchesPattern(filter, pattern));
+TEST(FastPathPlanGeneration, EmptyQuery) {
+    unittest::GoldenTestContext gctx{&goldenTestConfig};
+    gctx.printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
+
+    auto filter = fromjson(R"({})");
+    verifySbePlan(gctx, "Empty query", filter);
 }
 
-TEST(CqfFastPathsTest, FilterComparatorDoesNotMatchEqFiltersOfDifferentShapes) {
-    auto filter = fromjson("{a: \"123\"}");
-    auto pattern = BSON("ignored" << BSON("$eq" << 0));
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
+TEST(FastPathPlanGeneration, SinglePredicateOnTopLevelField) {
+    unittest::GoldenTestContext gctx{&goldenTestConfig};
+    gctx.printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
 
-    filter = fromjson("{a: {\"$eq\": \"123\"}}");
-    pattern = BSON("ignored" << 0);
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
-}
+    {
+        auto filter = fromjson(R"({a: 1})");
+        verifySbePlan(gctx, "equals int", filter);
+    }
 
-TEST(CqfFastPathsTest, FilterComparatorMatchesLtOnTopLevelField) {
-    auto filter = fromjson("{a: {\"$lt\": \"123\"}}");
-    auto pattern = BSON("ignored" << BSON("$lt" << 0));
-    ASSERT_TRUE(filterMatchesPattern(filter, pattern));
-}
+    {
+        auto filter = fromjson(R"({a: {$eq: 1}})");
+        verifySbePlan(gctx, "$eq int", filter);
+    }
 
-TEST(CqfFastPathsTest, FilterComparatorDoesNotMatchLtOnNestedField) {
-    auto filter = fromjson("{\"a.b.c\": {\"$lt\": \"123\"}}");
-    auto pattern = BSON("ignored" << BSON("$lt" << 0));
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
+    {
+        auto filter = fromjson(R"({a: {$eq: NaN}})");
+        verifySbePlan(gctx, "$eq NaN", filter);
+    }
 
-    filter = fromjson("{a: {b: {c: {\"$lt\": \"123\"}}}}");
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
-}
+    {
+        auto filter = fromjson(R"({a: {$eq: null}})");
+        verifySbePlan(gctx, "$eq null", filter);
+    }
 
-TEST(CqfFastPathsTest, FilterComparatorDoesNotMatchDifferentOps) {
-    auto filter = fromjson("{a: {\"$eq\": \"123\"}}");
-    auto pattern = BSON("ignored" << BSON("$lt" << 0));
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
+    {
+        auto filter = fromjson(R"({a: {$lt: 1}})");
+        verifySbePlan(gctx, "$lt int", filter);
+    }
 
-    filter = fromjson("{a: {\"$gt\": \"123\"}}");
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
-}
+    {
+        auto filter = fromjson(R"({a: {$lt: NaN}})");
+        verifySbePlan(gctx, "$lt NaN", filter);
+    }
 
-TEST(CqfFastPathsTest, FilterComparatorDoesNotMatchSameOpsWithDifferentSubExprs) {
-    auto filter = fromjson(R"({a: {$eq: {$concat: ["1", "2"]}}})");
-    auto pattern = BSON("ignored" << BSON("$eq" << 0));
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
+    {
+        auto filter = fromjson(R"({a: {$lt: null}})");
+        verifySbePlan(gctx, "$lt null", filter);
+    }
 
-    filter = fromjson(R"({a: {$eq: "$field"}})");
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
-}
+    {
+        auto filter = fromjson(R"({a: {$lte: 1}})");
+        verifySbePlan(gctx, "$lte int", filter);
+    }
 
-TEST(CqfFastPathsTest, FilterComparatorDoesNotMatchSingleOpWithConjunction) {
-    auto filter = fromjson(R"({ignored: {$lt: 5}, b: {$gt: 5}})");
-    auto pattern = BSON("ignored" << BSON("$lt" << 0));
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
-}
+    {
+        auto filter = fromjson(R"({a: {$lte: NaN}})");
+        verifySbePlan(gctx, "$lte NaN", filter);
+    }
 
-TEST(CqfFastPathsTest, FilterComparatorMatchesEmptyWithEmpty) {
-    BSONObj filter{};
-    BSONObj pattern{};
-    ASSERT_TRUE(filterMatchesPattern(filter, pattern));
-}
-
-TEST(CqfFastPathsTest, FilterComparatorDoesNotMatchEmptyWithNonEmpty) {
-    BSONObj filter{};
-    auto pattern = BSON("ignored" << 0);
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
-}
-
-TEST(CqfFastPathsTest, FilterComparatorDoesNotMatchEquivalentConjunctionsInDifferentOrder) {
-    // This test illustrates a limitation of the comparator where the ordering of predicates
-    // matters.
-    auto filter = fromjson(R"({f1: {$gt: 5}, f2: {$lt: 10}})");
-    auto pattern = fromjson(R"({ignore: {$lt: 10}, ignore: {$gt: 5}})");
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
-
-    filter = fromjson(R"({ignore: {$lt: 1, $gt: 1}})");
-    pattern = fromjson(R"({f1: {$gt: 1, $lt: 1}})");
-    ASSERT_FALSE(filterMatchesPattern(filter, pattern));
-}
-
-TEST(CqfFastPathsTest, FilterComparatorMatchesConstantContainingSpecialFields) {
-    auto filter = fromjson(R"({ignored: {$eq: {_id: 1, "a.b.c": 2}}})");
-    auto pattern = BSON("ignored" << BSON("$eq" << 0));
-    ASSERT_TRUE(filterMatchesPattern(filter, pattern));
-}
-
-TEST(CqfFastPathsTest, FilterComparatorMatchesConjunctionWithDifferentConstants) {
-    auto filter = fromjson(R"({a: {$lt: {x: 10}, $gt: {y: 50}}})");
-    auto pattern = fromjson(R"({ignored: {$lt: 0, $gt: 0}})");
-    ASSERT_TRUE(filterMatchesPattern(filter, pattern));
+    {
+        auto filter = fromjson(R"({a: {$lte: null}})");
+        verifySbePlan(gctx, "$lte null", filter);
+    }
 }
 
 }  // namespace
