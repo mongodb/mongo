@@ -139,6 +139,13 @@ public:
          *
          * 2. On stepdown/shutdown of a PrimaryOnlyService, the input cancellation token will be
          * marked canceled.
+         *
+         * 3. Currently, 'run()' is scheduled on the Instance ScopedTaskExecutor, which means it's
+         * possible the task never gets executed if the scheduling executor is shutdown
+         * (eg. as part of stepdown) before the task gets run. This also implies that creating
+         * an instance does not guarantee that run() will be called before destruction, and so
+         * PrimaryOnlyService implementations should not rely on run() to guarantee behavior around
+         * safe destruction of an Instance.
          */
         virtual SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                      const CancellationToken& token) noexcept = 0;
