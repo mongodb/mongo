@@ -19,7 +19,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
     session = conn->default_session;
 
-    TAILQ_INIT(&conn->chunkcache_metadataqh); /* Chunkcache metadata work unit list */
+    TAILQ_INIT(&conn->chunkcache_metadataqh); /* Chunk cache metadata work unit list */
     TAILQ_INIT(&conn->dhqh);                  /* Data handle list */
     TAILQ_INIT(&conn->dlhqh);                 /* Library list */
     TAILQ_INIT(&conn->dsrcqh);                /* Data source list */
@@ -52,7 +52,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
     WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
     WT_SPIN_INIT_TRACKED(session, &conn->checkpoint_lock, checkpoint);
     WT_RET(__wt_spin_init(session, &conn->background_compact.lock, "background compact"));
-    WT_RET(__wt_spin_init(session, &conn->chunkcache_metadata_lock, "chunkcache metadata"));
+    WT_RET(__wt_spin_init(session, &conn->chunkcache_metadata_lock, "chunk cache metadata"));
     WT_RET(__wt_spin_init(session, &conn->encryptor_lock, "encryptor"));
     WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
     WT_RET(__wt_spin_init(session, &conn->flush_tier_lock, "flush tier"));

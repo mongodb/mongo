@@ -117,7 +117,7 @@ __chunkcache_metadata_run_chk(WT_SESSION_IMPL *session)
 
 /*
  * __chunkcache_metadata_insert --
- *     Insert a specific work queue entry into the chunk cache metadata file.
+ *     Insert the specified work queue entry into the chunk cache metadata file.
  */
 static int
 __chunkcache_metadata_insert(WT_CURSOR *cursor, WT_CHUNKCACHE_METADATA_WORK_UNIT *entry)
@@ -130,7 +130,7 @@ __chunkcache_metadata_insert(WT_CURSOR *cursor, WT_CHUNKCACHE_METADATA_WORK_UNIT
 
 /*
  * __chunkcache_metadata_delete --
- *     Remove an entry from the chunk cache metadata file.
+ *     Remove the specified entry from the chunk cache metadata file.
  */
 static int
 __chunkcache_metadata_delete(WT_CURSOR *cursor, WT_CHUNKCACHE_METADATA_WORK_UNIT *entry)
@@ -209,7 +209,7 @@ err:
 
 /*
  * __chunkcache_metadata_server --
- *     Dispatch chunks of work (or stop the server) whenever we're signalled to do so.
+ *     Dispatch chunks of work (or stop the server) when signalled.
  */
 static WT_THREAD_RET
 __chunkcache_metadata_server(void *arg)
@@ -267,12 +267,12 @@ __wt_chunkcache_metadata_create(WT_SESSION_IMPL *session)
     if (ret == WT_NOTFOUND) {
         WT_ERR(__chunkcache_create_metadata_file(
           session, chunkcache->capacity, chunkcache->hashtable_size, chunkcache->chunk_size));
-        __wt_verbose(session, WT_VERB_CHUNKCACHE, "%s", "created chunkcache metadata file");
+        __wt_verbose(session, WT_VERB_CHUNKCACHE, "%s", "created chunk cache metadata file");
         ret = 0;
     } else if (ret == 0) {
         WT_ERR(__chunkcache_verify_metadata_config(session, metadata_config, chunkcache->capacity,
           chunkcache->hashtable_size, chunkcache->chunk_size));
-        __wt_verbose(session, WT_VERB_CHUNKCACHE, "%s", "reused chunkcache metadata file");
+        __wt_verbose(session, WT_VERB_CHUNKCACHE, "%s", "reused chunk cache metadata file");
     }
     WT_ERR(ret);
 
@@ -284,7 +284,7 @@ __wt_chunkcache_metadata_create(WT_SESSION_IMPL *session)
 
     WT_ERR(__chunkcache_apply_metadata_content(session));
 
-    WT_ERR(__wt_cond_alloc(session, "chunkcache metadata", &conn->chunkcache_metadata_cond));
+    WT_ERR(__wt_cond_alloc(session, "chunk cache metadata", &conn->chunkcache_metadata_cond));
 
     /* Start the thread. */
     WT_ERR(__wt_thread_create(

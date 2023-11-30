@@ -6,7 +6,7 @@ This functionality allows users to provide a list of tables that should remain p
 fetch data from potentially much slower block storage. If a user wishes to cache a table in the chunk cache (such that the cached chunks belonging to these tables
 are non-evictable), the pinned configuration is required.
 
-<b>Note:</b> It is crucial to assess the memory implications of pinning large tables. Ensure the chunkcache has enough capacity to cache the pinned tables.
+<b>Note:</b> It is crucial to assess the memory implications of pinning large tables. Ensure the chunk cache has enough capacity to cache the pinned tables.
 
 Example Configuration:
 @code
@@ -14,7 +14,7 @@ chunk_cache=[enabled=true,chunk_size=512KB,capacity=20GB,pinned=("table:chunkcac
 @endcode
 
 In the configuration above, the pinned configuration array contains the names of tables to be pinned. In this example, the tables <b>chunkcache01</b> and <b>chunkcache02</b> are specified.
-By marking tables as pinned in the chunk cache, all chunks belonging to these tables (when read into chunkcache) remain in the cache. These chunks won't be evicted,
+By marking tables as pinned in the chunk cache, all chunks belonging to these tables (when read into chunk cache) remain in the cache. These chunks won't be evicted,
 regardless of how infrequently they might be accessed.
 
 <b>Note:</b> There could be circumstances when the pinned chunks can become unpinned (and evicted) for internal reasons.
@@ -23,8 +23,8 @@ This ensures that the pinned tables are always relatively cheap to access, minim
 
 @section inserts Newly inserted or modified content
 
-Newer content is more likely to be accessed again, so we insert freshly-flushed data into the chunkcache. This minimizes latency and reduces resource usage (disk bandwidth and API access).
-This saves the chunkcache from having to read freshly-flushed data back from the object store soon after it was put there. When a tiered object is flushed and before it is deleted locally, we make an ingest call and the new or modified table will be inserted into the chunkcache.
+Newer content is more likely to be accessed again, so we insert freshly-flushed data into the chunk cache. This minimizes latency and reduces resource usage (disk bandwidth and API access).
+This saves the chunk cache from having to read freshly-flushed data back from the object store soon after it was put there. When a tiered object is flushed and before it is deleted locally, we make an ingest call and the new or modified table will be inserted into the chunk cache.
 This function will also check for outdated pinned content in the chunk cache, ensuring the older versions of the pinned content can be cleaned up by chunk cache's eviction process.
 
 @section persistence Persisted content

@@ -37,7 +37,7 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 '''
-Testing chunkcache in-memory and on-disk.
+Testing chunk cache in-memory and on-disk.
 
 Create a multithreaded environment to allow for the allocation and deallocation of bits
 in the bitmap (for the on-disk case) and chunks.
@@ -122,6 +122,6 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
         for thread in threads:
             thread.join()
 
-        # Check relevant chunkcache stats.
+        # Check relevant chunk cache stats.
         self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_inuse), 0)
         self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_evicted), 0)

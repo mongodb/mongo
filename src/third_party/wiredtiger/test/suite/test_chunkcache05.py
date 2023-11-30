@@ -82,7 +82,7 @@ class test_chunkcache05(wttest.WiredTigerTestCase):
         self.assertEqual(self.get_stat(wiredtiger.stat.conn.chunkcache_created_from_metadata), 0)
         self.assertEqual(self.get_stat(wiredtiger.stat.conn.chunkcache_bytes_read_persistent), 0)
 
-        # Flush the tables into the chunkcache
+        # Flush the tables into the chunk cache.
         self.session.checkpoint()
         self.session.checkpoint('flush_tier=(enabled)')
 

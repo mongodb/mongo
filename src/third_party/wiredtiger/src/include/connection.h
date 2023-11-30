@@ -322,7 +322,7 @@ struct __wt_connection_impl {
 
     WT_SPINLOCK api_lock;                 /* Connection API spinlock */
     WT_SPINLOCK checkpoint_lock;          /* Checkpoint spinlock */
-    WT_SPINLOCK chunkcache_metadata_lock; /* Chunkcache metadata spinlock */
+    WT_SPINLOCK chunkcache_metadata_lock; /* Chunk cache metadata spinlock */
     WT_RWLOCK debug_log_retention_lock;   /* Log retention reconfiguration lock */
     WT_SPINLOCK fh_lock;                  /* File handle queue spinlock */
     WT_SPINLOCK flush_tier_lock;          /* Flush tier spinlock */
@@ -380,7 +380,7 @@ struct __wt_connection_impl {
 
     WT_FH *lock_fh; /* Lock file handle */
 
-    /* Locked: chunkcache metadata work queue (and length counter). */
+    /* Locked: chunk cache metadata work queue (and length counter). */
     TAILQ_HEAD(__wt_chunkcache_metadata_qh, __wt_chunkcache_metadata_work_unit)
     chunkcache_metadataqh;
     int chunkcache_queue_len;
@@ -585,10 +585,10 @@ struct __wt_connection_impl {
     uint32_t flush_state;            /* State of last flush tier */
     wt_timestamp_t flush_ts;         /* Timestamp of most recent flush_tier */
 
-    WT_SESSION_IMPL *chunkcache_metadata_session; /* Chunkcache metadata server thread session */
-    wt_thread_t chunkcache_metadata_tid;          /* Chunkcache metadata thread */
-    bool chunkcache_metadata_tid_set;             /* Chunkcache metadata thread set */
-    WT_CONDVAR *chunkcache_metadata_cond;         /* Chunkcache metadata wait mutex */
+    WT_SESSION_IMPL *chunkcache_metadata_session; /* Chunk cache metadata server thread session */
+    wt_thread_t chunkcache_metadata_tid;          /* Chunk cache metadata thread */
+    bool chunkcache_metadata_tid_set;             /* Chunk cache metadata thread set */
+    WT_CONDVAR *chunkcache_metadata_cond;         /* Chunk cache metadata wait mutex */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CONN_LOG_CONFIG_ENABLED 0x001u  /* Logging is configured */

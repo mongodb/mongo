@@ -219,7 +219,7 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
         if (ret == ENOENT)
             ret = 0;
         else if (ret == 0) {
-            /* Cache the flushed content into chunkcache. */
+            /* Cache the flushed content into chunk cache. */
             WT_ERR(__wt_tiered_name(
               session, &tiered->iface, 0, WT_TIERED_NAME_SKIP_PREFIX, &sp_obj_name));
             WT_ERR_ERROR_OK(

@@ -33,7 +33,7 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 '''
-- Evaluate chunkcache performance both in-memory and on-disk, to test the functionality of pinned chunks.
+- Evaluate chunk cache performance both in-memory and on-disk, to test the functionality of pinned chunks.
 - Verify the functionality of reconfiguring pinned configurations.
 '''
 class test_chunkcache03(wttest.WiredTigerTestCase):
@@ -89,7 +89,7 @@ class test_chunkcache03(wttest.WiredTigerTestCase):
         uris = self.pinned_uris + ["table:chunkcache03", "table:chunkcache04"]
         ds = [SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format) for uri in uris]
 
-        # Insert data in four tables.
+        # Insert data into four tables.
         for i, dataset in enumerate(ds):
             dataset.populate()
             self.insert(uris[i], dataset)

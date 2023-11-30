@@ -17,7 +17,7 @@
 #include "wrappers/mock_session.h"
 #include "wt_internal.h"
 
-TEST_CASE("Chunkcache bitmap: __chunkcache_bitmap_find_free", "[bitmap]")
+TEST_CASE("Chunk cache bitmap: __chunkcache_bitmap_find_free", "[bitmap]")
 {
     /* Build Mock session, this will automatically create a mock connection. */
     std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();

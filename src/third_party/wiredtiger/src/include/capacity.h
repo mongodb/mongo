@@ -7,7 +7,7 @@
  */
 
 typedef enum {
-    WT_THROTTLE_CHUNKCACHE, /* Chunkcache throttle */
+    WT_THROTTLE_CHUNKCACHE, /* Chunk cache throttle */
     WT_THROTTLE_CKPT,       /* Checkpoint throttle */
     WT_THROTTLE_EVICT,      /* Eviction throttle */
     WT_THROTTLE_LOG,        /* Logging throttle */

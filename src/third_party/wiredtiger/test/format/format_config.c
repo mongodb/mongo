@@ -1495,17 +1495,17 @@ config_chunk_cache(void)
 
     chunkcache_type = NULL;
 
-    /* Chunkcache does not work unless tiered storage is configured. */
+    /* Chunk cache does not work unless tiered storage is configured. */
     if (!g.tiered_storage_config) {
         if (config_explicit(NULL, "chunk_cache") && GV(CHUNK_CACHE))
             testutil_die(EINVAL,
-              "%s: chunkcache cannot be enabled unless tiered storage is configured.", progname);
+              "%s: chunk cache cannot be enabled unless tiered storage is configured.", progname);
         return;
     }
 
     if (!config_explicit(NULL, "chunk_cache")) {
         /*
-         * Make sure no configurations related to chunk caching are set if chunkcache is not
+         * Make sure no configurations related to chunk caching are set if chunk cache is not
          * enabled.
          */
         if (config_explicit(NULL, "chunk_cache.capacity") ||
@@ -1517,7 +1517,7 @@ config_chunk_cache(void)
               "settings",
               progname);
 
-        /* Enable chunkcache 50% of the time if not explicit set. */
+        /* Enable chunk cache 50% of the time if not explicit set. */
         testutil_snprintf(
           buf, sizeof(buf), "chunk_cache=%s", mmrand(&g.data_rnd, 1, 100) <= 50 ? "on" : "off");
         config_single(NULL, buf, false);

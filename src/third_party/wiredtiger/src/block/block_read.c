@@ -253,7 +253,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
             __wt_verbose(session, WT_VERB_BLOCK,
               "Reloading data due to checksum mismatch for block: %s" PRIu32 ", offset: %" PRIuMAX
               ", size: %" PRIu32
-              " with possibly stale or corrupt chunkcache content for object id: %" PRIu32
+              " with possibly stale or corrupt chunk cache content for object id: %" PRIu32
               ". Retrying once.",
               block->name, (uintmax_t)offset, size, objectid);
             WT_RET(__wt_chunkcache_free_external(session, block, objectid, offset, size));

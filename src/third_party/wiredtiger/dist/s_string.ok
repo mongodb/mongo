@@ -72,7 +72,6 @@ Ceil
 CentOS
 Checkpointing
 Checksums
-Chunkcache
 CityHash
 ClmSvxz
 CloseHandle
@@ -114,6 +113,7 @@ ENCRYPTOR
 ENDIAN
 ENOENT
 ENOMEM
+ENOSPC
 ENOTSUP
 ENUM
 EOF
