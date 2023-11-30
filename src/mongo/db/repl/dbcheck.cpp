@@ -474,7 +474,6 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
             MONGO_UNREACHABLE;
         }();
 
-        // TODO SERVER-80682: Add rate limiting in hashing.
         BSONObj currBSON = key_string::toBsonSafe(
             keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
         _last = currBSON;
