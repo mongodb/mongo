@@ -27,6 +27,7 @@ db-contrib-tool setup-repro-env \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
+  --evgVersionsFile multiversion-downloads.json \
   $version
 
 version_dir=$(find /data/install -type d -iname "*$version*")

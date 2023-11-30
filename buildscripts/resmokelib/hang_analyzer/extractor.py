@@ -355,6 +355,30 @@ def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str
     binary_download_options = _DownloadOptions(db=True, ds=False, da=False, dv=False)
     debugsymbols_download_options = _DownloadOptions(db=False, ds=True, da=False, dv=False)
 
+    @retry(tries=3, delay=5)
+    def get_multiversion_download_links(task: Task) -> Optional[dict]:
+        for artifact in task.artifacts:
+            if artifact.name != "Multiversion download links":
+                continue
+
+            with urllib.request.urlopen(artifact.url) as url:
+                return json.load(url)
+        return None
+
+    # dictionary of versions and the information about where to download that version
+    # The key is the version, if the key is an empty string that means master was downloaded
+    multiversion_downloads = get_multiversion_download_links(task_info)
+
+    # We support `skip_compile` tasks that download master instead of compiling it
+    # For analysis on these tasks we should download the same binaries that the task downloaded
+    if multiversion_downloads and "" in multiversion_downloads:
+        version_downloads = multiversion_downloads[""]
+        variant = version_downloads["evg_build_variant"]
+        version_id = version_downloads["evg_version_id"]
+    else:
+        variant = task_info.build_variant
+        version_id = task_info.version_id
+
     all_downloaded = True
     multiversion_versions = set()
     with OtelThreadPoolExecutor() as executor:
@@ -367,15 +391,13 @@ def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str
         futures.append(
             executor.submit(run_with_retries, func=download_multiversion_artifact,
                             timeout_secs=download_timeout_secs, retry_secs=retry_secs,
-                            root_logger=root_logger, version_id=task_info.version_id,
-                            variant=task_info.build_variant,
+                            root_logger=root_logger, version_id=version_id, variant=variant,
                             download_options=binary_download_options, download_dir=download_dir,
                             name="binaries"))
         futures.append(
             executor.submit(run_with_retries, func=download_multiversion_artifact,
                             timeout_secs=download_timeout_secs, retry_secs=retry_secs,
-                            root_logger=root_logger, version_id=task_info.version_id,
-                            variant=task_info.build_variant,
+                            root_logger=root_logger, version_id=version_id, variant=variant,
                             download_options=debugsymbols_download_options,
                             download_dir=download_dir, name="debugsymbols"))
 
@@ -389,18 +411,6 @@ def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str
                 break
 
     if multiversion_versions:
-
-        @retry(tries=3, delay=5)
-        def get_multiversion_download_links(task: Task) -> Optional[dict]:
-            for artifact in task.artifacts:
-                if artifact.name != "Multiversion download links":
-                    continue
-
-                with urllib.request.urlopen(artifact.url) as url:
-                    return json.load(url)
-            return None
-
-        multiversion_downloads = get_multiversion_download_links(task_info)
         if not multiversion_downloads:
             raise RuntimeError("Multiversion core dumps were found without download links.")
 
