@@ -67,7 +67,7 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
-#include "mongo/db/op_observer/oplog_writer_impl.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
@@ -6127,7 +6127,7 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
     DurableHistoryRegistry::set(opCtx->getServiceContext(),
                                 std::make_unique<DurableHistoryRegistry>());
     opCtx->getServiceContext()->setOpObserver(
-        std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+        std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
     OpDebug* const nullOpDbg = nullptr;
 
@@ -6306,7 +6306,7 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     DurableHistoryRegistry::set(opCtx->getServiceContext(),
                                 std::make_unique<DurableHistoryRegistry>());
     opCtx->getServiceContext()->setOpObserver(
-        std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+        std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
     OpDebug* const nullOpDbg = nullptr;
 

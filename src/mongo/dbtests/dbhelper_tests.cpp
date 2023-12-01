@@ -55,7 +55,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
-#include "mongo/db/op_observer/oplog_writer_impl.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/oplog.h"
@@ -143,7 +143,7 @@ public:
 
         auto registry = std::make_unique<OpObserverRegistry>();
         registry->addObserver(
-            std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+            std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
         opCtx1.get()->getServiceContext()->setOpObserver(std::move(registry));
         repl::createOplog(opCtx1.get());
 

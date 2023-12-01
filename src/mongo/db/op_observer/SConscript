@@ -31,9 +31,9 @@ env.Library(
 )
 
 env.Library(
-    target='oplog_writer_impl',
+    target='operation_logger_impl',
     source=[
-        'oplog_writer_impl.cpp',
+        'operation_logger_impl.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -42,9 +42,9 @@ env.Library(
 )
 
 env.Library(
-    target='oplog_writer_transaction_proxy',
+    target='operation_logger_transaction_proxy',
     source=[
-        'oplog_writer_transaction_proxy.cpp',
+        'operation_logger_transaction_proxy.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -184,7 +184,7 @@ env.CppUnitTest(
         'find_and_modify_images_op_observer',
         'op_observer_impl',
         'op_observer_util',
-        'oplog_writer_impl',
+        'operation_logger_impl',
         'user_write_block_mode_op_observer',
     ],
 )

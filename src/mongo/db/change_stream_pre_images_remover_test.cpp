@@ -72,7 +72,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
-#include "mongo/db/op_observer/oplog_writer_impl.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/record_id.h"
@@ -305,7 +305,7 @@ protected:
         auto opObserverRegistry =
             dynamic_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
         opObserverRegistry->addObserver(
-            std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+            std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
         auto& manager = ChangeStreamPreImagesCollectionManager::get(getServiceContext());
         manager.createPreImagesCollection(operationContext(), boost::none);

@@ -64,7 +64,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
-#include "mongo/db/op_observer/oplog_writer_impl.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
@@ -180,7 +180,8 @@ public:
         // to avoid the invariant in ReplClientInfo::setLastOp that the optime only goes forward.
         repl::ReplClientInfo::forClient(_opCtx.getClient()).clearLastOp();
 
-        sc->setOpObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+        sc->setOpObserver(
+            std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
         createOplog(&_opCtx);
 

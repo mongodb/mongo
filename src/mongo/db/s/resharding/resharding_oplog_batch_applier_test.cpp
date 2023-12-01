@@ -66,7 +66,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
-#include "mongo/db/op_observer/oplog_writer_impl.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -168,7 +168,7 @@ public:
             invariant(opObserverRegistry);
 
             opObserverRegistry->addObserver(
-                std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+                std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
             opObserverRegistry->addObserver(
                 std::make_unique<MigrationChunkClonerSourceOpObserver>());
         }

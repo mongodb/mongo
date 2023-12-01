@@ -29,43 +29,26 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <vector>
-
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer/oplog_writer.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/util/time_support.h"
+#include "mongo/db/op_observer/operation_logger.h"
 
 namespace mongo {
 
-/**
- * Accumulates replicated operations for multi-document transactions and batched WUOW writes.
- * When the operations are ready to be replicated, we compose the final chain of applyOps oplog
- * entries and write it to the actual oplog referenced in '_targetOplogWriter'.
- */
-class OplogWriterTransactionProxy : public OplogWriter {
-    OplogWriterTransactionProxy(const OplogWriterTransactionProxy&) = delete;
-    OplogWriterTransactionProxy& operator=(const OplogWriterTransactionProxy&) = delete;
+class OperationLoggerMock : public OperationLogger {
+    OperationLoggerMock(const OperationLoggerMock&) = delete;
+    OperationLoggerMock& operator=(const OperationLoggerMock&) = delete;
 
 public:
-    OplogWriterTransactionProxy(std::unique_ptr<OplogWriter> targetOplogWriter);
-    virtual ~OplogWriterTransactionProxy() = default;
+    OperationLoggerMock() = default;
+    virtual ~OperationLoggerMock() = default;
 
     void appendOplogEntryChainInfo(OperationContext* opCtx,
                                    repl::MutableOplogEntry* oplogEntry,
                                    repl::OplogLink* oplogLink,
-                                   const std::vector<StmtId>& stmtIds) override;
+                                   const std::vector<StmtId>& stmtIds) override {}
 
-    repl::OpTime logOp(OperationContext* opCtx, repl::MutableOplogEntry* oplogEntry) override;
+    repl::OpTime logOp(OperationContext* opCtx, repl::MutableOplogEntry* oplogEntry) override {
+        return {};
+    }
 
     void logOplogRecords(OperationContext* opCtx,
                          const NamespaceString& nss,
@@ -74,12 +57,18 @@ public:
                          const CollectionPtr& oplogCollection,
                          repl::OpTime finalOpTime,
                          Date_t wallTime,
-                         bool isAbortIndexBuild) override;
+                         bool isAbortIndexBuild) override {}
 
-    std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override;
-
-private:
-    std::unique_ptr<OplogWriter> _targetOplogWriter;
+    /**
+     * Returns a vector of 'count' non-null OpTimes.
+     * Some tests have to populate test collections, which may require OpObserverImpl::onInserts()
+     * to be able to acquire non-null optimes for insert operations even though no oplog entries
+     * are appended to the oplog.
+     * If the test requires actual OpTimes to work, use OperationLoggerImpl instead.
+     */
+    std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override {
+        return std::vector<OplogSlot>{count, OplogSlot(Timestamp(1, 1), /*term=*/1LL)};
+    }
 };
 
 }  // namespace mongo
