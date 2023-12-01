@@ -9,12 +9,16 @@
  *   cannot_run_during_upgrade_downgrade,
  *   # "Explain of a resolved view must be executed by mongos"
  *   directly_against_shardsvrs_incompatible,
+ *   # Some suites use mixed-binary cluster setup where some nodes might have the flag enabled while
+ *   # others -- not. For this test we need control over whether the flag is set on the node that
+ *   # ends up executing the query.
+ *   assumes_standalone_mongod
  * ]
  */
 import {getAggPlanStage, getEngine} from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
-const sbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull", "featureFlagTimeSeriesInSbe"]);
+const sbeEnabled = checkSBEEnabled(db, ["featureFlagTimeSeriesInSbe"]);
 
 const coll = db.timeseries_sbe;
 coll.drop();

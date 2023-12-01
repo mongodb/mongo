@@ -11,11 +11,8 @@
  *   directly_against_shardsvrs_incompatible,
  * ]
  */
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getEngine} from "jstests/libs/analyze_plan.js";
 import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
-const sbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull", "featureFlagTimeSeriesInSbe"]);
 
 const coll = db.timeseries_bucket_level_filter;
 coll.drop();
@@ -32,8 +29,7 @@ assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: 42, b: 17}));
         {$count: "ct"}
     ];
     const explain = coll.explain("executionStats").aggregate(pipeline);
-
-    if (sbeEnabled) {
+    if (getEngine(explain) == "sbe") {
         // Ensure we get a collection scan, with one 'scan' stage.
         const scanStages = getSbePlanStages(explain, "scan");
         assert.eq(scanStages.length, 1, () => "Expected one scan stage " + tojson(explain));
@@ -79,7 +75,7 @@ assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: 42, b: 17}));
     ];
     const explain = coll.explain("executionStats").aggregate(pipeline);
 
-    if (sbeEnabled) {
+    if (getEngine(explain) == "sbe") {
         // Ensure we get an ixscan/fetch plan, with one ixseek stage and one seek stage.
         const seekStages = getSbePlanStages(explain, "seek");
         assert.eq(seekStages.length, 1, () => "Expected one seek stage " + tojson(explain));

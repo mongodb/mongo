@@ -18,7 +18,7 @@ assert.neq(null, conn, "mongod was unable to start up");
 const dbName = jsTestName();
 const db = conn.getDB(dbName);
 
-const sbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull", "featureFlagTimeSeriesInSbe"]);
+const sbeEnabled = checkSBEEnabled(db, ["featureFlagTimeSeriesInSbe"]);
 
 const coll = db.timeseries
 coll.drop();
