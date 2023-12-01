@@ -47,15 +47,15 @@
 
 namespace mongo {
 
-class SetUserWriteBlockModeCoordinator : public ConfigsvrCoordinator {
+class SetUserWriteBlockModeCoordinator
+    : public ConfigsvrCoordinatorImpl<SetUserWriteBlockModeCoordinatorDocument,
+                                      SetUserWriteBlockModeCoordinatorPhaseEnum> {
 public:
     using StateDoc = SetUserWriteBlockModeCoordinatorDocument;
     using Phase = SetUserWriteBlockModeCoordinatorPhaseEnum;
 
     explicit SetUserWriteBlockModeCoordinator(const BSONObj& stateDoc)
-        : ConfigsvrCoordinator(stateDoc),
-          _doc(StateDoc::parse(IDLParserContext("SetUserWriteBlockModeCoordinatorDocument"),
-                               stateDoc)) {}
+        : ConfigsvrCoordinatorImpl(stateDoc) {}
 
     bool hasSameOptions(const BSONObj& participantDoc) const override;
 
@@ -66,33 +66,14 @@ public:
     void checkIfOptionsConflict(const BSONObj& stateDoc) const override {}
 
 private:
-    StateDoc _doc;
-
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
     const ConfigsvrCoordinatorMetadata& metadata() const override;
 
-    template <typename Func>
-    auto _buildPhaseHandler(const Phase& newPhase, Func&& handlerFn) {
-        return [=, this] {
-            const auto& currPhase = _doc.getPhase();
-
-            if (currPhase > newPhase) {
-                // Do not execute this phase if we already reached a subsequent one.
-                return;
-            }
-            if (currPhase < newPhase) {
-                // Persist the new phase if this is the first time we are executing it.
-                _enterPhase(newPhase);
-            }
-            return handlerFn();
-        };
+    StringData serializePhase(const Phase& phase) const override {
+        return SetUserWriteBlockModeCoordinatorPhase_serializer(phase);
     }
-
-    void _removeStateDocument(OperationContext* opCtx);
-    void _enterPhase(Phase newPhase);
-    void _invalidateFutures(const Status& errStatus);
 };
 
 }  // namespace mongo

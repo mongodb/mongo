@@ -46,7 +46,6 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/set_user_write_block_mode_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_util.h"
@@ -55,9 +54,6 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -108,55 +104,24 @@ void sendSetUserWriteBlockModeCmdToAllShards(OperationContext* opCtx,
 bool SetUserWriteBlockModeCoordinator::hasSameOptions(const BSONObj& otherDocBSON) const {
     const auto otherDoc =
         StateDoc::parse(IDLParserContext("SetUserWriteBlockModeCoordinatorDocument"), otherDocBSON);
-
-    return _doc.getBlock() == otherDoc.getBlock();
+    return _evalStateDocumentThreadSafe(
+        [&](const StateDoc& doc) { return doc.getBlock() == otherDoc.getBlock(); });
 }
 
 boost::optional<BSONObj> SetUserWriteBlockModeCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
 
+    const auto phase =
+        _evalStateDocumentThreadSafe([](const StateDoc& doc) { return doc.getPhase(); });
+
     BSONObjBuilder bob;
     bob.append("type", "op");
     bob.append("desc", "SetUserWriteBlockModeCoordinator");
     bob.append("op", "command");
-    bob.append("currentPhase", _doc.getPhase());
+    bob.append("currentPhase", phase);
     bob.append("active", true);
     return bob.obj();
-}
-
-void SetUserWriteBlockModeCoordinator::_enterPhase(Phase newPhase) {
-    StateDoc newDoc(_doc);
-    newDoc.setPhase(newPhase);
-
-    LOGV2_DEBUG(
-        6347305,
-        2,
-        "SetUserWriteBlockModeCoordinator phase transition",
-        "newPhase"_attr = SetUserWriteBlockModeCoordinatorPhase_serializer(newDoc.getPhase()),
-        "oldPhase"_attr = SetUserWriteBlockModeCoordinatorPhase_serializer(_doc.getPhase()));
-
-    auto opCtx = cc().makeOperationContext();
-
-    if (_doc.getPhase() == Phase::kUnset) {
-        PersistentTaskStore<StateDoc> store(NamespaceString::kConfigsvrCoordinatorsNamespace);
-        try {
-            store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernNoTimeout);
-        } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
-            // A series of step-up and step-down events can cause a node to try and insert the
-            // document when it has already been persisted locally, but we must still wait for
-            // majority commit.
-            const auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
-            const auto lastLocalOpTime = replCoord->getMyLastAppliedOpTime();
-            WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajorityForWrite(lastLocalOpTime, opCtx.get()->getCancellationToken())
-                .get(opCtx.get());
-        }
-    } else {
-        _updateStateDocument(opCtx.get(), newDoc);
-    }
-
-    _doc = std::move(newDoc);
 }
 
 const ConfigsvrCoordinatorMetadata& SetUserWriteBlockModeCoordinator::metadata() const {
@@ -176,7 +141,7 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
 
                 // Get an incremented {lsid, txNnumber} pair that will be attached to the command
                 // sent to the shards to guarantee message replay protection.
-                _doc = _updateSession(opCtx, _doc);
+                _updateSession(opCtx);
                 const auto session = _getCurrentSession();
 
                 // Ensure the topology is stable so we don't miss propagating the write blocking
@@ -224,7 +189,7 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
 
             // Get an incremented {lsid, txNnumber} pair that will be attached to the command sent
             // to the shards to guarantee message replay protection.
-            _doc = _updateSession(opCtx, _doc);
+            _updateSession(opCtx);
             const auto session = _getCurrentSession();
 
             // Ensure the topology is stable so we don't miss propagating the write blocking state

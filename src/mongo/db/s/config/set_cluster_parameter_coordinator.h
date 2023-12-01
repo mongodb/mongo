@@ -47,15 +47,15 @@
 
 namespace mongo {
 
-class SetClusterParameterCoordinator : public ConfigsvrCoordinator {
+class SetClusterParameterCoordinator
+    : public ConfigsvrCoordinatorImpl<SetClusterParameterCoordinatorDocument,
+                                      SetClusterParameterCoordinatorPhaseEnum> {
 public:
     using StateDoc = SetClusterParameterCoordinatorDocument;
     using Phase = SetClusterParameterCoordinatorPhaseEnum;
 
     explicit SetClusterParameterCoordinator(const BSONObj& stateDoc)
-        : ConfigsvrCoordinator(stateDoc),
-          _doc(StateDoc::parse(IDLParserContext("SetClusterParameterCoordinatorDocument"),
-                               stateDoc)) {}
+        : ConfigsvrCoordinatorImpl(stateDoc) {}
 
     bool hasSameOptions(const BSONObj& participantDoc) const override;
 
@@ -64,8 +64,6 @@ public:
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
 private:
-    StateDoc _doc;
-
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
@@ -89,24 +87,9 @@ private:
 
     const ConfigsvrCoordinatorMetadata& metadata() const override;
 
-    template <typename Func>
-    auto _buildPhaseHandler(const Phase& newPhase, Func&& handlerFn) {
-        return [=, this] {
-            const auto& currPhase = _doc.getPhase();
-
-            if (currPhase > newPhase) {
-                // Do not execute this phase if we already reached a subsequent one.
-                return;
-            }
-            if (currPhase < newPhase) {
-                // Persist the new phase if this is the first time we are executing it.
-                _enterPhase(newPhase);
-            }
-            return handlerFn();
-        };
+    StringData serializePhase(const Phase& phase) const override {
+        return SetClusterParameterCoordinatorPhase_serializer(phase);
     }
-
-    void _enterPhase(Phase newPhase);
 };
 
 }  // namespace mongo

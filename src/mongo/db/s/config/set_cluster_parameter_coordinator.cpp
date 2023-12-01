@@ -58,7 +58,6 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -66,9 +65,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -91,62 +87,37 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
 bool SetClusterParameterCoordinator::hasSameOptions(const BSONObj& otherDocBSON) const {
     const auto otherDoc =
         StateDoc::parse(IDLParserContext("SetClusterParameterCoordinatorDocument"), otherDocBSON);
-    return SimpleBSONObjComparator::kInstance.evaluate(_doc.getParameter() ==
-                                                       otherDoc.getParameter()) &&
-        _doc.getTenantId() == otherDoc.getTenantId();
+
+    return _evalStateDocumentThreadSafe([&](const StateDoc& doc) -> bool {
+        return SimpleBSONObjComparator::kInstance.evaluate(doc.getParameter() ==
+                                                           otherDoc.getParameter()) &&
+            doc.getTenantId() == otherDoc.getTenantId();
+    });
 }
 
 boost::optional<BSONObj> SetClusterParameterCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    BSONObjBuilder cmdBob;
-    cmdBob.appendElements(_doc.getParameter());
 
     BSONObjBuilder bob;
-    bob.append("type", "op");
-    bob.append("desc", "SetClusterParameterCoordinator");
-    bob.append("op", "command");
-    auto tenantId = _doc.getTenantId();
-    if (tenantId.is_initialized()) {
-        bob.append("tenantId", tenantId->toString());
-    }
-    bob.append("currentPhase", _doc.getPhase());
-    bob.append("command", cmdBob.obj());
-    bob.append("active", true);
-    return bob.obj();
-}
 
-void SetClusterParameterCoordinator::_enterPhase(Phase newPhase) {
-    StateDoc newDoc(_doc);
-    newDoc.setPhase(newPhase);
+    _evalStateDocumentThreadSafe([&](const StateDoc& doc) {
+        BSONObjBuilder cmdBob;
+        cmdBob.appendElements(_doc.getParameter());
 
-    LOGV2_DEBUG(6343101,
-                2,
-                "SetClusterParameterCoordinator phase transition",
-                "newPhase"_attr = SetClusterParameterCoordinatorPhase_serializer(newDoc.getPhase()),
-                "oldPhase"_attr = SetClusterParameterCoordinatorPhase_serializer(_doc.getPhase()));
-
-    auto opCtx = cc().makeOperationContext();
-
-    if (_doc.getPhase() == Phase::kUnset) {
-        PersistentTaskStore<StateDoc> store(NamespaceString::kConfigsvrCoordinatorsNamespace);
-        try {
-            store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernNoTimeout);
-        } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
-            // A series of step-up and step-down events can cause a node to try and insert the
-            // document when it has already been persisted locally, but we must still wait for
-            // majority commit.
-            const auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
-            const auto lastLocalOpTime = replCoord->getMyLastAppliedOpTime();
-            WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajorityForWrite(lastLocalOpTime, opCtx.get()->getCancellationToken())
-                .get(opCtx.get());
+        bob.append("type", "op");
+        bob.append("desc", "SetClusterParameterCoordinator");
+        bob.append("op", "command");
+        auto tenantId = _doc.getTenantId();
+        if (tenantId.is_initialized()) {
+            bob.append("tenantId", tenantId->toString());
         }
-    } else {
-        _updateStateDocument(opCtx.get(), newDoc);
-    }
+        bob.append("currentPhase", _doc.getPhase());
+        bob.append("command", cmdBob.obj());
+        bob.append("active", true);
+    });
 
-    _doc = std::move(newDoc);
+    return bob.obj();
 }
 
 bool SetClusterParameterCoordinator::_isClusterParameterSetAtTimestamp(OperationContext* opCtx) {
@@ -226,7 +197,10 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                 // Select a clusterParameter time.
                 auto vt = VectorClock::get(opCtx)->getTime();
                 auto clusterParameterTime = vt.clusterTime();
-                _doc.setClusterParameterTime(clusterParameterTime.asTimestamp());
+
+                _updateStateDocumentWith(opCtx, [&](StateDoc& doc) {
+                    doc.setClusterParameterTime(clusterParameterTime.asTimestamp());
+                });
             }
         })
         .then(_buildPhaseHandler(
@@ -249,7 +223,7 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                     return;
                 }
 
-                _doc = _updateSession(opCtx, _doc);
+                _updateSession(opCtx);
                 const auto session = _getCurrentSession();
 
                 {
