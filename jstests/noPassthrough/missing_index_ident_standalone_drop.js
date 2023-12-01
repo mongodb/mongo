@@ -10,6 +10,7 @@
 (function() {
 'use strict';
 
+load('jstests/noPassthrough/libs/index_build.js');
 load('jstests/noPassthrough/libs/missing_index_ident.js');
 
 const {replTest, dbpath} = MissingIndexIdent.run();
@@ -19,6 +20,11 @@ const standalone = MongoRunner.runMongod({
     noCleanData: true,
 });
 const coll = standalone.getDB('test')[jsTestName()];
+
+if (!IndexBuildTest.twoPhaseIndexBuildEnabled(standalone)) {
+    MongoRunner.stopMongod(standalone);
+    return;
+}
 
 IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
 assert.commandWorked(standalone.getDB('test')[jsTestName()].dropIndex('a_1'));
