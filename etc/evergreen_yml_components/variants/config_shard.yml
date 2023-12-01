@@ -1,8 +1,12 @@
 # This build variant is used to test suites that use sharded cluster fixture with config shard mode.
 # TODO (SERVER-75884): Remove this once we switch to config shard as the default.
 
-# THIS WAS COPIED FROM EVERGREEN.YML - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
 variables:
+# THIS HAS COPIES IN:
+# - etc/evergreen.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/config_shard.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
   - name: archive_dist_test_debug
@@ -15,29 +19,37 @@ variables:
   - name: generate_buildid_to_debug_symbols_mapping
     variant: linux-x86-dynamic-compile
 
-# THIS WAS COPIED FROM EVERGREEN.YML - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
+# THIS HAS COPIES IN:
+# - etc/evergreen.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/config_shard.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel80-medium
+  core_analyzer_distro_name: rhel80-large
   num_scons_link_jobs_available: 0.99
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
-# THIS WAS COPIED FROM EVERGREEN.YML - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
+# THIS HAS COPIES IN:
+# - etc/evergreen.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/config_shard.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &enterprise-rhel-80-64-bit-dynamic-expansions
-    <<: *linux_x86_generic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    has_packages: false
-    jstestfuzz_num_generated_files: 40
-    jstestfuzz_concurrent_num_files: 10
-    target_resmoke_time: 10
-    max_sub_suites: 5
-    idle_timeout_factor: 1.5
-    exec_timeout_factor: 1.5
-    large_distro_name: rhel80-medium
-    core_analyzer_distro_name: rhel80-large
+  <<: *linux_x86_generic_expansions
+  scons_cache_scope: shared
+  scons_cache_mode: all
+  has_packages: false
+  jstestfuzz_num_generated_files: 40
+  jstestfuzz_concurrent_num_files: 10
+  target_resmoke_time: 10
+  max_sub_suites: 5
+  idle_timeout_factor: 1.5
+  exec_timeout_factor: 1.5
+  large_distro_name: rhel80-medium
 
 buildvariants:
 - &enterprise-rhel-80-64-bit-dynamic-config-shard

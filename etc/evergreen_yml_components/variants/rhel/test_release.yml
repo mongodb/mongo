@@ -1,4 +1,4 @@
-# RHEL test release variants
+# RHEL build variants for testing release environments
 
 buildvariants:
 - name: ubi8
