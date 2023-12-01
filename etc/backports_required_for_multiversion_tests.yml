@@ -123,6 +123,8 @@ last-continuous:
     ticket: SERVER-81201
   - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
     ticket: SERVER-81985
+  - test_file: jstests/core/match_with_and_or_lockstep_enumeration.js
+    ticket: SERVER-83091
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -308,6 +310,8 @@ last-lts:
     ticket: SERVER-81201
   - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
     ticket: SERVER-81985
+  - test_file: jstests/core/match_with_and_or_lockstep_enumeration.js
+    ticket: SERVER-83091
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
