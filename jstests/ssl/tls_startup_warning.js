@@ -8,8 +8,10 @@ function runTest(opts, expectWarningCertifcates) {
     clearRawMongoProgramOutput();
     let mongo = MongoRunner.runMongod(Object.assign({
         auth: '',
-        waitForConnect: false,
         tlsMode: 'requireTLS',
+        env: {
+            SSL_CERT_FILE: 'jstests/libs/ca.pem',
+        }
     },
                                                     opts));
 
