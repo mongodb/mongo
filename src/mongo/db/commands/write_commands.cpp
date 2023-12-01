@@ -507,8 +507,9 @@ public:
             write_ops_exec::WriteResult reply;
             // For retryable updates on time-series collections, we needs to run them in
             // transactions to ensure the multiple writes are replicated atomically.
-            if (isTimeseriesViewRequest && opCtx->isRetryableWrite() &&
-                !opCtx->inMultiDocumentTransaction()) {
+            bool isTimeseriesRetryableUpdate = isTimeseriesViewRequest &&
+                opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction();
+            if (isTimeseriesRetryableUpdate) {
                 auto executor = serverGlobalParams.clusterRole.has(ClusterRole::None)
                     ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
                           opCtx->getServiceContext())
@@ -553,11 +554,15 @@ public:
                           PopulateReplyHooks{singleWriteHandler, postProcessHandler});
 
             // Collect metrics.
-            for (auto&& update : request().getUpdates()) {
-                incrementUpdateMetrics(update.getU(),
-                                       request().getNamespace(),
-                                       CmdUpdate::updateMetrics,
-                                       update.getArrayFilters());
+            // For time-series retryable updates, the metrics are already incremented when running
+            // the internal transaction. Avoids updating them twice.
+            if (!isTimeseriesRetryableUpdate) {
+                for (auto&& update : request().getUpdates()) {
+                    incrementUpdateMetrics(update.getU(),
+                                           request().getNamespace(),
+                                           CmdUpdate::updateMetrics,
+                                           update.getArrayFilters());
+                }
             }
 
             return updateReply;
