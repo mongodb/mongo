@@ -4160,9 +4160,6 @@ def doConfigure(myenv):
 
         if myenv.AddToCCFLAGSIfSupported(sanitizer_option):
             myenv.Append(LINKFLAGS=[sanitizer_option])
-            # Sanitizers builds do not include symbols for int128 multiplication.
-            # See: https://bugs.llvm.org/show_bug.cgi?id=16404
-            myenv.Append(LINKFLAGS=['-rtlib=compiler-rt', '-unwindlib=libgcc'])
             myenv.Append(CCFLAGS=['-fno-omit-frame-pointer'])
         else:
             myenv.ConfError('Failed to enable sanitizers with flag: {0}', sanitizer_option)
