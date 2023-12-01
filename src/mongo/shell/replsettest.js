@@ -1285,11 +1285,20 @@ var ReplSetTest = function ReplSetTest(opts) {
         let db = primary.getDB('admin');
         runFnWithAuthOnPrimary(this, function() {
             assert.soon(function() {
-                const getConfigRes = assert.commandWorked(db.adminCommand({
-                    replSetGetConfig: 1,
-                    commitmentStatus: true,
-                    $_internalIncludeNewlyAdded: true
-                }));
+                const getConfigRes =
+                    assert.commandWorkedOrFailedWithCode(db.adminCommand({
+                        replSetGetConfig: 1,
+                        commitmentStatus: true,
+                        $_internalIncludeNewlyAdded: true
+                    }),
+                                                         ErrorCodes.NotWritablePrimary);
+
+                if (!getConfigRes.ok) {
+                    print("waitForAllNewlyAddedRemovals: Retrying because the old primary " +
+                          " stepped down");
+                    return false;
+                }
+
                 const config = getConfigRes.config;
                 for (let i = 0; i < config.members.length; i++) {
                     const memberConfig = config.members[i];
