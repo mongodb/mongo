@@ -122,13 +122,7 @@ def old_patch_description(pattern: str) -> str:
 
 # NOTE: re.VERBOSE is for visibility / debugging. As such significant white space must be
 # escaped (e.g ' ' to \s).
-VALID_PATTERNS = [
-    re.compile(
-        new_patch_description(COMMON_10GENREPO_COMMIT_QUEUE_PATTERN),
-        re.MULTILINE | re.DOTALL | re.VERBOSE),
-    re.compile(
-        old_patch_description(COMMON_10GENREPO_COMMIT_QUEUE_PATTERN),
-        re.MULTILINE | re.DOTALL | re.VERBOSE),
+COMMON_PUBLIC_PATTERNS = [
     re.compile(
         new_patch_description(COMMON_PUBLIC_PATTERN),
         re.MULTILINE | re.DOTALL | re.VERBOSE,
@@ -137,6 +131,10 @@ VALID_PATTERNS = [
         old_patch_description(COMMON_PUBLIC_PATTERN),
         re.MULTILINE | re.DOTALL | re.VERBOSE,
     ),
+]
+"""common public patterns."""
+
+VALID_PATTERNS = [
     re.compile(
         new_patch_description(COMMON_LINT_PATTERN),
         re.MULTILINE | re.DOTALL | re.VERBOSE,
@@ -173,6 +171,12 @@ PRIVATE_PATTERNS = [
         old_patch_description(COMMON_PRIVATE_PATTERN),
         re.MULTILINE | re.DOTALL | re.VERBOSE,
     ),
+    re.compile(
+        new_patch_description(COMMON_10GENREPO_COMMIT_QUEUE_PATTERN),
+        re.MULTILINE | re.DOTALL | re.VERBOSE),
+    re.compile(
+        old_patch_description(COMMON_10GENREPO_COMMIT_QUEUE_PATTERN),
+        re.MULTILINE | re.DOTALL | re.VERBOSE),
 ]
 """private patterns."""
 
@@ -214,18 +218,22 @@ class CommitMessageValidationOrchestrator:
         :param project: Project commit is targeting.
         :return: True if the message is valid.
         """
+        for pattern in COMMON_PUBLIC_PATTERNS:
+            match = pattern.match(message)
+            if not match:
+                continue
+            if not self.validate_ticket(match.group("ticket"), project):
+                print(
+                    ERROR_MSG.format(
+                        error_msg="Reference to a internal Jira Ticket",
+                        branch=project,
+                        commit_message=message,
+                    ))
+                return False
+            return True
+
         valid_matches = [valid_pattern.match(message) for valid_pattern in VALID_PATTERNS]
         if any(valid_matches):
-            ticket_matches = [pattern.match(message) for pattern in VALID_PATTERNS[0:2]]
-            for match in [ticket_match for ticket_match in ticket_matches if ticket_match]:
-                if not self.validate_ticket(match.group("ticket"), project):
-                    print(
-                        ERROR_MSG.format(
-                            error_msg="Reference to a internal Jira Ticket",
-                            branch=project,
-                            commit_message=message,
-                        ))
-                    return False
             return True
         elif any(private_pattern.match(message) for private_pattern in PRIVATE_PATTERNS):
             print(
