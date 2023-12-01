@@ -226,20 +226,20 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
             return Status(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
         }
 
-        const NamespaceString bucketNs = _nss.makeTimeseriesBucketsNamespace();
+        _nss = _nss.makeTimeseriesBucketsNamespace();
         if (isBackground()) {
-            _collection = CollectionPtr(
-                _catalog->establishConsistentCollection(opCtx, bucketNs, _validateTs));
+            _collection =
+                CollectionPtr(_catalog->establishConsistentCollection(opCtx, _nss, _validateTs));
         } else {
-            _collectionLock.emplace(opCtx, bucketNs, MODE_X);
-            _collection = CollectionPtr(_catalog->lookupCollectionByNamespace(opCtx, bucketNs));
+            _collectionLock.emplace(opCtx, _nss, MODE_X);
+            _collection = CollectionPtr(_catalog->lookupCollectionByNamespace(opCtx, _nss));
         }
 
         if (!_collection) {
             return Status(ErrorCodes::NamespaceNotFound,
                           fmt::format("Cannot validate a time-series collection without its "
                                       "bucket collection {}.",
-                                      bucketNs.toStringForErrorMsg()));
+                                      _nss.toStringForErrorMsg()));
         }
     }
 
