@@ -1,18 +1,24 @@
 variables:
-
-- &amazon_linux2_x86_compile_variant_dependency
+- &amazon2_x86_compile_variant_dependency
   depends_on:
   - name: schedule_global_auto_tasks
     variant: task_generation
   - name: package_new_compile
-    variant: package-amazon2-x86
+    variant: amazon2-x86-compile
 
 - &amazon_linux2_arm64_compile_variant_dependency
   depends_on:
   - name: schedule_global_auto_tasks
     variant: task_generation
   - name: package_new_compile
-    variant: package-amazon-linux2-arm64
+    variant: amazon2-arm64-compile
+
+- &amazon_linux2_x86_streams_compile_variant_dependency
+  depends_on:
+  - name: schedule_global_auto_tasks
+    variant: task_generation
+  - name: package_new_compile
+    variant: amazon2-x86-streams-compile
 
 - &amazon2_x86_expansions
   multiversion_platform: amazon2
@@ -70,7 +76,7 @@ buildvariants:
     project_dir: &perf_project_dir dsi
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - rhel70-small
   tasks:
@@ -107,7 +113,7 @@ buildvariants:
   # - name: tpch_10_normalized
   # - name: tpch_10_denormalized
 
-- <<: *amazon_linux2_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-standalone-classic-query-engine.intel.aws.2023-11
   display_name: PERF Standalone (Classic Query Engine) Intel AWS 2023-11
   # cron: &cron_query_perf_schedule "0 0 * * 4"  # 00:00 on Thursday
@@ -152,7 +158,7 @@ buildvariants:
     - name: canaries_only
 
 
-- <<: *amazon_linux2_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-standalone-sbe.intel.aws.2023-11
   display_name: PERF Standalone (SBE) Intel AWS 2023-11
   # cron: *cron_query_perf_schedule
@@ -173,7 +179,7 @@ buildvariants:
     - "rhel70-perf-single"
   tasks: *classic_engine_tasks
 
-- <<: *amazon_linux2_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-1-node-replSet-classic-query-engine.intel.aws.2023-11
   display_name: PERF Intel 1-Node ReplSet (Classic Query Engine) Intel AWS 2023-11
   # cron: &linux-1-node-repl-cron "0 0 * * 4"  # 00:00 on Thursday
@@ -200,7 +206,7 @@ buildvariants:
     - name: snapshot_reads
     - name: canaries_only
 
-- <<: *amazon_linux2_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-1-node-replSet-sbe.intel.aws.2023-11
   display_name: PERF 1-Node ReplSet (SBE) Intel AWS 2023-11
   # cron: *linux-1-node-repl-cron
@@ -237,7 +243,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks:
@@ -269,7 +275,7 @@ buildvariants:
     platform: linux
     project_dir: *perf_project_dir
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-atlas-large"
   tasks:
@@ -296,7 +302,7 @@ buildvariants:
     platform: linux
     project_dir: *perf_project_dir
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-atlas-large"
   tasks:
@@ -327,14 +333,14 @@ buildvariants:
     platform: linux
     project_dir: *perf_project_dir
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-atlas-large"
   tasks:
     - name: locust_bulk_insert
 
 # Uncomment after SERVER-83767 is completed
-# - <<: *amazon_linux2_x86_compile_variant_dependency
+# - <<: *amazon2_x86_compile_variant_dependency
 #   name: perf-atlas-M60-real.intel.azure.2023-11
 #   display_name: PERF M60-Atlas ReplSet Intel Azure 2023-11
 #   # cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
@@ -383,7 +389,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: &standalonetasks
@@ -434,7 +440,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks:
@@ -465,30 +471,30 @@ buildvariants:
     - name: column_store_tpch_10_denormalized_unindexed
     - name: ssb_column_store_comparison
 
-# - name: perf-streams-single.intel.aws.2023-10
-#   display_name: PERF Streams-Single Intel AWS 2023-10
-#   activate: false
-#   # cron: "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
-#   modules: *perf_modules
-#   expansions:
-#     compile_variant: -stream-x86_64
-#     requires_mongostream: true
-#     mongodb_setup_release: 2022-11
-#     mongodb_setup: streams-single.2023-10
-#     infrastructure_provisioning_release: 2023-09
-#     infrastructure_provisioning: streams-single.intel.2023-11
-#     workload_setup: 2022-11
-#     platform: linux
-#     project_dir: *perf_project_dir
-#     authentication: enabled
-#     storageEngine: wiredTiger
-#   run_on:
-#     - "rhel70-perf-single"
-#   depends_on: *_compile_amazon2_streams
-#   tasks:
-#     - name: schedule_patch_auto_tasks
-#     - name: schedule_variant_auto_tasks
-#     - name: stream_workloads
+- <<: *amazon_linux2_x86_streams_compile_variant_dependency
+  name: perf-streams-single.intel.aws.2023-10
+  display_name: PERF Streams-Single Intel AWS 2023-10
+  activate: false
+  # cron: "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
+  modules: *perf_modules
+  expansions:
+    compile_variant: amazon2-x86-streams-compile
+    requires_mongostream: true
+    mongodb_setup_release: 2022-11
+    mongodb_setup: streams-single.2023-10
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: streams-single.intel.2023-11
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+    - "rhel70-perf-single"
+  tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
+    - name: stream_workloads
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone-classic-query-engine.arm.aws.2023-11
@@ -506,7 +512,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: *classic_engine_tasks
@@ -527,7 +533,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: *classic_engine_tasks
@@ -548,14 +554,14 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: &bonsai_standalone_tasks
     - name: schedule_patch_auto_tasks
     - name: schedule_variant_auto_tasks
 
-- <<: *amazon_linux2_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-standalone-sampling-bonsai.intel.aws.2023-11
   display_name: PERF Standalone (Bonsai with Sampling CE) Intel AWS 2023-11
   activate: false
@@ -592,12 +598,12 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: *bonsai_standalone_tasks
 
-- <<: *amazon_linux2_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-standalone-heuristic-bonsai.intel.aws.2023-11
   display_name: PERF Standalone (Bonsai with Heuristic CE) Intel AWS 2023-11
   activate: false
@@ -618,7 +624,7 @@ buildvariants:
     - "rhel70-perf-single"
   tasks: *bonsai_standalone_tasks
 
-- <<: *amazon_linux2_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-1-node-replSet-sampling-bonsai.intel.aws.2023-11
   display_name: PERF 1-Node ReplSet (Bonsai with Sampling CE) Intel AWS 2023-11
   activate: false
@@ -659,12 +665,12 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: *bonsai_1nodereplset_tasks
 
-- <<: *amazon_linux2_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-1-node-replSet-heuristic-bonsai.intel.aws.2023-11
   display_name: PERF 1-Node ReplSet (Bonsai with Heuristic CE) Intel AWS 2023-11
   activate: false
@@ -701,7 +707,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: *bonsai_1nodereplset_tasks
@@ -722,7 +728,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: *classic_engine_1nodereplset_tasks
@@ -743,7 +749,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: *classic_engine_1nodereplset_tasks
@@ -765,7 +771,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks:
@@ -798,7 +804,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks:
@@ -821,7 +827,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks:
@@ -846,7 +852,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
     # Needed to allow enabling failpoints.
     config_params_json: &config_params_enableTestCommmands '{"v":0, "enableTestCommands": true}'
   run_on:
@@ -870,7 +876,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: &audit-tasks
@@ -896,7 +902,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: *audit-tasks
@@ -917,7 +923,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: *audit-tasks
@@ -938,7 +944,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks:
@@ -975,7 +981,7 @@ buildvariants:
 #     project_dir: *perf_project_dir
 #     authentication: enabled
 #     storageEngine: wiredTiger
-#     compile_variant: amazon-linux2-arm64-compile
+#     compile_variant: amazon2-arm64-compile
 #     requires_mongocrypt_shlib: true
 #   run_on:
 #     - "rhel70-perf-shard-lite"
@@ -1005,7 +1011,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks: *audit-tasks
@@ -1026,7 +1032,7 @@ buildvariants:
 #     authentication: enabled
 #     fle: enabled
 #     storageEngine: wiredTiger
-#     compile_variant: amazon-linux2-arm64-compile
+#     compile_variant: amazon2-arm64-compile
 #     requires_mongocrypt_shlib: true
 #   run_on:
 #     - "rhel70-perf-single"
@@ -1054,7 +1060,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks:
@@ -1081,7 +1087,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks:
@@ -1108,7 +1114,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks:
@@ -1135,7 +1141,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-replset"
   tasks:
@@ -1164,7 +1170,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-shard"
   tasks: &linux_3_shard_tasks
@@ -1238,7 +1244,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-shard"
   tasks:
@@ -1263,7 +1269,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-shard-lite"
   tasks:
@@ -1286,7 +1292,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-shard-lite"
   tasks: &shardlitetasks
@@ -1315,7 +1321,7 @@ buildvariants:
     - name: tsbs_query_sharded_balancer
     - name: tsbs_query_finance_sharded_balancer
 
-- <<: *amazon_linux2_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-shard-lite-intel.intel.aws.2023-11
   display_name: PERF Shard Lite Cluster Intel AWS 2023-11
   activate: false
@@ -1359,7 +1365,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-shard-lite"
   tasks:
@@ -1384,7 +1390,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-shard-lite"
   tasks:
@@ -1441,7 +1447,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-shard-lite"
   tasks:
@@ -1464,7 +1470,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-replset"
   tasks:
@@ -1532,7 +1538,7 @@ buildvariants:
       # cron: *high-value-workload-cron
 
 
-- <<: *amazon_linux2_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-3-node-replSet-intel.intel.aws.2023-11
   display_name: PERF 3-Node ReplSet Intel AWS 2023-11
   activate: false
@@ -1587,7 +1593,7 @@ buildvariants:
     - name: time_series_sort_high_value
       # cron: *query-stats-cron
 
-- <<: *amazon_linux2_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-3-node-replSet-intel-query-stats.intel.aws.2023-11
   display_name: PERF 3-Node ReplSet (QueryStats) Intel AWS 2023-11
   activate: false
@@ -1624,7 +1630,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-replset"
   tasks:
@@ -1685,7 +1691,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-replset"
   tasks:
@@ -1746,7 +1752,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-replset"
   tasks:
@@ -1810,7 +1816,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-replset"
   tasks:
@@ -1835,7 +1841,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-replset"
   tasks:
@@ -1869,7 +1875,7 @@ buildvariants:
     platform: linux
     authentication: disabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
     project_dir: *perf_project_dir
   run_on:
     - "rhel70-perf-replset"
@@ -1894,7 +1900,7 @@ buildvariants:
     platform: linux
     authentication: disabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
     project_dir: *perf_project_dir
   run_on:
     - "rhel70-perf-replset"
@@ -1919,7 +1925,7 @@ buildvariants:
     platform: linux
     authentication: disabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
     project_dir: *perf_project_dir
   run_on:
     - "rhel70-perf-initialsync-logkeeper"
@@ -1971,7 +1977,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-replset"
   tasks:
@@ -1995,7 +2001,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-replset"
   tasks:
@@ -2018,7 +2024,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-replset"
   tasks:
@@ -2074,7 +2080,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-replset"
   tasks:
@@ -2102,7 +2108,7 @@ buildvariants:
     canaries: none
     storageEngine: inMemory
     project_dir: *perf_project_dir
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
   - "rhel70-perf-microbenchmarks"
   tasks:
@@ -2255,7 +2261,7 @@ buildvariants:
     canaries: none
     storageEngine: inMemory
     project_dir: *perf_project_dir
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
   - "rhel70-perf-microbenchmarks"
   tasks:
@@ -2370,7 +2376,7 @@ buildvariants:
   # If diverging from that list, add the entire list of desired tasks here
 
 - &linux-mongo-perf-standalone-intel
-  <<: *amazon_linux2_x86_compile_variant_dependency
+  <<: *amazon2_x86_compile_variant_dependency
   name: perf-mongo-perf-standalone.intel.aws.2023-11
   display_name: PERF Mongo-Perf Standalone inMemory Intel AWS 2023-11
   activate: false
@@ -2413,7 +2419,7 @@ buildvariants:
   - name: tie-breaking-heuristics
 
 - &linux-mongo-perf-repl-intel
-  <<: *amazon_linux2_x86_compile_variant_dependency
+  <<: *amazon2_x86_compile_variant_dependency
   name: perf-mongo-perf-repl.intel.aws.2023-11
   display_name: PERF Mongo-Perf 1-Node ReplSet inMemory Intel AWS 2023-11
   activate: false
@@ -2520,7 +2526,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-single"
   tasks:
@@ -2541,7 +2547,7 @@ buildvariants:
     platform: linux
     authentication: disabled
     storageEngine: wiredTiger
-    compile_variant: amazon-linux2-arm64-compile
+    compile_variant: amazon2-arm64-compile
     project_dir: *perf_project_dir
   run_on:
     - "rhel70-perf-shard"
