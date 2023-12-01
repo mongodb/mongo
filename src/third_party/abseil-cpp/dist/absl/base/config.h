@@ -338,7 +338,11 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #if (defined(__clang__) && !defined(_WIN32)) || \
     (defined(__CUDACC__) && __CUDACC_VER_MAJOR__ >= 9) ||                \
     (defined(__GNUC__) && !defined(__clang__) && !defined(__CUDACC__))
+#if !ABSL_HAVE_FEATURE(address_sanitizer) && !ABSL_HAVE_FEATURE(memory_sanitizer) && \
+    !ABSL_HAVE_FEATURE(thread_sanitizer) && !ABSL_HAVE_FEATURE(undefined_behavior_sanitizer)
 #define ABSL_HAVE_INTRINSIC_INT128 1
+#endif  // !ABSL_HAVE_FEATURE(address_sanitizer) && !ABSL_HAVE_FEATURE(memory_sanitizer) &&
+        // !ABSL_HAVE_FEATURE(thread_sanitizer) && !ABSL_HAVE_FEATURE(undefined_behavior_sanitizer)
 #elif defined(__CUDACC__)
 // __CUDACC_VER__ is a full version number before CUDA 9, and is defined to a
 // string explaining that it has been removed starting with CUDA 9. We use
