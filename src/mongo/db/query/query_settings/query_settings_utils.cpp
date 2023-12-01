@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
+#include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/util/serialization_context.h"
@@ -95,6 +96,48 @@ RepresentativeQueryInfo createRepresentativeInfoFind(
 }
 
 /*
+ * Creates the corresponding RepresentativeQueryInfo for Distinct query representatives.
+ */
+RepresentativeQueryInfo createRepresentativeInfoDistinct(
+    const QueryInstance& queryInstance,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::optional<TenantId>& tenantId) {
+    auto distinctCommandRequest =
+        std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
+            IDLParserContext(
+                "distinctCommandRequest", false /* apiStrict */, tenantId, kSerializationContext),
+            queryInstance));
+
+    auto parsedDistinctCommand =
+        parsed_distinct_command::parse(expCtx,
+                                       queryInstance,
+                                       std::move(distinctCommandRequest),
+                                       ExtensionsCallbackNoop(),
+                                       MatchExpressionParser::kAllowAllSpecialFeatures);
+
+    // Extract namespace from distinct command.
+    auto& nssOrUuid = parsedDistinctCommand->distinctCommandRequest->getNamespaceOrUUID();
+    uassert(7919501,
+            "Collection namespace string must be provided for setQuerySettings command",
+            nssOrUuid.isNamespaceString());
+    stdx::unordered_set<NamespaceString> involvedNamespaces{nssOrUuid.nss()};
+
+    DistinctCmdShape distinctCmdShape{*parsedDistinctCommand, expCtx};
+    const auto serializationContext =
+        parsedDistinctCommand->distinctCommandRequest->getSerializationContext();
+
+    return RepresentativeQueryInfo{
+        distinctCmdShape.toBson(expCtx->opCtx,
+                                SerializationOptions::kDebugQueryShapeSerializeOptions,
+                                serializationContext),
+        distinctCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
+        nssOrUuid.nss(),
+        std::move(involvedNamespaces),
+        boost::none /* encryptionInformation */,
+        false /* isIdHackEligibleQuery */};
+}
+
+/*
  * Creates the corresponding RepresentativeQueryInfo for Aggregation query representatives.
  */
 RepresentativeQueryInfo createRepresentativeInfoAgg(
@@ -147,19 +190,20 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(
         false /* isIdHackEligibleQuery */};
 }
 
-// TODO: SERVER-79105 Ensure setQuerySettings and removeQuerySettings commands can take distinct
-// commands as arguments - a similar function can be added for `distinct` command.
-
 RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
                                                  OperationContext* opCtx,
                                                  const boost::optional<TenantId>& tenantId) {
 
     auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, NamespaceString());
-    if (cmd.firstElementFieldName() == FindCommandRequest::kCommandName) {
+    const auto commandName = cmd.firstElementFieldNameStringData();
+    if (commandName == FindCommandRequest::kCommandName) {
         return createRepresentativeInfoFind(cmd, expCtx, tenantId);
     }
-    if (cmd.firstElementFieldName() == AggregateCommandRequest::kCommandName) {
+    if (commandName == AggregateCommandRequest::kCommandName) {
         return createRepresentativeInfoAgg(cmd, expCtx, tenantId);
+    }
+    if (commandName == DistinctCommandRequest::kCommandName) {
+        return createRepresentativeInfoDistinct(cmd, expCtx, tenantId);
     }
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
 }
