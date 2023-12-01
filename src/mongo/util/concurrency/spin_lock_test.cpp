@@ -44,13 +44,10 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-
+namespace mongo {
 namespace {
 
-using mongo::SpinLock;
-using mongo::Timer;
-
-namespace stdx = mongo::stdx;
+using namespace fmt::literals;
 
 class LockTester {
 public:
@@ -135,7 +132,6 @@ public:
         }
 
         int ms = timer.millis();
-        using namespace mongo::literals;
         LOGV2(24149, "spinlock {testName} time: {ms}", "testName"_attr = testName, "ms"_attr = ms);
 
         ASSERT_EQUALS(counter, _threads * _incs);
@@ -158,3 +154,4 @@ TEST(Concurrency, ConcurrentIncsWithTryLock) {
 }
 
 }  // namespace
+}  // namespace mongo

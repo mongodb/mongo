@@ -368,6 +368,7 @@ private:
     //
     // This has to be locked inside const methods, hence the mutable.
     mutable SpinLock _lock;
+
     // Note: this data structure must always guarantee the continued validity of pointers/references
     // to its contents (LockRequests). The LockManager maintains a LockRequestList of pointers to
     // the LockRequests managed by this data structure.

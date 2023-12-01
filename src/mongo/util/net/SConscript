@@ -106,15 +106,15 @@ if not get_option('ssl') == 'off':
     env.Library(
         target='ssl_manager',
         source=[
-            "sock.cpp",
-            "private/ssl_expiration.cpp",
-            "ssl_manager.cpp",
-            "ssl_parameters.cpp",
-            "ssl_manager_%s.cpp" % (ssl_provider),
-            "ssl_stream.cpp",
-            "ssl_peer_info.cpp",
+            'sock.cpp',
+            'private/ssl_expiration.cpp',
+            'ssl_manager.cpp',
+            'ssl_parameters.cpp',
+            'ssl_manager_%s.cpp' % (ssl_provider),
+            'ssl_stream.cpp',
+            'ssl_peer_info.cpp',
             'ssl_parameters.idl',
-            "ocsp/ocsp_manager.cpp",
+            'ocsp/ocsp_manager.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
