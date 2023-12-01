@@ -521,7 +521,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         // enabled.
         // (Ignore FCV check): As with 'featureFlagSbeFull' (above), the effects of
         // 'featureFlagSearchInSbe' are local to this node, making it safe to ignore the FCV.
-        .search = feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe(),
+        .search = false,
 
         .window = !(SbeCompatibility::fullyCompatible < minRequiredCompatibility),
 
