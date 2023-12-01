@@ -3,7 +3,10 @@
  * are targeting that rewrites for $project with $getField, or '$$ROOT'/'$$CURRENT' should only
  * occur in certain situations.
  *
- * @tags: [requires_timeseries]
+ * @tags: [
+ *   requires_timeseries,
+ *   requires_fcv_72,
+ * ]
  */
 
 const timeField = "t";
