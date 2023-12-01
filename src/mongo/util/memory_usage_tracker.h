@@ -258,17 +258,12 @@ public:
 
     MemoryUsageTokenImpl(size_t initial, Tracker* tracker)
         : _tracker(tracker), _curMemoryUsageBytes(initial) {
-        tassert(817700, "tracker must be set", _tracker != nullptr);
-        dassert(initial <= static_cast<size_t>(std::numeric_limits<int64_t>::max()));
-        if (initial != 0) {
-            _tracker->add(initial);
-        }
+        _tracker->add(_curMemoryUsageBytes);
     }
 
     MemoryUsageTokenImpl(MemoryUsageTokenImpl&& other)
         : _tracker(other._tracker), _curMemoryUsageBytes(other._curMemoryUsageBytes) {
         other._tracker = nullptr;
-        other._curMemoryUsageBytes = 0;
     }
 
     MemoryUsageTokenImpl& operator=(MemoryUsageTokenImpl&& other) {
@@ -280,7 +275,6 @@ public:
         _tracker = other._tracker;
         _curMemoryUsageBytes = other._curMemoryUsageBytes;
         other._tracker = nullptr;
-        other._curMemoryUsageBytes = 0;
         return *this;
     }
 
@@ -305,7 +299,6 @@ protected:
         if (_tracker) {
             _tracker->add(-_curMemoryUsageBytes);
         }
-        _curMemoryUsageBytes = 0;
     }
 
     Tracker* _tracker{nullptr};
