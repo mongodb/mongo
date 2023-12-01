@@ -297,7 +297,7 @@ bool ResidualRequirement::operator==(const ResidualRequirement& other) const {
 
 ResidualRequirementWithOptionalCE::ResidualRequirementWithOptionalCE(PartialSchemaKey key,
                                                                      PartialSchemaRequirement req,
-                                                                     boost::optional<CEType> ce)
+                                                                     boost::optional<CERecord> ce)
     : _key(std::move(key)), _req(std::move(req)), _ce(ce) {}
 
 EqualityPrefixEntry::EqualityPrefixEntry(const size_t startPos)

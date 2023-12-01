@@ -1811,7 +1811,7 @@ void lowerPartialSchemaRequirements(boost::optional<CEType> scanGroupCE,
                                        // Compute CE for the node implementing the current
                                        // PartialSchemaRequirement.
                                        if (entry._ce && *scanGroupCE > 0.0) {
-                                           indexPredSels.push_back(*entry._ce / *scanGroupCE);
+                                           indexPredSels.push_back(entry._ce->_ce / *scanGroupCE);
                                        }
                                        if (!indexPredSels.empty()) {
                                            *residualCE *= ce::conjExponentialBackoff(indexPredSels);
@@ -1849,7 +1849,7 @@ void lowerPartialSchemaRequirements(boost::optional<CEType> scanGroupCE,
 
                             toAnd.push_back(std::move(*evalFilter));
                             if (ce && scanGroupCE && *scanGroupCE > 0.0) {
-                                conjSels.push_back(*ce / *scanGroupCE);
+                                conjSels.push_back(ce->_ce / *scanGroupCE);
                             }
                         });
                 });
@@ -1896,7 +1896,7 @@ void sortResidualRequirements(ResidualRequirementsWithOptionalCE::Node& residual
                                 if (!isIntervalReqFullyOpenDNF(entry._req.getIntervals())) {
                                     multiplier++;
                                 }
-                                costs.emplace_back(entry._ce->_value * multiplier,
+                                costs.emplace_back(entry._ce->_ce._value * multiplier,
                                                    conjCtx.getChildIndex());
                             }
                         });

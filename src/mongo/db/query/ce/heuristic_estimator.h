@@ -44,10 +44,10 @@ namespace mongo::optimizer::ce {
  */
 class HeuristicEstimator : public cascades::CardinalityEstimator {
 public:
-    CEType deriveCE(const Metadata& metadata,
-                    const cascades::Memo& memo,
-                    const properties::LogicalProps& /*logicalProps*/,
-                    ABT::reference_type logicalNodeRef) const override final;
+    CERecord deriveCE(const Metadata& metadata,
+                      const cascades::Memo& memo,
+                      const properties::LogicalProps& /*logicalProps*/,
+                      ABT::reference_type logicalNodeRef) const override final;
 };
 
 }  // namespace mongo::optimizer::ce

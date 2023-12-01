@@ -397,12 +397,12 @@ TEST(PhysRewriter, LowerRequirementsWithTopLevelDisjunction) {
     BoolExprBuilder<ResidualRequirementWithOptionalCE> residReqsBuilder;
     residReqsBuilder.pushDisj()
         .pushConj()
-        .atom({makeKey("a"), req, CEType{2.0}})
-        .atom({makeKey("b"), req, CEType{3.0}})
+        .atom({makeKey("a"), req, CERecord{2.0, "test"}})
+        .atom({makeKey("b"), req, CERecord{3.0, "test"}})
         .pop()
         .pushConj()
-        .atom({makeKey("c"), req, CEType{5.0}})
-        .atom({makeKey("d"), req, CEType{4.0}})
+        .atom({makeKey("c"), req, CERecord{5.0, "test"}})
+        .atom({makeKey("d"), req, CERecord{4.0, "test"}})
         .pop();
     auto residReqs = residReqsBuilder.finish().get();
     lowerPartialSchemaRequirements(

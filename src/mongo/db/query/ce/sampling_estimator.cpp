@@ -238,13 +238,13 @@ public:
           _fallbackCE(std::move(fallbackCE)),
           _executor(std::move(executor)) {}
 
-    CEType transport(const ABT::reference_type n,
-                     const FilterNode& node,
-                     const Metadata& metadata,
-                     const cascades::Memo& memo,
-                     const properties::LogicalProps& logicalProps,
-                     CEType childResult,
-                     CEType /*exprResult*/) {
+    CERecord transport(const ABT::reference_type n,
+                       const FilterNode& node,
+                       const Metadata& metadata,
+                       const cascades::Memo& memo,
+                       const properties::LogicalProps& logicalProps,
+                       CERecord childResult,
+                       CERecord /*exprResult*/) {
         if (_phaseManager.getHints()._forceSamplingCEFallBackForFilterNode ||
             !properties::hasProperty<properties::IndexingAvailability>(logicalProps)) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
@@ -254,17 +254,18 @@ public:
         // Create a plan with all eval nodes so far and the filter last.
         ABT abtTree = make<FilterNode>(node.getFilter(), planExtractor.extract(n.copy()));
 
-        return estimateFilterCE(metadata, memo, logicalProps, n, std::move(abtTree), childResult);
+        return estimateFilterCE(
+            metadata, memo, logicalProps, n, std::move(abtTree), childResult._ce);
     }
 
-    CEType transport(const ABT::reference_type n,
-                     const SargableNode& node,
-                     const Metadata& metadata,
-                     const cascades::Memo& memo,
-                     const properties::LogicalProps& logicalProps,
-                     CEType childResult,
-                     CEType /*bindResult*/,
-                     CEType /*refsResult*/) {
+    CERecord transport(const ABT::reference_type n,
+                       const SargableNode& node,
+                       const Metadata& metadata,
+                       const cascades::Memo& memo,
+                       const properties::LogicalProps& logicalProps,
+                       CERecord childResult,
+                       CERecord /*bindResult*/,
+                       CERecord /*refsResult*/) {
         if (!properties::hasProperty<properties::IndexingAvailability>(logicalProps)) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
         }
@@ -304,6 +305,7 @@ public:
         // conjKeyPair.first until its match is found by the lambda below. conjKeyPair.second is
         // used to identify the PartialSchemaKey path of each conjunct.
         boost::optional<std::pair<ABT, ABT>> conjKeyPair;
+        std::string estimationMode;
         // Estimate individual requirements separately by potentially re-using cached results.
         // TODO: consider estimating together the entire set of requirements (but caching!)
         EstimatePartialSchemaEntrySelFn estimateFn = [&](SelectivityTreeBuilder& selTreeBuilder,
@@ -342,54 +344,54 @@ public:
                 }
                 // Continue the sampling estimation only if the field from the partial schema is
                 // indexed.
-                const bool isPartialSchemaKeyIndexed = isFieldPathIndexed(key, scanDef);
-                const CEType filterCE = isPartialSchemaKeyIndexed
+                const CERecord& filterCE = isFieldPathIndexed(key, scanDef)
                     ? estimateFilterCE(
-                          metadata, memo, logicalProps, n, std::move(entry), childResult)
+                          metadata, memo, logicalProps, n, std::move(entry), childResult._ce)
                     : _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
                 const SelectivityType sel =
-                    childResult > 0.0 ? (filterCE / childResult) : SelectivityType{0.0};
+                    childResult._ce > 0.0 ? (filterCE._ce / childResult._ce) : SelectivityType{0.0};
                 selTreeBuilder.atom(sel);
+                estimationMode = filterCE._mode;
             }
         };
-        PartialSchemaRequirementsCardinalityEstimator estimator(estimateFn, childResult);
-        return estimator.estimateCE(node.getReqMap());
+        PartialSchemaRequirementsCardinalityEstimator estimator(estimateFn, childResult._ce);
+        return {estimator.estimateCE(node.getReqMap()), estimationMode};
     }
 
     /**
      * Other ABT types.
      */
     template <typename T, typename... Ts>
-    CEType transport(ABT::reference_type n,
-                     const T& /*node*/,
-                     const Metadata& metadata,
-                     const cascades::Memo& memo,
-                     const properties::LogicalProps& logicalProps,
-                     Ts&&...) {
+    CERecord transport(ABT::reference_type n,
+                       const T& /*node*/,
+                       const Metadata& metadata,
+                       const cascades::Memo& memo,
+                       const properties::LogicalProps& logicalProps,
+                       Ts&&...) {
         if (canBeLogicalNode<T>()) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
         }
-        return {0.0};
+        return {0.0, samplingLabel};
     }
 
-    CEType derive(const Metadata& metadata,
-                  const cascades::Memo& memo,
-                  const properties::LogicalProps& logicalProps,
-                  const ABT::reference_type logicalNodeRef) {
+    CERecord derive(const Metadata& metadata,
+                    const cascades::Memo& memo,
+                    const properties::LogicalProps& logicalProps,
+                    const ABT::reference_type logicalNodeRef) {
         return algebra::transport<true>(logicalNodeRef, *this, metadata, memo, logicalProps);
     }
 
 private:
-    CEType estimateFilterCE(const Metadata& metadata,
-                            const cascades::Memo& memo,
-                            const properties::LogicalProps& logicalProps,
-                            const ABT::reference_type n,
-                            ABT abtTree,
-                            CEType childResult) {
+    CERecord estimateFilterCE(const Metadata& metadata,
+                              const cascades::Memo& memo,
+                              const properties::LogicalProps& logicalProps,
+                              const ABT::reference_type n,
+                              ABT abtTree,
+                              CEType childResult) {
         auto it = _selectivityCacheMap.find(abtTree);
         if (it != _selectivityCacheMap.cend()) {
             // Cache hit.
-            return it->second * childResult;
+            return {it->second * childResult, samplingLabel};
         }
 
         const auto selectivity = estimateSelectivity(abtTree);
@@ -403,7 +405,7 @@ private:
                             5,
                             "CE sampling estimated filter selectivity",
                             "selectivity"_attr = selectivity->_value);
-        return *selectivity * childResult;
+        return {*selectivity * childResult, samplingLabel};
     }
 
     boost::optional<optimizer::SelectivityType> estimateSelectivity(ABT abt) {
@@ -480,6 +482,8 @@ private:
     const int64_t _sampleSize;
     std::unique_ptr<cascades::CardinalityEstimator> _fallbackCE;
     std::unique_ptr<SamplingExecutor> _executor;
+
+    static constexpr char samplingLabel[] = "sampling";
 };
 
 SamplingEstimator::SamplingEstimator(OptPhaseManager phaseManager,
@@ -491,10 +495,10 @@ SamplingEstimator::SamplingEstimator(OptPhaseManager phaseManager,
 
 SamplingEstimator::~SamplingEstimator() {}
 
-CEType SamplingEstimator::deriveCE(const Metadata& metadata,
-                                   const cascades::Memo& memo,
-                                   const properties::LogicalProps& logicalProps,
-                                   const ABT::reference_type logicalNodeRef) const {
+CERecord SamplingEstimator::deriveCE(const Metadata& metadata,
+                                     const cascades::Memo& memo,
+                                     const properties::LogicalProps& logicalProps,
+                                     const ABT::reference_type logicalNodeRef) const {
     return _transport->derive(metadata, memo, logicalProps, logicalNodeRef);
 }
 

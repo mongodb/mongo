@@ -232,6 +232,14 @@ constexpr CEType& operator*=(CEType& v1, const SelectivityType v2) {
     return v1;
 }
 
+// Holds a CE and the estimation method used to derive it.
+struct CERecord {
+    CEType _ce;
+    std::string _mode;
+
+    bool operator==(const CERecord& other) const = default;
+};
+
 // We can divide two cardinalities to obtain a selectivity.
 constexpr SelectivityType operator/(const CEType v1, const CEType v2) {
     return {v1._value / v2._value};

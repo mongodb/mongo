@@ -762,7 +762,8 @@ public:
                                                 const PSRExpr::VisitorContext&) {
                                                 if (residIndexes.count(entryIndex) == 0) {
                                                     const SelectivityType sel =
-                                                        partialSchemaKeyCE.at(entryIndex).second /
+                                                        partialSchemaKeyCE.at(entryIndex)
+                                                            .second._ce /
                                                         scanGroupCE;
                                                     atomSels.push_back(sel);
                                                     indexPredSelMap.emplace(entryIndex, sel);

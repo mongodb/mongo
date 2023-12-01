@@ -77,19 +77,20 @@ public:
     template <typename T, typename... Ts>
     CEType transport(ABT::reference_type n, const T& /*node*/, Ts&&...) {
         if (canBeLogicalNode<T>()) {
-            return _heuristicCE.deriveCE(_metadata, _memo, _logicalProps, n);
+            return _heuristicCE.deriveCE(_metadata, _memo, _logicalProps, n)._ce;
         }
         return {0.0};
     }
 
-    static CEType derive(const Metadata& metadata,
-                         const cascades::Memo& memo,
-                         const PartialSchemaSelHints& pathHints,
-                         const PartialSchemaIntervalSelHints& intervalHints,
-                         const properties::LogicalProps& logicalProps,
-                         const ABT::reference_type logicalNodeRef) {
+    static CERecord derive(const Metadata& metadata,
+                           const cascades::Memo& memo,
+                           const PartialSchemaSelHints& pathHints,
+                           const PartialSchemaIntervalSelHints& intervalHints,
+                           const properties::LogicalProps& logicalProps,
+                           const ABT::reference_type logicalNodeRef) {
         HintedTransport instance(metadata, memo, logicalProps, pathHints, intervalHints);
-        return algebra::transport<true>(logicalNodeRef, instance);
+        CEType ce = algebra::transport<true>(logicalNodeRef, instance);
+        return {ce, "hinted"};
     }
 
 private:
@@ -118,10 +119,10 @@ private:
     const PartialSchemaIntervalSelHints& _intervalHints;
 };
 
-CEType HintedEstimator::deriveCE(const Metadata& metadata,
-                                 const cascades::Memo& memo,
-                                 const properties::LogicalProps& logicalProps,
-                                 const ABT::reference_type logicalNodeRef) const {
+CERecord HintedEstimator::deriveCE(const Metadata& metadata,
+                                   const cascades::Memo& memo,
+                                   const properties::LogicalProps& logicalProps,
+                                   const ABT::reference_type logicalNodeRef) const {
     return HintedTransport::derive(
         metadata, memo, _pathHints, _intervalHints, logicalProps, logicalNodeRef);
 }

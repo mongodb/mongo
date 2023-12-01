@@ -426,10 +426,10 @@ public:
         _benchmark->collectElapsedTime("deriveCE", _elapsedTimePerQuery);
     }
 
-    CEType deriveCE(const Metadata& metadata,
-                    const cascades::Memo& memo,
-                    const properties::LogicalProps& logicalProps,
-                    ABT::reference_type logicalNodeRef) const final;
+    CERecord deriveCE(const Metadata& metadata,
+                      const cascades::Memo& memo,
+                      const properties::LogicalProps& logicalProps,
+                      ABT::reference_type logicalNodeRef) const final;
 
 private:
     const Benchmark* _benchmark;

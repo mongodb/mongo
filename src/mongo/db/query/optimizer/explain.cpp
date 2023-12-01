@@ -2280,7 +2280,10 @@ public:
                         .printSingleLevel(pathPrinter)
                         .separator("', ")
                         .fieldName("ce")
-                        .print(ce);
+                        .print(ce._ce)
+                        .separator(", ")
+                        .fieldName("mode")
+                        .print(ce._mode);
                     reqPrinters.push_back(std::move(local));
                 }
                 ExplainPrinter requirementsPrinter;
