@@ -139,7 +139,7 @@ TsBucketPathExtractor::extractCellBlocks(const BSONObj& bucketObj) {
         }
 
         // The time field cannot be nothing.
-        bool isDense = _timeField == topLevelField;
+        const bool isTimeField = topLevelField == _timeField;
 
         // Initialize a TsBlock for the top level field. For paths of the form [Get <field> Id], or
         // equivalent, we will create a CellBlock. For nested paths that aren't eligible for the
@@ -149,7 +149,7 @@ TsBucketPathExtractor::extractCellBlocks(const BSONObj& bucketObj) {
                                                       false /*owned*/,
                                                       columnTag,
                                                       columnVal,
-                                                      isDense,
+                                                      isTimeField,
                                                       controlMin,
                                                       controlMax));
         auto tsBlock = outBlocks.back().get();
@@ -250,14 +250,14 @@ TsBlock::TsBlock(size_t ncells,
                  bool owned,
                  TypeTags blockTag,
                  Value blockVal,
-                 bool isDense,
+                 bool isTimeField,
                  std::pair<TypeTags, Value> controlMin,
                  std::pair<TypeTags, Value> controlMax)
     : _blockOwned(owned),
       _blockTag(blockTag),
       _blockVal(blockVal),
       _count(ncells),
-      _isDense(isDense),
+      _isTimeField(isTimeField),
       _controlMin(copyValue(controlMin.first, controlMin.second)),
       _controlMax(copyValue(controlMax.first, controlMax.second)) {
     invariant(_blockTag == TypeTags::bsonObject || _blockTag == TypeTags::bsonBinData);
@@ -352,6 +352,27 @@ DeblockedTagVals TsBlock::deblock(boost::optional<DeblockedTagValStorage>& stora
     return DeblockedTagVals{storage->vals.size(), storage->tags.data(), storage->vals.data()};
 }
 
+std::pair<TypeTags, Value> TsBlock::tryMin() const {
+    // If the _blockTag is TypeTags::bsonObject, then the underlying bucket is using the v1
+    // schema. Since v1 buckets are unsorted and the bucket min of the time field is a lower
+    // bound, we just ignore it and return Nothting since verifying the true minimum requires
+    // traversing the entire block anyways.
+    if (_isTimeField && _blockTag != TypeTags::bsonObject) {
+        // control.min is only a lower bound for the time field but v2 buckets are sorted by
+        // time, so we can easily get the true min by reading the first element in the block.
+        auto blockColumn = getBSONColumn();
+        auto it = blockColumn.begin();
+        auto [trueMinTag, trueMinVal] = bson::convertFrom</*View*/ true>(*it);
+        return value::copyValue(trueMinTag, trueMinVal);
+    } else if (!isObject(_controlMin.first) && !isArray(_controlMin.first) && !_isTimeField) {
+        // Timeseries computes min and max for arrays/objects differently from our language. As
+        // a result, the min/max value is not guaranteed to a member of the block so we choose
+        // not to expose it.
+        return _controlMin;
+    }
+    return std::pair{TypeTags::Nothing, Value{0u}};
+}
+
 void TsBlock::ensureDeblocked(boost::optional<DeblockedTagValStorage>& storage) const {
     if (!storage) {
         storage = DeblockedTagValStorage{};
@@ -387,7 +408,7 @@ TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(size_t count,
                                                          bool owned,
                                                          TypeTags topLevelTag,
                                                          Value topLevelVal,
-                                                         bool isDense,
+                                                         bool isTimefield,
                                                          std::pair<TypeTags, Value> controlMin,
                                                          std::pair<TypeTags, Value> controlMax)
     : TsCellBlockForTopLevelField(
@@ -398,7 +419,7 @@ TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(size_t count,
           // number of values in '_tsBlock'. So, we pass 'count' to '_tsBlock' as the number of
           // values in it.
           std::make_unique<TsBlock>(
-              count, owned, topLevelTag, topLevelVal, isDense, controlMin, controlMax)) {}
+              count, owned, topLevelTag, topLevelVal, isTimefield, controlMin, controlMax)) {}
 
 TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(TsBlock* block) : _unownedTsBlock(block) {
     auto count = block->tryCount();

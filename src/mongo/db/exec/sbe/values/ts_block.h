@@ -99,7 +99,7 @@ public:
             bool owned,
             TypeTags blockTag,
             Value blockVal,
-            bool isDense = false,
+            bool isTimefield = false,
             std::pair<TypeTags, Value> controlMin = {TypeTags::Nothing, Value{0u}},
             std::pair<TypeTags, Value> controlMax = {TypeTags::Nothing, Value{0u}});
 
@@ -132,14 +132,14 @@ public:
         return _count;
     }
 
-    std::pair<TypeTags, Value> tryMin() const override {
-        // Timeseries computes min and max for arrays/objects differently. As a result, the min/max
-        // value is not guaranteed to a member of the block so we choose not to expose it.
-        if (!isObject(_controlMin.first) && !isArray(_controlMin.first)) {
-            return _controlMin;
-        }
-        return std::pair{TypeTags::Nothing, Value{0u}};
+    BSONColumn getBSONColumn() const {
+        return BSONColumn(BSONBinData{
+            value::getBSONBinData(TypeTags::bsonBinData, _blockVal),
+            static_cast<int>(value::getBSONBinDataSize(TypeTags::bsonBinData, _blockVal)),
+            BinDataType::Column});
     }
+
+    std::pair<TypeTags, Value> tryMin() const override;
 
     std::pair<TypeTags, Value> tryMax() const override {
         if (!isObject(_controlMax.first) && !isArray(_controlMax.first)) {
@@ -149,7 +149,7 @@ public:
     }
 
     boost::optional<bool> tryDense() const override {
-        return _isDense;
+        return _isTimeField;
     }
 
 private:
@@ -183,7 +183,7 @@ private:
     size_t _count;
 
     // true if all values in the block are non-nothing. Currently only true for timeField
-    bool _isDense;
+    bool _isTimeField;
 
     // Store the min and max found in the control field of a bucket
     std::pair<TypeTags, Value> _controlMin;
@@ -215,7 +215,7 @@ public:
                                 bool owned,
                                 TypeTags topLevelTag,
                                 Value topLevelVal,
-                                bool isDense,
+                                bool isTimefield,
                                 std::pair<TypeTags, Value> controlMin,
                                 std::pair<TypeTags, Value> controlMax);
 
