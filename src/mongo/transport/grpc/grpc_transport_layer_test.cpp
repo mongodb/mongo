@@ -158,40 +158,53 @@ public:
         return OpMsg::parse(message).body.getOwned();
     }
 
+    /**
+     * Exercises the session manager and service entry point codepath through sending the specified
+     * message from the client to the server, which responds back to the client with the same
+     * message.
+     */
+    void runCommandThroughServiceEntryPoint(StringData message) {
+        constexpr auto kCommandName = "mockCommand"_sd;
+        constexpr auto kReplyField = "mockReply"_sd;
+        serviceEntryPoint->handleRequestCb = [&](OperationContext*,
+                                                 const Message& request) -> Future<DbResponse> {
+            ASSERT_EQ(OpMsg::parse(request).body.firstElement().fieldName(), kCommandName);
+            OpMsgBuilder reply;
+            reply.setBody(BSON(kReplyField << message));
+            return DbResponse{.response = reply.finish()};
+        };
+
+        auto cb = [&](GRPCTransportLayer& tl) {
+            auto client = std::make_shared<GRPCClient>(
+                &tl, makeClientMetadataDocument(), CommandServiceTestFixtures::makeClientOptions());
+            client->start(getServiceContext());
+            ON_BLOCK_EXIT([&] { client->shutdown(); });
+
+            auto session = client->connect(tl.getListeningAddresses().at(0),
+                                           CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                           {});
+
+            ASSERT_OK(session->sinkMessage(makeMessage(BSON(kCommandName << message))));
+            auto replyMessage = uassertStatusOK(session->sourceMessage());
+            auto replyBody = getMessageBody(replyMessage);
+            ASSERT_EQ(replyBody.firstElement().fieldName(), kReplyField);
+
+            ASSERT_OK(session->finish());
+        };
+
+        runWithTL(makeActiveRPCHandler(), cb, CommandServiceTestFixtures::makeTLOptions());
+    }
+
     MockServiceEntryPoint* serviceEntryPoint;
 };
 
 TEST_F(GRPCTransportLayerTest, RunCommand) {
-    constexpr auto kCommandName = "mockCommand"_sd;
-    constexpr auto kReplyField = "mockReply"_sd;
-    serviceEntryPoint->handleRequestCb = [&](OperationContext*,
-                                             const Message& request) -> Future<DbResponse> {
-        ASSERT_EQ(OpMsg::parse(request).body.firstElement().fieldName(), kCommandName);
-        OpMsgBuilder reply;
-        reply.setBody(BSON(kReplyField << 1));
-        return DbResponse{.response = reply.finish()};
-    };
+    runCommandThroughServiceEntryPoint("x");
+}
 
-    auto tl = makeTL(makeActiveRPCHandler());
-    auto client = std::make_shared<GRPCClient>(
-        tl.get(), makeClientMetadataDocument(), CommandServiceTestFixtures::makeClientOptions());
-    client->start(getServiceContext());
-    ON_BLOCK_EXIT([&] { client->shutdown(); });
-
-    uassertStatusOK(tl->setup());
-    uassertStatusOK(tl->start());
-    ON_BLOCK_EXIT([&] { tl->shutdown(); });
-
-
-    auto session = client->connect(
-        tl->getListeningAddresses().at(0), CommandServiceTestFixtures::kDefaultConnectTimeout, {});
-
-    ASSERT_OK(session->sinkMessage(makeMessage(BSON(kCommandName << 1))));
-    auto replyMessage = uassertStatusOK(session->sourceMessage());
-    auto replyBody = getMessageBody(replyMessage);
-    ASSERT_EQ(replyBody.firstElement().fieldName(), kReplyField);
-
-    ASSERT_OK(session->finish());
+TEST_F(GRPCTransportLayerTest, RunLargeCommand) {
+    std::string largeMessage(5 * 1024 * 1024, 'x');
+    runCommandThroughServiceEntryPoint(largeMessage);
 }
 
 /**
