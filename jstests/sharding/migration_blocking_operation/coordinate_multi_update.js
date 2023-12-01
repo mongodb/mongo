@@ -29,7 +29,9 @@ function assertCoordinateMultiUpdateReturns(connection, code) {
 assertCoordinateMultiUpdateReturns(st.rs0.getPrimary(), ErrorCodes.OK);
 assertCoordinateMultiUpdateReturns(st.rs0.getSecondary(), ErrorCodes.NotWritablePrimary);
 assertCoordinateMultiUpdateReturns(st.s, ErrorCodes.CommandNotFound);
-assertCoordinateMultiUpdateReturns(replicaSet.getPrimary(), ErrorCodes.NoShardingEnabled);
+assertCoordinateMultiUpdateReturns(
+    replicaSet.getPrimary(),
+    [ErrorCodes.ShardingStateNotInitialized, ErrorCodes.NoShardingEnabled_OBSOLETE]);
 
 replicaSet.stopSet();
 st.stop();

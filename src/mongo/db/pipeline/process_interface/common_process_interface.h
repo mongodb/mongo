@@ -141,6 +141,14 @@ public:
     static bool keyPatternNamesExactPaths(const BSONObj& keyPattern,
                                           const std::set<FieldPath>& uniqueKeyPaths);
 
+    /**
+     * Converts the fields from a ShardKeyPattern to a vector of FieldPaths, including the _id if
+     * it's not already in 'keyPatternFields'.
+     */
+    static std::vector<FieldPath> shardKeyToDocumentKeyFields(
+        const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields);
+
+
     std::vector<BSONObj> getCurrentOps(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        CurrentOpConnectionsMode connMode,
                                        CurrentOpSessionsMode sessionMode,
@@ -162,13 +170,6 @@ public:
     std::string getHostAndPort(OperationContext* opCtx) const override;
 
 protected:
-    /**
-     * Converts the fields from a ShardKeyPattern to a vector of FieldPaths, including the _id if
-     * it's not already in 'keyPatternFields'.
-     */
-    std::vector<FieldPath> _shardKeyToDocumentKeyFields(
-        const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) const;
-
     /**
      * Returns a BSONObj representing a report of the operation which is currently being
      * executed by the supplied client. This method is called by the getCurrentOps method of

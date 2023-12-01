@@ -41,7 +41,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_data.h"
@@ -103,13 +103,13 @@ private:
 TEST_F(RecoveryUnitTestHarness, CommitUnitOfWork) {
     Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
-    opCtx->lockState()->beginWriteUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     ru->commitUnitOfWork();
-    opCtx->lockState()->endWriteUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
     RecordData rd;
     ASSERT_TRUE(rs->findRecord(opCtx.get(), s.getValue(), &rd));
 }
@@ -117,13 +117,13 @@ TEST_F(RecoveryUnitTestHarness, CommitUnitOfWork) {
 TEST_F(RecoveryUnitTestHarness, AbortUnitOfWork) {
     Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
-    opCtx->lockState()->beginWriteUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     ru->abortUnitOfWork();
-    opCtx->lockState()->endWriteUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
     ASSERT_FALSE(rs->findRecord(opCtx.get(), s.getValue(), nullptr));
 }
 
@@ -147,24 +147,24 @@ TEST_F(RecoveryUnitTestHarness, CommitAndRollbackChanges) {
 TEST_F(RecoveryUnitTestHarness, CheckIsActiveWithCommit) {
     Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
-    opCtx->lockState()->beginWriteUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
     ASSERT_TRUE(ru->isActive());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ru->commitUnitOfWork();
-    opCtx->lockState()->endWriteUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
     ASSERT_FALSE(ru->isActive());
 }
 
 TEST_F(RecoveryUnitTestHarness, CheckIsActiveWithAbort) {
     Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
-    opCtx->lockState()->beginWriteUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
     ASSERT_TRUE(ru->isActive());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ru->abortUnitOfWork();
-    opCtx->lockState()->endWriteUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
     ASSERT_FALSE(ru->isActive());
 }
 
@@ -208,7 +208,7 @@ TEST_F(RecoveryUnitTestHarness, AbandonSnapshotCommitMode) {
     ru->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kCommit);
 
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
-    opCtx->lockState()->beginWriteUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
     ru->beginUnitOfWork(opCtx->readOnly());
     StatusWith<RecordId> rid1 = rs->insertRecord(opCtx.get(), "ABC", 3, Timestamp());
     StatusWith<RecordId> rid2 = rs->insertRecord(opCtx.get(), "123", 3, Timestamp());
@@ -216,7 +216,7 @@ TEST_F(RecoveryUnitTestHarness, AbandonSnapshotCommitMode) {
     ASSERT_TRUE(rid2.isOK());
     ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
     ru->commitUnitOfWork();
-    opCtx->lockState()->endWriteUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
 
     auto snapshotIdBefore = ru->getSnapshotId();
 

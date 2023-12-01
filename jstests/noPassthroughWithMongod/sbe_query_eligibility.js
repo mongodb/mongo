@@ -1,7 +1,8 @@
 /**
  * Test that verifies which query shapes which are eligible for SBE.
+ *
+ * @tags: [requires_sbe]
  */
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 /**
  * Utility which asserts that when running the given 'query' over 'collection', explain's reported
@@ -20,11 +21,6 @@ function assertEngineUsed(collection, query, isSBE) {
     const expectedExplainVersion = isSBE ? "2" : "1";
     assert(explain.hasOwnProperty("explainVersion"), explain);
     assert.eq(explain.explainVersion, expectedExplainVersion, explain);
-}
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is disabled");
-    quit();
 }
 
 const collName = "sbe_eligiblity";

@@ -7,7 +7,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 if (FeatureFlagUtil.isEnabled(db, "QueryStats") ||
     FeatureFlagUtil.isEnabled(db, "QueryStatsFindCommand")) {
     function testQueryStatsSetting(paramName, paramValue) {
-        // The feature flag is enabled - make sure the telemetry store can be configured.
+        // The feature flag is enabled - make sure the queryStats store can be configured.
         const original = assert.commandWorked(db.adminCommand({getParameter: 1, [paramName]: 1}));
         assert(original.hasOwnProperty(paramName), original);
         const originalValue = original[paramName];

@@ -238,6 +238,8 @@ public:
                 const ResourceConsumption::OperationMetrics* operationMetrics,
                 logv2::DynamicAttributes* pAttrs) const;
 
+    void reportStorageStats(logv2::DynamicAttributes* pAttrs) const;
+
     /**
      * Appends information about the current operation to "builder"
      *
@@ -336,6 +338,8 @@ public:
     boost::optional<std::size_t> queryStatsKeyHash;
     // The Key used by query stats to generate the query stats store key.
     std::unique_ptr<query_stats::Key> queryStatsKey;
+    // True if the request was rate limited and stats should not be collected.
+    bool queryStatsRateLimited{false};
 
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
@@ -359,9 +363,9 @@ public:
     // after optimizations.
     Microseconds planningTime{0};
 
-    // Amount of CPU time used by this thread. Will remain zero if this platform does not support
+    // Amount of CPU time used by this thread. Will remain -1 if this platform does not support
     // this feature.
-    Nanoseconds cpuTime{0};
+    Nanoseconds cpuTime{-1};
 
     int responseLength{-1};
 

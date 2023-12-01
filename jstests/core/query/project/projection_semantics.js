@@ -12,15 +12,10 @@
  *   # server parameters are stored in-memory only so are not transferred onto the recipient.
  *   tenant_migration_incompatible,
  *   not_allowed_with_security_token,
+ *   requires_sbe,
  * ]
  */
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
-if (!checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"])) {
-    jsTestLog("Skipping test since columnstore Indexes are not enabled");
-    quit();
-}
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();

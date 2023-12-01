@@ -1328,6 +1328,7 @@ bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
     return true;
 }
 
+namespace {
 template <TopBottomSense sense, bool single>
 bool extractFromAcc(const AccumulatorN* acc,
                     const boost::intrusive_ptr<Expression>& init,
@@ -1375,30 +1376,37 @@ bool extractFromAccIfTopBottomN(const AccumulatorN* multiAcc,
                                 boost::optional<BSONObj>& outputSortPattern) {
     const auto accType = multiAcc->getAccumulatorType();
     if (accType == AccumulatorN::kTopN) {
-        return extractFromAcc<TopBottomSense::kTop, false>(
+        return extractFromAcc<TopBottomSense::kTop, false /* single */>(
             multiAcc, init, outputAccumulator, outputSortPattern);
     } else if (accType == AccumulatorN::kTop) {
-        return extractFromAcc<TopBottomSense::kTop, true>(
+        return extractFromAcc<TopBottomSense::kTop, true /* single */>(
             multiAcc, init, outputAccumulator, outputSortPattern);
     } else if (accType == AccumulatorN::kBottomN) {
-        return extractFromAcc<TopBottomSense::kBottom, false>(
+        return extractFromAcc<TopBottomSense::kBottom, false /* single */>(
             multiAcc, init, outputAccumulator, outputSortPattern);
     } else if (accType == AccumulatorN::kBottom) {
-        return extractFromAcc<TopBottomSense::kBottom, true>(
+        return extractFromAcc<TopBottomSense::kBottom, true /* single */>(
             multiAcc, init, outputAccumulator, outputSortPattern);
     }
     // This isn't a topN/bottomN/top/bottom accumulator.
     return false;
 }
 
+// The lastpoint optimization ultimately inserts bucket-level $sort + $group to limit the amount of
+// data to be unpacked. Here we use the original $group to create a matching $sort followed by a
+// $group with $first/$last accumulator over $$ROOT as if it ran _after_ unpacking. We'll modify
+// these stages to run at the bucket-level later.
 std::pair<boost::intrusive_ptr<DocumentSourceSort>, boost::intrusive_ptr<DocumentSourceGroup>>
-tryRewriteGroupAsSortGroup(boost::intrusive_ptr<ExpressionContext> expCtx,
-                           Pipeline::SourceContainer::iterator itr,
-                           Pipeline::SourceContainer* container,
-                           DocumentSourceGroup* groupStage) {
+tryCreateBucketLevelSortGroup(boost::intrusive_ptr<ExpressionContext> expCtx,
+                              Pipeline::SourceContainer::iterator itr,
+                              Pipeline::SourceContainer* container,
+                              DocumentSourceGroup* groupStage) {
     const auto accumulators = groupStage->getAccumulationStatements();
     if (accumulators.size() != 1) {
-        // If we have multiple accumulators, we fail to optimize for a lastpoint query.
+        // If we have multiple accumulators, we fail to optimize for a lastpoint query. Notice, that
+        // this is too strict. The optimization can still be done for the same type of acc with
+        // the same ordering. However, for this case the query can be re-written to combine the two
+        // accumulators into one $top/$bottom with a concatenated 'output' array.
         return {nullptr, nullptr};
     }
 
@@ -1425,12 +1433,12 @@ tryRewriteGroupAsSortGroup(boost::intrusive_ptr<ExpressionContext> expCtx,
         expCtx.get(), maybeAcc->firstElement(), expCtx->variablesParseState);
     auto newGroupStage =
         DocumentSourceGroup::create(expCtx, groupStage->getIdExpression(), {newAccState});
-    // We are running the same accumulators as were present in the original group but at the bucket
-    // level, so the group compatibility with SBE should be the same.
-    newGroupStage->setSbeCompatibility(groupStage->sbeCompatibility());
+
+    // The bucket-level group uses $first/$last accumulators that are supported by SBE.
+    newGroupStage->setSbeCompatibility(SbeCompatibility::fullyCompatible);
     return {newSortStage, newGroupStage};
 }
-
+}  // namespace
 
 bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceContainer::iterator itr,
                                                            Pipeline::SourceContainer* container) {
@@ -1458,7 +1466,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
         // Try to rewrite the $group to a $sort+$group-style lastpoint query before proceeding with
         // the optimization.
         std::tie(sortStagePtr, groupStagePtr) =
-            tryRewriteGroupAsSortGroup(pExpCtx, itr, container, groupStage);
+            tryCreateBucketLevelSortGroup(pExpCtx, itr, container, groupStage);
 
         // Both these stages should be discarded once we exit this function; either because the
         // rewrite failed validation checks, or because we created updated versions of these stages

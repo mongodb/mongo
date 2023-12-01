@@ -43,12 +43,6 @@ selector:
   - jstests/core/**/create_indexes.js
   - jstests/core/**/list_indexes_non_existent_ns.js
   - jstests/core/**/mr_preserve_indexes.js
-  # The following tests fail because they expect no databases to be created. However a DB is created
-  # automatically when we shard a collection.
-  - jstests/core/**/dbcase.js
-  - jstests/core/**/dbcase2.js
-  - jstests/core/**/no_db_created.js
-  - jstests/core/**/killop_drop_collection.js # Uses fsyncLock.
   # These tests fail because sharded clusters do not clean up correctly after failed index builds.
   # See SERVER-33207 as an example.
   - jstests/core/**/geo_borders.js
@@ -76,8 +70,6 @@ selector:
   - jstests/core/**/bulk_api_ordered.js
   - jstests/core/**/bulk_api_unordered.js
   - jstests/core/**/commands_with_uuid.js
-  - jstests/core/**/dbcase.js
-  - jstests/core/**/dbcase2.js
   - jstests/core/**/explain_execution_error.js
   - jstests/core/**/expr.js
   - jstests/core/**/find9.js
@@ -174,10 +166,6 @@ selector:
   - jstests/core/**/write_result.js
   - jstests/core/**/positional_projection.js
 
-  # Trick for bypassing mongo shell validation in the test doesn't work because txn_override
-  # retry logic will hit the shell validation.
-  - jstests/core/**/invalid_db_name.js
-
   # Multiple writes in a txn, some of which fail because the collection doesn't exist.
   # We create the collection and retry the last write, but previous writes would have
   # still failed.
@@ -270,6 +258,9 @@ selector:
   - assumes_write_concern_unchanged
   - assumes_against_mongod_not_mongos
   - assumes_standalone_mongod
+  # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+  # can't be created on `getCollection` call.
+  - assumes_no_implicit_collection_creation_on_get_collection
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation

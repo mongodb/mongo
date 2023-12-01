@@ -80,11 +80,13 @@
 #include "mongo/s/index_version.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
@@ -2385,6 +2387,62 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnOr
     ASSERT_EQ(summaryFields.nErrors, 1);
 }
 
+// Test handling of a WouldChangeOwningShard error in a transaction.
+TEST_F(BulkWriteOpChildBatchErrorTest, WouldChangeOwningShardInTxn) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    auto request = BulkWriteCommandRequest(
+        {BulkWriteUpdateOp(0, BSON("x" << 1), BSON("$set" << BSON("x" << -1)))}, {kNss1, kNss2});
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    TargetedBatchMap targeted;
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+
+    ASSERT_EQUALS(targeted.size(), 1);
+    ASSERT_EQUALS(targeted[kShardId1]->getWrites().size(), 1);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+
+    auto wcosInfo = WouldChangeOwningShardInfo(
+                        BSON("x" << 1), BSON("x" << -1), false, kNss1, boost::none, boost::none)
+                        .toBSON();
+    auto errInfo =
+        ErrorReply(
+            0, ErrorCodes::WouldChangeOwningShard, "WouldChangeOwningShard", "simulating WCOS")
+            .toBSON();
+    wcosInfo = wcosInfo.addFields(errInfo);
+
+    AsyncRequestsSender::Response wcosResponse = AsyncRequestsSender::Response{
+        kShardId1,
+        StatusWith<executor::RemoteCommandResponse>(
+            executor::RemoteCommandResponse(wcosInfo, Microseconds(0))),
+        boost::none};
+
+    // Simulate a WouldChangeOwningShardError.
+    bulkWriteOp.processChildBatchResponseFromRemote(
+        *targeted[kShardId1], wcosResponse, boost::none);
+
+    // The command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    // We should not have set the _aborted flag, unlike we would for other top-level errors,
+    // since WouldChangeOwningShard errors do not abort their transactions.
+    ASSERT_FALSE(bulkWriteOp.getAborted_forTest());
+
+    // The error for the first op should be the WCOS error.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
+              ErrorCodes::WouldChangeOwningShard);
+    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+    ASSERT_EQ(replies.size(), 1);
+    ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::WouldChangeOwningShard);
+    ASSERT_EQ(summaryFields.nErrors, 1);
+}
+
 // Ordered bulkWrite: Test handling of a remote top-level error that is a TransientTransactionError
 // in a transaction.
 TEST_F(BulkWriteOpChildBatchErrorTest, RemoteTransientTransactionErrorInTxnOrdered) {
@@ -2661,6 +2719,143 @@ TEST_F(BulkWriteOpTest, SuccessfulShardRepliesAreSavedAfterRetargeting) {
     ASSERT_OK(replies[0].getStatus());
     // Seeing n: 2 here proves we saved the success reply from the first round of targeting.
     ASSERT_EQ(replies[0].getN(), 2);
+}
+
+TEST_F(BulkWriteOpTest, ShardGetsSuccessfullyRetargetedOnCannotRefreshCacheError) {
+    auto multiDelete = BulkWriteDeleteOp(0, BSON("x" << BSON("$gte" << -5 << "$lt" << 5)));
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    auto request = BulkWriteCommandRequest({multiDelete}, {NamespaceInfoEntry(nss)});
+    BulkWriteOp op(_opCtx, request);
+
+    ShardId shardId("shard");
+    ShardEndpoint endpoint0(
+        shardId, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterFullRange(nss, endpoint0));
+
+    TargetedBatchMap targeted;
+    ASSERT_OK(op.target(targeters, false, targeted));
+
+    // Confirm the outcome of the targeting.
+    ASSERT_EQUALS(targeted.size(), 1);
+    ASSERT_EQUALS(targeted[shardId]->getWrites().size(), 1u);
+    ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+
+    // Simulate a ShardCannotRefreshDueToLocksHeld error from the shard.
+    auto error = Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
+                        "Mock error: Catalog cache busy in refresh"};
+    op.noteChildBatchError(*targeted[shardId], error);
+
+    // We should have marked the write as ready so we can retarget as needed.
+    ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Ready);
+
+    // Clear targeting map for a new round of targeting; shardId should be still involved, and the
+    // op state still pending.
+    targeted.clear();
+
+    ASSERT_OK(op.target(targeters, false, targeted));
+    ASSERT_EQUALS(targeted.size(), 1);
+    ASSERT_EQUALS(targeted[shardId]->getWrites().size(), 1u);
+    ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+
+    // Simulate OK response from the shard.
+    auto reply2 = BulkWriteReplyItem(0);
+    reply2.setN(1);
+    op.noteChildBatchResponse(*targeted[shardId], {reply2}, boost::none, boost::none);
+
+    // We should now be done.
+    ASSERT(op.isFinished());
+
+    auto [replies, summaryFields, _, __] = op.generateReplyInfo(false);
+    ASSERT_EQ(replies.size(), 1);
+    ASSERT_EQ(summaryFields.nErrors, 0);
+    ASSERT_OK(replies[0].getStatus());
+    ASSERT_EQ(1, replies[0].getN());
+}
+
+TEST_F(BulkWriteOpTest, UnorderedBulkInsertGetsRepeatedOnCannotRefreshShardCacheError) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << -5)),
+                                     BulkWriteInsertOp(0, BSON("x" << 5)),
+                                     BulkWriteInsertOp(0, BSON("x" << 10))},
+                                    {NamespaceInfoEntry(nss)});
+    request.setOrdered(false);
+
+    BulkWriteOp op(_opCtx, request);
+
+    ShardId shardIdA("shardA");
+    ShardId shardIdB("shardB");
+    ShardEndpoint endpointA0(
+        shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    ShardEndpoint endpointB0(
+        shardIdB, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterSplitRange(nss, endpointA0, endpointB0));
+
+    TargetedBatchMap targeted;
+    ASSERT_OK(op.target(targeters, false, targeted));
+
+    // Confirm the outcome of the targeting.
+    ASSERT_EQUALS(targeted.size(), 2);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 2u);
+    ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQ(op.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQ(op.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+
+    // Simulate OK response from first shard.
+    auto reply1 = BulkWriteReplyItem(0);
+    reply1.setN(1);
+    op.noteChildBatchResponse(*targeted[shardIdA], {reply1}, boost::none, boost::none);
+
+    // Ensure that the write state is consistent.
+    ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Completed);
+    ASSERT_EQ(op.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQ(op.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+
+    // Simulate a ShardCannotRefreshDueToLocksHeld error from the second shard.
+    auto error = Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
+                        "Mock error: Catalog cache busy in refresh"};
+
+    op.noteChildBatchError(*targeted[shardIdB], error);
+
+    // We should have marked the remaining writes as ready so we can retarget as needed.
+    ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Completed);
+    ASSERT_EQ(op.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(op.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+
+    // Clear targeting map for a new round of targeting.
+    targeted.clear();
+
+    // We should have retargeted only the writes to shardB, since we already succeeded on shardA
+    ASSERT_OK(op.target(targeters, false, targeted));
+    ASSERT_EQUALS(targeted.size(), 1);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 2u);
+    ASSERT_EQ(op.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQ(op.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+
+    // // Simulate OK response from second shard.
+    auto reply2 = BulkWriteReplyItem(0);
+    reply2.setN(1);
+    auto reply3 = BulkWriteReplyItem(1);
+    reply3.setN(1);
+    op.noteChildBatchResponse(*targeted[shardIdB], {reply2, reply3}, boost::none, boost::none);
+
+    // We should now be done.
+    ASSERT(op.isFinished());
+
+    auto [replies, summaryFields, _, __] = op.generateReplyInfo(false);
+    ASSERT_EQ(replies.size(), 3);
+    ASSERT_EQ(summaryFields.nErrors, 0);
+    ASSERT_OK(replies[0].getStatus());
+    ASSERT_EQ(replies[0].getN(), 1);
+    ASSERT_OK(replies[1].getStatus());
+    ASSERT_EQ(replies[1].getN(), 1);
+    ASSERT_OK(replies[2].getStatus());
+    ASSERT_EQ(replies[2].getN(), 1);
 }
 
 /**

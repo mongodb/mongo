@@ -371,11 +371,7 @@ AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
             _sessionManager || !_listenerOptions.isIngress());
 }
 
-AsioTransportLayer::~AsioTransportLayer() {
-    if (_sessionManager) {
-        _sessionManager->shutdown(kSessionShutdownTimeout);
-    }
-}
+AsioTransportLayer::~AsioTransportLayer() = default;
 
 struct AsioTransportLayer::AcceptorRecord {
     AcceptorRecord(SockAddr address, GenericAcceptor acceptor)
@@ -1177,14 +1173,14 @@ void AsioTransportLayer::_runListener() noexcept {
 #endif
     LOGV2(23016, "Waiting for connections", "port"_attr = _listenerPort, "ssl"_attr = ssl);
 
-    _listener.active = true;
+    _listener.state = Listener::State::kActive;
     _listener.cv.notify_all();
     ON_BLOCK_EXIT([&] {
-        _listener.active = false;
+        _listener.state = Listener::State::kShutdown;
         _listener.cv.notify_all();
     });
 
-    while (!_isShutdown) {
+    while (!_isShutdown && (_listener.state == Listener::State::kActive)) {
         lk.unlock();
         _acceptorReactor->run();
         lk.lock();
@@ -1223,7 +1219,7 @@ Status AsioTransportLayer::start() {
     if (_listenerOptions.isIngress()) {
         invariant(_sessionManager);
         _listener.thread = stdx::thread([this] { _runListener(); });
-        _listener.cv.wait(lk, [&] { return _isShutdown || _listener.active; });
+        _listener.cv.wait(lk, [&] { return _listener.state != Listener::State::kNew; });
         return Status::OK();
     }
 
@@ -1238,10 +1234,20 @@ void AsioTransportLayer::shutdown() {
         // We were already stopped
         return;
     }
-    lk.unlock();
-    _timerService->stop();
-    lk.lock();
 
+    stopAcceptingSessionsWithLock(std::move(lk));
+
+    _timerService->stop();
+
+    if (_sessionManager) {
+        LOGV2(4784923, "Shutting down the ASIO transport SessionManager");
+        if (!_sessionManager->shutdown(kSessionShutdownTimeout)) {
+            LOGV2(20563, "SessionManager did not shutdown within the time limit");
+        }
+    }
+}
+
+void AsioTransportLayer::stopAcceptingSessionsWithLock(stdx::unique_lock<Mutex> lk) {
     if (!_listenerOptions.isIngress()) {
         // Egress only reactors never start a listener
         return;
@@ -1253,16 +1259,23 @@ void AsioTransportLayer::shutdown() {
         return;
     }
 
-    // Spam stop() on the reactor, it interrupts run()
-    while (_listener.active) {
-        lk.unlock();
-        _acceptorReactor->stop();
-        lk.lock();
+    if (_listener.state == Listener::State::kActive) {
+        // Spam stop() on the reactor, it interrupts run()
+        _listener.state = Listener::State::kShuttingDown;
+        while (_listener.state != Listener::State::kShutdown) {
+            lk.unlock();
+            _acceptorReactor->stop();
+            lk.lock();
+        }
     }
 
     // Release the lock and wait for the thread to die
     lk.unlock();
     thread.join();
+}
+
+void AsioTransportLayer::stopAcceptingSessions() {
+    stopAcceptingSessionsWithLock(stdx::unique_lock(_mutex));
 }
 
 ReactorHandle AsioTransportLayer::getReactor(WhichReactor which) {

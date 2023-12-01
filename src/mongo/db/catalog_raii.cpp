@@ -46,14 +46,15 @@
 #include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -617,7 +618,7 @@ AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t
     auto lockMode = (mode == OplogAccessMode::kRead) ? MODE_IS : MODE_IX;
     if (mode == OplogAccessMode::kLogOp) {
         // Invariant that global lock is already held for kLogOp mode.
-        invariant(opCtx->lockState()->isWriteLocked());
+        invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
     } else {
         _globalLock.emplace(opCtx, lockMode, deadline, Lock::InterruptBehavior::kThrow);
     }
@@ -648,7 +649,7 @@ AutoGetChangeCollection::AutoGetChangeCollection(OperationContext* opCtx,
     // pointer.
     tassert(6671500,
             str::stream() << "Lock not held in IX mode for the tenant " << tenantId,
-            opCtx->lockState()->isLockHeldForMode(
+            shard_role_details::getLocker(opCtx)->isLockHeldForMode(
                 ResourceId(ResourceType::RESOURCE_TENANT, tenantId), LockMode::MODE_IX));
     auto changeCollectionPtr = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
         opCtx, changeCollectionNamespaceString);

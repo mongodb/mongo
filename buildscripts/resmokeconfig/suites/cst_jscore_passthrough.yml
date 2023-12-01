@@ -115,7 +115,7 @@ selector:
   - jstests/core/**/date2.js
   - jstests/core/**/date3.js
   - jstests/core/**/delx.js
-  - jstests/core/**/distinct1.js
+  - jstests/core/**/distinct_semantics.js
   - jstests/core/**/distinct3.js
   - jstests/core/**/distinct_index1.js
   - jstests/core/**/distinct_multikey.js

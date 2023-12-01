@@ -290,7 +290,7 @@ auto mapValue(T val) {
         CustomAttributeValue custom;
         custom.stringSerialize = [val](fmt::memory_buffer& buffer) {
             StringData sd = toString(val);
-            buffer.append(sd.begin(), sd.end());
+            buffer.append(sd.data(), sd.data() + sd.size());
         };
         return custom;
     } else {
@@ -368,7 +368,7 @@ CustomAttributeValue mapValue(const T& val) {
     } else if constexpr (hasToStringReturnStringData<T>) {
         custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
             StringData sd = val.toString();
-            buffer.append(sd.begin(), sd.end());
+            buffer.append(sd.data(), sd.data() + sd.size());
         };
     } else if constexpr (hasNonMemberToString<T>) {
         custom.toString = [&val]() {
@@ -377,7 +377,7 @@ CustomAttributeValue mapValue(const T& val) {
     } else if constexpr (hasNonMemberToStringReturnStringData<T>) {
         custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
             StringData sd = toString(val);
-            buffer.append(sd.begin(), sd.end());
+            buffer.append(sd.data(), sd.data() + sd.size());
         };
     }
 
@@ -439,11 +439,11 @@ public:
 
     // Text Format: (elem1, elem2, ..., elemN)
     void serialize(fmt::memory_buffer& buffer) const {
-        StringData separator = ""_sd;
+        StringData separator;
         buffer.push_back('(');
         for (auto it = _begin; it != _end; ++it) {
             const auto& item = *it;
-            buffer.append(separator.begin(), separator.end());
+            buffer.append(separator.data(), separator.data() + separator.size());
 
             auto append = [&buffer](auto&& val) {
                 if constexpr (std::is_same_v<decltype(val), CustomAttributeValue&&>) {
@@ -556,7 +556,7 @@ public:
         buffer.push_back('(');
         for (auto it = _begin; it != _end; ++it) {
             const auto& item = *it;
-            buffer.append(separator.begin(), separator.end());
+            buffer.append(separator.data(), separator.data() + separator.size());
 
             auto append = [&buffer](StringData key, auto&& val) {
                 if constexpr (std::is_same_v<decltype(val), CustomAttributeValue&&>) {

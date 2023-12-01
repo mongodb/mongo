@@ -33,3 +33,27 @@
 
 using uint128_t = absl::uint128;
 using int128_t = absl::int128;
+
+namespace mongo {
+template <typename T>
+struct make_unsigned : public std::make_unsigned<T> {};
+
+template <>
+struct make_unsigned<int128_t> {
+    using type = uint128_t;
+};
+
+template <typename T>
+struct make_signed : public std::make_signed<T> {};
+
+template <>
+struct make_signed<uint128_t> {
+    using type = int128_t;
+};
+
+template <typename T>
+using make_unsigned_t = typename make_unsigned<T>::type;
+
+template <typename T>
+using make_signed_t = typename make_signed<T>::type;
+}  // namespace mongo

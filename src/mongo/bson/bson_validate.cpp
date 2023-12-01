@@ -46,6 +46,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsontypes.h"
@@ -115,8 +116,8 @@ public:
 
     void popLevel() {}
 
-    BSONValidateMode validateMode() {
-        return BSONValidateMode::kDefault;
+    BSONValidateModeEnum validateMode() {
+        return BSONValidateModeEnum::kDefault;
     }
 };
 
@@ -199,8 +200,8 @@ public:
         }
     }
 
-    BSONValidateMode validateMode() {
-        return BSONValidateMode::kExtended;
+    BSONValidateModeEnum validateMode() {
+        return BSONValidateModeEnum::kExtended;
     }
 
 private:
@@ -376,8 +377,8 @@ public:
         checkDuplicateFieldName();
     }
 
-    BSONValidateMode validateMode() {
-        return BSONValidateMode::kFull;
+    BSONValidateModeEnum validateMode() {
+        return BSONValidateModeEnum::kFull;
     }
 
 private:
@@ -706,7 +707,7 @@ class ColumnValidator {
 public:
     static Status doValidateBSONColumn(const char* originalBuffer,
                                        int maxLength,
-                                       BSONValidateMode mode) noexcept {
+                                       BSONValidateModeEnum mode) noexcept {
         // run control pointer through to end of buffer
         // run over literal data as directed by lengths from control
         // check formatting of Simple8B blocks
@@ -738,15 +739,15 @@ public:
                     }
                 } else if (isBSONColumnControlLiteral(control)) {
                     int size;
-                    if (MONGO_likely(mode == BSONValidateMode::kDefault))
+                    if (MONGO_likely(mode == BSONValidateModeEnum::kDefault))
                         size = ValidateBuffer<false, DefaultValidator>(
                                    ptr, end - ptr, DefaultValidator())
                                    .validateAndMeasureElem();
-                    else if (mode == BSONValidateMode::kExtended)
+                    else if (mode == BSONValidateModeEnum::kExtended)
                         size = ValidateBuffer<false, ExtendedValidator>(
                                    ptr, end - ptr, ExtendedValidator())
                                    .validateAndMeasureElem();
-                    else if (mode == BSONValidateMode::kFull)
+                    else if (mode == BSONValidateModeEnum::kFull)
                         size = ValidateBuffer<false, FullValidator>(ptr, end - ptr, FullValidator())
                                    .validateAndMeasureElem();
                     else
@@ -802,25 +803,25 @@ private:
 
 Status validateBSON(const char* originalBuffer,
                     uint64_t maxLength,
-                    BSONValidateMode mode) noexcept {
-    if (MONGO_likely(mode == BSONValidateMode::kDefault))
+                    BSONValidateModeEnum mode) noexcept {
+    if (MONGO_likely(mode == BSONValidateModeEnum::kDefault))
         return _doValidate(originalBuffer, maxLength, DefaultValidator());
-    else if (mode == BSONValidateMode::kExtended)
+    else if (mode == BSONValidateModeEnum::kExtended)
         return _doValidate(originalBuffer, maxLength, ExtendedValidator());
-    else if (mode == BSONValidateMode::kFull)
+    else if (mode == BSONValidateModeEnum::kFull)
         return ValidateBuffer<true, FullValidator>(originalBuffer, maxLength, FullValidator())
             .validate();
     else
         MONGO_UNREACHABLE;
 }
 
-Status validateBSON(const BSONObj& obj, BSONValidateMode mode) {
+Status validateBSON(const BSONObj& obj, BSONValidateModeEnum mode) {
     return validateBSON(obj.objdata(), obj.objsize(), mode);
 }
 
 Status validateBSONColumn(const char* originalBuffer,
                           int maxLength,
-                          BSONValidateMode mode) noexcept {
+                          BSONValidateModeEnum mode) noexcept {
     return ColumnValidator::doValidateBSONColumn(originalBuffer, maxLength, mode);
 }
 

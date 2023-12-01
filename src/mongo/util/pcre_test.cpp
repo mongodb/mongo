@@ -57,7 +57,11 @@ template <typename Out, typename Ch, size_t N>
 Out u8Cast(const Ch (&in)[N]) {
     const Ch* inp = in;
     auto cp = reinterpret_cast<const char*>(inp);
-    return Out{cp, cp + N - 1};
+    if constexpr (std::is_same_v<Out, StringData>) {
+        return Out{cp, N - 1};
+    } else {
+        return Out{cp, cp + N - 1};
+    }
 }
 
 TEST(PcreTest, GoodPatterns) {

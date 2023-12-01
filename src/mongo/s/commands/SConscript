@@ -5,7 +5,7 @@ Import("get_option")
 
 env = env.Clone()
 
-# These commands are linked both in MongoS and MongoD
+# These commands are registered with both the router and shard command registries.
 # This library is currently also linked into mongoqd
 env.Library(
     target='sharded_cluster_sharding_commands',
@@ -25,7 +25,8 @@ env.Library(
     ],
 )
 
-# These commands are linked in mongos and mongoqd
+# These commands are registered only with the router-role.
+# They are also available on mongoqd.
 env.Library(
     target='cluster_commands',
     source=[
@@ -124,6 +125,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/auth_checks',
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
+        '$BUILD_DIR/mongo/db/coll_mod_command_idl',
         '$BUILD_DIR/mongo/db/commands/bulk_write_common',
         '$BUILD_DIR/mongo/db/commands/bulk_write_parser',
         '$BUILD_DIR/mongo/db/commands/cluster_server_parameter_cmds_idl',
@@ -157,7 +159,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/cursor_response_idl',
         '$BUILD_DIR/mongo/db/query/map_reduce_output_format',
-        '$BUILD_DIR/mongo/db/query/query_settings_manager',
+        '$BUILD_DIR/mongo/db/query/query_settings/utils',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/repl/hello_auth',
@@ -182,7 +184,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/s/query/cluster_query',
         '$BUILD_DIR/mongo/s/sharding_api',
-        '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         'cluster_commands_common',
@@ -222,8 +223,9 @@ env.Library(
     ],
 )
 
-# These commands are linked in MongoS only
-# This library is currently also linked into mongoqd
+# These commands are registered with the router role only.
+# This library is currently also linked into mongoqd, but contains
+# commands that should not be used in serverless mode.
 env.Library(
     target='sharded_cluster_commands',
     source=[
@@ -266,7 +268,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/analyze_shard_key_util',
         '$BUILD_DIR/mongo/s/mongos_topology_coordinator',
         '$BUILD_DIR/mongo/s/sharding_api',
-        '$BUILD_DIR/mongo/s/vector_clock_mongos',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         'cluster_commands',
         'cluster_commands_common',

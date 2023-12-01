@@ -74,5 +74,11 @@ private:
  */
 bool isFeatureFlagEnabled();
 
+/**
+ * Returns true if the feature flag is enabled, ignoring the feature compatibility version.
+ * To be used only by the machinery for maintaining the ReplicaSetEndpointShardingState.
+ */
+bool isFeatureFlagEnabledIgnoreFCV();
+
 }  // namespace replica_set_endpoint
 }  // namespace mongo

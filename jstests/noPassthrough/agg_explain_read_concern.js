@@ -1,52 +1,77 @@
 /**
  * Test that explained aggregation commands behave correctly with the readConcern option.
- * @tags: [requires_majority_read_concern]
  */
-const rst = new ReplSetTest(
-    {name: "aggExplainReadConcernSet", nodes: 1, nodeOptions: {enableMajorityReadConcern: ""}});
-rst.startSet();
-rst.initiate();
 
-const primary = rst.getPrimary();
-const session = primary.getDB("test").getMongo().startSession({causalConsistency: false});
-const sessionDB = session.getDatabase("test");
-const coll = sessionDB.agg_explain_read_concern;
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 
-// Test that explain is legal with readConcern "local".
-assert.commandWorked(coll.explain().aggregate([], {readConcern: {level: "local"}}));
-assert.commandWorked(sessionDB.runCommand(
-    {aggregate: coll.getName(), pipeline: [], explain: true, readConcern: {level: "local"}}));
-assert.commandWorked(sessionDB.runCommand({
-    explain: {aggregate: coll.getName(), pipeline: [], cursor: {}},
-    readConcern: {level: "local"}
-}));
+const runTest = (db, coll) => {
+    // Test that explain is legal with all readConcern levels.
+    const readConcernLevels = ["local", "majority", "available", "linearizable", "snapshot"];
+    readConcernLevels.forEach(function(readConcernLevel) {
+        assert.commandWorked(
+            coll.explain().aggregate([], {readConcern: {level: readConcernLevel}}));
 
-// Test that explain is illegal with other readConcern levels.
-const nonLocalReadConcerns = ["majority", "available", "linearizable"];
-nonLocalReadConcerns.forEach(function(readConcernLevel) {
-    let aggCmd = {
-        aggregate: coll.getName(),
-        pipeline: [],
-        explain: true,
-        readConcern: {level: readConcernLevel}
-    };
-    let explainCmd = {
-        explain: {aggregate: coll.getName(), pipeline: [], cursor: {}},
-        readConcern: {level: readConcernLevel}
-    };
+        assert.commandWorked(db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [],
+            explain: true,
+            readConcern: {level: readConcernLevel}
+        }));
 
-    assert.throws(() => coll.explain().aggregate([], {readConcern: {level: readConcernLevel}}));
+        assert.commandWorked(db.runCommand({
+            explain: {aggregate: coll.getName(), pipeline: [], cursor: {}},
+            readConcern: {level: readConcernLevel}
+        }));
 
-    let cmdRes = sessionDB.runCommand(aggCmd);
-    assert.commandFailedWithCode(cmdRes, ErrorCodes.InvalidOptions, tojson(cmdRes));
-    let expectedErrStr = "aggregate command cannot run with a readConcern other than 'local'";
-    assert.neq(cmdRes.errmsg.indexOf(expectedErrStr), -1, tojson(cmdRes));
+        assert.commandWorked(db.runCommand(
+            {explain: {find: coll.getName(), filter: {}}, readConcern: {level: readConcernLevel}}));
 
-    cmdRes = sessionDB.runCommand(explainCmd);
-    assert.commandFailedWithCode(cmdRes, ErrorCodes.InvalidOptions, tojson(cmdRes));
-    expectedErrStr = "read concern not supported";
-    assert.neq(cmdRes.errmsg.indexOf(expectedErrStr), -1, tojson(cmdRes));
-});
+        assert.commandWorked(db.runCommand(
+            {explain: {count: coll.getName(), query: {}, readConcern: {level: readConcernLevel}}}));
+    });
+};
 
-session.endSession();
-rst.stopSet();
+// Test with a replica set
+{
+    const rst = new ReplSetTest({name: "aggExplainReadConcernSet", nodes: 2});
+    rst.startSet();
+    rst.initiate();
+
+    const session =
+        rst.getPrimary().getDB("test").getMongo().startSession({causalConsistency: false});
+    const db = session.getDatabase("test");
+    const coll = db.agg_explain_read_concern;
+
+    runTest(db, coll);
+
+    session.endSession();
+    rst.stopSet();
+}
+
+// Test with a sharded cluster
+{
+    const st = new ShardingTest({shards: 2, config: 1});
+
+    const config = st.s.getDB("config");
+    const db = st.s.getDB("test");
+    const coll = db.agg_explain_read_concern;
+
+    assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
+    assert.commandWorked(
+        st.s.adminCommand({movePrimary: "test", to: config.shards.find().toArray()[0]._id}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: "test.agg_explain_read_concern", key: {_id: 1}}));
+
+    runTest(db, coll);
+
+    // Ensure read concern level is reflected in explain output.
+    let explain = db.runCommand(
+        {explain: {find: coll.getName(), filter: {}}, readConcern: {level: "available"}});
+    assert(!planHasStage(db, explain, "SHARDING_FILTER"));
+
+    explain = db.runCommand(
+        {explain: {find: coll.getName(), filter: {}}, readConcern: {level: "snapshot"}});
+    assert(planHasStage(db, explain, "SHARDING_FILTER"));
+
+    st.stop();
+}

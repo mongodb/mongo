@@ -1,19 +1,16 @@
-// Tests aggregation queries containing a mix of SBE supported and unspported expressions execute
-// the pushed down query with SBE.
-// TODO: Remove this file when all agg expressions are supported by SBE.
-
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+/*
+ * Tests aggregation queries containing a mix of SBE supported and unspported expressions execute
+ * the pushed down query with SBE.
+ * TODO: Remove this file when all agg expressions are supported by SBE.
+ *
+ * @tags: [requires_sbe]
+ */
 
 // Storing the expression we assume is unsupported as a constant, so we can easily change it when we
 // implement $toBool in SBE.
 const kUnsupportedExpression = {
     $toBool: {date: "$b"}
 };
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    quit();
-}
 
 const coll = db.jstests_sbe_pushdown;
 coll.drop();

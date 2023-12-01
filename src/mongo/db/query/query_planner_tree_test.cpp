@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -401,6 +402,8 @@ TEST_F(QueryPlannerTest,
     // With the simplifer enabled the solution below will be simplified to "{a:1, b:2, c:1, $or:
     // [{d:3}, {e:4}]}" which allow the multiplanner to build more effective test with only one
     // fecth instead of two.
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryEnableBooleanExpressionsSimplifier", true);
 
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuery(fromjson("{c: 1, $or: [{a:1, b:2, d:3}, {a:1, b:2, e:4}]}"));
@@ -408,9 +411,9 @@ TEST_F(QueryPlannerTest,
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        R"--({fetch: {filter: {$and: [{$or:[{e:4},{d:3}]}, {c: 1}]}, 
-                      node: {ixscan: {pattern: {a: 1, b: 1}, 
-                                      filter: null, 
+        R"--({fetch: {filter: {$and: [{$or:[{e:4},{d:3}]}, {c: 1}]},
+                      node: {ixscan: {pattern: {a: 1, b: 1},
+                                      filter: null,
                                       bounds: {a: [[1,1,true,true]], b: [[2,2,true,true]]}}}}})--");
 }
 
@@ -926,13 +929,8 @@ TEST_F(QueryPlannerTest, CantExplodeWithEmptyBounds) {
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuerySortProj(fromjson("{a: {$in: []}}"), BSON("b" << 1), BSONObj());
 
-    assertNumSolutions(2U);
-    assertSolutionExists(
-        "{sort: {pattern: {b:1}, limit: 0, type: 'simple', node: "
-        "{cscan: {dir: 1}}}}");
-    assertSolutionExists(
-        "{fetch: {node: {sort: {pattern: {b:1}, limit: 0, type: 'default', node: "
-        "{ixscan: {pattern: {a: 1, b: 1}}}}}}}");
+    assertNumSolutions(1);
+    assertSolutionExists("{eof: 1}");
 }
 
 // SERVER-13752
@@ -2927,6 +2925,92 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationApplysToEachOrInTree) {
         "]}}");
 }
 
+// This test was designed to reproduce SERVER-83091, a case in which an implementation error in the
+// lockstep $or enumeration algorithm could result in an infinite loop. This could happen only if
+// there were nested $or nodes and the inner $or hit the maximum number of plans that it is willing
+// to generate.
+TEST_F(QueryPlannerTest, LockstepOrEnumerationWithNestedOrWhereInnerOrHitsEnumerationLimit) {
+    // Disable the simplifier, since when enabled it will collapse nested $or nodes into a single
+    // $or. Similarly, turn on the failpoint to disable match expression simplification which would
+    // also eliminate the redundant $or.
+    RAIIServerParameterControllerForTest boolSimplificationController(
+        "internalQueryEnableBooleanExpressionsSimplifier", false);
+    FailPointEnableBlock failPoint("disableMatchExpressionOptimization");
+
+    // The repro depends on the inner $or hitting its enumeration limit. The original problem from
+    // SERVER-83091 can be reproduced with a simpler query if we lower the limit on the number of
+    // plans that the 'PlanEnumerator' is allowed to generate for any $or node.
+    RAIIServerParameterControllerForTest maxOrPlansController(
+        "internalQueryEnumerationMaxOrSolutions", 3);
+
+    params.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+
+    runQueryAsCommand(fromjson(R"(
+        {find: 'testns', filter: {
+            $or: [
+                {$or: [
+                    {a: 1, b: 2},
+                    {a: 3}
+                ]},
+                {c: 4}
+            ]
+        }})"));
+
+    // There are two plans, the only difference between the two being whether the nested $and
+    // {a: 1, b: 2} uses the index on "a" or the index on "b".
+    assertNumSolutions(2U);
+
+    // Plan using the {a: 1} index for the innermost conjunction.
+    assertSolutionExists(R"(
+    {
+        fetch: {
+            node: {
+                or: {
+                    nodes: [
+                        {
+                            or: {
+                                nodes: [
+                                    {fetch: {filter: {b: 2}, node: {ixscan: {pattern: {a: 1}}}}},
+                                    {ixscan: {pattern: {a: 1}}}
+                                ]
+                            }
+                        },
+                        {ixscan: {pattern: {c: 1}}}
+                    ]
+                }
+            }
+        }
+    }
+    )");
+
+    // Alternative plan using the {b: 1} index for the innermost conjunction.
+    assertSolutionExists(R"(
+    {
+        fetch: {
+            node: {
+                or: {
+                    nodes: [
+                        {
+                            or: {
+                                nodes: [
+                                    {fetch: {filter: {a: 1}, node: {ixscan: {pattern: {b: 1}}}}},
+                                    {ixscan: {pattern: {a: 1}}}
+                                ]
+                            }
+                        },
+                        {ixscan: {pattern: {c: 1}}}
+                    ]
+                }
+            }
+        }
+    }
+    )");
+}
+
 TEST_F(QueryPlannerTest, NoOrSolutionsIfMaxOrSolutionsIsZero) {
     auto defaultMaxOr = internalQueryEnumerationMaxOrSolutions.load();
     ON_BLOCK_EXIT([&] { internalQueryEnumerationMaxOrSolutions.store(defaultMaxOr); });
@@ -2950,6 +3034,56 @@ TEST_F(QueryPlannerTest, NoOrSolutionsIfMaxOrSolutionsIsZero) {
     runQuery(BSON(
         "$or" << BSON_ARRAY(BSON("one" << 0 << "two" << 0) << BSON("one" << 1 << "two" << 1))));
     assertNumSolutions(2U);
+}
+
+TEST_F(QueryPlannerTest, EOFForAlwaysFalsePredicates) {
+    runQuery(fromjson("{$alwaysFalse: 1}"));
+    assertNumSolutions(1);
+    assertSolutionExists("{eof: 1}");
+}
+
+TEST_F(QueryPlannerTest, EOFForAlwaysFalsePredicatesAndOtherModifications) {
+    runQuerySortProjSkipLimit(
+        fromjson("{$alwaysFalse: 1}"), fromjson("{x:1}"), fromjson("{x:1}"), 5, 6);
+    assertNumSolutions(1);
+    assertSolutionExists("{eof: 1}");
+}
+
+TEST_F(QueryPlannerTest, EOFForAlwaysFalsePredicatesUsingClusteredCollections) {
+    params.clusteredInfo = clustered_util::makeDefaultClusteredIdIndex();
+    runQuery(fromjson("{$alwaysFalse: 1}"));
+    assertNumSolutions(1);
+    assertSolutionExists("{eof: 1}");
+}
+
+TEST_F(QueryPlannerTest, NotEOFForChangeStreamsEvenIfAlwaysFalsePredicateIsGiven) {
+    // Here we simulate a change stream by requesting a tailable cursor on the oplog of the testColl
+    // collection. See NamespaceString::oplog() method.
+    nss = NamespaceString::createNamespaceString_forTest("local.oplog");
+    auto cmdObj = fromjson("{find: 'oplog.testColl', filter: {$alwaysFalse: 1}, tailable: true}");
+    runQueryAsCommand(cmdObj);
+
+    assertNumSolutions(1);
+    assertSolutionExists("{cscan: {filter: {$alwaysFalse: 1}, collation: {}, dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, NotEOFForChangeCollectionsEvenIfAlwaysFalsePredicateIsGiven) {
+    // Here we simulate a change collection (serverless change stream) by requesting a tailable
+    // cursor on the config.system.change_collection collection. See
+    // NamespaceString::isChangeCollection() method.
+    nss = NamespaceString::createNamespaceString_forTest("config.system");
+    auto cmdObj =
+        fromjson("{find: 'system.change_collection', filter: {$alwaysFalse: 1}, tailable: true}");
+    runQueryAsCommand(cmdObj);
+
+    assertNumSolutions(1);
+    assertSolutionExists("{cscan: {filter: {$alwaysFalse: 1}, collation: {}, dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, EOFForAlwaysFalsePredicatesInTailableCursors) {
+    runQueryAsCommand(fromjson("{find: 'testColl', filter: {$alwaysFalse: 1}, tailable: true}"));
+    assertNumSolutions(1);
+    assertSolutionExists("{eof: 1}");
 }
 
 }  // namespace

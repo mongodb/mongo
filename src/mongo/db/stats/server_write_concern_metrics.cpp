@@ -142,17 +142,25 @@ void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::recordWrite
         } else {
             // Provenance is either:
             //  - "implicitDefault" : implicit default WC (w:1 or w:"majority") is used.
-            //  - "clientSupplied"  : set without "w" value, so implicit default WC (w:1) is used.
             //  - "internalWriteDefault" : if internal command sets empty WC ({writeConcern: {}}),
             //    then default constructed WC (w:1) is used.
             implicitDefaultWC.recordWriteConcern(writeConcernOptions, numOps);
         }
 
         notExplicitWCount += numOps;
-        return;
+    } else {
+        // Supplied write concern contains 'w' field, the provenance can still be default if it is
+        // being set by mongos.
+        if (writeConcernOptions.getProvenance().isCustomDefault()) {
+            cWWC.recordWriteConcern(writeConcernOptions, numOps);
+            notExplicitWCount += numOps;
+        } else if (writeConcernOptions.getProvenance().isImplicitDefault()) {
+            implicitDefaultWC.recordWriteConcern(writeConcernOptions, numOps);
+            notExplicitWCount += numOps;
+        } else {
+            explicitWC.recordWriteConcern(writeConcernOptions, numOps);
+        }
     }
-
-    explicitWC.recordWriteConcern(writeConcernOptions, numOps);
 }
 
 void ServerWriteConcernMetrics::WriteConcernCounters::toBSON(BSONObjBuilder* builder) const {

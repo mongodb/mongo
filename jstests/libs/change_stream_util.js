@@ -377,6 +377,7 @@ export function ChangeStreamTest(_db, options) {
         cursor = self.getNextBatch(cursor);
         assert.eq(
             0, cursor.nextBatch.length, () => "Cursor had changes: " + tojsonMaybeTruncate(cursor));
+        return cursor;
     };
 
     /**

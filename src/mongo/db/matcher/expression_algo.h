@@ -212,6 +212,14 @@ bool bidirectionalPathPrefixOf(StringData first, StringData second);
  */
 void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path = "");
 
+/**
+ * Rewrites the match expression to assume that InternalExpr* match expressions return true. These
+ * expressions are "imprecise" in that they can return true even for non-passing documents, and
+ * rely on a second layer of filtering being applied later.
+ */
+std::unique_ptr<MatchExpression> assumeImpreciseInternalExprNodesReturnTrue(
+    std::unique_ptr<MatchExpression> expr);
+
 using ShouldSplitExprFunc = std::function<bool(
     MatchExpression&, const OrderedPathSet&, const StringMap<std::string>&, Renameables&)>;
 

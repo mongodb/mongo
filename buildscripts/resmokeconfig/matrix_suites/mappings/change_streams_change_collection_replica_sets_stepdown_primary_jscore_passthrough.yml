@@ -1,5 +1,5 @@
 # This suite tests that live rollbacks do not cause holes to appear in pre-image collections.
-base_suite: multitenancy_jscore_passthrough
+base_suite: multitenancy_with_atlas_proxy_jscore_passthrough
 overrides:
   - "serverless.enable"
   - "kill_primary.replica_sets_shell_options"
@@ -16,6 +16,7 @@ extends:
   - "stepdown_primary_change_streams.replica_sets_hooks"
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_base"
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_aggregation"
 
 eval:
   - "serverless.shell_eval"

@@ -2,7 +2,7 @@
  * Tests that as long as the replica set endpoint enabled, the connection to a standalone or replica
  * set works across upgrade and downgrade.
  *
- * @tags: [requires_fcv_73]
+ * @tags: [featureFlagEmbeddedRouter]
  */
 
 import "jstests/multiVersion/libs/multi_rs.js";
@@ -27,13 +27,18 @@ function runTest(connString, getShard0PrimaryFunc, upgradeFunc, downgradeFunc, t
     upgradeFunc();
     jsTest.log("Finished upgrading");
     let shard0Primary = getShard0PrimaryFunc();
-    waitForAutoBootstrap(shard0Primary, null /* keyFile */, true /* isAutoBootstrapAfterUpgrade */);
+    assert.commandWorked(
+        shard0Primary.adminCommand({transitionToShardedCluster: 1, writeConcern: {w: "majority"}}));
+    waitForAutoBootstrap(shard0Primary);
 
     if (!connString.includes("replicaSet=")) {
         // For a standalone connection string, the shell doesn't auto-reconnect when there is a
         // network error.
         conn = new Mongo(connString);
     }
+    // TODO (PM-3364): Remove the enableSharding command below once we start tracking unsharded
+    // collections.
+    assert.commandWorked(conn.adminCommand({enableSharding: dbName}));
     const docAfterUpgrade = conn.getDB(dbName).getCollection(collName).findOne({x: 1});
     assert.neq(docAfterUpgrade, null);
 
@@ -107,7 +112,7 @@ function runReplicaSetTest(oldBinVersion, oldFCVVersion) {
             }
         });
         assert.commandWorked(rst.getPrimary().adminCommand(
-            {setFeatureCompatibilityVersion: oldFCVVersion, confirm: true}));
+            {setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     };
     const downgradeFunc = () => {
         assert.commandWorked(rst.getPrimary().adminCommand(
@@ -118,15 +123,15 @@ function runReplicaSetTest(oldBinVersion, oldFCVVersion) {
     runTest(connString, getShard0PrimaryFunc, upgradeFunc, downgradeFunc, tearDownFunc);
 }
 
-jsTest.log("Running tests for a 'latest' standalone bootstrapped as a single-shard cluster");
-runStandaloneTest("latest", latestFCV);
+jsTest.log("Running tests for a 'last-lts' standalone bootstrapped as a single-shard cluster");
+runStandaloneTest("last-lts", lastLTSFCV);
 
 jsTest.log(
     "Running tests for a 'last-continuous' standalone bootstrapped as a single-shard cluster");
 runStandaloneTest("last-continuous", lastContinuousFCV);
 
-jsTest.log("Running tests for a 'latest' replica set bootstrapped as a single-shard cluster");
-runReplicaSetTest("latest", latestFCV);
+jsTest.log("Running tests for a 'last-lts' replica set bootstrapped as a single-shard cluster");
+runReplicaSetTest("last-lts", lastLTSFCV);
 
 jsTest.log(
     "Running tests for a 'last-continuous' replica set bootstrapped as a single-shard cluster");

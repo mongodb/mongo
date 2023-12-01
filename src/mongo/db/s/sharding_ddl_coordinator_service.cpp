@@ -112,7 +112,7 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             return std::make_shared<RefineCollectionShardKeyCoordinatorPre71Compatible>(
                 service, std::move(initialState));
             break;
-        case DDLCoordinatorTypeEnum::kCreateCollectionPre71Compatible:
+        case DDLCoordinatorTypeEnum::kCreateCollectionPre73Compatible:
             return std::make_shared<CreateCollectionCoordinatorLegacy>(service,
                                                                        std::move(initialState));
             break;
@@ -234,7 +234,7 @@ void ShardingDDLCoordinatorService::waitForOngoingCoordinatorsToFinish(
     }
 }
 
-void ShardingDDLCoordinatorService::_afterStepDown() {
+void ShardingDDLCoordinatorService::_onServiceTermination() {
     stdx::lock_guard lg(_mutex);
     _state = State::kPaused;
     _numCoordinatorsToWait = 0;

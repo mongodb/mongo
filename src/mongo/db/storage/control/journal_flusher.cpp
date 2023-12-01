@@ -37,7 +37,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -111,34 +111,33 @@ void JournalFlusher::run() {
         // Updates to a non-replicated collection, oplogTruncateAfterPoint, are made by this thread.
         // As this operation is critical for data durability we mark it as having Immediate priority
         // to skip ticket and flow control.
-        _uniqueCtx.get()->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+        shard_role_details::getLocker(_uniqueCtx->get())
+            ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
         // The journal flusher should not conflict with the setFCV command.
-        _uniqueCtx->get()->lockState()->setShouldConflictWithSetFeatureCompatibilityVersion(false);
+        shard_role_details::getLocker(_uniqueCtx->get())
+            ->setShouldConflictWithSetFeatureCompatibilityVersion(false);
     };
 
     setUpOpCtx();
     while (true) {
         pauseJournalFlusherBeforeFlush.pauseWhileSet();
         try {
-            ON_BLOCK_EXIT([&] {
-                // We do not want to miss an interrupt for the next round. Therefore, the opCtx
-                // will be reset after a flushing round finishes.
-                //
-                // It is fine if the opCtx is signaled between finishing and resetting because
-                // state changes will be seen before the next round. We want to catch any
-                // interrupt signals that occur after state is checked at the start of a round:
-                // the time during or before the next flush.
-                stdx::lock_guard<Latch> lk(_opCtxMutex);
-                _uniqueCtx.reset();
-                setUpOpCtx();
-            });
-
             _uniqueCtx->get()->recoveryUnit()->waitUntilDurable(_uniqueCtx->get());
 
             // Signal the waiters that a round completed.
             _currentSharedPromise->emplaceValue();
+
+            // Release snapshot before we start the next round.
+            _uniqueCtx->get()->recoveryUnit()->abandonSnapshot();
         } catch (const AssertionException& e) {
+            {
+                // Reset opCtx if we get an error.
+                stdx::lock_guard<Latch> lk(_opCtxMutex);
+                _uniqueCtx.reset();
+                setUpOpCtx();
+            }
+
             // Can be caused by killOp or stepdown.
             if (ErrorCodes::isInterruption(e.code())) {
                 // When this thread is interrupted it will immediately restart the journal flush

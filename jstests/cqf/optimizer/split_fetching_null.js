@@ -14,23 +14,30 @@ coll.drop();
 
 // Prepare documents where only few of them have null/missing values whereas the rest of them have
 // non-null values.
-const documents = [
+const docs = [
     {b: -1},
     {a: null, b: -2},
     {a: -1},
     {a: -2, b: null},
 ];
 
-const extraDocCount = 10000;
-// Add extra docs to make sure indexes can be picked and 1/10 of them have a=10.
-for (let i = 0; i < extraDocCount; i++) {
-    documents.push({a: i, b: i * 10});
-}
 for (let i = 0; i < 1000; i++) {
-    documents.push({a: 10, b: i * 100});
+    docs.push({a: 10, b: i * 100});
 }
 
-assert.commandWorked(coll.insertMany(documents));
+// Add extra docs to make sure indexes can be picked and 1/10 of them have a=10.
+let newDocs = [];
+for (let i = 0; i < 10000; i++) {
+    newDocs.push({a: i, b: i * 10});
+}
+
+// Distribute interesting documents to encourage IndexScan when sampling in chunks.
+for (let i = 0; i < docs.length; i++) {
+    const idx = Math.floor(i * (newDocs.length / docs.length));
+    newDocs[idx] = docs[i];
+}
+
+assert.commandWorked(coll.insertMany(newDocs));
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
 function runWithExplainV2(fn) {
@@ -77,7 +84,7 @@ res = runWithExplainV2(() => coll.explain("executionStats").aggregate([
     {$match: {$expr: {$lte: ['$a', 10]}}},
     {$project: {a: 1, _id: 0}}
 ]));
-assert.eq(1015, res.executionStats.nReturned);
+assert.eq(1013, res.executionStats.nReturned);
 // We expect to see a query plan similar to the above. The difference is that the interval becomes
 // an inequality and the field projection is 'a'.
 const expectedStrLte =
@@ -101,5 +108,5 @@ assert.eq(expectedStrLte, removeUUIDsFromExplain(db, res));
 res = runWithExplainV2(
     () =>
         coll.explain("executionStats").find({$expr: {$lte: ['$a', 10]}}, {a: 1, _id: 0}).finish());
-assert.eq(1015, res.executionStats.nReturned);
+assert.eq(1013, res.executionStats.nReturned);
 assert.eq(expectedStrLte, removeUUIDsFromExplain(db, res));

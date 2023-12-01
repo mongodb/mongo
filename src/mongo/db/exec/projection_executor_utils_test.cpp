@@ -219,14 +219,16 @@ TEST(ElemMatchProjection, CanMergeWithExistingFieldsInInputDocument) {
                                          "{bar: 6, z: 6}, {bar: 10, z: 10}]}")}));
 }
 
-TEST(ElemMatchProjection, RertursEmptyValuefItContainsNumericSubfield) {
-    ASSERT_VALUE_EQ(
-        {}, applyElemMatch(fromjson("{$gt: 2}"), "foo", Document{BSON("foo" << BSON(0 << 3))}));
+TEST(ElemMatchProjection, ReturnsEmptyValueIfItContainsNumericSubfield) {
+    ASSERT_VALUE_EQ({},
+                    applyElemMatch(fromjson("{$gt: 2}"),
+                                   "foo",
+                                   Document{BSON("foo" << BSON(StringData{} << 3))}));
 
     ASSERT_VALUE_EQ({},
                     applyElemMatch(fromjson("{$gt: 2}"),
                                    "foo",
-                                   Document{BSON("bar" << 1 << "foo" << BSON(0 << 3))}));
+                                   Document{BSON("bar" << 1 << "foo" << BSON(StringData{} << 3))}));
 }
 }  // namespace elem_match_projection_tests
 

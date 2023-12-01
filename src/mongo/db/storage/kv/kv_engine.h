@@ -260,7 +260,7 @@ public:
         return false;
     }
 
-    virtual void checkpoint(OperationContext* opCtx) {}
+    virtual void checkpoint() {}
 
     virtual StorageEngine::CheckpointIteration getCheckpointIteration() const {
         return StorageEngine::CheckpointIteration{0};
@@ -488,6 +488,16 @@ public:
     virtual StatusWith<BSONObj> getSanitizedStorageOptionsForSecondaryReplication(
         const BSONObj& options) const {
         return options;
+    }
+
+    /**
+     * See StorageEngine::autoCompact for details
+     */
+    virtual Status autoCompact(OperationContext* opCtx,
+                               bool enable,
+                               boost::optional<int64_t> freeSpaceTargetMB) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine doesn't support auto compact");
     }
 
     /**

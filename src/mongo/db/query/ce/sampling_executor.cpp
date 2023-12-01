@@ -50,15 +50,8 @@ boost::optional<optimizer::SelectivityType> SBESamplingExecutor::estimateSelecti
     sbe::value::SlotIdGenerator ids;
     sbe::InputParamToSlotMap inputParamToSlotMap;
 
-    SBENodeLowering g{env,
-                      *runtimeEnvironment,
-                      ids,
-                      inputParamToSlotMap,
-                      metadata,
-                      planAndProps._map,
-                      internalCascadesOptimizerSamplingCEScanStartOfColl.load()
-                          ? ScanOrder::Forward
-                          : ScanOrder::Random};
+    SBENodeLowering g{
+        env, *runtimeEnvironment, ids, inputParamToSlotMap, metadata, planAndProps._map};
     auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
     tassert(6624261, "Unexpected rid slot", !ridSlot);
 

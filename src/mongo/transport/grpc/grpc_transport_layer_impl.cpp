@@ -32,6 +32,8 @@
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/client.h"
+#include "mongo/transport/grpc/grpc_session_manager.h"
+#include "mongo/transport/grpc/service.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_utils.h"
 
@@ -59,10 +61,20 @@ GRPCTransportLayerImpl::GRPCTransportLayerImpl(ServiceContext* svcCtx,
                                                std::unique_ptr<SessionManager> sm)
     : _svcCtx{svcCtx}, _options{std::move(options)}, _sessionManager(std::move(sm)) {}
 
-GRPCTransportLayerImpl::~GRPCTransportLayerImpl() {
-    if (_sessionManager) {
-        _sessionManager->shutdown(kSessionManagerShutdownTimeout);
-    }
+std::unique_ptr<GRPCTransportLayerImpl> GRPCTransportLayerImpl::createWithConfig(
+    ServiceContext* svcCtx, Options options) {
+
+    auto tl = std::make_unique<GRPCTransportLayerImpl>(
+        svcCtx, std::move(options), std::make_unique<GRPCSessionManager>(svcCtx));
+    uassertStatusOK(tl->registerService(std::make_unique<CommandService>(
+        tl.get(),
+        [tlPtr = tl.get()](auto session) {
+            invariant(session->getTransportLayer() == tlPtr);
+            tlPtr->getSessionManager()->startSession(std::move(session));
+        },
+        std::make_shared<grpc::WireVersionProvider>())));
+
+    return tl;
 }
 
 Status GRPCTransportLayerImpl::registerService(std::unique_ptr<Service> svc) {
@@ -105,12 +117,18 @@ Status GRPCTransportLayerImpl::setup() {
             serverOptions.addresses = std::move(addresses);
             serverOptions.maxThreads = _options.maxServerThreads;
 
+            uassert(ErrorCodes::InvalidOptions,
+                    "Unable to start GRPC transport for ingress without tlsCertificateKeyFile",
+                    !sslGlobalParams.sslPEMKeyFile.empty());
+            serverOptions.tlsCertificateKeyFile = sslGlobalParams.sslPEMKeyFile;
+
             if (!sslGlobalParams.sslCAFile.empty()) {
                 serverOptions.tlsCAFile = sslGlobalParams.sslCAFile;
             }
-            if (!sslGlobalParams.sslPEMKeyFile.empty()) {
-                serverOptions.tlsPEMKeyFile = sslGlobalParams.sslPEMKeyFile;
-            }
+
+            serverOptions.tlsAllowInvalidCertificates = sslGlobalParams.sslAllowInvalidCertificates;
+            serverOptions.tlsAllowConnectionsWithoutCertificates =
+                sslGlobalParams.sslWeakCertificateValidation;
 
             uassert(ErrorCodes::InvalidOptions,
                     "Unable to start GRPCTransportLayerImpl for ingress without SessionManager",
@@ -120,6 +138,7 @@ Status GRPCTransportLayerImpl::setup() {
         }
         if (_options.enableEgress) {
             GRPCClient::Options clientOptions;
+
             if (!sslGlobalParams.sslCAFile.empty()) {
                 clientOptions.tlsCAFile = sslGlobalParams.sslCAFile;
             }
@@ -225,6 +244,16 @@ void GRPCTransportLayerImpl::shutdown() {
     }
     if (_client) {
         _client->shutdown();
+    }
+
+    if (_sessionManager) {
+        _sessionManager->shutdown(kSessionManagerShutdownTimeout);
+    }
+}
+
+void GRPCTransportLayerImpl::stopAcceptingSessions() {
+    if (_server) {
+        _server->stopAcceptingRequests();
     }
 }
 

@@ -15,6 +15,7 @@ export const $config = (function() {
     const data = {
         shardKey: shardKeys[0],
         currentShardKeyIndex: 0,
+        reshardingCount: 0,
     };
 
     const iterations = 25;
@@ -54,8 +55,24 @@ export const $config = (function() {
         insert: function insert(db, collName) {
             const coll = db.getCollection(collName);
             print(`Inserting documents for collection ${coll.getFullName()}.`);
-            const totalDocumentsToInsert = 10;
-            assert.commandWorked(coll.insert(createDocuments(totalDocumentsToInsert)));
+            const totalDocumentsToInsert = 5;
+            assert.soon(() => {
+                try {
+                    coll.insert(createDocuments(totalDocumentsToInsert));
+                    return true;
+                } catch (err) {
+                    if (err instanceof BulkWriteError && err.hasWriteErrors()) {
+                        for (let writeErr of err.getWriteErrors()) {
+                            if (writeErr.code == 11000) {
+                                // 11000 is a duplicate key error. If the insert generates the same
+                                // _id object as another concurrent insert, retry the command.
+                                return false;
+                            }
+                        }
+                    }
+                    throw err;
+                }
+            });
             print(`Finished Inserting documents.`);
         },
         reshardCollection: function reshardCollection(db, collName) {

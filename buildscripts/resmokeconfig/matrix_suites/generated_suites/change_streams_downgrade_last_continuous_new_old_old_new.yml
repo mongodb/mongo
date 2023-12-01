@@ -106,10 +106,6 @@ selector:
   - jstests/core/**/create_indexes.js
   - jstests/core/**/list_indexes_non_existent_ns.js
   - jstests/core/**/mr_preserve_indexes.js
-  - jstests/core/**/dbcase.js
-  - jstests/core/**/dbcase2.js
-  - jstests/core/**/no_db_created.js
-  - jstests/core/**/killop_drop_collection.js
   - jstests/core/**/geo_borders.js
   - jstests/core/**/distinct_index1.js
   - jstests/core/**/explain1.js
@@ -124,8 +120,6 @@ selector:
   - jstests/core/**/bulk_api_ordered.js
   - jstests/core/**/bulk_api_unordered.js
   - jstests/core/**/commands_with_uuid.js
-  - jstests/core/**/dbcase.js
-  - jstests/core/**/dbcase2.js
   - jstests/core/**/explain_execution_error.js
   - jstests/core/**/expr.js
   - jstests/core/**/find9.js
@@ -200,7 +194,6 @@ selector:
   - jstests/core/**/updatel.js
   - jstests/core/**/write_result.js
   - jstests/core/**/positional_projection.js
-  - jstests/core/**/invalid_db_name.js
   - jstests/core/**/dbref1.js
   - jstests/core/**/dbref2.js
   - jstests/core/**/ref3.js
@@ -262,6 +255,7 @@ selector:
   - operations_longer_than_stepdown_interval_in_txns
   - assumes_against_mongod_not_mongos
   - assumes_standalone_mongod
+  - assumes_no_implicit_collection_creation_on_get_collection
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection

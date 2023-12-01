@@ -59,7 +59,6 @@
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/batched_delete_stage.h"
@@ -114,6 +113,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cqf_command_utils.h"
+#include "mongo/db/query/cqf_fast_paths.h"
 #include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_bounds.h"
@@ -142,9 +142,9 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings_decoration.h"
-#include "mongo/db/query/query_settings_gen.h"
-#include "mongo/db/query/query_settings_manager.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/sbe_cached_solution_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
@@ -515,13 +515,18 @@ void fillOutIndexEntries(OperationContext* opCtx,
 }
 }  // namespace
 
-CollectionStats fillOutCollectionStats(OperationContext* opCtx, const CollectionPtr& collection) {
-    auto recordStore = collection->getRecordStore();
-    CollectionStats stats;
-    stats.noOfRecords = recordStore->numRecords(opCtx),
-    stats.approximateDataSizeBytes = recordStore->dataSize(opCtx),
-    stats.storageSizeBytes = recordStore->storageSize(opCtx);
-    return stats;
+void fillOutPlannerCollectionInfo(OperationContext* opCtx,
+                                  const CollectionPtr& collection,
+                                  PlannerCollectionInfo* out,
+                                  bool includeSizeStats) {
+    out->isTimeseries = static_cast<bool>(collection->getTimeseriesOptions());
+    if (includeSizeStats) {
+        // We only include these sometimes, since they are slightly expensive to compute.
+        auto recordStore = collection->getRecordStore();
+        out->noOfRecords = recordStore->numRecords(opCtx);
+        out->approximateDataSizeBytes = recordStore->dataSize(opCtx);
+        out->storageSizeBytes = recordStore->storageSize(opCtx);
+    }
 }
 
 void fillOutPlannerParams(OperationContext* opCtx,
@@ -606,10 +611,14 @@ void fillOutPlannerParams(OperationContext* opCtx,
         plannerParams->clusteredCollectionCollator = collection->getDefaultCollator();
     }
 
-    if (!plannerParams->columnStoreIndexes.empty()) {
-        // Fill out statistics needed for column scan query planning.
-        plannerParams->collectionStats = fillOutCollectionStats(opCtx, collection);
 
+    fillOutPlannerCollectionInfo(opCtx,
+                                 collection,
+                                 &plannerParams->collectionStats,
+                                 // Only include the full size stats when there's a CSI.
+                                 !plannerParams->columnStoreIndexes.empty());
+    if (!plannerParams->columnStoreIndexes.empty()) {
+        // Only fill this out when a CSI is present.
         const auto kMB = 1024 * 1024;
         plannerParams->availableMemoryBytes =
             static_cast<long long>(ProcessInfo::getMemSizeMB()) * kMB;
@@ -633,7 +642,8 @@ std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsIn
                                 secondaryColl,
                                 secondaryInfo.indexes,
                                 secondaryInfo.columnIndexes);
-            secondaryInfo.stats = fillOutCollectionStats(opCtx, secondaryColl);
+            fillOutPlannerCollectionInfo(
+                opCtx, secondaryColl, &secondaryInfo.stats, true /* include size stats */);
         } else {
             secondaryInfo.exists = false;
         }
@@ -1562,6 +1572,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),
+                                       nullptr /*pipeline*/,
                                        std::move(solutions[0]),
                                        std::move(roots[0]),
                                        {},
@@ -1573,47 +1584,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(remoteCursors),
                                        std::move(remoteExplains));
 }  // getSlotBasedExecutor
-
-/**
- * Function which returns true if 'cq' uses features that are currently supported in SBE without
- * 'featureFlagSbeFull' being set; false otherwise.
- */
-bool shouldUseRegularSbe(const CanonicalQuery& cq) {
-    auto sbeCompatLevel = cq.getExpCtx()->sbeCompatibility;
-    // We shouldn't get here if there are expressions in the query which are completely unsupported
-    // by SBE.
-    tassert(7248600,
-            "Unexpected SBE compatibility value",
-            sbeCompatLevel != SbeCompatibility::notCompatible);
-    // The 'ExpressionContext' may indicate that there are expressions which are only supported in
-    // SBE when 'featureFlagSbeFull' is set, or fully supported regardless of the value of the
-    // feature flag. This function should only return true in the latter case.
-    if (cq.getExpCtx()->sbeCompatibility != SbeCompatibility::fullyCompatible) {
-        return false;
-    }
-    for (const auto& stage : cq.cqPipeline()) {
-        if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage->documentSource())) {
-            // Group stage wouldn't be pushed down if it's not supported in SBE.
-            tassert(7548611,
-                    "Unexpected SBE compatibility value",
-                    groupStage->sbeCompatibility() != SbeCompatibility::notCompatible);
-            if (groupStage->sbeCompatibility() != SbeCompatibility::fullyCompatible) {
-                return false;
-            }
-        }
-        if (auto windowStage =
-                dynamic_cast<DocumentSourceInternalSetWindowFields*>(stage->documentSource())) {
-            // Window stage wouldn't be pushed down if it's not supported in SBE.
-            tassert(7914600,
-                    "Unexpected SBE compatibility value",
-                    windowStage->sbeCompatibility() != SbeCompatibility::notCompatible);
-            if (windowStage->sbeCompatibility() != SbeCompatibility::fullyCompatible) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
 
 /**
  * Attempts to create a slot-based executor for the query, if the query plan is eligible for SBE
@@ -1640,16 +1610,16 @@ attemptToGetSlotBasedExecutor(
         extractAndAttachPipelineStages(canonicalQuery.get(), true /* attachOnly */);
     }
 
-    // (Ignore FCV check): This is intentional because we always want to use this feature once the
-    // feature flag is enabled.
-    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
-    const bool canUseRegularSbe = shouldUseRegularSbe(*canonicalQuery);
+    // (Ignore FCV check): featureFlagSbeFull does not change the semantics of queries, so it can
+    // safely be enabled on some nodes and disabled on other nodes during upgrade/downgrade.
+    SbeCompatibility minRequiredCompatibility =
+        feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe()
+        ? SbeCompatibility::flagGuarded
+        : SbeCompatibility::fullyCompatible;
 
-    // If 'canUseRegularSbe' is true, then only the subset of SBE which is currently on by default
-    // is used by the query. If 'sbeFull' is true, then the server is configured to run any
-    // SBE-compatible query using SBE, even if the query uses features that are not on in SBE by
-    // default. Either way, try to construct an SBE plan executor.
-    if (canUseRegularSbe || sbeFull) {
+    // Try to construct an SBE plan executor if all the expressions in the CanonicalQuery's filter
+    // and projection are SBE compatible.
+    if (canonicalQuery->getExpCtx()->sbeCompatibility >= minRequiredCompatibility) {
         auto sbeYieldPolicy =
             PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, canonicalQuery->nss());
         SlotBasedPrepareExecutionHelper helper{
@@ -1709,11 +1679,21 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         if (isEligibleForBonsai(*canonicalQuery, opCtx, mainColl)) {
             optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
             const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
-            auto maybeExec = getSBEExecutorViaCascadesOptimizer(
-                collections, std::move(queryHints), canonicalQuery.get());
+
+            auto maybeExec = [&] {
+                // If the query is eligible for a fast path, use the fast path plan instead of
+                // invoking the optimizer.
+                if (auto fastPathExec = optimizer::fast_path::tryGetSBEExecutorViaFastPath(
+                        collections, canonicalQuery.get())) {
+                    return fastPathExec;
+                }
+
+                return getSBEExecutorViaCascadesOptimizer(
+                    collections, std::move(queryHints), canonicalQuery.get());
+            }();
             if (maybeExec) {
-                auto exec = uassertStatusOK(
-                    makeExecFromParams(std::move(canonicalQuery), std::move(*maybeExec)));
+                auto exec = uassertStatusOK(makeExecFromParams(
+                    std::move(canonicalQuery), nullptr /*pipeline*/, std::move(*maybeExec)));
                 return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
                     std::move(exec));
             } else {
@@ -1727,7 +1707,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
             }
         }
 
-        bool shouldAttemptSBE = [&]() {
+        const bool shouldAttemptSBE = [&]() {
             // If the query is not SBE compatible, do not attempt to run it on SBE.
             if (!canonicalQuery->isSbeCompatible()) {
                 return false;
@@ -1735,8 +1715,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 
             // If query settings engine version is set, use it to determine which engine should be
             // used.
-            if (auto querySettingsEngineVersion = querySettings.getQueryEngineVersion()) {
-                return *querySettingsEngineVersion == query_settings::QueryEngineVersionEnum::kV2;
+            if (auto queryFramework = querySettings.getQueryFramework()) {
+                return *queryFramework == QueryFrameworkControlEnum::kTrySbeEngine;
             }
 
             return !canonicalQuery->getForceClassicEngine();
@@ -1878,6 +1858,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
         opCtx, cq, metadataCursorId, remoteCursors.get(), sbeYieldPolicy.get());
     return plan_executor_factory::make(opCtx,
                                        nullptr /* cq */,
+                                       nullptr /*pipeline*/,
                                        nullptr /* solution */,
                                        std::move(root),
                                        nullptr /* optimizerData */,

@@ -1476,7 +1476,7 @@ TEST_F(DensifyRedactionTest, RedactionDateBounds) {
                         "?date",
                         "?date"
                     ],
-                    "unit": "?string"
+                    "unit": "hour"
                 }
             }
         })",
@@ -1538,11 +1538,83 @@ TEST_F(DensifyRedactionTest, RedactionPartitionBounds) {
                 "range": {
                     "step": "?number",
                     "bounds": "partition",
-                    "unit": "?string"
+                    "unit": "second"
                 }
             }
         })",
         redact(*docSource));
+}
+
+void assertRangeTimeUnitSerialization(auto expCtx,
+                                      BSONObj inputStage,
+                                      auto expectedStage,
+                                      auto opts) {
+    auto parsedStage =
+        DocumentSourceInternalDensify::createFromBson(inputStage.firstElement(), expCtx);
+    std::vector<Value> serialization;
+    parsedStage->serializeToArray(serialization, opts);
+
+    auto serializedStage = serialization[0].getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(expectedStage, serializedStage);
+}
+
+TEST_F(DensifyRedactionTest, RangeTimeUnitSerializationRepresentative) {
+    assertRangeTimeUnitSerialization(
+        getExpCtx(),
+        fromjson(R"({
+            $densify: {
+                field: "x",
+                partitionByFields: ["foo"],
+                range: {
+                    bounds: "partition",
+                    step: 50,
+                    unit: "second"
+                }
+            }
+        })"),
+        fromjson(R"({
+            $_internalDensify: {
+                field: "x",
+                partitionByFields: [
+                    "foo"
+                ],
+                range: {
+                    step: 1,
+                    bounds: "partition",
+                    unit: "second"
+                }
+            }
+        })"),
+        SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+}
+
+TEST_F(DensifyRedactionTest, RangeTimeUnitSerializationDebug) {
+    assertRangeTimeUnitSerialization(getExpCtx(),
+                                     fromjson(
+                                         R"({
+            $densify: {
+                field: "x",
+                partitionByFields: ["foo"],
+                range: {
+                    bounds: "partition",
+                    step: 50,
+                    unit: "second"
+                }
+            }
+        })"),
+                                     fromjson(
+                                         R"({
+            $_internalDensify: {
+                field: "x",
+                partitionByFields: ["foo"],
+                range: {
+                    step: "?number",
+                    bounds: "partition",
+                    unit: "second"
+                }
+            }
+        })"),
+                                     SerializationOptions::kDebugQueryShapeSerializeOptions);
 }
 }  // namespace
 }  // namespace mongo

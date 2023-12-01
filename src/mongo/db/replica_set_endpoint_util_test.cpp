@@ -30,6 +30,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/cluster_role.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/replica_set_endpoint_util.h"
 
 #include "mongo/util/database_name_util.h"
@@ -213,6 +214,87 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_AdminDatabase) {
     auto opMsgRequest = mongo::OpMsgRequest::fromDBAndBody(ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+}
+
+TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_SystemDotProfileCollection) {
+    std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
+    auto client =
+        getServiceContext()->getService()->makeClient("SystemDotProfileCollection", session);
+    auto opCtx = client->makeOperationContext();
+
+    auto dbName =
+        DatabaseName::createDatabaseName_forTest(boost::none /* tenantId */, {kTestDbName});
+    auto ns = NamespaceString::makeSystemDotProfileNamespace(dbName);
+    commands_test_example::ExampleIncrement incrementCmd(ns, 0);
+    auto opMsgRequest = mongo::OpMsgRequest::fromDBAndBody(ns.dbName(), incrementCmd.toBSON({}));
+
+    ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
+}
+
+TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_ConfigSystemSessionsCollection) {
+    std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
+    auto client =
+        getServiceContext()->getService()->makeClient("ConfigSystemSessionsCollection", session);
+    auto opCtx = client->makeOperationContext();
+
+    auto ns = NamespaceString::kLogicalSessionsNamespace;
+    commands_test_example::ExampleIncrement incrementCmd(ns, 0);
+    auto opMsgRequest = mongo::OpMsgRequest::fromDBAndBody(ns.dbName(), incrementCmd.toBSON({}));
+
+    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+}
+
+TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_AdminSystemUsersCollection) {
+    std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
+    auto client =
+        getServiceContext()->getService()->makeClient("AdminSystemUsersCollection", session);
+    auto opCtx = client->makeOperationContext();
+
+    auto ns = NamespaceString::createNamespaceString_forTest(NamespaceString::kSystemUsers);
+    commands_test_example::ExampleIncrement incrementCmd(ns, 0);
+    auto opMsgRequest = mongo::OpMsgRequest::fromDBAndBody(ns.dbName(), incrementCmd.toBSON({}));
+
+    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+}
+
+TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_UserSystemCollection) {
+    std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
+    auto client = getServiceContext()->getService()->makeClient("UserSystemCollection", session);
+    auto opCtx = client->makeOperationContext();
+
+    auto ns =
+        NamespaceString::createNamespaceString_forTest(kTestDbName, "system." + kTestCollName);
+    commands_test_example::ExampleIncrement incrementCmd(ns, 0);
+    auto opMsgRequest = mongo::OpMsgRequest::fromDBAndBody(ns.dbName(), incrementCmd.toBSON({}));
+
+    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+}
+
+TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_UserNonSystemCollection) {
+    std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
+    auto client = getServiceContext()->getService()->makeClient("UserNonSystemCollection", session);
+    auto opCtx = client->makeOperationContext();
+
+    auto ns0 =
+        NamespaceString::createNamespaceString_forTest(kTestDbName, "system-" + kTestCollName);
+    commands_test_example::ExampleIncrement incrementCmd0(ns0, 0);
+    auto opMsgRequest0 = mongo::OpMsgRequest::fromDBAndBody(ns0.dbName(), incrementCmd0.toBSON({}));
+
+    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest0));
+
+    auto ns1 =
+        NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName + "system");
+    commands_test_example::ExampleIncrement incrementCmd1(ns1, 0);
+    auto opMsgRequest1 = mongo::OpMsgRequest::fromDBAndBody(ns1.dbName(), incrementCmd1.toBSON({}));
+
+    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest1));
+
+    auto ns2 =
+        NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName + ".system.foo");
+    commands_test_example::ExampleIncrement incrementCmd2(ns2, 0);
+    auto opMsgRequest2 = mongo::OpMsgRequest::fromDBAndBody(ns2.dbName(), incrementCmd2.toBSON({}));
+
+    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest2));
 }
 
 TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_TargetedCommand) {

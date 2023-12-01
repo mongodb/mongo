@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/commands/cluster_bulk_write_cmd.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 
 namespace mongo {
 namespace {
@@ -56,7 +56,7 @@ struct ClusterBulkWriteCmdD {
 
         // A cluster command on the config server may attempt to use a ShardLocal to target itself,
         // which triggers an invariant, so only shard servers can run this.
-        uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
     }
 };
 MONGO_REGISTER_COMMAND(ClusterBulkWriteCmd<ClusterBulkWriteCmdD>).forShard();

@@ -43,7 +43,8 @@ class test_compact06(wttest.WiredTigerTestCase):
         #   1. We cannot trigger the background compaction on a specific API. Note that the URI is
         # not relevant here, the corresponding table does not need to exist for this check.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-            self.session.compact("file:123", 'background=true'), '/Background compaction does not work on specific URIs/')
+            self.session.compact("file:123", 'background=true'),
+            '/Background compaction does not work on specific URIs/')
             
         #   2. We cannot set other configurations while turning off the background server.
         items = ['exclude=["table:a.wt"]', 'free_space_target=10MB', 'timeout=60']
@@ -52,15 +53,12 @@ class test_compact06(wttest.WiredTigerTestCase):
                 self.session.compact(None, f'background=false,{item}'),
                 '/configuration cannot be set when disabling the background compaction server/')
 
-        #   3. We cannot disable the background server when it is already disabled.
+        #   3. We cannot exclude invalid URIs when enabling background compaction.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-            self.session.compact(None, 'background=false'), '/Background compaction is already disabled/')
+            self.session.compact(None, 'background=true,exclude=["file:a"]'),
+            '/can only exclude objects of type "table"/')
 
-        #   4. We cannot enable the background server with an invalid URIs to be excluded.
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-            self.session.compact(None, 'background=true,exclude=["file:a"]'), '/can only exclude objects of type "table"/')
-
-        #   5. Enable the background compaction server.
+        #   4. Enable the background compaction server.
         self.session.compact(None, 'background=true')
 
         # Wait for the background server to wake up.
@@ -72,14 +70,15 @@ class test_compact06(wttest.WiredTigerTestCase):
 
         #   5. We cannot reconfigure the background server.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-            self.session.compact(None, 'background=true,free_space_target=10MB'), '/Background compaction is already enabled/')
+            self.session.compact(None, 'background=true,free_space_target=10MB'),
+            '/Cannot reconfigure background compaction while it\'s already running/')
 
-        #   6. We cannot enable the background server when it is already enabled.
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-            self.session.compact(None, 'background=true'), '/Background compaction is already enabled/')
-
-        #   7. Disable the background compaction server.
+        #   6. Disable the background compaction server.
         self.session.compact(None, 'background=false')
+
+        # Background compaction may have been inspecting a table when disabled, which is considered
+        # as an interruption, ignore that message.
+        self.ignoreStdoutPatternIfExists('background compact interrupted by application')
 
 if __name__ == '__main__':
     wttest.run()

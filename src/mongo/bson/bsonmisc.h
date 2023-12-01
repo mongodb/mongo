@@ -177,7 +177,7 @@ public:
 
     void endField(StringData nextFieldName = StringData());
     bool subobjStarted() const {
-        return _fieldName != nullptr;
+        return !_fieldName.empty();
     }
 
     // The following methods provide API compatibility with BSONArrayBuilder

@@ -32,6 +32,28 @@
 #include <benchmark/benchmark.h>
 
 namespace mongo::boolean_simplification {
+namespace {
+std::unique_ptr<MatchExpression> buildOrOfLeafs(int value) {
+    auto operand = BSON("$eq" << value);
+    auto expr = std::make_unique<OrMatchExpression>();
+    expr->add(std::make_unique<EqualityMatchExpression>("a"_sd, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("b"_sd, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("c"_sd, operand["$eq"]));
+    return expr;
+}
+
+std::unique_ptr<MatchExpression> buildAndOfOrs(int startValue, int endValue) {
+    auto expr = std::make_unique<AndMatchExpression>();
+    for (int value = startValue; value < endValue; ++value) {
+        expr->add(buildOrOfLeafs(value));
+    }
+    return expr;
+}
+
+struct EnableSimplifier {};
+struct DisableSimplifier {};
+}  // namespace
+
 /**
  * 1 Minterm of size N
  */
@@ -53,6 +75,8 @@ void matchExpression_createAnd(benchmark::State& state) {
     }
 }
 
+BENCHMARK(matchExpression_createAnd)->RangeMultiplier(10)->Range(10, 10000);
+
 void matchExpression_createOr(benchmark::State& state) {
     const size_t numPredicates = static_cast<size_t>(state.range());
     std::vector<BSONObj> operands;
@@ -70,6 +94,8 @@ void matchExpression_createOr(benchmark::State& state) {
         }
     }
 }
+
+BENCHMARK(matchExpression_createOr)->RangeMultiplier(10)->Range(10, 10000);
 
 void matchExpression_createAndOfOrs(benchmark::State& state) {
     const size_t size = static_cast<size_t>(state.range());
@@ -90,6 +116,8 @@ void matchExpression_createAndOfOrs(benchmark::State& state) {
     }
 }
 
+BENCHMARK(matchExpression_createAndOfOrs)->Args({3})->Args({7})->Args({10})->Args({13});
+
 void matchExpression_cloneAnd(benchmark::State& state) {
     const size_t numPredicates = static_cast<size_t>(state.range());
     auto root = std::make_unique<AndMatchExpression>();
@@ -105,6 +133,8 @@ void matchExpression_cloneAnd(benchmark::State& state) {
     }
 }
 
+BENCHMARK(matchExpression_cloneAnd)->RangeMultiplier(10)->Range(10, 10000);
+
 void matchExpression_cloneOr(benchmark::State& state) {
     const size_t numPredicates = static_cast<size_t>(state.range());
     auto root = std::make_unique<OrMatchExpression>();
@@ -119,6 +149,8 @@ void matchExpression_cloneOr(benchmark::State& state) {
         benchmark::DoNotOptimize(root->clone());
     }
 }
+
+BENCHMARK(matchExpression_cloneOr)->RangeMultiplier(10)->Range(10, 10000);
 
 void matchExpression_cloneAndOfOrs(benchmark::State& state) {
     const size_t size = static_cast<size_t>(state.range());
@@ -138,11 +170,145 @@ void matchExpression_cloneAndOfOrs(benchmark::State& state) {
     }
 }
 
-BENCHMARK(matchExpression_createAnd)->RangeMultiplier(10)->Range(10, 10000);
-BENCHMARK(matchExpression_createOr)->RangeMultiplier(10)->Range(10, 10000);
-BENCHMARK(matchExpression_createAndOfOrs)->Args({3})->Args({7})->Args({10})->Args({13});
-
-BENCHMARK(matchExpression_cloneAnd)->RangeMultiplier(10)->Range(10, 10000);
-BENCHMARK(matchExpression_cloneOr)->RangeMultiplier(10)->Range(10, 10000);
 BENCHMARK(matchExpression_cloneAndOfOrs)->Args({3})->Args({7})->Args({10})->Args({13});
+
+/**
+ * Trivially simple expression (1 predicate).
+ */
+template <typename SimplifierStatus>
+void matchExpressionOptimize_triviallySimple(benchmark::State& state) {
+    auto operand = BSON("$eq" << 1);
+    auto expr = std::make_unique<EqualityMatchExpression>("a"_sd, operand["$eq"]);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(MatchExpression::optimize(
+            expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
+    }
+}
+
+BENCHMARK_TEMPLATE(matchExpressionOptimize_triviallySimple, DisableSimplifier);
+BENCHMARK_TEMPLATE(matchExpressionOptimize_triviallySimple, EnableSimplifier);
+
+/**
+ * Simple $and of 3 predicates expression.
+ */
+template <typename SimplifierStatus>
+void matchExpressionOptimize_simpleAnd(benchmark::State& state) {
+    auto operand = BSON("$eq" << 1);
+    auto expr = std::make_unique<AndMatchExpression>();
+    expr->add(std::make_unique<EqualityMatchExpression>("a"_sd, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("b"_sd, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("c"_sd, operand["$eq"]));
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(MatchExpression::optimize(
+            expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
+    }
+}
+
+BENCHMARK_TEMPLATE(matchExpressionOptimize_simpleAnd, DisableSimplifier);
+BENCHMARK_TEMPLATE(matchExpressionOptimize_simpleAnd, EnableSimplifier);
+
+/**
+ * Simple $or of 3 predicates expression.
+ */
+template <typename SimplifierStatus>
+void matchExpressionOptimize_simpleOr(benchmark::State& state) {
+    auto operand = BSON("$eq" << 1);
+    auto expr = std::make_unique<OrMatchExpression>();
+    expr->add(std::make_unique<EqualityMatchExpression>("a"_sd, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("b"_sd, operand["$eq"]));
+    expr->add(std::make_unique<EqualityMatchExpression>("c"_sd, operand["$eq"]));
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(MatchExpression::optimize(
+            expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
+    }
+}
+
+BENCHMARK_TEMPLATE(matchExpressionOptimize_simpleOr, DisableSimplifier);
+BENCHMARK_TEMPLATE(matchExpressionOptimize_simpleOr, EnableSimplifier);
+
+/**
+ * Moderately complex expression that ended up in 81 minterms.
+ */
+template <typename SimplifierStatus>
+void matchExpressionOptimize_mediumComplex(benchmark::State& state) {
+    auto expr = std::make_unique<AndMatchExpression>();
+    expr->add(buildAndOfOrs(0, 3));
+    expr->add(buildAndOfOrs(3, 6));
+    expr->add(buildAndOfOrs(6, 9));
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(MatchExpression::optimize(
+            expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
+    }
+}
+
+BENCHMARK_TEMPLATE(matchExpressionOptimize_mediumComplex, DisableSimplifier);
+BENCHMARK_TEMPLATE(matchExpressionOptimize_mediumComplex, EnableSimplifier);
+
+/**
+ * Maximum allowed complex expression that ended up in 486 minterms.
+ */
+template <typename SimplifierStatus>
+void matchExpressionOptimize_maxComplex(benchmark::State& state) {
+    auto expr = std::make_unique<AndMatchExpression>();
+    {
+        auto orExpr = std::make_unique<OrMatchExpression>();
+        orExpr->add(buildAndOfOrs(0, 3));
+        orExpr->add(buildAndOfOrs(3, 6));
+        orExpr->add(buildAndOfOrs(6, 9));
+        expr->add(std::move(orExpr));
+    }
+    {
+        auto operand = BSON("$gt" << 0);
+        auto orExpr = std::make_unique<OrMatchExpression>();
+        orExpr->add(std::make_unique<GTMatchExpression>("a"_sd, operand["$gt"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("b"_sd, operand["$gt"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("c"_sd, operand["$gt"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("d"_sd, operand["$gt"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("e"_sd, operand["$gt"]));
+        orExpr->add(std::make_unique<GTMatchExpression>("f"_sd, operand["$gt"]));
+        expr->add(std::move(orExpr));
+    }
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(MatchExpression::optimize(
+            expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
+    }
+}
+
+BENCHMARK_TEMPLATE(matchExpressionOptimize_maxComplex, DisableSimplifier);
+BENCHMARK_TEMPLATE(matchExpressionOptimize_maxComplex, EnableSimplifier);
+
+/**
+ * Too complex expression that abort the simplification earlier.
+ */
+template <typename SimplifierStatus>
+void matchExpressionOptimize_overComplex(benchmark::State& state) {
+    auto expr = std::make_unique<AndMatchExpression>();
+    {
+        auto orExpr = std::make_unique<OrMatchExpression>();
+        orExpr->add(buildAndOfOrs(0, 3));
+        orExpr->add(buildAndOfOrs(3, 6));
+        orExpr->add(buildAndOfOrs(6, 9));
+        expr->add(std::move(orExpr));
+    }
+    {
+        auto orExpr = std::make_unique<OrMatchExpression>();
+        orExpr->add(buildAndOfOrs(9, 12));
+        orExpr->add(buildAndOfOrs(12, 15));
+        orExpr->add(buildAndOfOrs(15, 18));
+        expr->add(std::move(orExpr));
+    }
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(MatchExpression::optimize(
+            expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
+    }
+}
+
+BENCHMARK_TEMPLATE(matchExpressionOptimize_overComplex, DisableSimplifier);
+BENCHMARK_TEMPLATE(matchExpressionOptimize_overComplex, EnableSimplifier);
 }  // namespace mongo::boolean_simplification

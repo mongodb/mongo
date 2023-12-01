@@ -35,7 +35,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/memory_usage_tracker.h"
+#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 

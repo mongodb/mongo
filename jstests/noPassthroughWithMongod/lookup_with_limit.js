@@ -1,13 +1,10 @@
 /**
  * Tests that the $limit stage is pushed before $lookup stages, except when there is an $unwind.
+ *
+ * @tags: [requires_sbe]
  */
 import {flattenQueryPlanTree, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE $lookup is not enabled.");
-    quit();
-}
 
 // SERVER-80226: Remove 'featureFlagSbeFull' used by SBE Pushdown, SBE $unwind.
 const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);

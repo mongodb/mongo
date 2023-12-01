@@ -92,11 +92,15 @@ void dropAggTempCollections(OperationContext* opCtx) {
 
                 try {
                     dropTempCollection(opCtx.get(), nss);
+                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                    // The database might have been dropped by a different operation, so the temp
+                    // collection does no longer exist.
                 } catch (const DBException& ex) {
                     LOGV2(8144400,
                           "Failed to drop temporary aggregation collection",
                           logAttrs(nss),
                           "error"_attr = redact(ex.toString()));
+                    // Do not remove the temporary collection entry.
                     continue;
                 }
 

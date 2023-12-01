@@ -1225,8 +1225,10 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
                                                       callbacks);
         }
 
+        ScanOrder scanOrder = n.getScanOrder();
+
         bool forwardScan = [&]() {
-            switch (_scanOrder) {
+            switch (scanOrder) {
                 case ScanOrder::Forward:
                 case ScanOrder::Random:
                     return true;
@@ -1254,7 +1256,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
             planNodeId,
             callbacks,
             gDeprioritizeUnboundedUserCollectionScans.load(), /* lowPriority */
-            _scanOrder == ScanOrder::Random);
+            scanOrder == ScanOrder::Random);
     } else {
         tasserted(6624355, "Unknown scan type.");
     }

@@ -40,8 +40,6 @@
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
-#include "mongo/db/s/add_shard_cmd_gen.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
@@ -164,6 +162,8 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
  * Initialize the sharding components for a config server, if they haven't already been set up.
  */
 void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCtx);
+
+void initializeGlobalShardingStateForEmbeddedRouterIfNeeded(OperationContext* opCtx);
 
 /**
  * Helper method to initialize sharding awareness from the shard identity document if it can be

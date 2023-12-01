@@ -67,7 +67,7 @@ namespace mongo {
  * This implements an aggregation document source that lists the active/cached users in the
  * authorization manager. It is intended for diagnostic and reporting purposes.
  */
-class DocumentSourceListCachedAndActiveUsers final : public DocumentSource {
+class DocumentSourceListCachedAndActiveUsers final {
 public:
     static constexpr StringData kStageName = "$listCachedAndActiveUsers"_sd;
 
@@ -109,45 +109,8 @@ public:
         const Privilege _requiredPrivilege;
     };
 
-    const char* getSourceName() const final {
-        return kStageName.rawData();
-    }
-
-    Value serialize(
-        const SerializationOptions& opts = SerializationOptions{}) const final override {
-        return Value(Document{{getSourceName(), Document{}}});
-    }
-
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        StageConstraints constraints(StreamType::kStreaming,
-                                     PositionRequirement::kFirst,
-                                     HostTypeRequirement::kLocalOnly,
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kNotAllowed,
-                                     TransactionRequirement::kNotAllowed,
-                                     LookupRequirement::kAllowed,
-                                     UnionRequirement::kNotAllowed);
-
-        constraints.isIndependentOfAnyCollection = true;
-        constraints.requiresInputDocSource = false;
-        return constraints;
-    }
-
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        return boost::none;
-    }
-
-    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
-
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-private:
-    DocumentSourceListCachedAndActiveUsers(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    GetNextResult doGetNext() final;
-
-    std::vector<AuthorizationManager::CachedUserInfo> _users;
 };
 
 }  // namespace mongo

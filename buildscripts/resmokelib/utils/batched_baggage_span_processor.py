@@ -13,7 +13,7 @@ class BatchedBaggageSpanProcessor(BatchSpanProcessor):
     from the parent context and adds the baggage entries' keys and
     values to the span as attributes on span start.
 
-    Use this to propogate attributes you want in every nested span
+    Use this to propogate attributes you want in every nested span.
     """
 
     def __init__(self, span_exporter: SpanExporter):

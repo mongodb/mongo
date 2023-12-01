@@ -240,7 +240,7 @@ StringData String::caseFoldAndStripDiacritics(StackBufBuilder* buffer,
             // utf-8. We make no guarantees about what results will be returned in this case.
             uassert(ErrorCodes::BadValue,
                     "text contains invalid UTF-8",
-                    leadingOnes > 1 && leadingOnes <= 4 && inputIt + leadingOnes - 1 <= endIt);
+                    leadingOnes > 1 && leadingOnes <= 4 && inputIt + (leadingOnes - 1) <= endIt);
 
             codepoint = firstByte & (0xff >> leadingOnes);  // mask off the size indicator.
             for (int subByteIx = 1; subByteIx < leadingOnes; subByteIx++) {

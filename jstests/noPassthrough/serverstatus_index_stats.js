@@ -7,6 +7,9 @@
  *   requires_replication,
  * ]
  */
+
+import {safeToCreateColumnStoreIndex} from "jstests/libs/columnstore_util.js";
+
 const assertStats = (db, assertFn) => {
     const stats = db.serverStatus().indexStats;
     try {
@@ -224,9 +227,7 @@ assertStats(db, (stats) => {
 
 lastStats = db.serverStatus().indexStats;
 
-const columnstoreIndexesEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagColumnstoreIndexes: 1}))
-        .featureFlagColumnstoreIndexes.value;
+const columnstoreIndexesEnabled = safeToCreateColumnStoreIndex(db);
 if (columnstoreIndexesEnabled) {
     // TODO SERVER-61644 (or sooner) should support accessing/using index and seeing that reflected.
     assert.commandWorked(db.testColl.createIndex({'$**': 'columnstore'}));

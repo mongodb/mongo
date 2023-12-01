@@ -50,6 +50,7 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/optime.h"
@@ -320,8 +321,9 @@ void ScanStage::doDetachFromOperationContext() {
 
 void ScanStage::doAttachToOperationContext(OperationContext* opCtx) {
     if (_lowPriority && _open && gDeprioritizeUnboundedUserCollectionScans.load() &&
-        opCtx->getClient()->isFromUserConnection() && opCtx->lockState()->shouldWaitForTicket()) {
-        _priority.emplace(opCtx->lockState(), AdmissionContext::Priority::kLow);
+        opCtx->getClient()->isFromUserConnection() &&
+        shard_role_details::getLocker(opCtx)->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kLow);
     }
     if (auto cursor = getActiveCursor()) {
         cursor->reattachToOperationContext(opCtx);
@@ -432,13 +434,6 @@ void ScanStage::open(bool reOpen) {
     _open = true;
 }
 
-value::OwnedValueAccessor* ScanStage::getFieldAccessor(StringData name) {
-    if (size_t pos = _scanFieldNames.findPos(name); pos != StringListSet::npos) {
-        return &_scanFieldAccessors[pos];
-    }
-    return nullptr;
-}
-
 PlanState ScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
@@ -448,8 +443,9 @@ PlanState ScanStage::getNext() {
     }
 
     if (_lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
-        _opCtx->getClient()->isFromUserConnection() && _opCtx->lockState()->shouldWaitForTicket()) {
-        _priority.emplace(_opCtx->lockState(), AdmissionContext::Priority::kLow);
+        _opCtx->getClient()->isFromUserConnection() &&
+        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(_opCtx), AdmissionContext::Priority::kLow);
     }
 
     // We are about to call next() on a storage cursor so do not bother saving our internal state in
@@ -548,6 +544,12 @@ PlanState ScanStage::getNext() {
                                                            _indexKeyPatternAccessor,
                                                            _seekRecordId,
                                                            *_coll.getCollName());
+        }
+
+        // Indicate that the last recordId seen is null once EOF is hit.
+        if (_recordIdSlot) {
+            auto [tag, val] = sbe::value::makeCopyRecordId(RecordId());
+            _recordIdAccessor.reset(true, tag, val);
         }
         _priority.reset();
         return trackPlanState(PlanState::IS_EOF);

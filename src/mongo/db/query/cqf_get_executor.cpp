@@ -158,27 +158,27 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
 
     std::pair<IndexDefinitions, MultikeynessTrie> result;
     std::string indexHintName;
-    bool skipAllIndexes = false;
+
+    // True if the query has a $natural hint, indicating that we must use a collection scan.
+    bool hasNaturalHint = false;
+
     if (indexHint) {
         const BSONElement element = indexHint->firstElement();
         const StringData fieldName = element.fieldNameStringData();
-        if (fieldName == "$natural"_sd) {
+        if (fieldName == query_request_helper::kNaturalSortField) {
             // Do not add indexes.
-            skipAllIndexes = true;
+            hasNaturalHint = true;
         } else if (fieldName == "$hint"_sd && element.type() == BSONType::String) {
             indexHintName = element.valueStringData().toString();
         }
 
-        disableScan = !skipAllIndexes;
+        disableScan = !hasNaturalHint;
     }
 
     const IndexCatalog& indexCatalog = *collection->getIndexCatalog();
 
     auto indexIterator =
         indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
-
-    const bool queryHasNaturalHint = indexHint && !indexHint->isEmpty() &&
-        indexHint->firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
 
     while (indexIterator->more()) {
         const IndexCatalogEntry& catalogEntry = *indexIterator->next();
@@ -196,32 +196,25 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
             continue;
         }
 
-        // If there is a $natural hint, we should not assert here as we will not use the index.
-        const bool isSpecialIndex =
-            descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
+        // Check for special indexes. We do not want to try to build index metadata for a special
+        // index (since we do not support those yet in CQF) but we should allow the query to go
+        // through CQF if there is a $natural hint.
+        if (descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
             descriptor.isSparse() || descriptor.getIndexType() != IndexType::INDEX_BTREE ||
-            !descriptor.collation().isEmpty();
-        if (!queryHasNaturalHint && isSpecialIndex) {
-            uasserted(ErrorCodes::InternalErrorNotSupported, "Unsupported index type");
-        }
-
-        // We do not want to try to build index metadata for a special index (since we do not
-        // support those yet in CQF) but we should allow the query to go through CQF if there is a
-        // $natural hint.
-        if (queryHasNaturalHint && isSpecialIndex) {
+            !descriptor.collation().isEmpty()) {
+            uassert(
+                ErrorCodes::InternalErrorNotSupported, "Unsupported index type", hasNaturalHint);
             continue;
         }
 
         if (indexHint) {
             if (indexHintName.empty()) {
-                if (!SimpleBSONObjComparator::kInstance.evaluate(descriptor.keyPattern() ==
-                                                                 *indexHint)) {
-                    // Index key pattern does not match hint.
-                    skipIndex = true;
-                }
-            } else if (indexHintName != descriptor.indexName()) {
-                // Index name does not match hint.
-                skipIndex = true;
+                // Index hint is a key pattern. Check if it matches this descriptor's key pattern.
+                skipIndex = SimpleBSONObjComparator::kInstance.evaluate(descriptor.keyPattern() !=
+                                                                        *indexHint);
+            } else {
+                // Index hint is an index name. Check if it matches the descriptor's name.
+                skipIndex = indexHintName != descriptor.indexName();
             }
         }
 
@@ -331,7 +324,7 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
             }
         }
         // For now we assume distribution is Centralized.
-        if (!skipIndex && !skipAllIndexes) {
+        if (!skipIndex && !hasNaturalHint) {
             result.first.emplace(descriptor.indexName(), std::move(indexDef));
         }
     }
@@ -401,7 +394,6 @@ static ExecParams createExecutor(
     const NamespaceString& nss,
     const MultipleCollectionAccessor& collections,
     const bool requireRID,
-    const ScanOrder scanOrder,
     const boost::optional<MatchExpression*> pipelineMatchExpr,
     PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
     auto env = VariableEnvironment::build(planAndProps._node);
@@ -426,7 +418,6 @@ static ExecParams createExecutor(
                       staticData->inputParamToSlotMap,
                       phaseManager.getMetadata(),
                       planAndProps._map,
-                      scanOrder,
                       sbeYieldPolicy.get()};
     auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
     tassert(6624262, "Unexpected rid slot", !requireRID || ridSlot);
@@ -552,7 +543,9 @@ static void populateAdditionalScanDefs(
             collectionCE = collection->numRecords(opCtx);
         }
 
-
+        // We use a forward scan order below by default since these collections are not the main
+        // collection of the query (and currently, the scan order can only be non-forward for the
+        // main collection).
         scanDefs.emplace(
             scanDefName,
             createScanDef(involvedNss.dbName(),
@@ -697,6 +690,12 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
     ShardingMetadata shardingMetadata(shardKey, isSharded);
 
+    auto scanOrder = ScanOrder::Forward;
+    if (indexHint && indexHint->firstElementFieldNameStringData() == "$natural"_sd &&
+        indexHint->firstElement().safeNumberInt() < 0) {
+        scanOrder = ScanOrder::Reverse;
+    }
+
     scanDefs.emplace(
         scanDefName,
         createScanDef(
@@ -709,7 +708,9 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
             std::move(distribution),
             collectionExists,
             numRecords,
-            std::move(shardingMetadata)));
+            std::move(shardingMetadata),
+            {} /* indexedFieldPaths*/,
+            scanOrder));
 
     // Add a scan definition for all involved collections. Note that the base namespace has already
     // been accounted for above and isn't included here.
@@ -745,6 +746,13 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
             for (auto& entry : metadataForSampling._scanDefs) {
                 // Do not use indexes for sampling.
                 entry.second.getIndexDefs().clear();
+
+                // Setting the scan order for all scan definitions will cause any PhysicalScanNodes
+                // in the tree for that scan to have the appropriate scan order.
+                entry.second.setScanOrder(internalCascadesOptimizerSamplingCEScanStartOfColl.load()
+                                              ? ScanOrder::Forward
+                                              : ScanOrder::Random);
+
                 // Do not perform shard filtering for sampling.
                 entry.second.shardingMetadata().setMayContainOrphans(false);
             }
@@ -849,7 +857,10 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 
     const auto& collection = collections.getMainCollection();
 
-    validateCommandOptions(canonicalQuery, collection, indexHint, involvedCollections);
+    const boost::optional<BSONObj>& hint =
+        (indexHint && !indexHint->isEmpty() ? indexHint : boost::none);
+
+    validateCommandOptions(canonicalQuery, collection, hint, involvedCollections);
 
     const bool requireRID = canonicalQuery ? canonicalQuery->getForceGenerateRecordId() : false;
     const bool collectionExists = static_cast<bool>(collection);
@@ -867,18 +878,13 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                      collection,
                                      involvedCollections,
                                      nss,
-                                     indexHint,
+                                     hint,
                                      scanProjName,
                                      uuidStr,
                                      scanDefName,
                                      constFold,
                                      queryHints,
                                      prefixId);
-    auto scanOrder = ScanOrder::Forward;
-    if (indexHint && indexHint->firstElementFieldNameStringData() == "$natural"_sd &&
-        indexHint->firstElement().safeNumberInt() < 0) {
-        scanOrder = ScanOrder::Reverse;
-    }
 
     ABT abt = collectionExists
         ? make<ScanNode>(scanProjName, scanDefName)
@@ -886,9 +892,10 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                               createInitialScanProps(scanProjName, scanDefName));
 
     // Check if pipeline is eligible for plan caching.
-    auto _isCacheable = false;
+    // TODO SERVER-83414: Enable histogram CE with parameterization.
+    auto _isCacheable = (internalQueryCardinalityEstimatorMode != "histogram"_sd);
     if (pipeline) {
-        _isCacheable = [&]() -> bool {
+        _isCacheable &= [&]() -> bool {
             auto& sources = pipeline->getSources();
             if (sources.empty())
                 return false;
@@ -907,16 +914,19 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
             return true;
         }();
         _isCacheable = false;  // TODO: SERVER-82185: Remove once E2E parameterization enabled
-        if (_isCacheable)
+        if (_isCacheable) {
             MatchExpression::parameterize(
                 dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())->getMatchExpression());
+        }
         abt = translatePipelineToABT(metadata, *pipeline, scanProjName, std::move(abt), prefixId);
     } else {
         // Clear match expression auto-parameterization by setting max param count to zero before
         // CQ to ABT translation
         // TODO: SERVER-82185: Update value of _isCacheable to true for M2-eligible queries
-        if (!_isCacheable)
+        _isCacheable = false;  // TODO: SERVER-82185: Remove once E2E parameterization enabled
+        if (!_isCacheable) {
             MatchExpression::unparameterize(canonicalQuery->getPrimaryMatchExpression());
+        }
         abt = translateCanonicalQueryToABT(
             metadata, *canonicalQuery, scanProjName, std::move(abt), prefixId);
     }
@@ -1001,7 +1011,6 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                           nss,
                           collections,
                           requireRID,
-                          scanOrder,
                           pipelineMatchExpr);
 }
 
@@ -1029,7 +1038,9 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> makeExecFromParams(
-    std::unique_ptr<CanonicalQuery> cq, ExecParams execArgs) {
+    std::unique_ptr<CanonicalQuery> cq,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    ExecParams execArgs) {
     if (cq) {
         input_params::bind(cq->getPrimaryMatchExpression(), execArgs.root.second, false);
     } else if (execArgs.pipelineMatchExpr != boost::none) {
@@ -1039,6 +1050,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> makeExecFromPar
 
     return plan_executor_factory::make(execArgs.opCtx,
                                        std::move(cq),
+                                       std::move(pipeline),
                                        std::move(execArgs.solution),
                                        std::move(execArgs.root),
                                        std::move(execArgs.optimizerData),

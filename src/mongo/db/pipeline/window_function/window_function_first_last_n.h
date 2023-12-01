@@ -64,8 +64,9 @@ public:
 
     void add(Value value) final {
         auto valToInsert = value.missing() ? Value(BSONNULL) : std::move(value);
-        _values.emplace_back(SimpleMemoryToken{valToInsert.getApproximateSize(), &_memUsageTracker},
-                             std::move(valToInsert));
+        _values.emplace_back(
+            SimpleMemoryUsageToken{valToInsert.getApproximateSize(), &_memUsageTracker},
+            std::move(valToInsert));
     }
 
     void remove(Value value) final {
@@ -104,7 +105,7 @@ public:
     }
 
 private:
-    std::vector<SimpleMemoryTokenWith<Value>> _values;
+    std::vector<SimpleMemoryUsageTokenWith<Value>> _values;
     long long _n;
 };
 using WindowFunctionFirstN = WindowFunctionFirstLastN<FirstLastSense::kFirst>;

@@ -63,8 +63,12 @@ std::string dumpVariables(const Vectorizer::VariableTypes& variableTypes) {
 }  // namespace
 
 Vectorizer::Tree Vectorizer::vectorize(optimizer::ABT& node,
-                                       const VariableTypes& externalBindings) {
+                                       const VariableTypes& externalBindings,
+                                       boost::optional<sbe::value::SlotId> externalBitmapSlot) {
     _variableTypes = externalBindings;
+    if (externalBitmapSlot) {
+        _activeMasks.push_back(getABTVariableName(*externalBitmapSlot));
+    }
     auto result = node.visit(*this);
     foldIfNecessary(result);
     return result;
@@ -127,10 +131,15 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
         // If the variable holds a cell, extract the block variable from that and propagate the name
         // of the cell variable to the caller to be used when folding back the result.
         if (TypeSignature::kCellType.isSubset(varIt->second.first)) {
-            return {makeABTFunction("cellBlockGetFlatValuesBlock"_sd, n),
-                    varIt->second.first.exclude(TypeSignature::kCellType)
-                        .include(TypeSignature::kBlockType),
-                    var.name()};
+            Tree result = Tree{makeABTFunction("cellBlockGetFlatValuesBlock"_sd, n),
+                               varIt->second.first.exclude(TypeSignature::kCellType)
+                                   .include(TypeSignature::kBlockType),
+                               var.name()};
+            if (_purpose == Purpose::Project) {
+                // When we are computing projections, we always work on folded values.
+                foldIfNecessary(result);
+            }
+            return result;
         } else {
             return {n, varIt->second.first, varIt->second.second};
         }

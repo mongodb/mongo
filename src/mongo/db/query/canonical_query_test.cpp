@@ -263,6 +263,8 @@ TEST(CanonicalQueryTest, NormalizeQuerySort) {
 TEST(CanonicalQueryTest, NormalizeQueryTree) {
     // Single-child $or elimination.
     testNormalizeQuery("{$or: [{b: 1}]}", "{b: 1}");
+    // $or deduplication for same-path children.
+    testNormalizeQuery("{$or: [{b: 1}, {b: 1}]}", "{b: 1}");
     // Single-child $and elimination.
     testNormalizeQuery("{$or: [{$and: [{a: 1}]}, {b: 1}]}", "{$or: [{a: 1}, {b: 1}]}");
     // Single-child $_internalSchemaXor elimination.
@@ -279,11 +281,13 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
         "{$_internalSchemaXor: [{$and: [{a: 1}, {b:1}]}, {$_internalSchemaXor: [{c: 1}, {d: "
         "1}]}]}",
         /*skipHashTest*/ true);
+    // $in with 0 arguments is alwaysFalse
+    testNormalizeQuery("{a: {$in: []}}", "{$alwaysFalse: 1}");
     // $in with one argument is rewritten as an equality or regex predicate.
     testNormalizeQuery("{a: {$in: [1]}}", "{a: {$eq: 1}}");
     testNormalizeQuery("{a: {$in: [/./]}}", "{a: {$regex: '.'}}");
-    // $in with 0 or more than 1 argument is not modified.
-    testNormalizeQuery("{a: {$in: []}}", "{a: {$in: []}}");
+    // $in with two or more args is not rewritten
+    testNormalizeQuery("{a: {$in: [/foo/, /bar/]}}", "{a: {$in: [/foo/, /bar/]}}");
     testNormalizeQuery("{a: {$in: [/./, 3]}}", "{a: {$in: [/./, 3]}}");
     // Child of $elemMatch object expression is normalized.
     testNormalizeQuery("{a: {$elemMatch: {$or: [{b: 1}]}}}", "{a: {$elemMatch: {b: 1}}}");

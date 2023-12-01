@@ -56,6 +56,10 @@ namespace {
  * Context class for MatchExpression visitor 'BitsetVisitor'.
  */
 struct Context {
+    // Up to kThreshold number of predicates ExpressionMap is not used 'getOrAssignBitIndex'. This
+    // exact value was selected empirically using benchmarks.
+    static constexpr size_t kThreshold = 8;
+
     // Map between MatchExpression and a bit index assigned to this MatchExpression in the Bitset
     // building by the visitor.
     using ExpressionMap = stdx::
@@ -82,6 +86,25 @@ struct Context {
      * Stores the given MatchExpression and assign a bit index to it. Returns the bit index.
      */
     size_t getOrAssignBitIndex(const MatchExpression* expr) {
+        if (expressions.size() < kThreshold) {
+            auto pos = std::find_if(
+                expressions.begin(), expressions.end(), [expr](const ExpressionBitInfo& info) {
+                    return expr->equivalent(info.expression);
+                });
+            if (pos != expressions.end()) {
+                return std::distance(expressions.begin(), pos);
+            }
+
+            expressions.emplace_back(expr);
+            return expressions.size() - 1;
+        }
+
+        if (_map.empty()) {
+            for (size_t i = 0; i < expressions.size(); ++i) {
+                _map.emplace(expressions[i].expression, i);
+            }
+        }
+
         auto [it, inserted] = _map.try_emplace(expr, expressions.size());
         if (inserted) {
             expressions.emplace_back(expr);
@@ -97,7 +120,7 @@ struct Context {
         return containsSchemaExpressions || _maximumNumberOfUniquePredicates <= expressions.size();
     }
 
-    std::vector<ExpressionBitInfo> expressions;
+    BitsetTreeTransformResult::ExpressionList expressions;
 
     BitConflict bitConflict{None};
 
@@ -118,8 +141,8 @@ private:
  */
 class BitsetVisitor : public MatchExpressionConstVisitor {
 public:
-    BitsetVisitor(Context& context, BitsetTreeNode& parent, bool isNegated)
-        : _context(context), _parent(parent), _isNegated{isNegated} {}
+    BitsetVisitor(Context& context, BitsetTreeNode& parent, bool isNegated, bool isRoot = false)
+        : _context(context), _parent(parent), _isNegated{isNegated}, _isRoot{isRoot} {}
 
     void visit(const AndMatchExpression* expr) final {
         ++_context.expressionSize;
@@ -147,7 +170,7 @@ public:
             }
         }
 
-        _parent.internalChildren.emplace_back(std::move(node));
+        appendChild(std::move(node));
     }
 
     void visit(const OrMatchExpression* expr) final {
@@ -176,7 +199,7 @@ public:
             }
         }
 
-        _parent.internalChildren.emplace_back(std::move(node));
+        appendChild(std::move(node));
     }
 
     void visit(const NorMatchExpression* expr) final {
@@ -206,7 +229,7 @@ public:
             }
         }
 
-        _parent.internalChildren.emplace_back(std::move(node));
+        appendChild(std::move(node));
     }
 
     void visit(const NotMatchExpression* expr) final {
@@ -393,6 +416,14 @@ public:
     }
 
 private:
+    void appendChild(BitsetTreeNode&& child) {
+        if (_isRoot) {
+            _parent = std::move(child);
+        } else {
+            _parent.internalChildren.emplace_back(std::move(child));
+        }
+    }
+
     void visitLeafNode(const MatchExpression* expr) {
         ++_context.expressionSize;
 
@@ -420,6 +451,7 @@ private:
     Context& _context;
     BitsetTreeNode& _parent;
     const bool _isNegated;
+    const bool _isRoot;
 };
 }  // namespace
 
@@ -427,8 +459,8 @@ boost::optional<BitsetTreeTransformResult> transformToBitsetTree(
     const MatchExpression* root, size_t maximumNumberOfUniquePredicates) {
     Context context{maximumNumberOfUniquePredicates};
 
-    BitsetTreeNode bitsetRoot{BitsetTreeNode::And, false};
-    BitsetVisitor visitor{context, bitsetRoot, false};
+    BitsetTreeNode bitsetRoot{BitsetTreeNode::And, /* isNegated */ false};
+    BitsetVisitor visitor{context, bitsetRoot, /* isNegated */ false, /* isRoot */ true};
     root->acceptVisitor(&visitor);
 
     if (MONGO_unlikely(context.isAborted())) {
@@ -448,14 +480,6 @@ boost::optional<BitsetTreeTransformResult> transformToBitsetTree(
             return {{BitsetTreeNode{BitsetTreeNode::And, false},
                      std::move(context.expressions),
                      context.expressionSize}};
-    }
-
-    // If we have just one child return it to avoid unnecessary $and or $or nodes with only one
-    // child.
-    if (bitsetRoot.leafChildren.mask.count() == 0 && bitsetRoot.internalChildren.size() == 1) {
-        return {{std::move(bitsetRoot.internalChildren[0]),
-                 std::move(context.expressions),
-                 context.expressionSize}};
     }
 
     return {{std::move(bitsetRoot), std::move(context.expressions), context.expressionSize}};

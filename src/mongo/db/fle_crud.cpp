@@ -1101,6 +1101,11 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
         return updateReply;
     }
 
+    // If this is a retried write, we are done
+    if (updateReply.getWriteCommandReplyBase().getRetriedStmtIds().has_value()) {
+        return updateReply;
+    }
+
     // If there are errors, we are done
     if (updateReply.getWriteErrors().has_value() && !updateReply.getWriteErrors().value().empty()) {
         return updateReply;
@@ -1368,6 +1373,11 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     auto reply = queryImpl->findAndModify(edcNss, ei, newFindAndModifyRequest);
     if (!reply.getValue().has_value() || reply.getValue().value().isEmpty()) {
         // if there is no preimage, then we did not update or delete any documents, we are done
+        return reply;
+    }
+
+    // If this is a retried write, we are done
+    if (reply.getRetriedStmtId()) {
         return reply;
     }
 

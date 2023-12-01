@@ -32,7 +32,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
 
@@ -127,8 +127,8 @@ Status RecordStore::oplogDiskLocRegister(OperationContext* opCtx,
     // we never get here while holding an uninterruptible, read-ticketed lock. That would indicate
     // that we are operating with the wrong global lock semantics, and either hold too weak a lock
     // (e.g. IS) or that we upgraded in a way we shouldn't (e.g. IS -> IX).
-    invariant(!opCtx->lockState()->hasReadTicket() ||
-              !opCtx->lockState()->uninterruptibleLocksRequested());
+    invariant(!shard_role_details::getLocker(opCtx)->hasReadTicket() ||
+              !shard_role_details::getLocker(opCtx)->uninterruptibleLocksRequested());
 
     return oplogDiskLocRegisterImpl(opCtx, opTime, orderedCommit);
 }
@@ -139,8 +139,8 @@ void RecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCt
     // indicate we are holding a stronger lock than we need to, and that we could actually
     // contribute to ticket-exhaustion. That could prevent the write we are waiting on from
     // acquiring the lock it needs to update the oplog visibility.
-    invariant(!opCtx->lockState()->hasWriteTicket() ||
-              !opCtx->lockState()->uninterruptibleLocksRequested());
+    invariant(!shard_role_details::getLocker(opCtx)->hasWriteTicket() ||
+              !shard_role_details::getLocker(opCtx)->uninterruptibleLocksRequested());
 
     waitForAllEarlierOplogWritesToBeVisibleImpl(opCtx);
 }

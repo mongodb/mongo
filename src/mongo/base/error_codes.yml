@@ -236,7 +236,7 @@ error_codes:
     - {code: 190,name: MasterSlaveConnectionFailure}
     - {code: 191,name: OBSOLETE_BalancerLostDistributedLock}
     - {code: 192,name: FailPointEnabled}
-    - {code: 193,name: NoShardingEnabled}
+    - {code: 193,name: NoShardingEnabled_OBSOLETE}
     - {code: 194,name: BalancerInterrupted}
     - {code: 195,name: ViewPipelineMaxSizeExceeded}
     - {code: 197,name: InvalidIndexSpecificationOption}
@@ -426,9 +426,6 @@ error_codes:
     - {code: 341, name: ReshardCollectionAborted}
     - {code: 342, name: ReshardingCriticalSectionTimeout}
 
-    # ShardCannotRefreshDueToLocksHeld will be retried by the shards. Note that it is not under the
-    # NeedRetargettingError, meaning MongoS will pass it through to the client, because there is no
-    # case where it would be possible for MongoS to retry where MongoD couldn't.
     - {code: 343, name: ShardCannotRefreshDueToLocksHeld,
                   extra: ShardCannotRefreshDueToLocksHeldInfo}
 

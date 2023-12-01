@@ -8,6 +8,7 @@
  *
  * @tags: [
  *   requires_fcv_73,
+ *   featureFlagEmbeddedRouter,
  *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
  *   featureFlagSecurityToken,
  *   requires_persistence
@@ -94,14 +95,22 @@ function runTest(shard0Primary, execCtxType, expectShardingMetadata) {
         shard0Primary, execCtxType, dbName3, collName3, "createIndex", expectShardingMetadata);
 }
 
-function runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, isMultitenant) {
+function isTxnNumNotSupportedOnStandaloneError(err) {
+    return err.toString().match(
+        /Transaction numbers are only allowed on a replica set member or mongos/);
+}
+
+function runTests(getShard0PrimaryFunc,
+                  restartFunc,
+                  tearDownFunc,
+                  {isMultitenant, isStandalone, skipMaintenanceMode} = {}) {
     let shard0Primary = getShard0PrimaryFunc();
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains one shard (config shard)");
 
     // The cluster now contains only one shard (shard0) which acts as also the config server so the
     // commands against shard0 should go through the router code paths.
-    // TODO (SERVER-81968): Make mongod dispatch commands through router code paths if applicable.
+    // TODO (PM-3364): Uncomment once we start tracking unsharded collections.
     const expectShardingMetadata0 = false;
     // Currently, sharding isn't supported in serverless.
     // const expectShardingMetadata0 = !isMultitenant;
@@ -110,19 +119,53 @@ function runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, isMultitenant
     runTest(shard0Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata0);
     runTest(shard0Primary, execCtxTypes.kTransaction, expectShardingMetadata0);
 
-    restartFunc();
+    if (!skipMaintenanceMode) {
+        jsTest.log("Restarting shard0 in maintenance mode");
+
+        restartFunc(true /* maintenanceMode */);
+        shard0Primary = getShard0PrimaryFunc();
+
+        jsTest.log("Running tests for " + shard0Primary.host + " while the cluster contains one " +
+                   "shard (config shard) after restarting the shard in maintenance mode");
+
+        // The replica set endpoint should not dispatch any commands through the router code paths
+        // when the mongod is in maintenance mode.
+        const expectShardingMetadata1 = false;
+        runTest(shard0Primary, execCtxTypes.kNoSession, expectShardingMetadata1);
+        runTest(shard0Primary, execCtxTypes.kNonRetryableWrite, expectShardingMetadata1);
+        if (isStandalone) {
+            // Retryable writes are not supported on a standalone mongod.
+            const res0 = assert.throwsWithCode(
+                () => runTest(shard0Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata1),
+                ErrorCodes.IllegalOperation);
+            assert(isTxnNumNotSupportedOnStandaloneError(res0), res0);
+
+            // Transactions are not supported on a standalone mongod.
+            const res1 = assert.throwsWithCode(
+                () => runTest(shard0Primary, execCtxTypes.kTransaction, expectShardingMetadata1),
+                ErrorCodes.IllegalOperation);
+            assert(isTxnNumNotSupportedOnStandaloneError(res1), res1);
+        } else {
+            runTest(shard0Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata1);
+            runTest(shard0Primary, execCtxTypes.kTransaction, expectShardingMetadata1);
+        }
+    }
+
+    jsTest.log("Restarting shard0 in default mode");
+
+    restartFunc(false /* maintenanceMode */);
     shard0Primary = getShard0PrimaryFunc();
 
-    jsTest.log("Running tests for " + shard0Primary.host +
-               " while the cluster contains one shard (config shard) after restart");
+    jsTest.log("Running tests for " + shard0Primary.host + " while the cluster contains one " +
+               "shard (config shard) after restarting the shard in default mode");
 
-    const expectShardingMetadata1 = false;
+    const expectShardingMetadata2 = false;
     // Currently, sharding isn't supported in serverless.
-    // const expectShardingMetadata1 = !isMultitenant;
-    runTest(shard0Primary, execCtxTypes.kNoSession, expectShardingMetadata1);
-    runTest(shard0Primary, execCtxTypes.kNonRetryableWrite, expectShardingMetadata1);
-    runTest(shard0Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata1);
-    runTest(shard0Primary, execCtxTypes.kTransaction, expectShardingMetadata1);
+    // const expectShardingMetadata2 = !isMultitenant;
+    runTest(shard0Primary, execCtxTypes.kNoSession, expectShardingMetadata2);
+    runTest(shard0Primary, execCtxTypes.kNonRetryableWrite, expectShardingMetadata2);
+    runTest(shard0Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata2);
+    runTest(shard0Primary, execCtxTypes.kTransaction, expectShardingMetadata2);
 
     if (isMultitenant) {
         // Currently, sharding isn't supported in serverless. So the cluster cannot become
@@ -130,6 +173,9 @@ function runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, isMultitenant
         tearDownFunc();
         return;
     }
+
+    // Add a second shard to the cluster.
+    jsTest.log("Setting up shard1");
 
     const shard1Name = "shard1-" + extractUUIDFromObject(UUID());
     const shard1Rst = new ReplSetTest({
@@ -141,42 +187,68 @@ function runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, isMultitenant
     shard1Rst.initiate();
     const shard1Primary = shard1Rst.getPrimary();
 
-    const shard0URL = getReplicaSetURL(shard0Primary);
-    // TODO (SERVER-81968): Connect to the router port on a shardsvr mongod instead.
-    const mongos = MongoRunner.runMongos({configdb: shard0URL});
-    assert.commandWorked(mongos.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
+    // Run the addShard command against shard0's primary mongod instead to verify that
+    // replica set endpoint supports router commands.
+    assert.commandWorked(
+        shard0Primary.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains two shards (one config shard and one regular shard)");
 
     // The cluster now contains more than one shard so the commands against shard0 should no longer
     // go through the router code paths.
-    const expectShardingMetadata2 = false;
-    runTest(shard0Primary, execCtxTypes.kNoSession, expectShardingMetadata2);
-    runTest(shard0Primary, execCtxTypes.kNonRetryableWrite, expectShardingMetadata2);
-    runTest(shard0Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata2);
-    runTest(shard0Primary, execCtxTypes.kTransaction, expectShardingMetadata2);
-
-    assert.commandWorked(mongos.adminCommand({transitionToDedicatedConfigServer: 1}));
-
-    jsTest.log("Running tests for " + shard0Primary.host +
-               " while the cluster contains one shard (regular shard)");
-
-    // The cluster now contains only one shard (shard1) but it is not the config server so commands
-    // against shard0 (config server) or shard1 should not go through the router code paths.
     const expectShardingMetadata3 = false;
     runTest(shard0Primary, execCtxTypes.kNoSession, expectShardingMetadata3);
     runTest(shard0Primary, execCtxTypes.kNonRetryableWrite, expectShardingMetadata3);
     runTest(shard0Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata3);
     runTest(shard0Primary, execCtxTypes.kTransaction, expectShardingMetadata3);
-    runTest(shard1Primary, execCtxTypes.kNoSession, expectShardingMetadata3);
-    runTest(shard1Primary, execCtxTypes.kNonRetryableWrite, expectShardingMetadata3);
-    runTest(shard1Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata3);
-    runTest(shard1Primary, execCtxTypes.kTransaction, expectShardingMetadata3);
+
+    const shard0URL = getReplicaSetURL(shard0Primary);
+    // TODO (SERVER-83380): Connect to the router port on a shardsvr mongod instead.
+    const mongos = MongoRunner.runMongos({configdb: shard0URL});
+    assert.commandWorked(mongos.adminCommand({transitionToDedicatedConfigServer: 1}));
+
+    jsTest.log("Running tests for " + shard0Primary.host +
+               " while the cluster contains one shard (regular shard)");
+
+    // The cluster now contains only one shard (shard1) but it is not the config server so
+    // commands against shard0 (config server) or shard1 should not go through the router code
+    // paths.
+    const expectShardingMetadata4 = false;
+    runTest(shard0Primary, execCtxTypes.kNoSession, expectShardingMetadata4);
+    runTest(shard0Primary, execCtxTypes.kNonRetryableWrite, expectShardingMetadata4);
+    runTest(shard0Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata4);
+    runTest(shard0Primary, execCtxTypes.kTransaction, expectShardingMetadata4);
+    runTest(shard1Primary, execCtxTypes.kNoSession, expectShardingMetadata4);
+    runTest(shard1Primary, execCtxTypes.kNonRetryableWrite, expectShardingMetadata4);
+    runTest(shard1Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata4);
+    runTest(shard1Primary, execCtxTypes.kTransaction, expectShardingMetadata4);
 
     tearDownFunc();
     shard1Rst.stopSet();
     MongoRunner.stopMongos(mongos);
+}
+
+function getStandaloneRestartOptions(maintenanceMode, port, setParameterOpts) {
+    const restartOpts = {noCleanData: true, port, setParameter: setParameterOpts};
+    if (maintenanceMode) {
+        restartOpts.maintenanceMode = "standalone";
+    } else {
+        // Unset any existing "maintenanceMode" option.
+        restartOpts.maintenanceMode = null;
+    }
+    return restartOpts;
+}
+
+function getReplicaSetRestartOptions(maintenanceMode, setParameterOpts) {
+    const restartOpts = {restart: true, setParameter: setParameterOpts};
+    if (maintenanceMode) {
+        restartOpts.maintenanceMode = "replicaSet";
+    } else {
+        // Unset any existing "maintenanceMode" option.
+        restartOpts.maintenanceMode = null;
+    }
+    return restartOpts;
 }
 
 {
@@ -189,10 +261,11 @@ function runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, isMultitenant
     const getShard0PrimaryFunc = () => {
         return node;
     };
-    const restartFunc = () => {
+    const restartFunc = (maintenanceMode) => {
         MongoRunner.stopMongod(node, null, {noCleanData: true});
-        node = MongoRunner.runMongod(
-            {noCleanData: true, port: node.port, setParameter: setParameterOpts});
+        const restartOpts =
+            getStandaloneRestartOptions(maintenanceMode, node.port, setParameterOpts);
+        node = MongoRunner.runMongod(restartOpts);
         assert.soon(() => {
             const res = assert.commandWorked(node.adminCommand({hello: 1}));
             return res.isWritablePrimary;
@@ -201,7 +274,7 @@ function runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, isMultitenant
     const tearDownFunc = () => MongoRunner.stopMongod(node);
 
     waitForAutoBootstrap(getShard0PrimaryFunc());
-    runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc);
+    runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, {isStandalone: true});
 }
 
 {
@@ -210,21 +283,22 @@ function runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, isMultitenant
         featureFlagAllMongodsAreSharded: true,
         featureFlagReplicaSetEndpoint: true,
     };
-    const rst = new ReplSetTest(
-        {nodes: 2, nodeOptions: {setParameter: setParameterOpts}, useAutoBootstrapProcedure: true});
+    const rst = new ReplSetTest({
+        // TODO (SERVER-83433): Make the replica set have secondaries to get test coverage for
+        // running db hash check while the replica set is fsync locked.
+        nodes: 1,
+        nodeOptions: {setParameter: setParameterOpts},
+        useAutoBootstrapProcedure: true
+    });
     rst.startSet();
     rst.initiate();
     const getShard0PrimaryFunc = () => {
         return rst.getPrimary();
     };
-    const restartFunc = () => {
+    const restartFunc = (maintenanceMode) => {
         rst.stopSet(null /* signal */, true /*forRestart */);
-        rst.startSet({
-            restart: true,
-            setParameter: {
-                featureFlagReplicaSetEndpoint: true,
-            }
-        });
+        const restartOpts = getReplicaSetRestartOptions(maintenanceMode, setParameterOpts);
+        rst.startSet(restartOpts);
     };
     const tearDownFunc = () => rst.stopSet();
 
@@ -232,29 +306,37 @@ function runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, isMultitenant
     runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc);
 }
 
-{
-    jsTest.log("Running tests for a single-shard cluster");
-    const setParameterOpts = {
-        featureFlagReplicaSetEndpoint: true,
-    };
-    const st = new ShardingTest(
-        {shards: 1, rs: {nodes: 2, setParameter: setParameterOpts}, configShard: true});
-    const getShard0PrimaryFunc = () => {
-        return st.rs0.getPrimary();
-    };
-    const restartFunc = () => {
-        st.rs0.stopSet(null /* signal */, true /*forRestart */);
-        st.rs0.startSet({
-            restart: true,
-            setParameter: {
-                featureFlagReplicaSetEndpoint: true,
-            }
-        });
-    };
-    const tearDownFunc = () => st.stop();
+// TODO (SERVER-81968): Re-enable single-shard cluster test cases once config shards support
+// embedded routers.
+// {
+//     jsTest.log("Running tests for a single-shard cluster");
+//     const setParameterOpts = {
+//         featureFlagReplicaSetEndpoint: true,
+//     };
+//     const st = new ShardingTest({
+//         shards: 1,
+//         rs: {
+//             // TODO (SERVER-83433): Make the replica set have secondaries to get test coverage
+//             // for running db hash check while the replica set is fsync locked.
+//             nodes: 1,
+//             setParameter: setParameterOpts
+//         },
+//         configShard: true
+//     });
+//     const getShard0PrimaryFunc = () => {
+//         return st.rs0.getPrimary();
+//     };
+//     const restartFunc = (maintenanceMode) => {
+//         st.rs0.stopSet(null /* signal */, true /*forRestart */);
+//         const restartOpts = getReplicaSetRestartOptions(maintenanceMode, setParameterOpts);
+//         st.rs0.startSet(restartOpts);
+//     };
+//     const tearDownFunc = () => st.stop();
 
-    runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc);
-}
+//     // TODO (SERVER-83371): Allow configsvr mongod to be restarted in maintenance mode. Remove
+//     // the 'skipMaintenanceMode' option and its associated code.
+//     runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, {skipMaintenanceMode: true});
+// }
 
 {
     jsTest.log("Running tests for a serverless replica set bootstrapped as a single-shard cluster");
@@ -306,12 +388,13 @@ function runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, isMultitenant
         primary._setSecurityToken(testUser.securityToken);
         return primary;
     };
-    const restartFunc = () => {
+    const restartFunc = (maintenanceMode) => {
         const primary = rst.getPrimary();
         authutil.asCluster(
             primary, keyFile, () => rst.stopSet(null /* signal */, true /*forRestart */));
-        rst.startSet({restart: true, setParameter: setParameterOpts});
+        const restartOpts = getReplicaSetRestartOptions(maintenanceMode, setParameterOpts);
+        rst.startSet(restartOpts);
     };
     const tearDownFunc = () => authutil.asCluster(rst.getPrimary(), keyFile, () => rst.stopSet());
-    runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, true /* isMultitenant */);
+    runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, {isMultitenant: true});
 }

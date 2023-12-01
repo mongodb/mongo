@@ -62,7 +62,7 @@ void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
     auto addValue = [this](auto&& val) {
         bool inserted = _set.insert(val).second;
         if (inserted) {
-            _memUsageTracker.update(val.getApproximateSize());
+            _memUsageTracker.add(val.getApproximateSize());
             uassert(
                 ErrorCodes::ExceededMemoryLimit,
                 str::stream() << "$addToSet used too much memory and cannot spill to disk. Used: "

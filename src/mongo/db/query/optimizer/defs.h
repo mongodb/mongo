@@ -359,9 +359,9 @@ struct QueryHints {
     size_t _minIndexEqPrefixes = 1;
     size_t _maxIndexEqPrefixes = 1;
 
-    // Rather than sampling a fully random set of documents, sample N documents (5 by default)
+    // Rather than sampling a fully random set of documents, sample N documents (10 by default)
     // randomly and scan sequentially from each of them for the rest.
-    int32_t _numSamplingChunks = 5;
+    size_t _numSamplingChunks = 10;
 
     // If the collection size falls within this range, sampling is a valid estimation method.
     size_t _samplingCollectionSizeMin = 100;
@@ -370,5 +370,13 @@ struct QueryHints {
     // If enabled, take the square root of numDocs for sample size.
     bool _sqrtSampleSizeEnabled = true;
 };
+
+#define SCAN_ORDER(F) \
+    F(Forward)        \
+    F(Reverse)        \
+    F(Random)  // Uses a random cursor.
+
+QUERY_UTIL_NAMED_ENUM_DEFINE(ScanOrder, SCAN_ORDER);
+#undef SCAN_ORDER
 
 }  // namespace mongo::optimizer

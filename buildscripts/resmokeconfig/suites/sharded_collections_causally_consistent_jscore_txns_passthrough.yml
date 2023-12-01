@@ -37,6 +37,9 @@ selector:
 
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
+  # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+  # can't be created on `getCollection` call.
+  - assumes_no_implicit_collection_creation_on_get_collection
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation

@@ -66,12 +66,12 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_policy.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -198,7 +198,8 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
 
     // The generated unique collection name is only guaranteed to exist if the database is
     // exclusively locked.
-    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name(), LockMode::MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(targetDB->name(),
+                                                                      LockMode::MODE_X));
     auto tmpNameResult = makeUniqueCollectionName(opCtx, targetDB->name(), "tmp%%%%%.rename");
     if (!tmpNameResult.isOK()) {
         return tmpNameResult.getStatus().withContext(
@@ -508,7 +509,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
 
     boost::optional<Lock::DBLock> sourceDbLock;
     boost::optional<Lock::CollectionLock> sourceCollLock;
-    if (!opCtx->lockState()->isCollectionLockedForMode(source, MODE_S)) {
+    if (!shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(source, MODE_S)) {
         // Lock the DB using MODE_IX to ensure we have the global lock in that mode, as to prevent
         // upgrade from MODE_IS to MODE_IX, which caused deadlock on systems not supporting Database
         // locking and should be avoided in general.
@@ -517,7 +518,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     }
 
     boost::optional<Lock::DBLock> targetDBLock;
-    if (!opCtx->lockState()->isDbLockedForMode(target.dbName(), MODE_X)) {
+    if (!shard_role_details::getLocker(opCtx)->isDbLockedForMode(target.dbName(), MODE_X)) {
         targetDBLock.emplace(opCtx, target.dbName(), MODE_X);
     }
 
@@ -583,7 +584,8 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
 
     // The generated unique collection name is only guaranteed to exist if the database is
     // exclusively locked.
-    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name(), LockMode::MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(targetDB->name(),
+                                                                      LockMode::MODE_X));
 
     // Note that this temporary collection name is used by MongoMirror and thus must not be changed
     // without consultation.

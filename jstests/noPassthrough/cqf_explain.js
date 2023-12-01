@@ -131,8 +131,7 @@ function analyzeExplainHelper(explainPathList, expectedStages, expectedDir) {
         // We can only assert on the scan direction if a COLLSCAN stage is present in the explain.
         // This is not the case for an EOF plan.
         if (!expectedStages.includes("EOF")) {
-            // TOOD SERVER-82876: Change this assertion to use expectedDir.
-            checkScanDirection(explain, "<todo>");
+            checkScanDirection(explain, expectedDir);
         }
     }
 }

@@ -45,73 +45,67 @@
 namespace mongo {
 namespace sbe {
 namespace bson {
-
-/**
- * Advance table specifies how to change the pointer to skip current BSON value (so that pointer
- * points to the next byte after the BSON value):
- *  - For values less than 128 (0x80), pointer is advanced by this value
- *  - 255 (0xff) - pointer is advanced by the 32-bit integer stored in the buffer plus 4 bytes
- *  - 254 (0xfe) - pointer is advanced by the 32-bit integer stored in the buffer
- *  - 128 (0x80) - the type is either unsupported or handled explicitly
- */
 // clang-format off
-static uint8_t advanceTable[] = {
-	0xff, // EOO
-	8,    // Double
-	0xff, // String
-	0xfe, // Object
-	0xfe, // Array
-	0x80, // BinData
-	0,    // Undefined - Deprecated
-	12,   // ObjectId
-	1,    // Boolean
-	8,    // UTC datetime
-	0,    // Null value
-	0x80, // Regular expression
-	0x80, // DBPointer - Deprecated
-	0xff, // JavaScript code
-	0xff, // Symbol - Deprecated
-	0xfe, // JavaScript code with scope - Deprecated
-	4,    // 32-bit integer
-	8,    // Timestamp
-	8,    // 64-bit integer
-	16    // 128-bit decimal floating point
-
+const uint8_t kAdvanceTable alignas(64)[256] = {
+    0x7F, // 0: EOO
+    8,    // 1: Double
+    0xFB, // 2: String
+    0xFF, // 3: Object
+    0xFF, // 4: Array
+    0xFA, // 5: BinData
+    0,    // 6: Undefined
+    12,   // 7: ObjectId
+    1,    // 8: Boolean
+    8,    // 9: UTC datetime
+    0,    // 10: Null
+    0x7F, // 11: Regular expression
+    0xEF, // 12: DBPointer
+    0xFB, // 13: JavaScript code
+    0xFB, // 14: Symbol
+    0xFF, // 15: JavaScript code with scope
+    4,    // 16: 32-bit integer
+    8,    // 17: Timestamp
+    8,    // 18: 64-bit integer
+    16,   // 19: 128-bit decimal floating point
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 20-29:   Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 30-39:   Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 40-49:   Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 50-59:   Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 60-69:   Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 70-79:   Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 80-89:   Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 90-99:   Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 100-109: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 110-119: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F,                   // 120-126: Invalid
+    0,                                                          // 127:     MaxKey
+    0x7F, 0x7F,                                                 // 128-129: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 130-139: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 140-149: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 150-159: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 160-169: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 170-179: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 180-189: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 190-199: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 200-209: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 210-219: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 220-229: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 230-239: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, // 240-249: Invalid
+    0x7F, 0x7F, 0x7F, 0x7F, 0x7F,                               // 250-254: Invalid
+    0,                                                          // 255:     MinKey
 };
 // clang-format on
 
-const char* advance(const char* be, size_t fieldNameSize) {
+const char* advanceHelper(const char* be, size_t fieldNameSize) {
     auto type = static_cast<unsigned char>(*be);
+    uassert(4822804, "unsupported bson element", static_cast<BSONType>(type) == BSONType::RegEx);
 
-    be += 1 /*type*/ + fieldNameSize + 1 /*zero at the end of fieldname*/;
-    if (type < sizeof(advanceTable)) {
-        auto advOffset = advanceTable[type];
-        if (advOffset < 128) {
-            be += advOffset;
-        } else if (static_cast<BSONType>(type) == BSONType::RegEx) {
-            be += value::BsonRegex(be).byteSize();
-        } else if (static_cast<BSONType>(type) == BSONType::DBRef) {
-            be += value::BsonDBPointer(be).byteSize();
-        } else {
-            be += ConstDataView(be).read<LittleEndian<uint32_t>>();
-            if (advOffset == 0xff) {
-                be += 4;
-            } else if (advOffset == 0xfe) {
-            } else {
-                if (static_cast<BSONType>(type) == BSONType::BinData) {
-                    be += 5;
-                } else {
-                    uasserted(4822803, "unsupported bson element");
-                }
-            }
-        }
-    } else if (type == static_cast<unsigned char>(BSONType::MinKey) ||
-               type == static_cast<unsigned char>(BSONType::MaxKey)) {
-        // We don't have to adjust the 'be' pointer as the above types have no value part.
-    } else {
-        uasserted(4822804, "unsupported bson element");
-    }
+    size_t sizeOfTypeCodeAndFieldName =
+        1 /*type*/ + fieldNameSize + 1 /*zero at the end of fieldname*/;
 
+    be += sizeOfTypeCodeAndFieldName;
+    be += value::BsonRegex(be).byteSize();
     return be;
 }
 

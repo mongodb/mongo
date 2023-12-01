@@ -60,7 +60,6 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
@@ -78,6 +77,7 @@
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -89,7 +89,8 @@ namespace mongo {
 
 void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                                                       const NamespaceString& nss,
-                                                      bool fromMigrate) {
+                                                      bool fromMigrate,
+                                                      bool dropSystemCollections) {
 
     boost::optional<UUID> collectionUUID;
     {
@@ -143,12 +144,14 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
 
     try {
         DropReply unused;
-        uassertStatusOK(
-            dropCollection(opCtx,
-                           nss,
-                           &unused,
-                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops,
-                           fromMigrate));
+        uassertStatusOK(dropCollection(
+            opCtx,
+            nss,
+            &unused,
+            (dropSystemCollections
+                 ? DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops
+                 : DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops),
+            fromMigrate));
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // Note that even if the namespace was not found we have to execute the code below!
         LOGV2_DEBUG(5280920,
@@ -215,6 +218,7 @@ void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
         // at this level, such as the time series collection must be resolved to remove the
         // corresponding bucket collection, or tag documents associated to non-existing collections
         // must be cleaned up.
+        using namespace fmt::literals;
         if (nss().isSystem()) {
             uassert(ErrorCodes::NamespaceNotFound,
                     "namespace {} does not exist"_format(nss().toStringForErrorMsg()),
@@ -328,13 +332,25 @@ void DropCollectionCoordinator::_commitDropCollection(
                        participants.end());
 
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss(), participants, **executor, getNewSession(opCtx), true /*fromMigrate*/);
+        opCtx,
+        nss(),
+        participants,
+        **executor,
+        getNewSession(opCtx),
+        true /* fromMigrate */,
+        false /* dropSystemCollections */);
 
     // The sharded collection must be dropped on the primary shard after it has been
     // dropped on all of the other shards to ensure it can only be re-created as
     // unsharded with a higher optime than all of the drops.
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss(), {primaryShardId}, **executor, getNewSession(opCtx), false /*fromMigrate*/);
+        opCtx,
+        nss(),
+        {primaryShardId},
+        **executor,
+        getNewSession(opCtx),
+        false /* fromMigrate */,
+        false /* dropSystemCollections */);
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss());
     LOGV2(5390503, "Collection dropped", logAttrs(nss()));

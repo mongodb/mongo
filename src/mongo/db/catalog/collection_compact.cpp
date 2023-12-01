@@ -48,8 +48,8 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/views/view.h"
@@ -71,7 +71,8 @@ using logv2::LogComponent;
 namespace {
 
 CollectionPtr getCollectionForCompact(OperationContext* opCtx, const NamespaceString& resolvedNss) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(resolvedNss, MODE_IX));
+    invariant(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(resolvedNss, MODE_IX));
 
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto collectionCatalog = CollectionCatalog::get(opCtx);

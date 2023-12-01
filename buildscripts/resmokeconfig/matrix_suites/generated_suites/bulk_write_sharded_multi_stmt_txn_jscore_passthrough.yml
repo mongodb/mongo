@@ -67,7 +67,6 @@ selector:
   - jstests/core/**/geo_s2explain.js
   - jstests/core/**/geo_s2sparse.js
   - jstests/core/**/operation_latency_histogram.js
-  - jstests/core/**/killop_drop_collection.js
   - jstests/core/**/explain_upsert.js
   - jstests/core/views/views_drop.js
   - jstests/core/**/api_params_getmore.js

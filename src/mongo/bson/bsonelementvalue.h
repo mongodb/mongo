@@ -148,7 +148,7 @@ public:
      */
     BSONDBRef DBRef() const {
         StringData ns = String();
-        return BSONDBRef(ns, mongo::OID::from(ns.end() + kStringTerminatorBytes));
+        return BSONDBRef(ns, mongo::OID::from(ns.data() + ns.size() + kStringTerminatorBytes));
     }
     const char* DBRefNS() const {
         return _CString();

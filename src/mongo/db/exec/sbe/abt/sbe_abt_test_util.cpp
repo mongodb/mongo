@@ -181,13 +181,8 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
     sbe::InputParamToSlotMap inputParamToSlotMap;
 
     auto env = VariableEnvironment::build(planAndProps._node);
-    SBENodeLowering g{env,
-                      *runtimeEnv,
-                      ids,
-                      inputParamToSlotMap,
-                      phaseManager.getMetadata(),
-                      planAndProps._map,
-                      ScanOrder::Forward};
+    SBENodeLowering g{
+        env, *runtimeEnv, ids, inputParamToSlotMap, phaseManager.getMetadata(), planAndProps._map};
     auto sbePlan = g.optimize(planAndProps._node, map, ridSlot);
     ASSERT_EQ(1, map.size());
     tassert(6624260, "Unexpected rid slot", !ridSlot);

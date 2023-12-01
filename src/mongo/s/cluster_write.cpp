@@ -81,8 +81,10 @@ void write(OperationContext* opCtx,
         4817401, 2, {logv2::LogComponent::kShardMigrationPerf}, "Finished batch write");
 }
 
-bulk_write_exec::BulkWriteReplyInfo bulkWrite(OperationContext* opCtx,
-                                              const BulkWriteCommandRequest& request) {
+bulk_write_exec::BulkWriteReplyInfo bulkWrite(
+    OperationContext* opCtx,
+    const BulkWriteCommandRequest& request,
+    const std::vector<std::unique_ptr<NSTargeter>>& targeters) {
     if (request.getNsInfo().size() > 1) {
         for (const auto& nsInfo : request.getNsInfo()) {
             uassert(ErrorCodes::BadValue,
@@ -94,12 +96,6 @@ bulk_write_exec::BulkWriteReplyInfo bulkWrite(OperationContext* opCtx,
         if (result == FLEBatchResult::kProcessed) {
             return replies;
         }  // else fallthrough.
-    }
-
-    std::vector<std::unique_ptr<NSTargeter>> targeters;
-    targeters.reserve(request.getNsInfo().size());
-    for (const auto& nsInfo : request.getNsInfo()) {
-        targeters.push_back(std::make_unique<CollectionRoutingInfoTargeter>(opCtx, nsInfo.getNs()));
     }
 
     return bulk_write_exec::execute(opCtx, targeters, request);

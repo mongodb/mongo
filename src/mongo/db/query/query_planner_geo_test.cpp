@@ -1661,22 +1661,26 @@ TEST_F(QueryPlannerTest, 2dNearWithInternalExprEqOverTrailingField) {
                   << "2d"
                   << "b" << 1));
 
+    // Normally $_internalExpr would be accompanied by a $expr expression. In this case we omit
+    // that, since we're just trying to ensure that the filter on 'b' can get pushed into the
+    // geoNear2d stage.
     runQuery(fromjson("{a: {$near: [0, 0]}, b: {$_internalExprEq: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists("{geoNear2d: {a: '2d', b: 1}}}}");
 }
 
-TEST_F(QueryPlannerTest, 2dNearWithInternalExprEqOverTrailingFieldMultikey) {
+TEST_F(QueryPlannerTest, 2dNearWithExprEqOverTrailingFieldMultikey) {
     const bool multikey = true;
     addIndex(BSON("a"
                   << "2d"
                   << "b" << 1),
              multikey);
 
-    runQuery(fromjson("{a: {$near: [0, 0]}, b: {$_internalExprEq: 1}}"));
+    runQuery(fromjson("{$and: [{$expr: {$eq: ['$b', 1]}}, {a: {$near: [0, 0]}}]}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {b: {$_internalExprEq: 1}}, node: {geoNear2d: {a: '2d', b: 1}}}}");
+        "{fetch: {filter: {$and: [{$expr: {$eq: ['$b', {$const:1}]}}]}, node: {geoNear2d: {a: "
+        "'2d', b: 1}}}}");
 }
 
 TEST_F(QueryPlannerTest, 2dGeoWithinWithInternalExprEqOverTrailingField) {
@@ -1764,15 +1768,16 @@ TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverTrailingFieldMulti
                   << "b" << 1),
              multikey);
 
-    runQuery(
-        fromjson("{a: {$geoWithin: {$centerSphere: [[0, 0], 10]}}, b: {$_internalExprEq: 0}}"));
+    runQuery(fromjson(
+        "{$and: [{a: {$geoWithin: {$centerSphere: [[0, 0], 10]}}}, {$expr: {$eq: ['$b', 0]}}]}"));
 
     // This query will generate complex bounds, so we relax the checks to make the test readable.
     relaxBoundsCheckingToSubsetOnly();
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {a: {$geoWithin: {$centerSphere: [[0,0],10]}}, b: {$_internalExprEq: 0}},"
+        "{fetch: {filter: {$and: [{a: {$geoWithin: {$centerSphere: [[0, 0], 10]}}},"
+        "                         {$expr: {$eq: ['$b', 0]}}]},"
         "node: {ixscan: {pattern: {a : '2dsphere', b: 1}, filter: null, bounds:"
         "{a: [],"  // Complex, so leaving empty.
         "b: [['MinKey','MaxKey',true,true]]}}}}}");

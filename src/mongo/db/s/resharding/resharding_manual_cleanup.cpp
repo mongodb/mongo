@@ -115,6 +115,7 @@ std::vector<AsyncRequestsSender::Request> createShardCleanupRequests(
 void assertResponseOK(const NamespaceString& nss,
                       StatusWith<executor::RemoteCommandResponse> response,
                       ShardId shardId) {
+    using namespace fmt::literals;
     auto errorContext = "Unable to cleanup reshard collection for namespace {} on shard {}"_format(
         nss.toStringForErrorMsg(), shardId.toString());
     auto shardResponse = uassertStatusOKWithContext(std::move(response), errorContext);

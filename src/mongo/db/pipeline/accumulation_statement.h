@@ -78,12 +78,14 @@ namespace mongo {
  * to correctly enable/disable the accumulator.
  */
 #define REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(key, factory, featureFlag) \
-    REGISTER_ACCUMULATOR_CONDITIONALLY(key,                               \
-                                       factory,                           \
-                                       AllowedWithApiStrict::kAlways,     \
-                                       AllowedWithClientType::kAny,       \
-                                       featureFlag,                       \
-                                       featureFlag.isEnabledAndIgnoreFCVUnsafeAtStartup())
+    REGISTER_ACCUMULATOR_CONDITIONALLY(                                   \
+        key,                                                              \
+        factory,                                                          \
+        AllowedWithApiStrict::kAlways,                                    \
+        AllowedWithClientType::kAny,                                      \
+        featureFlag,                                                      \
+        featureFlag.isEnabledUseLatestFCVWhenUninitialized(               \
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
 
 /**
  * You can specify a condition, evaluated during startup,

@@ -47,6 +47,7 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor_impl.h"
@@ -162,8 +163,8 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 
     if (_params.lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
         opCtx()->getClient()->isFromUserConnection() &&
-        opCtx()->lockState()->shouldWaitForTicket()) {
-        _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(opCtx())->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx()), AdmissionContext::Priority::kLow);
     }
 
     boost::optional<Record> record;
@@ -215,16 +216,16 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     }
                 }
 
-                if (_params.resumeAfterRecordId && !_params.resumeAfterRecordId->isNull()) {
+                if (_params.resumeAfterRecordId) {
                     invariant(!_params.tailable);
                     invariant(_lastSeenId.isNull());
                     // Seek to where we are trying to resume the scan from. Signal a KeyNotFound
-                    // error if the record no longer exists.
+                    // error if the record no longer exists or if the recordId is null.
                     //
                     // Note that we want to return the record *after* this one since we have already
                     // returned this one prior to the resume.
                     auto& recordIdToSeek = *_params.resumeAfterRecordId;
-                    if (!_cursor->seekExact(recordIdToSeek)) {
+                    if (recordIdToSeek.isNull() || !_cursor->seekExact(recordIdToSeek)) {
                         uasserted(ErrorCodes::KeyNotFound,
                                   str::stream()
                                       << "Failed to resume collection scan: the recordId from "
@@ -526,8 +527,8 @@ void CollectionScan::doDetachFromOperationContext() {
 void CollectionScan::doReattachToOperationContext() {
     if (_params.lowPriority && gDeprioritizeUnboundedUserCollectionScans.load() &&
         opCtx()->getClient()->isFromUserConnection() &&
-        opCtx()->lockState()->shouldWaitForTicket()) {
-        _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(opCtx())->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx()), AdmissionContext::Priority::kLow);
     }
     if (_cursor)
         _cursor->reattachToOperationContext(opCtx());

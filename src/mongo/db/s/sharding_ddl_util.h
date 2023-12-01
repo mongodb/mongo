@@ -303,7 +303,8 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   const std::vector<ShardId>& shardIds,
                                                   std::shared_ptr<executor::TaskExecutor> executor,
                                                   const OperationSessionInfo& osi,
-                                                  bool fromMigrate);
+                                                  bool fromMigrate,
+                                                  bool dropSystemCollections);
 
 BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to);
 

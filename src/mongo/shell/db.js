@@ -1177,7 +1177,7 @@ DB.prototype.getQueryOptions = function() {
  */
 DB.prototype.loadServerScripts = function() {
     var global = Function('return this')();
-    this.system.js.find().forEach(function(u) {
+    this.getCollection('system.js').find().forEach(function(u) {
         if (u.value.constructor === Code) {
             global[u._id] = eval("(" + u.value.code + ")");
         } else {

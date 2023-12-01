@@ -93,6 +93,7 @@ int sleep(int seconds);
 int usleep(useconds_t useconds);
 
 #define lseek(fd, offset, origin) _lseek(fd, (long)(offset), origin)
+#define read(fd, buffer, count) _read(fd, buffer, (unsigned int)(count))
 #define write(fd, buffer, count) _write(fd, buffer, (unsigned int)(count))
 
 /*

@@ -40,11 +40,13 @@
  */
 
 import {
+    getOptimizer,
     getPlanCacheKeyFromPipeline,
     getPlanCacheKeyFromShape,
     getPlanStage,
     getSingleNodeExplain,
     getWinningPlan,
+    getWinningPlanFromExplain,
     isClusteredIxscan,
     isCollscan,
     isIdhack,
@@ -224,7 +226,19 @@ if (collectionIsClustered) {
     assert(isClusteredIxscan(db, getWinningPlan(explain.queryPlanner)),
            "Expected clustered ixscan: " + tojson(explain));
 } else {
-    assert(isIdhack(db, winningPlan), winningPlan);
+    switch (getOptimizer(explain)) {
+        case "classic":
+            assert(isIdhack(db, winningPlan), winningPlan);
+            break;
+        case "CQF":
+            // TODO SERVER-70847, how to recognize the case of an IDHACK for Bonsai?
+            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+            assert(isCollscan(db, getWinningPlanFromExplain(explain)));
+            break;
+        default:
+            break;
+    }
 }
 
 // Clearing filters on a missing collection should be a no-op.

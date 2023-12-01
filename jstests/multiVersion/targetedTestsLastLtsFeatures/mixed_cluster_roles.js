@@ -38,7 +38,7 @@ function testCRUD(conn) {
 function ensureShardingCommandsFail(conn) {
     assert.commandFailedWithCode(
         conn.getDB('admin').runCommand({_shardsvrCreateCollection: 'test.test', key: {_id: 1}}),
-        [ErrorCodes.NoShardingEnabled, ErrorCodes.ShardingStateNotInitialized]);
+        [ErrorCodes.ShardingStateNotInitialized, ErrorCodes.NoShardingEnabled_OBSOLETE]);
 }
 
 /**

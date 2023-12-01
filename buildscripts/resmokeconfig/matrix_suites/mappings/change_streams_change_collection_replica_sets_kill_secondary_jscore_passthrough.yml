@@ -3,7 +3,7 @@
 # any removal so that a secondary containing a hole is detected as the documents when read in
 # descending order (most recent -> oldest) wouldn't match.
 
-base_suite: multitenancy_jscore_passthrough
+base_suite: multitenancy_with_atlas_proxy_jscore_passthrough
 overrides:
   - "serverless.enable"
   - "replica_sets_kill_secondary.selector"

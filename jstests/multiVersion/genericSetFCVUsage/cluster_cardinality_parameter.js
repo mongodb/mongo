@@ -31,15 +31,25 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
             removeShard(st, st.shard1.name);
         }
 
-        checkClusterParameter(st.configRS, true);
-        checkClusterParameter(st.rs0, true);
+        if (oldVersion == "last-lts") {
+            // In v7.0, the cluster parameter 'hasTwoOrMoreShards' gets set to true when the number
+            // of shards goes from 1 to 2 but doesn't get set to false when the number of shards
+            // goes down to 1.
+            checkClusterParameter(st.configRS, true);
+            checkClusterParameter(st.rs0, true);
+        }
 
         jsTest.log("Start upgrading the binaries for the cluster");
         st.upgradeCluster("latest");
         jsTest.log("Finished upgrading the binaries for the cluster");
 
-        checkClusterParameter(st.configRS, true);
-        checkClusterParameter(st.rs0, true);
+        if (oldVersion == "last-lts") {
+            // In v7.0, the cluster parameter 'hasTwoOrMoreShards' gets set to true when the number
+            // of shards goes from 1 to 2 but doesn't get set to false when the number of shards
+            // goes down to 1.
+            checkClusterParameter(st.configRS, true);
+            checkClusterParameter(st.rs0, true);
+        }
         if (hasTwoOrMoreShardsPriorToUpgrade) {
             checkClusterParameter(st.rs1, true);
         }

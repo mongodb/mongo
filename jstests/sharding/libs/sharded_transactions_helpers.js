@@ -1,3 +1,4 @@
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const kSnapshotErrors =
     [ErrorCodes.SnapshotTooOld, ErrorCodes.SnapshotUnavailable, ErrorCodes.StaleChunkHistory];
@@ -261,8 +262,5 @@ export function makePrepareTransactionCmdObj(lsid, txnNumber) {
 export function isUpdateDocumentShardKeyUsingTransactionApiEnabled(conn) {
     return jsTestOptions().mongosBinVersion !== "last-lts" &&
         jsTestOptions().mongosBinVersion !== "last-continuous" &&
-        assert
-            .commandWorked(conn.adminCommand(
-                {getParameter: 1, featureFlagUpdateDocumentShardKeyUsingTransactionApi: 1}))
-            .featureFlagUpdateDocumentShardKeyUsingTransactionApi.value;
+        FeatureFlagUtil.isEnabled(conn, "UpdateDocumentShardKeyUsingTransactionApi");
 }

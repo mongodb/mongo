@@ -160,7 +160,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // Use the workload name as part of the database name, since the workload name is assumed to
         // be unique.
-        this.uniqueDBName = db.getName() + 'kill_multicollection_aggregation';
+        this.uniqueDBName = db.getName() + jsTestName();
 
         var myDB = db.getSiblingDB(this.uniqueDBName);
         this.involvedCollections.forEach(collName => {

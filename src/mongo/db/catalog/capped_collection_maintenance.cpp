@@ -42,7 +42,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/service_context.h"
@@ -128,7 +128,8 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         // 'cappedFirstRecord' until the outermost WriteUnitOfWork commits or aborts. Locking the
         // metadata resource exclusively on the collection gives us that guarantee as it uses
         // two-phase locking semantics.
-        invariant(opCtx->lockState()->getLockMode(ResourceId(RESOURCE_METADATA, nss)) == MODE_X);
+        invariant(shard_role_details::getLocker(opCtx)->getLockMode(
+                      ResourceId(RESOURCE_METADATA, nss)) == MODE_X);
     } else {
         // Capped deletes not performed under the capped lock need the 'cappedFirstRecordMutex'
         // mutex.
@@ -246,7 +247,8 @@ void cappedTruncateAfter(OperationContext* opCtx,
                          const CollectionPtr& collection,
                          const RecordId& end,
                          bool inclusive) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
+    invariant(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_X));
     invariant(collection->isCapped());
     invariant(collection->getIndexCatalog()->numIndexesInProgress() == 0);
 

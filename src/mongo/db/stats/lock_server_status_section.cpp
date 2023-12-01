@@ -38,7 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/lock_stats.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util_core.h"
@@ -68,8 +68,8 @@ public:
             stdx::unique_lock<Client> uniqueLock(*client);
 
             const OperationContext* clientOpCtx = client->getOperationContext();
-            auto state =
-                clientOpCtx ? clientOpCtx->lockState()->getClientState() : Locker::kInactive;
+            auto state = clientOpCtx ? shard_role_details::getLocker(clientOpCtx)->getClientState()
+                                     : Locker::kInactive;
             invariant(state < clientStatusCounts.size());
             clientStatusCounts[state]++;
         }

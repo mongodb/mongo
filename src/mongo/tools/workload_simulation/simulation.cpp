@@ -29,7 +29,7 @@
 
 #include "mongo/tools/workload_simulation/simulation.h"
 
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -79,8 +79,7 @@ public:
     void onDestroyClient(Client* client) final {}
     void onCreateOperationContext(OperationContext* opCtx) final {
         auto service = opCtx->getServiceContext();
-
-        opCtx->setLockState(std::make_unique<LockerImpl>(service));
+        shard_role_details::setLocker(opCtx, std::make_unique<LockerImpl>(service));
     }
     void onDestroyOperationContext(OperationContext* opCtx) final {}
 };

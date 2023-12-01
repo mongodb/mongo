@@ -47,7 +47,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/validate_results.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/rebuild_indexes.h"
@@ -191,7 +191,7 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
     DisableDocumentValidation validationDisabler(opCtx);
 
     // We must hold some form of lock here
-    invariant(opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(opCtx)->isW());
 
     LOGV2(21029, "repairDatabase", logAttrs(dbName));
 

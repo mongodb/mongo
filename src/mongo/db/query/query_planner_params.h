@@ -42,7 +42,7 @@ namespace mongo {
 /**
  * Struct containing basic stats about a collection useful for query planning.
  */
-struct CollectionStats {
+struct PlannerCollectionInfo {
     // The number of records in the collection.
     long long noOfRecords{0};
 
@@ -51,6 +51,9 @@ struct CollectionStats {
 
     // The allocated storage size in bytes.
     long long storageSizeBytes{0};
+
+    // Whether this is a timeseries collection. This is sometimes used in planning decisions.
+    bool isTimeseries = false;
 };
 
 /**
@@ -61,7 +64,7 @@ struct SecondaryCollectionInfo {
     std::vector<IndexEntry> indexes{};
     std::vector<ColumnIndexEntry> columnIndexes{};
     bool exists{true};
-    CollectionStats stats{};
+    PlannerCollectionInfo stats{};
 };
 
 
@@ -169,7 +172,7 @@ struct QueryPlannerParams {
     std::vector<ColumnIndexEntry> columnStoreIndexes;
 
     // Basic collection stats for the main collection.
-    CollectionStats collectionStats;
+    PlannerCollectionInfo collectionStats;
 
     // What's our shard key?  If INCLUDE_SHARD_FILTER is set we will create a shard filtering
     // stage.  If we know the shard key, we can perform covering analysis instead of always

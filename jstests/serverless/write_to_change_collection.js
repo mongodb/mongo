@@ -18,6 +18,10 @@ const secondary = replSetTest.getSecondary();
 const firstTenantId = ObjectId("6303b6bb84305d2266d0b779");
 const secondTenantId = ObjectId("7303b6bb84305d2266d0b779");
 
+// Create tokens for each tenant
+const firstToken = _createTenantToken({tenant: firstTenantId});
+const secondToken = _createTenantToken({tenant: secondTenantId});
+
 // Connections to the replica set primary that are stamped with their respective tenant ids.
 const firstTenantConn =
     ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, firstTenantId);
@@ -42,6 +46,12 @@ function getLatestTimestamp() {
     const oplogTimestamp = oplogColl.find().sort({ts: -1}).limit(1).next().ts;
     assert(oplogTimestamp !== undefined);
     return oplogTimestamp;
+}
+
+// Clear token on primary and secondary connections
+function clearTokens() {
+    primary._setSecurityToken(undefined);
+    secondary._setSecurityToken(undefined);
 }
 
 // Test that writes to two different change collections are isolated and that each change collection
@@ -92,17 +102,22 @@ function getLatestTimestamp() {
 
     // Verify that both change collections captured their respective tenant's oplog entries in
     // the primary.
-    verifyChangeCollectionEntries(primary, startOplogTimestamp, endOplogTimestamp, firstTenantId);
-    verifyChangeCollectionEntries(primary, startOplogTimestamp, endOplogTimestamp, secondTenantId);
+    verifyChangeCollectionEntries(
+        primary, startOplogTimestamp, endOplogTimestamp, firstTenantId, firstToken);
+    verifyChangeCollectionEntries(
+        primary, startOplogTimestamp, endOplogTimestamp, secondTenantId, secondToken);
+    clearTokens();
 
     // Wait for the replication to finish.
     replSetTest.awaitReplication();
 
     // Verify that both change collections captured their respective tenant's oplog entries in
     // the secondary.
-    verifyChangeCollectionEntries(secondary, startOplogTimestamp, endOplogTimestamp, firstTenantId);
     verifyChangeCollectionEntries(
-        secondary, startOplogTimestamp, endOplogTimestamp, secondTenantId);
+        secondary, startOplogTimestamp, endOplogTimestamp, firstTenantId, firstToken);
+    verifyChangeCollectionEntries(
+        secondary, startOplogTimestamp, endOplogTimestamp, secondTenantId, secondToken);
+    clearTokens();
 })();
 
 // Test that transactional writes to two different change collections are isolated and that each
@@ -159,17 +174,22 @@ function getLatestTimestamp() {
 
     // Verify that both change collections captured their respective tenant's 'applyOps' oplog
     // entries in the primary.
-    verifyChangeCollectionEntries(primary, startOplogTimestamp, endOplogTimestamp, firstTenantId);
-    verifyChangeCollectionEntries(primary, startOplogTimestamp, endOplogTimestamp, secondTenantId);
+    verifyChangeCollectionEntries(
+        primary, startOplogTimestamp, endOplogTimestamp, firstTenantId, firstToken);
+    verifyChangeCollectionEntries(
+        primary, startOplogTimestamp, endOplogTimestamp, secondTenantId, secondToken);
+    clearTokens();
 
     // Wait for the replication to finish.
     replSetTest.awaitReplication();
 
     // Verify that both change collections captured their respective tenant's 'applyOps' oplog
     // entries in the secondary.
-    verifyChangeCollectionEntries(secondary, startOplogTimestamp, endOplogTimestamp, firstTenantId);
     verifyChangeCollectionEntries(
-        secondary, startOplogTimestamp, endOplogTimestamp, secondTenantId);
+        secondary, startOplogTimestamp, endOplogTimestamp, firstTenantId, firstToken);
+    verifyChangeCollectionEntries(
+        secondary, startOplogTimestamp, endOplogTimestamp, secondTenantId, secondToken);
+    clearTokens();
 })();
 
 replSetTest.stopSet();

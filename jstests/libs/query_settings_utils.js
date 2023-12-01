@@ -92,27 +92,6 @@ export class QuerySettingsUtils {
         }
     }
 
-    // Adjust the 'clusterServerParameterRefreshIntervalSecs' value for faster fetching of
-    // 'querySettings' cluster parameter on mongos from the configsvr.
-    // TODO: SERVER-81062 Update cluster parameter cache on set-/removeQuerySettings and perform
-    // single retry on failure.
-    setClusterParamRefreshSecs(newValue) {
-        if (FixtureHelpers.isMongos(this.db)) {
-            const response = assert.commandWorked(this.db.adminCommand(
-                {getParameter: 1, clusterServerParameterRefreshIntervalSecs: 1}));
-            const oldValue = response.clusterServerParameterRefreshIntervalSecs;
-            assert.commandWorked(this.db.adminCommand(
-                {setParameter: 1, clusterServerParameterRefreshIntervalSecs: newValue}));
-            return {
-                restore: () => {
-                    assert.commandWorked(this.db.adminCommand(
-                        {setParameter: 1, clusterServerParameterRefreshIntervalSecs: oldValue}));
-                }
-            };
-        }
-        return {restore: () => {}};
-    }
-
     /**
      * Remove all query settings for the current tenant.
      */

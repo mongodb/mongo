@@ -153,6 +153,12 @@ bool isExpressionValid(const MatchExpression* root) {
     return context.isExpressionValid();
 }
 
+bool containsNegations(const Maxterm& dnf) {
+    return std::any_of(dnf.minterms.begin(), dnf.minterms.end(), [](const Minterm& minterm) {
+        return minterm.mask != minterm.predicates;
+    });
+}
+
 boost::optional<Maxterm> quineMcCluskey(const BitsetTreeNode& tree,
                                         const ExpressionSimlifierSettings& settings) {
     auto maxterm = boolean_simplification::convertToDNF(tree, settings.maximumNumberOfMinterms);
@@ -162,12 +168,15 @@ boost::optional<Maxterm> quineMcCluskey(const BitsetTreeNode& tree,
         return boost::none;
     }
 
+    // The simplifications using Absorption law.
     maxterm->removeRedundancies();
 
     LOGV2_DEBUG(
         7767001, 5, "MatchExpression in DNF representation", "maxterm"_attr = maxterm->toString());
 
-    if (settings.applyQuineMcCluskey) {
+    // The simplifications using the Quine-McCluskey algorithm (x&y | x&~y = x). The QMC works only
+    // for expressions with negations.
+    if (settings.applyQuineMcCluskey && containsNegations(*maxterm)) {
         maxterm = boolean_simplification::quineMcCluskey(std::move(*maxterm));
     }
 
@@ -192,8 +201,17 @@ boost::optional<BitsetTreeNode> handleRootedAndCase(Maxterm dnfExpression) {
     return {std::move(topBitsetTree)};
 }
 
-boost::optional<BitsetTreeNode> simplifyBitsetTree(const BitsetTreeNode& tree,
+boost::optional<BitsetTreeNode> simplifyBitsetTree(BitsetTreeNode&& tree,
                                                    const ExpressionSimlifierSettings& settings) {
+    // Nothing to simplify since the the expression has only one conjunctive or disjunctive term.
+    if (tree.internalChildren.empty()) {
+        // Since the expression restorer does not accept any BitsetTree nodes with negations,
+        // particularly in the presence of the $nor operator, we apply De Morgan's Law which
+        // effectively push down the negations down the tree to the leaves.
+        tree.applyDeMorgan();
+        return std::move(tree);
+    }
+
     auto maxterm = quineMcCluskey(tree, settings);
     if (!maxterm) {
         return boost::none;
@@ -203,30 +221,23 @@ boost::optional<BitsetTreeNode> simplifyBitsetTree(const BitsetTreeNode& tree,
         return handleRootedAndCase(std::move(*maxterm));
     }
 
-    return {boolean_simplification::convertToBitsetTree(*maxterm)};
+    return boolean_simplification::convertToBitsetTree(*maxterm);
 }
 }  // namespace
 
 boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
     const MatchExpression* root, const ExpressionSimlifierSettings& settings) {
-    if (!isExpressionValid(root)) {
-        LOGV2_DEBUG(8163000,
-                    5,
-                    "Skipping the expression for it is not suitable for simplification.",
-                    "expression"_attr = root->debugString());
-        return boost::none;
-    }
-
     LOGV2_DEBUG(7767000,
                 5,
                 "Converting MatchExpression to corresponding DNF",
                 "expression"_attr = root->debugString());
 
-    auto result = transformToBitsetTree(root,
-                                        std::min(boolean_simplification::kBitsetNumberOfBits,
-                                                 settings.maximumNumberOfUniquePredicates));
+    auto bitsetAndExpressions =
+        transformToBitsetTree(root,
+                              std::min(boolean_simplification::kBitsetNumberOfBits,
+                                       settings.maximumNumberOfUniquePredicates));
 
-    if (MONGO_unlikely(!result.has_value())) {
+    if (MONGO_unlikely(!bitsetAndExpressions.has_value())) {
         LOGV2_DEBUG(8113911,
                     2,
                     "The query contains schema expressions or maximum number of unique predicates "
@@ -234,21 +245,20 @@ boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
         return boost::none;
     }
 
-    auto bitsetAndExpressions = std::move(*result);
-
-    auto bitsetTreeResult = simplifyBitsetTree(bitsetAndExpressions.bitsetTree, settings);
+    auto bitsetTreeResult =
+        simplifyBitsetTree(std::move(bitsetAndExpressions->bitsetTree), settings);
     if (MONGO_unlikely(!bitsetTreeResult.has_value())) {
         return boost::none;
     }
 
-    if (bitsetAndExpressions.expressionSize * settings.maxSizeFactor <=
+    if (bitsetAndExpressions->expressionSize * settings.maxSizeFactor <=
         bitsetTreeResult->calculateSize()) {
         LOGV2_DEBUG(8113910, 2, "The number of predicates has exceeded the 'maxSizeFactor' limit");
         return boost::none;
     }
 
     auto simplifiedExpression =
-        restoreMatchExpression(*bitsetTreeResult, bitsetAndExpressions.expressions);
+        restoreMatchExpression(*bitsetTreeResult, bitsetAndExpressions->expressions);
 
     // Check here if we still have a valid query, e.g. no more than one special index operator (geo,
     // text).

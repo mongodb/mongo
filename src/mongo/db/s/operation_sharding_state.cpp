@@ -40,7 +40,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/s/sharding_api_d_params_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -150,7 +150,7 @@ boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(
 Status OperationShardingState::waitForCriticalSectionToComplete(
     OperationContext* opCtx, SharedSemiFuture<void> critSecSignal) noexcept {
     // Must not block while holding a lock
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     // If we are in a transaction, limit the time we can wait behind the critical section. This is
     // needed in order to prevent distributed deadlocks in situations where a DDL operation needs to
@@ -258,6 +258,40 @@ ScopedSetShardRole::~ScopedSetShardRole() {
         invariant(--tracker.recursion >= 0);
         if (tracker.recursion == 0)
             oss._databaseVersions.erase(it);
+    }
+}
+
+ScopedUnsetImplicitTimeSeriesBucketsShardRole::ScopedUnsetImplicitTimeSeriesBucketsShardRole(
+    OperationContext* opCtx, const NamespaceString& nss)
+    : _opCtx(opCtx), _nss(nss) {
+    invariant(nss.isTimeseriesBucketsCollection());
+
+    auto& oss = OperationShardingState::get(_opCtx);
+
+    auto it = oss._shardVersions.find(
+        NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
+    if (it != oss._shardVersions.end()) {
+        tassert(8123300,
+                "Cannot unset implicit timeseries buckets shard role if recursion level is greater "
+                "than 1",
+                it->second.recursion == 1);
+        _stashedShardVersion.emplace(it->second.v);
+        oss._shardVersions.erase(it);
+    }
+}
+
+ScopedUnsetImplicitTimeSeriesBucketsShardRole::~ScopedUnsetImplicitTimeSeriesBucketsShardRole() {
+    auto& oss = OperationShardingState::get(_opCtx);
+    auto it = oss._shardVersions.find(
+        NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
+    invariant(it == oss._shardVersions.end());
+
+    if (_stashedShardVersion) {
+        auto emplaceResult = oss._shardVersions.emplace(
+            NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()),
+            *_stashedShardVersion);
+        auto& tracker = emplaceResult.first->second;
+        tracker.recursion = 1;
     }
 }
 

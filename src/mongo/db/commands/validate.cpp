@@ -243,8 +243,8 @@ public:
         }
         if (auto vts = auth::ValidatedTenancyScope::get(opCtx)) {
             reqSerializationCtx.setTenantIdSource(vts->hasTenantId());
-            // TODO SERVER-82319 we no longer need to check here once expectPrefix never comes from
-            // the command body.
+            // TODO SERVER-82320 we should no longer need to check here once expectPrefix only comes
+            // from the unsigned security token.
             if (reqSerializationCtx.getPrefix() == SerializationContext::Prefix::Default) {
                 reqSerializationCtx.setPrefixState(vts->isFromAtlasProxy());
             }
@@ -313,6 +313,33 @@ public:
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream() << "Running the validate command with { metadata: true } is not"
                                     << " supported with any other options");
+        }
+
+        // Background validation uses point-in-time catalog lookups. This requires an instance of
+        // the collection at the checkpoint timestamp. Because timestamps aren't used in standalone
+        // mode, this prevents the CollectionCatalog from being able to establish the correct
+        // collection instance.
+        const bool isReplSet = repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
+        if (background && !isReplSet) {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream() << "Running the validate command with { background: true } "
+                                    << "is not supported in standalone mode");
+        }
+
+        // The same goes for unreplicated collections, DDL operations are untimestamped.
+        if (background && !nss.isReplicated()) {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream() << "Running the validate command with { background: true } "
+                                    << "is not supported on unreplicated collections");
+        }
+
+        if (background && nss.isGlobalIndex()) {
+            // TODO SERVER-74209: Reading earlier than the minimum valid snapshot is temporarily not
+            // supported for global index collections as it results in extra index entries being
+            // detected. This requires further investigation.
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream() << "Background validation is temporarily disabled"
+                                    << " on the global indexes namespace");
         }
 
         if (!serverGlobalParams.quiet.load()) {

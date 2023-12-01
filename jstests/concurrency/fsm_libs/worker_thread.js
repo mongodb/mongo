@@ -5,6 +5,7 @@ import {SpecificSecondaryReaderMongo} from "jstests/libs/specific_secondary_read
 export const workerThread = (function() {
     // workloads = list of workload filenames
     // args.tid = the thread identifier
+    // args.tenantId = the tenant id
     // args.data = map of workload -> 'this' parameter passed to the FSM state functions
     // args.host = the address to make a new connection to
     // args.latch = CountDownLatch instance for starting all threads
@@ -53,6 +54,11 @@ export const workerThread = (function() {
                 mongo = new SpecificSecondaryReaderMongo(connectionString, args.secondaryHost);
             } else {
                 mongo = new Mongo(connectionString);
+            }
+
+            if (typeof args.tenantId !== 'undefined') {
+                TestData.tenantId = args.tenantId;
+                await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
             }
 
             // Retry operations that fail due to in-progress background operations. Load this early

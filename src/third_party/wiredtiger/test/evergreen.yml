@@ -419,6 +419,9 @@ functions:
             mv docs docs-$branch
           done
 
+          # Checkout the default ("develop") branch again to leave wiredtiger/ in the same state we started with
+          git checkout develop
+
   "update wiredtiger docs":
     - command: shell.exec
       type: setup
@@ -449,13 +452,13 @@ functions:
 
             # Synchronize the generated documentation with the current one.
             echo "Synchronizing documentation for branch $branch ..."
-            rsync -avq ../wiredtiger/docs-$branch/ $branch/ --delete
+            rsync -aq ../wiredtiger/docs-$branch/ $branch/ --delete
 
             # Commit and push the changes if any.
             if [[ $(git status "$branch" --porcelain) ]]; then
               git add $branch
               git commit -m "Update auto-generated docs for $branch" \
-                        --author="svc-bot-doc-build <svc-wiredtiger-doc-build@10gen.com>"
+                        --author="doc-build-bot <svc-wiredtiger-doc-build@10gen.com>"
             else
               echo "No documentation changes for $branch."
             fi
@@ -475,8 +478,18 @@ functions:
             exit 0
           fi
 
-          cd wiredtiger.github.com
-          git push https://"${doc-update-github-token}"@github.com/wiredtiger/wiredtiger.github.com
+          # Push the above-generated commit
+          ${PREPARE_PATH}
+          virtualenv -p python3 venv
+          source venv/bin/activate
+          python -m pip install PyGithub
+          export GITHUB_OWNER="wiredtiger"
+          export GITHUB_REPO="wiredtiger.github.com"
+          export GITHUB_APP_ID="${doc_update_github_app_id}"
+          export GITHUB_APP_PRIVATE_KEY="${doc_update_github_app_private_key}"
+          # Make sure the below script is called under the default ("develop") branch.
+          (cd wiredtiger && git checkout develop)
+          python wiredtiger/test/evergreen/doc_update.py
 
   "make check directory":
     command: shell.exec
@@ -940,7 +953,7 @@ functions:
         bucket: build_external
         permissions: public-read
         content_type: application/tar
-        display_name: Artifacts
+        display_name: ${artifacts_name|Artifacts}
         remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}${postfix|}.tgz
   "upload endian format artifacts":
     - command: s3.put
@@ -2230,6 +2243,17 @@ tasks:
       - func: "csuite test"
         vars:
           test_name: wt10461_skip_list_stress
+
+  - name: csuite-wt12015-backup-corruption-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "csuite test"
+        vars:
+          test_name: wt12015_backup_corruption
+
   # End of csuite test tasks
 
   # Start of Python unit test tasks
@@ -2404,6 +2428,9 @@ tasks:
               ${python_binary|python3} ../test/suite/run.py -v 4 test_prepare_hs03.py --hook timestamp
             done
 
+  # csuite-long-running-bucket1 and csuite-long-running-bucket2 test tasks each run half of the long-running tests
+  # so that each test task completes within the 5-hour time limit
+
   - name: csuite-long-running
     # Set 5 hours timeout (60 * 60 * 5)
     exec_timeout_secs: 18000
@@ -2412,6 +2439,7 @@ tasks:
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
+          # Run the first test, and then every second test
           extra_args: -L long_running
 
   # Break out Python unit tests into multiple buckets/tasks.  We have a fixed number of buckets,
@@ -3164,6 +3192,15 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger docs"
       - func: "update wiredtiger docs"
+      - func: "upload artifact"
+        vars:
+          artifacts_name: wiredtiger
+      - func: "upload artifact"
+        vars:
+          upload_filename: wiredtiger.github.com.tgz
+          upload_source_dir: wiredtiger.github.com
+          artifacts_name: wiredtiger.github.com
+          postfix: -wiredtiger.github.com
 
   - name: syscall-linux
     commands:
@@ -3799,16 +3836,6 @@ tasks:
         vars:
           config: ../../../test/format/CONFIG.mirror
           trace_args: -T all
-
-  # FIXME-WT-11606 Remove this temporary task.
-  - name: format-11507-test
-    exec_timeout_secs: 25200
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "format test script"
-        vars:
-          format_test_script_args: -c ../../../test/format/failure_configs/CONFIG.WT-11507 -t 360 -T all
 
   - name: format-stress-pull-request-test
     tags: ["pull_request"]
@@ -5929,6 +5956,8 @@ buildvariants:
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-test
+    - name: csuite-long-running
+      batchtime: 1440 # once a day
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
@@ -5993,9 +6022,16 @@ buildvariants:
     - name: format-stress-pull-request-test
     - name: make-check-test
       distros: ubuntu2004-large
-    - name: csuite-long-running
-      distros: ubuntu2004-large
-      batchtime: 1440 # once a day
+      # FIXME-WT-11989 Long running test may timeout with sanitizers.
+    # - name: csuite-long-running-bucket1
+    #   # Some of the long-running tests require a large instance to run successfully.
+    #   distros: ubuntu2004-large
+    #   batchtime: 1440 # once a day
+      # FIXME-WT-11989 Long running test may timeout with sanitizers.
+    # - name: csuite-long-running-bucket2
+    #   # Some of the long-running tests require a large instance to run successfully.
+    #   distros: ubuntu2004-large
+    #   batchtime: 1440 # once a day
 
 - name: ubuntu2004-ubsan
   display_name: "! Ubuntu 20.04 UBSAN"
@@ -6043,8 +6079,6 @@ buildvariants:
     additional_env_vars: export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
-    # FIXME-WT-11606 Remove this temporary task.
-    - name: format-11507-test
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"
@@ -6078,8 +6112,6 @@ buildvariants:
     additional_env_vars: export LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
-    # FIXME-WT-11606 Remove this temporary task.
-    - name: format-11507-test
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"

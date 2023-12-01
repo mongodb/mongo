@@ -29,9 +29,9 @@
 
 #include "mongo/db/s/global_index/global_index_cloning_external_state.h"
 
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 
 namespace mongo {
 namespace global_index {

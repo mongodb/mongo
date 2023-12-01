@@ -63,8 +63,6 @@ class ReplOperation;
 
 }  // namespace repl
 
-class ShardingWriteRouter;
-
 class OpObserverImpl : public OpObserver {
     OpObserverImpl(const OpObserverImpl&) = delete;
     OpObserverImpl& operator=(const OpObserverImpl&) = delete;

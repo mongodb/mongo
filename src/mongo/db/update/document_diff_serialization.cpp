@@ -304,7 +304,7 @@ public:
         auto formatFieldName = [&](char pre, size_t idx) {
             const char* fieldNameStorageEnd =
                 fmt::format_to(fieldNameStorage, FMT_STRING("{}{}"), pre, idx);
-            return StringData(static_cast<const char*>(fieldNameStorage), fieldNameStorageEnd);
+            return StringData(fieldNameStorage, fieldNameStorageEnd - fieldNameStorage);
         };
 
         // Make sure that 'doc_diff::kUpdateSectionFieldName' is a single character.

@@ -51,11 +51,11 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
@@ -122,7 +122,8 @@ Status ViewsForDatabase::reload(OperationContext* opCtx, const CollectionPtr& sy
         return Status::OK();
     }
 
-    invariant(opCtx->lockState()->isCollectionLockedForMode(systemViews->ns(), MODE_IS));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(systemViews->ns(),
+                                                                              MODE_IS));
 
     auto cursor = systemViews->getCursor(opCtx);
     while (auto record = cursor->next()) {
@@ -369,9 +370,11 @@ Status ViewsForDatabase::_upsertIntoCatalog(OperationContext* opCtx,
 void ViewsForDatabase::remove(OperationContext* opCtx,
                               const CollectionPtr& systemViews,
                               const NamespaceString& ns) {
-    dassert(opCtx->lockState()->isDbLockedForMode(systemViews->ns().dbName(), MODE_IX));
-    dassert(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_IX));
-    dassert(opCtx->lockState()->isCollectionLockedForMode(systemViews->ns(), MODE_X));
+    dassert(shard_role_details::getLocker(opCtx)->isDbLockedForMode(systemViews->ns().dbName(),
+                                                                    MODE_IX));
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns, MODE_IX));
+    dassert(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(systemViews->ns(), MODE_X));
 
     _viewGraph.remove(ns);
     _viewMap.erase(ns.coll());

@@ -133,13 +133,13 @@ key_string::Value makeKeyStringForSeek(SortedDataInterface* sorted,
 /**
  * Inserts all entries in toInsert into index.
  * ASSERT_OKs the inserts.
- * Always uses dupsAllowed=true.
  *
  * Should be used for declaring and changing conditions, not for testing inserts.
  */
 void insertToIndex(OperationContext* opCtx,
                    SortedDataInterface* index,
-                   std::initializer_list<IndexKeyEntry> toInsert);
+                   std::initializer_list<IndexKeyEntry> toInsert,
+                   bool dupsAllowed = true);
 
 /**
  * Removes all entries in toRemove from index.

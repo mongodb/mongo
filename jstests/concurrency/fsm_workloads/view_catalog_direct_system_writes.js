@@ -4,6 +4,10 @@
  * Extends 'view_catalog.js' in concurrently creating, modifying and dropping view namespaces, but
  * does so via direct writes to system.views instead of using the collMod or drop commands. Each
  * worker operates on their own view, built on a shared underlying collection.
+ * @tags: [
+ *  # `applyOps` is not supported in serverless.
+ *  command_not_supported_in_serverless
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/view_catalog.js";

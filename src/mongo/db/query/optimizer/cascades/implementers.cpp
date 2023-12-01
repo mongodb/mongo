@@ -324,7 +324,8 @@ public:
                 getPropertyConst<CardinalityEstimate>(_logicalProps).getEstimate(),
                 fieldProjectionMap,
                 node.getScanDefName(),
-                canUseParallelScan);
+                canUseParallelScan,
+                _metadata._scanDefs.at(node.getScanDefName()).getScanOrder());
         }
         // If needed, add EvaluationNodes to collect the shard key from dotted paths.
         if (mustRemoveOrphans) {
@@ -925,8 +926,11 @@ public:
                 baseCE = scanGroupCE;
 
                 // Return a physical scan with field map.
-                builder.make<PhysicalScanNode>(
-                    baseCE, fieldProjectionMap, scanDefName, canUseParallelScan);
+                builder.make<PhysicalScanNode>(baseCE,
+                                               fieldProjectionMap,
+                                               scanDefName,
+                                               canUseParallelScan,
+                                               _metadata._scanDefs.at(scanDefName).getScanOrder());
                 rule = PhysicalRewriteType::SargableToPhysicalScan;
             } else {
                 baseCE = {1.0};

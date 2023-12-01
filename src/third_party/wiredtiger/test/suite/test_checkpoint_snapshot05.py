@@ -171,7 +171,7 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
         # Verify exactly one checkpoint is present: as required by the test assertions.
         # Assertion is NOT about the code under test, so use 'assert'.
         with open_cursor(self.session, 'statistics:') as stat_cursor:
-            assert stat_cursor[stat.conn.checkpoints][2] == 1
+            assert stat_cursor[stat.conn.checkpoints_api][2] == 1
             assert stat_cursor[stat.conn.checkpoint_skipped][2] == 0
 
         # The restoration of the backup is expected to fix the inconsistent checkpoint.

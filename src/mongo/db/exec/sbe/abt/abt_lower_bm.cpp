@@ -106,9 +106,9 @@ protected:
             sbe::value::SlotIdGenerator ids;
             sbe::InputParamToSlotMap inputParamToSlotMap;
 
-            benchmark::DoNotOptimize(SBENodeLowering{
-                env, runtimeEnv, ids, inputParamToSlotMap, m, _nodeMap, ScanOrder::Forward}
-                                         .optimize(n, map, ridSlot));
+            benchmark::DoNotOptimize(
+                SBENodeLowering{env, runtimeEnv, ids, inputParamToSlotMap, m, _nodeMap}.optimize(
+                    n, map, ridSlot));
             benchmark::ClobberMemory();
         }
     }

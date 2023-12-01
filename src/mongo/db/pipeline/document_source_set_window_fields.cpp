@@ -244,7 +244,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     // $set
     if (complexPartitionBy) {
         result.push_back(
-            DocumentSourceAddFields::create(*simplePartitionBy, *complexPartitionBy, expCtx));
+            DocumentSourceAddFields::create(*simplePartitionBy, *complexPartitionBy, expCtx, true));
     }
 
     // $sort

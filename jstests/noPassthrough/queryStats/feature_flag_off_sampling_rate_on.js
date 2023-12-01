@@ -6,11 +6,7 @@
 // This test specifically tests error handling when the feature flag is not on.
 // Set sampling rate to -1.
 let options = {
-    setParameter: {
-        internalQueryStatsRateLimit: -1,
-        featureFlagQueryStatsFindCommand: false,
-        featureFlagQueryStats: false
-    },
+    setParameter: {internalQueryStatsRateLimit: -1, featureFlagQueryStats: false},
 };
 const conn = MongoRunner.runMongod(options);
 assert.neq(null, conn, 'failed to start mongod');
@@ -26,14 +22,14 @@ for (let i = 1; i <= 20; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-// Pipeline to read telemetry store should fail without feature flag turned on even though sampling
+// Pipeline to read queryStats store should fail without feature flag turned on even though sampling
 // rate is > 0.
 assert.commandFailedWithCode(
     testdb.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
     ErrorCodes.QueryFeatureNotAllowed);
 
-// Pipeline, with a filter, to read telemetry store fails without feature flag turned on even though
-// sampling rate is > 0.
+// Pipeline, with a filter, to read queryStats store fails without feature flag turned on even
+// though sampling rate is > 0.
 assert.commandFailedWithCode(testdb.adminCommand({
     aggregate: 1,
     pipeline: [{$queryStats: {}}, {$match: {"key.queryShape.find": {$eq: "###"}}}],

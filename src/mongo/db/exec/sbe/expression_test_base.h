@@ -283,6 +283,10 @@ protected:
         return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(value)};
     }
 
+    static std::pair<value::TypeTags, value::Value> makeDecimal(std::string value) {
+        return value::makeCopyDecimal(Decimal128(value));
+    }
+
     static std::pair<value::TypeTags, value::Value> makeBool(bool value) {
         return {value::TypeTags::Boolean, value::bitcastFrom<bool>(value)};
     }

@@ -60,7 +60,7 @@ void AccumulatorPush::processInternal(const Value& input, bool merging) {
     if (!merging) {
         if (!input.missing()) {
             _array.push_back(input);
-            _memUsageTracker.update(input.getApproximateSize());
+            _memUsageTracker.add(input.getApproximateSize());
             uassert(ErrorCodes::ExceededMemoryLimit,
                     str::stream()
                         << "$push used too much memory and cannot spill to disk. Memory limit: "
@@ -75,7 +75,7 @@ void AccumulatorPush::processInternal(const Value& input, bool merging) {
 
         const vector<Value>& vec = input.getArray();
         for (auto&& val : vec) {
-            _memUsageTracker.update(val.getApproximateSize());
+            _memUsageTracker.add(val.getApproximateSize());
             uassert(ErrorCodes::ExceededMemoryLimit,
                     str::stream()
                         << "$push used too much memory and cannot spill to disk. Memory limit: "

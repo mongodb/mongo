@@ -65,9 +65,9 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -169,7 +169,8 @@ public:
             return true;
         } else if (cmdObj.hasElement("getLastStableRecoveryTimestamp")) {
             try {
-                opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+                shard_role_details::getLocker(opCtx)->setAdmissionPriority(
+                    AdmissionContext::Priority::kImmediate);
                 // We need to hold the lock so that we don't run when storage is being shutdown.
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,

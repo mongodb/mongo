@@ -1,7 +1,7 @@
 import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 const kDenylistedDbNames = new Set(["config", "admin", "local"]);
-export function isDenylistedDb(dbName) {
+function isDenylistedDb(dbName) {
     return kDenylistedDbNames.has(dbName);
 }
 
@@ -126,6 +126,97 @@ function prependTenantId(obj, tenantId) {
 }
 
 /**
+ * Check the db name in error message.
+ * The db name and namesapce string in error message should always include tenant prefix
+ * regardless how the tenantId was received in the request.
+ */
+export function checkDbInErrorMsg(errMsg, dbName) {
+    // Skip check system db names (admin, local and config) which could be tenant prefixed or not.
+    if (dbName == "admin" || dbName == "local" || dbName == "config") {
+        return true;
+    }
+
+    let words = errMsg.split(/[ ,]+/);
+    const findExactDbName = words.includes(dbName);
+    if (findExactDbName) {
+        return false;
+    }
+
+    // We expect ns starts with `<tenantId>_<dbName>_` instead of `<dbName>_`.
+    let dbPrefix = dbName + "_";
+    for (const word in words) {
+        if (word.startsWith(dbPrefix)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Check if the raw command response is a CollectionUUIDMismatch error.
+ * CollectionUUIDMismatch includes tenant prefixed db name in "db" instead of "errmsg".
+ * There are three different locations for error "code" and "db":
+ * - they are children of root response object.
+ * - they are children of "writeErrors" object.
+ * - they are children of "writeConcernError" object.
+ */
+function isCollectionUUIDMismatch(res) {
+    if (!res.hasOwnProperty("ok")) {
+        return false;
+    }
+
+    const mismatchCode = ErrorCodes.CollectionUUIDMismatch;
+    if (res.hasOwnProperty("code") && res.code == mismatchCode) {
+        return true;
+    }
+
+    if (res.hasOwnProperty("writeConcernError") && res.writeConcernError.code == mismatchCode) {
+        return true;
+    }
+
+    if (res.hasOwnProperty("writeErrors")) {
+        for (let err of res.writeErrors) {
+            if (err.code == mismatchCode) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Remove tenant id from CollectionUUIDMismatch object.
+ */
+function removeTenantIdFromCollectionUUIDMismatch(obj, checkPrefix, tenantId) {
+    const prefix = tenantId + "_";
+    const debugLog =
+        `The db name in the errmsg does not contain matched tenant prefix
+                        "${prefix}". The response is "${tojsononeline(obj)}"`;
+
+    let errors = [];
+    const mismatchCode = ErrorCodes.CollectionUUIDMismatch;
+    if (obj.hasOwnProperty("code") && obj.code == mismatchCode) {
+        errors.push(obj);
+    } else if (obj.hasOwnProperty("writeConcernError") &&
+               obj.writeConcernError.code == mismatchCode) {
+        errors.push(obj.writeConcernError);
+    } else if (obj.hasOwnProperty("writeErrors")) {
+        for (let err of obj.writeErrors) {
+            if (err.code == mismatchCode) {
+                errors.push(err);
+            }
+        }
+    }
+
+    for (let err of errors) {
+        if (checkPrefix) {
+            assert(err.db.startsWith(prefix), debugLog);
+        }
+        err.db = extractOriginalDbName(err.db);
+    }
+}
+
+/**
  * Removes a tenant prefix from all the database name and namespace fields in the provided object,
  * where applicable. Optionally check that namespaces are prefixed with the expected tenant id.
  *
@@ -139,17 +230,24 @@ function prependTenantId(obj, tenantId) {
  */
 export function removeTenantIdAndMaybeCheckPrefixes(obj, options = {
     checkPrefix: false,
+    expectPrefix: false,
     tenantId: undefined,
     dbName: undefined,
     cmdName: undefined,
     debugLog: undefined,
 }) {
-    const {checkPrefix, tenantId, dbName: requestDbName, cmdName, debugLog} = options;
+    const {checkPrefix, expectPrefix, tenantId, dbName: requestDbName, cmdName, debugLog} = options;
     if (checkPrefix) {
         assert(tenantId != null, "Missing required option `tenantId` when checking prefixes");
         assert(requestDbName != null, "Missing required option `dbName` when checking prefixes");
     }
 
+    if (isCollectionUUIDMismatch(obj)) {
+        removeTenantIdFromCollectionUUIDMismatch(obj, checkPrefix, tenantId);
+        return;
+    }
+
+    const expectedDbName = expectPrefix ? `${tenantId}_${requestDbName}` : requestDbName;
     for (let k of Object.keys(obj)) {
         let v = obj[k];
         let originalK = removeTenantIdFromString(k);
@@ -157,20 +255,24 @@ export function removeTenantIdAndMaybeCheckPrefixes(obj, options = {
             if (k === "dbName" || k == "db" || k == "dropped") {
                 if (checkPrefix && !isDenylistedDb(requestDbName) &&
                     !shouldSkipPrefixCheck(cmdName, obj)) {
-                    assert.eq(v, `${tenantId}_${requestDbName}`, debugLog);
+                    assert.eq(v, expectedDbName, debugLog);
                 }
-
                 obj[originalK] = extractOriginalDbName(v);
             } else if (k === "namespace" || k === "ns") {
                 if (checkPrefix) {
                     const responseDbName = v.split('.')[0];
                     if (!isDenylistedDb(requestDbName) && !shouldSkipPrefixCheck(cmdName, obj)) {
-                        assert.eq(responseDbName, `${tenantId}_${requestDbName}`, debugLog);
+                        assert.eq(responseDbName, expectedDbName, debugLog);
                     }
                 }
 
                 obj[originalK] = extractOriginalNs(v);
-            } else if (k === "errmsg" || k == "name") {
+            } else if (k === "errmsg") {
+                if (checkPrefix) {
+                    assert(checkDbInErrorMsg(v, requestDbName), debugLog);
+                }
+                obj[originalK] = removeTenantIdFromString(v);
+            } else if (k == "name") {
                 // TODO(): improve response checking
                 obj[originalK] = removeTenantIdFromString(v);
             }

@@ -274,6 +274,7 @@ private:
     InstanceID _instanceID;
 
     // protects this entire instance
-    mutable mongo::SpinLock _lock;
+    mutable SpinLock _lock;
 };
+
 }  // namespace mongo

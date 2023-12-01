@@ -334,4 +334,17 @@ typename Simple8b<T>::Iterator Simple8b<T>::end() const {
     return {_buffer + _size};
 }
 
+namespace simple8b {
+// Constant for a simple8b block containing a single 'missing' value.
+static constexpr uint64_t kSingleSkip = 0xFFFFFFFFFFFFFFFE;
+
+/**
+ * Calculates the sum for multiple simple8b blocks in a buffer. 'prevNonRLE' should be initialized
+ * to 'kSingleSkip' when calculating sum for the first buffer. If the caller needs sum from multiple
+ * buffers the value should be passed along between the calls.
+ */
+template <typename T>
+T sum(const char* buffer, size_t size, uint64_t& prevNonRLE);
+}  // namespace simple8b
+
 }  // namespace mongo

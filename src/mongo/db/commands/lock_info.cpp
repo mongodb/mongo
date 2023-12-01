@@ -48,6 +48,7 @@
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
+namespace {
 
 class CmdLockInfo : public TypedCommand<CmdLockInfo> {
 public:
@@ -57,12 +58,8 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
-    }
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const {
-        return false;
     }
 
     std::string help() const override {
@@ -101,7 +98,7 @@ public:
 
             auto lockToClientMap = LockManager::getLockToClientMap(opCtx->getServiceContext());
             auto result = reply->getBodyBuilder();
-            LockManager::get(opCtx)->getLockInfoBSON(lockToClientMap, &result);
+            LockManager::get(opCtx->getServiceContext())->getLockInfoBSON(lockToClientMap, &result);
             const auto& includeStorageEngineDump = request().getIncludeStorageEngineDump();
             if (includeStorageEngineDump) {
                 opCtx->getServiceContext()->getStorageEngine()->dump();
@@ -110,4 +107,6 @@ public:
     };
 };
 MONGO_REGISTER_COMMAND(CmdLockInfo).forShard();
+
+}  // namespace
 }  // namespace mongo

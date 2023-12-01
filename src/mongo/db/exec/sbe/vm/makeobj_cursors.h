@@ -60,60 +60,56 @@ class BsonObjCursor {
 public:
     using InputFields = MakeObjCursorInputFields;
 
-    BsonObjCursor(const StringListSet& fields,
-                  const std::vector<MakeObjSpec::FieldAction>& actions,
-                  MakeObjSpec::ActionType defActionType,
-                  const char* be)
-        : _fields(fields), _actions(actions), _defActionType(defActionType), _be(be) {
+    BsonObjCursor(const StringListSet& fields, const char* be) : _be(be) {
         _last = _be + ConstDataView(_be).read<LittleEndian<uint32_t>>() - 1;
         _be += 4;
         if (_be != _last) {
+            // Initialize '_name' and '_nextBe'.
             _name = bson::fieldNameAndLength(_be);
             _nextBe = bson::advance(_be, _name.size());
+            // Look up '_name' in the 'fields' set.
+            _fieldIdx = fields.findPos(_name);
         }
     }
 
-    inline bool atEnd() const {
+    MONGO_COMPILER_ALWAYS_INLINE bool atEnd() const {
         return _be == _last;
     }
-    inline void moveNext() {
+    MONGO_COMPILER_ALWAYS_INLINE void moveNext(const StringListSet& fields) {
         _be = _nextBe;
         if (_be != _last) {
+            // Update '_name' and '_nextBe'.
             _name = bson::fieldNameAndLength(_be);
             _nextBe = bson::advance(_be, _name.size());
+            // Look up '_name' in the 'fields' set.
+            _fieldIdx = fields.findPos(_name);
         }
     }
-    inline StringData fieldName() const {
+    MONGO_COMPILER_ALWAYS_INLINE StringData fieldName() const {
         return _name;
     }
-    inline std::pair<size_t, MakeObjSpec::ActionType> fieldIdxAndType() const {
-        // Look up '_name' in the '_fields' set.
-        size_t fieldIdx = _fields.findPos(_name);
-        // Return the index ('npos' if not found) and the ActionType for this field.
-        auto type = fieldIdx != StringListSet::npos ? _actions[fieldIdx].type() : _defActionType;
-        return {fieldIdx, type};
+    MONGO_COMPILER_ALWAYS_INLINE size_t fieldIdx() const {
+        return _fieldIdx;
     }
-    inline std::pair<value::TypeTags, value::Value> value() const {
+    MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> value() const {
         return bson::convertFrom<true>(bsonElement());
     }
-    inline void appendTo(UniqueBSONObjBuilder& bob) const {
+    MONGO_COMPILER_ALWAYS_INLINE void appendTo(UniqueBSONObjBuilder& bob) const {
         bob.append(bsonElement());
     }
 
 private:
-    inline BSONElement bsonElement() const {
+    MONGO_COMPILER_ALWAYS_INLINE BSONElement bsonElement() const {
         auto fieldNameLenWithNull = _name.size() + 1;
         auto totalSize = _nextBe - _be;
         return BSONElement(_be, fieldNameLenWithNull, totalSize, BSONElement::TrustedInitTag{});
     }
 
-    const StringListSet& _fields;
-    const std::vector<MakeObjSpec::FieldAction>& _actions;
-    MakeObjSpec::ActionType _defActionType;
-
     const char* _be{nullptr};
     const char* _nextBe{nullptr};
     const char* _last{nullptr};
+
+    size_t _fieldIdx{0};
     StringData _name;
 };
 
@@ -122,49 +118,49 @@ class ObjectCursor {
 public:
     using InputFields = MakeObjCursorInputFields;
 
-    ObjectCursor(const StringListSet& fields,
-                 const std::vector<MakeObjSpec::FieldAction>& actions,
-                 MakeObjSpec::ActionType defActionType,
-                 value::Object* objRoot)
-        : _fields(fields),
-          _actions(actions),
-          _defActionType(defActionType),
-          _objRoot(objRoot),
-          _idx(0),
-          _endIdx(_objRoot->size()) {}
+    ObjectCursor(const StringListSet& fields, value::Object* objRoot)
+        : _objRoot(objRoot), _idx(0), _endIdx(_objRoot->size()) {
+        if (_idx != _endIdx) {
+            // Initialize '_name'.
+            _name = StringData(_objRoot->field(_idx));
+            // Look up '_name' in the 'fields' set.
+            _fieldIdx = fields.findPos(_name);
+        }
+    }
 
-    inline bool atEnd() const {
+    MONGO_COMPILER_ALWAYS_INLINE bool atEnd() const {
         return _idx == _endIdx;
     }
-    inline void moveNext() {
+    MONGO_COMPILER_ALWAYS_INLINE void moveNext(const StringListSet& fields) {
         ++_idx;
+        if (_idx != _endIdx) {
+            // Update '_name'.
+            _name = StringData(_objRoot->field(_idx));
+            // Look up '_name' in the 'fields' set.
+            _fieldIdx = fields.findPos(_name);
+        }
     }
-    inline StringData fieldName() const {
+    MONGO_COMPILER_ALWAYS_INLINE StringData fieldName() const {
         return StringData(_objRoot->field(_idx));
     }
-    inline std::pair<size_t, MakeObjSpec::ActionType> fieldIdxAndType() const {
-        // Look up '_name' in the '_fields' set.
-        size_t fieldIdx = _fields.findPos(fieldName());
-        // Return the index ('npos' if not found) and the ActionType for this field.
-        auto type = fieldIdx != StringListSet::npos ? _actions[fieldIdx].type() : _defActionType;
-        return {fieldIdx, type};
+    MONGO_COMPILER_ALWAYS_INLINE size_t fieldIdx() const {
+        return _fieldIdx;
     }
-    inline std::pair<value::TypeTags, value::Value> value() const {
+    MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> value() const {
         return _objRoot->getAt(_idx);
     }
-    inline void appendTo(UniqueBSONObjBuilder& bob) const {
+    MONGO_COMPILER_ALWAYS_INLINE void appendTo(UniqueBSONObjBuilder& bob) const {
         auto [tag, val] = value();
         bson::appendValueToBsonObj(bob, fieldName(), tag, val);
     }
 
 private:
-    const StringListSet& _fields;
-    const std::vector<MakeObjSpec::FieldAction>& _actions;
-    MakeObjSpec::ActionType _defActionType;
-
     value::Object* _objRoot{nullptr};
     size_t _idx{0};
     size_t _endIdx{0};
+
+    size_t _fieldIdx{0};
+    StringData _name;
 };
 
 }  // namespace mongo::sbe::vm

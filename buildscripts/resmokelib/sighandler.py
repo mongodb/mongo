@@ -153,12 +153,12 @@ def _analyze_pids(logger, pids):
 
         return
 
+    # See hang-analyzer argument options here:
+    # https://github.com/10gen/mongo/blob/8636ede10bd70b32ff4b6cd115132ab0f22b89c7/buildscripts/resmokelib/hang_analyzer/hang_analyzer.py#L245
     hang_analyzer_args = [
-        'hang-analyzer', '-o', 'file', '-o', 'stdout', '-k', '-d', ','.join([str(p) for p in pids])
+        'hang-analyzer', '-c', '-o', 'file', '-o', 'stdout', '-k', '-d',
+        ','.join([str(p) for p in pids])
     ]
-
-    if not os.getenv('ASAN_OPTIONS') and not os.getenv('TSAN_OPTIONS'):
-        hang_analyzer_args.append('-c')
     _hang_analyzer = parser.parse_command_line(hang_analyzer_args, logger=logger)
 
     # Evergreen has a 15 minute timeout for task timeout commands

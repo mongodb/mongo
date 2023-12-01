@@ -84,6 +84,9 @@ def signal_python(logger, pname, pid):
         logger.info("Sending signal SIGUSR1 to python process %s with PID %d", pname, pid)
         signal_process(logger, pid, signal.SIGUSR1)
 
+    logger.info("Waiting for process to report")
+    time.sleep(5)
+
 
 def signal_event_object(logger, pid):
     """Signal the Windows event object."""
@@ -106,22 +109,26 @@ def signal_event_object(logger, pid):
     finally:
         win32api.CloseHandle(task_timeout_handle)
 
-    logger.info("Waiting for process to report")
-    time.sleep(5)
-
 
 def signal_process(logger, pid, signalnum):
     """Signal process with signal, N/A on Windows."""
     try:
         os.kill(pid, signalnum)
-
-        logger.info("Waiting for process to report")
-        time.sleep(5)
     except OSError as err:
         logger.error("Hit OS error trying to signal process: %s", err)
 
     except AttributeError:
         logger.error("Cannot send signal to a process on Windows")
+
+
+def quit_process(logger, pname, pid):
+    """Sending sigquit to process."""
+
+    logger.info("Sending sigquit to process %s with PID %d", pname, pid)
+    try:
+        signal_process(logger, pid, signal.SIGQUIT)
+    except psutil.NoSuchProcess as err:
+        logger.error("Process not found: %s", err.msg)
 
 
 def pause_process(logger, pname, pid):

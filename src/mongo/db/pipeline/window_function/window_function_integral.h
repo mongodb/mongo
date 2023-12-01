@@ -103,7 +103,7 @@ private:
     void assertValueType(const Value& value);
 
     WindowFunctionSum _integral;
-    std::deque<SimpleMemoryTokenWith<Value>> _values;
+    std::deque<SimpleMemoryUsageTokenWith<Value>> _values;
     boost::optional<long long> _unitMillis;
     int _nanCount = 0;
     bool isNonremovable = false;

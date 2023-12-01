@@ -54,12 +54,12 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -746,7 +746,8 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
         auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
         int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(opCtx, dbName, MODE_X, [&](const Collection* collection) {
-            ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
+            ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                collection->ns(), MODE_X));
             numCollectionsTraversed++;
             return true;
         });
@@ -759,7 +760,8 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
         auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
         int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, [&](const Collection* collection) {
-            ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IS));
+            ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                collection->ns(), MODE_IS));
             numCollectionsTraversed++;
             return true;
         });
@@ -793,14 +795,14 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
             dbName,
             MODE_X,
             [&](const Collection* collection) {
-                ASSERT_TRUE(
-                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
+                ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                    collection->ns(), MODE_X));
                 numCollectionsTraversed++;
                 return true;
             },
             [&](const Collection* collection) {
-                ASSERT_TRUE(
-                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_NONE));
+                ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                    collection->ns(), MODE_NONE));
                 return collection->getCollectionOptions().temp;
             });
 
@@ -816,14 +818,14 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
             dbName,
             MODE_IX,
             [&](const Collection* collection) {
-                ASSERT_TRUE(
-                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
+                ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                    collection->ns(), MODE_IX));
                 numCollectionsTraversed++;
                 return true;
             },
             [&](const Collection* collection) {
-                ASSERT_TRUE(
-                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_NONE));
+                ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                    collection->ns(), MODE_NONE));
                 return !collection->getCollectionOptions().temp;
             });
 

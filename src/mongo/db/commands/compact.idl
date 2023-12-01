@@ -51,3 +51,18 @@ commands:
                 validator: { gte: 1 }
         namespace: concatenate_with_db
         strict: true
+
+    autoCompact:
+        api_version: ""
+        command_name: autoCompact
+        cpp_name: AutoCompact
+        description: "Parser for the 'autoCompact' command."
+        namespace: type
+        type: bool
+        fields:
+            freeSpaceTargetMB:
+                description: "Minimum amount of space recoverable for compaction to proceed."
+                optional: true
+                type: safeInt64
+                validator: { gte: 1 }
+            

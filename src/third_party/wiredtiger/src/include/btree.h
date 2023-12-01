@@ -225,7 +225,9 @@ struct __wt_btree {
      * We flush pages from the tree (in order to make checkpoint faster), without a high-level lock.
      * To avoid multiple threads flushing at the same time, lock the tree.
      */
-    WT_SPINLOCK flush_lock; /* Lock to flush the tree's pages */
+    WT_SPINLOCK flush_lock;          /* Lock to flush the tree's pages */
+    uint64_t flush_most_recent_secs; /* Wall clock time for the most recent flush */
+    uint64_t flush_most_recent_ts;   /* Timestamp of the most recent flush */
 
 /*
  * All of the following fields live at the end of the structure so it's easier to clear everything

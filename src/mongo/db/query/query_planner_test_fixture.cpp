@@ -70,10 +70,8 @@ namespace mongo {
 
 using unittest::assertGet;
 
-const NamespaceString QueryPlannerTest::nss =
-    NamespaceString::createNamespaceString_forTest("test.collection");
-
 void QueryPlannerTest::setUp() {
+    nss = NamespaceString::createNamespaceString_forTest("test.collection");
     opCtx = serviceContext.makeOperationContext();
     expCtx = make_intrusive<ExpressionContext>(
         opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), nss);
@@ -465,7 +463,6 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     plannerStatus = statusWithMultiPlanSolns.getStatus();
     ASSERT_NOT_OK(plannerStatus);
 }
-
 
 void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     clearState();

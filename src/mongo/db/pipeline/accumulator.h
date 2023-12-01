@@ -45,7 +45,6 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/stats/stats_gen.h"
 #include "mongo/db/query/stats/value_utils.h"
@@ -54,6 +53,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/memory_usage_tracker.h"
 #include "mongo/util/summation.h"
 
 namespace mongo {

@@ -146,7 +146,7 @@ PlanStage::StageState SpoolStage::doWork(WorkingSetID* out) {
 
             auto memUsage = member->recordId.memUsage();
             _specificStats.totalDataSizeBytes += memUsage;
-            _memTracker.update(memUsage);
+            _memTracker.add(memUsage);
 
             _buffer.emplace_back(std::move(member->recordId));
 

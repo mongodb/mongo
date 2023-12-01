@@ -290,7 +290,7 @@ intrusive_ptr<Expression> Expression::parseOperand(ExpressionContext* const expC
                                                    const VariablesParseState& vps) {
     BSONType type = exprElement.type();
 
-    if (type == String && exprElement.valueStringData()[0] == '$') {
+    if (type == String && exprElement.valueStringData().starts_with('$')) {
         /* if we got here, this is a field path expression */
         return ExpressionFieldPath::parse(expCtx, exprElement.str(), vps);
     } else if (type == Object) {
@@ -3342,9 +3342,7 @@ StatusWith<Value> ExpressionMod::apply(Value lhs, Value rhs) {
             return Status(ErrorCodes::Error(16610), str::stream() << "can't $mod by zero");
         };
 
-        if (leftType == NumberDouble || (rightType == NumberDouble && !rhs.integral())) {
-            // Need to do fmod. Integer-valued double case is handled below.
-
+        if (leftType == NumberDouble || rightType == NumberDouble) {
             double left = lhs.coerceToDouble();
             return Value(fmod(left, right));
         }
@@ -6971,11 +6969,26 @@ boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
 }
 
 Value ExpressionConvert::serialize(const SerializationOptions& options) const {
+    // Since the 'to' field is a parameter from a set of valid values and not free user input,
+    // we want to avoid boiling it down to the representative value in the query shape. The first
+    // condition is so that we can keep serializing correctly whenever the 'to' field is an
+    // expression that gets resolved down to a string of a valid type, or its corresponding
+    // numerical value. If it's just the constant, we want to wrap it in a $const except when the
+    // serialization policy is debug.
+    auto constExpr = dynamic_cast<ExpressionConstant*>(_children[_kTo].get());
+    Value toField = Value();
+    if (!constExpr) {
+        toField = _children[_kTo]->serialize(options);
+    } else if (options.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString) {
+        toField = constExpr->getValue();
+    } else {
+        toField = Value(DOC("$const" << constExpr->getValue()));
+    }
     return Value(Document{
         {"$convert",
          Document{
              {"input", _children[_kInput]->serialize(options)},
-             {"to", _children[_kTo]->serialize(options)},
+             {"to", toField},
              {"onError", _children[_kOnError] ? _children[_kOnError]->serialize(options) : Value()},
              {"onNull",
               _children[_kOnNull] ? _children[_kOnNull]->serialize(options) : Value()}}}});
@@ -7104,11 +7117,12 @@ Value ExpressionRegex::nextMatch(RegexExecutionState* regexState) const {
         // No match.
         return Value(BSONNULL);
 
-    StringData beforeMatch(m.input().begin() + m.startPos(), m[0].begin());
+    auto afterStart = m.input().substr(m.startPos());
+    auto beforeMatch = afterStart.substr(0, m[0].data() - afterStart.data());
     regexState->startCodePointPos += str::lengthInUTF8CodePoints(beforeMatch);
 
     // Set the start index for match to the new one.
-    regexState->startBytePos = m[0].begin() - m.input().begin();
+    regexState->startBytePos = m[0].data() - m.input().data();
 
     std::vector<Value> captures;
     captures.reserve(m.captureCount());
@@ -7349,6 +7363,8 @@ Value ExpressionRegexFindAll::evaluate(const Document& root, Variables* variable
             // the character at startByteIndex matches the regex, we cannot return it since we are
             // already returing an empty string starting at this index. So we move on to the next
             // byte index.
+            if (static_cast<size_t>(executionState.startBytePos) >= input.size())
+                continue;  // input already exhausted
             executionState.startBytePos +=
                 str::getCodePointLength(input[executionState.startBytePos]);
             ++executionState.startCodePointPos;

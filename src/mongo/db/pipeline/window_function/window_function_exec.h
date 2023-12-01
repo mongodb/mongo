@@ -40,13 +40,13 @@
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 
@@ -107,7 +107,7 @@ public:
 
     void reset() {
         _function->reset();
-        _values = std::queue<MemoryTokenWith<Value>>();
+        _values = std::queue<MemoryUsageTokenWith<Value>>();
         _memTracker->set(_function->getApproximateSize());
         doReset();
     }
@@ -127,8 +127,8 @@ protected:
     void addValue(Value v) {
         long long prior = _function->getApproximateSize();
         _function->add(v);
-        _values.emplace(MemoryToken{v.getApproximateSize(), _memTracker}, std::move(v));
-        _memTracker->update(_function->getApproximateSize() - prior);
+        _values.emplace(MemoryUsageToken{v.getApproximateSize(), _memTracker}, std::move(v));
+        _memTracker->add(_function->getApproximateSize() - prior);
     }
 
     void removeValue() {
@@ -137,12 +137,12 @@ protected:
         auto& v = _values.front();
         _function->remove(std::move(v.value()));
         _values.pop();
-        _memTracker->update(_function->getApproximateSize() - prior);
+        _memTracker->add(_function->getApproximateSize() - prior);
     }
 
     boost::intrusive_ptr<Expression> _input;
     // Keep track of values in the window function that will need to be removed later.
-    std::queue<MemoryTokenWith<Value>> _values;
+    std::queue<MemoryUsageTokenWith<Value>> _values;
 
 private:
     /**

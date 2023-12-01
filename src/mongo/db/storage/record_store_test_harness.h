@@ -68,7 +68,6 @@ public:
      * Advances the stable timestamp of the engine.
      */
     void advanceStableTimestamp(Timestamp newTimestamp) {
-        auto opCtx = this->client()->getOperationContext();
         auto engine = getEngine();
         // Disable the callback for oldest active transaction as it blocks the timestamps from
         // advancing.
@@ -76,7 +75,7 @@ public:
             StorageEngine::OldestActiveTransactionTimestampCallback{});
         engine->setInitialDataTimestamp(newTimestamp);
         engine->setStableTimestamp(newTimestamp, true);
-        engine->checkpoint(opCtx);
+        engine->checkpoint();
     }
 };
 

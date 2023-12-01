@@ -46,6 +46,8 @@ public:
                                      const Message& request) noexcept final;
 
 private:
+    Future<DbResponse> _replicaSetEndpointHandleRequest(OperationContext* opCtx,
+                                                        const Message& m) noexcept;
     class Hooks;
 };
 

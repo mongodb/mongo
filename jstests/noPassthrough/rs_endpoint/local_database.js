@@ -2,7 +2,7 @@
  * Tests that commands against the "local" database work correctly when the replica set endpoint is
  * used.
  *
- * @tags: [requires_fcv_73, requires_persistence]
+ * @tags: [requires_fcv_73, featureFlagEmbeddedRouter, requires_persistence]
  */
 
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
@@ -73,13 +73,17 @@ function runTests(shard0Primary, shard0Secondary, tearDownFunc, isMultitenant) {
     const shard1PrimaryStartupColl = shard1PrimaryLocalDB.getCollection(startUpLogCollName);
     const shard1PrimaryTestColl = shard1PrimaryLocalDB.getCollection(testCollName);
 
+    // Run the addShard command against shard0's primary mongod instead to verify that
+    // replica set endpoint supports router commands.
+    assert.commandWorked(
+        shard0Primary.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
+
     const shard0URL = getReplicaSetURL(shard0Primary);
-    // TODO (SERVER-81968): Connect to the router port on a shardsvr mongod instead.
+    // TODO (SERVER-83380): Connect to the router port on a shardsvr mongod instead.
     const mongos = MongoRunner.runMongos({configdb: shard0URL});
     const mongosLocalDB = mongos.getDB(localDbName);
     const mongosStartupColl = mongosLocalDB.getCollection(startUpLogCollName);
     const mongosTestColl = mongosLocalDB.getCollection(testCollName);
-    assert.commandWorked(mongos.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains two shards (one config shard and one regular shard)");
@@ -105,6 +109,10 @@ function runTests(shard0Primary, shard0Secondary, tearDownFunc, isMultitenant) {
     assert.neq(shard1PrimaryTestColl.findOne({_id: shard1DocId}), null);
 
     // Remove the second shard from the cluster.
+    // For completion, try running the removeShard command against shard0's primary mongod
+    // to verify that replica set endpoint is not supported while the cluster has multiple shards.
+    assert.commandFailedWithCode(shard0Primary.adminCommand({removeShard: shard1Name}),
+                                 ErrorCodes.CommandNotFound);
     assert.soon(() => {
         const res = assert.commandWorked(mongos.adminCommand({removeShard: shard1Name}));
         return res.state == "completed";
@@ -171,19 +179,21 @@ function runTests(shard0Primary, shard0Secondary, tearDownFunc, isMultitenant) {
     runTests(primary /* shard0Primary */, secondary /* shard0Secondary */, tearDownFunc);
 }
 
-{
-    jsTest.log("Running tests for a single-shard cluster");
-    const st = new ShardingTest({
-        shards: 1,
-        rs: {nodes: 2, setParameter: {featureFlagReplicaSetEndpoint: true}},
-        configShard: true,
-    });
-    const tearDownFunc = () => st.stop();
+// TODO (SERVER-81968): Re-enable single-shard cluster test cases once config shards support
+// embedded routers.
+// {
+//     jsTest.log("Running tests for a single-shard cluster");
+//     const st = new ShardingTest({
+//         shards: 1,
+//         rs: {nodes: 2, setParameter: {featureFlagReplicaSetEndpoint: true}},
+//         configShard: true,
+//     });
+//     const tearDownFunc = () => st.stop();
 
-    runTests(st.rs0.getPrimary() /* shard0Primary */,
-             st.rs0.getSecondary() /* shard0Secondary */,
-             tearDownFunc);
-}
+//     runTests(st.rs0.getPrimary() /* shard0Primary */,
+//              st.rs0.getSecondary() /* shard0Secondary */,
+//              tearDownFunc);
+// }
 
 {
     jsTest.log("Running tests for a serverless replica set bootstrapped as a single-shard cluster");

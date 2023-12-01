@@ -50,9 +50,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -280,7 +280,7 @@ void IndexCatalogEntryImpl::forceSetMultikey(OperationContext* const opCtx,
                                              const CollectionPtr& coll,
                                              bool isMultikey,
                                              const MultikeyPaths& multikeyPaths) const {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(coll->ns(), MODE_X));
 
     // Don't check _indexTracksMultikeyPathsInCatalog because the caller may be intentionally trying
     // to bypass this check. That is, pre-3.4 indexes may be 'stuck' in a state where they are not

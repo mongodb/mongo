@@ -88,6 +88,7 @@ public:
     virtual ~CreateCollectionResponseProvider() {}
 };
 
+// TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
 class CreateCollectionCoordinatorLegacy
     : public RecoverableShardingDDLCoordinator<CreateCollectionCoordinatorDocumentLegacy,
                                                CreateCollectionCoordinatorPhaseLegacyEnum>,
@@ -185,6 +186,8 @@ private:
         return CreateCollectionCoordinatorPhase_serializer(phase);
     }
 
+    bool _mustAlwaysMakeProgress() override;
+
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
@@ -192,26 +195,45 @@ private:
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
 
-    /**
-     * Acquires critical sections on all shards.
-     */
-    void _acquireCriticalSectionsOnParticipants(
-        OperationContext* opCtx,
-        std::shared_ptr<executor::ScopedTaskExecutor> executor,
-        const CancellationToken& token);
+    // Check the command arguments passed and validate that the collection has not been tracked from
+    // another request.
+    void _checkPreconditions();
 
-    /**
-     * Releases critical sections on all shards.
-     */
-    void _releaseCriticalSectionsOnParticipants(
-        OperationContext* opCtx,
-        std::shared_ptr<executor::ScopedTaskExecutor> executor,
-        const CancellationToken& token);
+    // Enter to the critical section on the coordinator for the namespace and its buckets namespace.
+    // Only blocks writes.
+    void _enterWriteCriticalSectionOnCoordinator();
 
-    /**
-     * Functions to encapsulate each phase
-     */
-    void _checkPreconditions(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+    // Translate the request parameters and persist them in the coordinator document.
+    void _translateRequestParameters();
+
+    // Ensure that the collection is created locally and build the shard key index if necessary.
+    void _createCollectionOnCoordinator();
+
+    // Enter to the critical section on all the shards. Blocks writes and reads.
+    void _enterCriticalSection(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                               const CancellationToken& token);
+
+    // Broadcast create collection to the other shards.
+    void _createCollectionOnParticipants(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    // Commits the create collection operation to the sharding catalog within a transaction. After
+    // that, it clears the filtering metadata on the primary shard.
+    void _commitOnShardingCatalog(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    // Exit from the critical section on all the shards, unblocking reads and writes. On the
+    // participant shards, it is set to clear the filtering metadata after exiting the critical
+    // section.
+    void _exitCriticalSection(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                              const CancellationToken& token);
+
+    // Exit critical sections on participant shards.
+    void _exitCriticalSectionsOnParticipants(OperationContext* opCtx,
+                                             bool throwIfReasonDiffers,
+                                             std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                             const CancellationToken& token);
+
+    bool _validateCreateCollectionAlreadyCommitted(OperationContext* opCtx);
 
     mongo::ShardsvrCreateCollectionRequest _request;
 
@@ -220,13 +242,11 @@ private:
     // Set on successful completion of the coordinator
     boost::optional<CreateCollectionResponse> _result;
 
-    // The fields below are only populated if the coordinator enters in the branch where the
-    // collection is not already sharded (i.e., they will not be present on early return)
-
-    boost::optional<UUID> _collectionUUID;
-    std::unique_ptr<InitialSplitPolicy> _splitPolicy;
-    boost::optional<InitialSplitPolicy::ShardCollectionConfig> _initialChunks;
+    // The fields below are only populated for the first execution, they will not be present if it
+    // is not the first run.
+    boost::optional<UUID> _uuid;
     boost::optional<bool> _collectionEmpty;
+    boost::optional<InitialSplitPolicy::ShardCollectionConfig> _initialChunks;
 };
 
 }  // namespace mongo

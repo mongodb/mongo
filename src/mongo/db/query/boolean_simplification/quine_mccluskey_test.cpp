@@ -41,7 +41,7 @@ TEST(FindPrimeImplicantsTest, Test1) {
         Minterm{"11"_b, mask},
     }};
     Maxterm expectedMaxterm{Minterm{"10", "10"}};
-    std::vector<std::vector<unsigned>> expectedCoveredMinterms{{0, 1}};
+    std::vector<CoveredOriginalMinterms> expectedCoveredMinterms{{0, 1}};
 
     auto [actualMaxterm, actualCoveredMinterms] = findPrimeImplicants(maxterm);
     ASSERT_EQ(expectedMaxterm, actualMaxterm);
@@ -56,7 +56,7 @@ TEST(FindPrimeImplicantsTest, Test2) {
         Minterm{"101"_b, mask},
     };
     Maxterm expectedMaxterm{Minterm{"101", "101"}};
-    std::vector<std::vector<unsigned>> expectedCoveredMinterms{{0, 1}};
+    std::vector<CoveredOriginalMinterms> expectedCoveredMinterms{{0, 1}};
 
     auto [actualMaxterm, actualCoveredMinterms] = findPrimeImplicants(maxterm);
     ASSERT_EQ(expectedMaxterm, actualMaxterm);
@@ -77,7 +77,7 @@ TEST(FindPrimeImplicantsTest, Test3) {
         Minterm{"110", "110"},
     };
 
-    std::vector<std::vector<unsigned>> expectedCoveredMinterms{
+    std::vector<CoveredOriginalMinterms> expectedCoveredMinterms{
         {0, 1},
         {0, 2},
     };
@@ -101,7 +101,7 @@ TEST(FindPrimeImplicantsTest, Test4) {
         Minterm{"0000", "1010"},
     };
 
-    std::vector<std::vector<unsigned>> expectedCoveredMinterms{
+    std::vector<CoveredOriginalMinterms> expectedCoveredMinterms{
         {0, 1, 2, 3},
     };
 
@@ -126,7 +126,7 @@ TEST(FindPrimeImplicantsTest, Test5) {
         Minterm{"0000", "1010"},
     };
 
-    std::vector<std::vector<unsigned>> expectedCoveredMinterms{
+    std::vector<CoveredOriginalMinterms> expectedCoveredMinterms{
         {5},
         {3, 4},
         {0, 1, 2, 3},
@@ -158,7 +158,7 @@ TEST(FindPrimeImplicantsTest, Test6) {
         Minterm{"101", "101"},
     };
 
-    std::vector<std::vector<unsigned>> expectedCoveredMinterms{
+    std::vector<CoveredOriginalMinterms> expectedCoveredMinterms{
         {0, 1},
         {0, 2},
         {1, 3},

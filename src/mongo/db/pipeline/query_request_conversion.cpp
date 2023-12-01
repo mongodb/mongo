@@ -129,8 +129,18 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
 
     // The aggregation 'cursor' option is always set, regardless of the presence of batchSize.
     SimpleCursorOptions cursor;
-    if (findCommand.getBatchSize()) {
-        cursor.setBatchSize(findCommand.getBatchSize());
+    if (auto batchSize = findCommand.getBatchSize()) {
+        // If the find command specifies `singleBatch`, 'limit' is required to be 1 (as checked
+        // above). If 'batchSize' is also 1, an open cursor will be returned, contradicting the
+        // 'singleBatch' option. We set 'batchSize' to 2 as a workaround to ensure no cursor is
+        // returned.
+        // TODO SERVER-83077 This workaround will be unnecessary if a full batch of size 1 doesn't
+        // open a cursor.
+        if (findCommand.getSingleBatch() && *batchSize == 1LL) {
+            cursor.setBatchSize(2);
+        } else {
+            cursor.setBatchSize(*batchSize);
+        }
     }
     result.setCursor(std::move(cursor));
 

@@ -36,9 +36,9 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 
@@ -140,7 +140,7 @@ private:
     MemoryUsageTracker::Impl _memTracker;
 
     ExpressionContext* _expCtx;
-    std::deque<MemoryTokenWith<Document>> _memCache;
+    std::deque<MemoryUsageTokenWith<Document>> _memCache;
 
     std::unique_ptr<TemporaryRecordStore> _diskCache = nullptr;
     // The number of documents we've written to disk, as well as the recordID of the last document

@@ -49,9 +49,9 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/historical_catalogid_tracker.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/rebuild_indexes.h"
 #include "mongo/db/repl/oplog.h"
@@ -157,7 +157,7 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
 }  // namespace
 
 PreviousCatalogState closeCatalog(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(opCtx)->isW());
 
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgress();
 
@@ -224,7 +224,7 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
 void openCatalog(OperationContext* opCtx,
                  const PreviousCatalogState& previousCatalogState,
                  Timestamp stableTimestamp) {
-    invariant(opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(opCtx)->isW());
 
     // Load the catalog in the storage engine.
     LOGV2(20273, "openCatalog: loading storage engine catalog");
@@ -307,7 +307,7 @@ void openCatalog(OperationContext* opCtx,
 
 
 void openCatalogAfterStorageChange(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(opCtx)->isW());
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     reopenAllDatabasesAndReloadCollectionCatalog(opCtx, storageEngine, {}, {});
 }

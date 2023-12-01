@@ -1865,8 +1865,8 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
         if (btree->evict_ref == NULL) {
             for (;;) {
                 /* Ensure internal pages indexes remain valid */
-                WT_WITH_PAGE_INDEX(
-                  session, ret = __wt_random_descent(session, &btree->evict_ref, read_flags));
+                WT_WITH_PAGE_INDEX(session,
+                  ret = __wt_random_descent(session, &btree->evict_ref, read_flags, &session->rnd));
                 if (ret != WT_RESTART)
                     break;
                 WT_STAT_CONN_INCR(session, cache_eviction_walk_restart);

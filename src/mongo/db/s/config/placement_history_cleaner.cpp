@@ -61,6 +61,7 @@
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -128,6 +129,13 @@ PlacementHistoryCleaner* PlacementHistoryCleaner::get(OperationContext* opCtx) {
 void PlacementHistoryCleaner::runOnce(Client* client, size_t minPlacementHistoryDocs) {
     auto opCtxHolder = client->makeOperationContext();
     auto opCtx = opCtxHolder.get();
+
+    // TODO: SERVER-82965 remove wait
+    try {
+        ShardingState::get(opCtx)->awaitClusterRoleRecovery().get(opCtx);
+    } catch (const DBException&) {
+        return;
+    }
 
     try {
         // Count the number of entries in the placementHistory collection; skip cleanup if below

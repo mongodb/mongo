@@ -223,25 +223,25 @@ TEST(NamespaceStringUtilTest, SerializeExpectPrefixFalse_CommandReply) {
     ctxt_withTenantId.setPrefixState(false);
 
     {  // No prefix, no tenantId.
-        // request --> { ns: database.coll, expectPrefix: false }
+        // request --> { ns: database.coll }
         auto nss = NamespaceString::createNamespaceString_forTest(boost::none, nsString);
         ASSERT_EQ(NamespaceStringUtil::serialize(nss, ctxt_noTenantId), nsString);
     }
 
     {  // Has prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
-        // request --> { ns: tenantId_database.coll, expectPrefix: false }
+        // request --> { ns: tenantId_database.coll }
         auto nss = NamespaceString::createNamespaceString_forTest(boost::none, nsPrefixString);
         ASSERT_EQ(NamespaceStringUtil::serialize(nss, ctxt_noTenantId), nsPrefixString);
     }
 
     {  // No prefix, has tenantId.
-        // request --> { ns: database.coll, expectPrefix: false }
+        // request --> { ns: database.coll }
         auto nss = NamespaceString::createNamespaceString_forTest(tenantId, nsString);
         ASSERT_EQ(NamespaceStringUtil::serialize(nss, ctxt_withTenantId), nsString);
     }
 
     {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
-        // request --> { ns: tenantId_database.coll, expectPrefix: false }
+        // request --> { ns: tenantId_database.coll }
         auto nss = NamespaceString::createNamespaceString_forTest(tenantId, nsPrefixString);
         ASSERT_EQ(NamespaceStringUtil::serialize(nss, ctxt_withTenantId), nsPrefixString);
     }
@@ -342,14 +342,14 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
     ctxt_withTenantId.setPrefixState(false);
 
     {  // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy in MT mode
-        // request --> { ns: database.coll, expectPrefix: false }
+        // request --> { ns: database.coll }
         ASSERT_THROWS_CODE(NamespaceStringUtil::deserialize(boost::none, nsString, ctxt_noTenantId),
                            AssertionException,
                            8423387);
     }
 
     {  // Has prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
-        // request --> { ns: tenantId_database.coll, expectPrefix: false }
+        // request --> { ns: tenantId_database.coll }
         auto nss = NamespaceStringUtil::deserialize(boost::none, nsPrefixString, ctxt_noTenantId);
         // This is an anomaly, when no tenantId is supplied, we actually ignore expectPrefix, so we
         // can't expect nss.toString == nsPrefixString as we will still attempt to parse the prefix
@@ -359,14 +359,14 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
     }
 
     {  // No prefix, has tenantId.
-        // request --> { ns: database.coll, expectPrefix: false }
+        // request --> { ns: database.coll }
         auto nss = NamespaceStringUtil::deserialize(tenantId, nsString, ctxt_withTenantId);
         ASSERT_EQ(nss.tenantId(), tenantId);
         ASSERT_EQ(nss.toString_forTest(), nsString);
     }
 
     {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
-        // request --> { ns: tenantId_database.coll, expectPrefix: false }
+        // request --> { ns: tenantId_database.coll }
         auto nss = NamespaceStringUtil::deserialize(tenantId, nsPrefixString, ctxt_withTenantId);
         ASSERT_EQ(nss.tenantId(), tenantId);
         ASSERT_EQ(nss.toString_forTest(), nsPrefixString);

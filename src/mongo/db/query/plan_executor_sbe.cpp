@@ -44,11 +44,11 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/plan_executor_sbe.h"
 #include "mongo/db/query/plan_explainer_factory.h"
@@ -81,6 +81,7 @@ extern FailPoint planExecutorHangBeforeShouldWaitForInserts;
 
 PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  std::unique_ptr<CanonicalQuery> cq,
+                                 std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                                  std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
                                  sbe::CandidatePlans candidates,
                                  bool returnOwnedBson,
@@ -99,6 +100,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _solution{std::move(candidates.winner().solution)},
       _stash{std::move(candidates.winner().results)},
       _cq{std::move(cq)},
+      _pipeline{std::move(pipeline)},
       _yieldPolicy(std::move(yieldPolicy)),
       _generatedByBonsai(generatedByBonsai),
       _remoteCursors(std::move(remoteCursors)),
@@ -168,6 +170,14 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   _rootData.debugInfo,
                                                   _remoteExplains.get());
     _cursorType = _rootData.staticData->cursorType;
+
+    if (_remoteCursors) {
+        for (auto& it : *_remoteCursors) {
+            if (auto yieldPolicy = it.second->getYieldPolicy()) {
+                yieldPolicy->registerPlanExecutor(this);
+            }
+        }
+    }
 }
 
 void PlanExecutorSBE::saveState() {
@@ -323,16 +333,8 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
     // Capped insert data; declared outside the loop so we hold a shared pointer to the capped
     // insert notifier the entire time we are in the loop. Holding a shared pointer to the capped
     // insert notifier is necessary for the notifierVersion to advance.
-    //
-    // Note that we need to hold a database intent lock before acquiring a notifier.
-    boost::optional<AutoGetCollectionForReadMaybeLockFree> coll;
     std::unique_ptr<insert_listener::Notifier> notifier;
     if (insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
-        if (!_opCtx->isLockFreeReadsOp() &&
-            !_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS)) {
-            coll.emplace(_opCtx, _nss);
-        }
-
         notifier = insert_listener::getCappedInsertNotifier(_opCtx, _nss, _yieldPolicy.get());
     }
 

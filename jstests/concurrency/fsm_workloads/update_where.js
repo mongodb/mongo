@@ -3,6 +3,10 @@
  *
  * Bulk inserts documents in batches of 100, randomly selects ~1/10th of documents inserted by the
  * thread and updates them. Also queries by the thread that created the documents to verify counts.
+ * @tags: [
+ *  # Uses $where operator
+ *  requires_scripting,
+ * ]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

@@ -44,9 +44,8 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_concern.h"
@@ -56,6 +55,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
@@ -68,12 +68,16 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/rpc/check_allowed_op_query_cmd.h"
+#include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
@@ -195,7 +199,7 @@ public:
         // transactions will do a noop write at commit time, which should have incremented the
         // lastOp. And speculative majority semantics dictate that "abortTransaction" should not
         // wait for write concern on operations the transaction observed.
-        if (opCtx->lockState()->wasGlobalLockTakenForWrite() &&
+        if (shard_role_details::getLocker(opCtx)->wasGlobalLockTakenForWrite() &&
             !opCtx->inMultiDocumentTransaction()) {
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
             lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -220,8 +224,8 @@ public:
     }
 
     void waitForLinearizableReadConcern(OperationContext* opCtx) const override {
-        // When a linearizable read command is passed in, check to make sure we're reading
-        // from the primary.
+        // When a linearizable read command is passed in, check to make sure we're reading from the
+        // primary.
         if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
             repl::ReadConcernLevel::kLinearizableReadConcern) {
             uassertStatusOK(mongo::waitForLinearizableReadConcern(opCtx, Milliseconds::zero()));
@@ -286,8 +290,9 @@ public:
     void resetLockerState(OperationContext* opCtx) const noexcept override {
         // It is necessary to lock the client to change the Locker on the OperationContext.
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        invariant(!opCtx->lockState()->isLocked());
-        opCtx->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()), lk);
+        invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+        shard_role_details::swapLocker(
+            opCtx, std::make_unique<LockerImpl>(opCtx->getServiceContext()), lk);
     }
 
     std::unique_ptr<PolymorphicScoped> scopedOperationCompletionShardingActions(
@@ -296,8 +301,47 @@ public:
     }
 };
 
+Future<DbResponse> ServiceEntryPointMongod::_replicaSetEndpointHandleRequest(
+    OperationContext* opCtx, const Message& m) noexcept try {
+    // TODO (SERVER-81551): Move the OpMsgRequest parsing above ServiceEntryPoint::handleRequest().
+    auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(m, opCtx->getClient());
+    if (m.operation() == dbQuery) {
+        checkAllowedOpQueryCommand(*opCtx->getClient(), opMsgReq.getCommandName());
+    }
+
+    auto shouldRoute = replica_set_endpoint::shouldRouteRequest(opCtx, opMsgReq);
+    LOGV2(8196801,
+          "Using replica set endpoint",
+          "opId"_attr = opCtx->getOpID(),
+          "cmdName"_attr = opMsgReq.getCommandName(),
+          "dbName"_attr = opMsgReq.getDatabaseNoThrow(),
+          "cmdObj"_attr = opMsgReq.body,
+          "shouldRoute"_attr = shouldRoute);
+    if (shouldRoute) {
+        replica_set_endpoint::ScopedSetRouterService service(opCtx);
+        return ServiceEntryPointMongos::handleRequestImpl(opCtx, m);
+    }
+    return ServiceEntryPointCommon::handleRequest(opCtx, m, std::make_unique<Hooks>());
+} catch (const DBException& ex) {
+    // Try to generate a response based on the status. If encounter another error (e.g.
+    // UnsupportedFormat) while trying to generate the response, just return the status.
+    try {
+        auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(m));
+        replyBuilder->setCommandReply(ex.toStatus(), {});
+        DbResponse dbResponse;
+        dbResponse.response = replyBuilder->done();
+        return dbResponse;
+    } catch (...) {
+    }
+    return ex.toStatus();
+}
+
 Future<DbResponse> ServiceEntryPointMongod::handleRequest(OperationContext* opCtx,
                                                           const Message& m) noexcept {
+    // TODO (SERVER-77921): Support for different ServiceEntryPoints based on role.
+    if (replica_set_endpoint::isReplicaSetEndpointClient(opCtx->getClient())) {
+        return _replicaSetEndpointHandleRequest(opCtx, m);
+    }
     return ServiceEntryPointCommon::handleRequest(opCtx, m, std::make_unique<Hooks>());
 }
 

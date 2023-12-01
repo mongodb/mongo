@@ -20,7 +20,8 @@ selector:
   - jstests/sharding/query/mongos_query_comment.js
   - jstests/sharding/query/pipeline_length_limit.js
   - jstests/sharding/query/pipeline_pass_through_from_mongos.js
-  - jstests/sharding/query/view_on_shard_rewrite.js
+  # TODO SERVER-75496: Uncomment once ticket is complete.
+  # - jstests/sharding/query/view_on_shard_rewrite.js
   - jstests/sharding/resharding_prohibited_commands.js
   - jstests/sharding/resharding_replicate_updates_as_insert_delete.js
   - jstests/sharding/retryable_write_error_labels.js

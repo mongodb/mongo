@@ -47,7 +47,7 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/query/query_stats/util.h"
+#include "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -72,6 +72,13 @@ CounterMetric queryStatsEvictedMetric("queryStats.numEvicted");
 CounterMetric queryStatsRateLimitedRequestsMetric("queryStats.numRateLimitedRequests");
 CounterMetric queryStatsStoreWriteErrorsMetric("queryStats.numQueryStatsStoreWriteErrors");
 
+/**
+ * Indicates whether or not query stats is enabled via the feature flag.
+ */
+bool isQueryStatsFeatureEnabled() {
+    return feature_flags::gFeatureFlagQueryStats.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
 
 /**
  * Cap the queryStats store size.
@@ -100,9 +107,18 @@ size_t getQueryStatsStoreSize() {
     return capQueryStatsStoreSize(requestedSize);
 }
 
-class TelemetryOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
+void assertConfigurationAllowed() {
+    uassert(7373500,
+            "Cannot configure queryStats store. The feature flag is not enabled. Please restart "
+            "and specify the feature flag, or upgrade the feature compatibility version to one "
+            "where it is enabled by default.",
+            isQueryStatsFeatureEnabled());
+}
+
+class QueryStatsOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
+        assertConfigurationAllowed();
         auto requestedSize = memory_util::convertToSizeInBytes(memSize);
         auto cappedSize = capQueryStatsStoreSize(requestedSize);
         auto& queryStatsStoreManager = queryStatsStoreDecoration(serviceCtx);
@@ -111,28 +127,24 @@ public:
     }
 
     void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) {
+        assertConfigurationAllowed();
         queryStatsRateLimiter(serviceCtx).get()->setSamplingRate(samplingRate);
     }
 };
 
 ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
     "QueryStatsStoreManagerRegisterer", [](ServiceContext* serviceCtx) {
-        // It is possible that this is called before FCV is properly set up. Setting up the store if
-        // the flag is enabled but FCV is incorrect is safe, and guards against the FCV being
-        // changed to a supported version later.
-        if (!feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
-            !feature_flags::gFeatureFlagQueryStatsFindCommand
-                 .isEnabledAndIgnoreFCVUnsafeAtStartup()) {
-            // featureFlags are not allowed to be changed at runtime. Therefore it's not an issue
-            // to not create a queryStats store in ConstructorActionRegisterer at start up with the
-            // flag off - because the flag can not be turned on at any point afterwards.
-            query_stats_util::queryStatsStoreOnParamChangeUpdater(serviceCtx) =
-                std::make_unique<query_stats_util::NoChangesAllowedTelemetryParamUpdater>();
-            return;
-        }
+        // Note: it is possible that this is called before FCV is properly set up. The feature flags
+        // can only be specified at startup, but the feature compatibility version may change at
+        // runtime. If the feature compatibility version upgrades at runtime, the feature may now be
+        // enabled by default, even if the flag was not specified. To allow for this possibility, we
+        // will always configure a query stats store of the size currently specified by
+        // 'internalQueryStatsCacheSize', but we will prevent changing its shape or rate limit at
+        // runtime unless the feature flag is enabled (at whatever current FCV when the
+        // configuration setParameter command is run).
 
         query_stats_util::queryStatsStoreOnParamChangeUpdater(serviceCtx) =
-            std::make_unique<TelemetryOnParamChangeUpdaterImpl>();
+            std::make_unique<QueryStatsOnParamChangeUpdaterImpl>();
         size_t size = getQueryStatsStoreSize();
         auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(serviceCtx);
         // Initially the queryStats store used the same number of partitions as the plan cache, that
@@ -163,15 +175,12 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
 /**
  * Top-level checks for whether queryStats collection is enabled. If this returns false, we must go
  * no further.
- * TODO SERVER-79494 Remove requiresFullQueryStatsFeatureFlag parameter.
  */
-bool isQueryStatsEnabled(const ServiceContext* serviceCtx, bool requiresFullQueryStatsFeatureFlag) {
+bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
     // During initialization, FCV may not yet be setup but queries could be run. We can't
     // check whether queryStats should be enabled without FCV, so default to not recording
     // those queries.
-    // TODO SERVER-75935 Remove FCV Check.
-    return isQueryStatsFeatureEnabled(requiresFullQueryStatsFeatureFlag) &&
-        queryStatsStoreDecoration(serviceCtx)->getMaxSize() > 0;
+    return isQueryStatsFeatureEnabled() && queryStatsStoreDecoration(serviceCtx)->getMaxSize() > 0;
 }
 
 /**
@@ -209,27 +218,10 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
 
 }  // namespace
 
-/**
- * Indicates whether or not query stats is enabled via the feature flags. If
- * requiresFullQueryStatsFeatureFlag is true, it will only return true if featureFlagQueryStats is
- * enabled. Otherwise, it will return true if either featureFlagQueryStats or
- * featureFlagQueryStatsFindCommand is enabled.
- *
- * TODO SERVER-79494 Remove this function and collapse feature flag check into isQueryStatsEnabled.
- */
-bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag) {
-    return feature_flags::gFeatureFlagQueryStats.isEnabled(
-               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-        (!requiresFullQueryStatsFeatureFlag &&
-         feature_flags::gFeatureFlagQueryStatsFindCommand.isEnabled(
-             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-}
-
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<Key>(void)> makeKey,
-                     bool requiresFullQueryStatsFeatureFlag) {
-    if (!isQueryStatsEnabled(opCtx->getServiceContext(), requiresFullQueryStatsFeatureFlag)) {
+                     std::function<std::unique_ptr<Key>(void)> makeKey) {
+    if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         return;
     }
 
@@ -238,10 +230,20 @@ void registerRequest(OperationContext* opCtx,
         return;
     }
 
-    if (!shouldCollect(opCtx->getServiceContext())) {
+    auto& opDebug = CurOp::get(opCtx)->debug();
+
+    if (opDebug.queryStatsRateLimited) {
+        LOGV2_DEBUG(
+            8288900,
+            4,
+            "Query stats request was previously rate limited. We expect this is a query on a view");
         return;
     }
-    auto& opDebug = CurOp::get(opCtx)->debug();
+
+    if (!shouldCollect(opCtx->getServiceContext())) {
+        opDebug.queryStatsRateLimited = true;
+        return;
+    }
 
     if (opDebug.queryStatsKey) {
         // A find() request may have already registered the shapifier. Ie, it's a find command over
@@ -278,8 +280,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
     uassert(6579000,
             "Query stats is not enabled without the feature flag on and a cache size greater than "
             "0 bytes",
-            isQueryStatsEnabled(opCtx->getServiceContext(),
-                                /*requiresFullQueryStatsFeatureFlag*/ false));
+            isQueryStatsEnabled(opCtx->getServiceContext()));
     return queryStatsStoreDecoration(opCtx->getServiceContext())->getQueryStatsStore();
 }
 
@@ -306,7 +307,7 @@ void writeQueryStats(OperationContext* opCtx,
 
     // Otherwise we didn't find an existing entry. Try to create one.
     tassert(7315200,
-            "key cannot be null when writing a new entry to the telemetry store",
+            "key cannot be null when writing a new entry to the queryStats store",
             key != nullptr);
     size_t numEvicted =
         queryStatsStore.put(*queryStatsKeyHash, QueryStatsEntry(std::move(key)), partitionLock);

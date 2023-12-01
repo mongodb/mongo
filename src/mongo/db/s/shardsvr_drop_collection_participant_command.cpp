@@ -47,12 +47,12 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/str.h"
@@ -91,7 +91,7 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
@@ -105,8 +105,10 @@ public:
             // Checkpoint the vector clock to ensure causality in the event of a crash or shutdown.
             VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
-            bool fromMigrate = request().getFromMigrate().value_or(false);
-            DropCollectionCoordinator::dropCollectionLocally(opCtx, ns(), fromMigrate);
+            const bool fromMigrate = request().getFromMigrate().value_or(false);
+            const bool dropSystemCollections = request().getDropSystemCollections().value_or(false);
+            DropCollectionCoordinator::dropCollectionLocally(
+                opCtx, ns(), fromMigrate, dropSystemCollections);
 
             // Since no write that generated a retryable write oplog entry with this sessionId and
             // txnNumber happened, we need to make a dummy write so that the session gets durably

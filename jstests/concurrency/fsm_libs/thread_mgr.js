@@ -99,6 +99,7 @@ export const ThreadManager = function(clusterOptions) {
             for (var i = 0; i < config.threadCount; ++i) {
                 var args = {
                     tid: tid++,
+                    tenantId: options.tenantId,
                     data: workloadData,
                     host: cluster.getHost(),
                     secondaryHost: cluster.getSecondaryHost(),

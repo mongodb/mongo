@@ -68,7 +68,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
@@ -76,6 +75,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -99,7 +99,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/find_key_generator.h"
@@ -111,7 +111,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -132,6 +131,7 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
@@ -193,47 +193,16 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
     curOp->setNS_inlock(nss);
 }
 
-/**
- * Performs the lookup for the QuerySettings given the 'parsedRequest'.
- */
+// TODO: SERVER-73632 Remove Feature Flag for PM-635.
+// Remove query settings lookup as it is only done on mongos.
 query_settings::QuerySettings lookupQuerySettingsForFind(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const ParsedFindCommand& parsedRequest,
-    const CollectionPtr& collection,
     const NamespaceString& nss) {
     auto opCtx = expCtx->opCtx;
-
-    // TODO: SERVER-73632 Remove Feature Flag for PM-635.
-    // Remove query settings lookup as it is only done on mongos.
-    if (ShardingState::get(opCtx)->enabled()) {
-        return parsedRequest.findCommandRequest->getQuerySettings().get_value_or({});
-    }
-
-    // No QuerySettings lookup for IDHACK queries.
-    if (!feature_flags::gFeatureFlagQuerySettings.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-        (collection &&
-         isIdHackEligibleQuery(
-             collection, *parsedRequest.findCommandRequest, parsedRequest.collator.get()))) {
-        return query_settings::QuerySettings();
-    }
-
-    auto& manager = query_settings::QuerySettingsManager::get(opCtx);
-    auto queryShapeHashFn = [&]() {
-        auto& opDebug = CurOp::get(opCtx)->debug();
-        if (opDebug.queryStatsKey) {
-            return opDebug.queryStatsKey->getQueryShapeHash(
-                opCtx, parsedRequest.findCommandRequest->getSerializationContext());
-        }
-
-        return std::make_unique<query_shape::FindCmdShape>(parsedRequest, expCtx)
-            ->sha256Hash(opCtx, parsedRequest.findCommandRequest->getSerializationContext());
-    };
-
-    // Return the found query settings or an empty one.
-    return manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
-        .get_value_or({})
-        .first;
+    return ShardingState::get(opCtx)->enabled()
+        ? parsedRequest.findCommandRequest->getQuerySettings().get_value_or({})
+        : query_settings::lookupForFind(expCtx, parsedRequest, nss);
 }
 
 /**
@@ -266,17 +235,13 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     // It is important to do this before canonicalizing and optimizing the query, each of which
     // would alter the query shape.
     if (!(collection && collection.get()->getCollectionOptions().encryptedFieldConfig)) {
-        query_stats::registerRequest(
-            opCtx,
-            nss,
-            [&]() {
-                return std::make_unique<query_stats::FindKey>(
-                    expCtx, *parsedRequest, collOrViewAcquisition.getCollectionType());
-            },
-            /*requiresFullQueryStatsFeatureFlag*/ false);
+        query_stats::registerRequest(opCtx, nss, [&]() {
+            return std::make_unique<query_stats::FindKey>(
+                expCtx, *parsedRequest, collOrViewAcquisition.getCollectionType());
+        });
     }
 
-    expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedRequest, collection, nss));
+    expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedRequest, nss));
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = std::move(expCtx),
         .parsedFind = std::move(parsedRequest),
@@ -438,7 +403,8 @@ public:
             // cursors to be closed under the global MODE_X lock, after having sent interrupt
             // signals to read operations. This operation must never hold open storage cursors while
             // ignoring interrupt.
-            InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
+            InterruptibleLockGuard interruptibleLockAcquisition(
+                shard_role_details::getLocker(opCtx));
 
             // Parse the command BSON to a FindCommandRequest.
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, nss, _request);
@@ -460,9 +426,7 @@ public:
                  .extensionsCallback = ExtensionsCallbackReal(opCtx, &nss),
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
-            auto querySettings =
-                lookupQuerySettingsForFind(expCtx, *parsedRequest, collectionPtr, nss);
-            expCtx->setQuerySettings(std::move(querySettings));
+            expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedRequest, nss));
             auto cq = std::make_unique<CanonicalQuery>(
                 CanonicalQueryParams{.expCtx = std::move(expCtx),
                                      .parsedFind = std::move(parsedRequest),
@@ -580,7 +544,8 @@ public:
                 // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
                 // depend on data reaching secondaries in order to proceed; and secondaries may get
                 // stalled replicating because of an inability to acquire a read ticket.
-                opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+                shard_role_details::getLocker(opCtx)->setAdmissionPriority(
+                    AdmissionContext::Priority::kImmediate);
             }
 
             // If this read represents a reverse oplog scan, we want to bypass oplog visibility
@@ -674,7 +639,8 @@ public:
             // cursors to be closed under the global MODE_X lock, after having sent interrupt
             // signals to read operations. This operation must never hold open storage cursors while
             // ignoring interrupt.
-            InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
+            InterruptibleLockGuard interruptibleLockAcquisition(
+                shard_role_details::getLocker(opCtx));
 
             const auto& collectionPtr = collectionOrView->getCollectionPtr();
 

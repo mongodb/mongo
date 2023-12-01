@@ -317,5 +317,21 @@ void BM_ARRAY_BSON(benchmark::State& state) {
 
 BENCHMARK(BM_ARRAY_BSON)->Arg(10)->Arg(1000)->Arg(10000)->Unit(benchmark::kNanosecond);
 
+void BM_CHECK_AND_ASSERT_TYPES(benchmark::State& state) {
+    // Perform setup here.
+    // We construct a WriteCommandRequestBase with just the "bypassDocumentValidation"
+    // field set, which is of type safeBool, to run the generated checkAndAssertTypes()
+    // function.
+    auto request = BSON("bypassDocumentValidation" << 1);
+
+    for (auto _ : state) {
+        // This code gets timed
+        benchmark::DoNotOptimize(
+            write_ops::WriteCommandRequestBase::parse(IDLParserContext("test"), request));
+    }
+}
+
+BENCHMARK(BM_CHECK_AND_ASSERT_TYPES);
+
 }  // namespace
 }  // namespace mongo

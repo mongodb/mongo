@@ -26,20 +26,26 @@
 		},
 		"files.insertFinalNewline": true,
 		"js/ts.implicitProjectConfig.target": "ES2020",
+		"pylint.path": [
+			"${interpreter}",
+			"-m",
+			"pylint"
+		],
 		"python.autoComplete.extraPaths": [
 			"/opt/mongodbtoolchain/v4/share/gcc-11.3.0/python",
 			"src/third_party/scons-3.1.2/scons-local-3.1.2"
 		],
 		"python.defaultInterpreterPath": "python3-venv/bin/python",
-		"python.formatting.yapfPath": "python3-venv/bin/yapf",
-		"python.formatting.provider": "yapf",
-		"python.linting.pylintEnabled": true,
 		"python.analysis.extraPaths": [
 			"/opt/mongodbtoolchain/v4/share/gcc-11.3.0/python",
 			"src/third_party/scons-3.1.2/scons-local-3.1.2"
 		],
-		"python.linting.mypyEnabled": true,
-		"python.linting.mypyPath": "python3-venv/bin/mypy",
+		"mypy-type-checker.path": [
+			"${interpreter}",
+			"-m",
+			"mypy"
+		],
+		"mypy-type-checker.importStrategy": "fromEnvironment",
 		"[c]": {
 			"editor.defaultFormatter": "xaver.clang-format",
 			"editor.formatOnSave": true,
@@ -53,8 +59,9 @@
 			"editor.formatOnSave": true,
 		},
 		"[python]": {
-			"editor.defaultFormatter": "ms-python.python",
+			"editor.formatOnSaveMode": "file",
 			"editor.formatOnSave": true,
+			"editor.defaultFormatter": "eeyore.yapf"
 		},
 	},
 	"extensions": {
@@ -63,7 +70,10 @@
 			"dbaeumer.vscode-eslint",
 			"ms-python.python",
 			"xaver.clang-format",
-			"cs128.cs128-clang-tidy"
+			"cs128.cs128-clang-tidy",
+			"eeyore.yapf",
+			"ms-python.pylint",
+			"ms-python.mypy-type-checker"
 		]
 	}
 }

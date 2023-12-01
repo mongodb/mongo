@@ -88,6 +88,9 @@ public:
     Status start() override;
     void shutdown() override;
     bool inShutdown() const;
+    void stopAcceptingSessions() override {
+        MONGO_UNIMPLEMENTED;
+    }
 
     StringData getNameForLogging() const override {
         return "mock"_sd;

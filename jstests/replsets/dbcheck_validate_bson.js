@@ -54,11 +54,24 @@ const invalidHashQuery = {
     msg: "dbCheck batch inconsistent",
     "data.md5": {$exists: true}
 };
+const warningQuery = {
+    operation: "dbCheckBatch",
+    severity: "warning"
+};
+const BSONWarningQuery = {
+    operation: "dbCheckBatch",
+    severity: "warning",
+    msg: "Document is not well-formed BSON"
+};
 const successfulBatchQuery = {
     operation: "dbCheckBatch",
     severity: "info",
     msg: "dbCheck batch consistent",
     "data.count": maxDocsPerBatch
+};
+const errAndWarningQuery = {
+    operation: "dbCheckBatch",
+    $or: [{severity: "error"}, {severity: "warning"}]
 };
 
 const doc1 = {
@@ -94,8 +107,11 @@ function testKDefaultBSONValidation() {
     });
 
     // Both primary and secondary should have error in health log for invalid BSON.
-    runDbCheck(
-        replSet, primaryDb, collName, {validateMode: "dataConsistencyAndMissingIndexKeysCheck"});
+    runDbCheck(replSet,
+               primaryDb,
+               collName,
+               {validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
+               true /* awaitCompletion */);
 
     // Primary and secondary have the same invalid BSON document so there is an error for invalid
     // BSON but not data inconsistency. We check that the only errors in the health log are for
@@ -111,20 +127,62 @@ function testPrimaryInvalidBson() {
 
     clearHealthLog(replSet);
 
+    primaryDb[collName].drop();
+    assert.commandWorked(primaryDb.createCollection(collName));
+    replSet.awaitReplication();
+
     // Insert an invalid document on the primary.
     insertCorruptDocument(primaryDb, collName);
 
     // Insert a normal document on the secondary.
     assert.commandWorked(secondaryDb.runCommand({godinsert: collName, obj: doc1}));
 
-    runDbCheck(replSet, primaryDb, collName, {
-        maxDocsPerBatch: maxDocsPerBatch,
-        validateMode: "dataConsistencyAndMissingIndexKeysCheck"
-    });
+    runDbCheck(
+        replSet,
+        primaryDb,
+        collName,
+        {maxDocsPerBatch: maxDocsPerBatch, validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
+        true /* awaitCompletion */);
 
-    // Verify primary logs an error for invalid BSON and data inconsistency.
+    // Verify primary logs an error for invalid BSON while the secondary logs an error for data
+    // inconsistency.
+    checkHealthLog(primary.getDB("local").system.healthlog, invalidBSONQuery, 1);
+    checkHealthLog(secondary.getDB("local").system.healthlog, invalidHashQuery, 1);
+
+    // Verify that the primary and secondary do not have other error/warning logs.
+    checkHealthLog(primary.getDB("local").system.healthlog, errAndWarningQuery, 1);
+    checkHealthLog(secondary.getDB("local").system.healthlog, errAndWarningQuery, 1);
+}
+
+function testSecondaryInvalidBson() {
+    jsTestLog("Testing when the secondary has invalid BSON but the primary does not.");
+
+    clearHealthLog(replSet);
+
+    primaryDb[collName].drop();
+    assert.commandWorked(primaryDb.createCollection(collName));
+    replSet.awaitReplication();
+
+    // Insert a normal document on the primary.
+    assert.commandWorked(primaryDb.runCommand({godinsert: collName, obj: doc1}));
+
+    // Insert an invalid document on the secondary.
+    insertCorruptDocument(secondaryDb, collName);
+
+    runDbCheck(
+        replSet,
+        primaryDb,
+        collName,
+        {maxDocsPerBatch: maxDocsPerBatch, validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
+        true /* awaitCompletion */);
+
+    // Verify secondary logs an error for invalid BSON and data inconsistency.
     checkHealthLog(secondary.getDB("local").system.healthlog, invalidBSONQuery, 1);
     checkHealthLog(secondary.getDB("local").system.healthlog, invalidHashQuery, 1);
+
+    // Verify that the primary and secondary do not have other error/warning logs.
+    checkHealthLog(primary.getDB("local").system.healthlog, errAndWarningQuery, 0);
+    checkHealthLog(secondary.getDB("local").system.healthlog, errAndWarningQuery, 2);
 }
 
 function testMultipleBatches() {
@@ -137,10 +195,12 @@ function testMultipleBatches() {
     assert.commandWorked(primaryDb.runCommand({godinsert: collName, obj: {_id: 0, a: nDocs}}));
     insertCorruptDocument(secondaryDb, collName);
 
-    runDbCheck(replSet, primaryDb, collName, {
-        maxDocsPerBatch: maxDocsPerBatch,
-        validateMode: "dataConsistencyAndMissingIndexKeysCheck"
-    });
+    runDbCheck(
+        replSet,
+        primaryDb,
+        collName,
+        {maxDocsPerBatch: maxDocsPerBatch, validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
+        true /* awaitCompletion */);
 
     // Secondary logs an error for invalid BSON and data inconsistency.
     checkHealthLog(secondary.getDB("local").system.healthlog, invalidBSONQuery, 1);
@@ -159,7 +219,46 @@ function testMultipleBatches() {
     checkHealthLog(secondary.getDB("local").system.healthlog, {operation: "dbCheckStop"}, 1);
 }
 
+function testInvalidUuid() {
+    jsTestLog(
+        "Testing that a BSON document that is structurally valid but invalid in other ways (such as by having UUID that have incorrect lengths) is included in hashing but logs a warning");
+    clearHealthLog(replSet);
+
+    primaryDb[collName].drop();
+    assert.commandWorked(primaryDb.createCollection(collName));
+    replSet.awaitReplication();
+
+    // Insert 2 documents with invalid UUID (length is 4 or 20 instead of 16).
+    assert.commandWorked(primaryDb[collName].insert({u: HexData(4, "deadbeef")}));
+    assert.commandWorked(
+        primaryDb[collName].insert({u: HexData(20, "deadbeefdeadbeefdeadbeefdeadbeef")}));
+    replSet.awaitReplication();
+
+    runDbCheck(replSet,
+               primaryDb,
+               collName,
+               {
+                   maxDocsPerBatch: maxDocsPerBatch,
+                   validateMode: "dataConsistencyAndMissingIndexKeysCheck",
+                   bsonValidateMode: "kExtended"
+               },
+               true /* awaitCompletion */);
+
+    // Verify both primary and secondary log a warning for invalid BSON (k).
+    checkHealthLog(primary.getDB("local").system.healthlog, BSONWarningQuery, 2);
+    checkHealthLog(secondary.getDB("local").system.healthlog, BSONWarningQuery, 2);
+
+    // Verify that the primary and secondary do not have other error/warning logs.
+    checkHealthLog(primary.getDB("local").system.healthlog, successfulBatchQuery, 1);
+    checkHealthLog(secondary.getDB("local").system.healthlog, successfulBatchQuery, 1);
+    checkHealthLog(primary.getDB("local").system.healthlog, errAndWarningQuery, 2);
+    checkHealthLog(secondary.getDB("local").system.healthlog, errAndWarningQuery, 2);
+}
+
 testKDefaultBSONValidation();
+testPrimaryInvalidBson();
+testSecondaryInvalidBson();
 testMultipleBatches();
+testInvalidUuid();
 
 replSet.stopSet();

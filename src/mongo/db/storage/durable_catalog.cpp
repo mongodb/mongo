@@ -47,11 +47,11 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_format.h"
@@ -295,7 +295,7 @@ DurableCatalog::EntryIdentifier DurableCatalog::getEntry(const RecordId& catalog
 
 StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_addEntry(
     OperationContext* opCtx, NamespaceString nss, const CollectionOptions& options) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     auto ident = generateUniqueIdent(nss, "collection");
 
@@ -341,7 +341,7 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_addEntry(
 StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_importEntry(OperationContext* opCtx,
                                                                          NamespaceString nss,
                                                                          const BSONObj& metadata) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     auto ident = metadata["ident"].String();
     StatusWith<RecordId> res =
@@ -566,7 +566,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalog::cr
     const NamespaceString& nss,
     const CollectionOptions& options,
     bool allocateDefaultSpace) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
     invariant(nss.coll().size() > 0);
 
     StatusWith<EntryIdentifier> swEntry = _addEntry(opCtx, nss, options);
@@ -628,7 +628,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
     const BSONObj& metadata,
     const BSONObj& storageMetadata,
     const ImportOptions& importOptions) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X));
     invariant(nss.coll().size() > 0);
 
     BSONCollectionCatalogEntry::MetaData md;
@@ -760,7 +760,7 @@ Status DurableCatalog::dropCollection(OperationContext* opCtx, const RecordId& c
         entry = _catalogIdToEntryMap[catalogId];
     }
 
-    invariant(opCtx->lockState()->isCollectionLockedForMode(entry.nss, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(entry.nss, MODE_X));
     invariant(getParsedCatalogEntry(opCtx, catalogId)->metadata->getTotalIndexCount() == 0);
 
     // Remove metadata from mdb_catalog

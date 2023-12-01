@@ -60,7 +60,7 @@ namespace mongo {
  * Lock/unlock methods must always be called from a single thread.
  *
  */
-// TODO (SERVER-26879): Get rid of LockerImpl, devirtualise Locker and make it final
+// TODO (SERVER-77213): Get rid of LockerImpl, devirtualise Locker and make it final
 class Locker {
     Locker(const Locker&) = delete;
     Locker& operator=(const Locker&) = delete;

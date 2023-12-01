@@ -37,6 +37,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -65,37 +66,47 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
 
 boost::intrusive_ptr<DocumentSourceQueue> DocumentSourceQueue::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<StringData> aliasStageName) {
-    return new DocumentSourceQueue({}, expCtx, aliasStageName);
+    boost::optional<StringData> stageNameOverride) {
+    return new DocumentSourceQueue(std::deque<GetNextResult>{}, expCtx, stageNameOverride);
 }
 
-DocumentSourceQueue::DocumentSourceQueue(std::deque<GetNextResult> results,
+DocumentSourceQueue::DocumentSourceQueue(DocumentSourceQueue::DeferredQueue results,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         boost::optional<StringData> aliasStageName)
+                                         boost::optional<StringData> stageNameOverride,
+                                         boost::optional<Value> serializeOverride,
+                                         boost::optional<StageConstraints> constraintsOverride)
     : DocumentSource(kStageName /* pass the real stage name here for execution stats */, expCtx),
       _queue(std::move(results)),
-      _aliasStageName(std::move(aliasStageName)) {}
+      _stageNameOverride(std::move(stageNameOverride)),
+      _serializeOverride(std::move(serializeOverride)),
+      _constraintsOverride(std::move(constraintsOverride)) {}
 
 const char* DocumentSourceQueue::getSourceName() const {
-    return _aliasStageName.value_or(kStageName).rawData();
+    return _stageNameOverride.value_or(kStageName).rawData();
 }
 
 DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
-    if (_queue.empty()) {
+    if (_queue->empty()) {
         return GetNextResult::makeEOF();
     }
 
-    auto next = std::move(_queue.front());
-    _queue.pop_front();
+    auto next = std::move(_queue->front());
+    _queue->pop_front();
     return next;
 }
 
 Value DocumentSourceQueue::serialize(const SerializationOptions& opts) const {
+    // Early exit with the pre-defined serialization override if it exists.
+    if (_serializeOverride.has_value()) {
+        return *_serializeOverride;
+    }
+
+    // Initialize the deferred queue if needed, and serialize its documents as one literal in the
+    // context of redaction.
     ValueArrayStream vals;
-    for (const auto& elem : _queue) {
+    for (const auto& elem : (*_queue.get())) {
         vals << elem.getDocument().getOwned();
     }
-    // We treat the queue's documents as one literal in the context of redaction.
     return Value(DOC(kStageName << opts.serializeLiteral(vals.done())));
 }
 

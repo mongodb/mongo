@@ -13,7 +13,8 @@ function assertConnectFailsWithErrorCode(uri, errorCode) {
 // (true for success). This is used over assertConnectFailsWithErrorCode when CLI-only arguments
 // need to be specified.
 function testShellConnect(ok, ...args) {
-    const exitCode = runMongoProgram('mongo', '--eval', ';', ...args);
+    const cmd = 'assert.commandWorked(db.runCommand({hello: 1}));'
+    const exitCode = runMongoProgram('mongo', '--eval', cmd, ...args);
     if (ok) {
         assert.eq(exitCode, 0, "failed to connect with `" + args.join(' ') + "`");
     } else {
@@ -34,47 +35,26 @@ if (!FeatureFlagUtil.isPresentAndEnabled(mongod.getDB("admin"), "GRPC")) {
     quit();
 }
 
-const host = `localhost:${mongod.port}`;
+const host = `localhost:${mongod.fullOptions.grpcPort}`;
 
-// TODO SERVER-80768 Uncomment tests once gRPC ingress path is set up on mongod.
-// testShellConnect(true, `mongodb://${host}`, "--gRPC", "--tls", "--tlsCAFile", tlsCAFile);
-// testShellConnect(true, `mongodb://${host}/?gRPC=true`, "--tls", "--tlsCAFile", tlsCAFile);
-testShellConnect(false,
-                 `mongodb://${host}`,
-                 "--gRPC",
-                 "--tls",
-                 "--tlsCAFile",
-                 tlsCAFile,
-                 "--tlsCertificateKeyFile",
-                 "jstests/libs/client.pem",
-                 "--tlsCertificateKeyFilePassword",
-                 "qwerty");
-testShellConnect(false,
-                 `mongodb://${host}/?gRPC=true`,
-                 "--tls",
-                 "--tlsCAFile",
-                 tlsCAFile,
-                 "--tlsCertificateKeyFile",
-                 "jstests/libs/client.pem",
-                 "--tlsCertificateKeyFilePassword",
-                 "qwerty");
-testShellConnect(false,
-                 `mongodb://${host}`,
-                 "--gRPC",
-                 "--tls",
-                 "--tlsCAFile",
-                 tlsCAFile,
-                 "--tlsCRLFile",
-                 "jstests/libs/crl.pem");
-testShellConnect(false,
-                 `mongodb://${host}/?gRPC=true`,
-                 "--tls",
-                 "--tlsCAFile",
-                 tlsCAFile,
-                 "--tlsCRLFile",
-                 "jstests/libs/crl.pem");
-testShellConnect(
-    false, `mongodb://${host}`, "--gRPC", "--tls", "--tlsCAFile", tlsCAFile, "--tlsFIPSMode");
+function testGRPCConnect(ok, ...testArgs) {
+    const args = ['--tls', '--tlsCAFile', tlsCAFile].concat(testArgs);
+    testShellConnect(ok, `mongodb://${host}`, '--gRPC', ...args);
+    testShellConnect(ok, `mongodb://${host}/?gRPC=true`, ...args);
+}
+
+testGRPCConnect(true);
+testGRPCConnect(true, '--tlsCertificateKeyFile', 'jstests/libs/client.pem');
+
+// Options currently prohibited when using gRPC.
+testGRPCConnect(false, '--tlsCRLFile', 'jstests/libs/crl.pem');
+testGRPCConnect(false,
+                '--tlsCertificateKeyFile',
+                'jstests/libs/password_protected.pem',
+                '--tlsCertificateKeyFilePassword',
+                'qwerty');
+testGRPCConnect(false, '--tlsFIPSMode');
+
 assertConnectFailsWithErrorCode(`mongodb://user:password@${host}/?gRPC=true&tls=true`,
                                 ErrorCodes.InvalidOptions);
 assertConnectFailsWithErrorCode(`mongodb://${host}/?gRPC=true&tls=true&replicaSet=blah`,

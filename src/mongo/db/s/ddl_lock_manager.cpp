@@ -41,6 +41,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/concurrency/resource_catalog.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -61,6 +62,7 @@
 MONGO_FAIL_POINT_DEFINE(overrideDDLLockTimeout);
 
 namespace mongo {
+using namespace fmt::literals;
 namespace {
 
 const auto ddlLockManagerDecorator = ServiceContext::declareDecoration<DDLLockManager>();
@@ -100,7 +102,6 @@ void DDLLockManager::_lock(OperationContext* opCtx,
         if (!opCtx->waitForConditionOrInterruptUntil(_stateCV, lock, deadline, [&] {
                 return _state == State::kPrimaryAndRecovered || !waitForRecovery;
             })) {
-            using namespace fmt::literals;
             uasserted(
                 ErrorCodes::LockTimeout,
                 "Failed to acquire DDL lock for namespace '{}' in mode {} after {} with reason "
@@ -127,7 +128,6 @@ void DDLLockManager::_lock(OperationContext* opCtx,
     try {
         locker->lock(opCtx, resId, mode, deadline);
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
-        using namespace fmt::literals;
 
         std::vector<std::string> lockHoldersArr;
         const auto& lockHolders = locker->getLockInfoFromResourceHolders(resId);
@@ -197,7 +197,8 @@ DDLLockManager::ScopedDatabaseDDLLock::ScopedDatabaseDDLLock(OperationContext* o
                                                              const DatabaseName& db,
                                                              StringData reason,
                                                              LockMode mode)
-    : _dbLock{opCtx, opCtx->lockState(), db, reason, mode, true /*waitForRecovery*/} {
+    : _dbLock{
+          opCtx, shard_role_details::getLocker(opCtx), db, reason, mode, true /*waitForRecovery*/} {
     // Check under the DDL dbLock if this is the primary shard for the database
     Lock::DBLock dbLock(opCtx, db, MODE_IS);
     const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, db);
@@ -210,7 +211,7 @@ DDLLockManager::ScopedCollectionDDLLock::ScopedCollectionDDLLock(OperationContex
                                                                  LockMode mode) {
     // Acquire implicitly the db DDL lock
     _dbLock.emplace(opCtx,
-                    opCtx->lockState(),
+                    shard_role_details::getLocker(opCtx),
                     ns.dbName(),
                     reason,
                     isSharedLockMode(mode) ? MODE_IS : MODE_IX,
@@ -227,7 +228,7 @@ DDLLockManager::ScopedCollectionDDLLock::ScopedCollectionDDLLock(OperationContex
     // Acquire the collection DDL lock.
     // If the ns represents a timeseries buckets collection, translate to its corresponding view ns.
     _collLock.emplace(opCtx,
-                      opCtx->lockState(),
+                      shard_role_details::getLocker(opCtx),
                       ns.isTimeseriesBucketsCollection() ? ns.getTimeseriesViewNamespace() : ns,
                       reason,
                       mode,

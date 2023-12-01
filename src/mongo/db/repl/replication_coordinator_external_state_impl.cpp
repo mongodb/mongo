@@ -61,11 +61,11 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
@@ -98,7 +98,6 @@
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_ready.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -137,6 +136,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
@@ -492,8 +492,9 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
 }
 
 void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* opCtx) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(opCtx->lockState()->getAdmissionPriority() == AdmissionContext::Priority::kImmediate,
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(shard_role_details::getLocker(opCtx)->getAdmissionPriority() ==
+                  AdmissionContext::Priority::kImmediate,
               "Replica Set state changes are critical to the cluster and should not be throttled");
 
     if (_oplogBuffer) {
@@ -502,8 +503,9 @@ void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* 
 }
 
 OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isRSTLExclusive());
-    invariant(opCtx->lockState()->getAdmissionPriority() == AdmissionContext::Priority::kImmediate,
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
+    invariant(shard_role_details::getLocker(opCtx)->getAdmissionPriority() ==
+                  AdmissionContext::Priority::kImmediate,
               "Replica Set state changes are critical to the cluster and should not be throttled");
 
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -745,7 +747,8 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     OperationContext* opCtx, const LastVote& lastVote) {
     BSONObj lastVoteObj = lastVote.toBSON();
 
-    invariant(opCtx->lockState()->getAdmissionPriority() == AdmissionContext::Priority::kImmediate,
+    invariant(shard_role_details::getLocker(opCtx)->getAdmissionPriority() ==
+                  AdmissionContext::Priority::kImmediate,
               "Writes that are part of elections should not be throttled");
 
     try {
@@ -762,7 +765,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
 
         boost::optional<UninterruptibleLockGuard> noInterrupt;
         if (replCoord->isInPrimaryOrSecondaryState_UNSAFE())
-            noInterrupt.emplace(opCtx->lockState());
+            noInterrupt.emplace(shard_role_details::getLocker(opCtx));
 
         Status status = writeConflictRetry(
             opCtx, "save replica set lastVote", NamespaceString::kLastVoteNamespace, [&] {
@@ -890,8 +893,15 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
             // Called earlier for config servers.
             TransactionCoordinatorService::get(_service)->onStepDown();
         }
+    } else if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+        // If this mongod has a router service, it needs to run stepdown
+        // hooks even if the shard-role isn't initialized yet.
+        // TODO SERVER-82588: Update this code once CatalogCacheLoader is split between
+        // router and shard roles.
+        if (Grid::get(_service)->isShardingInitialized()) {
+            CatalogCacheLoader::get(_service).onStepDown();
+        }
     }
-
     if (auto validator = LogicalTimeValidator::get(_service)) {
         auto opCtx = cc().getOperationContext();
 
@@ -913,7 +923,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
     // As opCtx does not expose a method to allow skipping flow control on purpose we mark the
     // operation as having Immediate priority. This will skip flow control and ticket acquisition.
     // It is fine to do this since the system is essentially shutting down at this point.
-    ScopedAdmissionPriorityForLock priority(opCtx->lockState(),
+    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
                                             AdmissionContext::Priority::kImmediate);
 
     // Tell the system to stop updating the oplogTruncateAfterPoint asynchronously and to go
@@ -1019,6 +1029,14 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             // Schedule a drop of the temporary collections used by aggregations ($out
             // specifically).
             dropAggTempCollections(opCtx);
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+            // If this mongod has a router service, it needs to run stepdown
+            // hooks even if the shard-role isn't initialized yet.
+            // TODO SERVER-82588: Update this code once CatalogCacheLoader is split between
+            // router and shard roles.
+            if (Grid::get(_service)->isShardingInitialized()) {
+                CatalogCacheLoader::get(_service).onStepUp();
+            }
         }
         // The code above will only be executed after a stepdown happens, however the code below
         // needs to be executed also on startup, and the enabled check might fail in shards during
@@ -1103,7 +1121,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // initialization which will transition some components into the "primary" state, like
         // the TransactionCoordinatorService, and they would fail if the onStepUp logic
         // attempted the same transition.
-
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         // TODO: SERVER-82965 Remove condition after v8.0 becomes last-lts.
         if (!serverGlobalParams.doAutoBootstrapSharding ||

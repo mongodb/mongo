@@ -96,6 +96,11 @@ bool allBools(const value::TypeTags* tag, size_t sz) {
     return true;
 }
 
+bool emptyPositionInfo(const std::vector<char>& positionInfo) {
+    return positionInfo.empty() ||
+        std::all_of(positionInfo.begin(), positionInfo.end(), [](const char& c) { return c == 1; });
+}
+
 struct FillEmptyFunctor {
     FillEmptyFunctor(value::TypeTags fillTag, value::Value fillVal)
         : _fillTag(fillTag), _fillVal(fillVal) {}
@@ -266,10 +271,72 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMax(Ar
 }
 
 /*
- * TODO: Comment.
+ * Given a ValueBlock bitset, count how many "true" elements there are.
  */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCount(ArityType arity) {
-    MONGO_UNREACHABLE;
+    // TODO SERVER-83450 add monoblock fast path.
+    invariant(arity == 1);
+
+    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    invariant(bitsetTag == value::TypeTags::valueBlock);
+    auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+
+    auto bitset = bitsetBlock->extract();
+
+    tassert(8151800, "Expected bitset to be all bools", allBools(bitset.tags, bitset.count));
+
+    size_t count = 0;
+    for (size_t i = 0; i < bitset.count; ++i) {
+        if (value::bitcastTo<bool>(bitset[i].second)) {
+            count++;
+        }
+    }
+    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(count)};
+}
+
+/*
+ * Given a ValueBlock and bitset, returns the sum of the elements of the ValueBlock where the bitset
+ * indicates true. If all elements of the bitset are false, return Nothing. If there are non-Nothing
+ * elements where the bitset indicates true, we return a value. If there are only Nothing elements,
+ * we return Nothing.
+ */
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockSum(ArityType arity) {
+    // TODO SERVER-83450 add monoblock fast path.
+    invariant(arity == 2);
+
+    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    invariant(inputTag == value::TypeTags::valueBlock);
+    auto* inputBlock = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    invariant(bitsetTag == value::TypeTags::valueBlock);
+    auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+
+    auto block = inputBlock->extract();
+    auto bitset = bitsetBlock->extract();
+
+    tassert(8151801, "Expected block and bitset to be the same size", block.count == bitset.count);
+    tassert(8151802, "Expected bitset to be all bools", allBools(bitset.tags, bitset.count));
+
+    value::TypeTags resultTag = value::TypeTags::Nothing;
+    value::Value resultVal = 0;
+    for (size_t i = 0; i < bitset.count; ++i) {
+        // If we find a non-Nothing value and our current result is nothing, set the result to be
+        // this value.
+        if (value::bitcastTo<bool>(bitset[i].second) && resultTag == value::TypeTags::Nothing &&
+            block.tags[i] != value::TypeTags::Nothing) {
+            // We do not own the value in the block, so make a copy.
+            auto [copyTag, copyVal] = value::copyValue(block.tags[i], block.vals[i]);
+            resultTag = copyTag, resultVal = copyVal;
+        } else if (value::bitcastTo<bool>(bitset[i].second) &&
+                   block[i].first != value::TypeTags::Nothing) {
+            auto [sumOwned, sumTag, sumVal] =
+                genericAdd(resultTag, resultVal, block[i].first, block[i].second);
+            value::releaseValue(resultTag, resultVal);
+            resultTag = sumTag, resultVal = sumVal;
+        }
+    }
+    return {true, resultTag, resultVal};
 }
 
 namespace {
@@ -573,6 +640,27 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
     invariant(rightTag == value::TypeTags::valueBlock);
     auto* rightValueBlock = value::bitcastTo<value::ValueBlock*>(rightVal);
 
+    auto leftRun = leftValueBlock->tryIsSingleRun();
+    auto rightRun = rightValueBlock->tryIsSingleRun();
+
+    if (leftRun || rightRun) {
+        if (!leftRun) {
+            std::swap(leftRun, rightRun);
+            swapStack();
+        }
+
+        // We always assume that the inputs are blocks of bools that can provide a count in O(1).
+        tassert(8256900,
+                "Mismatch on size",
+                *leftValueBlock->tryCount() == *rightValueBlock->tryCount());
+        if (value::bitcastTo<bool>(leftRun->val)) {
+            // and True is a noop.
+            return moveFromStack(0);
+        }
+        // and False returns a block of all falses.
+        return moveFromStack(1);
+    }
+
     auto blockOut = applyBoolBinOp<std::logical_and<>>(leftValueBlock, rightValueBlock);
     return {true,
             value::TypeTags::valueBlock,
@@ -590,6 +678,28 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
     auto [rightOwned, rightTag, rightVal] = getFromStack(0);
     invariant(rightTag == value::TypeTags::valueBlock);
     auto* rightValueBlock = value::bitcastTo<value::ValueBlock*>(rightVal);
+
+    auto leftRun = leftValueBlock->tryIsSingleRun();
+    auto rightRun = rightValueBlock->tryIsSingleRun();
+
+    if (leftRun || rightRun) {
+        if (!leftRun) {
+            std::swap(leftRun, rightRun);
+            swapStack();
+        }
+
+        // We always assume that the inputs are blocks of bools that can provide a count in O(1).
+        tassert(8256901,
+                "Mismatch on size",
+                *leftValueBlock->tryCount() == *rightValueBlock->tryCount());
+
+        if (value::bitcastTo<bool>(leftRun->val)) {
+            // or True returns a block of all trues.
+            return moveFromStack(1);
+        }
+        // or False is a noop.
+        return moveFromStack(0);
+    }
 
     auto blockOut = applyBoolBinOp<std::logical_or<>>(leftValueBlock, rightValueBlock);
     return {true,
@@ -698,9 +808,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
 
     auto valsExtracted = valueBlock->extract();
     tassert(7953533, "Expected all bool inputs", allBools(valsExtracted.tags, valsExtracted.count));
+    tassert(7953535, "Unsupported empty block", valsExtracted.count > 0);
 
     const auto& positionInfo = cellBlock->filterPositionInfo();
-    if (positionInfo.empty()) {
+    if (emptyPositionInfo(positionInfo)) {
         // Return the input unchanged.
         return moveFromStack(0);
     }
@@ -708,7 +819,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
     tassert(7953534,
             "Expected position info count to be same as value size",
             valsExtracted.count == positionInfo.size());
-    tassert(7953535, "Unsupported empty block", valsExtracted.count > 0);
     tassert(7953536, "First position info element should always be true", positionInfo[0]);
 
     // Note: if this code ends up being a bottleneck, we can make some changes. foldCounts()
@@ -741,7 +851,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_P(ArityType arity) {
-    MONGO_UNREACHABLE;
+    auto [valBlockOwned, valBlockTag, valBlockVal] = getFromStack(0);
+    invariant(valBlockTag == value::TypeTags::valueBlock);
+
+    auto [cellOwned, cellTag, cellVal] = getFromStack(1);
+    invariant(cellTag == value::TypeTags::cellBlock);
+    auto* cellBlock = value::bitcastTo<value::CellBlock*>(cellVal);
+
+    const auto& positionInfo = cellBlock->filterPositionInfo();
+    tassert(7953901, "Only top-level cell values are supported", emptyPositionInfo(positionInfo));
+    // Return the input unchanged.
+    return moveFromStack(0);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellBlockGetFlatValuesBlock(

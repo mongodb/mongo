@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parameterization.h"
 #include "mongo/db/matcher/expression_simplifier.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
@@ -105,6 +106,30 @@ bool matchExpressionLessThan(const MatchExpression* lhs, const MatchExpression* 
     return matchExpressionComparator(lhs, rhs) < 0;
 }
 
+/**
+ * Return true if the expression is trivially simple:
+ * - has no children
+ * - has one child without children
+ * - rewritten simple $expr: contains one $expr and one simple simple expression without children.
+ */
+inline bool isTriviallySimple(const MatchExpression& expr) {
+    switch (expr.numChildren()) {
+        case 0:
+            return true;
+        case 1:
+            return expr.getChild(0)->numChildren() == 0;
+        case 2:
+            // In the case of the rewritten simple $expr of the two nodes will be Internal
+            // Expression Comparison node.
+            return ComparisonMatchExpressionBase::isInternalExprComparison(
+                       expr.getChild(0)->matchType()) ||
+                ComparisonMatchExpressionBase::isInternalExprComparison(
+                       expr.getChild(1)->matchType());
+        default:
+            return false;
+    }
+}
+
 }  // namespace
 
 MatchExpression::MatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> annotation)
@@ -123,9 +148,7 @@ std::unique_ptr<MatchExpression> MatchExpression::optimize(
 
     try {
         auto optimizedExpr = optimizer(std::move(expression));
-        const bool isTriviallySimple = optimizedExpr->numChildren() == 0 ||
-            (optimizedExpr->numChildren() == 1 && optimizedExpr->getChild(0)->numChildren() == 0);
-        if (enableSimplification && !isTriviallySimple &&
+        if (enableSimplification && !isTriviallySimple(*optimizedExpr) &&
             internalQueryEnableBooleanExpressionsSimplifier.load()) {
             ExpressionSimlifierSettings settings{
                 static_cast<size_t>(internalQueryMaximumNumberOfUniquePredicatesToSimplify.load()),

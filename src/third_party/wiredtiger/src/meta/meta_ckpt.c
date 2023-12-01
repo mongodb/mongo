@@ -272,10 +272,11 @@ __wt_meta_checkpoint_clear(WT_SESSION_IMPL *session, const char *fname)
 static int
 __ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v, bool use_base)
 {
+    struct timespec ts;
     WT_DATA_HANDLE *dhandle;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
-    size_t meta_base_length;
+    uint64_t base_hash;
     char *config, *newcfg;
     const char *cfg[3], *meta_base, *str;
 
@@ -294,27 +295,23 @@ __ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v, bool use_
 
         /* Check the metadata is not corrupted. */
         meta_base = dhandle->meta_base;
-        meta_base_length = strlen(meta_base);
-        if (dhandle->meta_base_length != meta_base_length)
+        base_hash = __wt_hash_city64(meta_base, strlen(meta_base));
+        __wt_epoch(session, &ts);
+        if (dhandle->meta_hash != base_hash)
             WT_ERR_PANIC(session, WT_PANIC,
-              "Corrupted metadata. The original metadata length was %lu while the new one is %lu.",
-              dhandle->meta_base_length, meta_base_length);
-#ifdef HAVE_DIAGNOSTIC
-        if (!WT_STREQ(dhandle->orig_meta_base, meta_base))
-            WT_ERR_PANIC(session, WT_PANIC,
-              "Corrupted metadata. The original metadata length was %lu while the new one is %lu. "
-              "The original metadata inserted was %s and the current "
+              "Corrupted metadata. The original metadata inserted was %s and the current "
               "metadata is now %s.",
-              dhandle->meta_base_length, meta_base_length, dhandle->orig_meta_base, meta_base);
-#endif
+              dhandle->orig_meta_base, meta_base);
+        else
+            /*
+             * Only if the hash matches, update the time structure to know when we last had a
+             * matching hash. If there is a problem with the metadata string then we have bounded
+             * the time from what is in the dhandle to the local time structure we have.
+             */
+            dhandle->base_upd = ts;
 
         /* Concatenate the metadata base string with the checkpoint string. */
         WT_ERR(__wt_buf_fmt(session, tmp, "%s,%s", meta_base, str));
-        /*
-         * Check the new metadata length is at least as long as the original metadata string with
-         * the checkpoint base stripped out.
-         */
-        WT_ASSERT(session, tmp->size >= dhandle->meta_base_length);
         WT_ERR(__wt_metadata_update(session, fname, tmp->mem));
     } else {
         /* Retrieve the metadata for this file. */
@@ -1381,16 +1378,14 @@ __meta_print_snapshot(WT_SESSION_IMPL *session, WT_ITEM *buf)
     WT_RET(__wt_buf_fmt(session, buf,
       WT_SYSTEM_CKPT_SNAPSHOT_MIN "=%" PRIu64 "," WT_SYSTEM_CKPT_SNAPSHOT_MAX "=%" PRIu64
                                   "," WT_SYSTEM_CKPT_SNAPSHOT_COUNT "=%" PRIu32,
-      txn->snapshot_data.snap_min, txn->snapshot_data.snap_max, txn->snapshot_data.snapshot_count));
+      txn->snap_min, txn->snap_max, txn->snapshot_count));
 
-    if (txn->snapshot_data.snapshot_count > 0) {
+    if (txn->snapshot_count > 0) {
         WT_RET(__wt_buf_catfmt(session, buf, "," WT_SYSTEM_CKPT_SNAPSHOT "=["));
-        for (snap_count = 0; snap_count < txn->snapshot_data.snapshot_count - 1; ++snap_count)
-            WT_RET(__wt_buf_catfmt(
-              session, buf, "%" PRIu64 "%s", txn->snapshot_data.snapshot[snap_count], ","));
+        for (snap_count = 0; snap_count < txn->snapshot_count - 1; ++snap_count)
+            WT_RET(__wt_buf_catfmt(session, buf, "%" PRIu64 "%s", txn->snapshot[snap_count], ","));
 
-        WT_RET(__wt_buf_catfmt(
-          session, buf, "%" PRIu64 "%s", txn->snapshot_data.snapshot[snap_count], "]"));
+        WT_RET(__wt_buf_catfmt(session, buf, "%" PRIu64 "%s", txn->snapshot[snap_count], "]"));
     }
 
     WT_RET(__wt_buf_catfmt(session, buf,
@@ -1547,7 +1542,7 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session, bool full, const char *name, siz
       " snapshot count: %" PRIu32
       ", oldest timestamp: %s , meta checkpoint timestamp: %s"
       " base write gen: %" PRIu64,
-      txn->snapshot_data.snap_min, txn->snapshot_data.snap_max, txn->snapshot_data.snapshot_count,
+      txn->snap_min, txn->snap_max, txn->snapshot_count,
       __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[0]),
       __wt_timestamp_to_string(txn_global->meta_ckpt_timestamp, ts_string[1]),
       conn->base_write_gen);

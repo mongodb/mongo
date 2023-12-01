@@ -59,9 +59,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/resumable_index_builds_gen.h"
@@ -159,7 +159,8 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
     // recover these orphaned idents.
     // Allowing locking in write mode as reinitializeStorageEngine will be called while holding the
     // global lock in exclusive mode.
-    invariant(!opCtx->lockState()->isLocked() || opCtx->lockState()->isW());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked() ||
+              shard_role_details::getLocker(opCtx)->isW());
     Lock::GlobalWrite globalLk(opCtx);
     loadCatalog(opCtx,
                 _engine->getRecoveryTimestamp(),
@@ -469,7 +470,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
 }
 
 void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
-    dassert(opCtx->lockState()->isLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isLocked());
     if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOGV2_FOR_RECOVERY(4615632, kCatalogLogLevel.toInt(), "loadCatalog:");
         _dumpCatalog(opCtx);
@@ -1130,7 +1131,7 @@ bool StorageEngineImpl::supportsRecoveryTimestamp() const {
 }
 
 StatusWith<Timestamp> StorageEngineImpl::recoverToStableTimestamp(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(opCtx)->isW());
 
     auto state = catalog::closeCatalog(opCtx);
 
@@ -1232,8 +1233,8 @@ std::shared_ptr<Ident> StorageEngineImpl::markIdentInUse(StringData ident) {
     return _dropPendingIdentReaper.markIdentInUse(ident);
 }
 
-void StorageEngineImpl::checkpoint(OperationContext* opCtx) {
-    _engine->checkpoint(opCtx);
+void StorageEngineImpl::checkpoint() {
+    _engine->checkpoint();
 }
 
 StorageEngine::CheckpointIteration StorageEngineImpl::getCheckpointIteration() const {
@@ -1298,7 +1299,7 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
                 // The TimestampMonitor is an important background cleanup task for the storage
                 // engine and needs to be able to make progress to free up resources.
                 ScopedAdmissionPriorityForLock immediatePriority(
-                    opCtx->lockState(), AdmissionContext::Priority::kImmediate);
+                    shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kImmediate);
 
                 Timestamp checkpoint;
                 Timestamp oldest;
@@ -1448,6 +1449,12 @@ StatusWith<BSONObj> StorageEngineImpl::getSanitizedStorageOptionsForSecondaryRep
 
 void StorageEngineImpl::dump() const {
     _engine->dump();
+}
+
+Status StorageEngineImpl::autoCompact(OperationContext* opCtx,
+                                      bool enable,
+                                      boost::optional<int64_t> freeSpaceTargetMB) {
+    return _engine->autoCompact(opCtx, enable, freeSpaceTargetMB);
 }
 
 }  // namespace mongo

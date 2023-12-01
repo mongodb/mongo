@@ -8,7 +8,7 @@
 const testdb = db.getSiblingDB("storefunc");
 let res;
 
-const s = testdb.system.js;
+const s = testdb.getCollection("system.js");
 assert.commandWorked(s.remove({}));
 assert.eq(0, s.countDocuments({}));
 

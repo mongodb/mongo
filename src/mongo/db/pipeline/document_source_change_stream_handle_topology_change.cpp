@@ -67,6 +67,11 @@
 namespace mongo {
 namespace {
 
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamHandleTopologyChange,
+                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  DocumentSourceChangeStreamHandleTopologyChange::createFromBson,
+                                  true);
+
 // Failpoint to throw an exception when the 'kNewShardDetected' event is observed.
 MONGO_FAIL_POINT_DEFINE(throwChangeStreamTopologyChangeExceptionToClient);
 
@@ -129,6 +134,15 @@ bool isShardConfigEvent(const Document& eventDoc) {
     return true;
 }
 }  // namespace
+
+boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChange>
+DocumentSourceChangeStreamHandleTopologyChange::createFromBson(
+    const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(8131300,
+            str::stream() << "the '" << kStageName << "' spec must be an empty object",
+            elem.type() == Object && elem.Obj().isEmpty());
+    return new DocumentSourceChangeStreamHandleTopologyChange(expCtx);
+}
 
 boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChange>
 DocumentSourceChangeStreamHandleTopologyChange::create(

@@ -117,6 +117,24 @@ optimizer::ABT makeVariable(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::Variable>(std::move(var));
 }
 
+VariableTypes buildVariableTypes(const PlanStageSlots& outputs) {
+    VariableTypes varTypes;
+    for (const TypedSlot& slot : outputs.getAllSlotsInOrder()) {
+        varTypes.emplace(getABTVariableName(slot.slotId), slot.typeSignature);
+    }
+    return varTypes;
+}
+
+bool hasBlockOutput(const PlanStageSlots& outputs) {
+    for (const TypedSlot& slot : outputs.getAllSlotsInOrder()) {
+        if (TypeSignature::kBlockType.isSubset(slot.typeSignature) ||
+            TypeSignature::kCellType.isSubset(slot.typeSignature)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 TypeSignature constantFold(optimizer::VariableEnvironment& env,
                            optimizer::ABT& abt,
                            StageBuilderState& state,

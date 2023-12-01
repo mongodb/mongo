@@ -58,7 +58,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/s/transaction_coordinator_structures.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -75,6 +74,8 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -116,7 +117,7 @@ public:
         Response typedRun(OperationContext* opCtx) {
             if (!getTestCommandsEnabled() &&
                 !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+                ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             }
 
             // If a node has majority read concern disabled, replication must use the legacy
@@ -153,10 +154,30 @@ public:
                         "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON(),
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
-            // TODO(SERVER-46105) remove
-            uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                    "Cannot create new collections inside distributed transactions",
-                    UncommittedCatalogUpdates::get(opCtx).isEmpty());
+            if (!feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                        "Cannot create new collections inside distributed transactions",
+                        UncommittedCatalogUpdates::get(opCtx).isEmpty());
+            } else {
+                // TODO SERVER-81037: This can be removed whenever the catalog uses the new schema
+                // and we can rely on WT to detect these changes.
+                //
+                // We now verify that the created collections are not part of the latest catalog.
+                // That means that there is a prepare conflict and we should error.
+                auto latestCatalog = CollectionCatalog::latest(opCtx);
+                const auto& updates = UncommittedCatalogUpdates::get(opCtx);
+                for (const auto& update : updates.entries()) {
+                    if (update.action !=
+                        UncommittedCatalogUpdates::Entry::Action::kCreatedCollection) {
+                        continue;
+                    }
+                    // TODO SERVER-81937: Verify that the DDL Coordinator locks are acquired for all
+                    // uncommitted collection catalog entries.
+
+                    latestCatalog->ensureCollectionIsNew(opCtx, update.nss);
+                }
+            }
 
             uassert(ErrorCodes::NoSuchTransaction,
                     "Transaction isn't in progress",
@@ -294,7 +315,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             // Only config servers or initialized shard servers can act as transaction coordinators.
             if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+                ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             }
 
             const auto& cmd = request();

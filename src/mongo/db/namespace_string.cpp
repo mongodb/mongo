@@ -75,6 +75,8 @@ bool NamespaceString::isLegalClientSystemNS() const {
             return true;
         if (collectionName == "system.backup_users")
             return true;
+        if (collectionName == "system.new_users")
+            return true;
     } else if (isConfigDB()) {
         if (collectionName == "system.sessions")
             return true;

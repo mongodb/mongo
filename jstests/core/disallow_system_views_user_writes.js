@@ -15,9 +15,11 @@ const invalidField = {
     invalidField: true
 };
 
-assert.commandFailedWithCode(db.system.views.insert(viewDefinition), ErrorCodes.InvalidNamespace);
-assert.commandFailedWithCode(db.system.views.update({}, invalidField), ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(db["system.views"].insert(viewDefinition),
+                             ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(db["system.views"].update({}, invalidField),
+                             ErrorCodes.InvalidNamespace);
 assert.commandFailedWithCode(
     db.runCommand({findAndModify: "system.views", query: {}, update: invalidField}),
     ErrorCodes.InvalidNamespace);
-assert.commandFailedWithCode(db.system.views.remove({}), ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(db["system.views"].remove({}), ErrorCodes.InvalidNamespace);

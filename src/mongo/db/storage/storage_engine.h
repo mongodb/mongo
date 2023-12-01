@@ -494,7 +494,7 @@ public:
      * underlying storage engine must take a checkpoint at this point.
      * Acquires a resource mutex before taking the checkpoint.
      */
-    virtual void checkpoint(OperationContext* opCtx) = 0;
+    virtual void checkpoint() = 0;
 
     /**
      * Returns the checkpoint iteration the committed write will be part of.
@@ -727,6 +727,16 @@ public:
      * Instructs the storage engine to dump its internal state.
      */
     virtual void dump() const = 0;
+
+    /**
+     * Toggles auto compact for a database. Auto compact periodically iterates through all of
+     * the files available and runs compaction if they are eligible. If the freeSpaceTargetMB is
+     * provided, compaction only proceeds if the free storage space available is greater than
+     * the provided value.
+     */
+    virtual Status autoCompact(OperationContext* opCtx,
+                               bool enable,
+                               boost::optional<int64_t> freeSpaceTargetMB) = 0;
 };
 
 }  // namespace mongo

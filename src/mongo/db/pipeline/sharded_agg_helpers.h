@@ -177,10 +177,12 @@ DispatchShardPipelineResults dispatchShardPipeline(
     bool eligibleForSampling,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
+    boost::optional<CollectionRoutingInfo> cri = boost::none,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none,
     AsyncRequestsSender::ShardHostMap designatedHostsMap = {},
-    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap = {});
+    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap = {},
+    std::set<ShardId> shardsToSkip = {});
 
 BSONObj createPassthroughCommandForShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

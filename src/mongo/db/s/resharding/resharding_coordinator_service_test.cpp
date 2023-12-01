@@ -44,9 +44,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/query/find_command.h"
@@ -517,7 +517,7 @@ public:
             OperationContext* toKill = client->getOperationContext();
 
             if (toKill && !toKill->isKillPending() && toKill->getOpID() != opCtx->getOpID()) {
-                auto locker = toKill->lockState();
+                auto locker = shard_role_details::getLocker(toKill);
                 if (toKill->shouldAlwaysInterruptAtStepDownOrUp() ||
                     locker->wasGlobalLockTakenInModeConflictingWithWrites()) {
                     serviceCtx->killOperation(lk, toKill);

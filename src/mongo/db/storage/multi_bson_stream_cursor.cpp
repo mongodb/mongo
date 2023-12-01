@@ -48,6 +48,7 @@
 #include "mongo/platform/compiler.h"
 
 namespace mongo {
+using namespace fmt::literals;
 
 /**
  * Expands '_buffer' by a multiple of two of its current size that is large enough to contain two

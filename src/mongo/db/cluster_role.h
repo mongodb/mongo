@@ -99,6 +99,8 @@ BSONArray toBSON(ClusterRole role);
 
 std::ostream& operator<<(std::ostream& os, ClusterRole r);
 
+StringBuilder& operator<<(StringBuilder& s, ClusterRole r);
+
 inline std::string toString(ClusterRole r) {
     std::ostringstream os;
     os << r;

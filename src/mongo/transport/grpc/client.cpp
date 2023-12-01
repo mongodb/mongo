@@ -275,7 +275,15 @@ public:
                 auto credentials = util::isUnixSchemeGRPCFormattedURI(uri)
                     ? ::grpc::InsecureChannelCredentials()
                     : ::grpc::SslCredentials(_sslOps);
-                return ::grpc::CreateChannel(uri, credentials);
+
+                ::grpc::ChannelArguments channel_args;
+                channel_args.SetMaxReceiveMessageSize(MaxMessageSizeBytes);
+                channel_args.SetMaxSendMessageSize(MaxMessageSizeBytes);
+                channel_args.SetCompressionAlgorithm(
+                    ::grpc_compression_algorithm::GRPC_COMPRESS_NONE);
+
+                return ::grpc::CreateCustomChannel(
+                    util::formatHostAndPortForGRPC(remote), credentials, channel_args);
             },
             [](std::shared_ptr<::grpc::Channel>& channel, Milliseconds connectTimeout) {
                 iassert(ErrorCodes::NetworkTimeout,

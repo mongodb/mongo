@@ -346,7 +346,7 @@ public:
 
     void startTimestampMonitor() override;
 
-    void checkpoint(OperationContext* opCtx) override;
+    void checkpoint() override;
 
     StorageEngine::CheckpointIteration getCheckpointIteration() const override;
 
@@ -406,6 +406,10 @@ public:
         const BSONObj& options) const override;
 
     void dump() const override;
+
+    virtual Status autoCompact(OperationContext* opCtx,
+                               bool enable,
+                               boost::optional<int64_t> freeSpaceTargetMB) override;
 
 private:
     using CollIter = std::list<std::string>::iterator;

@@ -44,7 +44,6 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/partition_key_comparator.h"
 #include "mongo/db/pipeline/window_function/spillable_cache.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
@@ -52,6 +51,7 @@
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 
@@ -325,7 +325,7 @@ private:
 
     // Memory token, used to track memory consumption of PartitionIterator. Needed to avoid problems
     // when getNextPartitionStateSize() changes value between invocations.
-    MemoryToken _memoryToken;
+    MemoryUsageToken _memoryToken;
 };
 
 /**

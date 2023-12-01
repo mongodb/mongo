@@ -220,7 +220,7 @@ void scanDocument(mutablebson::ConstElement elem,
         !allowTopLevelDollarPrefixes && (recursionLevel == 1 || isEmbeddedInIdField);
 
     auto fieldName = elem.getFieldName();
-    if (fieldName[0] == '$') {
+    if (fieldName.starts_with('$')) {
         if (containsDotsAndDollarsField) {
             *containsDotsAndDollarsField = true;
             // If we are not validating for storage, return once a $-prefixed field is found.

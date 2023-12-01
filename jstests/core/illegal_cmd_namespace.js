@@ -3,7 +3,7 @@
  * but is rejected by the server.
  *
  * @tags: [
- *   assumes_unsharded_collection,
+ *   assumes_no_implicit_collection_creation_on_get_collection,
  * ]
  */
 

@@ -587,7 +587,7 @@ struct __wt_connection_stats {
     int64_t checkpoint_handle_skipped;
     int64_t checkpoint_handle_walked;
     int64_t checkpoint_time_recent;
-    int64_t checkpoints;
+    int64_t checkpoints_api;
     int64_t checkpoints_compact;
     int64_t checkpoint_sync;
     int64_t checkpoint_presync;
@@ -606,8 +606,14 @@ struct __wt_connection_stats {
     int64_t checkpoint_prep_total;
     int64_t checkpoint_state;
     int64_t checkpoint_scrub_target;
-    int64_t checkpoint_scrub_time;
+    int64_t checkpoint_scrub_max;
+    int64_t checkpoint_scrub_min;
+    int64_t checkpoint_scrub_recent;
+    int64_t checkpoint_scrub_total;
     int64_t checkpoint_stop_stress_active;
+    int64_t checkpoint_tree_duration;
+    int64_t checkpoints_total_failed;
+    int64_t checkpoints_total_succeed;
     int64_t checkpoint_time_total;
     int64_t checkpoint_obsolete_applied;
     int64_t checkpoint_wait_reduce_dirty;
@@ -617,12 +623,15 @@ struct __wt_connection_stats {
     int64_t chunkcache_exceeded_capacity;
     int64_t chunkcache_lookups;
     int64_t chunkcache_chunks_loaded_from_flushed_tables;
+    int64_t chunkcache_metadata_work_units_dropped;
     int64_t chunkcache_metadata_work_units_created;
     int64_t chunkcache_metadata_work_units_dequeued;
     int64_t chunkcache_misses;
     int64_t chunkcache_io_failed;
     int64_t chunkcache_retries;
+    int64_t chunkcache_retries_checksum_mismatch;
     int64_t chunkcache_toomany_retries;
+    int64_t chunkcache_bytes_read_persistent;
     int64_t chunkcache_bytes_inuse;
     int64_t chunkcache_bytes_inuse_pinned;
     int64_t chunkcache_chunks_inuse;
@@ -910,7 +919,6 @@ struct __wt_connection_stats {
     int64_t thread_fsync_active;
     int64_t thread_read_active;
     int64_t thread_write_active;
-    int64_t application_evict_snapshot_refreshed;
     int64_t application_evict_time;
     int64_t application_cache_time;
     int64_t txn_release_blocked;

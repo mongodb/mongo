@@ -18,6 +18,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.startState = "init";
+    $config.data.partitionSize = 100;
 
     const customShardKeyFieldName = "customShardKey";
 

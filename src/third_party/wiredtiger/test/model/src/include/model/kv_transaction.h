@@ -76,13 +76,16 @@ public:
      * kv_transaction::kv_transaction --
      *     Create a new instance of the transaction.
      */
-    inline kv_transaction(kv_database &database, txn_id_t id, kv_transaction_snapshot &&snapshot,
-      timestamp_t read_timestamp = k_timestamp_latest) noexcept
+    inline kv_transaction(kv_database &database, txn_id_t id, kv_transaction_snapshot_ptr snapshot,
+      timestamp_t read_timestamp = k_timestamp_latest)
         : _database(database), _id(id), _commit_timestamp(k_initial_commit_timestamp),
           _durable_timestamp(k_timestamp_none), _prepare_timestamp(k_timestamp_none),
           _failed(false), _read_timestamp(read_timestamp), _snapshot(snapshot),
-          _state(kv_transaction_state::in_progress)
+          _state(kv_transaction_state::in_progress), _wt_id(k_txn_none),
+          _wt_base_write_gen(k_write_gen_none)
     {
+        if (!snapshot)
+            throw model_exception("The snapshot is NULL.");
     }
 
     /*
@@ -156,13 +159,23 @@ public:
     }
 
     /*
-     * kv_transaction::visible_txn --
-     *     Check whether the given transaction ID is visible for this transaction.
+     * kv_transaction::snapshot --
+     *     Get the transaction snapshot.
+     */
+    inline kv_transaction_snapshot_ptr
+    snapshot() const noexcept
+    {
+        return _snapshot;
+    }
+
+    /*
+     * kv_transaction::visible_update --
+     *     Check whether the given update is visible for this transaction.
      */
     inline bool
-    visible_txn(txn_id_t id) const noexcept
+    visible_update(const kv_update &update) const noexcept
     {
-        return _snapshot.contains(id);
+        return _snapshot->contains(update);
     }
 
     /*
@@ -212,6 +225,41 @@ public:
      */
     void set_commit_timestamp(timestamp_t commit_timestamp);
 
+    /*
+     * kv_transaction::set_wt_metadata --
+     *     If this transaction was imported from WiredTiger, remember the corresponding metadata.
+     *     This can be done only before the first update is added to the transaction.
+     */
+    inline void
+    set_wt_metadata(txn_id_t wt_id, write_gen_t wt_base_write_gen)
+    {
+        std::lock_guard lock_guard(_lock);
+        if (!_updates.empty())
+            throw model_exception("There are already updates in the transaction");
+        _wt_id = wt_id;
+        _wt_base_write_gen = wt_base_write_gen;
+    }
+
+    /*
+     * kv_transaction::wt_id --
+     *     Get the WiredTiger ID, if available.
+     */
+    inline txn_id_t
+    wt_id() const
+    {
+        return _wt_id;
+    }
+
+    /*
+     * kv_transaction::wt_base_write_gen --
+     *     Get the WiredTiger base write generation number, if available.
+     */
+    inline write_gen_t
+    wt_base_write_gen() const
+    {
+        return _wt_base_write_gen;
+    }
+
 protected:
     /*
      * kv_transaction::assert_in_progress_or_prepared --
@@ -228,7 +276,7 @@ private:
     timestamp_t _durable_timestamp;
     timestamp_t _prepare_timestamp;
     timestamp_t _read_timestamp;
-    kv_transaction_snapshot _snapshot;
+    kv_transaction_snapshot_ptr _snapshot;
 
     /* The lifetime of the transaction must not exceed the lifetime of the database. */
     kv_database &_database;
@@ -236,6 +284,10 @@ private:
     mutable std::mutex _lock;
     std::list<std::shared_ptr<kv_transaction_update>> _updates;
     std::list<std::shared_ptr<kv_transaction_update>> _nontimestamped_updates;
+
+    /* Transaction information for updates imported from WiredTiger's debug log. */
+    txn_id_t _wt_id;
+    write_gen_t _wt_base_write_gen;
 };
 
 /*

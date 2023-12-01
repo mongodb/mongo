@@ -45,14 +45,13 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -81,12 +80,6 @@ public:
                     _initCallCount++;
                     return Status::OK();
                 });
-    }
-
-    void tearDown() override {
-        ShardingState::get(getServiceContext())->clearForTests();
-
-        ShardingMongodTestFixture::tearDown();
     }
 
     int getInitCallCount() const {

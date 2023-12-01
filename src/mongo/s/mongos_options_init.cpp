@@ -38,6 +38,7 @@
 #include "mongo/db/keyfile_option_gen.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
+#include "mongo/db/server_options_upgrade_downgrade_gen.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
@@ -52,6 +53,7 @@ MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongosOptions)(InitializerContext* contex
     uassertStatusOK(addKeyfileServerOption(&moe::startupOptions));
     uassertStatusOK(addClusterAuthModeServerOption(&moe::startupOptions));
     uassertStatusOK(addNonGeneralServerOptions(&moe::startupOptions));
+    uassertStatusOK(addServerUpgradeDowngradeOptions(&moe::startupOptions));
 }
 
 MONGO_INITIALIZER_GENERAL(MongosOptions,

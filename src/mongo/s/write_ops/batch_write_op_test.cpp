@@ -62,6 +62,7 @@
 #include "mongo/s/index_version.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
@@ -76,6 +77,9 @@
 
 namespace mongo {
 namespace {
+
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+const int splitPoint = 0;
 
 auto initTargeterFullRange(const NamespaceString& nss, const ShardEndpoint& endpoint) {
     return MockNSTargeter(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
@@ -289,7 +293,7 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
-    request.setWriteConcern(BSON("w" << 3));
+    _opCtx->setWriteConcern(WriteConcernOptions::parse(BSON("w" << 3)).getValue());
 
     BatchWriteOp batchOp(_opCtx, request);
 
@@ -301,7 +305,7 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
 
     BatchedCommandRequest targetBatch =
         batchOp.buildBatchRequest(*targeted.begin()->second, targeter, boost::none);
-    ASSERT(targetBatch.getWriteConcern().woCompare(request.getWriteConcern()) == 0);
+    ASSERT(targetBatch.getWriteConcern().woCompare(_opCtx->getWriteConcern().toBSON()) == 0);
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -365,12 +369,22 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
+    // Respond with a ShardCannotRefreshDueToLocksHeld error; the batch should still be retriable.
+    targeted.clear();
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
+    buildResponse(0, &response);
+    response.addToErrDetails(write_ops::WriteError(
+        0, Status{ShardCannotRefreshDueToLocksHeldInfo(nss), "mock cache busy error"}));
+
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
+    ASSERT(!batchOp.isFinished());
+
+    // Respond with an 'ok' response
     targeted.clear();
     ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     buildResponse(1, &response);
 
-    // Respond with an 'ok' response
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
@@ -1202,7 +1216,7 @@ TEST_F(BatchWriteOpTest, MultiOpErrorAndWriteConcernErrorUnordered) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 1)});
         return insertOp;
     }());
-    request.setWriteConcern(BSON("w" << 3));
+    _opCtx->setWriteConcern(WriteConcernOptions::parse(BSON("w" << 3)).getValue());
 
     BatchWriteOp batchOp(_opCtx, request);
 
@@ -1249,7 +1263,7 @@ TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
         updateOp.setUpdates({buildUpdate(BSON("x" << GTE << -1 << LT << 2), true)});
         return updateOp;
     }());
-    request.setWriteConcern(BSON("w" << 3));
+    _opCtx->setWriteConcern(WriteConcernOptions::parse(BSON("w" << 3)).getValue());
 
     BatchWriteOp batchOp(_opCtx, request);
 
@@ -1616,7 +1630,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoWCErrors) {
         insertOp.setDocuments({BSON("x" << -1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSON("w" << 3));
+    _opCtx->setWriteConcern(WriteConcernOptions::parse(BSON("w" << 3)).getValue());
 
     BatchWriteOp batchOp(_opCtx, request);
 
@@ -1902,9 +1916,6 @@ TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Update) {
     ASSERT_GT(response.sizeErrDetails(), 0u);
     ASSERT_EQ(ErrorCodes::UnknownError, response.getErrDetailsAt(0).getStatus().code());
 }
-
-const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
-const int splitPoint = 0;
 
 class WriteWithoutShardKeyFixture : public RouterCatalogCacheTestFixture {
 public:
@@ -2745,6 +2756,107 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneAndDeleteOneBroadcastMatchWit
 
         ASSERT(batchOp.isFinished());
     }
+}
+
+TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneBroadcastNoMatchWithStaleDBError) {
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithIdWithoutShardKey", true};
+
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(kNss);
+        // Op style update.
+        updateOp.setUpdates({buildUpdate(BSON("_id" << 1), BSON("$inc" << BSON("a" << 1)), false)});
+        return updateOp;
+    }());
+
+    makeCollectionRoutingInfo(kNss, _shardKeyPattern, nullptr, false, {BSON("x" << 0)}, {});
+    _criTargeter = CollectionRoutingInfoTargeter(getOpCtx(), kNss);
+
+    BatchWriteOp batchOp(getOpCtx(), request);
+
+    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+    auto status = batchOp.targetBatch(getCollectionRoutingInfoTargeter(), false, &targeted);
+    ASSERT_OK(status);
+    ASSERT_EQ(status.getValue(), WriteType::WithoutShardKeyWithId);
+    ASSERT_EQUALS(targeted.size(), 2);
+
+    const static Timestamp timestamp{2};
+
+    BatchedCommandResponse firstShardResp;
+    firstShardResp.addToErrDetails(write_ops::WriteError(
+        0,
+        Status(StaleDbRoutingVersion(kNss.dbName(), DatabaseVersion(), boost::none),
+               "Stale DB error")));
+    firstShardResp.setStatus(Status::OK());
+
+    auto iterator = targeted.begin();
+
+    // Respond to first targeted batch.
+    TrackedErrors trackedErrors;
+    trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
+    batchOp.noteBatchResponse(*iterator->second, firstShardResp, &trackedErrors);
+
+    ASSERT(!batchOp.isFinished());
+    iterator++;
+
+    BatchedCommandResponse secondShardResp;
+    buildResponse(0, &secondShardResp);
+
+    // Respond to second targeted batch.
+    batchOp.noteBatchResponse(*iterator->second, secondShardResp, nullptr);
+
+    ASSERT(!batchOp.isFinished());
+}
+
+TEST_F(WriteWithoutShardKeyWithIdFixture,
+       UpdateOrDeleteInTransactionIsNotWriteWithoutShardKeyWithIdWriteType) {
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithIdWithoutShardKey", true};
+
+    std::vector<BatchedCommandRequest*> requests;
+
+    BatchedCommandRequest updateRequest([&] {
+        write_ops::UpdateCommandRequest updateOp(kNss);
+        // Op style update.
+        updateOp.setUpdates({buildUpdate(BSON("_id" << 1), BSON("$inc" << BSON("a" << 1)), false)});
+        return updateOp;
+    }());
+
+    BatchedCommandRequest deleteRequest([&] {
+        write_ops::DeleteCommandRequest deleteOp(kNss);
+        deleteOp.setDeletes({buildDelete(BSON("_id" << 1), false)});
+        return deleteOp;
+    }());
+
+    requests.emplace_back(&updateRequest);
+    requests.emplace_back(&deleteRequest);
+
+    makeCollectionRoutingInfo(kNss, _shardKeyPattern, nullptr, false, {BSON("x" << 0)}, {});
+    _criTargeter = CollectionRoutingInfoTargeter(getOpCtx(), kNss);
+
+    const TxnNumber kTxnNumber = 0;
+    getOpCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    getOpCtx()->setTxnNumber(kTxnNumber);
+    repl::ReadConcernArgs::get(getOpCtx()) =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    boost::optional<RouterOperationContextSession> _scopedSession(getOpCtx());
+
+    auto txnRouter = TransactionRouter::get(getOpCtx());
+    txnRouter.beginOrContinueTxn(
+        getOpCtx(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
+
+    for (auto request : requests) {
+        BatchWriteOp batchOp(getOpCtx(), *request);
+
+        std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+        auto status = batchOp.targetBatch(getCollectionRoutingInfoTargeter(), false, &targeted);
+        ASSERT_OK(status);
+        ASSERT_NE(status.getValue(), WriteType::WithoutShardKeyWithId);
+        // This should still be a broadcast
+        ASSERT_EQ(targeted.size(), 2);
+    }
+    _scopedSession.reset();
 }
 
 }  // namespace

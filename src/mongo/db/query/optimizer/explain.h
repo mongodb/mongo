@@ -82,6 +82,7 @@ public:
     constexpr static StringData kDir = "direction"_sd;
     constexpr static StringData kForward = "forward"_sd;
     constexpr static StringData kBackward = "backward"_sd;
+    constexpr static StringData kRandom = "random"_sd;
 
     // Specific to FilterNode.
     constexpr static StringData kFilterName = "FILTER"_sd;
@@ -160,8 +161,19 @@ public:
 
         bob->append(kStage, kScanName);
         bob->append(kNodeId, props._planNodeId);
-        // TOOD SERVER-82876: Populate the scan direction here accordingly.
-        bob->append(kDir, "<todo>");
+
+        switch (node.getScanOrder()) {
+            case ScanOrder::Forward:
+                bob->append(kDir, kForward);
+                break;
+            case ScanOrder::Reverse:
+                bob->append(kDir, kBackward);
+                break;
+            case ScanOrder::Random:
+                bob->append(kDir, kRandom);
+                break;
+        }
+
         bob->append(kProj, "<todo>");
         bob->append(kCE, "<todo>");
     }

@@ -182,6 +182,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/util/procparser" if env.TargetOSIs('linux') else [],
     ],
     LIBDEPS_PRIVATE=[
         'pcre_wrapper',
@@ -794,6 +795,8 @@ icuEnv.CppUnitTest(
         'lru_cache_test.cpp',
         'md5_test.cpp',
         'md5main.cpp',
+        'concurrent_memory_aggregator_test.cpp',
+        'memory_usage_tracker_test.cpp',
         'optional_util_test.cpp',
         'out_of_line_executor_test.cpp',
         'overloaded_visitor_test.cpp',

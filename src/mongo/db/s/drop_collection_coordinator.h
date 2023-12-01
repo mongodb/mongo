@@ -76,12 +76,17 @@ public:
     /**
      * Locally drops a collection, cleans its CollectionShardingRuntime metadata and refreshes the
      * catalog cache.
-     * The oplog entry associated with the drop collection will be generated with the fromMigrate
-     * flag.
+     *
+     * When fromMigrate is set, the related oplog entry will be marked with a 'fromMigrate' field to
+     * reduce its visibility.
+     *
+     * When dropSystemCollections is set, system collections are allowed to be dropped. Therefore,
+     * if nss is a system collection but dropSystemCollections is false, the drop will fail.
      */
     static void dropCollectionLocally(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      bool fromMigrate);
+                                      bool fromMigrate,
+                                      bool dropSystemCollections);
 
 private:
     const BSONObj _critSecReason;

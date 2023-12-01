@@ -127,7 +127,7 @@ TEST(ExpressionOptimizeTest, IsValidText) {
     // Valid: TEXT outside NOR.
     ASSERT_OK(isValid("{$text: {$search: 's'}, $nor: [{a: 1}, {b: 1}]}", *findCommand));
 
-    // Invalid: TEXT inside NOR. Boolean expression simplifier does not simplify it.
+    // Invalid: TEXT inside NOR.
     ASSERT_NOT_OK(isValid("{$nor: [{$text: {$search: 's'}}, {a: 1}]}", *findCommand));
 
     // Valid: Boolean expression simplifier opens up $nor expressions.
@@ -516,6 +516,21 @@ TEST(ExpressionOptimizeTest, NorWithAlwaysTrueChildOptimizesToAlwaysFalse) {
     std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
     auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
     ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(), fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST(ExpressionOptimizeTest, EmptyInOptimizesToAlwaysFalse) {
+    BSONObj obj = fromjson("{x: {$in: []}}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(), fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST(ExpressionOptimizeTest, InWithJustRegexesIsNotOptimizedToAlwaysFalse) {
+    BSONObj obj = fromjson("{x: {$in: [/foo/, /bar/]}}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(),
+                      fromjson("{x: {$in: [/foo/, /bar/]}}"));
 }
 }  // namespace
 }  // namespace mongo

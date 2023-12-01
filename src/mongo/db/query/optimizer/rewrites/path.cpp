@@ -117,7 +117,9 @@ bool PathFusion::fuse(ABT& lhs, const ABT& rhs) {
             // constant.
             if (lhsCmp->op() == Operations::EqMember) {
                 auto result = make<PathConstant>(make<If>(
-                    make<FunctionCall>("isArray", makeSeq(lhsCmp->getVal())),
+                    make<BinaryOp>(Operations::Or,
+                                   make<FunctionCall>("isArray", makeSeq(lhsCmp->getVal())),
+                                   make<FunctionCall>("isInListData", makeSeq(lhsCmp->getVal()))),
                     make<BinaryOp>(Operations::EqMember, rhsConst->getConstant(), lhsCmp->getVal()),
                     make<BinaryOp>(Operations::Eq,
                                    make<BinaryOp>(Operations::Cmp3w,

@@ -3,6 +3,7 @@
  */
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 /**
@@ -56,9 +57,12 @@ export function checkSBEEnabled(theDB, featureFlags = [], checkAllNodes = false)
                 }
 
                 featureFlags.forEach(function(featureFlag) {
-                    const featureFlagParam = conn.adminCommand({getParameter: 1, [featureFlag]: 1});
-                    checkResult = checkResult && featureFlagParam.hasOwnProperty(featureFlag) &&
-                        featureFlagParam[featureFlag]["value"];
+                    const kFeatureFlagPrefix = "featureFlag";
+                    if (featureFlag.startsWith(kFeatureFlagPrefix)) {
+                        featureFlag = featureFlag.substring(kFeatureFlagPrefix.length);
+                    }
+                    checkResult =
+                        checkResult && FeatureFlagUtil.isPresentAndEnabled(conn, featureFlag);
                 });
 
                 // Exit `assert.soon` if we are only analyzing one node in the cluster.

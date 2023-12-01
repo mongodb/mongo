@@ -75,19 +75,36 @@ TEST_F(QueryPlannerTest, EqualityIndexScanWithTrailingFields) {
 TEST_F(QueryPlannerTest, ExprEqCanUseIndex) {
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("a" << 1));
-    runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
+    runQuery(fromjson("{$expr: {$eq: ['$a', 1]}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: {pattern: {a: 1}, bounds: {a: "
+        "{fetch: {filter: {$expr: {$eq: ['$a', {$const: 1}]}}, node: {ixscan: {pattern: {a: 1}, "
+        "bounds: {a: "
         "[[1,1,true,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, ExprEqCannotUseMultikeyFieldOfIndex) {
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(BSON("a.b" << 1), multikeyPaths);
-    runQuery(fromjson("{'a.b': {$_internalExprEq: 1}}"));
+    runQuery(fromjson("{$expr: {$eq: ['$a.b', 1]}}"));
     assertNumSolutions(1U);
-    assertSolutionExists("{cscan: {dir: 1, filter: {'a.b': {$_internalExprEq: 1}}}}");
+    assertSolutionExists("{cscan: {dir: 1, filter: {$and: [{$expr: {$eq: ['$a.b', 1]}}]}}}");
+}
+
+// Test that when a $expr predicate is ANDed with an index-eligible predicate, an imprecise
+// $_internalExpr predicate is pushed into the IXSCAN bounds, to filter out results before fetching.
+TEST_F(QueryPlannerTest, ExprQueryOnMultiKeyIndexPushesImpreciseFilterToIxscan) {
+    params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1), false /* multikey */);
+    runQuery(fromjson("{$and: [{a: 123}, {$expr: {$eq: ['$b', 456]}}]}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{cscan: {filter: {$and: [{a: 123}, {$expr: {$eq: ['$b', 456]}}]}, dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$expr: {$eq: ['$b', 456]}}, node: "
+        "{ixscan: {pattern: {a:1,b:1}, bounds: "
+        "{a: [[123,123,true,true]], b: [[456,456,true,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, MustFetchWhenIndexKeyRequiredToCoverSortIsMultikey) {
@@ -220,22 +237,22 @@ TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndex) {
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("a"
                   << "hashed"));
-    runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
+    runQuery(fromjson("{$expr: {$eq: ['$a', 1]}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
-        "{fetch: {filter: {a: {$_internalExprEq: 1}}, node: {ixscan: {filter: null, pattern: {a: "
-        "'hashed'}}}}}");
+        "{fetch: {filter: {$and: [{$expr: {$eq: ['$a', {$const: 1}]}}]}, node: "
+        "{ixscan: {filter: null, pattern: {a: 'hashed'}}}}}");
 }
 
 TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndexWithRegex) {
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("a"
                   << "hashed"));
-    runQuery(fromjson("{a: {$_internalExprEq: /abc/}}"));
+    runQuery(fromjson("{$expr: {$eq: ['$a', /abc/]}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
-        "{fetch: {filter: {a: {$_internalExprEq: /abc/}}, node: {ixscan: {filter: null, pattern: "
-        "{a: 'hashed'}}}}}");
+        "{fetch: {filter: {$and: [{$expr: {$eq: ['$a', {$const: /abc/}]}}]}, node: "
+        "{ixscan: {filter: null, pattern: {a: 'hashed'}}}}}");
 }
 
 

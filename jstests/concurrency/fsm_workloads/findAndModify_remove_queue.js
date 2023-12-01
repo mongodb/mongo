@@ -15,7 +15,7 @@ export const $config = (function() {
     var data = {
         // Use the workload name as the database name, since the workload name is assumed to be
         // unique.
-        uniqueDBName: 'findAndModify_remove_queue',
+        uniqueDBName: jsTestName(),
 
         newDocForInsert: function newDocForInsert(i) {
             return {_id: i, rand: Random.rand()};

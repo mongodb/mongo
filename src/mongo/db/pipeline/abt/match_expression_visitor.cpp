@@ -253,35 +253,17 @@ public:
             }
         }
 
-        // If there is only one term in the match expression, we don't need to use EqMember
-        if (arrTraversePtr->size() == 1) {
-            const auto [tagSingle, valSingle] = sbe::value::copyValue(
-                arrTraversePtr->getAt(0).first, arrTraversePtr->getAt(0).second);
-
-            if (expr->getInputParamId())
-                result =
-                    make<FunctionCall>(kParameterFunctionName,
-                                       makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32,
-                                                              *expr->getInputParamId()),
-                                               make<Constant>(sbe::value::TypeTags::NumberInt32,
-                                                              static_cast<int>(tagSingle))));
-            else
-                result = make<Constant>(tagSingle, valSingle);
-            result = make<PathCompare>(Operations::Eq, std::move(result));
+        if (expr->getInputParamId()) {
+            result = make<FunctionCall>(
+                kParameterFunctionName,
+                makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32, *expr->getInputParamId()),
+                        make<Constant>(sbe::value::TypeTags::NumberInt32,
+                                       static_cast<int>(tagTraverse))));
         } else {
-            if (expr->getInputParamId()) {
-                result =
-                    make<FunctionCall>(kParameterFunctionName,
-                                       makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32,
-                                                              *expr->getInputParamId()),
-                                               make<Constant>(sbe::value::TypeTags::NumberInt32,
-                                                              static_cast<int>(tagTraverse))));
-            } else {
-                result = make<Constant>(tagTraverse, valTraverse);
-                arrGuard.reset();
-            }
-            result = make<PathCompare>(Operations::EqMember, std::move(result));
+            result = make<Constant>(tagTraverse, valTraverse);
+            arrGuard.reset();
         }
+        result = make<PathCompare>(Operations::EqMember, std::move(result));
 
         if (addNullPathDefault) {
             maybeComposePath<PathComposeA>(result, make<PathDefault>(Constant::boolean(true)));
@@ -484,15 +466,16 @@ public:
 
         const ProjectionName lambdaProjName{_ctx.getNextId("lambda_sizeMatch")};
         auto result = [&]() {
-            if (expr->getInputParamId())
+            if (expr->getInputParamId()) {
                 return make<FunctionCall>(
                     kParameterFunctionName,
                     makeSeq(
                         make<Constant>(sbe::value::TypeTags::NumberInt32, *expr->getInputParamId()),
                         make<Constant>(sbe::value::TypeTags::NumberInt32,
                                        static_cast<int>(sbe::value::TypeTags::NumberInt32))));
-            else
+            } else {
                 return Constant::int64(expr->getData());
+            }
         }();
         result = make<PathLambda>(make<LambdaAbstraction>(
             lambdaProjName,
@@ -595,14 +578,18 @@ private:
         assertSupportedPathExpression(expr);
 
         auto [tag, val] = sbe::value::makeValue(Value(expr->getData()));
+        sbe::value::ValueGuard guard{tag, val};
+
         auto result = ABT{make<PathIdentity>()};
-        if (expr->getInputParamId())
+        if (expr->getInputParamId()) {
             result = make<FunctionCall>(
                 kParameterFunctionName,
                 makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32, *expr->getInputParamId()),
                         make<Constant>(sbe::value::TypeTags::NumberInt32, static_cast<int>(tag))));
-        else
+        } else {
             result = make<Constant>(tag, val);
+            guard.reset();
+        }
         result = make<PathCompare>(op, std::move(result));
 
         bool tagNullMatchMissingField =

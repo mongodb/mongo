@@ -52,16 +52,19 @@ assert.eq(null, doc._id, tojson(doc));
 // Tests that failing to insert an invalid document with a regex for the _id field will not result
 // in the collection being created.
 // Previously in insert2.js (tagged with assumes_no_implicit_collection_creation_after_drop).
-t = db.getCollection(collNamePrefix + collCount++);
-t.drop();
-if (t.exists()) {
+const originalImplicitlyShardOnCreateCollectionOnly =
+    TestData.implicitlyShardOnCreateCollectionOnly;
+try {
     // Some passthroughs, sharded test fixtures for example, may override DB.getCollection() or
-    // DB.drop() to create and shard the collection.
-    jsTestLog('Collection implicitly created after DB.getCollection(): ' + t.getFullName() +
-              ' Skipping regex _id test.');
-} else {
+    // DB.drop() to create and shard the collection. We should disable the collection creation on
+    // other functions than DB.createCollection() to test this part properly.
+    TestData.implicitlyShardOnCreateCollectionOnly = true;
+    t = db.getCollection(collNamePrefix + collCount++);
+    t.drop();
     assert.commandFailed(t.insert({_id: /x/}));
     assert.isnull(t.exists());
+} finally {
+    TestData.implicitlyShardOnCreateCollectionOnly = originalImplicitlyShardOnCreateCollectionOnly;
 }
 
 // Tests that _id field can be a number and handling of bulk write results over

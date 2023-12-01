@@ -271,3 +271,18 @@ try {
     db.setLogLevel(originalCmdLogLevel, 'command');
     db.setLogLevel(originalQueryLogLevel, 'query');
 }
+
+jsTestLog("Testing tailable cursors with trivially false conditions...");
+cmdRes = assert.commandWorked(db.runCommand(
+    {find: collName, batchSize: 2, filter: {$alwaysFalse: 1}, awaitData: true, tailable: true}));
+assert.gt(cmdRes.cursor.id, NumberLong(0));
+assert.eq(cmdRes.cursor.ns, coll.getFullName());
+assert.eq(cmdRes.cursor.firstBatch.length, 0);
+
+assert.commandWorked(coll.insert({_id: "new insertion", x: 123}));
+
+cmdRes = assert.commandWorked(
+    db.runCommand({getMore: cmdRes.cursor.id, collection: collName, batchSize: 1}));
+assert.gt(cmdRes.cursor.id, NumberLong(0));
+assert.eq(cmdRes.cursor.ns, coll.getFullName());
+assert.eq(cmdRes.cursor.nextBatch.length, 0);

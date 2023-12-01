@@ -155,6 +155,14 @@ public:
         return false;
     }
 
+    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault) const override {
+        static const Status kDefaultReadConcernNotPermitted{
+            ErrorCodes::InvalidOptions,
+            "Explain does not permit default readConcern to be applied."};
+        return {Status::OK(), {kDefaultReadConcernNotPermitted}};
+    }
+
     /**
      * You are authorized to run an explain if you are authorized to run
      * the command that you are explaining. The auth check is performed recursively

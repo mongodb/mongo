@@ -163,6 +163,7 @@ const allCommands = {
     appendOplogNote: {skip: isPrimaryOnly},
     applyOps: {skip: isPrimaryOnly},
     authenticate: {skip: isNotAUserDataRead},
+    autoCompact: {skip: isNotAUserDataRead},
     autoSplitVector: {skip: isPrimaryOnly},
     buildInfo: {skip: isNotAUserDataRead},
     bulkWrite: {skip: isPrimaryOnly},

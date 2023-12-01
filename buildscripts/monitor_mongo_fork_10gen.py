@@ -1,6 +1,6 @@
 import argparse
 import sys
-from typing import Optional
+from typing import List, Optional
 from github import Github, GithubIntegration, GithubException
 
 from buildscripts.util.read_config import read_config_file
@@ -48,25 +48,26 @@ def get_users_who_forked_mongo_repo(owner: str, repo: str, token: str) -> list[s
     return [fork.owner.login for fork in repository.get_forks() if not fork.archived]
 
 
-def is_10gen_member(user: str, org: str, token: str) -> bool:  # noqa: D406
+def are_users_members_of_org(users: List[str], org: str, token: str) -> List[str]:  # noqa: D406
     """
-    Check if a user is a member of a particular organization.
+    Check if users are members of a particular organization.
 
     Args:
-    - user: The username to check.
+    - users: A list of usernames to check.
     - org: The organization name to check against.
     - token: The GitHub authentication token.
 
     Returns:
-    - bool: True if the user is a member of the organization, otherwise False.
+    - List[str]: A list of usernames who are members of the organization.
     """
     try:
         github_client = Github(token)
         organization = github_client.get_organization(org)
-        user_obj = github_client.get_user(user)
-        return organization.has_in_members(user_obj)
-    except GithubException:
-        return False
+        org_member_usernames = set(member.login for member in organization.get_members())
+        return [user for user in users if user in org_member_usernames]
+    except GithubException as e:
+        print(f"An exception occurred: {e}")
+        raise
 
 
 def main():
@@ -97,10 +98,16 @@ def main():
     forked_users = get_users_who_forked_mongo_repo('mongodb', 'mongo', access_token_mongodb_forks)
     print(f"Recent forks info: {forked_users}")
 
+    #TODO: SERVER-83253: Request for Deletion of mongodb/mongo Fork
+    #TODO: SERVER-83254: Request for Deletion of mongodb/mongo Fork
+    exclude_list = ['RedBeard0531', 'hanumantmk']
+
     # Filter out users who are members of the specified organization
     members_from_10gen = [
-        user for user in forked_users if is_10gen_member(user, '10gen', access_token_10gen_member)
+        user for user in are_users_members_of_org(forked_users, '10gen', access_token_10gen_member)
+        if user not in exclude_list
     ]
+
     # Sort so list is easier to see diffs of time over time
     members_from_10gen.sort()
 

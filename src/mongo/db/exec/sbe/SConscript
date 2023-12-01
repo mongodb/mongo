@@ -12,6 +12,18 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='query_sbe_makeobj_spec',
+    source=[
+        'makeobj_spec.cpp',
+        'size_estimator.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/sbe_values',
+    ],
+)
+
 sbeEnv = env.Clone()
 sbeEnv.InjectThirdParty(libraries=['snappy'])
 sbeEnv.Library(
@@ -23,9 +35,7 @@ sbeEnv.Library(
         'expressions/expression.cpp',
         'expressions/runtime_environment.cpp',
         'extended_types.cpp',
-        'makeobj_spec.cpp',
         'sbe_pattern_value_cmp.cpp',
-        'size_estimator.cpp',
         'sort_spec.cpp',
         'util/debug_print.cpp',
         'util/pcre.cpp',
@@ -40,6 +50,7 @@ sbeEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_makeobj_spec',
         '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/mongohasher',
@@ -300,6 +311,17 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/ce/query_ce_sampling',
+        'sbe_abt_test_util',
+    ],
+)
+
+env.CppUnitTest(
+    target='makeobj_spec_hash_test',
+    source=[
+        'makeobj_spec_hash_test.cpp',
+    ],
+    LIBDEPS=[
+        'query_sbe_makeobj_spec',
         'sbe_abt_test_util',
     ],
 )

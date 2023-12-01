@@ -34,25 +34,32 @@ function testParametersInHealthlog() {
     jsTestLog("Testing that health log contains validateMode parameters.");
 
     // The start and stop health log entries on the primary and secondary nodes should contain the
-    // default validateMode parameter dataConsistency.
+    // default validateMode parameter dataConsistency and the default bsonValidateMode parameter
+    // kDefault when no bsonValidateMode parameter was passed in (so the default is `kDefault`).
     resetAndInsert(replSet, db, colName, nDocs);
     let dbCheckParameters = {maxDocsPerBatch: maxDocsPerBatch, batchWriteConcern: writeConcern};
     runDbCheck(replSet, db, colName, dbCheckParameters);
     let query = {
         namespace: dbName + "." + colName,
         collectionUUID: getUUIDFromListCollections(db, colName),
-        data: {validateMode: "dataConsistency", secondaryIndex: "", skipLookupForExtraKeys: false}
+        data: {
+            validateMode: "dataConsistency",
+            secondaryIndex: "",
+            skipLookupForExtraKeys: false,
+            bsonValidateMode: "kDefault"
+        }
     };
     checkHealthLog(primaryHealthlog, query, 2);
     checkHealthLog(secondaryHealthlog, query, 2);
 
     // The start and stop health log entries on the primary and secondary nodes should contain the
-    // validateMode parameter.
+    // validateMode and bsonValidateMode parameters that are passed in.
     resetAndInsert(replSet, db, colName, nDocs);
     dbCheckParameters = {
         maxDocsPerBatch: maxDocsPerBatch,
         batchWriteConcern: writeConcern,
-        validateMode: "dataConsistencyAndMissingIndexKeysCheck"
+        validateMode: "dataConsistencyAndMissingIndexKeysCheck",
+        bsonValidateMode: "kExtended"
     };
     runDbCheck(replSet, db, colName, dbCheckParameters);
     query = {
@@ -61,14 +68,17 @@ function testParametersInHealthlog() {
         data: {
             validateMode: "dataConsistencyAndMissingIndexKeysCheck",
             secondaryIndex: "",
-            skipLookupForExtraKeys: false
+            skipLookupForExtraKeys: false,
+            bsonValidateMode: "kExtended"
         }
     };
     checkHealthLog(primaryHealthlog, query, 2);
     checkHealthLog(secondaryHealthlog, query, 2);
 
     // The start and stop health log entries on the primary and secondary nodes should contain the
-    // secondaryIndex parameter when validateMode is extraIndexKeysCheck
+    // secondaryIndex parameter when validateMode is extraIndexKeysCheck and the default
+    // bsonValidateMode parameter kDefault when no bsonValidateMode parameter was passed in (so the
+    // default is `kDefault`).
     resetAndInsert(replSet, db, colName, nDocs);
     dbCheckParameters = {
         maxDocsPerBatch: maxDocsPerBatch,
@@ -84,7 +94,8 @@ function testParametersInHealthlog() {
         data: {
             validateMode: "extraIndexKeysCheck",
             secondaryIndex: "secondaryIndex",
-            skipLookupForExtraKeys: true
+            skipLookupForExtraKeys: true,
+            bsonValidateMode: "kDefault"
         }
     };
     checkHealthLog(primaryHealthlog, query, 2);

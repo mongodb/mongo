@@ -183,6 +183,7 @@ BatchTransform makeUpdateTransform(const std::string& updateOp) {
  * field of the 'on' extracted from 'doc' is nullish or an array.
  */
 BSONObj extractMergeOnFieldsFromDoc(const Document& doc, const std::set<FieldPath>& mergeOnFields) {
+    using namespace fmt::literals;
     MutableDocument result;
     for (const auto& field : mergeOnFields) {
         auto value = doc.getNestedField(field);
@@ -313,14 +314,11 @@ MergeProcessor::MergeProcessor(const boost::intrusive_ptr<ExpressionContext>& ex
                                MergeStrategyDescriptor::WhenNotMatched whenNotMatched,
                                boost::optional<BSONObj> letVariables,
                                boost::optional<std::vector<BSONObj>> pipeline,
-                               std::set<FieldPath> mergeOnFields,
                                boost::optional<ChunkVersion> collectionPlacementVersion)
     : _expCtx(expCtx),
       _writeConcern(expCtx->opCtx->getWriteConcern()),
       _descriptor(getMergeStrategyDescriptors().at({whenMatched, whenNotMatched})),
       _pipeline(std::move(pipeline)),
-      _mergeOnFields(std::move(mergeOnFields)),
-      _mergeOnFieldsIncludesId(_mergeOnFields.count("_id") == 1),
       _collectionPlacementVersion(collectionPlacementVersion) {
     if (letVariables) {
         _letVariables.emplace();
@@ -336,15 +334,18 @@ MergeProcessor::MergeProcessor(const boost::intrusive_ptr<ExpressionContext>& ex
     }
 }
 
-MongoProcessInterface::BatchObject MergeProcessor::makeBatchObject(Document doc) const {
+MongoProcessInterface::BatchObject MergeProcessor::makeBatchObject(
+    Document doc,
+    const std::set<FieldPath>& mergeOnFieldPaths,
+    bool mergeOnFieldPathsIncludeId) const {
     // Generate an _id if the uniqueKey includes _id but the document doesn't have one.
-    if (_mergeOnFieldsIncludesId && doc.getField("_id"_sd).missing()) {
+    if (mergeOnFieldPathsIncludeId && doc.getField("_id"_sd).missing()) {
         MutableDocument mutableDoc(std::move(doc));
         mutableDoc["_id"_sd] = Value(OID::gen());
         doc = mutableDoc.freeze();
     }
 
-    auto mergeOnFields = extractMergeOnFieldsFromDoc(doc, _mergeOnFields);
+    auto mergeOnFields = extractMergeOnFieldsFromDoc(doc, mergeOnFieldPaths);
     auto mod = makeBatchUpdateModification(doc);
     auto vars = resolveLetVariablesIfNeeded(doc);
     MongoProcessInterface::BatchObject batchObject{

@@ -57,6 +57,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
@@ -118,6 +119,13 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
         if (suggestedPrimaryId)
             request.setPrimaryShardId(*suggestedPrimaryId);
 
+        // If this is a database creation triggered by a command running inside a transaction, the
+        // _configsvrCreateDatabase command here will also need to run inside that session. Yield
+        // the session here. Otherwise, if this router is also the configsvr primary, the
+        // _configsvrCreateDatabase command would not be able to check out the session.
+        auto txnRouterResourceYielder = std::make_unique<TransactionRouterResourceYielder>();
+        txnRouterResourceYielder->yield(opCtx);
+
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
             opCtx,
@@ -125,6 +133,8 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
             DatabaseName::kAdmin,
             CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
             Shard::RetryPolicy::kIdempotent));
+
+        uassertStatusOK(txnRouterResourceYielder->unyieldNoThrow(opCtx));
         uassertStatusOK(response.writeConcernStatus);
         uassertStatusOKWithContext(response.commandStatus,
                                    str::stream() << "Database " << dbName.toStringForErrorMsg()

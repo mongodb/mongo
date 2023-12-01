@@ -68,12 +68,20 @@ namespace {
  *  - Infinity: /(?i)^[+-]?inf(inity)?$)
  */
 size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
+    if (input.empty()) {
+        *signalingFlags = Decimal128::SignalingFlag::kInvalid;
+        return 0;
+    }
     bool isSigned = input[0] == '-' || input[0] == '+';
 
     // Check for NaN and Infinity
     size_t start = (isSigned) ? 1 : 0;
     size_t charsConsumed = start;
     StringData noSign = input.substr(start);
+    if (noSign.empty()) {
+        *signalingFlags = Decimal128::SignalingFlag::kInvalid;
+        return 0;
+    }
     bool isNanOrInf = noSign.equalCaseInsensitive("nan") || noSign.equalCaseInsensitive("inf") ||
         noSign.equalCaseInsensitive("infinity");
 

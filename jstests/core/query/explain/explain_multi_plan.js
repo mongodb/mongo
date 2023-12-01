@@ -7,6 +7,8 @@
 //   does_not_support_causal_consistency,
 // ]
 
+import {hasRejectedPlans} from "jstests/libs/analyze_plan.js";
+
 /**
  * Tests running explain on a variety of explainable commands (find, update, remove, etc.) when
  * there are multiple plans available. This is a regression test for SERVER-20849 and SERVER-21376.
@@ -55,25 +57,10 @@ assert.doesNotThrow(function() {
     coll.explain("allPlansExecution").distinct("a", {a: {$gte: 1}});
 });
 
-// SERVER-21376: Make sure the 'rejectedPlans' field is filled in appropriately.
-function assertHasRejectedPlans(explainOutput) {
-    var queryPlannerOutput = explainOutput.queryPlanner;
-
-    // The 'rejectedPlans' section will be in a different place if passed through a mongos.
-    if ("SINGLE_SHARD" == queryPlannerOutput.winningPlan.stage) {
-        var shards = queryPlannerOutput.winningPlan.shards;
-        shards.forEach(function assertShardHasRejectedPlans(shard) {
-            assert.gt(shard.rejectedPlans.length, 0);
-        });
-    } else {
-        assert.gt(queryPlannerOutput.rejectedPlans.length, 0);
-    }
-}
-
 var res = coll.explain("queryPlanner").find({a: {$gte: 1}}).finish();
 assert.commandWorked(res);
-assertHasRejectedPlans(res);
+assert(hasRejectedPlans(res));
 
 res = coll.explain("executionStats").find({a: {$gte: 1}}).finish();
 assert.commandWorked(res);
-assertHasRejectedPlans(res);
+assert(hasRejectedPlans(res));

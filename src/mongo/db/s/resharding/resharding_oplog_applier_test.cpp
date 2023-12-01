@@ -72,7 +72,6 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
@@ -99,6 +98,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -173,10 +173,11 @@ public:
         ShardingMongodTestFixture::setUp();
 
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-
-        auto clusterId = OID::gen();
         ShardingState::get(getServiceContext())
-            ->setInitialized(_sourceId.getShardId().toString(), clusterId);
+            ->setRecoveryCompleted({OID::gen(),
+                                    ClusterRole::ShardServer,
+                                    ConnectionString(kConfigHostAndPort),
+                                    _sourceId.getShardId()});
 
         auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
         _mockCatalogCacheLoader = mockLoader.get();

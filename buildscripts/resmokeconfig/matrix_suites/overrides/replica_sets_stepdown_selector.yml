@@ -60,6 +60,13 @@
       - jstests/fle2/**/*.js
       - src/mongo/db/modules/*/jstests/fle2/**/*.js
 
+- name: kill_primary_jscore_passthrough_exclude_files_aggregation
+  value:
+    selector:
+      exclude_files:
+        - jstests/aggregation/**/*.js
+
+
 - name: reconfig_kill_primary_jscore_passthrough_exclude_files
   value:
     selector:

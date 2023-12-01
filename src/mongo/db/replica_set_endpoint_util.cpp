@@ -29,12 +29,15 @@
 
 #include "mongo/db/replica_set_endpoint_util.h"
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/s/replica_set_endpoint_feature_flag_gen.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -49,6 +52,21 @@ namespace {
 bool isInternalClient(OperationContext* opCtx) {
     return !opCtx->getClient()->session() || opCtx->getClient()->isInternalClient() ||
         opCtx->getClient()->isInDirectClient();
+}
+
+/**
+ * Returns true if this is a request for an unreplicated database or collection.
+ */
+bool isUnreplicatedDatabaseOrCollectionCommandRequest(const OpMsgRequest& opMsgReq) {
+    if (opMsgReq.getDbName().isLocalDB()) {
+        return true;
+    }
+    if (const auto& firstElement = opMsgReq.body.firstElement();
+        firstElement.type() == BSONType::String &&
+        firstElement.String() == NamespaceString::kSystemDotProfileCollectionName) {
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -72,14 +90,35 @@ bool isTargetedCommandRequest(OperationContext* opCtx, const OpMsgRequest& opMsg
 }
 
 /**
+ * Returns the router service.
+ */
+Service* getRouterService(OperationContext* opCtx) {
+    auto routerService = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
+    invariant(routerService);
+    return routerService;
+}
+
+/**
  * Returns true if this is a request for a command that does not exist on a router.
  */
 bool isRoutableCommandRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
-    Service routerService{opCtx->getServiceContext(), ClusterRole::RouterServer};
-    return CommandHelpers::findCommand(&routerService, opMsgReq.getCommandName());
+    return CommandHelpers::findCommand(getRouterService(opCtx), opMsgReq.getCommandName());
 }
 
 }  // namespace
+
+ScopedSetRouterService::ScopedSetRouterService(OperationContext* opCtx)
+    : _opCtx(opCtx), _originalService(opCtx->getService()) {
+    // Verify that the opCtx is not using the router service already.
+    invariant(!_originalService->role().has(ClusterRole::RouterServer));
+    _opCtx->getClient()->setService(getRouterService(opCtx));
+}
+
+ScopedSetRouterService::~ScopedSetRouterService() {
+    // Verify that the opCtx is still using the router service.
+    invariant(_opCtx->getService()->role().has(ClusterRole::RouterServer));
+    _opCtx->getClient()->setService(_originalService);
+}
 
 bool isReplicaSetEndpointClient(Client* client) {
     if (client->isRouterClient()) {
@@ -107,7 +146,7 @@ bool shouldRouteRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
         return false;
     }
 
-    if (isInternalClient(opCtx) || opMsgReq.getDbName().isLocalDB() ||
+    if (isInternalClient(opCtx) || isUnreplicatedDatabaseOrCollectionCommandRequest(opMsgReq) ||
         isTargetedCommandRequest(opCtx, opMsgReq) || !isRoutableCommandRequest(opCtx, opMsgReq)) {
         return false;
     }

@@ -68,7 +68,7 @@ BSONObj UniversalKeyComponents::shapifyReadConcern(const BSONObj& readConcern,
                                                    const SerializationOptions& opts) {
     // Read concern should not be considered a literal.
     // afterClusterTime is distinct for every operation with causal consistency enabled. We
-    // normalize it in order not to blow out the telemetry store cache.
+    // normalize it in order not to blow out the queryStats store cache.
     if (readConcern["afterClusterTime"].eoo()) {
         return readConcern.copy();
     } else {

@@ -47,9 +47,9 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/sbe_plan_cache.h"
@@ -59,7 +59,6 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
@@ -71,6 +70,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -136,7 +136,7 @@ CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* service, Na
 CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime
 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(OperationContext* opCtx,
                                                                   const NamespaceString& nss) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS) ||
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IS) ||
             (nss.isCommand() && opCtx->inMultiDocumentTransaction()));
     return ScopedSharedCollectionShardingRuntime(
         ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_IS));
@@ -145,7 +145,7 @@ CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(OperationConte
 CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime
 CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(OperationContext* opCtx,
                                                                      const NamespaceString& nss) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
+    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IS));
     return ScopedExclusiveCollectionShardingRuntime(
         ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_X));
 }
@@ -477,16 +477,17 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         : ShardVersionPlacementIgnoredNoIndexes();
 
     {
-        auto criticalSectionSignal = _critSec.getSignal(
-            opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
-                                                : ShardingMigrationCriticalSection::kRead);
+        auto criticalSectionSignal =
+            _critSec.getSignal(shard_role_details::getLocker(opCtx)->isWriteLocked()
+                                   ? ShardingMigrationCriticalSection::kWrite
+                                   : ShardingMigrationCriticalSection::kRead);
         std::string reason = _critSec.getReason() ? _critSec.getReason()->toString() : "unknown";
         uassert(StaleConfigInfo(_nss,
                                 receivedShardVersion,
                                 boost::none /* wantedVersion */,
                                 ShardingState::get(opCtx)->shardId(),
                                 std::move(criticalSectionSignal),
-                                opCtx->lockState()->isWriteLocked()
+                                shard_role_details::getLocker(opCtx)->isWriteLocked()
                                     ? StaleConfigInfo::OperationType::kWrite
                                     : StaleConfigInfo::OperationType::kRead),
                 str::stream() << "The critical section for " << _nss.toStringForErrorMsg()
@@ -517,7 +518,6 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         ShardVersionFactory::make(currentMetadata, wantedCollectionIndexes);
 
     const ChunkVersion receivedPlacementVersion = receivedShardVersion.placementVersion();
-
     const bool isPlacementVersionIgnored =
         ShardVersion::isPlacementVersionIgnored(receivedShardVersion);
     const boost::optional<Timestamp> receivedIndexVersion = receivedShardVersion.indexVersion();
@@ -690,7 +690,7 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
 
 CollectionCriticalSection::~CollectionCriticalSection() {
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(_opCtx));  // NOLINT.
     AutoGetCollection autoColl(_opCtx, _nss, MODE_IX);
     auto scopedCsr =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, _nss);
@@ -777,16 +777,17 @@ void CollectionShardingRuntime::_checkCritSecForIndexMetadata(OperationContext* 
     const auto& receivedShardVersion = optReceivedShardVersion
         ? *optReceivedShardVersion
         : ShardVersionPlacementIgnoredNoIndexes();
-    auto criticalSectionSignal = _critSec.getSignal(opCtx->lockState()->isWriteLocked()
-                                                        ? ShardingMigrationCriticalSection::kWrite
-                                                        : ShardingMigrationCriticalSection::kRead);
+    auto criticalSectionSignal =
+        _critSec.getSignal(shard_role_details::getLocker(opCtx)->isWriteLocked()
+                               ? ShardingMigrationCriticalSection::kWrite
+                               : ShardingMigrationCriticalSection::kRead);
     std::string reason = _critSec.getReason() ? _critSec.getReason()->toString() : "unknown";
     uassert(StaleConfigInfo(_nss,
                             receivedShardVersion,
                             boost::none /* wantedVersion */,
                             ShardingState::get(opCtx)->shardId(),
                             std::move(criticalSectionSignal),
-                            opCtx->lockState()->isWriteLocked()
+                            shard_role_details::getLocker(opCtx)->isWriteLocked()
                                 ? StaleConfigInfo::OperationType::kWrite
                                 : StaleConfigInfo::OperationType::kRead),
             str::stream() << "The critical section for " << _nss.toStringForErrorMsg()

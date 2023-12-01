@@ -37,11 +37,9 @@
 #include <mutex>
 #include <string>
 
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context.h"
@@ -51,8 +49,8 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
 namespace {
+
 thread_local ServiceContext::UniqueClient currentClient;
 
 void invariantNoCurrentClient() {
@@ -60,6 +58,7 @@ void invariantNoCurrentClient() {
               str::stream() << "Already have client on this thread: "  //
                             << '"' << Client::getCurrent()->desc() << '"');
 }
+
 }  // namespace
 
 void Client::initThread(StringData desc,
@@ -134,12 +133,6 @@ std::string Client::clientAddress(bool includePort) const {
 
 Client* Client::getCurrent() {
     return currentClient.get();
-}
-
-std::unique_ptr<Locker> Client::swapLockState(std::unique_ptr<Locker> locker) {
-    scoped_spinlock scopedLock(_lock);
-    invariant(_opCtx);
-    return _opCtx->swapLockState(std::move(locker), scopedLock);
 }
 
 Client& cc() {

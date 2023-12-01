@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/health_log_gen.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -300,7 +301,7 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
                                IncludeDuplicateRecordId includeDuplicateRecordId) {
     // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
     // (global MODE_IS).
-    dassert(opCtx->lockState()->isLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isLocked());
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
 
     LOGV2_TRACE_INDEX(20093, "KeyString: {keyString}", "keyString"_attr = keyString);
@@ -317,7 +318,7 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
                               bool dupsAllowed) {
     // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
     // (global MODE_IS).
-    dassert(opCtx->lockState()->isLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isLocked());
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
 
     WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
@@ -330,31 +331,12 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
 
 boost::optional<RecordId> WiredTigerIndex::findLoc(OperationContext* opCtx,
                                                    const key_string::Value& key) const {
-    dassert(key_string::decodeDiscriminator(
-                key.getBuffer(), key.getSize(), getOrdering(), key.getTypeBits()) ==
-            key_string::Discriminator::kInclusive);
-
     auto cursor = newCursor(opCtx);
-    auto ksEntry = cursor->seekForKeyString(key);
-    if (!ksEntry) {
-        return boost::none;
-    }
-
-    auto sizeWithoutRecordId = KeyFormat::Long == _rsKeyFormat
-        ? key_string::sizeWithoutRecordIdLongAtEnd(ksEntry->keyString.getBuffer(),
-                                                   ksEntry->keyString.getSize())
-        : key_string::sizeWithoutRecordIdStrAtEnd(ksEntry->keyString.getBuffer(),
-                                                  ksEntry->keyString.getSize());
-    if (key_string::compare(
-            ksEntry->keyString.getBuffer(), key.getBuffer(), sizeWithoutRecordId, key.getSize()) ==
-        0) {
-        return ksEntry->loc;
-    }
-    return boost::none;
+    return cursor->seekExact(key);
 }
 
 IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool full) const {
-    dassert(opCtx->lockState()->isReadLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
 
     IndexValidateResults results;
     WiredTigerUtil::validateTableLogging(opCtx,
@@ -426,7 +408,7 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
     // Printing the index entry metadata requires a new session. We cannot open other cursors when
     // there are open history store cursors in the session. We also need to make sure that the
     // existing session has not written data to avoid potential deadlocks.
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     WiredTigerSession session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
 
     // Per the version cursor API:
@@ -490,7 +472,7 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
 }
 
 long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
-    dassert(opCtx->lockState()->isReadLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
     WT_SESSION* s = ru->getSession()->getSession();
 
@@ -501,7 +483,7 @@ long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
 }
 
 long long WiredTigerIndex::getFreeStorageBytes(OperationContext* opCtx) const {
-    dassert(opCtx->lockState()->isReadLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
     WiredTigerSession* session = ru->getSessionNoTxn();
 
@@ -1036,6 +1018,24 @@ public:
         return getKeyStringEntry();
     }
 
+    boost::optional<RecordId> seekExact(const key_string::Value& keyString) override {
+        dassert(
+            key_string::decodeDiscriminator(
+                keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits()) ==
+            key_string::Discriminator::kInclusive);
+
+        seekForKeyStringInternal(keyString);
+        if (_eof) {
+            return boost::none;
+        }
+
+        if (matchesPositionedKey(keyString)) {
+            return _id;
+        }
+
+        return boost::none;
+    }
+
     void save() override {
         WiredTigerIndexCursorGeneric::resetCursor();
 
@@ -1113,7 +1113,7 @@ protected:
     // Called after _key has been filled in, ie a new key to be processed has been fetched.
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
-    virtual void updateIdAndTypeBits() {
+    virtual void updateIdAndTypeBits(const char* newValueData, size_t newValueSize) {
         if (_rsKeyFormat == KeyFormat::Long) {
             _id = key_string::decodeRecordIdLongAtEnd(_key.getBuffer(), _key.getSize());
         } else {
@@ -1122,15 +1122,17 @@ protected:
         }
         invariant(!_id.isNull());
 
-        WT_CURSOR* c = _cursor->get();
-        WT_ITEM item;
-        // Can't get WT_ROLLBACK and hence won't throw an exception.
-        // Don't expect WT_PREPARE_CONFLICT either.
-        auto ret = c->get_value(c, &item);
-        invariant(ret != WT_ROLLBACK && ret != WT_PREPARE_CONFLICT);
-        invariantWTOK(ret, c->session);
-        BufReader br(item.data, item.size);
+        BufReader br(newValueData, newValueSize);
         _typeBits.resetFromBuffer(&br);
+    }
+
+    virtual bool matchesPositionedKey(const key_string::Value& search) const {
+        const auto sizeWithoutRecordId = KeyFormat::Long == _rsKeyFormat
+            ? key_string::sizeWithoutRecordIdLongAtEnd(_key.getBuffer(), _key.getSize())
+            : key_string::sizeWithoutRecordIdStrAtEnd(_key.getBuffer(), _key.getSize());
+        return key_string::compare(
+                   search.getBuffer(), _key.getBuffer(), search.getSize(), sizeWithoutRecordId) ==
+            0;
     }
 
     boost::optional<IndexKeyEntry> curr(KeyInclusion keyInclusion) const {
@@ -1264,7 +1266,10 @@ protected:
      * be called after a restore that did not restore to original state since that does not
      * logically move the cursor until the following call to next().
      */
-    void updatePosition(const char* newKeyData, size_t newKeySize) {
+    void updatePosition(const char* newKeyData,
+                        size_t newKeySize,
+                        const char* newValueData,
+                        size_t newValueSize) {
         // Store (a copy of) the new item data as the current key for this cursor.
         _key.resetFromBuffer(newKeyData, newKeySize);
 
@@ -1272,7 +1277,7 @@ protected:
         if (_eof)
             return;
 
-        updateIdAndTypeBits();
+        updateIdAndTypeBits(newValueData, newValueSize);
     }
 
     void checkKeyIsOrdered(const char* newKeyData, size_t newKeySize) {
@@ -1299,7 +1304,7 @@ protected:
 
 
     void seekForKeyStringInternal(const key_string::Value& keyStringValue) {
-        dassert(_opCtx->lockState()->isReadLocked());
+        dassert(shard_role_details::getLocker(_opCtx)->isReadLocked());
         seekWTCursor(keyStringValue);
 
         _lastMoveSkippedKey = false;
@@ -1311,9 +1316,13 @@ protected:
 
         WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
-        getKey(c, &item);
+        WT_ITEM value;
+        getKeyValue(c, &item, &value);
 
-        updatePosition(static_cast<const char*>(item.data), item.size);
+        updatePosition(static_cast<const char*>(item.data),
+                       item.size,
+                       static_cast<const char*>(value.data),
+                       value.size);
     }
 
     void advanceNext() {
@@ -1339,11 +1348,15 @@ protected:
 
         WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
-        getKey(c, &item);
+        WT_ITEM value;
+        getKeyValue(c, &item, &value);
 
         checkKeyIsOrdered(static_cast<const char*>(item.data), item.size);
 
-        updatePosition(static_cast<const char*>(item.data), item.size);
+        updatePosition(static_cast<const char*>(item.data),
+                       item.size,
+                       static_cast<const char*>(value.data),
+                       value.size);
     }
 
     boost::optional<KeyStringEntry> getKeyStringEntry() {
@@ -1426,7 +1439,7 @@ public:
     // Called after _key has been filled in, ie a new key to be processed has been fetched.
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
-    void updateIdAndTypeBits() override {
+    void updateIdAndTypeBits(const char* newValueData, size_t newValueSize) override {
         LOGV2_TRACE_INDEX(
             20096, "Unique Index KeyString: [{keyString}]", "keyString"_attr = _key.toString());
 
@@ -1439,11 +1452,11 @@ public:
             key_string::getKeySize(_key.getBuffer(), _key.getSize(), _ordering, _typeBits);
 
         if (_key.getSize() == keySize) {
-            _updateIdAndTypeBitsFromValue();
+            _updateIdAndTypeBitsFromValue(newValueData, newValueSize);
         } else {
             // The RecordId is in the key at the end. This implementation is provided by the
             // base class, let us just invoke that functionality here.
-            WiredTigerIndexCursorBase::updateIdAndTypeBits();
+            WiredTigerIndexCursorBase::updateIdAndTypeBits(newValueData, newValueSize);
         }
     }
 
@@ -1488,22 +1501,11 @@ private:
     // Called after _key has been filled in, ie a new key to be processed has been fetched.
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
-    void _updateIdAndTypeBitsFromValue() {
+    void _updateIdAndTypeBitsFromValue(const char* newValueData, size_t newValueSize) {
         // Old-format unique index keys always use the Long format.
         invariant(_rsKeyFormat == KeyFormat::Long);
 
-        // We assume that cursors can only ever see unique indexes in their "pristine" state,
-        // where no duplicates are possible. The cases where dups are allowed should hold
-        // sufficient locks to ensure that no cursor ever sees them.
-        WT_CURSOR* c = _cursor->get();
-        WT_ITEM item;
-        // Can't get WT_ROLLBACK and hence won't throw an exception.
-        // Don't expect WT_PREPARE_CONFLICT either.
-        auto ret = c->get_value(c, &item);
-        invariant(ret != WT_ROLLBACK && ret != WT_PREPARE_CONFLICT);
-        invariantWTOK(ret, c->session);
-
-        BufReader br(item.data, item.size);
+        BufReader br(newValueData, newValueSize);
         _id = key_string::decodeRecordIdLong(&br);
         _typeBits.resetFromBuffer(&br);
 
@@ -1528,6 +1530,23 @@ private:
                                 logAttrs(collectionNamespace));
         }
     }
+
+    virtual bool matchesPositionedKey(const key_string::Value& search) const override {
+        // We perform different comparisons depending on whether this is an old-format or new-format
+        // key. New-format keys have record IDs at the end.
+        if (isRecordIdAtEndOfKeyString()) {
+            const auto sizeWithoutRecordId = KeyFormat::Long == _rsKeyFormat
+                ? key_string::sizeWithoutRecordIdLongAtEnd(_key.getBuffer(), _key.getSize())
+                : key_string::sizeWithoutRecordIdStrAtEnd(_key.getBuffer(), _key.getSize());
+            return key_string::compare(search.getBuffer(),
+                                       _key.getBuffer(),
+                                       search.getSize(),
+                                       sizeWithoutRecordId) == 0;
+        } else {
+            return key_string::compare(
+                       search.getBuffer(), _key.getBuffer(), search.getSize(), _key.getSize()) == 0;
+        }
+    }
 };
 
 class WiredTigerIdIndexCursor final : public WiredTigerIndexCursorBase {
@@ -1538,17 +1557,11 @@ public:
     // Called after _key has been filled in, i.e. a new key to be processed has been fetched.
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
-    void updateIdAndTypeBits() override {
+    void updateIdAndTypeBits(const char* newValueData, size_t newValueSize) override {
         // _id index keys always use the Long format.
         invariant(_rsKeyFormat == KeyFormat::Long);
 
-        WT_CURSOR* c = _cursor->get();
-        WT_ITEM item;
-        auto ret = c->get_value(c, &item);
-        invariant(ret != WT_ROLLBACK && ret != WT_PREPARE_CONFLICT);
-        invariantWTOK(ret, c->session);
-
-        BufReader br(item.data, item.size);
+        BufReader br(newValueData, newValueSize);
         _id = key_string::decodeRecordIdLong(&br);
         _typeBits.resetFromBuffer(&br);
 
@@ -1576,6 +1589,11 @@ public:
                                 "uri"_attr = _uri,
                                 logAttrs(collectionNamespace));
         }
+    }
+
+    virtual bool matchesPositionedKey(const key_string::Value& search) const override {
+        return key_string::compare(
+                   search.getBuffer(), _key.getBuffer(), search.getSize(), _key.getSize()) == 0;
     }
 };
 //}  // namespace

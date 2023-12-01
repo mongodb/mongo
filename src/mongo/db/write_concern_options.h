@@ -148,6 +148,21 @@ public:
         return stdx::holds_alternative<std::string>(w) && stdx::get<std::string>(w) == kMajority;
     }
 
+    /**
+     * Returns whether this write concern is explicitly set but missing 'w' field.
+     */
+    bool isExplicitWithoutWField() const {
+        return !usedDefaultConstructedWC && notExplicitWValue;
+    }
+
+    /**
+     * Returns whether this write concern requests acknowledgment to the write operation.
+     * Note that setting 'w' field to 0 requests no acknowledgment.
+     */
+    bool requiresWriteAcknowledgement() const {
+        return !stdx::holds_alternative<int64_t>(w) || stdx::get<int64_t>(w) != 0;
+    }
+
     // The w parameter for this write concern.
     WriteConcernW w{1};
     // Corresponds to the `j` or `fsync` parameters for write concern.

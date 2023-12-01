@@ -40,6 +40,7 @@
 
 import {CollectionValidator} from "jstests/hooks/validate_collections.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 import {waitForState} from "jstests/replsets/rslib.js";
@@ -110,18 +111,13 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
     // Return an helper function to set a tenantId on commands if it is required.
     let addTenantIdIfNeeded = (function() {
         const adminDB = replSet.getPrimary().getDB("admin");
-        const flagDoc = assert.commandWorked(
-            adminDB.adminCommand({getParameter: 1, featureFlagRequireTenantID: 1}));
+        const featureFlagRequireTenantID = FeatureFlagUtil.isEnabled(adminDB, "RequireTenantID");
         const multitenancyDoc =
             assert.commandWorked(adminDB.adminCommand({getParameter: 1, multitenancySupport: 1}));
         const fcvDoc = assert.commandWorked(
             adminDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
         if (multitenancyDoc.hasOwnProperty("multitenancySupport") &&
-            multitenancyDoc.multitenancySupport &&
-            flagDoc.hasOwnProperty("featureFlagRequireTenantID") &&
-            flagDoc.featureFlagRequireTenantID.value &&
-            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                           flagDoc.featureFlagRequireTenantID.version) >= 0) {
+            multitenancyDoc.multitenancySupport && featureFlagRequireTenantID) {
             const tenantId = ObjectId();
 
             return function(cmdObj) {

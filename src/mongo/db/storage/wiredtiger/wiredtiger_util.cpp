@@ -843,15 +843,11 @@ int mdb_handle_general(WT_EVENT_HANDLER* handler,
         return 0;
     }
 
-    OperationContext* opCtx = reinterpret_cast<OperationContext*>(session->app_private);
-
-    Status status = opCtx->checkForInterruptNoAssert();
-    if (!status.isOK()) {
-        // Returning non-zero indicates an error to WT. The precise value is irrelevant.
-        return -1;
-    }
-
-    return 0;
+    return reinterpret_cast<Interruptible*>(session->app_private)
+               ->checkForInterruptNoAssert()
+               .isOK()
+        ? 0
+        : -1;  // Returning non-zero indicates an error to WT. The precise value is irrelevant.
 }
 
 WT_EVENT_HANDLER defaultEventHandlers() {

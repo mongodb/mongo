@@ -232,7 +232,7 @@ public:
         options.addresses = {HostAndPort(kBindAddress, test::kLetKernelChoosePort)};
         options.maxThreads = kMaxThreads;
         options.tlsCAFile = kCAFile;
-        options.tlsPEMKeyFile = kServerCertificateKeyFile;
+        options.tlsCertificateKeyFile = kServerCertificateKeyFile;
         options.tlsAllowInvalidCertificates = false;
         options.tlsAllowConnectionsWithoutCertificates = false;
         return options;

@@ -45,17 +45,6 @@ from buildscripts.idl import lib
 from buildscripts.idl.idl import parser
 
 
-def is_third_party_idl(idl_path: str) -> bool:
-    """Check if an IDL file is under a third party directory."""
-    third_party_idl_subpaths = [os.path.join("third_party", "mozjs"), "win32com"]
-
-    for file_name in third_party_idl_subpaths:
-        if file_name in idl_path:
-            return True
-
-    return False
-
-
 def gen_all_feature_flags(idl_dirs: List[str] = None):
     """Generate a list of all feature flags."""
     default_idl_dirs = ["src", "buildscripts"]
@@ -66,7 +55,7 @@ def gen_all_feature_flags(idl_dirs: List[str] = None):
     all_flags = []
     for idl_dir in idl_dirs:
         for idl_path in sorted(lib.list_idls(idl_dir)):
-            if is_third_party_idl(idl_path):
+            if lib.is_third_party_idl(idl_path):
                 continue
             # Most IDL files do not contain feature flags.
             # We can discard these quickly without expensive YAML parsing.

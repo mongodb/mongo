@@ -52,6 +52,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -177,7 +178,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
         // Do another loop, with the db lock held in order to avoid taking the expensive path on
         // concurrent create database operations
         dbLock.emplace(opCtx,
-                       opCtx->lockState(),
+                       shard_role_details::getLocker(opCtx),
                        DatabaseNameUtil::deserialize(
                            boost::none, str::toLower(dbNameStr), serializationContext),
                        "createDatabase" /* reason */,

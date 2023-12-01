@@ -214,7 +214,6 @@ components:
     local_directory_path: src/third_party/libmongocrypt
     team_owner: "Security"
     # Note: libmongocrypt exists in Black Duck, but not OpenHub
-    upgrade_suppression: TODO SERVER-61193
 
   "librdkafka - the Apache Kafka C/C++ client library":
     homepage_url: https://github.com/confluentinc/librdkafka/

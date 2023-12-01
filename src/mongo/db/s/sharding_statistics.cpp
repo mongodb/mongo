@@ -87,8 +87,8 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
         builder->append("chunkMigrationConcurrency", chunkMigrationConcurrencyCnt.load());
     // The serverStatus command is run before the FCV is initialized so we ignore it when
     // checking whether the direct shard operations feature flag is enabled.
-    if (mongo::feature_flags::gCheckForDirectShardOperations
-            .isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+    if (mongo::feature_flags::gCheckForDirectShardOperations.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         builder->append("unauthorizedDirectShardOps", unauthorizedDirectShardOperations.load());
     }
 }

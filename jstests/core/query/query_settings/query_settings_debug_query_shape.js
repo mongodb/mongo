@@ -7,22 +7,19 @@
 // ]
 //
 
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const collName = jsTestName();
 const qsutils = new QuerySettingsUtils(db, collName);
 
-// Set the 'clusterServerParameterRefreshIntervalSecs' value to 1 second for faster fetching of
-// 'querySettings' cluster parameter on mongos from the configsvr.
-const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
-
 const settings = {
-    queryEngineVersion: "v1"
+    queryFramework: "classic"
 };
 
 // Creating the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.
-assert.commandWorked(db.createCollection(collName));
+assertDropAndRecreateCollection(db, collName);
 
 function runTest({queryInstance, expectedDebugQueryShape}) {
     // Ensure that no query settings are present at the start of the test.
@@ -130,19 +127,13 @@ runTest({
   },
 });
 
-// TODO SERVER-82128 Uncomment this test case once the $querySettings recursion issue has been
-// addressed.
-
 // Test the inception case: setting query settings on '$querySettings'.
-// runTest({
-//     queryInstance: qsutils.makeAggregateQueryInstance(
-//         /* pipeline */[{$querySettings: {showDebugQueryShape: true}}], /* collName */ 1),
-//     expectedDebugQueryShape: {
-//         cmdNs: {db: db.getName(), coll: "$cmd.aggregate"},
-//         command: "aggregate",
-//         pipeline: [{"$queue": "[]"}],
-//     },
-// });
-
-// Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
-clusterParamRefreshSecs.restore();
+runTest({
+    queryInstance: qsutils.makeAggregateQueryInstance(
+        /* pipeline */[{$querySettings: {showDebugQueryShape: true}}], /* collName */ 1),
+    expectedDebugQueryShape: {
+        cmdNs: {db: db.getName(), coll: "$cmd.aggregate"},
+        command: "aggregate",
+        pipeline: [{$querySettings: {showDebugQueryShape: true}}]
+    },
+});

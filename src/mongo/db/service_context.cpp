@@ -309,11 +309,6 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     onCreate(opCtx.get(), _clientObservers);
     ScopeGuard onCreateGuard([&] { onDestroy(opCtx.get(), _clientObservers); });
 
-    invariant(
-        opCtx->lockState(),
-        str::stream() << "No lock state configured. This could be a missing build dependency. "
-                      << ProcessInfo().getProcessName());
-
     if (!opCtx->recoveryUnit()) {
         opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);

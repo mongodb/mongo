@@ -63,26 +63,25 @@ background_compact(void *arg)
         if (g.workers_finished)
             break;
 
-        if (g.background_compaction_running)
-            testutil_snprintf(config_buf, sizeof(config_buf), "%s", "background=false");
-        else
+        /*
+         * The API supports enabling or disabling the background compact server multiple times in a
+         * row. Randomly pick whether we are enabling or disabling to cover all state changes.
+         */
+        if (mmrand(&g.extra_rnd, 0, 1))
             testutil_snprintf(config_buf, sizeof(config_buf),
               "background=true,free_space_target=%" PRIu32 "MB",
               GV(BACKGROUND_COMPACT_FREE_SPACE_TARGET));
+        else
+            testutil_snprintf(config_buf, sizeof(config_buf), "%s", "background=false");
 
         ret = session->compact(session, NULL, config_buf);
-        if (ret == 0)
-            g.background_compaction_running = !g.background_compaction_running;
-        else
+        if (ret != 0)
             testutil_assertfmt(ret == EBUSY, "WT_SESSION.compact failed: %d", ret);
     }
 
     /* Always disable the background compaction server. */
-    if (g.background_compaction_running)
-        ret = session->compact(session, NULL, "background=false");
-    if (ret == 0)
-        g.background_compaction_running = false;
-    else
+    ret = session->compact(session, NULL, "background=false");
+    if (ret != 0)
         testutil_assertfmt(ret == EBUSY, "WT_SESSION.compact failed: %d", ret);
 
     wt_wrap_close_session(session);

@@ -45,6 +45,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -104,8 +105,7 @@ bool ComparisonMatchExpressionBase::equivalent(const MatchExpression* other) con
 
     // Please, keep BSONElementComparator consistent with MatchExpressionHasher defined in
     // db/matcher/expression_hasher.cpp.
-    const StringDataComparator* stringComparator = nullptr;
-    BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, stringComparator);
+    BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, _collator);
     return path() == realOther->path() && eltCmp.evaluate(_rhs == realOther->_rhs);
 }
 
@@ -632,6 +632,9 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
             }
 
             return simplifiedExpression;
+        } else if (regexes.empty() && ime._equalities->elementsIsEmpty()) {
+            // Empty IN is always false
+            return std::make_unique<AlwaysFalseMatchExpression>();
         }
 
         return expression;

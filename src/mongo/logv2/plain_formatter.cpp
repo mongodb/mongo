@@ -164,7 +164,7 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     // Log messages logged via logd are already formatted and have the id == 0
     if (attrs.empty()) {
         if (extract<int32_t>(attributes::id(), rec).get() == 0) {
-            buffer.append(message.begin(), message.end());
+            buffer.append(message.data(), message.data() + message.size());
             return;
         }
     }
@@ -172,7 +172,7 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     TextValueExtractor extractor;
     extractor.reserve(attrs.size());
     attrs.apply(extractor);
-    fmt::vformat_to(buffer, std::string_view{message.rawData(), message.size()}, extractor.args());
+    fmt::vformat_to(buffer, std::string_view{message}, extractor.args());
 
     size_t attributeMaxSize = buffer.size();
     if (extract<LogTruncation>(attributes::truncation(), rec).get() == LogTruncation::Enabled) {

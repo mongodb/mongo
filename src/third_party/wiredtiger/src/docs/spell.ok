@@ -151,6 +151,7 @@ Valgrind
 WILLNEED
 WiredTiger
 WiredTiger's
+WiredTigerCC
 WiredTigerCheckpoint
 WiredTigerException
 WiredTigerHS
@@ -335,6 +336,7 @@ exe
 extensibility
 fadvise
 failchk
+failpoint
 fallocate
 fcoverage
 fd's

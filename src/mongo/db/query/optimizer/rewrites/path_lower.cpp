@@ -39,9 +39,10 @@
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/rewrites/proj_spec_lower.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/util/assert_util.h"
-
 
 namespace mongo::optimizer {
 
@@ -50,13 +51,27 @@ static ABT fillEmpty(ABT n, ABT emptyVal) {
 }
 
 bool EvalPathLowering::optimize(ABT& n, bool rebuild) {
-    _changed = false;
+    // Try to lower directly into a function call to makeBsonObj.
+    auto inputArgs = generateMakeObjArgs(n);
+    if (inputArgs.empty()) {
+        algebra::transport<true>(n, *this);
 
-    algebra::transport<true>(n, *this);
+    } else {
+        // We were able to generate arguments for a makeObj/makeBsonObj call! Now we need to lower
+        // them. We want to lower all arguments as usual. Note that we are intentionally lowering
+        // path components like PathLambda to LambdaAbstractions here.
+        for (auto& arg : inputArgs) {
+            algebra::transport<true>(arg, *this);
+        }
 
-    // This is needed for cases in which EvalPathLowering is called from a context other than during
-    // PathLowering. If the ABT is modified in a way that adds variable references and definitions
-    // the environment must be updated.
+        // TODO SERVER-62830: detect if we need to lower to makeObj instead.
+        n = make<FunctionCall>("makeBsonObj", std::move(inputArgs));
+        _changed = true;
+    }
+
+    // This is needed for cases in which EvalPathLowering is called from a context other than
+    // during PathLowering. If the ABT is modified in a way that adds variable references and
+    // definitions the environment must be updated.
     if (_changed && rebuild) {
         _env.rebuild(n);
     }
@@ -291,7 +306,9 @@ void EvalFilterLowering::transport(ABT& n, const PathCompare& cmp, ABT& c) {
         // the non-array case in the lowering below.
         n = make<LambdaAbstraction>(
             name,
-            make<If>(make<FunctionCall>("isArray", makeSeq(c)),
+            make<If>(make<BinaryOp>(Operations::Or,
+                                    make<FunctionCall>("isArray", makeSeq(c)),
+                                    make<FunctionCall>("isInListData", makeSeq(c))),
                      make<BinaryOp>(Operations::EqMember, make<Variable>(name), c),
                      make<BinaryOp>(Operations::Eq,
                                     make<BinaryOp>(Operations::Cmp3w, make<Variable>(name), c),

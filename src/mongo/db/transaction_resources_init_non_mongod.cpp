@@ -31,8 +31,7 @@
 #include <string>
 
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 
@@ -49,7 +48,8 @@ public:
     void onDestroyClient(Client* client) final {}
 
     void onCreateOperationContext(OperationContext* opCtx) final {
-        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
+        shard_role_details::setLocker(opCtx,
+                                      std::make_unique<LockerImpl>(opCtx->getServiceContext()));
     }
 
     void onDestroyOperationContext(OperationContext* opCtx) final {}

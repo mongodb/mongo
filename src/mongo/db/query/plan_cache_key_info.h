@@ -38,8 +38,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
-#include "mongo/db/query/query_settings_gen.h"
-#include "mongo/db/query/query_settings_hash.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/query_settings/query_settings_hash.h"
 
 namespace mongo {
 /**

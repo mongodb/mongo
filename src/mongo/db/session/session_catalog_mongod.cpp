@@ -57,7 +57,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
@@ -65,6 +64,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -582,7 +582,8 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
             auto newOpCtx = cc().makeOperationContext();
 
             // Avoid ticket acquisition during step up.
-            newOpCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+            shard_role_details::getLocker(newOpCtx.get())
+                ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
             // Synchronize with killOps to make this unkillable.
             {

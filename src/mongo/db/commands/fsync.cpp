@@ -52,9 +52,9 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
@@ -122,7 +122,7 @@ public:
     bool runFsyncCommand(OperationContext* opCtx, const BSONObj& cmdObj, BSONObjBuilder& result) {
         uassert(ErrorCodes::IllegalOperation,
                 "fsync: Cannot execute fsync command from contexts that hold a data lock",
-                !opCtx->lockState()->isLocked());
+                !shard_role_details::getLocker(opCtx)->isLocked());
 
         const bool lock = cmdObj["lock"].trueValue();
         const bool forBackup = cmdObj["forBackup"].trueValue();

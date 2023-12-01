@@ -22,7 +22,7 @@ const coll = prim.getDB("local")[jsTestName()];
 coll.insertOne({a: 1});
 
 let currentCount = checkLog.getFilteredLogMessages(prim, 8097401, {}).length;
-const currentDroppedCollections = checkLog.getFilteredLogMessages(prim, 6776600, {});
+const currentDroppedCollections = checkLog.getFilteredLogMessages(prim, 6776600, {}).length;
 
 // Drop the local collection, the ident should not be dropped as we haven't checkpointed yet.
 coll.drop();
@@ -33,9 +33,9 @@ assert.eq(
     checkLog.checkContainsWithAtLeastCountJson(prim, 6776600, {}, currentDroppedCollections + 1),
     false);
 
-// We re-enable checkpoints, this will make the catalog get checkpointed and let the ident drops
+// We force a checkpoint, this will make the catalog get checkpointed and let the ident drops
 // through.
-prim.adminCommand({setParameter: 1, syncdelay: 1});
+prim.adminCommand({fsync: 1});
 
 // Wait until the ident has been removed.
 assert.soon(() => checkLog.checkContainsWithAtLeastCountJson(

@@ -4171,14 +4171,78 @@ TEST_F(PipelineOptimizationsShardMerger, Project) {
            false /*needsPrimaryShardMerger*/);
 };
 
-TEST_F(PipelineOptimizationsShardMerger, LookUp) {
+TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
+    const ChunkRange range = ChunkRange{BSON("_id" << MINKEY), BSON("_id" << MAXKEY)};
+    const UUID uuid = UUID::gen();
+    const OID epoch = OID::gen();
+    const Timestamp timestamp{1, 1};
+    auto fromCollNs = getLookupCollNs();
+    auto rt = RoutingTableHistory::makeNew(
+        fromCollNs,
+        uuid,
+        KeyPattern{BSON("right" << 1)},
+        true /* unsplittable */,
+        nullptr /* defaultCollator */,
+        false /* unique */,
+        epoch,
+        Timestamp(1, 1),
+        boost::none /* timeseriesFields */,
+        boost::none /* reshardingFields */,
+        true /* allowMigrations */,
+        {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), _myShardName}});
+
+    getCatalogCacheMock()->setCollectionReturnValue(
+        fromCollNs,
+        CollectionRoutingInfo{ChunkManager{_myShardName,
+                                           DatabaseVersion{UUID::gen(), timestamp},
+                                           makeStandaloneRoutingTableHistory(std::move(rt)),
+                                           timestamp},
+                              boost::none});
     doTest(
-        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /*inputPipeJson*/
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* inputPipeJson */
         ,
-        "[]" /*shardPipeJson*/,
-        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /*mergePipeJson*/
+        "[]" /* shardPipeJson */,
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* mergePipeJson */
         ,
-        true /*needsPrimaryShardMerger*/);
+        false /* needsPrimaryShardMerger */,
+        _myShardName /* needsSpecificShardMerger */);
+};
+
+TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
+    const ChunkRange range = ChunkRange{BSON("_id" << MINKEY), BSON("_id" << MAXKEY)};
+    const UUID uuid = UUID::gen();
+    const OID epoch = OID::gen();
+    const Timestamp timestamp{1, 1};
+    auto fromCollNs = getLookupCollNs();
+    auto rt = RoutingTableHistory::makeNew(
+        fromCollNs,
+        uuid,
+        KeyPattern{BSON("right" << 1)},
+        false /* unsplittable */,
+        nullptr /* defaultCollator */,
+        false /* unique */,
+        epoch,
+        Timestamp(1, 1),
+        boost::none /* timeseriesFields */,
+        boost::none /* reshardingFields */,
+        true /* allowMigrations */,
+        {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), _myShardName}});
+
+    getCatalogCacheMock()->setCollectionReturnValue(
+        fromCollNs,
+        CollectionRoutingInfo{ChunkManager{_myShardName,
+                                           DatabaseVersion{UUID::gen(), timestamp},
+                                           makeStandaloneRoutingTableHistory(std::move(rt)),
+                                           timestamp},
+                              boost::none});
+    doTest(
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* inputPipeJson */
+        ,
+        "[]" /* shardPipeJson */,
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* mergePipeJson */
+        ,
+        false /* needsPrimaryShardMerger */,
+        boost::none /* needsSpecificShardMerger */);
 };
 
 }  // namespace needsPrimaryShardMerger
@@ -4240,8 +4304,8 @@ TEST_F(PipelineMustRunOnMongoSTest, UnsplittableMongoSPipelineAssertsIfDisallowe
     pipeline->optimizePipeline();
 
     // The entire pipeline must run on mongoS, but $sort cannot do so when 'allowDiskUse' is true.
-    ASSERT_THROWS_CODE(
-        pipeline->requiredToRunOnMongos(), AssertionException, ErrorCodes::IllegalOperation);
+    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+    ASSERT_NOT_OK(pipeline->canRunOnMongos());
 }
 
 DEATH_TEST_F(PipelineMustRunOnMongoSTest,
@@ -4304,9 +4368,8 @@ TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStageP
     auto splitPipeline = sharded_agg_helpers::splitPipeline(std::move(pipeline));
 
     // The merge pipeline must run on mongoS, but $out needs to run on  the primary shard.
-    ASSERT_THROWS_CODE(splitPipeline.mergePipeline->requiredToRunOnMongos(),
-                       AssertionException,
-                       ErrorCodes::IllegalOperation);
+    ASSERT_TRUE(splitPipeline.mergePipeline->requiredToRunOnMongos());
+    ASSERT_NOT_OK(splitPipeline.mergePipeline->canRunOnMongos());
 }
 
 TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShardSideOfSplit) {
@@ -4325,8 +4388,8 @@ TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShar
     // mongoS. However, the pipeline *cannot* run on mongoS and *must* split at
     // $_internalSplitPipeline due to the latter's 'anyShard' requirement. The mongoS stage would
     // end up on the shard side of this split, and so it asserts.
-    ASSERT_THROWS_CODE(
-        pipeline->requiredToRunOnMongos(), AssertionException, ErrorCodes::IllegalOperation);
+    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+    ASSERT_NOT_OK(pipeline->canRunOnMongos());
 }
 
 TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineRunsUnsplitOnMongoSIfSplitpointIsEligible) {

@@ -39,6 +39,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/executor/hedging_metrics.h"
+#include "mongo/idl/cluster_server_parameter_server_status.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
@@ -87,8 +88,13 @@ public:
             grid->getBalancerConfiguration()->getMaxChunkSizeBytes();
         result.append("maxChunkSizeInBytes", maxChunkSizeInBytes);
 
+        _clusterParameterStatus.report(opCtx, &result);
+
         return result.obj();
     }
+
+private:
+    ClusterServerParameterServerStatus _clusterParameterStatus;
 
 } shardingServerStatus;
 

@@ -65,6 +65,7 @@ selector:
   - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
+  - requires_profiling
   - assumes_read_preference_unchanged
   - does_not_support_causal_consistency
   - requires_collstats

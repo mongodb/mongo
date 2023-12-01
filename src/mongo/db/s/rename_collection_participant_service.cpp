@@ -48,6 +48,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -60,7 +61,6 @@
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
@@ -70,6 +70,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future_util.h"
@@ -89,7 +90,8 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 void dropCollectionLocally(OperationContext* opCtx,
                            const NamespaceString& nss,
                            bool markFromMigrate) {
-    DropCollectionCoordinator::dropCollectionLocally(opCtx, nss, markFromMigrate);
+    DropCollectionCoordinator::dropCollectionLocally(
+        opCtx, nss, markFromMigrate, false /* dropSystemCollections */);
     LOGV2_DEBUG(5515100,
                 1,
                 "Dropped target collection locally on renameCollection participant.",
@@ -150,7 +152,7 @@ void renameOrDropTarget(OperationContext* opCtx,
 void clearFilteringMetadataOnNss(OperationContext* opCtx, const NamespaceString& nss) {
     // Set the placement version to UNKNOWN to force a future operation to refresh the metadata
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+    UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
         ->clearFilteringMetadata(opCtx);

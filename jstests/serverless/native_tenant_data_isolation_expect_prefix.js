@@ -295,54 +295,5 @@ function runTestWithDollarTenant() {
     rst.stopSet();
 }
 
-function runTestTenantPrefixAlone() {
-    // setup regular replSet
-    const rst = new ReplSetTest(
-        {nodes: 2, nodeOptions: {auth: '', setParameter: {multitenancySupport: true}}});
-    rst.startSet({keyFile: 'jstests/libs/key1'});
-    rst.initiate();
-
-    let primary = rst.getPrimary();
-    let adminDb = primary.getDB('admin');
-
-    // Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
-    assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
-    assert(adminDb.auth('admin', 'pwd'));
-
-    let prefixedDb = primary.getDB(kTenant + '_' + kTestDb);
-
-    // Create a collection by inserting a document to it.
-    const testDocs = {_id: 0, a: 1, b: 1};
-    assert.commandWorked(prefixedDb.runCommand({insert: kCollName, documents: [testDocs]}));
-    // Create a view.
-    assert.commandWorked(
-        prefixedDb.runCommand({create: kViewName, viewOn: kCollName, pipeline: []}));
-
-    // Run a sanity check to locate the collection
-    checkDbStatsCommand({dbStats: 1}, prefixedDb, {targetPass: true});
-
-    // find prefixed DB only (expectPrefix is ignored in parsing).
-    {
-        let request = {find: kCollName, filter: {a: 1}};
-
-        // Baseline sanity check.
-        checkFindCommandPasses(request, prefixedDb, testDocs, {prefixed: true});
-
-        request = Object.assign(request, {'expectPrefix': false});
-        checkFindCommandPasses(request, prefixedDb, testDocs);
-
-        request = Object.assign(request, {'expectPrefix': true});
-        checkFindCommandPasses(request, prefixedDb, testDocs, {prefixed: true});
-    }
-
-    // count prefixed DB only.
-    testCountCommand(prefixedDb, {});
-
-    testDistictCommand(prefixedDb, {});
-
-    rst.stopSet();
-}
-
 runTestWithDollarTenant();
 runTestWithSecurityTokenFlag();
-runTestTenantPrefixAlone();

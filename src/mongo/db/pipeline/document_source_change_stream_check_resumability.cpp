@@ -233,8 +233,7 @@ Value DocumentSourceChangeStreamCheckResumability::serialize(
     if (opts.verbosity) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
         sub.append("stage"_sd, kStageName);
-        opts.serializeLiteral(ResumeToken(_tokenFromClient).toDocument().toBson())
-            .addToBsonObj(&sub, "resumeToken"_sd);
+        sub << "resumeToken"_sd << Value(ResumeToken(_tokenFromClient).toDocument(opts));
         sub.done();
     } else {
         builder.append(

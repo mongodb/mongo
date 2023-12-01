@@ -503,7 +503,7 @@ tiered tables and the history store file.
 @subsection util_verify_options Options
 The following are command-specific options for the \c verify command:
 
-\a -a
+\c -a
 Abort immediately if verify encounters a damaged table instead of continuing to
 verify the rest of the tables in the database.
 

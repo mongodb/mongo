@@ -197,6 +197,21 @@ bool AsyncRequestsSender::done() noexcept {
 AsyncRequestsSender::Request::Request(ShardId shardId, BSONObj cmdObj)
     : shardId(shardId), cmdObj(cmdObj) {}
 
+Status AsyncRequestsSender::Response::getEffectiveStatus(
+    const AsyncRequestsSender::Response& response) {
+    if (!response.swResponse.isOK()) {
+        return response.swResponse.getStatus();
+    }
+
+    const auto& cmdResponse = response.swResponse.getValue().data;
+    auto commandStatus = getStatusFromCommandResult(cmdResponse);
+    if (!commandStatus.isOK()) {
+        return commandStatus;
+    }
+    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(cmdResponse);
+    return writeConcernStatus;
+}
+
 AsyncRequestsSender::RemoteData::RemoteData(AsyncRequestsSender* ars,
                                             ShardId shardId,
                                             BSONObj cmdObj,

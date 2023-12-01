@@ -12,7 +12,9 @@
  *  requires_sharding, assumes_balancer_off,
  *  requires_non_retryable_writes,
  *  # mapReduce does not support afterClusterTime.
- *  does_not_support_causal_consistency
+ *  does_not_support_causal_consistency,
+ *   # Use mapReduce.
+ *   requires_scripting,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

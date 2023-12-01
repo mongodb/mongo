@@ -91,7 +91,6 @@
 #include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/vector_clock.h"
@@ -121,6 +120,7 @@
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/stdx/variant.h"
@@ -308,7 +308,7 @@ std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expC
         return {*mergeShardId};
     }
 
-    invariant(cri);
+    tassert(8361100, "Need CollectionRoutingInfo to target sharded query", cri);
     return getTargetedShardsForQuery(expCtx, cri->cm, shardQuery, collation);
 }
 
@@ -1301,19 +1301,35 @@ DispatchShardPipelineResults dispatchShardPipeline(
     bool eligibleForSampling,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
+    boost::optional<CollectionRoutingInfo> cri,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     AsyncRequestsSender::ShardHostMap designatedHostsMap,
-    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap) {
+    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap,
+    std::set<ShardId> shardsToSkip) {
     const auto& expCtx = pipeline->getContext();
-    auto executionNsRoutingInfo = getCollectionRoutingInfoForTargeting(expCtx, pipelineDataSource);
-    TargetingResults targeting = targetPipeline(
-        expCtx, pipeline.get(), pipelineDataSource, shardTargetingPolicy, executionNsRoutingInfo);
+
+    // Only acquire CollectionRoutingInfo if we do not already have one.
+    if (!cri) {
+        cri = getCollectionRoutingInfoForTargeting(expCtx, pipelineDataSource);
+    }
+    TargetingResults targeting =
+        targetPipeline(expCtx, pipeline.get(), pipelineDataSource, shardTargetingPolicy, cri);
+    auto& shardIds = targeting.shardIds;
+    for (const auto& shard : shardsToSkip) {
+        shardIds.erase(shard);
+    }
+
+    // Return if we don't need to establish any cursors.
+    if (shardIds.empty()) {
+        return DispatchShardPipelineResults{
+            false, {}, {}, boost::none, nullptr, BSONObj(), 0, boost::none};
+    }
     return dispatchTargetedShardPipeline(std::move(serializedCommand),
                                          targeting,
                                          pipelineDataSource == PipelineDataSource::kChangeStream,
                                          eligibleForSampling,
-                                         executionNsRoutingInfo,
+                                         cri,
                                          std::move(pipeline),
                                          std::move(explain),
                                          std::move(readConcern),
@@ -1460,7 +1476,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         auto* mergePipeline = dispatchResults.splitPipeline->mergePipeline.get();
         auto specificMergeShardId = mergePipeline->needsSpecificShardMerger();
         auto mergeType = [&]() -> std::string {
-            if (mergePipeline->canRunOnMongos()) {
+            if (mergePipeline->canRunOnMongos().isOK() && !specificMergeShardId) {
                 if (mergeCtx->inMongos) {
                     return "mongos";
                 }

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <absl/container/inlined_vector.h>
 #include <cstdint>
 #include <vector>
 
@@ -36,7 +37,7 @@ namespace mongo::boolean_simplification {
 /**
  * The list of original minterms covered by a derived minterm (a.k.a. prime implicant).
  */
-using CoveredOriginalMinterms = std::vector<uint32_t>;
+using CoveredOriginalMinterms = absl::InlinedVector<uint32_t, 2>;
 
 /**
  * Represents a list of prime implicants, identified by their indices.

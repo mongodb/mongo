@@ -39,10 +39,10 @@
 #include "mongo/util/decorable.h"
 
 namespace mongo {
+namespace {
 
 const auto getNumHostsTargeted = ServiceContext::declareDecoration<NumHostsTargetedMetrics>();
 
-namespace {
 std::string queryTypeToString(NumHostsTargetedMetrics::QueryType queryType) {
     switch (queryType) {
         case NumHostsTargetedMetrics::QueryType::kFindCmd:
@@ -59,6 +59,7 @@ std::string queryTypeToString(NumHostsTargetedMetrics::QueryType queryType) {
             return "";
     }
 }
+
 }  // namespace
 
 void NumHostsTargetedMetrics::addNumHostsTargeted(NumHostsTargetedMetrics::QueryType queryType,

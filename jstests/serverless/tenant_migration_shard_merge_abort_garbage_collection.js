@@ -17,7 +17,7 @@ import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
-// Disabling featureFlagRequireTenantID to allow using a tenantId prefix (instead of $tenant) and
+// Disabling featureFlagRequireTenantID to allow using a tenantId prefix and
 // reusing the same code to test garbage collection with and without multitenancy support.
 function runTest({multitenancySupport}) {
     const setParameter = {

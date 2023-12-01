@@ -34,17 +34,17 @@ assert.commandWorked(coll.insert({val: 'TestValue'}));
 // Check the histogram counters.
 let lastHistogram = getHistogramStats(view);
 view.aggregate([{$match: {}}]);
-lastHistogram = assertHistogramDiffEq(view, lastHistogram, 1, 0, 0);
+lastHistogram = assertHistogramDiffEq(viewsDB, view, lastHistogram, 1, 0, 0);
 
 // Check that failed inserts, updates, and deletes are counted.
 assert.writeError(view.insert({}));
-lastHistogram = assertHistogramDiffEq(view, lastHistogram, 0, 1, 0);
+lastHistogram = assertHistogramDiffEq(viewsDB, view, lastHistogram, 0, 1, 0);
 
 assert.writeError(view.remove({}));
-lastHistogram = assertHistogramDiffEq(view, lastHistogram, 0, 1, 0);
+lastHistogram = assertHistogramDiffEq(viewsDB, view, lastHistogram, 0, 1, 0);
 
 assert.writeError(view.update({}, {}));
-lastHistogram = assertHistogramDiffEq(view, lastHistogram, 0, 1, 0);
+lastHistogram = assertHistogramDiffEq(viewsDB, view, lastHistogram, 0, 1, 0);
 
 if (FixtureHelpers.isMongos(viewsDB)) {
     jsTest.log("Tests are being run on a mongos; skipping top tests.");
@@ -58,16 +58,16 @@ if (lastTop === undefined) {
 }
 
 view.aggregate([{$match: {}}]);
-lastTop = assertTopDiffEq(view, lastTop, "commands", 1);
+lastTop = assertTopDiffEq(viewsDB, view, lastTop, "commands", 1);
 
 assert.writeError(view.insert({}));
-lastTop = assertTopDiffEq(view, lastTop, "insert", 1);
+lastTop = assertTopDiffEq(viewsDB, view, lastTop, "insert", 1);
 
 assert.writeError(view.remove({}));
-lastTop = assertTopDiffEq(view, lastTop, "remove", 1);
+lastTop = assertTopDiffEq(viewsDB, view, lastTop, "remove", 1);
 
 assert.writeError(view.update({}, {}));
-lastTop = assertTopDiffEq(view, lastTop, "update", 1);
+lastTop = assertTopDiffEq(viewsDB, view, lastTop, "update", 1);
 
 // Check that operations on the backing collection do not modify the view stats.
 lastTop = getTop(view);
@@ -81,7 +81,7 @@ assert.commandWorked(coll.update({}, {$set: {x: 1}}));
 coll.aggregate([{$match: {}}]);
 assert.commandWorked(coll.remove({}));
 
-assertTopDiffEq(view, lastTop, "insert", 0);
-assertTopDiffEq(view, lastTop, "update", 0);
-assertTopDiffEq(view, lastTop, "remove", 0);
-assertHistogramDiffEq(view, lastHistogram, 0, 0, 0);
+assertTopDiffEq(viewsDB, view, lastTop, "insert", 0);
+assertTopDiffEq(viewsDB, view, lastTop, "update", 0);
+assertTopDiffEq(viewsDB, view, lastTop, "remove", 0);
+assertHistogramDiffEq(viewsDB, view, lastHistogram, 0, 0, 0);

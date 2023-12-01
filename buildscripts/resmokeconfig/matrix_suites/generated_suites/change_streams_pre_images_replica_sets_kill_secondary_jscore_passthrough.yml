@@ -51,6 +51,7 @@ selector:
   - jstests/core/**/exhaust.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
+  - requires_profiling
   - requires_emptycapped
   - incompatible_with_preimages_by_default
   roots:

@@ -114,15 +114,14 @@ class test_bug019(wttest.WiredTigerTestCase):
         self.prepfiles()
         used = self.get_prealloc_used()
         for i in range(1, 10):
+            # Make sure at least one pre-allocated log file exists before each populate
+            # iteration. There could be a race with the internal thread otherwise.
+            self.prepfiles()
             self.populate(self.entries, i)
             newused = self.get_prealloc_used()
             self.pr("Iteration " + str(i))
             self.pr("previous used " + str(used) + " now " + str(newused))
 
-            # Make sure we're consuming pre-allocated files.
-            if used >= newused:
-                self.pr("FAILURE on Iteration " + str(i))
-                self.pr("FAILURE: previous used " + str(used) + " now " + str(newused))
             self.assertTrue(used < newused)
             used = newused
 

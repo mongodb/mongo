@@ -59,7 +59,7 @@ public:
     }
 
     void add(Value value) override {
-        _values.emplace(SimpleMemoryToken{value.getApproximateSize(), &_memUsageTracker},
+        _values.emplace(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
                         std::move(value));
     }
 
@@ -90,7 +90,7 @@ public:
     }
 
 private:
-    std::multiset<SimpleMemoryTokenWith<Value>, MemoryTokenValueComparator> _values;
+    std::multiset<SimpleMemoryUsageTokenWith<Value>, MemoryTokenValueComparator> _values;
 };
 
 }  // namespace mongo

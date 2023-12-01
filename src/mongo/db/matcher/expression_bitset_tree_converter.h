@@ -46,12 +46,14 @@ struct ExpressionBitInfo {
  * Contains result of 'transformToBitsetTree' function.
  */
 struct BitsetTreeTransformResult {
+    using ExpressionList = absl::InlinedVector<ExpressionBitInfo, 4>;
+
     // The root node of the bitset tree.
     boolean_simplification::BitsetTreeNode bitsetTree;
 
     // A vector of ExpressionBitInfo represented by bits in the bitset tree. The size of the vector
     // equals to the number of bits of the BitSet tree.
-    std::vector<ExpressionBitInfo> expressions;
+    ExpressionList expressions;
 
     // The number of nodes of the original MatchExpression tree.
     size_t expressionSize;

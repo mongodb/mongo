@@ -308,6 +308,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     WT_BTREE *btree;
     WT_CONFIG_ITEM cval, metadata;
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
     int64_t maj_version, min_version;
     uint32_t bitcnt;
     const char **cfg;
@@ -323,7 +324,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
         maj_version = cval.val;
         WT_RET(__wt_config_gets(session, cfg, "version.minor", &cval));
         min_version = cval.val;
-        __wt_verbose(session, WT_VERB_VERSION, "%" PRId64 ".%" PRId64, maj_version, min_version);
+        __wt_verbose(session, WT_VERB_VERSION, "btree version: %" PRId64 ".%" PRId64, maj_version,
+          min_version);
     }
 
     /* Get the file ID. */
@@ -425,6 +427,20 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
         F_SET(btree, WT_BTREE_NO_CHECKPOINT);
     else
         F_CLR(btree, WT_BTREE_NO_CHECKPOINT);
+
+    /* Get the last flush times for tiered storage, if applicable. */
+    btree->flush_most_recent_secs = 0;
+    ret = __wt_config_gets(session, cfg, "flush_time", &cval);
+    WT_RET_NOTFOUND_OK(ret);
+    if (ret == 0)
+        btree->flush_most_recent_secs = (uint64_t)cval.val;
+
+    btree->flush_most_recent_ts = 0;
+    ret = __wt_config_gets(session, cfg, "flush_timestamp", &cval);
+    WT_RET_NOTFOUND_OK(ret);
+    if (ret == 0 && cval.len != 0)
+        WT_RET(__wt_txn_parse_timestamp_raw(
+          session, "flush_timestamp", &btree->flush_most_recent_ts, &cval));
 
     /* Checksums */
     WT_RET(__wt_config_gets(session, cfg, "checksum", &cval));

@@ -70,6 +70,7 @@
   value:
     exclude_with_any_tags:
     - assumes_unsharded_collection
+    - assumes_no_implicit_collection_creation_on_get_collection
 
 - name: sharded_collections_passthrough_eval
   value:

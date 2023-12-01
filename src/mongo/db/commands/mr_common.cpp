@@ -88,10 +88,11 @@
 namespace mongo::map_reduce_common {
 
 namespace {
-
 using namespace std::string_literals;
 
 Status interpretTranslationError(DBException* ex, const MapReduceCommandRequest& parsedMr) {
+    using namespace fmt::literals;
+
     auto status = ex->toStatus();
     auto outOptions = parsedMr.getOutOptions();
     const auto outNss = outOptions.getDatabaseName()

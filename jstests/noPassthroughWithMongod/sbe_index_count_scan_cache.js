@@ -1,16 +1,14 @@
 /**
  * Tests the SBE plan cache for COUNT SCAN queries.
+ *
+ * @tags: [
+ *    # This test is specifically verifying the behavior of the SBE plan cache.
+ *    requires_sbe,
+ * ]
  */
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const testDb = db.getSiblingDB(jsTestName());
-// This test is specifically verifying the behavior of the SBE plan cache.
-if (!checkSBEEnabled(testDb)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    quit();
-}
-
 assert.commandWorked(testDb.dropDatabase());
 
 const coll = testDb.coll;

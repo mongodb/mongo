@@ -53,8 +53,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -62,7 +62,6 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
@@ -81,6 +80,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -90,6 +90,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeCloningData);
 
@@ -223,7 +224,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 ScopeGuard unblockWritesLegacyOnExit([&] {
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT
+                    UninterruptibleLockGuard noInterrupt(  // NOLINT
+                        shard_role_details::getLocker(opCtx));
                     unblockWritesLegacy(opCtx);
                 });
 
@@ -236,8 +238,9 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 cloneData(opCtx);
 
-                // TODO (SERVER-71566): Temporary solution to cover the case of stepping down before
-                // actually entering the `kCatchup` phase.
+                // Hack to cover the case of stepping down before actually entering the `kCatchup`
+                // phase. Once the time required by the `kClone` phase will be reduced, this
+                // synchronization mechanism can be replaced using a critical section.
                 blockWrites(opCtx);
             }))
         .then(_buildPhaseHandler(Phase::kCatchup,
@@ -516,8 +519,7 @@ void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
     };
 }
 
-std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
-    OperationContext* opCtx) const {
+std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(OperationContext* opCtx) {
     // Enable write blocking bypass to allow cloning of catalog data even if writes are disallowed.
     WriteBlockBypass::get(opCtx).set(true);
 
@@ -528,28 +530,31 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
         uassertStatusOK(shardRegistry->getShard(opCtx, ShardingState::get(opCtx)->shardId()));
     const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
 
-    const auto cloneCommand = [&] {
+    auto cloneCommand = [&](boost::optional<OperationSessionInfo> osi) {
         BSONObjBuilder commandBuilder;
         commandBuilder.append(
             "_shardsvrCloneCatalogData",
             DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault()));
         commandBuilder.append("from", fromShard->getConnString().toString());
+        if (osi.is_initialized()) {
+            commandBuilder.appendElements(osi->toBSON());
+        }
         return CommandHelpers::appendMajorityWriteConcern(commandBuilder.obj());
-    }();
+    };
 
-    const auto cloneResponse =
-        toShard->runCommand(opCtx,
-                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                            DatabaseName::kAdmin,
-                            cloneCommand,
-                            Shard::RetryPolicy::kNoRetry);
+    auto clonedCollections = [&](const BSONObj& command) {
+        const auto cloneResponse =
+            toShard->runCommand(opCtx,
+                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                DatabaseName::kAdmin,
+                                command,
+                                Shard::RetryPolicy::kNoRetry);
 
-    uassertStatusOKWithContext(
-        Shard::CommandResponse::getEffectiveStatus(cloneResponse),
-        "movePrimary operation on database {} failed to clone data to recipient {}"_format(
-            _dbName.toStringForErrorMsg(), toShardId.toString()));
+        uassertStatusOKWithContext(
+            Shard::CommandResponse::getEffectiveStatus(cloneResponse),
+            "movePrimary operation on database {} failed to clone data to recipient {}"_format(
+                _dbName.toStringForErrorMsg(), toShardId.toString()));
 
-    auto clonedCollections = [&] {
         std::vector<NamespaceString> colls;
         for (const auto& bsonElem : cloneResponse.getValue().response["clonedColls"].Obj()) {
             if (bsonElem.type() == String) {
@@ -560,8 +565,15 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
 
         std::sort(colls.begin(), colls.end());
         return colls;
-    }();
-    return clonedCollections;
+    };
+
+    try {
+        return clonedCollections(cloneCommand(getNewSession(opCtx)));
+    } catch (const ExceptionFor<ErrorCodes::NotARetryableWriteCommand>&) {
+        // TODO SERVER-83213: we're dealing with an older binary version, retry without the OSI
+        // protection. Remove once 8.0 is last-lts.
+        return clonedCollections(cloneCommand(boost::none));
+    }
 }
 
 void MovePrimaryCoordinator::assertClonedData(
@@ -685,12 +697,14 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
     // Make a copy of this container since `getNewSession` changes the coordinator document.
     const auto collectionsToClone = *_doc.getCollectionsToClone();
     for (const auto& nss : collectionsToClone) {
-        sharding_ddl_util::sendDropCollectionParticipantCommandToShards(opCtx,
-                                                                        nss,
-                                                                        {_doc.getToShardId()},
-                                                                        **executor,
-                                                                        getNewSession(opCtx),
-                                                                        false /* fromMigrate */);
+        sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+            opCtx,
+            nss,
+            {_doc.getToShardId()},
+            **executor,
+            getNewSession(opCtx),
+            false /* fromMigrate */,
+            true /* dropSystemCollections */);
     }
 }
 

@@ -52,11 +52,11 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -221,7 +221,8 @@ bool containsClusteredIndex(const CollectionPtr& collection, const IndexArgument
 StatusWith<std::vector<std::string>> getIndexNames(OperationContext* opCtx,
                                                    const CollectionPtr& collection,
                                                    const IndexArgument& index) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
+    invariant(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_IX));
 
     return stdx::visit(
         OverloadedVisitor{
@@ -325,7 +326,8 @@ void dropReadyIndexes(OperationContext* opCtx,
                       const std::vector<std::string>& indexNames,
                       DropIndexesReply* reply,
                       bool forceDropShardKeyIndex) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
+    invariant(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_X));
 
     if (indexNames.empty()) {
         return;

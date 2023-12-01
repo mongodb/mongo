@@ -136,7 +136,7 @@
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/stats/stats_catalog.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -191,7 +191,6 @@
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_ready.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/serverless/multitenancy_check.h"
@@ -257,6 +256,8 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
+#include "mongo/s/service_entry_point_mongos.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
@@ -824,9 +825,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     try {
-        if ((serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
-             serverGlobalParams.clusterRole.has(ClusterRole::None)) &&
-            replSettings.isReplSet()) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::None) && replSettings.isReplSet()) {
             ReadWriteConcernDefaults::get(startupOpCtx.get()->getServiceContext())
                 .refreshIfNecessary(startupOpCtx.get());
         }
@@ -835,7 +834,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                       "Error loading read and write concern defaults at startup",
                       "error"_attr = redact(ex));
     }
-    readWriteConcernDefaultsMongodStartupChecks(startupOpCtx.get());
+    readWriteConcernDefaultsMongodStartupChecks(startupOpCtx.get(), replSettings.isReplSet());
+
+    MirrorMaestro::init(serviceContext);
 
     // Perform replication recovery for queryable backup mode if needed.
     if (storageGlobalParams.queryableBackupMode) {
@@ -861,11 +862,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             "Start up the replication coordinator for queryable backup mode",
             &startupTimeElapsedBuilder);
         replCoord->startup(startupOpCtx.get(), lastShutdownState);
-    }
-
-    MirrorMaestro::init(serviceContext);
-
-    if (!storageGlobalParams.queryableBackupMode) {
+    } else {
         if (storageEngine->supportsCappedCollections()) {
             logStartup(startupOpCtx.get());
         }
@@ -886,6 +883,17 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             // Sharding is always ready when there is at least one shard at startup (either the
             // config shard or a dedicated shard server).
             ShardingReady::get(startupOpCtx.get())->setIsReadyIfShardExists(startupOpCtx.get());
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+            // TODO SERVER-83135: Replace this 'else if' with an 'if' once we support
+            // config shard + embedded router.
+            initializeGlobalShardingStateForEmbeddedRouterIfNeeded(startupOpCtx.get());
+
+            // Router role should use SEPMongos
+            serviceContext->getService(ClusterRole::RouterServer)
+                ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
+
+            // This function may take the global lock.
+            initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get());
         } else {
             // On a dedicated shard server, ShardingReady is always set because there is guaranteed
             // to be at least one shard in the sharded cluster (either the config shard or a
@@ -1074,16 +1082,18 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     // Set up the logical session cache
-    LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        kind = LogicalSessionCacheServer::kConfigServer;
-    } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-        kind = LogicalSessionCacheServer::kSharded;
-    } else if (replSettings.isReplSet()) {
-        kind = LogicalSessionCacheServer::kReplicaSet;
-    }
-
-    LogicalSessionCache::set(serviceContext, makeLogicalSessionCacheD(kind));
+    auto logicalSessionCache = [&] {
+        LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            kind = LogicalSessionCacheServer::kConfigServer;
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+            kind = LogicalSessionCacheServer::kSharded;
+        } else if (replSettings.isReplSet()) {
+            kind = LogicalSessionCacheServer::kReplicaSet;
+        }
+        return makeLogicalSessionCacheD(kind);
+    }();
+    LogicalSessionCache::set(serviceContext, std::move(logicalSessionCache));
 
     if (analyze_shard_key::supportsSamplingQueries(serviceContext) &&
         serverGlobalParams.clusterRole.has(ClusterRole::None)) {
@@ -1716,14 +1726,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
     }
 
-    // Shutdown the TransportLayer so that new connections aren't accepted
-    if (auto tl = serviceContext->getTransportLayerManager()) {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Shut down the transport layer",
-                                                  &shutdownTimeElapsedBuilder);
-        LOGV2_OPTIONS(
-            20562, {LogComponent::kNetwork}, "Shutdown: going to close listening sockets");
-        tl->shutdown();
+    // Inform the TransportLayers to stop accepting new connections.
+    if (auto tlm = serviceContext->getTransportLayerManager()) {
+        LOGV2_OPTIONS(8314100, {LogComponent::kNetwork}, "Shutdown: Closing listener sockets");
+        tlm->stopAcceptingSessions();
     }
 
     // Shut down the global dbclient pool so callers stop waiting for connections.
@@ -1944,15 +1950,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         CatalogCacheLoader::get(serviceContext).shutDown();
     }
 
-    // Shutdown the Session Manager and its sessions and give it a grace period to complete.
-    if (auto mgr = serviceContext->getTransportLayerManager()) {
-        LOGV2_OPTIONS(
-            4784923, {LogComponent::kCommand}, "Shutting down the transport SessionManager");
-        if (!mgr->shutdownSessionManagers(Seconds(10))) {
-            LOGV2_OPTIONS(20563,
-                          {LogComponent::kNetwork},
-                          "SessionManager did not shutdown within the time limit");
-        }
+    // Finish shutting down the TransportLayers
+    if (auto tlm = serviceContext->getTransportLayerManager()) {
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Shut down the transport layer",
+                                                  &shutdownTimeElapsedBuilder);
+        LOGV2_OPTIONS(20562, {LogComponent::kNetwork}, "Shutdown: Closing open transport sessions");
+        tlm->shutdown();
     }
 
     if (auto* healthLog = HealthLogInterface::get(serviceContext)) {
@@ -1988,7 +1992,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // of this function to prevent any operations from running that need a lock.
     //
     LOGV2(4784929, "Acquiring the global lock for shutdown");
-    opCtx->lockState()->lockGlobal(opCtx, MODE_X);
+    shard_role_details::getLocker(opCtx)->lockGlobal(opCtx, MODE_X);
 
     // Global storage engine may not be started in all cases before we exit
     if (serviceContext->getStorageEngine()) {
@@ -2142,7 +2146,7 @@ int mongod_main(int argc, char* argv[]) {
         ChangeStreamChangeCollectionManager::create(service);
     }
 
-    query_settings::QuerySettingsManager::create(service);
+    query_settings::QuerySettingsManager::create(service, {});
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {

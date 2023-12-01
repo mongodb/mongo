@@ -54,7 +54,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_shape/query_shape.h"
@@ -280,14 +279,10 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     // The shapification process will bloat the input query over the 16 MB memory limit. Assert
     // that calling registerRequest() doesn't throw and that the opDebug isn't registered with a
     // key hash (thus metrics won't be tracked for this query).
-    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(
-        opCtx.get(),
-        nss,
-        [&]() {
-            return std::make_unique<query_stats::FindKey>(
-                expCtx, *parsedFind, query_shape::CollectionType::kCollection);
-        },
-        /*requiresFullQueryStatsFeatureFlag*/ false));
+    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
+        return std::make_unique<query_stats::FindKey>(
+            expCtx, *parsedFind, query_shape::CollectionType::kCollection);
+    }));
     auto& opDebug = CurOp::get(*opCtx)->debug();
     ASSERT_EQ(opDebug.queryStatsKeyHash, boost::none);
 }
@@ -966,7 +961,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
         shapified);
 
     // Add the fields that shouldn't be abstracted.
-    acr.setExplain(ExplainOptions::Verbosity::kExecStats);
     acr.setAllowDiskUse(false);
     acr.setHint(BSON("z" << 1 << "c" << 1));
     acr.setCollation(BSON("locale"
@@ -1027,7 +1021,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "collectionType": "collection",
@@ -1103,7 +1096,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "collectionType": "collection",
@@ -1182,7 +1174,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "comment": "?string",
@@ -1268,7 +1259,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                         }
                     }
                 ],
-                "explain": true,
                 "allowDiskUse": false
             },
             "comment": "?",

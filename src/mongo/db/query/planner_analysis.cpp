@@ -863,6 +863,36 @@ void QueryPlannerAnalysis::removeUselessColumnScanRowStoreExpression(QuerySoluti
 }
 
 // static
+void QueryPlannerAnalysis::removeImpreciseInternalExprFilters(const QueryPlannerParams& params,
+                                                              QuerySolutionNode& root) {
+    if (params.collectionStats.isTimeseries) {
+        // For timeseries collections, the imprecise filters are able to get rid of an entire
+        // bucket's worth of data, and save us from unpacking potentially thousands of documents.
+        // In this case, we decide not to prune the imprecise filters.
+        return;
+    }
+
+    // In principle we could do this optimization for TEXT queries, but for simplicity we do not
+    // today.
+    const auto stageType = root.getType();
+    if (stageType == StageType::STAGE_TEXT_OR || stageType == STAGE_TEXT_MATCH) {
+        return;
+    }
+
+    // Remove the imprecise predicates on nodes after a fetch. For nodes before a fetch, the
+    // imprecise filters may be able to save us the significant work of doing a fetch. In such
+    // cases, we assume the imprecise filter is always worth applying.
+    if (root.fetched() && root.filter) {
+        root.filter =
+            expression::assumeImpreciseInternalExprNodesReturnTrue(std::move(root.filter));
+    }
+
+    for (auto& child : root.children) {
+        removeImpreciseInternalExprFilters(params, *child);
+    }
+}
+
+// static
 std::pair<EqLookupNode::LookupStrategy, boost::optional<IndexEntry>>
 QueryPlannerAnalysis::determineLookupStrategy(
     const NamespaceString& foreignCollName,
@@ -871,10 +901,9 @@ QueryPlannerAnalysis::determineLookupStrategy(
     bool allowDiskUse,
     const CollatorInterface* collator) {
     auto foreignCollItr = collectionsInfo.find(foreignCollName);
-    tassert(5842600,
-            str::stream() << "Expected collection info, but found none; target collection: "
-                          << foreignCollName.toStringForErrorMsg(),
-            foreignCollItr != collectionsInfo.end());
+    if (foreignCollItr == collectionsInfo.end()) {
+        return {EqLookupNode::LookupStrategy::kNonExistentForeignCollection, boost::none};
+    }
 
     // Check if an eligible index exists for indexed loop join strategy.
     const auto foreignIndex = [&]() -> boost::optional<IndexEntry> {
@@ -1284,6 +1313,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     const QueryPlannerParams& params,
     std::unique_ptr<QuerySolutionNode> solnRoot) {
     auto soln = std::make_unique<QuerySolution>();
+
     soln->indexFilterApplied = params.indexFiltersApplied;
 
     solnRoot->computeProperties();
@@ -1395,6 +1425,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     solnRoot = tryPushdownProjectBeneathSort(std::move(solnRoot));
 
     QueryPlannerAnalysis::removeUselessColumnScanRowStoreExpression(*solnRoot);
+    QueryPlannerAnalysis::removeImpreciseInternalExprFilters(params, *solnRoot);
 
     soln->setRoot(std::move(solnRoot));
     return soln;

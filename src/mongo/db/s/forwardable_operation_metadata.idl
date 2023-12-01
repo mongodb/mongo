@@ -63,3 +63,7 @@ structs:
             mayBypassWriteBlocking:
                 type: optionalBool
                 description: "Whether this operation is allowed to bypass user write blocking."
+            validatedTenancyScopeToken:
+                type: string
+                description: "Token used to validate and create a new ValidatedTenancyScope."
+                optional: true

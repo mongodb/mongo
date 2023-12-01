@@ -3,6 +3,8 @@
 //   # The simulate_atlas_proxy override in multi-tenant mode might choose different
 //   # prefixes for each sibling DB in this test.
 //   multiple_tenants_incompatible,
+//   # Can't have 2 databases that just differ on case
+//   assumes_no_implicit_collection_creation_on_get_collection,
 // ]
 
 let a = db.getSiblingDB("dbcasetest_dbnamea");

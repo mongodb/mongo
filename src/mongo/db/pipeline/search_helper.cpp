@@ -43,8 +43,8 @@
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(searchReturnEofImmediately);
 
-ServiceContext::Decoration<std::unique_ptr<SearchDefaultHelperFunctions>> getSearchHelpers =
-    ServiceContext::declareDecoration<std::unique_ptr<SearchDefaultHelperFunctions>>();
+ServiceContext::Decoration<SearchDefaultHelperFunctions*> getSearchHelpers =
+    ServiceContext::declareDecoration<SearchDefaultHelperFunctions*>();
 
 namespace {
 void assertHelper(const Pipeline::SourceContainer& pipeline) {
@@ -74,7 +74,9 @@ void SearchDefaultHelperFunctions::assertSearchMetaAccessValid(
 
 ServiceContext::ConstructorActionRegisterer searchQueryHelperRegisterer{
     "searchQueryHelperRegisterer", [](ServiceContext* context) {
+        static SearchDefaultHelperFunctions searchDefaultHelperFunctions;
+
         invariant(context);
-        getSearchHelpers(context) = std::make_unique<SearchDefaultHelperFunctions>();
+        getSearchHelpers(context) = &searchDefaultHelperFunctions;
     }};
 }  // namespace mongo

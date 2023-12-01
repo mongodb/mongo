@@ -26,6 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -73,7 +74,13 @@ config_map::from_string(const char *str, const char **end)
             /* Handle keys. */
             if (!in_quotes && c == '=')
                 in_key = false;
-            else
+            else if (!in_quotes && c == ',') {
+                /* Empty value. */
+                if (!key_buf.str().empty()) {
+                    m._map[key_buf.str()] = "";
+                    key_buf.str("");
+                }
+            } else
                 key_buf << c;
         } else {
             /* Handle nested config maps. */
@@ -83,6 +90,16 @@ config_map::from_string(const char *str, const char **end)
                 m._map[key_buf.str()] = std::make_shared<config_map>(from_string(p + 1, &p));
                 if (*p != ')')
                     throw model_exception("Invalid nesting within a configuration string");
+                key_buf.str("");
+                in_key = true;
+            }
+            /* Handle arrays. */
+            else if (!in_quotes && c == '[') {
+                if (value_buf.str() != "")
+                    throw model_exception("Invalid array in the configuration string");
+                m._map[key_buf.str()] = parse_array(p + 1, &p);
+                if (*p != ']')
+                    throw model_exception("Unmatched '[' in a configuration string");
                 key_buf.str("");
                 in_key = true;
             }
@@ -112,6 +129,72 @@ config_map::from_string(const char *str, const char **end)
     } else
         *end = p;
 
+    return m;
+}
+
+/*
+ * config_map::parse_array --
+ *     Parse an array.
+ */
+std::shared_ptr<std::vector<std::string>>
+config_map::parse_array(const char *str, const char **end)
+{
+    std::shared_ptr<std::vector<std::string>> v = std::make_shared<std::vector<std::string>>();
+
+    std::ostringstream buf;
+    bool in_quotes = false;
+    const char *p;
+
+    for (p = str; *p != '\0' && (in_quotes || *p != ']'); p++) {
+        char c = *p;
+
+        /* Handle quotes. */
+        if (in_quotes) {
+            if (c == '\"') {
+                in_quotes = false;
+                continue;
+            }
+        } else if (c == '\"') {
+            in_quotes = true;
+            continue;
+        }
+
+        /* We found the end of the value. */
+        if (c == ',') {
+            std::string s = buf.str();
+            if (!s.empty()) {
+                v->push_back(s);
+                buf.str("");
+            }
+        }
+        /* Else we just get the next character. */
+        else
+            buf << c;
+    }
+
+    /* Handle the last value. */
+    if (in_quotes)
+        throw model_exception("Unmatched quotes within a configuration string");
+    std::string last = buf.str();
+    if (!last.empty())
+        v->push_back(last);
+
+    /* Handle the end of the array. */
+    if (end != nullptr)
+        *end = p;
+    return v;
+}
+
+/*
+ * config_map::merge --
+ *     Merge two config maps.
+ */
+config_map
+config_map::merge(const config_map &a, const config_map &b)
+{
+    config_map m;
+    std::merge(a._map.begin(), a._map.end(), b._map.begin(), b._map.end(),
+      std::inserter(m._map, m._map.begin()));
     return m;
 }
 

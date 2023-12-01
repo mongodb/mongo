@@ -459,11 +459,9 @@ private:
     };
 
     /**
-     * Called at the end of the service stepdown procedure.
-     * In order to not block the stepdown procedure, no blocking work must be done in this
-     * function.
+     * Called as part of the POS onStepDown/onShutdown hooks before interrupting instances.
      */
-    virtual void _afterStepDown() {}
+    virtual void _onServiceTermination() {}
 
     /**
      * Called as part of onStepUp.  Queries the state document collection for this

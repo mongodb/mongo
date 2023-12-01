@@ -160,7 +160,7 @@ public:
         return !isEphemeral();
     }
 
-    void checkpoint(OperationContext* opCtx) override;
+    void checkpoint() override;
 
     // Force a WT checkpoint, this will not update internal timestamps.
     void forceCheckpoint(bool useStableTimestamp);
@@ -429,6 +429,10 @@ public:
                                              Timestamp requestedTimestamp,
                                              bool roundUpIfTooOld) override;
 
+    Status autoCompact(OperationContext* opCtx,
+                       bool enable,
+                       boost::optional<int64_t> freeSpaceTargetMB) override;
+
 private:
     StatusWith<Timestamp> _pinOldestTimestamp(WithLock,
                                               const std::string& requestingServiceName,
@@ -470,7 +474,7 @@ private:
         StorageEngine::DropIdentCallback callback;
     };
 
-    void _checkpoint(OperationContext* opCtx, WT_SESSION* session);
+    void _checkpoint(WT_SESSION* session);
 
     void _checkpoint(WT_SESSION* session, bool useTimestamp);
 

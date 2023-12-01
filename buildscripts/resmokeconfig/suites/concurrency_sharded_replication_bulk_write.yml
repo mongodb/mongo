@@ -93,11 +93,6 @@ selector:
   # infrastructure. See SERVER-77039 for full details.
   - jstests/concurrency/fsm_workloads/map_reduce_drop.js
 
-  # TODO SERVER-72793 These tests cause WouldChangeOwningShard error which bulkWrite doesn't handle yet.
-  - jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key_kill_sessions.js
-  - jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key.js
-  - jstests/concurrency/fsm_workloads/random_internal_transactions_setFCV_operations.js
-
   exclude_with_any_tags:
   - requires_replication
   - assumes_balancer_on

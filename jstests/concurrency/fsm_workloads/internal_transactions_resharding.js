@@ -44,7 +44,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.isAcceptableAggregateCmdError = function isAcceptableAggregateCmdError(res) {
         // The aggregate command is expected to involve running getMore commands which are not
         // retryable after a collection rename (done by resharding).
-        return res && (interruptedQueryErrors.includes(res.code));
+        return $baseConfig.data.isAcceptableAggregateCmdError(res) ||
+            (res && (interruptedQueryErrors.includes(res.code)));
     };
 
     $config.data.isAcceptableRetryError = function isAcceptableRetryError(res) {

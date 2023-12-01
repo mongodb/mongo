@@ -40,15 +40,19 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/configsvr_coordinator_gen.h"
 #include "mongo/db/s/config/set_user_write_block_mode_coordinator_document_gen.h"
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 
@@ -93,18 +97,80 @@ protected:
 
     void _removeStateDocument(OperationContext* opCtx);
 
-    template <typename StateDoc>
-    void _updateStateDocument(OperationContext* opCtx, const StateDoc& newDoc) {
+    OperationSessionInfo _getCurrentSession() const;
+
+    Mutex _mutex = MONGO_MAKE_LATCH("ConfigsvrCoordinator::_mutex");
+    SharedPromise<void> _completionPromise;
+};
+
+template <class StateDoc, class Phase>
+class ConfigsvrCoordinatorImpl : public ConfigsvrCoordinator {
+public:
+    ConfigsvrCoordinatorImpl(const BSONObj& stateDoc)
+        : ConfigsvrCoordinator(stateDoc),
+          _doc(StateDoc::parse(IDLParserContext("CoordinatorDocument"), stateDoc)) {}
+
+    ~ConfigsvrCoordinatorImpl() {}
+
+protected:
+    /**
+     * Persists the given StateDoc in memory and sets `_doc` to the new value.
+     * Note: We assume only one thread make writes on `_doc` (which is the executor thread) while
+     * multiple threads can read it.
+     */
+    void _updateStateDocument(OperationContext* opCtx, StateDoc&& newDoc) {
         PersistentTaskStore<StateDoc> store(NamespaceString::kConfigsvrCoordinatorsNamespace);
         store.update(opCtx,
                      BSON(StateDoc::kIdFieldName << newDoc.getId().toBSON()),
                      newDoc.toBSON(),
                      WriteConcerns::kMajorityWriteConcernNoTimeout);
+
+        {
+            stdx::lock_guard lk{_docMutex};
+            _doc = std::move(newDoc);
+        }
     }
 
-    template <typename StateDoc>
-    StateDoc _updateSession(OperationContext* opCtx, const StateDoc& doc) {
-        const auto newCoordinatorMetadata = [&] {
+    /**
+     * Updates _doc according to the given function and persists it in memory.
+     * Note: We assume only one thread make writes on _doc (which is the executor thread) while
+     * multiple threads can read it.
+     */
+    template <typename Func>
+    void _updateStateDocumentWith(OperationContext* opCtx, Func&& updateF) requires(
+        std::is_invocable_r_v<void, Func, StateDoc&>) {
+        auto newDoc = _doc;
+
+        updateF(newDoc);
+
+        if (newDoc.getPhase() != Phase::kUnset) {
+            _updateStateDocument(opCtx, std::move(newDoc));
+        } else {
+            stdx::lock_guard lk{_docMutex};
+            _doc = std::move(newDoc);
+        }
+    }
+
+    /**
+     * Evaluates `_doc` under the `_docMutex` locking to protect the reads from concurrent writes.
+     * Note: `_doc` needs to be accessed through this method when the calling thread is other than
+     * the main coordinator thread. The reason is that writes are only done from the main
+     * coordinator thread.
+     */
+    template <typename Func>
+    auto _evalStateDocumentThreadSafe(Func&& evalF) const
+        requires(std::is_invocable_v<Func, const StateDoc&>) {
+        stdx::lock_guard lk{_docMutex};
+        return evalF(_doc);
+    }
+
+    /**
+     * Gets a new session if necessary and updates `_doc`.
+     */
+    void _updateSession(OperationContext* opCtx) {
+        auto internalSessionPool = InternalSessionPool::get(opCtx);
+
+        _updateStateDocumentWith(opCtx, [&](StateDoc& doc) {
             ConfigsvrCoordinatorMetadata newMetadata = doc.getConfigsvrCoordinatorMetadata();
 
             const auto optPrevSession = doc.getSession();
@@ -112,24 +178,72 @@ protected:
                 newMetadata.setSession(ConfigsvrCoordinatorSession(
                     optPrevSession->getLsid(), optPrevSession->getTxnNumber() + 1));
             } else {
-                const auto newSession = InternalSessionPool::get(opCtx)->acquireSystemSession();
+                const auto newSession = internalSessionPool->acquireSystemSession();
                 newMetadata.setSession(ConfigsvrCoordinatorSession(newSession.getSessionId(),
                                                                    newSession.getTxnNumber()));
             }
 
-            return newMetadata;
-        }();
-
-        StateDoc newDoc(doc);
-        newDoc.setConfigsvrCoordinatorMetadata(std::move(newCoordinatorMetadata));
-        _updateStateDocument(opCtx, newDoc);
-        return newDoc;
+            doc.setConfigsvrCoordinatorMetadata(newMetadata);
+        });
     }
 
-    OperationSessionInfo _getCurrentSession() const;
+    template <typename Func>
+    auto _buildPhaseHandler(const Phase& newPhase,
+                            Func&& handlerFn) requires(std::is_invocable_r_v<void, Func>) {
+        return [=, this] {
+            const auto& currPhase = _doc.getPhase();
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ConfigsvrCoordinator::_mutex");
-    SharedPromise<void> _completionPromise;
+            if (currPhase > newPhase) {
+                // Do not execute this phase if we already reached a subsequent one.
+                return;
+            }
+            if (currPhase < newPhase) {
+                // Persist the new phase if this is the first time we are executing it.
+                _enterPhase(newPhase);
+            }
+            return handlerFn();
+        };
+    }
+
+    virtual StringData serializePhase(const Phase& phase) const = 0;
+
+    void _enterPhase(Phase newPhase) {
+        auto newDoc = _doc;
+
+        newDoc.setPhase(newPhase);
+
+        LOGV2_DEBUG(8355400,
+                    2,
+                    "ConfigsvrCoordinator phase transition",
+                    "coordinatorId"_attr = _doc.getId(),
+                    "newPhase"_attr = serializePhase(newDoc.getPhase()),
+                    "oldPhase"_attr = serializePhase(_doc.getPhase()));
+
+        auto opCtx = cc().makeOperationContext();
+
+        if (_doc.getPhase() == Phase::kUnset) {
+            PersistentTaskStore<StateDoc> store(NamespaceString::kConfigsvrCoordinatorsNamespace);
+            try {
+                store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernNoTimeout);
+            } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+                // A series of step-up and step-down events can cause a node to try and insert the
+                // document when it has already been persisted locally, but we must still wait for
+                // majority commit.
+                const auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+                const auto lastLocalOpTime = replCoord->getMyLastAppliedOpTime();
+                WaitForMajorityService::get(opCtx->getServiceContext())
+                    .waitUntilMajorityForWrite(lastLocalOpTime, opCtx.get()->getCancellationToken())
+                    .get(opCtx.get());
+            }
+        } else {
+            _updateStateDocument(opCtx.get(), std::move(newDoc));
+        }
+    }
+
+    mutable Mutex _docMutex = MONGO_MAKE_LATCH("ConfigsvrCoordinatorImpl::_docMutex");
+    StateDoc _doc;
 };
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT
 
 }  // namespace mongo

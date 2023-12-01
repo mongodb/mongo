@@ -57,7 +57,8 @@ TEST(VectorizerTest, ConvertGt) {
         std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
                        boost::none));
 
-    auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings);
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
 
     ASSERT_TRUE(processed.expr.has_value());
     ASSERT_EXPLAIN_BSON_AUTO(
@@ -88,7 +89,8 @@ TEST(VectorizerTest, ConvertGtOnCell) {
                      std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
                                     boost::none));
 
-    auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings);
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
 
     ASSERT_TRUE(processed.expr.has_value());
     ASSERT_EXPLAIN_BSON_AUTO(
@@ -138,7 +140,8 @@ TEST(VectorizerTest, ConvertBooleanOpOnCell) {
                      std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
                                     boost::none));
 
-    auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings);
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
 
     ASSERT_TRUE(processed.expr.has_value());
     ASSERT_EXPLAIN_BSON_AUTO(
@@ -239,9 +242,8 @@ TEST(VectorizerTest, ConvertFilter) {
                      std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
                                     boost::none));
 
-    // Use Project to highlight that traverseF always translates to a cellFoldValue_F.
     auto processed =
-        Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(tree1, bindings);
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
 
     ASSERT_TRUE(processed.expr.has_value());
     ASSERT_EXPLAIN_BSON_AUTO(
@@ -309,7 +311,8 @@ TEST(VectorizerTest, ConvertBlockIf) {
                      std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
                                     boost::none));
 
-    auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings);
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
 
     ASSERT_TRUE(processed.expr.has_value());
     ASSERT_EXPLAIN_BSON_AUTO(
@@ -429,6 +432,57 @@ TEST(VectorizerTest, ConvertBlockIf) {
         "            }\n"
         "        ]\n"
         "    }\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertProjection) {
+    auto tree1 = make<BinaryOp>(
+        Operations::FillEmpty, make<Variable>("inputVar"), optimizer::Constant::emptyObject());
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    // A projection-style vectorization folds the cell blocks before running the operation.
+    auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+        tree1, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"valueBlockFillEmpty\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"cellFoldValues_P\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"inputVar\"\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"Object\", \n"
+        "            value: {\n"
+        "            }\n"
+        "        }\n"
+        "    ]\n"
         "}\n",
         *processed.expr);
 }

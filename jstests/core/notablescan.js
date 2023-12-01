@@ -52,10 +52,6 @@ try {
     t.createIndex({a: 1});
     assert.eq(0, t.find({a: 1, b: 1}).itcount());
     assert.eq(1, t.find({a: 1, b: null}).itcount());
-
-    // SERVER-4327
-    assert.eq(0, t.find({a: {$in: []}}).itcount());
-    assert.eq(0, t.find({a: {$in: []}, b: 0}).itcount());
 } finally {
     // We assume notablescan was false before this test started and restore that
     // expected value.

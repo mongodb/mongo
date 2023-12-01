@@ -23,7 +23,7 @@ let primary = rst.getPrimary();
 let testColl = primary.getCollection('test.validate_multikey');
 
 assert.commandWorked(testColl.createIndex({a: 1}));
-let validation = assert.commandWorked(testColl.validate({background: true}));
+let validation = assert.commandWorked(testColl.validate());
 jsTestLog({validation: validation});
 
 const args = [testColl.getDB().getName(), testColl.getName()];
@@ -45,8 +45,8 @@ let func = function(args) {
 let join = startParallelShell(funWithArgs(func, args), primary.port);
 
 while (testColl.count() < 2) {
-    validation = assert.commandWorked(testColl.validate({background: true}));
-    jsTestLog({background: validation});
+    validation = assert.commandWorked(testColl.validate());
+    jsTestLog({validation: validation});
     assert(validation.valid);
 }
 

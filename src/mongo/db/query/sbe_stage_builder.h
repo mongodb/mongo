@@ -205,6 +205,7 @@ public:
                                                                   "metadataSearchSortValues"_sd};
     static constexpr UnownedSlotName kMetadataSearchSequenceToken = {
         kMeta, "metadataSearchSequenceToken"_sd};
+    static constexpr UnownedSlotName kBlockSelectivityBitmap = {kMeta, "bitmap"_sd};
 
     /**
      * In addition to holding individual output slots, a PlanStageSlots object can also optionally
@@ -555,8 +556,12 @@ public:
 
     ~PlanStageReqs() = default;
 
-    PlanStageReqs copy() const {
-        return *this;
+    PlanStageReqs copyForChild() const {
+        PlanStageReqs copy = *this;
+        // The flag to signal that block processing is supported must be be explicitly set to true
+        // by the code handling each block-enabled stage.
+        copy.setCanProcessBlockValues(false);
+        return copy;
     }
 
     bool has(const UnownedSlotName& str) const {
@@ -762,6 +767,15 @@ public:
         return *this;
     }
 
+    bool getCanProcessBlockValues() const {
+        return _canProcessBlockValues;
+    }
+
+    PlanStageReqs& setCanProcessBlockValues(bool b) {
+        _canProcessBlockValues = b;
+        return *this;
+    }
+
     PlanStageReqs& setTargetNamespace(const NamespaceString& nss) {
         _targetNamespace = nss;
         return *this;
@@ -790,6 +804,10 @@ private:
     // resume branch. At all other times, this flag will be false.
     bool _isTailableCollScanResumeBranch{false};
 
+    // When we are processing a stage that can work on top of block values, this flag instruct the
+    // child stage not to insert a BlockToRow stage to convert the block values into scalar values.
+    bool _canProcessBlockValues{false};
+
     // Tracks the current namespace that we're building a plan over. Given that the stage
     // builder can build plans for multiple namespaces, a node in the tree that targets a
     // namespace different from its parent node can set this value to notify any child nodes of
@@ -800,6 +818,7 @@ private:
 struct BuildProjectionPlan {
     enum Type {
         kDoNotMakeResult,
+        kUseSimpleProjection,
         kUseChildResult,
         kUseCoveredProjection,
         kUseInputPlanWithoutObj,
@@ -876,7 +895,7 @@ public:
     PlanType build(const QuerySolutionNode* root) final;
 
 private:
-    void analyzeTree();
+    void analyzeTree(const QuerySolutionNode* node);
 
     QsnAnalysis analyze(const QuerySolutionNode* node);
 
@@ -888,11 +907,13 @@ private:
         return _analysis.find(node.get())->second;
     }
 
-    const FieldSet& getAllowedFieldSet(const QuerySolutionNode* node) const {
+    const FieldSet& getAllowedFieldSet(const QuerySolutionNode* node) {
+        analyzeTree(node);
         return getAnalysis(node).allowedFieldSet;
     }
 
-    const FieldSet& getAllowedFieldSet(const std::unique_ptr<QuerySolutionNode>& node) const {
+    const FieldSet& getAllowedFieldSet(const std::unique_ptr<QuerySolutionNode>& node) {
+        analyzeTree(node.get());
         return getAnalysis(node).allowedFieldSet;
     }
 
@@ -1008,6 +1029,17 @@ private:
 
     std::unique_ptr<BuildProjectionPlan> makeBuildProjectionPlan(const QuerySolutionNode* root,
                                                                  const PlanStageReqs& reqs);
+
+    std::unique_ptr<sbe::PlanStage> buildBlockToRow(std::unique_ptr<sbe::PlanStage> stage,
+                                                    PlanStageSlots& outputs);
+
+    // Given an expression built on top of scalar processing, along with the definition of the
+    // visible slots (some of which could be marked as holding block of values), produce an
+    // expression tree that can be executed directly on top of them. Returns an empty result if the
+    // expression isn't vectorizable.
+    boost::optional<TypedExpression> buildVectorizedExpr(SbExpr scalarExpression,
+                                                         PlanStageSlots& outputs,
+                                                         bool forFilterStage);
 
     /**
      * Returns a CollectionPtr corresponding to the collection that we are currently building a

@@ -73,7 +73,6 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/s/catalog_cache.h"

@@ -84,6 +84,7 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/ops/delete_request_gen.h"
@@ -216,12 +217,13 @@ public:
         } else {
             auto replyItem = BulkWriteReplyItem(currentOpIdx);
             replyItem.setN(writeResult.results[0].getValue().getN());
-            _summaryFields.nMatched += *replyItem.getN();
             replyItem.setNModified(writeResult.results[0].getValue().getNModified());
             _summaryFields.nModified += *replyItem.getNModified();
             if (auto idElement = writeResult.results[0].getValue().getUpsertedId().firstElement()) {
                 replyItem.setUpserted(write_ops::Upserted(0, idElement));
                 _summaryFields.nUpserted += 1;
+            } else {
+                _summaryFields.nMatched += *replyItem.getN();
             }
             _addReply(replyItem);
         }
@@ -239,7 +241,6 @@ public:
             replyItem.setUpserted(upserted);
             replyItem.setN(1);
             _summaryFields.nUpserted += 1;
-            _summaryFields.nMatched += 1;
         } else {
             replyItem.setN(numMatched);
             _summaryFields.nMatched += numMatched;
@@ -768,7 +769,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
     boost::optional<ScopedAdmissionPriorityForLock> priority;
     if (nsString == NamespaceString::kConfigSampledQueriesNamespace ||
         nsString == NamespaceString::kConfigSampledQueriesDiffNamespace) {
-        priority.emplace(opCtx->lockState(), AdmissionContext::Priority::kLow);
+        priority.emplace(shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kLow);
     }
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -1407,7 +1408,8 @@ public:
             const NamespaceString cursorNss =
                 NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
 
-            if (replies.size() == 0) {
+            if (replies.size() == 0 || bulk_write_common::isUnacknowledgedBulkWrite(opCtx)) {
+                // Skip cursor creation and return the simplest reply.
                 return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
                                                  0 /* cursorId */, {} /* firstBatch */, cursorNss),
                                              summaryFields.nErrors,

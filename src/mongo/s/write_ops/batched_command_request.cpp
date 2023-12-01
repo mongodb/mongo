@@ -182,20 +182,6 @@ const boost::optional<BSONObj>& BatchedCommandRequest::getLet() const {
     return _visit(Visitor{});
 };
 
-bool BatchedCommandRequest::isVerboseWC() const {
-    if (!hasWriteConcern()) {
-        return true;
-    }
-
-    BSONObj writeConcern = getWriteConcern();
-    BSONElement wElem = writeConcern["w"];
-    if (!wElem.isNumber() || wElem.Number() != 0) {
-        return true;
-    }
-
-    return false;
-}
-
 const write_ops::WriteCommandRequestBase& BatchedCommandRequest::getWriteCommandRequestBase()
     const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getWriteCommandRequestBase(); });

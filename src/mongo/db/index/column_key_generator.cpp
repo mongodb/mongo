@@ -608,7 +608,8 @@ private:
         }
 
         // Now put the rest of the new array info into the output buffer.
-        rcd.arrayInfoBuf += StringData(newIt, newPosition.end());
+        if (auto d = std::distance(newIt, newPosition.end()))
+            rcd.arrayInfoBuf += StringData(&*newIt, d);
         rcd.arrayInfoBuf += finalByte;
     }
 
@@ -704,7 +705,7 @@ private:
         static_assert(ColumnStore::kRowIdPath == "\xFF"_sd);
         uassert(6519200,
                 "Field name contains '\\xFF' which isn't valid in UTF-8",
-                fieldName[0] != '\xFF');  // We know field names are nul-terminated so this is safe.
+                !fieldName.starts_with('\xFF'));
 
         // Fields with dots are not illegal, but we skip them because a) the query optimizer can't
         // correctly track dependencies with them, and b) the current storage format uses dots as a

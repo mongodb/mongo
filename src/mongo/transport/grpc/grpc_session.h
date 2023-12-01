@@ -224,7 +224,7 @@ public:
 
     bool shouldOverrideMaxConns(
         const std::vector<stdx::variant<CIDR, std::string>>& exemptions) const override {
-        MONGO_UNIMPLEMENTED;
+        return false;
     }
 
     const RestrictionEnvironment& getAuthEnvironment() const override {

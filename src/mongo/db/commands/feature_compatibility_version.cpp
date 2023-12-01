@@ -56,12 +56,12 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -558,7 +558,7 @@ void FeatureCompatibilityVersion::updateMinWireVersion(OperationContext* opCtx) 
 
 void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) {
     // Global write lock must be held.
-    invariant(opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(opCtx)->isW());
     auto featureCompatibilityVersion = findFeatureCompatibilityVersionDocument(opCtx);
     if (!featureCompatibilityVersion) {
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
@@ -652,7 +652,7 @@ void FeatureCompatibilityVersion::addTransitionFromLatestToLastContinuous() {
 }
 
 Lock::ExclusiveLock FeatureCompatibilityVersion::enterFCVChangeRegion(OperationContext* opCtx) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     return Lock::ExclusiveLock(opCtx, fcvDocumentLock);
 }
 
@@ -718,8 +718,8 @@ Status FeatureCompatibilityVersionParameter::setFromString(StringData,
 
 FixedFCVRegion::FixedFCVRegion(OperationContext* opCtx)
     : _lk([&] {
-          invariant(!opCtx->lockState()->isLocked());
-          invariant(!opCtx->lockState()->isRSTLLocked());
+          invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+          invariant(!shard_role_details::getLocker(opCtx)->isRSTLLocked());
           return Lock::SharedLock(opCtx, fcvDocumentLock);
       }()) {}
 

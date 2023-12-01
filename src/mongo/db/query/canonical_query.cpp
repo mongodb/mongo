@@ -53,7 +53,6 @@
 #include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/query_settings_manager.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
@@ -182,9 +181,9 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     _forceClassicEngine = frameworkControl == QueryFrameworkControlEnum::kForceClassicEngine;
 
     // TODO SERVER-76509: Enable Boolean expression simplification in Bonsai.
-    _primaryMatchExpression =
-        MatchExpression::normalize(std::move(parsedFind->filter),
-                                   /* enableSimplification*/ !isBonsaiEnabled(frameworkControl));
+    _primaryMatchExpression = MatchExpression::normalize(
+        std::move(parsedFind->filter),
+        /* enableSimplification*/ !_expCtx->inLookup && !isBonsaiEnabled(frameworkControl));
     if (parsedFind->proj) {
         if (parsedFind->proj->requiresMatchDetails()) {
             // Sadly, in some cases the match details cannot be generated from the unoptimized

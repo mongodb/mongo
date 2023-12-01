@@ -242,9 +242,6 @@ std::pair<value::TypeTags, value::Value> genericCompare(
         }
     }
 
-    // TODO: SERVER-82089: Use cmp3w instead of simple comparisons in ABT optimization + lowering of
-    // parameterized constants
-
     return {value::TypeTags::Nothing, 0};
 }
 
@@ -365,6 +362,7 @@ struct Instruction {
         isNull,
         isObject,
         isArray,
+        isInListData,
         isString,
         isNumber,
         isBinData,
@@ -584,6 +582,8 @@ struct Instruction {
                 return "isObject";
             case isArray:
                 return "isArray";
+            case isInListData:
+                return "isInListData";
             case isString:
                 return "isString";
             case isNumber:
@@ -903,6 +903,7 @@ enum class Builtin : uint16_t {
     valueBlockMin,
     valueBlockMax,
     valueBlockCount,
+    valueBlockSum,
     valueBlockGtScalar,
     valueBlockGteScalar,
     valueBlockEqScalar,
@@ -1265,6 +1266,7 @@ public:
     void appendIsNull(Instruction::Parameter input);
     void appendIsObject(Instruction::Parameter input);
     void appendIsArray(Instruction::Parameter input);
+    void appendIsInListData(Instruction::Parameter input);
     void appendIsString(Instruction::Parameter input);
     void appendIsNumber(Instruction::Parameter input);
     void appendIsBinData(Instruction::Parameter input);
@@ -1768,42 +1770,28 @@ private:
      * directly passed in as C++ parameters -- instead the computed input values are passed via
      * the VM's stack.)
      */
-    void produceBsonObject(const MakeObjSpec* spec,
-                           MakeObjStackOffsets stackOffsets,
-                           const CodeFragment* code,
-                           UniqueBSONObjBuilder& bob,
-                           value::TypeTags rootTag,
-                           value::Value rootVal) {
+    MONGO_COMPILER_ALWAYS_INLINE void produceBsonObject(const MakeObjSpec* spec,
+                                                        MakeObjStackOffsets stackOffsets,
+                                                        const CodeFragment* code,
+                                                        UniqueBSONObjBuilder& bob,
+                                                        value::TypeTags rootTag,
+                                                        value::Value rootVal) {
         using TypeTags = value::TypeTags;
 
         const auto& fields = spec->fields;
-        const auto& actions = spec->actions;
-        const auto defActionType = spec->fieldsScopeIsClosed() ? MakeObjSpec::ActionType::kDrop
-                                                               : MakeObjSpec::ActionType::kKeep;
 
-        // Invoke the produceBsonObject() lambda with the appropriate iterator type.
-        switch (rootTag) {
-            case TypeTags::bsonObject: {
-                // For BSON objects, use BsonObjCursor.
-                auto cursor = BsonObjCursor(
-                    fields, actions, defActionType, value::bitcastTo<const char*>(rootVal));
-                produceBsonObject(spec, stackOffsets, code, bob, std::move(cursor));
-                break;
-            }
-            case TypeTags::Object: {
-                // For SBE objects, use ObjectCursor.
-                auto cursor =
-                    ObjectCursor(fields, actions, defActionType, value::getObjectView(rootVal));
-                produceBsonObject(spec, stackOffsets, code, bob, std::move(cursor));
-                break;
-            }
-            default: {
-                // For all other types, use BsonObjCursor initialized with an empty object.
-                auto cursor =
-                    BsonObjCursor(fields, actions, defActionType, BSONObj::kEmptyObject.objdata());
-                produceBsonObject(spec, stackOffsets, code, bob, std::move(cursor));
-                break;
-            }
+        // Invoke the produceBsonObject() lambda with the appropriate iterator type. For
+        // SBE objects, we use ObjectCursor. For all other types, we use BsonObjCursor.
+        if (rootTag == TypeTags::Object) {
+            auto obj = value::getObjectView(rootVal);
+
+            produceBsonObject(spec, stackOffsets, code, bob, ObjectCursor(fields, obj));
+        } else {
+            const char* obj = rootTag == TypeTags::bsonObject
+                ? value::bitcastTo<const char*>(rootVal)
+                : BSONObj::kEmptyObject.objdata();
+
+            produceBsonObject(spec, stackOffsets, code, bob, BsonObjCursor(fields, obj));
         }
     }
 
@@ -2135,6 +2123,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMin(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMax(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCount(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockSum(ArityType arity);
 
     template <class Cmp, value::ColumnOpType::Flags AddFlags = value::ColumnOpType::kNoFlags>
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCmpScalar(ArityType arity);
@@ -2273,7 +2262,15 @@ private:
         _argStackTop = _argStack - sizeOfElement;
     }
 
-    void allocStack(size_t size) noexcept;
+    MONGO_COMPILER_ALWAYS_INLINE_OPT void allocStack(size_t size) noexcept {
+        auto newSizeDelta = size * sizeOfElement;
+        if (_argStackEnd <= _argStackTop + newSizeDelta) {
+            allocStackImpl(newSizeDelta);
+        }
+    }
+
+    void allocStackImpl(size_t newSizeDelta) noexcept;
+
     void swapStack();
 
     // The top entry in '_argStack', or one element before the stack when empty.

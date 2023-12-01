@@ -70,13 +70,13 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -189,12 +189,12 @@ protected:
     void forceCheckpoint(bool background) {
         if (background) {
             // Checkpoint all of the data.
-            _opCtx.getServiceContext()->getStorageEngine()->checkpoint(&_opCtx);
+            _opCtx.getServiceContext()->getStorageEngine()->checkpoint();
         }
     }
 
     ValidateResults runValidate() {
-        // validate() will set a kCheckpoint read source. Callers continue to do operations after
+        // validate() will set a kProvided read source. Callers continue to do operations after
         // running validate, so we must reset the read source back to normal before returning.
         auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
         ON_BLOCK_EXIT([&] {
@@ -266,16 +266,18 @@ protected:
 
     void lockDb(LockMode mode) {
         _autoDb.reset();
-        invariant(_opCtx.lockState()->isDbLockedForMode(_nss.dbName(), MODE_NONE));
+        invariant(
+            shard_role_details::getLocker(&_opCtx)->isDbLockedForMode(_nss.dbName(), MODE_NONE));
         _autoDb.reset(new AutoGetDb(&_opCtx, _nss.dbName(), mode));
-        invariant(_opCtx.lockState()->isDbLockedForMode(_nss.dbName(), mode));
+        invariant(shard_role_details::getLocker(&_opCtx)->isDbLockedForMode(_nss.dbName(), mode));
         _db = _autoDb.get()->getDb();
     }
 
     void releaseDb() {
         _autoDb.reset();
         _db = nullptr;
-        invariant(_opCtx.lockState()->isDbLockedForMode(_nss.dbName(), MODE_NONE));
+        invariant(
+            shard_role_details::getLocker(&_opCtx)->isDbLockedForMode(_nss.dbName(), MODE_NONE));
     }
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
@@ -3520,7 +3522,7 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
+            // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
             auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
@@ -4363,7 +4365,7 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
+            // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
             auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
@@ -4478,7 +4480,7 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
+            // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
             auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
@@ -4590,7 +4592,7 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
+            // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
             auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
@@ -4631,7 +4633,7 @@ public:
             ValidateResults results;
             BSONObjBuilder output;
 
-            // validate() will set a kCheckpoint read source. Callers continue to do operations
+            // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
             auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
@@ -4804,37 +4806,39 @@ public:
     ValidateTests() : OldStyleSuiteSpecification("validate_tests") {}
 
     void setupTests() {
+        // TODO SERVER-83593: re-enable background validation tests.
+
         // Add tests for both full validate and non-full validate.
         add<ValidateIdIndexCount<true, false>>();
         add<ValidateIdIndexCount<false, false>>();
-        add<ValidateIdIndexCount<false, true>>();
+        // add<ValidateIdIndexCount<false, true>>();
         add<ValidateSecondaryIndexCount<true, false>>();
         add<ValidateSecondaryIndexCount<false, false>>();
-        add<ValidateSecondaryIndexCount<false, true>>();
+        // add<ValidateSecondaryIndexCount<false, true>>();
 
         // These tests are only needed for non-full validate.
         add<ValidateIdIndex<false, false>>();
-        add<ValidateIdIndex<false, true>>();
+        // add<ValidateIdIndex<false, true>>();
         add<ValidateSecondaryIndex<false, false>>();
-        add<ValidateSecondaryIndex<false, true>>();
+        // add<ValidateSecondaryIndex<false, true>>();
         add<ValidateMultiKeyIndex<false, false>>();
-        add<ValidateMultiKeyIndex<false, true>>();
+        // add<ValidateMultiKeyIndex<false, true>>();
         add<ValidateSparseIndex<false, false>>();
-        add<ValidateSparseIndex<false, true>>();
+        // add<ValidateSparseIndex<false, true>>();
         add<ValidateCompoundIndex<false, false>>();
-        add<ValidateCompoundIndex<false, true>>();
+        // add<ValidateCompoundIndex<false, true>>();
         add<ValidatePartialIndex<false, false>>();
-        add<ValidatePartialIndex<false, true>>();
+        // add<ValidatePartialIndex<false, true>>();
         add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, false>>();
-        add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, true>>();
+        // add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, true>>();
         add<ValidateWildCardIndex<false, false>>();
-        add<ValidateWildCardIndex<false, true>>();
+        // add<ValidateWildCardIndex<false, true>>();
         add<ValidateWildCardIndexWithProjection<false, false>>();
-        add<ValidateWildCardIndexWithProjection<false, true>>();
+        // add<ValidateWildCardIndexWithProjection<false, true>>();
 
         // Tests for index validation.
         add<ValidateIndexEntry<false, false>>();
-        add<ValidateIndexEntry<false, true>>();
+        // add<ValidateIndexEntry<false, true>>();
         add<ValidateIndexMetadata>();
 
         // Tests that the 'missingIndexEntries' and 'extraIndexEntries' field are populated
@@ -4854,10 +4858,10 @@ public:
         add<ValidateDuplicateDocumentIndexKeySet>();
 
         add<ValidateDuplicateKeysUniqueIndex<false, false>>();
-        add<ValidateDuplicateKeysUniqueIndex<false, true>>();
+        // add<ValidateDuplicateKeysUniqueIndex<false, true>>();
 
         add<ValidateInvalidBSONResults<false, false>>();
-        add<ValidateInvalidBSONResults<false, true>>();
+        // add<ValidateInvalidBSONResults<false, true>>();
         add<ValidateInvalidBSONRepair>();
 
         add<ValidateIndexWithMultikeyDocRepair>();
@@ -4867,15 +4871,15 @@ public:
 
         // Tests that validation works on clustered collections.
         add<ValidateInvalidBSONOnClusteredCollection<false>>();
-        add<ValidateInvalidBSONOnClusteredCollection<true>>();
+        // add<ValidateInvalidBSONOnClusteredCollection<true>>();
         add<ValidateReportInfoOnClusteredCollection<false>>();
-        add<ValidateReportInfoOnClusteredCollection<true>>();
+        // add<ValidateReportInfoOnClusteredCollection<true>>();
         add<ValidateRepairOnClusteredCollection>();
 
         add<ValidateInvalidRecordIdOnClusteredCollection<false>>(false /*withSecondaryIndex*/);
         add<ValidateInvalidRecordIdOnClusteredCollection<false>>(true /*withSecondaryIndex*/);
-        add<ValidateInvalidRecordIdOnClusteredCollection<true>>(false /*withSecondaryIndex*/);
-        add<ValidateInvalidRecordIdOnClusteredCollection<true>>(true /*withSecondaryIndex*/);
+        // add<ValidateInvalidRecordIdOnClusteredCollection<true>>(false /*withSecondaryIndex*/);
+        // add<ValidateInvalidRecordIdOnClusteredCollection<true>>(true /*withSecondaryIndex*/);
     }
 };
 

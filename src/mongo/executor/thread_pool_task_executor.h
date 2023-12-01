@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -182,7 +183,7 @@ private:
      * _poolInProgressQueue.
      */
     void scheduleIntoPool_inlock(WorkQueue* fromQueue,
-                                 const WorkQueue::iterator& iter,
+                                 boost::optional<WorkQueue::iterator> iter,
                                  stdx::unique_lock<Latch> lk);
 
     /**
@@ -190,8 +191,8 @@ private:
      * and moves them into _poolInProgressQueue.
      */
     void scheduleIntoPool_inlock(WorkQueue* fromQueue,
-                                 const WorkQueue::iterator& begin,
-                                 const WorkQueue::iterator& end,
+                                 boost::optional<WorkQueue::iterator>& begin,
+                                 boost::optional<WorkQueue::iterator>& end,
                                  stdx::unique_lock<Latch> lk);
 
     /**

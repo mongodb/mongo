@@ -39,16 +39,13 @@ selector:
   - jstests/core/**/create_indexes.js
   - jstests/core/**/list_indexes_non_existent_ns.js
   - jstests/core/**/mr_preserve_indexes.js
-  # The following tests fail because they expect no databases to be created. However a DB is created
-  # automatically when we shard a collection.
-  - jstests/core/**/dbcase.js
-  - jstests/core/**/dbcase2.js
-  - jstests/core/**/no_db_created.js
-  - jstests/core/**/killop_drop_collection.js # Uses fsyncLock.
   # This test uses `benchRun` which spawns connections which do not inherit the causal session.
   - jstests/core/**/benchrun_pipeline_updates.js
 
   exclude_with_any_tags:
+  # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+  # can't be created on `getCollection` call.
+  - assumes_no_implicit_collection_creation_on_get_collection
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_against_mongod_not_mongos
   - assumes_standalone_mongod

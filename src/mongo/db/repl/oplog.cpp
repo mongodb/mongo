@@ -74,6 +74,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
@@ -86,7 +87,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
@@ -95,6 +95,7 @@
 #include "mongo/db/global_index.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
@@ -148,6 +149,7 @@
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -229,7 +231,7 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
                                const CollectionPtr& oplogCollection,
                                std::vector<Record>* records,
                                const std::vector<Timestamp>& timestamps) {
-    invariant(opCtx->lockState()->isWriteLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
     Status status = oplogCollection->getRecordStore()->insertRecords(opCtx, records, timestamps);
     if (!status.isOK())
@@ -278,7 +280,12 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
                             OplogApplication::Mode mode) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(indexNss, MODE_X));
+    // Uncommitted collections support creating indexes using relaxed locking if they are part of a
+    // multi-document transaction.
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(indexNss, MODE_X) ||
+              (UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, indexNss) &&
+               shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(indexNss, MODE_IX) &&
+               opCtx->inMultiDocumentTransaction()));
 
     // Check if collection exists.
     auto databaseHolder = DatabaseHolder::get(opCtx);
@@ -364,8 +371,6 @@ void createIndexForApplyOps(OperationContext* opCtx,
     } else {
         indexBuildsCoordinator->createIndex(opCtx, collUUID, indexSpec, constraints, fromMigrate);
     }
-
-    opCtx->recoveryUnit()->abandonSnapshot();
 }
 
 /**
@@ -382,7 +387,8 @@ void writeToImageCollection(OperationContext* opCtx,
     // In practice, this lock acquisition on kConfigImagesNamespace cannot block. The only time a
     // stronger lock acquisition is taken on this namespace is during step up to create the
     // collection.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+        shard_role_details::getLocker(opCtx));
     auto collection = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
@@ -915,7 +921,37 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   first.type() == mongo::String);
           BSONObj indexSpec = cmd.removeField("createIndexes");
           Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
-          Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+          boost::optional<Lock::CollectionLock> collLock;
+          if (mongo::feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+                  serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+              opCtx->inMultiDocumentTransaction()) {
+              // During initial sync we could have the following three scenarios:
+              // * The collection is uncommitted and the index doesn't exist
+              // * The collection already exists and the index doesn't exist
+              // * Both exist
+              //
+              // The latter will cause us to return an IndexAlreadyExists error, which is an
+              // acceptable error. The first one is the happy expected path so let's focus on the
+              // other one. This case can only occur if the node is performing an initial sync and
+              // the source node collection performed an index drop during a later part of the
+              // oplog. In this scenario the index creation can early return since it knows the
+              // index will be deleted at a later point.
+              if (mode == OplogApplication::Mode::kInitialSync &&
+                  !UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, nss)) {
+                  return Status::OK();
+              }
+
+              // Multi-document transactions only allow createIndexes to implicitly create a
+              // collection. In this case, the collection must be empty and uncommitted. We can
+              // then relax the locking requirements (i.e. acquire the collection lock in MODE_IX)
+              // to allow a prepared transaction with the uncommitted catalog write to stash its
+              // resources before committing. This wouldn't be possible if we held the collection
+              // lock in exclusive mode.
+              invariant(UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, nss));
+              collLock.emplace(opCtx, nss, MODE_IX);
+          } else {
+              collLock.emplace(opCtx, nss, MODE_X);
+          }
           createIndexForApplyOps(opCtx, indexSpec, nss, mode);
           return Status::OK();
       },
@@ -1473,12 +1509,14 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 collection);
         requestNss = collection->ns();
         dassert(requestNss == collectionAcquisition.nss());
-        dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX));
+        dassert(
+            shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(requestNss, MODE_IX));
     } else {
         requestNss = op.getNss();
         invariant(requestNss.coll().size());
-        dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX),
-                requestNss.toStringForErrorMsg());
+        dassert(
+            shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(requestNss, MODE_IX),
+            requestNss.toStringForErrorMsg());
     }
 
     const CollectionPtr& collection = collectionAcquisition.getCollectionPtr();
@@ -1506,7 +1544,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
         o2 = op.getObject2().value();
 
     const IndexCatalog* indexCatalog = !collection ? nullptr : collection->getIndexCatalog();
-    const bool haveWrappingWriteUnitOfWork = opCtx->lockState()->inAWriteUnitOfWork();
+    const bool haveWrappingWriteUnitOfWork =
+        shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork();
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "applyOps not supported on view: " << requestNss.toStringForErrorMsg(),
             collection || !CollectionCatalog::get(opCtx)->lookupView(opCtx, requestNss));
@@ -2271,11 +2310,22 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
 
         // Don't assign commit timestamp for transaction commands.
-        const StringData commandName(o.firstElementFieldName());
         if (op->shouldPrepare() ||
             op->getCommandType() == OplogEntry::CommandType::kCommitTransaction ||
-            op->getCommandType() == OplogEntry::CommandType::kAbortTransaction)
+            op->getCommandType() == OplogEntry::CommandType::kAbortTransaction) {
             return false;
+        }
+
+        if (mongo::feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+            shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
+            // Do not assign timestamps to non-replicated commands that have a wrapping
+            // WriteUnitOfWork, as they will get the timestamp on that WUOW. Use cases include
+            // secondary oplog application of prepared transactions.
+            const auto cmdName = o.firstElementFieldNameStringData();
+            invariant(cmdName == "create" || cmdName == "createIndexes");
+            return false;
+        }
 
         if (ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
             // The timestamps in the command oplog entries are always real timestamps from this
@@ -2354,7 +2404,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                 "aborting index build and retrying",
                                 logAttrs(ns));
                 } else {
-                    invariant(!opCtx->lockState()->isLocked());
+                    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
                     auto swUUID = op->getUuid();
                     if (!swUUID) {
@@ -2470,7 +2520,7 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx) {
 }
 
 void establishOplogCollectionForLogging(OperationContext* opCtx, const Collection* oplog) {
-    invariant(opCtx->lockState()->isW());
+    invariant(shard_role_details::getLocker(opCtx)->isW());
     invariant(oplog);
     LocalOplogInfo::get(opCtx)->setCollection(oplog);
 }

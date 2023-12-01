@@ -9,6 +9,7 @@
 // ]
 import {
     aggPlanHasStage,
+    getOptimizer,
     hasRejectedPlans,
     isAggregationPlan,
     isQueryPlan,
@@ -24,36 +25,55 @@ for (let i = 0; i < 100; ++i) {
 }
 assert.commandWorked(bulk.execute());
 
-function assertQueryCoversProjection(
-    {pipeline = [], pipelineOptimizedAway = true, options = {}} = {}) {
+function assertQueryCoversProjection({pipeline = [], options = {}} = {}) {
     const explainOutput = coll.explain().aggregate(pipeline, options);
+    const optimizer = getOptimizer(explainOutput);
 
-    if (pipelineOptimizedAway) {
-        assert(isQueryPlan(explainOutput), explainOutput);
-        assert(!planHasStage(db, explainOutput, "FETCH"), explainOutput);
-        assert(planHasStage(db, explainOutput, "IXSCAN"), explainOutput);
-    } else {
-        assert(isAggregationPlan(explainOutput), explainOutput);
-        assert(!aggPlanHasStage(explainOutput, "FETCH"), explainOutput);
-        assert(aggPlanHasStage(explainOutput, "IXSCAN"), explainOutput);
+    assert(isQueryPlan(explainOutput), explainOutput);
+    // TODO SERVER-77719: Ensure that all stages are defined for all optimizers.
+    let stage = {"classic": "FETCH"};
+    if (stage[optimizer]) {
+        assert(!planHasStage(db, explainOutput, stage[optimizer]), explainOutput);
     }
-    assert(!hasRejectedPlans(explainOutput), explainOutput);
+    // TODO SERVER-77719: Ensure that all stages are defined for all optimizers.
+    stage = {"classic": "IXSCAN"};
+    if (stage[optimizer]) {
+        assert(planHasStage(db, explainOutput, stage[optimizer]), explainOutput);
+    }
+
+    switch (optimizer) {
+        case "classic":
+            assert(!hasRejectedPlans(explainOutput), explainOutput);
+            break;
+        case "CQF":
+            // TODO SERVER-77719: Address the existence of rejected plans in CQF.
+            break;
+    }
     return explainOutput;
 }
 
-function assertQueryDoesNotCoverProjection({pipeline = [], pipelineOptimizedAway = true} = {}) {
+function assertQueryDoesNotCoverProjection({pipeline = []} = {}) {
     const explainOutput = coll.explain().aggregate(pipeline);
+    const optimizer = getOptimizer(explainOutput);
 
-    if (pipelineOptimizedAway) {
-        assert(isQueryPlan(explainOutput), explainOutput);
-        assert(planHasStage(db, explainOutput, "FETCH") || aggPlanHasStage("COLLSCAN"),
-               explainOutput);
-    } else {
-        assert(isAggregationPlan(explainOutput), explainOutput);
-        assert(aggPlanHasStage(explainOutput, "FETCH") || aggPlanHasStage("COLLSCAN"),
+    assert(isQueryPlan(explainOutput), explainOutput);
+    // TODO SERVER-77719: Ensure that all stages are defined for all optimizers.
+    let stage1 = {"classic": "FETCH"};
+    let stage2 = {"classic": "COLLSCAN"};
+    if (stage1[optimizer] && stage2[optimizer]) {
+        assert(planHasStage(db, explainOutput, stage1[optimizer]) ||
+                   aggPlanHasStage(stage2[optimizer]),
                explainOutput);
     }
-    assert(!hasRejectedPlans(explainOutput), explainOutput);
+
+    switch (optimizer) {
+        case "classic":
+            assert(!hasRejectedPlans(explainOutput), explainOutput);
+            break;
+        case "CQF":
+            // TODO SERVER-77719: Address the existence of rejected plans in CQF.
+            break;
+    }
     return explainOutput;
 }
 

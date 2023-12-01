@@ -8,6 +8,9 @@ selector:
   roots:
   - src/mongo/db/modules/*/jstests/search/*.js
   - src/mongo/db/modules/*/jstests/mongot/*.js
+  exclude_files:
+  # Skip any tests that run with auth explicitly.
+  - src/mongo/db/modules/*/jstests/search/auth_list_search_indexes_agg.js
 
 executor:
   config:

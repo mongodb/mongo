@@ -72,7 +72,25 @@ public:
     static const char kKey[];
 
     // String representation of the balancer modes
-    static const char* kBalancerModes[];
+    static const std::vector<std::string> kBalancerModes;
+
+    /**
+     * Part of schema to enforce on config.settings document relating to documents with _id:
+     * "balancer".
+     *
+     * {"properties": {_id: {enum: ["balancer"]},
+     *                 mode: {bsonType: {enum: ["full", "off"]}},
+     *                 stopped: {bsonType: bool},
+     *                 activeWindow: {bsonType: object}
+     *                 _secondaryThrottle: {"oneOf": [{bsonType: bool}, {bsonType: object}]}
+     *                 _waitForDelete: {bsonType: bool}
+     *                 attemptToBalanceJumboChunks: {bsonType: bool}}
+     *  "additionalProperties": false}
+     *
+     * Note: validation of the active window values and secondary throttle object values are still
+     * handled after parsing.
+     */
+    static const BSONObj kSchema;
 
     /**
      * Constructs a settings object with the default values. To be used when no balancer settings
@@ -148,6 +166,21 @@ public:
     // Default value to use for the max chunk size if one is not specified in the balancer
     // configuration
     static const uint64_t kDefaultMaxChunkSizeBytes;
+
+    /**
+     * Part of schema to enforce on config.settings document relating to documents with _id:
+     * "chunksize".
+     *
+     * {"properties": {_id: {enum: ["chunksize"]}},
+     *                      {value: {bsonType: "number", minimum: 1, maximum: 1024}}
+     *  "additionalProperties": false}
+     *
+     * Note: the schema uses "number" for the chunksize instead of "int" because "int" requires the
+     * user to pass NumberInt(x) as the value rather than x (as all of our docs recommend). Non-
+     * integer values will be handled as they were before the schema, by the balancer failing until
+     * a new value is set.
+     */
+    static const BSONObj kSchema;
 
     /**
      * Constructs a settings object with the default values. To be used when no chunk size settings

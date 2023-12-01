@@ -38,6 +38,7 @@
 #include <vector>
 
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -47,7 +48,7 @@
 #include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -107,11 +108,11 @@ public:
             _mode == ValidateMode::kForegroundCheckBSON;
     }
 
-    BSONValidateMode getBSONValidateMode() const {
+    BSONValidateModeEnum getBSONValidateMode() const {
         return isFullValidation() || _mode == ValidateMode::kForegroundCheckBSON ||
                 _mode == ValidateMode::kBackgroundCheckBSON
-            ? BSONValidateMode::kFull
-            : BSONValidateMode::kExtended;
+            ? BSONValidateModeEnum::kFull
+            : BSONValidateModeEnum::kExtended;
     }
 
     bool isCollectionSchemaViolated() const {
@@ -150,11 +151,6 @@ public:
         return *_uuid;
     }
 
-    const Database* getDatabase() const {
-        invariant(_database);
-        return _database;
-    }
-
     const CollectionPtr& getCollection() const {
         invariant(_collection);
         return _collection;
@@ -162,10 +158,6 @@ public:
 
     const std::vector<std::string>& getIndexIdents() const {
         return _indexIdents;
-    }
-
-    const StringSet& getSkippedIndexes() const {
-        return _skippedIndexes;
     }
 
     /**
@@ -192,14 +184,17 @@ public:
     }
 
     /**
-     * Yields locks for background validation; or cursors for foreground validation. Locks are
-     * yielded to allow DDL ops to run concurrently with background validation. Cursors are yielded
-     * for foreground validation in order to avoid building cache pressure caused by holding a
-     * snapshot too long.
+     * Saves and restores the open cursors to release snapshots and minimize cache pressure for
+     * validation.
      *
-     * See _yieldLocks() and _yieldCursors() for details. Throws on interruptions.
+     * Throws on interruptions.
      */
-    void yield(OperationContext* opCtx);
+    void yieldCursors(OperationContext* opCtx);
+
+    /**
+     * Obtains a collection consistent with the snapshot.
+     */
+    Status initializeCollection(OperationContext* opCtx);
 
     /**
      * Initializes all the cursors to be used during validation and moves the traversal record
@@ -229,38 +224,6 @@ public:
 private:
     ValidateState() = delete;
 
-    /**
-     * Re-locks the database and collection with the appropriate locks for background validation.
-     * This should only be called when '_mode' is set to 'kBackground'.
-     */
-    void _relockDatabaseAndCollection(OperationContext* opCtx);
-
-    /**
-     * Yields both the database and collection locks temporarily in order to allow concurrent DDL
-     * operations to passthrough. After both the database and collection locks have been restored,
-     * check if validation can resume. Validation cannot be resumed if the database or collection is
-     * dropped. In addition, if any indexes that were being validated are removed, validation will
-     * be interrupted. A collection that was renamed across the same database can continue to be
-     * validated, but a cross database collection rename will interrupt validation. If the locks
-     * cannot be re-acquired, throws the error.
-     *
-     * Throws an interruption exception if validation cannot continue.
-     *
-     * After locks are reacquired:
-     *     - Check if the database exists.
-     *     - Check if the collection exists.
-     *     - Check if any indexes that were being validated have been removed.
-     */
-    void _yieldLocks(OperationContext* opCtx);
-
-    /**
-     * Saves and restores the open cursors to release snapshots and minimize cache pressure for
-     * validation.
-     */
-    void _yieldCursors(OperationContext* opCtx);
-
-    bool _isIndexDataCheckpointed(OperationContext* opCtx, const IndexCatalogEntry* entry);
-
     NamespaceString _nss;
     ValidateMode _mode;
     RepairMode _repairMode;
@@ -270,21 +233,23 @@ private:
     bool _enforceTimeseriesBucketsAreAlwaysCompressed = false;
     bool _warnOnSchemaValidation = false;
 
+    // To avoid racing with shutdown.
     boost::optional<Lock::GlobalLock> _globalLock;
+
+    // Locks for foreground validation only.
     boost::optional<AutoGetDb> _databaseLock;
     boost::optional<CollectionNamespaceOrUUIDLock> _collectionLock;
 
-    Database* _database;
+    // Hold a reference to the CollectionCatalog for a collection instance at a point-in-time to
+    // remain valid during the duration of background validation.
+    std::shared_ptr<const CollectionCatalog> _catalog;
     CollectionPtr _collection;
 
     // Always present after construction, but needs to be boost::optional due to the lack of default
     // constructor
     boost::optional<UUID> _uuid;
 
-    // Stores the index idents that are going to be validated. When validate yields periodically
-    // we'll use this list to determine if validation should abort when an existing index that was
-    // being validated is dropped. Additionally we'll use this list to determine which indexes to
-    // skip during validation that may have been created in-between yields.
+    // Stores the index idents that are going to be validated.
     std::vector<std::string> _indexIdents;
 
     // Shared cursors to be used during validation, created in 'initializeCursors()'.
@@ -293,16 +258,9 @@ private:
     std::unique_ptr<SeekableRecordThrottleCursor> _seekRecordStoreCursor;
     StringMap<std::unique_ptr<ColumnStore::Cursor>> _columnStoreIndexCursors;
 
-    // Stores the set of indexes that will not be validated for some reason, e.g. they are not
-    // ready.
-    StringSet _skippedIndexes;
-
     RecordId _firstRecordId;
 
     DataThrottle _dataThrottle;
-
-    // Used to detect when the catalog is re-opened while yielding locks.
-    uint64_t _catalogGeneration;
 
     // Can be set to obtain better insight into what validate sees/does.
     bool _logDiagnostics;

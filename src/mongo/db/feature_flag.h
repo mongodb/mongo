@@ -96,14 +96,6 @@ public:
     bool isEnabledAndIgnoreFCVUnsafe() const;
 
     /**
-     * TODO SERVER-82270: Remove isEnabledAndIgnoreFCVUnsafeAtStartup and replace use cases with
-     * isEnabledUseLatestFCVWhenUninitialized.
-     * Please do not add new use cases of this function. Instead, use
-     * isEnabledUseLatestFCVWhenUninitialized.
-     */
-    bool isEnabledAndIgnoreFCVUnsafeAtStartup() const;
-
-    /**
      * Returns true if the flag is set to true and enabled on the target FCV version.
      *
      * This function is used in the 'setFeatureCompatibilityVersion' command where the in-memory FCV

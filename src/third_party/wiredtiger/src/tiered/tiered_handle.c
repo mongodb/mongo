@@ -309,7 +309,7 @@ __tiered_restart_work(WT_SESSION_IMPL *session, WT_TIERED *tiered)
             __wt_verbose(session, WT_VERB_TIERED,
               "RESTART_WORK: local object %s has flush time %" PRId64, obj_uri, cval.val);
             if (cval.val == 0)
-                WT_ERR(__wt_tiered_put_flush(session, tiered, i));
+                WT_ERR(__wt_tiered_put_flush(session, tiered, i, 0));
             else
                 WT_ERR(__wt_tiered_put_remove_local(session, tiered, i));
             __wt_free(session, obj_val);
@@ -481,14 +481,20 @@ err:
 int
 __wt_tiered_set_metadata(WT_SESSION_IMPL *session, WT_TIERED *tiered, WT_ITEM *buf)
 {
+    WT_BTREE *btree;
+    WT_DATA_HANDLE *dhandle;
     WT_TIERED_TIERS *t;
     uint32_t i;
     char hex_timestamp[WT_TS_HEX_STRING_SIZE];
 
-    __wt_timestamp_to_hex_string(S2C(session)->flush_ts, hex_timestamp);
+    dhandle = &tiered->iface;
+    WT_ASSERT_ALWAYS(session, WT_DHANDLE_BTREE(dhandle), "Expected a btree handle");
+    btree = dhandle->handle;
+
+    __wt_timestamp_to_hex_string(btree->flush_most_recent_ts, hex_timestamp);
     WT_RET(__wt_buf_catfmt(session, buf,
       ",flush_time=%" PRIu64 ",flush_timestamp=\"%s\",last=%" PRIu32 ",oldest=%" PRIu32 ",tiers=(",
-      S2C(session)->flush_most_recent, hex_timestamp, tiered->current_id, tiered->oldest_id));
+      btree->flush_most_recent_secs, hex_timestamp, tiered->current_id, tiered->oldest_id));
     for (i = 0; i < WT_TIERED_MAX_TIERS; ++i) {
         t = &tiered->tiers[i];
         __wt_verbose(session, WT_VERB_TIERED,
@@ -592,7 +598,8 @@ __tiered_switch(WT_SESSION_IMPL *session, const char *config)
     /* Create the object: entry in the metadata. */
     if (need_object) {
         WT_ERR(__tiered_create_object(session, tiered));
-        WT_ERR(__wt_tiered_put_flush(session, tiered, tiered->current_id));
+        WT_ERR(__wt_tiered_put_flush(
+          session, tiered, tiered->current_id, __wt_gen(session, WT_GEN_CHECKPOINT)));
     }
 
     /* We always need to create a local object. */

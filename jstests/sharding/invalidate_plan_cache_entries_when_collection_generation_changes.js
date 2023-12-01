@@ -7,10 +7,9 @@
  *   requires_fcv_63,
  *  # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_incompatible,
+ *   requires_sbe,
  * ]
  */
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
@@ -32,12 +31,6 @@ const db = st.getDB(dbName);
 const collA = db["collA"];
 const collB = db["collB"];
 
-if (!checkSBEEnabled(db)) {
-    jsTestLog("********** Skip the test because SBE is disabled **********");
-    st.stop();
-    quit();
-}
-
 function assertPlanCacheSizeForColl(nss, expectedEntriesCount) {
     // Using assert.soon since the sharded metadata cleanup function is executed asynchronously.
     assert.soon(() => {
@@ -47,7 +40,8 @@ function assertPlanCacheSizeForColl(nss, expectedEntriesCount) {
             if (entry.version == "2")
                 numSBEEntries++;
         });
-        jsTestLog('99999 entries: ' + numSBEEntries);
+        jsTestLog('99999 actual SBE entries: ' + numSBEEntries + ', expected SBE entries: ' +
+                  expectedEntriesCount + ', total entries: ' + entries.length);
 
         return numSBEEntries === expectedEntriesCount;
     });

@@ -38,7 +38,8 @@ export const runner = (function() {
             'iterationMultiplier',
             'sessionOptions',
             'actionFiles',
-            'threadMultiplier'
+            'threadMultiplier',
+            'tenantId',
         ];
 
         if (mode.parallel) {

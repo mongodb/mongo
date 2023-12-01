@@ -59,7 +59,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/s/ddl_lock_manager.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/timeseries/catalog_helper.h"
@@ -75,6 +74,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -170,7 +170,7 @@ MONGO_REGISTER_COMMAND(ShardsvrDropIndexesCommand).forShard();
 
 ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Invocation::typedRun(
     OperationContext* opCtx) {
-    uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
     CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName, opCtx->getWriteConcern());
 
     // Since this operation is not directly writing locally we need to force its db profile level

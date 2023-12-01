@@ -41,5 +41,5 @@ namespace mongo {
  */
 std::unique_ptr<MatchExpression> restoreMatchExpression(
     const boolean_simplification::BitsetTreeNode& bitsetTree,
-    const std::vector<ExpressionBitInfo>& expressions);
+    const BitsetTreeTransformResult::ExpressionList& expressions);
 }  // namespace mongo

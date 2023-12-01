@@ -39,6 +39,10 @@ selector:
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
+  # After SERVER-80339, the server runs a "listIndexes" command on the background, which could show
+  # up during profiling. Some profiling tests expect a certain command other than this "listIndexes"
+  # command.
+  - requires_profiling
 
 executor:
   archive:

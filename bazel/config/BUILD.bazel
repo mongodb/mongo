@@ -1,4 +1,16 @@
-load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver", "spider_monkey_dbg", "allocator", "use_lldbserver", "use_wait_for_debugger", "use_disable_ref_track")
+load(
+    "//bazel/config:configs.bzl", 
+    "build_mode", 
+    "compiler_type", 
+    "use_libunwind", 
+    "use_gdbserver", 
+    "spider_monkey_dbg", 
+    "allocator", 
+    "use_lldbserver", 
+    "use_wait_for_debugger", 
+    "use_disable_ref_track", 
+    "use_ocsp_stapling",
+)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -330,6 +342,23 @@ config_setting(
     name = "use_wait_for_debugger_enabled",
     flag_values = {
         "//bazel/config:use_wait_for_debugger": "True",
+    }
+)
+
+
+# --------------------------------------
+# ocsp-stapling options
+# --------------------------------------
+
+use_ocsp_stapling(
+    name = "use_ocsp_stapling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_ocsp_stapling_enabled",
+    flag_values = {
+        "//bazel/config:use_ocsp_stapling": "True",
     }
 )
 

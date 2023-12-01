@@ -172,16 +172,24 @@ function runHangAnalyzer(pids) {
     // We are using a raw "python" rather than selecting the approperate python here
     // This is because as part of SERVER-79663 we noticed that servers.js is included in the legacy
     // shell
-    const args =
-        ['python', scriptPath, 'hang-analyzer', '-k', '-o', 'file', '-o', 'stdout', '-d', pids];
+    // See hang-analyzer argument options here:
+    // https://github.com/10gen/mongo/blob/8636ede10bd70b32ff4b6cd115132ab0f22b89c7/buildscripts/resmokelib/hang_analyzer/hang_analyzer.py#L245
+    const args = [
+        'python',
+        scriptPath,
+        'hang-analyzer',
+        '-c',
+        '-k',
+        '-o',
+        'file',
+        '-o',
+        'stdout',
+        '-d',
+        pids
+    ];
 
     if (jsTest.options().evergreenTaskId) {
         args.push('-t', jsTest.options().evergreenTaskId);
-    }
-
-    // Enable core dumps if not an ASAN build.
-    if (!_isAddressSanitizerActive()) {
-        args.push('-c');
     }
 
     return runProgram(...args);

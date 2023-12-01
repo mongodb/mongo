@@ -101,6 +101,10 @@ OplogEntry makeInsertOplogEntry(int t,
                                 const NamespaceString& nss,
                                 boost::optional<UUID> uuid = boost::none);
 
+OplogEntry makeDBCheckBatchEntry(int t,
+                                 const NamespaceString& nss,
+                                 boost::optional<UUID> uuid = boost::none);
+
 OplogEntry makeUpdateOplogEntry(int t,
                                 const NamespaceString& nss,
                                 boost::optional<UUID> uuid = boost::none,

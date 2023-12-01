@@ -39,11 +39,11 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/explain_options.h"
@@ -138,7 +138,8 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
         ? AdmissionContext::Priority::kImmediate
         : AdmissionContext::Priority::kLow;
 
-    ScopedAdmissionPriorityForLock priority{opCtx->lockState(), rangeDeleterPriority};
+    ScopedAdmissionPriorityForLock priority{shard_role_details::getLocker(opCtx),
+                                            rangeDeleterPriority};
 
     // Extend bounds to match the index we found
     const KeyPattern indexKeyPattern(shardKeyIdx->keyPattern());

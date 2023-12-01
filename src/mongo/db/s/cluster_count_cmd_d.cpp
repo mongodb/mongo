@@ -41,9 +41,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/commands/cluster_count_cmd.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -76,7 +76,7 @@ struct ClusterCountCmdD {
 
         // A cluster command on the config server may attempt to use a ShardLocal to target itself,
         // which triggers an invariant, so only shard servers can run this.
-        uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
     }
 
     static void checkCanExplainHere(OperationContext* opCtx) {

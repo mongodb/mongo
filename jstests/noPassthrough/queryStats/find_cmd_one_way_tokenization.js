@@ -61,19 +61,3 @@ let st = new ShardingTest({
 });
 runTest(st.s);
 st.stop();
-
-// TODO SERVER-79494 remove second run with find-command-only feature flag
-st = new ShardingTest({
-    mongos: 1,
-    shards: 1,
-    config: 1,
-    rs: {nodes: 1},
-    mongosOptions: {
-        setParameter: {
-            internalQueryStatsRateLimit: -1,
-            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
-        }
-    },
-});
-runTest(st.s);
-st.stop();

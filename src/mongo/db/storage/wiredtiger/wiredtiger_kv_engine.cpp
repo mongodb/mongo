@@ -93,9 +93,9 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -830,7 +830,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(OperationContext* opCtx, const char*
     // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
     // the operation to succeed if it was the only reason to fail.
     if (rc == EBUSY) {
-        _checkpoint(opCtx, session);
+        _checkpoint(session);
         rc = (session->verify)(session, uri, nullptr);
     }
 
@@ -851,7 +851,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(OperationContext* opCtx, const char*
     rc = session->salvage(session, uri, nullptr);
     // Same reasoning for handling EBUSY errors as above.
     if (rc == EBUSY) {
-        _checkpoint(opCtx, session);
+        _checkpoint(session);
         rc = session->salvage(session, uri, nullptr);
     }
     auto status = wtRCToStatus(rc, session, "Salvage failed:");
@@ -910,7 +910,7 @@ Status WiredTigerKVEngine::_rebuildIdent(OperationContext* opCtx,
     // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
     // the operation to succeed if it was the only reason to fail.
     if (rc == EBUSY) {
-        _checkpoint(opCtx, session);
+        _checkpoint(session);
         rc = session->drop(session, uri, nullptr);
     }
     if (rc != 0) {
@@ -1866,7 +1866,7 @@ Status WiredTigerKVEngine::alterMetadata(OperationContext* opCtx,
     // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
     // the operation to succeed if it was the only reason to fail.
     if (ret == EBUSY) {
-        _checkpoint(opCtx, sessionPtr);
+        _checkpoint(sessionPtr);
         ret =
             sessionPtr->alter(sessionPtr, uriNullTerminated.c_str(), configNullTerminated.c_str());
     }
@@ -1976,7 +1976,7 @@ void WiredTigerKVEngine::_checkpoint(WT_SESSION* session, bool useTimestamp) {
                        "checkpointIteration"_attr = checkpointedIteration);
 }
 
-void WiredTigerKVEngine::_checkpoint(OperationContext* opCtx, WT_SESSION* session) try {
+void WiredTigerKVEngine::_checkpoint(WT_SESSION* session) try {
     // Ephemeral WiredTiger instances cannot do a checkpoint to disk as there is no disk backing
     // the data.
     if (_ephemeral) {
@@ -2055,10 +2055,10 @@ void WiredTigerKVEngine::_checkpoint(OperationContext* opCtx, WT_SESSION* sessio
     invariant(ErrorCodes::isShutdownError(exc.code()), exc.what());
 }
 
-void WiredTigerKVEngine::checkpoint(OperationContext* opCtx) {
+void WiredTigerKVEngine::checkpoint() {
     UniqueWiredTigerSession session = _sessionCache->getSession();
     WT_SESSION* s = session->getSession();
-    return _checkpoint(opCtx, s);
+    return _checkpoint(s);
 }
 
 void WiredTigerKVEngine::forceCheckpoint(bool useStableTimestamp) {
@@ -2561,7 +2561,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
         return swPinnedTimestamp;
     }
 
-    if (opCtx->lockState()->inAWriteUnitOfWork()) {
+    if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
         // If we've moved the pin and are in a `WriteUnitOfWork`, assume the caller has a write that
         // should be atomic with this pin request. If the `WriteUnitOfWork` is rolled back, either
         // unpin the oldest timestamp or repin the previous value.
@@ -2766,6 +2766,41 @@ void WiredTigerKVEngine::sizeStorerPeriodicFlush() {
     if (needSyncSizeInfo) {
         syncSizeInfo(false);
     }
+}
+
+Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
+                                       bool enable,
+                                       boost::optional<int64_t> freeSpaceTargetMB) {
+    dassert(shard_role_details::getLocker(opCtx)->isWriteLocked());
+
+    WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
+    if (cache->isEphemeral()) {
+        return Status::OK();
+    }
+
+    WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
+    opCtx->recoveryUnit()->abandonSnapshot();
+
+    StringBuilder config;
+    if (enable) {
+        config << "background=true,timeout=0";
+    } else {
+        config << "background=false";
+    }
+
+    if (freeSpaceTargetMB && enable) {
+        config << ",free_space_target=" << std::to_string(*freeSpaceTargetMB) << "MB";
+    }
+    int ret = s->compact(s, nullptr, config.str().c_str());
+
+    if (ret == EBUSY) {
+        StringBuilder msg;
+        msg << "Auto compact failed to " << (enable ? "start" : "stop") << ", resource busy";
+        return Status(ErrorCodes::ObjectIsBusy, msg.str());
+    }
+    uassertStatusOK(wtRCToStatus(ret, s));
+
+    return Status::OK();
 }
 
 }  // namespace mongo

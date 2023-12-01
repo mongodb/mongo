@@ -45,6 +45,7 @@
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval.h"
+#include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
@@ -293,6 +294,76 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
 
     QueryPlannerAnalysis::analyzeGeo(params, &orNode);
     ASSERT_EQ(expr->getCanSkipValidation(), true);
+}
+
+TEST_F(QueryPlannerTest, ExprQueryHasImprecisePredicatesRemoved) {
+    // Ensure that all of the $_internalExpr predicates which get added when optimizing are later
+    // removed for an $expr on a collection scan.
+
+    runQuery(fromjson("{$expr: {$eq: ['$a', 123]}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{cscan: {filter: {$and: [{$expr: {$eq: ['$a', {$const: 123}]}}]}, dir: 1}}");
+
+    // Does not remove an InternalExpr* within an OR.
+    runQuery(fromjson("{$or: [{$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$b', 456]}}]}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{cscan: {filter: {$or: [{$and: [{$expr: {$eq: ['$a', {$const: 123}]}}]},"
+        "                        {$and: [{$expr: {$eq: ['$b', {$const: 456}]}}]}]},"
+        "dir: 1}}");
+
+    // Does not remove an InternalExpr* within an OR, even when an adjacent $expr is present.
+    runQuery(
+        fromjson("{or: [{a: {$_internalExprEq: 123}},"
+                 "{$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$b', 456]}}]}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{cscan: {filter: {or: [{a: {$_internalExprEq: 123}},"
+        " {$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$b', 456]}}]}, dir: 1}}");
+
+    // Removes an InternalExpr* within an AND when adjacent to precise $expr predicates.
+    runQuery(fromjson("{$and: [{$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$b', 456]}}]}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{cscan: {filter: "
+        "{$and: [{$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$b', 456]}}]}, dir:1}}");
+}
+
+TEST_F(QueryPlannerTest, ExprQueryHasImprecisePredicatesRemovedMix) {
+    // Ensure that the query plan generated does not include redundant $_internalExpr expressions.
+    const auto filter =
+        "{$or: [{$and: [{$expr: {$eq: ['$a', 123]}}, {$expr: {$eq: ['$a1', 123]}}]},"
+        "       {$and: [{$expr: {$eq: ['$b', 123]}}, {$expr: {$eq: ['$b1', 123]}}]},"
+        "       {$and: [{$or: [{$and: [{$expr: {$eq: ['$c', 123]}}]},"
+        "                      {$and: [{$expr: {$eq: ['$c1', 123]}}]}]},"
+        "               {$or: [{$and: [{$expr: {$eq: ['$d', 123]}},"
+        "                              {$expr: {$eq: ['$d1', 123]}}]},"
+        "                      {$and: [{$expr: {$eq: ['$e1', 123]}},"
+        "                              {$expr: {$eq: ['$e2', 123]}}]}]}]}]}";
+
+    runQuery(fromjson(filter));
+
+    assertNumSolutions(1U);
+
+    auto filterWithConstant = std::string(filter);
+    boost::replace_all(filterWithConstant, "123", "{$const: 123}");
+    std::string soln = str::stream() << "{cscan: {filter:" << filterWithConstant << ", dir: 1}}";
+    assertSolutionExists(soln);
+}
+
+TEST_F(QueryPlannerTest, ExprOnFetchDoesNotIncludeImpreciseFilter) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1));
+
+    // The residual predicate on b has to be applied after the fetch. Ensure that there is no
+    // additional imprecise predicate on the fetch.
+    runQuery(fromjson("{$and: [{a: 1}, {$expr: {$eq: ['$b', 99]}}]}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{fetch: {filter: {$and: [{$expr: {$eq: ['$b', {$const: 99}]}}]}, node: "
+        "     {ixscan: {pattern: {a: 1}, "
+        "      bounds: {a: [[1,1,true,true]]}}}}}");
 }
 
 }  // namespace

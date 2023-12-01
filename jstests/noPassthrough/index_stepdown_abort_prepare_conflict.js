@@ -21,6 +21,7 @@
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
@@ -43,10 +44,7 @@ assert.commandWorked(
 var failPoint;
 
 const gracefulIndexBuildFeatureFlag =
-    assert
-        .commandWorked(
-            primary.adminCommand({getParameter: 1, featureFlagIndexBuildGracefulErrorHandling: 1}))
-        .featureFlagIndexBuildGracefulErrorHandling.value;
+    FeatureFlagUtil.isEnabled(primary, "IndexBuildGracefulErrorHandling");
 if (gracefulIndexBuildFeatureFlag) {
     // If this feature flag is enabled, index builds fail immediately instead of suppressing errors
     // until the commit phase, and always signal the primary for abort (even if it is itself). Abort

@@ -6,6 +6,8 @@
  *     catches_command_failures,
  *     # This test leaks cursors causing range deletions to hang waiting for ongoing queries
  *     assumes_balancer_off,
+ *     # Uses $where operator
+ *     requires_scripting,
  * ]
  */
 export const $config = (function() {

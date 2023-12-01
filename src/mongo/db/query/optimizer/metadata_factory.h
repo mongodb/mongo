@@ -62,6 +62,7 @@ ScanDefinition createScanDef(DatabaseName dbName,
                              bool exists = true,
                              boost::optional<CEType> ce = boost::none,
                              ShardingMetadata shardingMetadata = {},
-                             const PathToIntervalFn& pathToInterval = {});
+                             const PathToIntervalFn& pathToInterval = {},
+                             ScanOrder scanOrder = ScanOrder::Forward);
 
 }  // namespace mongo::optimizer

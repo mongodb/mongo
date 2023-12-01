@@ -401,7 +401,9 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                     }
                     return parentOrExpr;
                 }
-                return inExpression;
+                // The Boolean simplifier is disabled since we don't want to simplify
+                // sub-expressions, but simplify the whole IN expression instead.
+                return MatchExpression::optimize(std::move(inExpression), false);
             }
         }
 

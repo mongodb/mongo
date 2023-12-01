@@ -113,4 +113,17 @@ std::ostream& operator<<(std::ostream& os, ClusterRole r) {
     return os;
 }
 
+StringBuilder& operator<<(StringBuilder& s, ClusterRole r) {
+    StringData sep;
+    s << "ClusterRole{";
+    for (auto&& [key, name] : roleNames) {
+        if (r.has(key)) {
+            s << sep << name;
+            sep = "|";
+        }
+    }
+    s << "}";
+    return s;
+}
+
 }  // namespace mongo

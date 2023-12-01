@@ -75,7 +75,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
@@ -84,6 +83,7 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/introspect.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/not_primary_error_tracker.h"
@@ -510,6 +510,7 @@ bool handleError(OperationContext* opCtx,
     }
 
     if (ex.code() == ErrorCodes::StaleDbVersion || ErrorCodes::isStaleShardVersionError(ex) ||
+        ex.code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
         ex.code() == ErrorCodes::CannotImplicitlyCreateCollection) {
         if (!opCtx->getClient()->isInDirectClient() &&
             ex.code() != ErrorCodes::CannotImplicitlyCreateCollection) {
@@ -517,9 +518,13 @@ bool handleError(OperationContext* opCtx,
             oss.setShardingOperationFailedStatus(ex.toStatus());
         }
 
-        // Since this is a routing error, it is guaranteed that all subsequent operations will fail
+        // For routing errors, it is guaranteed that all subsequent operations will fail
         // with the same cause, so don't try doing any more operations. The command reply serializer
         // will handle repeating this error for unordered writes.
+        // (On the other hand, ShardCannotRefreshDueToLocksHeld is caused by a temporary inability
+        // to access a stable version of the cache during the execution of the batch; the error is
+        // returned back to the router to leverage its capability of selectively retrying
+        // operations).
         out->results.emplace_back(ex.toStatus());
         return false;
     }
@@ -547,10 +552,6 @@ bool handleError(OperationContext* opCtx,
         // migration blocking, committing, or aborting.
         out->results.emplace_back(ex.toStatus());
         return false;
-    }
-
-    if (ex.code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
-        throw;
     }
 
     out->results.emplace_back(ex.toStatus());
@@ -734,7 +735,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
 
 boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
                                          PlanExecutor* exec,
-                                         bool isRemove) {
+                                         bool isRemove,
+                                         StringData operationName) {
     BSONObj value;
     PlanExecutor::ExecState state;
     try {
@@ -745,11 +747,12 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
         auto&& explainer = exec->getPlanExplainer();
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         LOGV2_WARNING(7267501,
-                      "Plan executor error during findAndModify",
+                      "Plan executor error",
+                      "operation"_attr = operationName,
                       "error"_attr = exception.toStatus(),
                       "stats"_attr = redact(stats));
 
-        exception.addContext("Plan executor error during findAndModify");
+        exception.addContext("Plan executor error during " + operationName);
         throw;
     }
 
@@ -873,7 +876,10 @@ UpdateResult performUpdate(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
     }
 
-    docFound = advanceExecutor(opCtx, exec.get(), remove);
+    docFound = advanceExecutor(opCtx,
+                               exec.get(),
+                               remove,
+                               updateRequest->shouldReturnAnyDocs() ? "findAndModify" : "update");
     // Nothing after advancing the plan executor should throw a WriteConflictException,
     // so the following bookkeeping with execution stats won't end up being done
     // multiple times.
@@ -982,7 +988,8 @@ long long performDelete(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
     }
 
-    docFound = advanceExecutor(opCtx, exec.get(), true);
+    docFound = advanceExecutor(
+        opCtx, exec.get(), true, deleteRequest->getReturnDeleted() ? "findAndModify" : "delete");
     // Nothing after advancing the plan executor should throw a WriteConflictException,
     // so the following bookkeeping with execution stats won't end up being done
     // multiple times.
@@ -1089,7 +1096,7 @@ WriteResult performInserts(OperationContext* opCtx,
     // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork() ||
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
 
     auto& curOp = *CurOp::get(opCtx);
@@ -1532,7 +1539,7 @@ WriteResult performUpdates(OperationContext* opCtx,
     // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork() ||
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
@@ -1796,7 +1803,7 @@ WriteResult performDeletes(OperationContext* opCtx,
     // Delete performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork() ||
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
@@ -1916,7 +1923,7 @@ Status performAtomicTimeseriesWrites(
     OperationContext* opCtx,
     const std::vector<write_ops::InsertCommandRequest>& insertOps,
     const std::vector<write_ops::UpdateCommandRequest>& updateOps) try {
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     invariant(!opCtx->inMultiDocumentTransaction());
     invariant(!insertOps.empty() || !updateOps.empty());
 

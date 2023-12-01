@@ -82,7 +82,11 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
             expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedClassic - 1);
     }
 
-    function testGT(op, val, expectedNReturned, expectedDocsExaminedClassic) {
+    function testGT(op,
+                    val,
+                    expectedNReturned,
+                    expectedDocsExaminedClassic,
+                    expectedDocsExaminedSbe = expectedDocsExaminedClassic) {
         initAndPopulate(coll, clusterKey);
 
         const expl = assert.commandWorked(coll.getDB().runCommand({
@@ -101,10 +105,16 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         // In this case the scans hit EOF, so there is no extra cursor->next() call in Classic,
         // making Classic and SBE expect the same number of docs examined.
         assertDocsExamined(
-            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedClassic);
+            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
     }
 
-    function testRange(min, minVal, max, maxVal, expectedNReturned, expectedDocsExaminedClassic) {
+    function testRange(min,
+                       minVal,
+                       max,
+                       maxVal,
+                       expectedNReturned,
+                       expectedDocsExaminedClassic,
+                       expectedDocsExaminedSbe = expectedDocsExaminedClassic - 1) {
         initAndPopulate(coll, clusterKey);
 
         const expl = assert.commandWorked(coll.getDB().runCommand({
@@ -126,7 +136,7 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         // In this case the scans do not hit EOF, so there is an extra cursor->next() call past the
         // end of the range in Classic, making SBE expect one fewer doc examined than Classic.
         assertDocsExamined(
-            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedClassic - 1);
+            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
     }
 
     function testIn() {
@@ -178,17 +188,22 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         // Expect docsExamined == nReturned + 1 due to the by-design additional cursor 'next' beyond
         // the range.
         testLT("$lte", 10, 11, 12);
-        // Expect docsExamined == nReturned. Note that unlike the 'testLT' cases, there's no
+        // Expect docsExamined (SBE) == nReturned. Note that unlike the 'testLT' cases, there's no
         // additional cursor 'next' beyond the range because we hit EOF.
-        testGT("$gt", 89, 10, 10);
+        // However, Classic needs to examine and discard the value equal to bound, as this is an
+        // exclusive bound.
+        testGT("$gt", 89, 10, 11, 10);
         // Expect docsExamined == nReturned.
         testGT("$gte", 89, 11, 11);
         // docsExamined reflects the fact that by design we do an additional cursor 'next' beyond
         // the range.
-        testRange("$gt", 20, "$lt", 40, 19, 20);
-        testRange("$gte", 20, "$lt", 40, 20, 21);
-        testRange("$gt", 20, "$lte", 40, 20, 21);
-        testRange("$gte", 20, "$lte", 40, 21, 22);
+        // In addition, Classic needs to examine and discard the value equal to bound,
+        // while SBE's scan starts after the bound.
+        testRange("$gt", 20, "$lt", 40, 19, 21, 19);
+        testRange("$gte", 20, "$lt", 40, 20, 21, 20);
+        // Again, Classic and SBE differ by 2 for the above reasons.
+        testRange("$gt", 20, "$lte", 40, 20, 22, 20);
+        testRange("$gte", 20, "$lte", 40, 21, 22, 21);
         testIn();
 
         testNonClusterKeyScan();

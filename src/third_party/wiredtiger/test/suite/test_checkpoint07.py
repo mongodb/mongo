@@ -32,6 +32,7 @@
 import wttest
 from wiredtiger import stat
 
+@wttest.skip_for_hook("tiered", "tiered checkpoints override clean checkpoint timer behavior")
 class test_checkpoint07(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,statistics=(all)'
 

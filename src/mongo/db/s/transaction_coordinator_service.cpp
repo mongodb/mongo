@@ -54,13 +54,13 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future_impl.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
-
 
 namespace mongo {
 namespace {
@@ -126,6 +126,11 @@ void TransactionCoordinatorService::createCoordinator(
 void TransactionCoordinatorService::reportCoordinators(OperationContext* opCtx,
                                                        bool includeIdle,
                                                        std::vector<BSONObj>* ops) {
+    // TODO: SERVER-82965 Remove early return
+    if (!ShardingState::get(opCtx)->enabled()) {
+        return;
+    }
+
     std::shared_ptr<CatalogAndScheduler> cas;
     try {
         cas = _getCatalogAndScheduler(opCtx);
@@ -203,6 +208,11 @@ boost::optional<SharedSemiFuture<txn::CommitDecision>> TransactionCoordinatorSer
 
 void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                                              Milliseconds recoveryDelayForTesting) {
+    // TODO: SERVER-82965 Remove early return
+    if (!ShardingState::get(opCtx)->enabled()) {
+        return;
+    }
+
     joinPreviousRound();
 
     stdx::lock_guard<Latch> lg(_mutex);
@@ -378,6 +388,11 @@ void TransactionCoordinatorService::cancelIfCommitNotYetStarted(
     OperationContext* opCtx,
     LogicalSessionId lsid,
     TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
+    // TODO: SERVER-82965 Remove early return
+    if (!ShardingState::get(opCtx)->enabled()) {
+        return;
+    }
+
     auto cas = _getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 

@@ -45,7 +45,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/plan_cache_key_info.h"
 #include "mongo/db/query/planner_ixselect.h"
-#include "mongo/db/query/query_settings_gen.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_version.h"

@@ -34,6 +34,9 @@ selector:
   - does_not_support_causal_consistency
   # These tests assume that the 'db' object refers to unsharded cluster.
   - assumes_against_mongod_not_mongos
+  # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+  # can't be created on `getCollection` call.
+  - assumes_no_implicit_collection_creation_on_get_collection
   # These tests cannot work with 'implicitly_shard_accessed_collections.js' override.
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_unsharded_collection

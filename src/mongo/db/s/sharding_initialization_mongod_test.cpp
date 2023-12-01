@@ -55,7 +55,6 @@
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
@@ -66,6 +65,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -121,7 +121,6 @@ protected:
         serverGlobalParams.overrideShardIdentity = BSONObj();
 
         CatalogCacheLoader::clearForTests(getServiceContext());
-        ShardingState::get(getServiceContext())->clearForTests();
 
         ShardingMongodTestFixture::tearDown();
     }
@@ -192,7 +191,7 @@ TEST_F(ShardingInitializationMongoDTest, ValidShardIdentitySucceeds) {
     shardIdentity.setClusterId(OID::gen());
 
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity);
-    ASSERT_OK(shardingState()->canAcceptShardedCommands());
+    shardingState()->assertCanAcceptShardedCommands();
     ASSERT(shardingState()->enabled());
     ASSERT_EQ(kShardName, shardingState()->shardId());
     ASSERT_EQ("config/a:1,b:2", shardRegistry()->getConfigServerConnectionString().toString());
@@ -225,8 +224,11 @@ TEST_F(ShardingInitializationMongoDTest, InitWhilePreviouslyInErrorStateWillStay
         shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity),
         AssertionException,
         ErrorCodes::ManualInterventionRequired);
-    ASSERT_NOT_OK(shardingState()->canAcceptShardedCommands());
-    ASSERT(!shardingState()->enabled());
+    ASSERT_THROWS_CODE(shardingState()->assertCanAcceptShardedCommands(),
+                       AssertionException,
+                       ErrorCodes::ManualInterventionRequired);
+    ASSERT_THROWS_CODE(
+        shardingState()->enabled(), AssertionException, ErrorCodes::ManualInterventionRequired);
 }
 
 TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
@@ -255,7 +257,7 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingShardIdentit
 
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity2);
 
-    ASSERT_OK(shardingState()->canAcceptShardedCommands());
+    shardingState()->assertCanAcceptShardedCommands();
     ASSERT_TRUE(shardingState()->enabled());
 
     ASSERT_EQ(kShardName, shardingState()->shardId());
@@ -338,7 +340,7 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingReplSetNameS
 
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity2);
 
-    ASSERT_OK(shardingState()->canAcceptShardedCommands());
+    shardingState()->assertCanAcceptShardedCommands();
     ASSERT_TRUE(shardingState()->enabled());
 
     ASSERT_EQ(kShardName, shardingState()->shardId());

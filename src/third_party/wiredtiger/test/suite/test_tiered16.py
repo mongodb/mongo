@@ -80,6 +80,10 @@ class test_tiered16(TieredConfigMixin, wttest.WiredTigerTestCase):
             c["a"] = "a"
             c["b"] = "b"
             c.close()
+            c2 = self.session.open_cursor(uri_b)
+            c2["a"] = "a"
+            c2["b"] = "b"
+            c2.close()
             # Use force to make sure the new objects are created.
             self.session.checkpoint('flush_tier=(enabled,force=true)')
 

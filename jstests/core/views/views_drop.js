@@ -21,8 +21,8 @@ assert(viewsDB.coll.drop(), "couldn't drop coll");
 assert.eq(viewsDB.view.find().toArray(), [], "view isn't empty after dropping coll");
 assert(viewsDB.view.drop(), "couldn't drop view");
 assert.eq(
-    viewsDB.system.views.find().toArray(), [], "system.views isn't empty after dropping view");
-assert(viewsDB.system.views.drop(), "couldn't drop system.views");
+    viewsDB['system.views'].find().toArray(), [], "system.views isn't empty after dropping view");
+assert(viewsDB['system.views'].drop(), "couldn't drop system.views");
 
 // Database should now be empty.
 let res = viewsDB.runCommand({listCollections: 1});

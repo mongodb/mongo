@@ -79,7 +79,8 @@ void wt_txn_begin(
  * wt_txn_commit --
  *     Commit a transaction.
  */
-void wt_txn_commit(WT_SESSION *session, model::timestamp_t commit_timestamp,
+void wt_txn_commit(WT_SESSION *session,
+  model::timestamp_t commit_timestamp = model::k_timestamp_none,
   model::timestamp_t durable_timestamp = model::k_timestamp_none);
 
 /*
@@ -118,6 +119,38 @@ model::data_value wt_txn_get(WT_SESSION *session, const char *uri, const model::
  */
 int wt_txn_insert(WT_SESSION *session, const char *uri, const model::data_value &key,
   const model::data_value &value, bool overwrite = true);
+
+/*
+ * wt_ckpt_get --
+ *     Read from WiredTiger.
+ */
+model::data_value wt_ckpt_get(WT_SESSION *session, const char *uri, const model::data_value &key,
+  const char *ckpt_name = nullptr,
+  model::timestamp_t debug_read_timestamp = model::k_timestamp_none);
+
+/*
+ * wt_ckpt_create --
+ *     Create a WiredTiger checkpoint.
+ */
+void wt_ckpt_create(WT_SESSION *session, const char *ckpt_name = nullptr);
+
+/*
+ * wt_get_stable_timestamp --
+ *     Get the stable timestamp in WiredTiger.
+ */
+model::timestamp_t wt_get_stable_timestamp(WT_CONNECTION *conn);
+
+/*
+ * wt_set_stable_timestamp --
+ *     Set the stable timestamp in WiredTiger.
+ */
+void wt_set_stable_timestamp(WT_CONNECTION *conn, model::timestamp_t timestamp);
+
+/*
+ * wt_print_debug_log --
+ *     Print the contents of a debug log to a file.
+ */
+void wt_print_debug_log(WT_CONNECTION *conn, const char *file);
 
 /*
  * wt_model_assert --
@@ -234,9 +267,31 @@ int wt_txn_insert(WT_SESSION *session, const char *uri, const model::data_value 
       wt_txn_insert(session, uri, key, value, ##__VA_ARGS__));
 
 /*
- * wt_print_debug_log --
- *     Print the contents of a debug log to a file.
+ * wt_model_ckpt_assert --
+ *     Check that the key has the same value in the model as in the database.
  */
-void wt_print_debug_log(WT_CONNECTION *conn, const char *file);
+#define wt_model_ckpt_assert(table, uri, ckpt_name, key, ...)                         \
+    testutil_assert(table->get(database.checkpoint(ckpt_name), key, ##__VA_ARGS__) == \
+      wt_ckpt_get(session, uri, key, ckpt_name, ##__VA_ARGS__));
+
+/*
+ * wt_model_ckpt_create_both --
+ *     Create a checkpoint in both the model and the database.
+ */
+#define wt_model_ckpt_create_both(...)           \
+    {                                            \
+        wt_ckpt_create(session, ##__VA_ARGS__);  \
+        database.create_checkpoint(__VA_ARGS__); \
+    }
+
+/*
+ * wt_model_set_stable_timestamp_both --
+ *     Set the stable timestamp in both the model and the database.
+ */
+#define wt_model_set_stable_timestamp_both(timestamp) \
+    {                                                 \
+        wt_set_stable_timestamp(conn, timestamp);     \
+        database.set_stable_timestamp(timestamp);     \
+    }
 
 #endif

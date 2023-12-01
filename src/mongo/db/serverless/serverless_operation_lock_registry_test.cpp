@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/serverless/serverless_operation_lock_registry.h"
-
 #include <boost/move/utility_core.hpp>
 #include <string>
 #include <vector>
@@ -37,6 +35,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/serverless/serverless_operation_lock_registry.h"
+#include "mongo/db/serverless/shard_split_statistics.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -158,6 +158,61 @@ TEST(ServerlessOperationLockRegistryTest, LockIsNotReleasedWhenNotAllInstanceAre
     // Verify the lock is held;
     ASSERT_EQ(*registry.getActiveOperationType_forTest(),
               ServerlessOperationLockRegistry::LockType::kShardSplit);
+}
+
+TEST(ServerlessOperationLockRegistryTest, LockTypeDropCollection) {
+    ServerlessOperationLockRegistry registry;
+    auto id = UUID::gen();
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient, id);
+    ASSERT_DOES_NOT_THROW(
+        registry.onDropStateCollection(ServerlessOperationLockRegistry::LockType::kMergeRecipient));
+    ASSERT_DOES_NOT_THROW(
+        registry.acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, UUID::gen()));
+}
+
+DEATH_TEST(ServerlessOperationLockRegistryTest,
+           LockTypeDropCollectionFail,
+           "Cannot release a serverless lock that is not owned by the given lock type") {
+    ServerlessOperationLockRegistry registry;
+    auto id = UUID::gen();
+    ASSERT_DOES_NOT_THROW(
+        registry.acquireLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient, id));
+    ASSERT_DOES_NOT_THROW(
+        registry.onDropStateCollection(ServerlessOperationLockRegistry::LockType::kMergeRecipient));
+    registry.releaseLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient, id);
+}
+
+TEST(ServerlessOperationLockRegistryTest, EmptyLockTypeDropCollection) {
+    ServerlessOperationLockRegistry registry;
+    ASSERT_DOES_NOT_THROW(
+        registry.onDropStateCollection(ServerlessOperationLockRegistry::LockType::kMergeRecipient));
+}
+
+TEST(ServerlessOperationLockRegistryTest, ServerlessAppendInfoBSONObj) {
+    ServerlessOperationLockRegistry registry;
+
+    BSONObjBuilder appendedBSON;
+    registry.appendInfoForServerStatus(&appendedBSON);
+    ASSERT_TRUE(appendedBSON.obj().getField(StringData("operationLock")).Int() == 0);
+
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient, UUID::gen());
+
+    BSONObjBuilder newAppendedBSON;
+    registry.appendInfoForServerStatus(&newAppendedBSON);
+    ASSERT_TRUE(newAppendedBSON.obj().getField(StringData("operationLock")).Int() == 4);
+}
+
+TEST(ShardSplitStatsTest, ShardSplitAppendInfoBSONObj) {
+    mongo::ShardSplitStatistics stat;
+    BSONObjBuilder appendedBSON;
+    stat.appendInfoForServerStatus(&appendedBSON);
+
+    const BSONObj bsonObject = appendedBSON.obj();
+    ASSERT_TRUE(bsonObject.getField(StringData("totalCommitted")).Long() == 0);
+    ASSERT_TRUE(bsonObject.getField(StringData("totalCommittedDurationMillis")).Long() == 0);
+    ASSERT_TRUE(
+        bsonObject.getField(StringData("totalCommittedDurationWithoutCatchupMillis")).Long() == 0);
+    ASSERT_TRUE(bsonObject.getField(StringData("totalAborted")).Long() == 0);
 }
 
 

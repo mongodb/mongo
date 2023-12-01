@@ -32,19 +32,11 @@
 #include <cstdint>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 
 namespace mongo {
-
-enum class BSONValidateMode {
-    // Only fast structural BSON consistency checks.
-    kDefault,
-    // Structural BSON consistency and extra fast checks on BSON specifications.
-    kExtended,
-    // Structural BSON consistency and extra comprehensive checks on BSON specifications.
-    kFull,
-};
 
 /**
  * Checks that the buf holds a BSON object as defined in http://bsonspec.org/spec.html.
@@ -69,12 +61,12 @@ enum class BSONValidateMode {
  */
 Status validateBSON(const char* buf,
                     uint64_t maxLength,
-                    BSONValidateMode mode = BSONValidateMode::kDefault) noexcept;
+                    BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault) noexcept;
 
-Status validateBSON(const BSONObj& obj, BSONValidateMode mode = BSONValidateMode::kDefault);
+Status validateBSON(const BSONObj& obj, BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault);
 
 Status validateBSONColumn(const char* buf,
                           int maxLength,
-                          BSONValidateMode mode = BSONValidateMode::kDefault) noexcept;
+                          BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault) noexcept;
 
 }  // namespace mongo

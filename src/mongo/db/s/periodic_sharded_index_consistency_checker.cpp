@@ -62,6 +62,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -108,6 +109,16 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                 return;
             }
 
+            auto uniqueOpCtx = client->makeOperationContext();
+            auto opCtx = uniqueOpCtx.get();
+
+            // TODO: SERVER-82965 Remove wait
+            try {
+                ShardingState::get(opCtx)->awaitClusterRoleRecovery().get(opCtx);
+            } catch (DBException&) {
+                return;
+            }
+
             LOGV2(22049, "Checking consistency of sharded collection indexes across the cluster");
 
             const auto aggRequestBSON = fromjson(
@@ -144,8 +155,6 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
 
                 "{$limit: 1}], cursor: {}}");
 
-            auto uniqueOpCtx = client->makeOperationContext();
-            auto opCtx = uniqueOpCtx.get();
             auto curOp = CurOp::get(opCtx);
             curOp->ensureStarted();
             ON_BLOCK_EXIT([&] { curOp->done(); });

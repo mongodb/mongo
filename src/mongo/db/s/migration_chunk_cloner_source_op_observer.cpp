@@ -42,7 +42,7 @@
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -90,7 +90,8 @@ void MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(
     }
 
     // TODO SERVER-58222: evaluate whether this is safe or whether acquiring the lock can block.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+        shard_role_details::getLocker(opCtx));
     Lock::DBLock dblock(opCtx, nss.dbName(), MODE_IS);
 
     const auto scopedDss =

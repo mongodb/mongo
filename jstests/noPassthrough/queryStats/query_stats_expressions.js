@@ -5,7 +5,7 @@
  */
 import {getQueryStats, resetQueryStatsStore} from "jstests/libs/query_stats_utils.js";
 
-// Turn on the collecting of telemetry metrics.
+// Turn on the collecting of queryStats metrics.
 let options = {
     setParameter: {internalQueryStatsRateLimit: -1},
 };

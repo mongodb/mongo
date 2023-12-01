@@ -442,12 +442,6 @@ LockManager* LockManager::get(ServiceContext& service) {
 }
 
 // static
-LockManager* LockManager::get(OperationContext* opCtx) {
-    return get(opCtx->getServiceContext());
-}
-
-
-// static
 std::map<LockerId, BSONObj> LockManager::getLockToClientMap(ServiceContext* serviceContext) {
     std::map<LockerId, BSONObj> lockToClientMap;
 
@@ -465,7 +459,7 @@ std::map<LockerId, BSONObj> LockManager::getLockToClientMap(ServiceContext* serv
             client->reportState(infoBuilder);
 
             infoBuilder.append("opid", static_cast<int>(clientOpCtx->getOpID()));
-            LockerId lockerId = clientOpCtx->lockState()->getId();
+            LockerId lockerId = clientOpCtx->lockState_DO_NOT_USE()->getId();
             lockToClientMap.insert({lockerId, infoBuilder.obj()});
         }
     }
@@ -728,7 +722,6 @@ void LockManager::cleanupUnusedLocks() {
 
 void LockManager::_cleanupUnusedLocksInBucket(LockBucket* bucket) {
     LockBucket::Map::iterator it = bucket->data.begin();
-    size_t deletedLockHeads = 0;
     while (it != bucket->data.end()) {
         LockHead* lock = it->second;
 
@@ -747,7 +740,6 @@ void LockManager::_cleanupUnusedLocksInBucket(LockBucket* bucket) {
             invariant(lock->compatibleFirstCount == 0);
 
             bucket->data.erase(it++);
-            deletedLockHeads++;
             delete lock;
         } else {
             it++;
@@ -878,20 +870,10 @@ bool LockManager::hasConflictingRequests(ResourceId resId, const LockRequest* re
     return request->lock ? !request->lock->conflictList.empty() : false;
 }
 
-void LockManager::dump() const {
-    BSONArrayBuilder locks;
-    _buildLocksArray(getLockToClientMap(getGlobalServiceContext()), true, nullptr, &locks);
-    LOGV2_OPTIONS(20521,
-                  logv2::LogTruncation::Disabled,
-                  "lock manager dump",
-                  "addr"_attr = formatPtr(this),
-                  "locks"_attr = locks.arr());
-}
-
 void LockManager::getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
                                   BSONObjBuilder* result) {
     auto lockInfoArr = BSONArrayBuilder(result->subarrayStart("lockInfo"));
-    _buildLocksArray(lockToClientMap, false, this, &lockInfoArr);
+    getLockInfoArray(lockToClientMap, false, this, &lockInfoArr);
 }
 
 std::vector<LogDegugInfo> LockManager::getLockInfoFromResourceHolders(ResourceId resId) {
@@ -911,7 +893,7 @@ std::vector<LogDegugInfo> LockManager::getLockInfoFromResourceHolders(ResourceId
     return locksInfo;
 }
 
-void LockManager::_buildLocksArray(const std::map<LockerId, BSONObj>& lockToClientMap,
+void LockManager::getLockInfoArray(const std::map<LockerId, BSONObj>& lockToClientMap,
                                    bool forLogging,
                                    LockManager* mutableThis,
                                    BSONArrayBuilder* locks) const {

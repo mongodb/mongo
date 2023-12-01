@@ -65,11 +65,11 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/find_command.h"
@@ -388,7 +388,7 @@ Status DefaultClonerImpl::_createCollectionsForDb(
     const DatabaseName& dbName) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->openDb(opCtx, dbName);
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_X));
 
     auto catalog = CollectionCatalog::get(opCtx);
     auto collCount = 0;
@@ -478,7 +478,7 @@ Status DefaultClonerImpl::_createCollectionsForDb(
 
 Status DefaultClonerImpl::setupConn(OperationContext* opCtx, const std::string& masterHost) {
     invariant(!_conn);
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     auto statusWithMasterHost = ConnectionString::parse(masterHost);
 
     if (!statusWithMasterHost.isOK()) {
@@ -523,7 +523,7 @@ Status DefaultClonerImpl::setupConn(OperationContext* opCtx, const std::string& 
 
 StatusWith<std::vector<BSONObj>> DefaultClonerImpl::getListOfCollections(
     OperationContext* opCtx, const DatabaseName& dbName, const std::string& masterHost) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     std::vector<BSONObj> collsToClone;
     if (!_conn) {
         auto connStatus = setupConn(opCtx, masterHost);
@@ -549,7 +549,7 @@ Status DefaultClonerImpl::copyDb(
               str::stream() << masterHost << ":" << dbName.toStringForErrorMsg());
     // This function can potentially block for a long time on network activity, so holding of locks
     // is disallowed.
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     auto toCloneStatus = getListOfCollections(opCtx, dbName, masterHost);
     if (!toCloneStatus.isOK()) {
         return toCloneStatus.getStatus();

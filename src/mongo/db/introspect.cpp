@@ -54,9 +54,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -94,9 +93,13 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
     {
         Locker::LockerInfo lockerInfo;
-        opCtx->lockState()->getLockerInfo(&lockerInfo, CurOp::get(opCtx)->getLockStatsBase());
+        shard_role_details::getLocker(opCtx)->getLockerInfo(&lockerInfo,
+                                                            CurOp::get(opCtx)->getLockStatsBase());
         CurOp::get(opCtx)->debug().append(
-            opCtx, lockerInfo.stats, opCtx->lockState()->getFlowControlStats(), b);
+            opCtx,
+            lockerInfo.stats,
+            shard_role_details::getLocker(opCtx)->getFlowControlStats(),
+            b);
     }
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
@@ -140,12 +143,13 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
         // We swap the lockers as that way we preserve locks held in transactions and any other
         // options set for the locker like maxLockTimeout.
-        auto oldLocker = opCtx->getClient()->swapLockState(
-            std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-        auto emptyLocker = newClient->swapLockState(std::move(oldLocker));
+        auto oldLocker = shard_role_details::swapLocker(
+            opCtx, std::make_unique<LockerImpl>(opCtx->getServiceContext()));
+        auto emptyLocker = shard_role_details::swapLocker(newCtx.get(), std::move(oldLocker));
         ON_BLOCK_EXIT([&] {
-            auto oldCtxLocker = newClient->swapLockState(std::move(emptyLocker));
-            opCtx->getClient()->swapLockState(std::move(oldCtxLocker));
+            auto oldCtxLocker =
+                shard_role_details::swapLocker(newCtx.get(), std::move(emptyLocker));
+            shard_role_details::swapLocker(opCtx, std::move(oldCtxLocker));
         });
         AlternativeClientRegion acr(newClient);
         const auto dbProfilingNS = NamespaceString::makeSystemDotProfileNamespace(ns.dbName());
@@ -198,7 +202,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 }
 
 Status createProfileCollection(OperationContext* opCtx, Database* db) {
-    invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(db->name(), MODE_IX));
 
     const auto dbProfilingNS = NamespaceString::makeSystemDotProfileNamespace(db->name());
 

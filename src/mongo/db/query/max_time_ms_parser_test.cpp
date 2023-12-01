@@ -54,6 +54,7 @@ TEST(MaxTimeMSParser, maxTimeMSOpOnlyMisnamedField) {
 }
 
 TEST(MaxTimeMSParser, maxTimeMSOpOnlyOutOfRange) {
+    using namespace fmt::literals;
     auto badValue = double(INT_MAX) + query_request_helper::kMaxTimeMSOpOnlyMaxPadding + 1;
 
     BSONObjBuilder builder;

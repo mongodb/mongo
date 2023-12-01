@@ -1,13 +1,9 @@
 /**
  * Tests basic functionality of pushing $group into the find layer.
+ *
+ * @tags: [requires_sbe]
  */
 import {getAggPlanStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    quit();
-}
 
 // Ensure group pushdown is enabled and capture the original value of
 // 'internalQuerySlotBasedExecutionDisableGroupPushdown' to use at the end of the test.

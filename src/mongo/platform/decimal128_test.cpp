@@ -297,6 +297,14 @@ TEST(Decimal128Test, TestStringConstructorNaN) {
     ASSERT_EQUALS(val.low64, lowBytes);
 }
 
+TEST(Decimal128Test, TestStringConstructorInvalidCases) {
+    for (auto in : {"", "-", "+", ".", "e", "1e", "1e-", "1e+", ".e", ".e-", ".e+"}) {
+        uint32_t flags = 0;
+        Decimal128{in, &flags};
+        ASSERT(Decimal128::hasFlag(flags, Decimal128::SignalingFlag::kInvalid)) << "in=" << in;
+    }
+}
+
 TEST(Decimal128Test, TestLiteral) {
 #define ASSERT_LITERAL128(x) ASSERT_TRUE((x##_dec128).isBinaryEqual(Decimal128(#x)))
     ASSERT_LITERAL128(5);

@@ -52,3 +52,14 @@ def parse_idl(idl_path: str, import_directories: List[str]) -> syntax.IDLParsedS
         raise ValueError(f"Cannot parse {idl_path}")
 
     return parsed_doc
+
+
+def is_third_party_idl(idl_path: str) -> bool:
+    """Check if an IDL file is under a third party directory."""
+    third_party_idl_subpaths = [os.path.join("third_party", "mozjs"), "win32com"]
+
+    for file_name in third_party_idl_subpaths:
+        if file_name in idl_path:
+            return True
+
+    return False

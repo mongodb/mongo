@@ -45,10 +45,10 @@
 #include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_stats.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -1158,7 +1158,7 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
 
 TEST_F(LockerImplTest, GetLockerInfoShouldSubtractBase) {
     auto opCtx = makeOperationContext();
-    auto locker = opCtx->lockState();
+    auto locker = shard_role_details::getLocker(opCtx.get());
     const ResourceId dbId(RESOURCE_DATABASE,
                           DatabaseName::createDatabaseName_forTest(boost::none, "SubtractTestDB"));
 
@@ -1352,26 +1352,27 @@ TEST_F(LockerImplTest, SetTicketAcquisitionForLockRAIIType) {
     auto opCtx = makeOperationContext();
 
     // By default, ticket acquisition is required.
-    ASSERT_TRUE(opCtx->lockState()->shouldWaitForTicket());
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
 
     {
-        ScopedAdmissionPriorityForLock setTicketAquisition(opCtx->lockState(),
-                                                           AdmissionContext::Priority::kImmediate);
-        ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
+        ScopedAdmissionPriorityForLock setTicketAquisition(
+            shard_role_details::getLocker(opCtx.get()), AdmissionContext::Priority::kImmediate);
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
     }
 
-    ASSERT_TRUE(opCtx->lockState()->shouldWaitForTicket());
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
 
-    opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
-    ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
+    shard_role_details::getLocker(opCtx.get())
+        ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
 
     {
-        ScopedAdmissionPriorityForLock setTicketAquisition(opCtx->lockState(),
-                                                           AdmissionContext::Priority::kImmediate);
-        ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
+        ScopedAdmissionPriorityForLock setTicketAquisition(
+            shard_role_details::getLocker(opCtx.get()), AdmissionContext::Priority::kImmediate);
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
     }
 
-    ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
 }
 
 // This test exercises the lock dumping code in ~LockerImpl in case locks are held on destruction.

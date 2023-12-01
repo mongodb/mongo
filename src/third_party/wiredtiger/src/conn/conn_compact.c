@@ -659,7 +659,7 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     const char *cfg[3] = {NULL, NULL, NULL}, *stripped_config;
-    bool running;
+    bool running, enable;
 
     conn = S2C(session);
     cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_compact);
@@ -684,15 +684,22 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
     running = conn->background_compact.running;
 
     WT_ERR(__wt_config_getones(session, config, "background", &cval));
-    if (cval.val == running)
-        /*
-         * This is an error as we are already in the same state and reconfiguration is not allowed.
-         */
+    enable = cval.val;
+
+    /* Strip the unused fields from the configuration to check if the configuration has changed. */
+    WT_ERR(__wt_config_merge(session, cfg, "background=,exclude=", &stripped_config));
+
+    /* The background compact configuration cannot be changed while it's already running. */
+    if (enable && running && strcmp(stripped_config, conn->background_compact.config) != 0)
         WT_ERR_MSG(
-          session, EINVAL, "Background compaction is already %s", running ? "enabled" : "disabled");
+          session, EINVAL, "Cannot reconfigure background compaction while it's already running.");
+
+    /* If we haven't changed states, we're done. */
+    if (enable == running)
+        goto err;
 
     /* Update the excluded tables when the server is turned on. */
-    if (cval.val) {
+    if (enable) {
         __background_compact_exclude_list_clear(session, false);
         WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "exclude", &cval), false);
         if (cval.len != 0) {
@@ -716,18 +723,16 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
         }
     }
 
-    /* Strip the unused fields from the configuration now it has been parsed. */
-    WT_ERR(__wt_config_merge(session, cfg, "background=,exclude=", &stripped_config));
-
     /* The background compaction has been signalled successfully, update its state. */
-    conn->background_compact.running = !running;
+    conn->background_compact.running = enable;
     __wt_free(session, conn->background_compact.config);
     conn->background_compact.config = stripped_config;
+    stripped_config = NULL;
     conn->background_compact.signalled = true;
+    __wt_cond_signal(session, conn->background_compact.cond);
 
 err:
+    __wt_free(session, stripped_config);
     __wt_spin_unlock(session, &conn->background_compact.lock);
-    if (ret == 0)
-        __wt_cond_signal(session, conn->background_compact.cond);
     return (ret);
 }

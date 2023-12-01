@@ -32,8 +32,8 @@ readers.
 The \c page_del field of a \c WT_REF, if not \c NULL, contains information about the
 transaction that deleted the page.
 Its type is \c WT_PAGE_DELETED.
-It can be thought of as a special kind of update, and contains roughly the same
-information.
+The \c page_del can be thought of as a special kind of update, as they contain roughly the same
+information as an update and is treated the same way but on a per page basis.
 
 The \c page_del field can be \c NULL; this means that the prior data on the page is all
 obsolete and nobody can see it.
@@ -63,33 +63,22 @@ locking was \c WT_REF_DELETED.
 Apart from instantiated pages, whose state is \c WT_REF_MEM (see @ref
 ft_instantiated_pages below) the \c page_del field will be \c NULL.
 
-Because locking the ref is expensive, and visibility checks are expensive as well, we want
-to avoid doing either unnecessarily.
-Consequently many of the places in the system that lock the ref to examine the deletion
-information will discard it right away if they find the deletion has become globally
-visible.
-
-Note that because on-disk pages can only be discarded at certain points, a page with null
-\c page_del may still have an on-disk page and consequently an address.
-That page presumptively contains no useful information.  (A page with non-null \c page_del
-should always have an on-disk page.)
+Locking the ref and visibility checks are expensive, we want to avoid doing either unnecessarily. Consequently many of the places in the system that lock the
+ref to examine the deletion information will discard it right away if they find the deletion has
+become globally visible. Therefore it is possible that a truncated page with null \c page_del may
+still have an on-disk image and an address.
 
 The transaction referenced in the deletion information may be committed or uncommitted,
 but it is never aborted.
 Upon transaction rollback the \c page_del field is cleared immediately.
 
-Note that it is not possible to delete a page twice; if the same region of a tree is
+Note: It is not possible to delete a page twice; if the same region of a tree is
 truncated twice, the already-deleted pages will be skipped over the second time.
 See @ref ft_truncate.
 
-Also note that deleted pages still "exist" in the sense that the \c WT_REF remains, and
-searches that lead to its portion of the namespace will still land on it.
-(This triggers instantiation.)
-At some point after the deletion becomes globally visible, the \c WT_REF is discarded.
-This happens either during an internal page split or reverse split, or when the internal
-page is evicted.
-It is this discard process (rather than the deletion itself) that creates gaps in the
-namespace.
+For the visibility of deleted pages, they still "exist" in the sense that the \c WT_REF remains, and
+any searches within the btree that lead to its portion of the namespace will still land on it. In
+this case we trigger page instantiation. See @ref ft_instantiation.
 
 @section ft_instantiated_pages Instantiated Pages
 
@@ -264,19 +253,11 @@ however, this does not matter when checkpointing either the child or the parent,
 updates created by instantiation will be left in memory in the usual way.
 Eviction of the child is blocked in these circumstances.)
 
-The only case when special steps are needed is when the parent is being checkpointed, and
-the child has been instantiated after the point in the tree walk that would have
-reconciled it.
-This gives us a child with no reconciliation result that we cannot refer to in the on-disk
-parent page.
-Fortunately in this case it must be correct to refer to the original pre-instantiation
-on-disk page: any changes to the instantiated page cannot be visible to the checkpoint and
-do not need to be part of it.
-However, we may need to write out the deletion information along with the address.
-This is the reason the deletion information is kept after instantiation.
-It turns out that the set of cases is exactly the same as the set of cases for deleted
-pages and the code can be shared, though it is necessary to lock the ref before calling
-it.
+There is an edge case where special steps are needed when reconciling an internal page. The case
+happens when the parent page is being checkpointed and a truncated child page has been instantiated
+after it has been reconciled already. The checkpoint will refer to the original on-disk page before it
+was instantiated, any updates to the instantiated page will not be visible to the checkpoint.
+The checkpoint will write out the deletion information along with the address.
 
 Note that in all these cases "visible" and "globally visible" do not include prepared
 transactions.
@@ -363,8 +344,8 @@ reading them into memory.
 The address cell type must be \c WT_ADDR_LEAF_NO, rather than \c WT_ADDR_LEAF, where
 overflow items may exist.
 - Pages that contain prepared values.
-- Pages where the newest transaction on the page (by either transaction ID or timestamp)
-is not visible.
+- Pages where the newest transaction ID or timestamp on the page is not visible in all the
+concurrent transactions in the system.
 
 If the page passes these checks, we mark its parent dirty, initialize the \c page_del
 structure, add a \c WT_TXN_OP_REF_DELETE operation to the current transaction (except if

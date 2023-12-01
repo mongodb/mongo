@@ -517,6 +517,20 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
         swapAndUpdate(cond,
                       std::exchange(condNot->get<0>(), optimizer::make<optimizer::Blackhole>()));
         std::swap(thenBranch, elseBranch);
+    } else if (auto funct = cond.cast<optimizer::FunctionCall>(); funct &&
+               funct->name() == "exists" && funct->nodes().size() == 1 &&
+               funct->nodes()[0] == thenBranch && elseBranch.is<optimizer::Constant>()) {
+        // If the condition is an "exists" on an expression, the thenBranch is the same expression
+        // and the elseBranch is a constant, the node is actually a FillEmpty.
+        // Note that this is not true if the replacement value is an expression that can have side
+        // effects, because FillEmpty has to evaluate both operands before deciding which one to
+        // return: keeping the if(exists(..)) allows not to evaluate the elseBranch when the
+        // condition returns true.
+        swapAndUpdate(n,
+                      optimizer::make<optimizer::BinaryOp>(
+                          optimizer::Operations::FillEmpty,
+                          std::exchange(thenBranch, optimizer::make<optimizer::Blackhole>()),
+                          std::exchange(elseBranch, optimizer::make<optimizer::Blackhole>())));
     }
 }
 

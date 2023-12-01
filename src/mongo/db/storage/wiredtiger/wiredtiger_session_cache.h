@@ -44,7 +44,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -332,13 +331,14 @@ public:
      * the conflicting WiredTiger API operation. A return from this function does not guarantee that
      * the conflicting transaction has ended, only that one prepared unit of work in the process has
      * signaled that it has ended.
-     * Accepts an OperationContext that will throw an AssertionException when interrupted.
+     * Accepts an Interruptible that will throw an AssertionException when interrupted.
      *
      * This method is provided in WiredTigerSessionCache and not RecoveryUnit because all recovery
      * units share the same session cache, and we want a recovery unit on one thread to signal all
      * recovery units waiting for prepare conflicts across all other threads.
      */
-    void waitUntilPreparedUnitOfWorkCommitsOrAborts(OperationContext* opCtx, uint64_t lastCount);
+    void waitUntilPreparedUnitOfWorkCommitsOrAborts(Interruptible& interruptible,
+                                                    uint64_t lastCount);
 
     /**
      * Notifies waiters that the caller's perpared unit of work has ended (either committed or

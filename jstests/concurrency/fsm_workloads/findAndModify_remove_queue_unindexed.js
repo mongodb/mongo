@@ -19,7 +19,7 @@ import {
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Use the workload name as the database name, since the workload
     // name is assumed to be unique.
-    $config.data.uniqueDBName = 'findAndModify_remove_queue_unindexed';
+    $config.data.uniqueDBName = jsTestName();
 
     $config.data.getIndexSpecs = function getIndexSpecs() {
         return [];

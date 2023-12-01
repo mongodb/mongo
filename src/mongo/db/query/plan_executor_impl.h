@@ -46,6 +46,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_result.h"
@@ -79,7 +80,7 @@ MONGO_WARN_UNUSED_RESULT_FUNCTION PlanStage::StageState handlePlanStageYield(
     ExpressionContext* expCtx, StringData opStr, F&& f, H&& yieldHandler) {
     auto opCtx = expCtx->opCtx;
     invariant(opCtx);
-    invariant(opCtx->lockState());
+    invariant(shard_role_details::getLocker(opCtx));
     invariant(opCtx->recoveryUnit());
     invariant(!expCtx->getTemporarilyUnavailableException());
 

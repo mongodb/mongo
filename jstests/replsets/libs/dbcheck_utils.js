@@ -1,6 +1,7 @@
 /**
  * Contains helper functions for testing dbCheck.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // Apply function on all secondary nodes except arbiters.
 export const forEachNonArbiterSecondary = (replSet, f) => {
@@ -57,12 +58,18 @@ export const awaitDbCheckCompletion = (replSet, db, waitForHealthLogDbCheckStop 
 };
 
 // Clear health log and insert nDocs documents.
-export const resetAndInsert = (replSet, db, collName, nDocs) => {
+export const resetAndInsert = (replSet, db, collName, nDocs, docSuffix = null) => {
     db[collName].drop();
     clearHealthLog(replSet);
 
-    assert.commandWorked(
-        db[collName].insertMany([...Array(nDocs).keys()].map(x => ({a: x})), {ordered: false}));
+    if (docSuffix) {
+        assert.commandWorked(db[collName].insertMany(
+            [...Array(nDocs).keys()].map(x => ({a: x.toString() + docSuffix})), {ordered: false}));
+    } else {
+        assert.commandWorked(
+            db[collName].insertMany([...Array(nDocs).keys()].map(x => ({a: x})), {ordered: false}));
+    }
+
     replSet.awaitReplication();
     assert.eq(db.getCollection(collName).find({}).count(), nDocs);
 };
@@ -138,30 +145,72 @@ function listCollectionsWithoutViews(database) {
     return [];
 }
 
+// Returns a list of names of all indexes.
+function getIndexNames(db, collName, allowedErrorCodes) {
+    var failMsg = "'listIndexes' command failed";
+    let res = assert.commandWorkedOrFailedWithCode(
+        db[collName].runCommand("listIndexes"), allowedErrorCodes, failMsg);
+    if (res.ok) {
+        return new DBCommandCursor(db, res).toArray().map(spec => spec.name);
+    }
+    return [];
+}
+
 // Run dbCheck for all collections in the database with given parameters and potentially wait for
 // completion.
 export const runDbCheckForDatabase = (replSet, db, awaitCompletion = false) => {
+    const secondaryIndexCheckEnabled =
+        checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(replSet.getPrimary());
+    let collDbCheckParameters = {};
+    if (secondaryIndexCheckEnabled) {
+        collDbCheckParameters = {validateMode: "dataConsistencyAndMissingIndexKeysCheck"};
+    }
+
+    const allowedErrorCodes = [
+        ErrorCodes.NamespaceNotFound /* collection got dropped. */,
+        ErrorCodes.CommandNotSupportedOnView /* collection got dropped and a view
+                                                got created with the same name. */
+        ,
+        40619 /* collection is not replicated error. */,
+        // Some tests adds an invalid view, resulting in a failure of the 'dbcheck'
+        // operation with an 'InvalidViewDefinition' error.
+        ErrorCodes.InvalidViewDefinition
+    ];
+
     listCollectionsWithoutViews(db).map(c => c.name).forEach(collName => {
-        jsTestLog("dbCheck is starting on ns: " + db.getName() + "." + collName +
-                  " for RS: " + replSet.getURL());
+        jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is starting on ns: " +
+                  db.getName() + "." + collName + " for RS: " + replSet.getURL());
         runDbCheck(replSet,
                    db,
                    collName,
-                   {} /* parameters */,
+                   collDbCheckParameters /* parameters */,
                    false /* awaitCompletion */,
                    false /* waitForHealthLogDbCheckStop */,
-                   [
-                       ErrorCodes.NamespaceNotFound /* collection got dropped. */,
-                       ErrorCodes.CommandNotSupportedOnView /* collection got dropped and a view
-                                                               got created with the same name. */
-                       ,
-                       40619 /* collection is not replicated error. */,
-                       // Some tests adds an invalid view, resulting in a failure of the 'dbcheck'
-                       // operation with an 'InvalidViewDefinition' error.
-                       ErrorCodes.InvalidViewDefinition
-                   ] /* allowedErrorCodes */);
-        jsTestLog("dbCheck is done on ns: " + db.getName() + "." + collName +
-                  " for RS: " + replSet.getURL());
+                   allowedErrorCodes);
+        jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is done on ns: " + db.getName() +
+                  "." + collName + " for RS: " + replSet.getURL());
+
+        if (!secondaryIndexCheckEnabled) {
+            return;
+        }
+
+        getIndexNames(db, collName, allowedErrorCodes).forEach(indexName => {
+            let extraIndexDbCheckParameters = {
+                validateMode: "extraIndexKeysCheck",
+                secondaryIndex: indexName
+            };
+            jsTestLog("dbCheck (" + tojson(extraIndexDbCheckParameters) + ") is starting on ns: " +
+                      db.getName() + "." + collName + " for RS: " + replSet.getURL());
+            runDbCheck(replSet,
+                       db,
+                       collName,
+                       extraIndexDbCheckParameters /* parameters */,
+                       false /* awaitCompletion */,
+                       false /* waitForHealthLogDbCheckStop */,
+                       allowedErrorCodes);
+            jsTestLog("dbCheck (" + tojson(extraIndexDbCheckParameters) + ") is done on ns: " +
+                      db.getName() + "." + collName + " for RS: " + replSet.getURL());
+        });
     });
 
     if (awaitCompletion) {
@@ -226,3 +275,10 @@ export const assertForDbCheckErrorsForAllNodes =
         forEachNonArbiterNode(
             rst, node => assertForDbCheckErrors(node, assertForErrors, assertForWarnings));
     };
+
+/**
+ * Utility for checking if the featureFlagSecondaryIndexChecksInDbCheck is on.
+ */
+export function checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(conn) {
+    return FeatureFlagUtil.isPresentAndEnabled(conn, 'SecondaryIndexChecksInDbCheck');
+}

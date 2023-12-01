@@ -147,8 +147,8 @@ class test_compact10(backup_base):
         for uri in uris:
             self.compare_backups(uri, self.backup_dir_1, self.backup_dir_2)
 
-        # Background compaction may be have been inspecting a table when disabled which is
-        # considered as an interruption, ignore that message.
+        # Background compaction may have been inspecting a table when disabled, which is considered
+        # as an interruption, ignore that message.
         self.ignoreStdoutPatternIfExists('background compact interrupted by application')
 
     # This test:
@@ -197,8 +197,8 @@ class test_compact10(backup_base):
         for uri in uris:
             self.compare_backups(uri, self.backup_dir_1, self.backup_dir_2)
 
-        # Background compaction may be have been inspecting a table when disabled which is
-        # considered as an interruption, ignore that message.
+        # Background compaction may have been inspecting a table when disabled, which is considered
+        # as an interruption, ignore that message.
         self.ignoreStdoutPatternIfExists('background compact interrupted by application')
 
 if __name__ == '__main__':

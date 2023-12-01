@@ -38,6 +38,7 @@
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
@@ -77,7 +78,7 @@ void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* res
     //
     // Fields are omitted if it cannot be immediately acquired to prevent stalling 'serverStatus'
     // observability.
-    ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+    ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
                                                         AdmissionContext::Priority::kImmediate);
     Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked, [] {
         Lock::GlobalLockSkipOptions options;

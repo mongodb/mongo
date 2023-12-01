@@ -17,7 +17,7 @@
 /* The maximum number of metadata entries to write out per server wakeup. */
 #define WT_CHUNKCACHE_METADATA_MAX_WORK 1000
 
-/* Different types of chunkcache metadata operations. */
+/* Different types of chunk cache metadata operations. */
 #define WT_CHUNKCACHE_METADATA_WORK_DEL 1
 #define WT_CHUNKCACHE_METADATA_WORK_INS 2
 
@@ -55,7 +55,7 @@ struct __wt_chunkcache_chunk {
     uint8_t *chunk_memory;
     wt_off_t chunk_offset;
     size_t chunk_size;
-    wt_shared volatile uint32_t valid;
+    wt_shared volatile uint32_t valid; /* Availability to read data from the chunk marked. */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CHUNK_PINNED 0x1u

@@ -34,6 +34,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -359,7 +360,7 @@ public:
      * processed.
      * Throws an exception if the BSON element's type is wrong.
      */
-    bool checkAndAssertTypes(const BSONElement& element, const std::vector<BSONType>& types) const;
+    bool checkAndAssertTypes(const BSONElement& element, std::span<const BSONType> types) const;
 
     /**
      * Throw an error message about the BSONElement being a duplicate field.
@@ -397,7 +398,7 @@ public:
      * Throw an error about a field having the wrong type.
      */
     MONGO_COMPILER_NORETURN void throwBadType(const BSONElement& element,
-                                              const std::vector<BSONType>& types) const;
+                                              std::span<const BSONType> types) const;
 
     /**
      * Throw an 'APIStrictError' if the user command has 'apiStrict' field as true.

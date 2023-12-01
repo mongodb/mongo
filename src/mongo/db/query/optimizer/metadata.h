@@ -242,7 +242,8 @@ public:
                    bool exists,
                    boost::optional<CEType> ce,
                    ShardingMetadata shardingMetadata,
-                   IndexPathOccurrences indexPathOccurrences);
+                   IndexPathOccurrences indexPathOccurrences,
+                   ScanOrder scanOrder);
 
     const ScanDefOptions& getOptionsMap() const;
 
@@ -268,6 +269,10 @@ public:
 
     const NamespaceStringOrUUID& getNamespaceStringOrUUID() const;
 
+    ScanOrder getScanOrder() const;
+
+    void setScanOrder(ScanOrder newScanOrder);
+
 private:
     ScanDefOptions _options;
     DistributionAndPaths _distributionAndPaths;
@@ -292,6 +297,13 @@ private:
     boost::optional<CEType> _ce;
 
     ShardingMetadata _shardingMetadata;
+
+    /**
+     * This is only applicable if we are doing a collection scan over the collection. The scan order
+     * represents the order in which the collection scan will occur: forwards, backwards, etc. A
+     * specific scan order can be hinted by the user with a $natural hint.
+     */
+    ScanOrder _scanOrder;
 };
 
 /**

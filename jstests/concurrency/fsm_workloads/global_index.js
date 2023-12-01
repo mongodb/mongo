@@ -4,7 +4,8 @@
  * @tags: [
  *     featureFlagGlobalIndexes,
  *     requires_fcv_62,
- *     requires_replication
+ *     requires_replication,
+ *     requires_sharding,
  * ]
  */
 export const $config = (function() {

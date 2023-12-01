@@ -63,6 +63,7 @@ selector:
   - do_not_run_in_whole_cluster_passthrough
   - assumes_against_mongod_not_mongos
   - assumes_unsharded_collection
+  - assumes_no_implicit_collection_creation_on_get_collection
   - assumes_read_preference_unchanged
   roots:
   - jstests/change_streams/**/*.js

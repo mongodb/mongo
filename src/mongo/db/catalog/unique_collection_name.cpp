@@ -40,7 +40,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util_core.h"
@@ -62,7 +62,7 @@ PseudoRandom uniqueCollectionNamespacePseudoRandom(Date_t::now().asInt64());
 StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
                                                      const DatabaseName& dbName,
                                                      StringData collectionNameModel) {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
 
     // There must be at least one percent sign in the collection name model.
     auto numPercentSign = std::count(collectionNameModel.begin(), collectionNameModel.end(), '%');

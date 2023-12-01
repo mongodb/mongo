@@ -9,6 +9,8 @@ EXT=""
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" || "$OSTYPE" == "win64" ]]; then
   OS="windows"
   EXT=".exe"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  OS="darwin"
 else
   OS="linux"
 fi

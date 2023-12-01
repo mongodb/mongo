@@ -325,6 +325,14 @@ struct QuerySolutionNode {
 
     bool hitScanLimit = false;
 
+    /**
+     * Returns a pair consisting of:
+     *  - First node of the specified type found by pre-order traversal. If node was not found, this
+     *    pair element is nullptr.
+     *  - Total number of nodes with the specified type in tree.
+     */
+    std::pair<const QuerySolutionNode*, size_t> getFirstNodeByType(StageType type) const;
+
 protected:
     /**
      * Formatting helper used by toString().
@@ -476,6 +484,14 @@ public:
 
     // Score calculated by PlanRanker. Only present if there are multiple candidate plans.
     boost::optional<double> score;
+
+    /**
+     * Returns a pair consisting of:
+     *  - First node of the specified type found by pre-order traversal. If node was not found, this
+     *    pair element is nullptr.
+     *  - Total number of nodes with the specified type in tree.
+     */
+    std::pair<const QuerySolutionNode*, size_t> getFirstNodeByType(StageType type) const;
 
 private:
     using QsnIdGenerator = IdGenerator<PlanNodeId>;
@@ -1940,8 +1956,7 @@ struct UnpackTsBucketNode : public QuerySolutionNode {
         return children[0]->sortedByDiskLoc();
     }
 
-    // TODO SERVER-79699 & SERVER-79700: Return the sort set which should be translated from the
-    // child's sort set.
+    // TODO SERVER-79700: Return the sort set which should be translated from the child's sort set.
     const ProvidedSortSet& providedSorts() const final {
         return kEmptySet;
     }

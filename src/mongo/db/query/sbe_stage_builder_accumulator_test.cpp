@@ -2728,11 +2728,11 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAddToSetWithCollat
     auto [expectedTag, expectedVal] =
         makeArrayAccumVal(BSON_ARRAY(BSON_ARRAY(BSON_ARRAY("bar"
                                                            << "foo")
-                                                << 34)
+                                                << 18)
                                      << BSON_ARRAY(BSON_ARRAY("bar"
                                                               << "baz"
                                                               << "foo")
-                                                   << 51)),
+                                                   << 27)),
                           Accumulator::kAddToSet);
     aggregateAndAssertResults(
         inputValuesTag, inputValuesVal, expectedTag, expectedVal, compiledExpr.get());

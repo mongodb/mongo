@@ -249,7 +249,7 @@ TEST_F(ABTSBE, Lower6) {
     auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
     sbe::value::ValueGuard guard(resultTag, resultVal);
 
-    ASSERT_EQ(sbe::value::TypeTags::Object, resultTag);
+    ASSERT(sbe::value::isObject(resultTag));
 }
 
 TEST_F(ABTSBE, Lower7) {
@@ -505,13 +505,8 @@ TEST_F(NodeSBE, Lower1) {
     sbe::value::SlotIdGenerator ids;
     sbe::InputParamToSlotMap inputParamToSlotMap;
 
-    SBENodeLowering g{env,
-                      *runtimeEnv,
-                      ids,
-                      inputParamToSlotMap,
-                      phaseManager.getMetadata(),
-                      planAndProps._map,
-                      ScanOrder::Forward};
+    SBENodeLowering g{
+        env, *runtimeEnv, ids, inputParamToSlotMap, phaseManager.getMetadata(), planAndProps._map};
     auto sbePlan = g.optimize(planAndProps._node, map, ridSlot);
     ASSERT_EQ(1, map.size());
     ASSERT_FALSE(ridSlot);
@@ -671,13 +666,8 @@ TEST_F(NodeSBE, RequireRID) {
     sbe::value::SlotIdGenerator ids;
     sbe::InputParamToSlotMap inputParamToSlotMap;
 
-    SBENodeLowering g{env,
-                      *runtimeEnv,
-                      ids,
-                      inputParamToSlotMap,
-                      phaseManager.getMetadata(),
-                      planAndProps._map,
-                      ScanOrder::Forward};
+    SBENodeLowering g{
+        env, *runtimeEnv, ids, inputParamToSlotMap, phaseManager.getMetadata(), planAndProps._map};
     auto sbePlan = g.optimize(planAndProps._node, map, ridSlot);
     ASSERT_EQ(1, map.size());
     ASSERT_TRUE(ridSlot);
@@ -738,20 +728,19 @@ TEST_F(NodeSBE, SamplingTest) {
                                       prefixId);
 
     // We are not lowering the paths.
-    OptPhaseManager phaseManagerForSampling{
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        false /*requireRID*/,
-        metadata,
-        makeHeuristicCE(),
-        makeHeuristicCE(),
-        makeCostEstimator(getTestCostModel()),
-        defaultConvertPathToInterval,
-        defaultConvertPathToInterval,
-        DebugInfo::kDefaultForProd,
-        {._numSamplingChunks = 5, ._sqrtSampleSizeEnabled = false}};
+    OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
+                                             OptPhase::MemoExplorationPhase,
+                                             OptPhase::MemoImplementationPhase},
+                                            prefixId,
+                                            false /*requireRID*/,
+                                            metadata,
+                                            makeHeuristicCE(),
+                                            makeHeuristicCE(),
+                                            makeCostEstimator(getTestCostModel()),
+                                            defaultConvertPathToInterval,
+                                            defaultConvertPathToInterval,
+                                            DebugInfo::kDefaultForProd,
+                                            {._sqrtSampleSizeEnabled = false}};
 
     // Used to record the sampling plans.
     ABTVector nodes;
@@ -796,9 +785,9 @@ TEST_F(NodeSBE, SamplingTest) {
         "|   Const [2]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
-        "|   LimitSkip [limit: 200, skip: 0]\n"
+        "|   LimitSkip [limit: 100, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, test]\n"
-        "LimitSkip [limit: 5, skip: 0]\n"
+        "LimitSkip [limit: 10, skip: 0]\n"
         "PhysicalScan [{'<rid>': rid_0}, test]\n",
         nodes.front());
 }
@@ -896,8 +885,7 @@ TEST_F(NodeSBE, SpoolFibonacci) {
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
     sbe::InputParamToSlotMap inputParamToSlotMap;
-    SBENodeLowering g{
-        env, *runtimeEnv, ids, inputParamToSlotMap, metadata, props, ScanOrder::Forward};
+    SBENodeLowering g{env, *runtimeEnv, ids, inputParamToSlotMap, metadata, props};
     auto sbePlan = g.optimize(tree, map, ridSlot);
     ASSERT_EQ(1, map.size());
 

@@ -170,7 +170,8 @@ class Document;
         if (!__VA_ARGS__ ||                                                                       \
             (boost::optional<FeatureFlag>(featureFlag) != boost::none &&                          \
              !boost::optional<FeatureFlag>(featureFlag)                                           \
-                  ->isEnabledAndIgnoreFCVUnsafeAtStartup())) {                                    \
+                  ->isEnabledUseLatestFCVWhenUninitialized(                                       \
+                      serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))) {           \
             DocumentSource::registerParser("$" #key, DocumentSource::parseDisabled, featureFlag); \
             LiteParsedDocumentSource::registerParser("$" #key,                                    \
                                                      LiteParsedDocumentSource::parseDisabled,     \

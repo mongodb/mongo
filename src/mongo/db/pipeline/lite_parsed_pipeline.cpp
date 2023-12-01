@@ -65,13 +65,6 @@ ReadConcernSupportResult LiteParsedPipeline::supportsReadConcern(
             ErrorCodes::ReadConcernMajorityNotEnabled,
             "Only change stream aggregation queries support 'majority' read concern when "
             "enableMajorityReadConcern=false"};
-    } else if (explain && level != repl::ReadConcernLevel::kLocalReadConcern) {
-        // Reject non-local read concern when the pipeline is being explained.
-        result.readConcernSupport = {
-            ErrorCodes::InvalidOptions,
-            str::stream() << "Explain for the aggregate command cannot run with a readConcern "
-                          << "other than 'local'. Current readConcern level: "
-                          << repl::readConcernLevels::toString(level)};
     }
 
     // 2. Determine whether the default read concern must be denied for any pipeline-global reasons.

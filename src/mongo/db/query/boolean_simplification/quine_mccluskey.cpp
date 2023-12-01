@@ -80,11 +80,11 @@ struct QmcTable {
         table.resize(size);
 
         for (uint32_t i = 0; i < static_cast<uint32_t>(minterms.size()); ++i) {
-            insert(std::move(minterms[i]), std::vector<uint32_t>{i});
+            insert(std::move(minterms[i]), CoveredOriginalMinterms{i});
         }
     }
 
-    void insert(Minterm minterm, std::vector<uint32_t> coveredMinterms) {
+    void insert(Minterm minterm, CoveredOriginalMinterms coveredMinterms) {
         const auto count = minterm.predicates.count();
         if (table.size() <= count) {
             table.resize(count + 1);
@@ -149,7 +149,7 @@ QmcTable combine(QmcTable& qmc) {
     return result;
 }
 
-size_t getCoverageCost(const std::vector<uint32_t>& coverage, const Maxterm& maxterm) {
+size_t getCoverageCost(const PrimeImplicantIndices& coverage, const Maxterm& maxterm) {
     size_t cost = coverage.size() * kBitsetNumberOfBits;
     for (const auto& mintermIndex : coverage) {
         cost += maxterm.minterms[mintermIndex].mask.count();
@@ -161,8 +161,8 @@ size_t getCoverageCost(const std::vector<uint32_t>& coverage, const Maxterm& max
  * Choose a coverage which has the fewest number of minterms, and if there is still a tie to
  * choose the coverage with the fewest number of literals.
  */
-const std::vector<uint32_t>& findOptimalCoverage(
-    const std::vector<std::vector<uint32_t>>& coverages, const Maxterm& maxterm) {
+const PrimeImplicantIndices& findOptimalCoverage(
+    const std::vector<PrimeImplicantIndices>& coverages, const Maxterm& maxterm) {
     return *std::min_element(
         begin(coverages), end(coverages), [&maxterm](const auto& lhs, const auto& rhs) {
             return getCoverageCost(lhs, maxterm) < getCoverageCost(rhs, maxterm);
@@ -198,6 +198,12 @@ std::pair<Maxterm, std::vector<CoveredOriginalMinterms>> findPrimeImplicants(Max
 
 Maxterm quineMcCluskey(Maxterm inputMaxterm) {
     auto [maxterm, maxtermCoverage] = findPrimeImplicants(std::move(inputMaxterm));
+    const bool allEssential = std::all_of(maxtermCoverage.begin(),
+                                          maxtermCoverage.end(),
+                                          [](const auto& cov) { return cov.size() == 1; });
+    if (allEssential) {
+        return maxterm;
+    }
     const auto& primeImplicantCoverages = petricksMethod(maxtermCoverage);
     if (primeImplicantCoverages.size() < 2) {
         return maxterm;

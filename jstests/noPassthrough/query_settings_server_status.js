@@ -10,6 +10,7 @@
 
 import "jstests/multiVersion/libs/multi_cluster.js";
 
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
@@ -19,7 +20,7 @@ const db = st.s.getDB("test");
 // Creating the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.
 const collName = jsTestName();
-assert.commandWorked(db.createCollection(collName));
+assertDropAndRecreateCollection(db, collName);
 
 const primaryQSU = new QuerySettingsUtils(db, collName);
 const query = primaryQSU.makeFindQueryInstance({filter: {a: 1}});
@@ -29,10 +30,6 @@ const smallerQuerySetting = {
 const biggerQuerySetting = {
     indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
 };
-
-// Set the 'clusterServerParameterRefreshIntervalSecs' value to 1 second for faster fetching of
-// 'querySettings' cluster parameter on mongos from the configsvr.
-const clusterParamRefreshSecs = primaryQSU.setClusterParamRefreshSecs(1);
 
 // Extends the `jstests/libs/fixture_helpers.js::mapOnEachShardNode()` function to also process
 // mongos instances from the current test instance. It runs the `func()` function over all the
@@ -150,6 +147,5 @@ runTest({
             size, lastSize, "`querySettings.size` server status failed to decrease on deletion.");
     }
 });
-// Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
-clusterParamRefreshSecs.restore();
+
 st.stop();

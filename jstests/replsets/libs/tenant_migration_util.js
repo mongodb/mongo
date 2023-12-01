@@ -1,3 +1,5 @@
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 /**
  * Utilities for testing tenant migrations.
  */
@@ -16,14 +18,7 @@ export function makeTenantDB(tenantId, dbName) {
  * Returns true if feature flag 'featureFlagShardMerge' is enabled, false otherwise.
  */
 export function isShardMergeEnabled(db) {
-    const adminDB = db.getSiblingDB("admin");
-    const flagDoc =
-        assert.commandWorked(adminDB.adminCommand({getParameter: 1, featureFlagShardMerge: 1}));
-    const fcvDoc = assert.commandWorked(
-        adminDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
-    return flagDoc.hasOwnProperty("featureFlagShardMerge") && flagDoc.featureFlagShardMerge.value &&
-        MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                       flagDoc.featureFlagShardMerge.version) >= 0;
+    return FeatureFlagUtil.isEnabled(db, "ShardMerge");
 }
 
 /**

@@ -37,6 +37,7 @@ imports:
   - "mongo/db/basic_types.idl"
   - "mongo/db/write_concern_options.idl"
   - "mongo/db/record_id.idl"
+  - "mongo/bson/bson_validate.idl"
 
 server_parameters:
     dbCheckHealthLogEveryNBatches:
@@ -48,6 +49,16 @@ server_parameters:
         validator:
           gte: 1
           lte: 10000
+
+    maxDbCheckMBperSec:
+        description: "Max MB per second that a single dbCheck process running in the background will
+                      process in order to limit I/O and CPU usage.
+                      Setting it to 0 turns off throttling."
+        set_at: [ startup, runtime ]
+        cpp_varname: gMaxDbCheckMBperSec
+        cpp_vartype: AtomicWord<int>
+        validator: { gte: 0 }
+        default: 1
 
 # TODO SERVER-78399: Remove once secondaryIndexChecksInDbCheck feature flag is removed.
 types:
@@ -97,6 +108,9 @@ structs:
       skipLookupForExtraKeys:
         type: safeBool
         default: false
+      bsonValidateMode:
+        type: BSONValidateMode
+        default: kDefault
 
   DbCheckSingleInvocation:
     description: "Command object for dbCheck invocation"
@@ -181,6 +195,10 @@ structs:
         description: Controls whether or not to run the reverse lookup portion of the extra index keys check.
         type: safeBool
         default: false
+      bsonValidateMode:
+        description: The validate mode that dbCheck will run for BSON consistency checks
+        type: BSONValidateMode
+        optional: true
 
   DbCheckAllInvocation:
     description: "Command object for database-wide form of dbCheck invocation"

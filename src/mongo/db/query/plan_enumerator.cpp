@@ -371,6 +371,8 @@ string PlanEnumerator::NodeAssignment::toString() const {
         str::stream ss;
         ss << "ALL OF (lockstep): {";
         ss << "\n\ttotalEnumerated: " << lockstepOrAssignment->totalEnumerated;
+        ss << "\n\texhaustedLockstepIteration: "
+           << lockstepOrAssignment->exhaustedLockstepIteration;
         ss << "\n\tsubnodes: [ ";
         for (auto&& node : lockstepOrAssignment->subnodes) {
             ss << "\n\t\t{";
@@ -1864,12 +1866,18 @@ bool PlanEnumerator::_nextMemoForLockstepOrAssignment(
         }
     };
     advanceOnce();
-    while (assignment->allIdentical()) {
-        // All sub-nodes have the same enumeration state, skip this one since we already did
-        // it above. This is expected to happen pretty often. For example, if we have two subnodes
-        // each enumerating two states, we'd expect the order to be: 00, 11 (these two iterated
-        // above), then 00 (skipped by falling through above after finishing lockstep iteration),
-        // then 10, 11 (skipped here), 00 (skipped here), then finally 01.
+    if (assignment->allIdentical()) {
+        // All sub-nodes have the same enumeration state, skip this one since we already did it
+        // above. This is expected to happen pretty often. For example, if we have two subnodes each
+        // enumerating two states, we'd expect the order to be: 00, 11 (these two iterated above),
+        // then 00 (skipped here when we fall through after finishing lockstep iteration), then 10,
+        // 01, then finally 11 (skipped here).
+        //
+        // In this example, when we finally roll back to 00, enumeration is complete. We will fall
+        // through the code below which is responsible for resetting all enumeration state to the
+        // starting point (which need not reset the child nodes in this case because they already
+        // all rolled back to the starting point of 00). Finally, we return true to indicate that
+        // all possibilities have been enumerated.
         advanceOnce();
     }
 
@@ -1881,10 +1889,12 @@ bool PlanEnumerator::_nextMemoForLockstepOrAssignment(
     }
     // Reset!
     for (auto&& subnode : assignment->subnodes) {
-        while (!nextMemo(subnode.memoId)) {
-            // Keep advancing till it rolls over.
+        if (subnode.iterationCount != 0) {
+            while (!nextMemo(subnode.memoId)) {
+                // Keep advancing till it rolls over.
+            }
+            subnode.iterationCount = 0;
         }
-        subnode.iterationCount = 0;
     }
     assignment->exhaustedLockstepIteration = false;
     return true;

@@ -69,8 +69,10 @@ function killopOnFailpoint(rst, failpointName, collName) {
     assert.eq(0, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
 
     // Index build should be removed from the config.system.indexBuilds collection.
-    assert.isnull(
-        primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
+    assert.soon(() => {
+        return primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}) ==
+            null;
+    });
 }
 
 const rst = new ReplSetTest({

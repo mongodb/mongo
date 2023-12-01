@@ -307,8 +307,26 @@ ResumeTokenData ResumeToken::getData() const {
     return result;
 }
 
-Document ResumeToken::toDocument() const {
-    return Document{{kDataFieldName, _hexKeyString}, {kTypeBitsFieldName, _typeBits}};
+Document ResumeToken::toDocument(const SerializationOptions& options) const {
+    /*
+     * This is our default resume token for the representative query shape.
+     * We use a high water mark token, otherwise a resume event is expected when reparsing.
+     * When serializing the "_typeBits", we purposely avoid serializing with SerializationOptions,
+     * as this will result in mistakenly add '?undefined' to the Document.
+     * The serialization of the Document will typically exclude the "_typeBits" if they
+     * were unset, which is the case for "kDefaultToken".
+     */
+    static const auto kDefaultToken = makeHighWaterMarkToken(Timestamp(), 0);
+    return Document{{kDataFieldName,
+                     options.serializeLiteral(_hexKeyString, Value(kDefaultToken._hexKeyString))},
+                    {kTypeBitsFieldName,
+                     options.literalPolicy != LiteralSerializationPolicy::kToDebugTypeString
+                         ? options.serializeLiteral(_typeBits, kDefaultToken._typeBits)
+                         : kDefaultToken._typeBits}};
+}
+
+BSONObj ResumeToken::toBSON(const SerializationOptions& options) const {
+    return toDocument(options).toBson();
 }
 
 ResumeToken ResumeToken::parse(const Document& resumeDoc) {

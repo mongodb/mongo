@@ -495,16 +495,38 @@ last-continuous:
     ticket: SERVER-81985
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-81379
+  - test_file: jstests/core/query/internal_strip_invalid_assignment.js
+    ticket: SERVER-82717
   - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_metrics.js
     ticket: SERVER-80842
   - test_file: jstests/sharding/server_status_crud_metrics_delete_one_without_shard_key_with_id.js
     ticket: SERVER-80842
-  - test_file: jstests/libs/clustered_collections/clustered_collection_bounded_scan_common.js
+  - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-75604
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
     ticket: SERVER-82984
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_replace.js
     ticket: SERVER-82984
+  - test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
+    ticket: SERVER-79848
+  - test_file: jstests/core/find_with_resume_after_param.js
+    ticket: SERVER-79848
+  - test_file: jstests/core/timeseries/timeseries_resume_after.js
+    ticket: SERVER-79848
+  - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
+    ticket: SERVER-83247
+  - test_file: jstests/core/timeseries/timeseries_project_pushdown.js
+    ticket: SERVER-82447
+  - test_file: jstests/core/query/project/projection_expr_mod.js
+    ticket: SERVER-39336
+  - test_file: jstests/aggregation/expressions/expression_mod.js
+    ticket: SERVER-39336
+  - test_file: src/mongo/db/modules/enterprise/jstests/external_auth_oidc/oidc_internal_authz.js
+    ticket: SERVER-78066
+  - test_file: src/mongo/db/modules/enterprise/jstests/external_auth_oidc/oidc_omit_client_id.js
+    ticket: SERVER-78066
+  - test_file: jstests/sharding/server_status_cluster_parameters.js
+    ticket: SERVER-81277
   suites: null
 last-lts:
   all:
@@ -1062,14 +1084,32 @@ last-lts:
     ticket: SERVER-81985
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-81379
+  - test_file: jstests/core/query/internal_strip_invalid_assignment.js
+    ticket: SERVER-82717
   - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_metrics.js
     ticket: SERVER-80842
   - test_file: jstests/sharding/server_status_crud_metrics_delete_one_without_shard_key_with_id.js
     ticket: SERVER-80842
-  - test_file: jstests/libs/clustered_collections/clustered_collection_bounded_scan_common.js
+  - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-75604
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
     ticket: SERVER-82984
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_replace.js
     ticket: SERVER-82984
+  - test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
+    ticket: SERVER-79848
+  - test_file: jstests/core/find_with_resume_after_param.js
+    ticket: SERVER-79848
+  - test_file: jstests/core/timeseries/timeseries_resume_after.js
+    ticket: SERVER-79848
+  - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
+    ticket: SERVER-83247
+  - test_file: jstests/core/timeseries/timeseries_project_pushdown.js
+    ticket: SERVER-82447
+  - test_file: jstests/core/query/project/projection_expr_mod.js
+    ticket: SERVER-39336
+  - test_file: jstests/aggregation/expressions/expression_mod.js
+    ticket: SERVER-39336
+  - test_file: jstests/sharding/server_status_cluster_parameters.js
+    ticket: SERVER-81277
   suites: null

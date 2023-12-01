@@ -44,6 +44,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -106,8 +107,8 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
     if (_lowPriority && gDeprioritizeUnboundedUserIndexScans.load() &&
         opCtx()->getClient()->isFromUserConnection() &&
-        opCtx()->lockState()->shouldWaitForTicket()) {
-        _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(opCtx())->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx()), AdmissionContext::Priority::kLow);
     }
 
     // Perform the possibly heavy-duty initialization of the underlying index cursor.
@@ -307,8 +308,8 @@ void IndexScan::doDetachFromOperationContext() {
 void IndexScan::doReattachToOperationContext() {
     if (_lowPriority && gDeprioritizeUnboundedUserIndexScans.load() &&
         opCtx()->getClient()->isFromUserConnection() &&
-        opCtx()->lockState()->shouldWaitForTicket()) {
-        _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(opCtx())->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx()), AdmissionContext::Priority::kLow);
     }
     if (_indexCursor)
         _indexCursor->reattachToOperationContext(opCtx());

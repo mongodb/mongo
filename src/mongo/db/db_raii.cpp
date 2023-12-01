@@ -50,8 +50,8 @@
 #include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -60,7 +60,6 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/storage/capped_snapshots.h"
@@ -72,6 +71,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/rpc/message.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -98,7 +98,7 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
     // Lock-free reads are not supported if a storage txn is already open w/o the lock-free reads
     // operation flag set.
     return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
-        !opCtx->lockState()->isWriteLocked() &&
+        !shard_role_details::getLocker(opCtx)->isWriteLocked() &&
         !(opCtx->recoveryUnit()->isActive() && !opCtx->isLockFreeReadsOp());
 }
 
@@ -1133,14 +1133,14 @@ OldClientContext::~OldClientContext() {
     if (_opCtx->getKillStatus() != ErrorCodes::OK)
         return;
 
-    invariant(_opCtx->lockState()->isLocked());
+    invariant(shard_role_details::getLocker(_opCtx)->isLocked());
     auto currentOp = CurOp::get(_opCtx);
     Top::get(_opCtx->getClient()->getServiceContext())
         .record(_opCtx,
                 currentOp->getNSS(),
                 currentOp->getLogicalOp(),
-                _opCtx->lockState()->isWriteLocked() ? Top::LockType::WriteLocked
-                                                     : Top::LockType::ReadLocked,
+                shard_role_details::getLocker(_opCtx)->isWriteLocked() ? Top::LockType::WriteLocked
+                                                                       : Top::LockType::ReadLocked,
                 _timer.micros(),
                 currentOp->isCommand(),
                 currentOp->getReadWriteType());
@@ -1166,7 +1166,7 @@ void assertReadConcernSupported(const CollectionPtr& coll,
                                 const repl::ReadConcernArgs& readConcernArgs,
                                 const RecoveryUnit::ReadSource& readSource) {
     const auto readConcernLevel = readConcernArgs.getLevel();
-    NamespaceString ns = coll->ns();
+    const auto& ns = coll->ns();
 
     // Pre-images and change collection tables prune old content using untimestamped truncates. A
     // read establishing a snapshot at a point in time (PIT) may see data inconsistent with that

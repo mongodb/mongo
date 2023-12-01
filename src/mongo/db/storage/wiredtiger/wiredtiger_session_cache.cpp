@@ -333,10 +333,8 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     }
 }
 
-void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(OperationContext* opCtx,
-                                                                        std::uint64_t lastCount) {
-    invariant(opCtx);
-
+void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(
+    Interruptible& interruptible, std::uint64_t lastCount) {
     // It is possible for a prepared transaction to block on bonus eviction inside WiredTiger after
     // it commits or rolls-back, but this delays it from signalling us to wake up. In the very
     // worst case that the only evictable page is the one pinned by our cursor, AND there are no
@@ -346,9 +344,10 @@ void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(Operatio
     const auto deadline = Date_t::now() + Seconds(1);
     stdx::unique_lock<Latch> lk(_prepareCommittedOrAbortedMutex);
     if (lastCount == _prepareCommitOrAbortCounter.loadRelaxed()) {
-        opCtx->waitForConditionOrInterruptUntil(_prepareCommittedOrAbortedCond, lk, deadline, [&] {
-            return _prepareCommitOrAbortCounter.loadRelaxed() > lastCount;
-        });
+        interruptible.waitForConditionOrInterruptUntil(
+            _prepareCommittedOrAbortedCond, lk, deadline, [&] {
+                return _prepareCommitOrAbortCounter.loadRelaxed() > lastCount;
+            });
     }
 }
 

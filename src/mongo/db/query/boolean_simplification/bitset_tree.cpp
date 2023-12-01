@@ -167,6 +167,30 @@ BitsetTreeNode restoreBitsetTree(const Minterm& minterm) {
 }
 }  // namespace
 
+void BitsetTreeNode::applyDeMorganImpl(bool isParentNegated) {
+    const bool isThisNegated = isNegated ^ isParentNegated;
+    isNegated = false;
+
+    if (isThisNegated) {
+        switch (type) {
+            case BitsetTreeNode::And:
+                type = BitsetTreeNode::Or;
+                break;
+            case BitsetTreeNode::Or:
+                type = BitsetTreeNode::And;
+                break;
+            default:
+                MONGO_UNREACHABLE_TASSERT(8316200);
+        }
+
+        leafChildren.flip();
+    }
+
+    for (auto& child : internalChildren) {
+        child.applyDeMorganImpl(isThisNegated);
+    }
+}
+
 boost::optional<Maxterm> convertToDNF(const BitsetTreeNode& node, size_t maximumNumberOfMinterms) {
     return convertToDNF(node, maximumNumberOfMinterms, /* isNegated */ false);
 }

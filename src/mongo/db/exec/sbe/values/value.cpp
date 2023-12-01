@@ -749,7 +749,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
     } else if (lhsTag == TypeTags::RecordId && rhsTag == TypeTags::RecordId) {
         int32_t result = getRecordIdView(lhsValue)->compare(*getRecordIdView(rhsValue));
-        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     } else if (lhsTag == TypeTags::bsonRegex && rhsTag == TypeTags::bsonRegex) {
         auto lhsRegex = getBsonRegexView(lhsValue);
         auto rhsRegex = getBsonRegexView(rhsValue);

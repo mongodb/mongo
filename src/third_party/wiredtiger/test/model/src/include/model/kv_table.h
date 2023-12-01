@@ -126,11 +126,26 @@ public:
       timestamp_t timestamp = k_timestamp_latest) const;
 
     /*
+     * kv_table::contains_any --
+     *     Check whether the table contains the given key-value pair. If there are multiple values
+     *     associated with the given timestamp, return true if any of them match.
+     */
+    bool contains_any(kv_checkpoint_ptr ckpt, const data_value &key, const data_value &value) const;
+
+    /*
      * kv_table::get --
      *     Get the value. Return a copy of the value if is found, or NONE if not found. Throw an
      *     exception on error.
      */
     data_value get(const data_value &key, timestamp_t timestamp = k_timestamp_latest) const;
+
+    /*
+     * kv_table::get --
+     *     Get the value. Return a copy of the value if is found, or NONE if not found. Throw an
+     *     exception on error.
+     */
+    data_value get(kv_checkpoint_ptr ckpt, const data_value &key,
+      timestamp_t timestamp = k_timestamp_latest) const;
 
     /*
      * kv_table::get --
@@ -145,6 +160,13 @@ public:
      */
     int get_ext(
       const data_value &key, data_value &out, timestamp_t timestamp = k_timestamp_latest) const;
+
+    /*
+     * kv_table::get_ext --
+     *     Get the value and return the error code instead of throwing an exception.
+     */
+    int get_ext(kv_checkpoint_ptr ckpt, const data_value &key, data_value &out,
+      timestamp_t timestamp = k_timestamp_latest) const;
 
     /*
      * kv_table::get_ext --
@@ -210,22 +232,24 @@ public:
     /*
      * kv_table::verify --
      *     Verify the table by comparing a WiredTiger table against the model. Throw an exception on
-     *     verification error.
+     *     verification error. If the checkpoint is specified, verify just that checkpoint.
      */
     inline void
-    verify(WT_CONNECTION *connection)
+    verify(WT_CONNECTION *connection, kv_checkpoint_ptr ckpt = kv_checkpoint_ptr(nullptr))
     {
-        kv_table_verifier(*this).verify(connection);
+        kv_table_verifier(*this).verify(connection, ckpt);
     }
 
     /*
      * kv_table::verify_noexcept --
-     *     Verify the table by comparing a WiredTiger table against the model.
+     *     Verify the table by comparing a WiredTiger table against the model. If the checkpoint is
+     *     specified, verify just that checkpoint.
      */
     inline bool
-    verify_noexcept(WT_CONNECTION *connection) noexcept
+    verify_noexcept(
+      WT_CONNECTION *connection, kv_checkpoint_ptr ckpt = kv_checkpoint_ptr(nullptr)) noexcept
     {
-        return kv_table_verifier(*this).verify_noexcept(connection);
+        return kv_table_verifier(*this).verify_noexcept(connection, ckpt);
     }
 
     /*

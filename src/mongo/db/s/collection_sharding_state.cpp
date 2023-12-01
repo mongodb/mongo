@@ -40,7 +40,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util_core.h"
@@ -176,8 +176,8 @@ CollectionShardingState::ScopedCollectionShardingState
 CollectionShardingState::assertCollectionLockedAndAcquire(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
     dassert(opCtx->isLockFreeReadsOp() ||
-            opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS) ||
-            (nss.isOplog() && opCtx->lockState()->isReadLocked()));
+            shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IS) ||
+            (nss.isOplog() && shard_role_details::getLocker(opCtx)->isReadLocked()));
 
     return acquire(opCtx, nss);
 }

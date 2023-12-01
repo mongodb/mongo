@@ -62,6 +62,12 @@ public:
     AuthOpObserver();
     ~AuthOpObserver();
 
+    // The filtering for this OpObserver is derived from the namespace filters in
+    // AuthorizationManagerImpl and the various AuditInterface implementations, see SERVER-83383.
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kSystem, NamespaceFilter::kSystem};
+    }
+
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator first,

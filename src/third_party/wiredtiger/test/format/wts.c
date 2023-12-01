@@ -314,7 +314,7 @@ configure_tiered_storage(const char *home, char **p, size_t max, char *ext_cfg, 
 
 /*
  * configure_chunkcache --
- *     Configure chunkcache settings for opening a connection.
+ *     Configure chunk cache settings for opening a connection.
  */
 static void
 configure_chunkcache(char **p, size_t max)
@@ -440,7 +440,7 @@ create_database(const char *home, WT_CONNECTION **connp)
     /* Optional tiered storage. */
     configure_tiered_storage(home, &p, max, tiered_ext_cfg, sizeof(tiered_ext_cfg));
 
-    /* Optional chunkcache. */
+    /* Optional chunk cache. */
     configure_chunkcache(&p, max);
 
 #define EXTENSION_PATH(path) (access((path), R_OK) == 0 ? (path) : "")

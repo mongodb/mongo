@@ -97,7 +97,11 @@ const endOplogTimestamp = oplogDocs.at(-1).ts;
 // oplog only after the data cloning is done. And so, the change collection already exists in place
 // to capture oplog entries. As such, the change collection entries and the oplog entries for
 // timestamp range ('startOplogTimestamp', 'endOplogTimestamp'] must be the same.
-verifyChangeCollectionEntries(secondary, startOplogTimestamp, endOplogTimestamp, userInfo.tenantId);
+verifyChangeCollectionEntries(secondary,
+                              startOplogTimestamp,
+                              endOplogTimestamp,
+                              userInfo.tenantId,
+                              _createTenantToken({tenant: userInfo.tenantId}));
 
 // The state of the change collection after the initial sync is not consistent with the primary.
 // This is because the change collection's data is never cloned to the secondary, only it's creation

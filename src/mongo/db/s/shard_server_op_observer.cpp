@@ -43,8 +43,8 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
@@ -106,7 +106,7 @@ public:
         : _nss(nss), _droppingCollection(droppingCollection) {}
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) override {
-        invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IX));
+        invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(_nss, MODE_IX));
         invariant(commitTime, "Invalid commit time");
 
         CatalogCacheLoader::get(opCtx).notifyOfCollectionRefreshEndMarkerSeen(_nss, *commitTime);
@@ -114,7 +114,7 @@ public:
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
         auto scopedCss =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, _nss);
         if (_droppingCollection)
@@ -156,7 +156,8 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
 
     // Need the WUOW to retain the lock for CollectionPlacementVersionLogOpHandler::commit().
     // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+        shard_role_details::getLocker(opCtx));
     AutoGetCollection autoColl(opCtx, deletedNss, MODE_IX);
 
     tassert(7751400,
@@ -224,9 +225,12 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             }
         }
 
-        if (replica_set_endpoint::isFeatureFlagEnabled() &&
+        if (replica_set_endpoint::isFeatureFlagEnabledIgnoreFCV() &&
             serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
             nss == NamespaceString::kConfigsvrShardsNamespace) {
+            // The feature flag check here needs to ignore the FCV since the
+            // ReplicaSetEndpointShardingState needs to be maintained even before the FCV is fully
+            // upgraded.
             if (auto shardId = insertedDoc["_id"].str(); shardId == ShardId::kConfigServerId) {
                 opCtx->recoveryUnit()->onCommit(
                     [](OperationContext* opCtx, boost::optional<Timestamp>) {
@@ -263,7 +267,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                             lockDbIfNotPrimary.emplace(opCtx, insertedNss.dbName(), MODE_IX);
                         }
                         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                        UninterruptibleLockGuard noInterrupt(  // NOLINT.
+                            shard_role_details::getLocker(opCtx));
                         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
                             opCtx, insertedNss.dbName());
                         scopedDss->enterCriticalSectionCatchUpPhase(opCtx, reason);
@@ -279,7 +284,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                         }
 
                         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                        UninterruptibleLockGuard noInterrupt(  // NOLINT.
+                            shard_role_details::getLocker(opCtx));
                         auto scopedCsr =
                             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                                 opCtx, insertedNss);
@@ -338,7 +344,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
 
         // Need the WUOW to retain the lock for CollectionPlacementVersionLogOpHandler::commit().
         // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
-        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+            shard_role_details::getLocker(opCtx));
         AutoGetCollection autoColl(opCtx, updatedNss, MODE_IX);
         if (refreshingFieldNewVal.isBoolean() && !refreshingFieldNewVal.boolean()) {
             tassert(7751401,
@@ -387,7 +394,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         if (enterCriticalSectionCounterFieldNewVal.ok()) {
             // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can
             // block.
-            AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+            AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+                shard_role_details::getLocker(opCtx));
 
             DatabaseName dbName = DatabaseNameUtil::deserialize(
                 boost::none, db, SerializationContext::stateDefault());
@@ -414,7 +422,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                     }
 
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                    UninterruptibleLockGuard noInterrupt(  // NOLINT.
+                        shard_role_details::getLocker(opCtx));
                     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
                         opCtx, updatedNss.dbName());
                     scopedDss->enterCriticalSectionCommitPhase(opCtx, reason);
@@ -430,7 +439,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                     }
 
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                    UninterruptibleLockGuard noInterrupt(  // NOLINT.
+                        shard_role_details::getLocker(opCtx));
                     auto scopedCsr =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                             opCtx, updatedNss);
@@ -606,7 +616,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                     documentId, ShardDatabaseType::kDbNameFieldName, &deletedDatabase));
 
         // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
-        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+        AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
+            shard_role_details::getLocker(opCtx));
 
         DatabaseName dbName = DatabaseNameUtil::deserialize(
             boost::none, deletedDatabase, SerializationContext::stateDefault());
@@ -632,9 +643,12 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         }
     }
 
-    if (replica_set_endpoint::isFeatureFlagEnabled() &&
+    if (replica_set_endpoint::isFeatureFlagEnabledIgnoreFCV() &&
         serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
         nss == NamespaceString::kConfigsvrShardsNamespace) {
+        // The feature flag check here needs to ignore the FCV since the
+        // ReplicaSetEndpointShardingState needs to be maintained even before the FCV is fully
+        // upgraded.
         if (auto shardId = documentId["_id"].str(); shardId == ShardId::kConfigServerId) {
             opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx,
                                                boost::optional<Timestamp>) {
@@ -660,7 +674,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                     }
 
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                    UninterruptibleLockGuard noInterrupt(  // NOLINT.
+                        shard_role_details::getLocker(opCtx));
                     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
                         opCtx, deletedNss.dbName());
 
@@ -683,7 +698,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                     }
 
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                    UninterruptibleLockGuard noInterrupt(  // NOLINT.
+                        shard_role_details::getLocker(opCtx));
                     auto scopedCsr =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                             opCtx, deletedNss);

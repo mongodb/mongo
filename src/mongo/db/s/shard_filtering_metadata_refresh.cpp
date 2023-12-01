@@ -48,9 +48,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -62,7 +62,6 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -76,6 +75,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/admission_context.h"
@@ -156,14 +156,14 @@ bool joinDbVersionOperation(OperationContext* opCtx,
 Status refreshDbMetadata(OperationContext* opCtx,
                          const DatabaseName& dbName,
                          CancellationToken cancellationToken) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
-    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
     ScopeGuard resetRefreshFutureOnError([&] {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         // Can be uninterruptible because the work done under it can never block.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
         auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
         scopedDss->resetDbMetadataRefreshFuture();
     });
@@ -255,10 +255,11 @@ SharedSemiFuture<void> recoverRefreshDbVersion(OperationContext* opCtx,
 void onDbVersionMismatch(OperationContext* opCtx,
                          const DatabaseName& dbName,
                          boost::optional<DatabaseVersion> receivedDbVersion) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
-    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
+    using namespace fmt::literals;
     tassert(ErrorCodes::IllegalOperation,
             "Can't check version of {} database"_format(dbName.toStringForErrorMsg()),
             !dbName.isAdminDB() && !dbName.isConfigDB());
@@ -419,7 +420,8 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
             ScopeGuard resetRefreshFutureOnError([&] {
                 // TODO (SERVER-71444): Fix to be interruptible or document exception.
                 // Can be uninterruptible because the work done under it can never block
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                UninterruptibleLockGuard noInterrupt(  // NOLINT.
+                    shard_role_details::getLocker(opCtx));
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
                 scopedCsr->resetPlacementVersionRecoverRefreshFuture();
             });
@@ -534,9 +536,9 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
 void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           boost::optional<ChunkVersion> chunkVersionReceived) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
-    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
     Timer t{};
     ScopeGuard finishTiming([&] {
@@ -560,7 +562,7 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
             // The refresh threads do not perform any data reads themselves, therefore they don't
             // need to go through admission control.
             ScopedAdmissionPriorityForLock skipAdmissionControl(
-                opCtx->lockState(), AdmissionContext::Priority::kImmediate);
+                shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kImmediate);
 
             boost::optional<Lock::DBLock> dbLock;
             boost::optional<Lock::CollectionLock> collLock;
@@ -638,7 +640,7 @@ Status onCollectionPlacementVersionMismatchNoExcept(
 }
 
 CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const NamespaceString& nss) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
@@ -646,7 +648,7 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
     }
 
     auto* const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->canAcceptShardedCommands());
+    shardingState->assertCanAcceptShardedCommands();
 
     try {
         const auto [cm, _] = uassertStatusOK(
@@ -669,7 +671,7 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
 
 ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
                                                 const NamespaceString& nss) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
@@ -677,7 +679,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     }
 
     auto* const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->canAcceptShardedCommands());
+    shardingState->assertCanAcceptShardedCommands();
 
     const auto [cm, _] = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));

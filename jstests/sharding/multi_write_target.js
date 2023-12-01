@@ -1,6 +1,8 @@
 //
 // Tests that multi-writes (update/delete) target *all* shards and not just shards in the collection
 //
+
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     WriteWithoutShardKeyTestUtil
 } from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
@@ -49,10 +51,15 @@ assert.neq(null, st.shard2.getCollection(coll.toString()).findOne({updated: true
 var staleColl = st.s1.getCollection('foo.bar');
 assert.commandWorked(staleColl.update({_id: 0}, {$set: {updatedById: true}}, {multi: false}));
 
-// Ensure _id update goes to *all* shards
-assert.neq(null, st.shard0.getCollection(coll.toString()).findOne({updatedById: true}));
-assert.neq(null, st.shard2.getCollection(coll.toString()).findOne({updatedById: true}));
-
+if (FeatureFlagUtil.isPresentAndEnabled(st.s, "UpdateOneWithIdWithoutShardKey")) {
+    // Ensure _id update goes to at least one shard
+    assert(st.shard0.getCollection(coll.toString()).findOne({updatedById: true}) != null ||
+           st.shard2.getCollection(coll.toString()).findOne({updatedById: true}) != null)
+} else {
+    // Ensure _id update goes to all shards
+    assert.neq(null, st.shard0.getCollection(coll.toString()).findOne({updatedById: true}));
+    assert.neq(null, st.shard2.getCollection(coll.toString()).findOne({updatedById: true}));
+}
 jsTest.log("Testing multi-delete...");
 
 // Sharded deleteOnes that do not directly target a shard can now use the two phase write

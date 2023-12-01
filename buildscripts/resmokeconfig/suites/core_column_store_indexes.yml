@@ -10,6 +10,8 @@ selector:
   # doubles.
   - jstests/core/**/index_bounds_number_edge_cases.js
   - jstests/core/**/type_bracket.js
+  # TODO SERVER-82397 enable when optimization is applied to column store indexes.
+  - jstests/core/query/explain/explain_find_trivially_false_predicates*.js
 
   exclude_with_any_tags:
   - assumes_no_implicit_index_creation

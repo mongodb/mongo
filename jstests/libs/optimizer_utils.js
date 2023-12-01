@@ -1,4 +1,5 @@
-import {getAggPlanStage, isAggregationPlan} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getQueryPlanner, isAggregationPlan} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 /**
  * Utility for checking if the Cascades optimizer code path is enabled (checks framework control).
@@ -12,6 +13,13 @@ export function checkCascadesOptimizerEnabled(theDB) {
 // TODO SERVER-82185: Remove this once M2-eligibility checker + E2E parameterization implemented
 export function checkPlanCacheParameterization(theDB) {
     return false;
+}
+
+export function checkFastPathEnabled(theDB) {
+    const isDisabled =
+        theDB.adminCommand({getParameter: 1, internalCascadesOptimizerDisableFastPath: 1})
+            .internalCascadesOptimizerDisableFastPath;
+    return !isDisabled;
 }
 
 /**
@@ -28,19 +36,21 @@ export function checkExperimentalCascadesOptimizerEnabled(theDB) {
  * Utility for checking if the Cascades optimizer feature flag is on.
  */
 export function checkCascadesFeatureFlagEnabled(theDB) {
-    const featureFlag = theDB.adminCommand({getParameter: 1, featureFlagCommonQueryFramework: 1});
-    return featureFlag.hasOwnProperty("featureFlagCommonQueryFramework") &&
-        featureFlag.featureFlagCommonQueryFramework.value;
+    return FeatureFlagUtil.isPresentAndEnabled(theDB, "CommonQueryFramework");
 }
 
 /**
  * Given the result of an explain command, returns whether the bonsai optimizer was used.
  */
 export function usedBonsaiOptimizer(explain) {
+    function isCQF(queryPlanner) {
+        return queryPlanner.queryFramework === "cqf";
+    }
+
+    // This section handles the explain output for aggregations against sharded colls.
     if (explain.hasOwnProperty("shards")) {
-        // This section handles the explain output for aggregations against sharded colls.
         for (let shardName of Object.keys(explain.shards)) {
-            if (explain.shards[shardName].queryPlanner.queryFramework !== "cqf") {
+            if (!isCQF(getQueryPlanner(explain.shards[shardName]))) {
                 return false;
             }
         }
@@ -49,7 +59,7 @@ export function usedBonsaiOptimizer(explain) {
                explain.queryPlanner.winningPlan.hasOwnProperty("shards")) {
         // This section handles the explain output for find queries against sharded colls.
         for (let shardExplain of explain.queryPlanner.winningPlan.shards) {
-            if (shardExplain.queryFramework !== "cqf") {
+            if (!isCQF(shardExplain)) {
                 return false;
             }
         }
@@ -57,7 +67,7 @@ export function usedBonsaiOptimizer(explain) {
     }
 
     // This section handles the explain output for unsharded queries.
-    return explain.hasOwnProperty("queryPlanner") && explain.queryPlanner.queryFramework === "cqf";
+    return explain.hasOwnProperty("queryPlanner") && isCQF(explain.queryPlanner);
 }
 
 /**
@@ -329,20 +339,23 @@ export function removeUUIDsFromExplain(db, explain) {
 }
 
 export function navigateToPath(doc, path) {
-    let result;
-    let field;
-
+    let result = doc;
+    let components = path.split(".");
     try {
-        result = doc;
-        for (field of path.split(".")) {
-            assert(result.hasOwnProperty(field));
-            result = result[field];
+        for (; components.length > 0; components = components.slice(1)) {
+            assert(result.hasOwnProperty(components[0]));
+            result = result[components[0]];
         }
         return result;
     } catch (e) {
-        jsTestLog("Error navigating to path '" + path + "'");
-        jsTestLog("Missing field: " + field);
+        const field = components[0];
+        const suffix = components.join('.');
+        jsTestLog(`Error navigating to path '${path}'\n` +
+                  `because the suffix '${suffix}' does not exist,\n` +
+                  `because the field '${field}' does not exist in this subtree:`);
         printjson(result);
+        jsTestLog("The entire tree was: ");
+        printjson(doc);
         throw e;
     }
 }

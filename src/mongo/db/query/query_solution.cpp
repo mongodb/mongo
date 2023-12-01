@@ -211,7 +211,28 @@ bool QuerySolutionNode::isEligibleForPlanCache() const {
     return true;
 }
 
+std::pair<const QuerySolutionNode*, size_t> QuerySolutionNode::getFirstNodeByType(
+    StageType type) const {
+    const QuerySolutionNode* result = nullptr;
+    size_t count = 0;
+    if (getType() == type) {
+        result = this;
+        count++;
+    }
+
+    for (auto&& child : children) {
+        auto [subTreeResult, subTreeCount] = child->getFirstNodeByType(type);
+        if (!result) {
+            result = subTreeResult;
+        }
+        count += subTreeCount;
+    }
+
+    return {result, count};
+}
+
 std::string QuerySolution::summaryString() const {
+    using namespace fmt::literals;
     tassert(5968205, "QuerySolutionNode cannot be null in this QuerySolution", _root);
 
     StringBuilder sb;
@@ -348,6 +369,11 @@ std::vector<NamespaceStringOrUUID> QuerySolution::getAllSecondaryNamespaces(
     std::set<NamespaceString> secondaryNssSet;
     getAllSecondaryNamespacesHelper(_root.get(), mainNss, secondaryNssSet);
     return {secondaryNssSet.begin(), secondaryNssSet.end()};
+}
+
+std::pair<const QuerySolutionNode*, size_t> QuerySolution::getFirstNodeByType(
+    StageType type) const {
+    return _root->getFirstNodeByType(type);
 }
 
 //

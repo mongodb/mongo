@@ -132,7 +132,11 @@ void CollectionRouter::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
 
 CollectionRoutingInfo CollectionRouter::_getRoutingInfo(OperationContext* opCtx) const {
     auto catalogCache = Grid::get(_service)->catalogCache();
-    return uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, _nss));
+    // When in a multi-document transaction, allow getting routing info from the CatalogCache even
+    // though locks may be held. The CatalogCache will throw CannotRefreshDueToLocksHeld if the
+    // entry is not already cached.
+    const auto allowLocks = opCtx->inMultiDocumentTransaction();
+    return uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, _nss, allowLocks));
 }
 
 void CollectionRouter::_onException(RouteContext* context, Status s) {

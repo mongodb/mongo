@@ -34,7 +34,7 @@
 
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/shard_role.h"
@@ -87,7 +87,7 @@ PlanYieldPolicy::YieldPolicy PlanYieldPolicy::getPolicyOverrideForOperation(
 
     // If the state of our locks held is not yieldable at all, we will assume this is an internal
     // operation that will not yield.
-    if (!opCtx->lockState()->canSaveLockState() &&
+    if (!shard_role_details::getLocker(opCtx)->canSaveLockState() &&
         (desired == YieldPolicy::YIELD_AUTO || desired == YieldPolicy::YIELD_MANUAL)) {
         return YieldPolicy::INTERRUPT_ONLY;
     }
@@ -101,7 +101,7 @@ bool PlanYieldPolicy::shouldYieldOrInterrupt(OperationContext* opCtx) {
     }
     if (!canAutoYield())
         return false;
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     if (_forceYield)
         return true;
     return _elapsedTracker.intervalHasElapsed();
@@ -124,7 +124,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
         return opCtx->checkForInterruptNoAssert();
     }
 
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // After we finish yielding (or in any early return), call resetTimer() to prevent yielding
     // again right away. We delay the resetTimer() call so that the clock doesn't start ticking
@@ -220,7 +220,7 @@ void PlanYieldPolicy::performYield(OperationContext* opCtx,
         opCtx->checkForInterrupt();  // throws
     }
 
-    Locker* locker = opCtx->lockState();
+    Locker* locker = shard_role_details::getLocker(opCtx);
     Locker::LockSnapshot snapshot;
     locker->saveLockStateAndUnlock(&snapshot);
 

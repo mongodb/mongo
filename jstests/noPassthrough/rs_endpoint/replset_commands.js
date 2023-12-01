@@ -1,7 +1,7 @@
 /*
  * Tests that replica set commands work correctly when the replica set endpoint is used.
  *
- * @tags: [requires_fcv_73, requires_persistence]
+ * @tags: [requires_fcv_73, featureFlagEmbeddedRouter, requires_persistence]
  */
 
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
@@ -43,14 +43,17 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     shard1Rst.initiate();
     const shard1Primary = shard1Rst.getPrimary();
 
-    const shard0URL = getReplicaSetURL(shard0Primary);
-    // TODO (SERVER-81968): Connect to the router port on a shardsvr mongod instead.
-    const mongos = MongoRunner.runMongos({configdb: shard0URL});
-    assert.commandWorked(mongos.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
+    // Run the addShard command against shard0's primary mongod instead to verify that
+    // replica set endpoint supports router commands.
+    assert.commandWorked(
+        shard0Primary.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains two shards (one config shard and one regular shard)");
 
+    // TODO (SERVER-83380): Connect to the router port on a shardsvr mongod instead.
+    const shard0URL = getReplicaSetURL(shard0Primary);
+    const mongos = MongoRunner.runMongos({configdb: shard0URL});
     assert.commandFailedWithCode(mongos.adminCommand({replSetStepDown: 1, force: true}),
                                  ErrorCodes.CommandNotFound);
 
@@ -98,17 +101,19 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     runTests(primary /* shard0Primary */, tearDownFunc);
 }
 
-{
-    jsTest.log("Running tests for a single-shard cluster");
-    const st = new ShardingTest({
-        shards: 1,
-        rs: {nodes: 2, setParameter: {featureFlagReplicaSetEndpoint: true}},
-        configShard: true,
-    });
-    const tearDownFunc = () => st.stop();
+// TODO (SERVER-81968): Re-enable single-shard cluster test cases once config shards support
+// embedded routers.
+// {
+//     jsTest.log("Running tests for a single-shard cluster");
+//     const st = new ShardingTest({
+//         shards: 1,
+//         rs: {nodes: 2, setParameter: {featureFlagReplicaSetEndpoint: true}},
+//         configShard: true,
+//     });
+//     const tearDownFunc = () => st.stop();
 
-    runTests(st.rs0.getPrimary() /* shard0Primary */, tearDownFunc);
-}
+//     runTests(st.rs0.getPrimary() /* shard0Primary */, tearDownFunc);
+// }
 
 {
     jsTest.log("Running tests for a serverless replica set bootstrapped as a single-shard cluster");

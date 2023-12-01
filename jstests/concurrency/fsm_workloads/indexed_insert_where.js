@@ -4,6 +4,10 @@
  * Bulk inserts documents in batches of 100, and then queries for documents inserted by the thread.
  * Note: This workload is extended by remove_where.js, update_where.js, and upsert_where.js.
  * data.insertedDocuments is used as a counter by all of those workloads for their own checks.
+ * @tags: [
+ *  # Uses $where operator
+ *  requires_scripting,
+ * ]
  */
 export const $config = (function() {
     var data = {

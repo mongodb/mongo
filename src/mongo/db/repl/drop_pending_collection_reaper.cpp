@@ -38,7 +38,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -108,7 +108,7 @@ void DropPendingCollectionReaper::addDropPendingNamespace(
     }
 
     _dropPendingNamespaces.insert(std::make_pair(dropOpTime, dropPendingNamespace));
-    if (opCtx->lockState()->inAWriteUnitOfWork()) {
+    if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
         opCtx->recoveryUnit()->onRollback(
             [this, dropPendingNamespace, dropOpTime](OperationContext*) {
                 stdx::lock_guard<Latch> lock(_mutex);

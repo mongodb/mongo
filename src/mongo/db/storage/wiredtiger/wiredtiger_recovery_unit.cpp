@@ -45,7 +45,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_options.h"
@@ -195,7 +195,7 @@ void WiredTigerRecoveryUnit::_ensureSession() {
 
 bool WiredTigerRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
     invariant(!_inUnitOfWork(), toString(_getState()));
-    invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair);
 
     // Flushes the journal log to disk. Checkpoints all data if journaling is disabled.
     _sessionCache->waitUntilDurable(opCtx,
@@ -208,7 +208,7 @@ bool WiredTigerRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
 bool WiredTigerRecoveryUnit::waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
                                                                bool stableCheckpoint) {
     invariant(!_inUnitOfWork(), toString(_getState()));
-    invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair);
 
     // Take a checkpoint, rather than only flush the (oplog) journal, in order to lock in stable
     // writes to unjournaled tables.
@@ -463,7 +463,7 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp(
     }
 
     // Ensure a transaction is opened. Storage engine operations require the global lock.
-    invariant(opCtx->lockState()->isLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isLocked());
     getSession();
 
     switch (_timestampReadSource) {

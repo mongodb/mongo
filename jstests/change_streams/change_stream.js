@@ -255,4 +255,25 @@ resumeCursor = cst.startWatchingChanges({
 });
 assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);
 
+jsTestLog("Testing filtered updates");
+// With unmatched predicates
+cursor = cst.startWatchingChanges(
+    {pipeline: [{$changeStream: {}}, {$match: {"fullDocument.a": {$gt: 2}}}], collection: db.t1});
+let resumeToken = cursor.postBatchResumeToken._data;
+assert.soon(() => {
+    assert.commandWorked(db.t1.insert({a: 2}));
+    cursor = cst.assertNoChange(cursor);
+    return resumeToken != cursor.postBatchResumeToken._data
+});
+
+// With trivially false predicates
+cursor = cst.startWatchingChanges(
+    {pipeline: [{$changeStream: {}}, {$match: {$alwaysFalse: 1}}], collection: db.t1});
+resumeToken = cursor.postBatchResumeToken._data;
+assert.soon(() => {
+    assert.commandWorked(db.t1.insert({a: 2}));
+    cursor = cst.assertNoChange(cursor);
+    return resumeToken != cursor.postBatchResumeToken._data
+});
+
 cst.cleanUp();

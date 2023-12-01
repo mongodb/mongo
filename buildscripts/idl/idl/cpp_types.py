@@ -601,15 +601,19 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
     def gen_serializer_expression(self, indented_writer, expression, should_shapify=False):
         # type: (writer.IndentedTextWriter, str, bool) -> str
         method_name = writer.get_method_name(self._ast_type.serializer)
-        if self._ast_type.deserialize_with_tenant:  # SerializationContext is tied to tenant deserialization
-            indented_writer.write_line(
-                common.template_args(
-                    'const BSONObj localObject = ${expression}.${method_name}(getSerializationContext());',
-                    expression=expression, method_name=method_name))
-        else:
-            indented_writer.write_line(
-                common.template_args('const BSONObj localObject = ${expression}.${method_name}();',
-                                     expression=expression, method_name=method_name))
+        function_arguments = []
+        # SerializationContext is tied to tenant deserialization
+        if self._ast_type.deserialize_with_tenant:
+            function_arguments.append('getSerializationContext()')
+        # Provide options if custom shapification required.
+        if should_shapify:
+            function_arguments.append('options')
+
+        indented_writer.write_line(
+            common.template_args(
+                'const BSONObj localObject = ${expression}.${method_name}(${function_arguments});',
+                expression=expression, method_name=method_name,
+                function_arguments=', '.join(function_arguments)))
         return "localObject"
 
 

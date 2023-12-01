@@ -151,7 +151,7 @@ public:
         : _propsMap(propsMap), _numChunks(numChunks), _ridProjections(ridProjections) {}
 
     void transport(ABT& n, const LimitSkipNode& limit, ABT& child) {
-        if (limit.getProperty().getSkip() != 0) {
+        if (limit.getProperty().getSkip() != 0 || !child.is<PhysicalScanNode>()) {
             return;
         }
         const PhysicalScanNode& physicalScan = *child.cast<PhysicalScanNode>();
@@ -160,7 +160,8 @@ public:
         ABT newPhysicalScan =
             make<PhysicalScanNode>(FieldProjectionMap{._ridProjection = ProjectionName{ridProj}},
                                    physicalScan.getScanDefName(),
-                                   physicalScan.useParallelScan());
+                                   physicalScan.useParallelScan(),
+                                   physicalScan.getScanOrder());
 
         NodeProps props = _propsMap.at(&physicalScan);
         properties::getProperty<properties::ProjectionRequirement>(props._physicalProps)

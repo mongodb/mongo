@@ -28,10 +28,6 @@ const querySettingsC = {
     indexHints: {allowedIndexes: ["c_1"]}
 };
 
-// Set the 'clusterServerParameterRefreshIntervalSecs' value to 1 second for faster fetching of
-// 'querySettings' cluster parameter on mongos from the configsvr.
-const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
-
 function runSetQuerySettingsConcurrently(
     {initialConfiguration, settingToFail, settingToPass, finalConfiguration}) {
     qsutils.assertQueryShapeConfiguration(initialConfiguration);
@@ -105,6 +101,4 @@ function runSetQuerySettingsConcurrently(
     qsutils.assertQueryShapeConfiguration([]);
 }
 
-// Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
-clusterParamRefreshSecs.restore();
 rst.stopSet();

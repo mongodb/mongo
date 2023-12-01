@@ -37,9 +37,9 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -477,8 +477,9 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
     // MODE_X lock is held and there cannot be concurrent external aborters.
     auto nssOptional = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, collectionUUID);
     invariant(!_indexBuildState.isExternalAbort());
-    invariant(nssOptional &&
-              opCtx->lockState()->isCollectionLockedForMode(nssOptional.get(), MODE_X));
+    invariant(
+        nssOptional &&
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nssOptional.get(), MODE_X));
 
     // Wait until the build is done setting up. This indicates that all required state is
     // initialized to attempt an abort.

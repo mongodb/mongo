@@ -134,6 +134,9 @@ public:
     /**
      * Adds a set of derived prepared transaction operations to writerVectors.
      *
+     * If `serial` is true, assign all derived operations to the writer vector corresponding to the
+     * hash of the first operation in `derivedOps`.
+     *
      * The prepareOp and derivedOps are inputs that we use to generate ApplierOperation's to be
      * added to the writerVectors. The derivedOps contains all the CRUD ops inside the applyOps
      * part of the prepareOp. When this function finishes the writerVectors may look like this:
@@ -181,7 +184,8 @@ public:
                                    OplogEntry* prepareOp,
                                    std::vector<OplogEntry>* derivedOps,
                                    std::vector<std::vector<ApplierOperation>>* writerVectors,
-                                   CachedCollectionProperties* collPropertiesCache);
+                                   CachedCollectionProperties* collPropertiesCache,
+                                   bool shouldSerialize);
 
     /**
      * Adds commit or abort transaction operations to the writerVectors.

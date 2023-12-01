@@ -13,10 +13,6 @@ const collName = jsTestName();
 
 const qsutils = new QuerySettingsUtils(db, collName)
 
-// Set the 'clusterServerParameterRefreshIntervalSecs' value to 1 second for faster fetching of
-// 'querySettings' cluster parameter on mongos from the configsvr.
-const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
-
 const querySettingsA = {
     indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
 };
@@ -145,6 +141,3 @@ const nonExistentQueryShapeHash = "0".repeat(64);
     }),
                                  7746608);
 }
-
-// Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
-clusterParamRefreshSecs.restore();

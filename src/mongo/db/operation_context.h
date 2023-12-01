@@ -155,24 +155,18 @@ public:
     WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(std::unique_ptr<RecoveryUnit> unit,
                                                        WriteUnitOfWork::RecoveryUnitState state);
 
-    /**
-     * Interface for locking.  Caller DOES NOT own pointer.
-     */
-    Locker* lockState() const {
+    // TODO (SERVER-77213): The locker ownership is being moved to the TransactionResources. Do not
+    // add any new usages to these methods as they will go away and will be folded as an
+    // implementation detail of the Shard Role API.
+    //
+    // The way to access the locker associated with a given OperationContext is through the
+    // shard_role_details::getLocker methods.
+    Locker* lockState_DO_NOT_USE() const {
         return _locker.get();
     }
-
-    /**
-     * Sets the locker for use by this OperationContext. Call during OperationContext
-     * initialization, only.
-     */
-    void setLockState(std::unique_ptr<Locker> locker);
-
-    /**
-     * Swaps the locker, releasing the old locker to the caller.  The Client lock is required to
-     * call this function.
-     */
-    std::unique_ptr<Locker> swapLockState(std::unique_ptr<Locker> locker, WithLock);
+    void setLockState_DO_NOT_USE(std::unique_ptr<Locker> locker);
+    std::unique_ptr<Locker> swapLockState_DO_NOT_USE(std::unique_ptr<Locker> locker,
+                                                     WithLock clientLock);
 
     /**
      * Returns Status::OK() unless this operation is in a killed state.

@@ -266,6 +266,10 @@ const allCommands = {
         // Skipping command because it requires additional authentication setup.
         skip: "requires additional authentication setup"
     },
+    autoCompact: {
+        // TODO SERVER-83318
+        skip: "authentication not yet supported for autoCompact"
+    },
     autoSplitVector: {skip: isAnInternalCommand},
     balancerCollectionStatus: {
         command: {balancerCollectionStatus: fullNs},

@@ -258,6 +258,7 @@ let testCases = {
     },
     applyOps: {skip: "internal command"},
     authenticate: {skip: "does not accept read or write concern"},
+    autoCompact: {skip: "does not accept read or write concern"},
     autoSplitVector: {skip: "internal command"},
     balancerCollectionStatus: {skip: "does not accept read or write concern"},
     balancerStart: {skip: "does not accept read or write concern"},

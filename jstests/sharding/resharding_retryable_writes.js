@@ -7,6 +7,7 @@
  * @tags: [uses_atclustertime]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
@@ -119,12 +120,19 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
             const epsilon = 5000;
             const elapsed = Date.now() - startTime;
             assert.gt(elapsed, minimumOperationDurationMS - epsilon);
-            runRetryableWrite("during resharding after collection cloning had finished",
-                              ErrorCodes.IncompleteTransactionHistory);
+            if (FeatureFlagUtil.isPresentAndEnabled(mongos, "UpdateOneWithIdWithoutShardKey")) {
+                runRetryableWrite("during resharding after collection cloning had finished");
+            } else {
+                runRetryableWrite("during resharding after collection cloning had finished",
+                                  ErrorCodes.IncompleteTransactionHistory);
+            }
         });
 
-    runRetryableWrite("after resharding", ErrorCodes.IncompleteTransactionHistory);
-
+    if (FeatureFlagUtil.isPresentAndEnabled(mongos, "UpdateOneWithIdWithoutShardKey")) {
+        runRetryableWrite("after resharding");
+    } else {
+        runRetryableWrite("after resharding", ErrorCodes.IncompleteTransactionHistory);
+    }
     reshardingTest.teardown();
 }
 const minimumOperationDurationMS = 30000;

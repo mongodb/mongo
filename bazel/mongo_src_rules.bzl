@@ -1,5 +1,5 @@
 # Common mongo-specific bazel build rules intended to be used in individual BUILD files in the "src/" subtree.
-
+load("@poetry//:dependencies.bzl", "dependency")
 # === Windows-specific compilation settings ===
 
 # /RTC1              Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized (implies /Od: no optimizations)
@@ -169,3 +169,87 @@ def mongo_cc_binary(
         }),
         includes = [],
     )
+
+IdlInfo = provider(
+    fields = {
+        "idl_deps": "depset of idl files",
+    },
+)
+
+def idl_generator_impl(ctx):
+    
+    base = ctx.attr.src.files.to_list()[0].basename.removesuffix(".idl")
+    
+    gen_source = ctx.actions.declare_file(base + "_gen.cpp")
+    gen_header = ctx.actions.declare_file(base + "_gen.h")
+
+    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    
+    idlc_path = ctx.attr.idlc.files.to_list()[0].path
+    dep_depsets = [dep[IdlInfo].idl_deps for dep in ctx.attr.deps]
+
+    # collect deps from python modules and setup the corresponding
+    # path so all modules can be found by the toolchain.
+    python_path = []
+    for py_dep in ctx.attr.py_deps:
+        for dep in py_dep[PyInfo].transitive_sources.to_list():
+            if dep.path not in  python_path:
+                python_path.append(dep.path)
+    py_depsets = [py_dep[PyInfo].transitive_sources for py_dep in ctx.attr.py_deps]
+
+    inputs = depset(transitive=[
+        ctx.attr.src.files,
+        ctx.attr.idlc.files, 
+        python.files] + dep_depsets + py_depsets)
+
+    ctx.actions.run(
+        executable = python.interpreter.path,
+        outputs = [gen_source, gen_header],
+        inputs = inputs,
+        arguments = [ 
+            'buildscripts/idl/idlc.py',
+            '--include', 'src', 
+            '--base_dir', ctx.bin_dir.path + '/src',
+            '--target_arch', ctx.var['TARGET_CPU'],
+            '--header', gen_header.path, 
+            '--output', gen_source.path, 
+            ctx.attr.src.files.to_list()[0].path
+        ],
+        mnemonic = "IdlcGenerator",
+         env={"PYTHONPATH":ctx.configuration.host_path_separator.join(python_path)}
+    )
+    
+    return [
+        DefaultInfo(
+            files = depset([gen_source, gen_header]),
+        ),
+        IdlInfo(
+            idl_deps = depset(ctx.attr.src.files.to_list(), transitive=[dep[IdlInfo].idl_deps for dep in ctx.attr.deps])
+        )
+    ]
+
+idl_generator = rule(
+    idl_generator_impl,
+    attrs = {
+        "src": attr.label(
+            doc = "The idl file to generate cpp/h files from.",
+            allow_single_file=True,
+        ),
+        "idlc" : attr.label(
+            doc = "The idlc generator to use.",
+            default = "//buildscripts/idl:idlc",
+        ),
+        "py_deps" : attr.label_list(
+            doc = "Python modules that should be imported.",
+            providers = [PyInfo],
+            default=[dependency("pyyaml", group="core"), dependency("pymongo", group="core")]
+        ),
+        "deps" : attr.label_list(
+            doc = "Other idl files that need to be imported.",
+            providers = [IdlInfo],
+        ),
+    },
+    doc = "Generates header/source files from IDL files.",
+    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    fragments = ["py"]
+)

@@ -52,7 +52,6 @@
 #include "mongo/db/s/create_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -60,6 +59,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -81,7 +81,11 @@ CreateCommand makeCreateCommand(OperationContext* opCtx,
     createRequest.setSize(request.getSize());
     createRequest.setAutoIndexId(request.getAutoIndexId());
     createRequest.setClusteredIndex(request.getClusteredIndex());
-    createRequest.setCollation(request.getCollation());
+    if (request.getCollation()) {
+        auto collation =
+            Collation::parse(IDLParserContext("shardsvrCreateCollection"), *request.getCollation());
+        createRequest.setCollation(collation);
+    }
     createRequest.setEncryptedFields(request.getEncryptedFields());
     createRequest.setChangeStreamPreAndPostImages(request.getChangeStreamPreAndPostImages());
     createRequest.setMax(request.getMax());
@@ -143,7 +147,7 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             bool inTransaction = opCtx->inMultiDocumentTransaction();
             bool isUnsplittable = request().getUnsplittable();
@@ -180,8 +184,8 @@ public:
                     requestToForward.setTimeseries(std::move(timeseriesOptions));
                 }
 
+                // TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
                 FixedFCVRegion fixedFcvRegion{opCtx};
-
                 auto coordinatorDoc = [&] {
                     if (feature_flags::gAuthoritativeShardCollection.isEnabled(
                             (*fixedFcvRegion).acquireFCVSnapshot())) {
@@ -193,7 +197,7 @@ public:
                         return doc.toBSON();
                     } else {
                         const DDLCoordinatorTypeEnum coordType =
-                            DDLCoordinatorTypeEnum::kCreateCollectionPre71Compatible;
+                            DDLCoordinatorTypeEnum::kCreateCollectionPre73Compatible;
                         auto doc = CreateCollectionCoordinatorDocumentLegacy();
                         doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
                         doc.setShardsvrCreateCollectionRequest(requestToForward);

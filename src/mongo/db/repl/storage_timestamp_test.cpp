@@ -83,7 +83,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
@@ -97,6 +96,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/skipped_record_tracker.h"
 #include "mongo/db/index_build_entry_helpers.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
@@ -198,7 +198,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
 
     // Make sure we haven't already locked this namespace. An AutoGetCollection already instantiated
     // on this namespace would have a dangling Collection pointer after this function has run.
-    invariant(!opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    invariant(!shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
 
     AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
     {

@@ -131,17 +131,12 @@ public:
 
 
     RecordId& operator=(RecordId&& other) {
-        swap(other);
-        return *this;
-    }
-
-    void swap(RecordId& other) {
-        // We perform a byte-wise swap here to avoid concerns with the actual underlying type of the
-        // RecordId.
-        std::array<std::byte, sizeof(RecordId)> tmp;
-        std::memcpy(reinterpret_cast<void*>(tmp.data()), this, sizeof(RecordId));
+        if (_format == Format::kBigStr) {
+            HeapStr::getBufferFrom(_data).~ConstSharedBuffer();
+        }
         std::memcpy(reinterpret_cast<void*>(this), &other, sizeof(RecordId));
-        std::memcpy(reinterpret_cast<void*>(&other), tmp.data(), sizeof(RecordId));
+        other._format = kNull;
+        return *this;
     }
 
     /**
@@ -158,7 +153,7 @@ public:
      * retrieved using getStr().
      */
     explicit RecordId(const char* str, int32_t size) {
-        invariant(size > 0, "key size must be greater than 0");
+        uassert(8273007, fmt::format("key size must be greater than 0. size: {}", size), size > 0);
         uassert(
             5894900,
             fmt::format("Size of RecordId ({}) is above limit of {} bytes", size, kBigStrMaxSize),
@@ -608,10 +603,6 @@ inline StringBuilder& operator<<(StringBuilder& stream, const RecordId& id) {
 
 inline std::ostream& operator<<(std::ostream& stream, const RecordId& id) {
     return stream << "RecordId(" << id.toString() << ')';
-}
-
-inline void swap(RecordId& lhs, RecordId& rhs) {
-    lhs.swap(rhs);
 }
 
 }  // namespace mongo

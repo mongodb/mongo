@@ -183,6 +183,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isNull
     0,  // isObject
     0,  // isArray
+    0,  // isInListData
     0,  // isString
     0,  // isNumber
     0,  // isBinData
@@ -213,16 +214,15 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // valueBlockApplyLambda
 };
 
-void ByteCode::allocStack(size_t size) noexcept {
-    invariant(size > 0);
-    auto newSizeDelta = size * sizeOfElement;
+void ByteCode::allocStackImpl(size_t newSizeDelta) noexcept {
+    invariant(newSizeDelta > 0);
+
     auto oldSize = _argStackEnd - _argStack;
-    if (_argStackEnd <= _argStackTop + newSizeDelta) {
-        auto oldTop = _argStackTop - _argStack;
-        _argStack = reinterpret_cast<uint8_t*>(mongoRealloc(_argStack, oldSize + newSizeDelta));
-        _argStackEnd = _argStack + oldSize + newSizeDelta;
-        _argStackTop = _argStack + oldTop;
-    }
+    auto oldTop = _argStackTop - _argStack;
+
+    _argStack = reinterpret_cast<uint8_t*>(mongoRealloc(_argStack, oldSize + newSizeDelta));
+    _argStackEnd = _argStack + oldSize + newSizeDelta;
+    _argStackTop = _argStack + oldTop;
 }
 
 std::string CodeFragment::toString() const {
@@ -848,6 +848,10 @@ void CodeFragment::appendIsObject(Instruction::Parameter input) {
 
 void CodeFragment::appendIsArray(Instruction::Parameter input) {
     appendSimpleInstruction(Instruction::isArray, input);
+}
+
+void CodeFragment::appendIsInListData(Instruction::Parameter input) {
+    appendSimpleInstruction(Instruction::isInListData, input);
 }
 
 void CodeFragment::appendIsString(Instruction::Parameter input) {
@@ -4291,7 +4295,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfCP(ArityT
     byteIndex = startByteIndex;
     for (codePointIndex = startCodePointIndex; codePointIndex < endCodePointIndex;
          ++codePointIndex) {
-        if (str.substr(byteIndex, substr.size()).compare(substr) == 0) {
+        if (str.substr(byteIndex, substr.size()) == substr) {
             return {
                 false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(codePointIndex)};
         }
@@ -4938,7 +4942,8 @@ FastTuple<bool, value::TypeTags, value::Value> pcreNextMatch(pcre::Regex* pcre,
     auto [matchedTag, matchedVal] = value::makeNewString(m[0]);
     value::ValueGuard matchedGuard{matchedTag, matchedVal};
 
-    StringData precedesMatch(m.input().begin() + m.startPos(), m[0].begin());
+    StringData precedesMatch = m.input().substr(m.startPos());
+    precedesMatch = precedesMatch.substr(0, m[0].data() - precedesMatch.data());
     codePointPos += str::lengthInUTF8CodePoints(precedesMatch);
     startBytePos += precedesMatch.size();
 
@@ -9480,6 +9485,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockMax(arity);
         case Builtin::valueBlockCount:
             return builtinValueBlockCount(arity);
+        case Builtin::valueBlockSum:
+            return builtinValueBlockSum(arity);
         case Builtin::valueBlockGtScalar:
             return builtinValueBlockGtScalar(arity);
         case Builtin::valueBlockGteScalar:
@@ -9964,6 +9971,8 @@ std::string builtinToString(Builtin b) {
             return "valueBlockMax";
         case Builtin::valueBlockCount:
             return "valueBlockCount";
+        case Builtin::valueBlockSum:
+            return "valueBlockSum";
         case Builtin::valueBlockGtScalar:
             return "valueBlockGtScalar";
         case Builtin::valueBlockGteScalar:
@@ -10897,6 +10906,10 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::isArray: {
                 runTagCheck(pcPointer, value::isArray);
+                break;
+            }
+            case Instruction::isInListData: {
+                runTagCheck(pcPointer, value::isInListData);
                 break;
             }
             case Instruction::isString: {

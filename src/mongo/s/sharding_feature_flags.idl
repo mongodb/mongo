@@ -82,6 +82,7 @@ feature_flags:
     default: true
     version: 7.1
     shouldBeFCVGated: true
+  # TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
   featureFlagAuthoritativeShardCollection:
     description: "Feature flag for enabling the authoritative version of the shardCollection DDL operation."
     cpp_varname: feature_flags::gAuthoritativeShardCollection
@@ -105,4 +106,11 @@ feature_flags:
     description: "Feature flag for updateOne and deleteOne with _id equality without shard key correctness during chunk migrations."
     cpp_varname: feature_flags::gUpdateOneWithIdWithoutShardKey
     default: false
+    shouldBeFCVGated: true
+  # TODO (SERVER-83264): Remove once 8.0 becomes last LTS.
+  featureFlagBalancerSettingsSchema:
+    description: "Feature flag for updating the config settings schema to enforce balancer settings"
+    cpp_varname: feature_flags::gBalancerSettingsSchema
+    default: true
+    version: 7.3
     shouldBeFCVGated: true

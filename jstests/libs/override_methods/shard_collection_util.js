@@ -133,8 +133,38 @@ export var ShardingOverrideCommon = (function() {
         }
     }
 
+    function createUnsplittableCollection({db, collName, opts}) {
+        // Expected to be called only on sharded clusters
+        assert(FixtureHelpers.isMongos(db));
+
+        const options = opts || {};
+
+        let createCmd = {createUnsplittableCollection: collName};
+        Object.extend(createCmd, options);
+
+        return db.runCommand(createCmd);
+    }
+
+    // SERVER-83396 Get rid of this function
+    function createUnsplittableCollectionOnRandomShard({db, collName, opts}) {
+        let options = opts || {};
+
+        // Expected to be called only on sharded clusters
+        assert(FixtureHelpers.isMongos(db));
+
+        // Select a random shard
+        let shardName =
+            db.getSiblingDB('config').shards.aggregate([{$sample: {size: 1}}]).toArray()[0]._id;
+        options['dataShard'] = shardName;
+
+        return this.createUnsplittableCollection({db: db, collName: collName, opts: options});
+    }
+
     return {
         shardCollection: shardCollection,
         shardCollectionWithSpec: shardCollectionWithSpec,
+        createUnsplittableCollection: createUnsplittableCollection,
+        // SERVER-83396 Get rid of this function
+        createUnsplittableCollectionOnRandomShard: createUnsplittableCollectionOnRandomShard
     };
 })();

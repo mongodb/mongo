@@ -220,6 +220,10 @@ bool processResponseFromRemote(OperationContext* opCtx,
                                BatchWriteOp& batchOp,
                                TargetedWriteBatch* batch,
                                BatchWriteExecStats* stats) {
+    // Stale routing info errors need to be tracked in order to trigger a refresh of the targeter.
+    // On the other hand, errors caused by the catalog cache being temporarily unavailable (such as
+    // ShardCannotRefreshDueToLocksHeld) are ignored in this context, since no deduction can be made
+    // around possible placement changes.
     TrackedErrors trackedErrors;
     trackedErrors.startTracking(ErrorCodes::StaleConfig);
     trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
@@ -893,7 +897,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                 2,
                                 {logv2::LogComponent::kShardMigrationPerf},
                                 "Starting post-migration commit refresh on the router");
-            targeterChanged = targeterChanged || targeter.refreshIfNeeded(opCtx);
+            targeterChanged |= targeter.refreshIfNeeded(opCtx);
             LOGV2_DEBUG_OPTIONS(4817407,
                                 2,
                                 {logv2::LogComponent::kShardMigrationPerf},

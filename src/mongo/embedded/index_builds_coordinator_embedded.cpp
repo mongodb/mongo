@@ -33,7 +33,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/embedded/index_builds_coordinator_embedded.h"
 #include "mongo/util/assert_util.h"
@@ -53,7 +53,7 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
                                                 const UUID& buildUUID,
                                                 IndexBuildProtocol protocol,
                                                 IndexBuildOptions indexBuildOptions) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     auto statusWithOptionalResult =
         _filterSpecsAndRegisterBuild(opCtx, dbName, collectionUUID, specs, buildUUID, protocol);

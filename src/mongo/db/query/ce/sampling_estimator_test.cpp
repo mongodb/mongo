@@ -79,20 +79,19 @@ TEST(SamplingEstimatorTest, SampleIndexedFields) {
 
 
     // We are not lowering the paths.
-    OptPhaseManager phaseManagerForSampling{
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        false /*requireRID*/,
-        metadata,
-        makeHeuristicCE(),
-        makeHeuristicCE(),
-        makeCostEstimator(getTestCostModel()),
-        defaultConvertPathToInterval,
-        defaultConvertPathToInterval,
-        DebugInfo::kDefaultForProd,
-        {._numSamplingChunks = 5, ._sqrtSampleSizeEnabled = false}};
+    OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
+                                             OptPhase::MemoExplorationPhase,
+                                             OptPhase::MemoImplementationPhase},
+                                            prefixId,
+                                            false /*requireRID*/,
+                                            metadata,
+                                            makeHeuristicCE(),
+                                            makeHeuristicCE(),
+                                            makeCostEstimator(getTestCostModel()),
+                                            defaultConvertPathToInterval,
+                                            defaultConvertPathToInterval,
+                                            DebugInfo::kDefaultForProd,
+                                            {._sqrtSampleSizeEnabled = false}};
 
     // Used to record the sampling plans.
     ABTVector nodes;
@@ -139,9 +138,9 @@ TEST(SamplingEstimatorTest, SampleIndexedFields) {
         "|   Const [1]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
-        "|   LimitSkip [limit: 200, skip: 0]\n"
+        "|   LimitSkip [limit: 100, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
-        "LimitSkip [limit: 5, skip: 0]\n"
+        "LimitSkip [limit: 10, skip: 0]\n"
         "PhysicalScan [{'<rid>': rid_0}, c1]\n",
         nodes.front());
 }
@@ -167,20 +166,19 @@ TEST(SamplingEstimatorTest, DoNotSampleUnindexedFields) {
 
 
     // We are not lowering the paths.
-    OptPhaseManager phaseManagerForSampling{
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        false /*requireRID*/,
-        metadata,
-        makeHeuristicCE(),
-        makeHeuristicCE(),
-        makeCostEstimator(getTestCostModel()),
-        defaultConvertPathToInterval,
-        defaultConvertPathToInterval,
-        DebugInfo::kDefaultForProd,
-        {._numSamplingChunks = 5, ._sqrtSampleSizeEnabled = false}};
+    OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
+                                             OptPhase::MemoExplorationPhase,
+                                             OptPhase::MemoImplementationPhase},
+                                            prefixId,
+                                            false /*requireRID*/,
+                                            metadata,
+                                            makeHeuristicCE(),
+                                            makeHeuristicCE(),
+                                            makeCostEstimator(getTestCostModel()),
+                                            defaultConvertPathToInterval,
+                                            defaultConvertPathToInterval,
+                                            DebugInfo::kDefaultForProd,
+                                            {._sqrtSampleSizeEnabled = false}};
 
     // Used to record the sampling plans.
     ABTVector nodes;
@@ -232,20 +230,19 @@ TEST_F(NodeSBE, SampleTwoPredicatesAtOnceTest) {
                                       prefixId);
 
     // We are not lowering the paths.
-    OptPhaseManager phaseManagerForSampling{
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        false /*requireRID*/,
-        metadata,
-        makeHeuristicCE(),
-        makeHeuristicCE(),
-        makeCostEstimator(getTestCostModel()),
-        defaultConvertPathToInterval,
-        defaultConvertPathToInterval,
-        DebugInfo::kDefaultForProd,
-        {._numSamplingChunks = 5, ._sqrtSampleSizeEnabled = false}};
+    OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
+                                             OptPhase::MemoExplorationPhase,
+                                             OptPhase::MemoImplementationPhase},
+                                            prefixId,
+                                            false /*requireRID*/,
+                                            metadata,
+                                            makeHeuristicCE(),
+                                            makeHeuristicCE(),
+                                            makeCostEstimator(getTestCostModel()),
+                                            defaultConvertPathToInterval,
+                                            defaultConvertPathToInterval,
+                                            DebugInfo::kDefaultForProd,
+                                            {._sqrtSampleSizeEnabled = false}};
 
     // Used to record the sampling plans.
     ABTVector nodes;
@@ -300,9 +297,9 @@ TEST_F(NodeSBE, SampleTwoPredicatesAtOnceTest) {
         "|   Const [1]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
-        "|   LimitSkip [limit: 200, skip: 0]\n"
+        "|   LimitSkip [limit: 100, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, test]\n"
-        "LimitSkip [limit: 5, skip: 0]\n"
+        "LimitSkip [limit: 10, skip: 0]\n"
         "PhysicalScan [{'<rid>': rid_0}, test]\n",
         nodes.front());
 
@@ -327,9 +324,9 @@ TEST_F(NodeSBE, SampleTwoPredicatesAtOnceTest) {
         "|   Const [1]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
-        "|   LimitSkip [limit: 200, skip: 0]\n"
+        "|   LimitSkip [limit: 100, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, test]\n"
-        "LimitSkip [limit: 5, skip: 0]\n"
+        "LimitSkip [limit: 10, skip: 0]\n"
         "PhysicalScan [{'<rid>': rid_0}, test]\n",
         nodes.at(1));
 
@@ -354,9 +351,9 @@ TEST_F(NodeSBE, SampleTwoPredicatesAtOnceTest) {
         "|   Const [1]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
-        "|   LimitSkip [limit: 200, skip: 0]\n"
+        "|   LimitSkip [limit: 100, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, test]\n"
-        "LimitSkip [limit: 5, skip: 0]\n"
+        "LimitSkip [limit: 10, skip: 0]\n"
         "PhysicalScan [{'<rid>': rid_0}, test]\n",
         nodes.at(2));
 }

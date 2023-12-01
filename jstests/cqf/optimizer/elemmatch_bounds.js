@@ -12,10 +12,13 @@ import {getPlanSkeleton} from "jstests/libs/optimizer_utils.js";
 const coll = db.cqf_elemmatch_bounds;
 coll.drop();
 let id = 0;
-let docs = [];
+let docsA = [];
+let docsB = [];
+let docsC = [];
 const numDuplicates = 100;
+
 for (let i = 0; i < numDuplicates; ++i) {
-    docs = docs.concat([
+    docsA = docsA.concat([
         // Each 'a' is an object, not an array.
         // Each 'c' is the same as 'a.b', which is a mixture of scalars/arrays.
         {_id: id++, a: {b: [1, 2, 3]}, c: [1, 2, 3]},
@@ -42,15 +45,22 @@ for (let i = 0; i < numDuplicates; ++i) {
 for (let i = 0; i < numDuplicates; ++i) {
     // Generate more docs where 'Get c Traverse Traverse Eq 2' but not 'Get c Traverse PathArr'.
     for (let j = 0; j < 10; ++j)
-        docs = docs.concat([
+        docsB = docsB.concat([
             {_id: id++, c: 2},
         ]);
 }
 for (let i = 0; i < numDuplicates; ++i) {
     // Generate non-matching docs to discourage collection scan.
-    assert.commandWorked(coll.insert(Array.from({length: 100}, () => ({_id: id++}))));
+    docsC = docsC.concat(Array.from({length: 100}, () => ({_id: id++})));
 }
-assert.commandWorked(coll.insert(docs));
+
+// Distribute interesting documents to encourage IndexScan when sampling in chunks.
+for (let i = 0; i < 500; i++) {
+    // Combine the selected elements into a new list
+    assert.commandWorked(coll.insertMany(docsA.splice(0, 3)));
+    assert.commandWorked(coll.insertMany(docsB.splice(0, 2)));
+    assert.commandWorked(coll.insertMany(docsC.splice(0, 20)));
+}
 
 assert.commandWorked(coll.createIndex({'a.b': 1}));
 assert.commandWorked(coll.createIndex({'c': 1}));

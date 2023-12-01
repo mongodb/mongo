@@ -11,7 +11,7 @@
 // where agg execution differs from query. It also includes confirmation that hint works for find
 // command against views, which is converted to a hinted aggregation on execution.
 
-import {getAggPlanStage, getPlanStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getOptimizer, getPlanStage} from "jstests/libs/analyze_plan.js";
 
 const testDB = db.getSiblingDB("agg_hint");
 assert.commandWorked(testDB.dropDatabase());
@@ -22,11 +22,27 @@ const view = testDB.getCollection(viewName);
 
 function confirmWinningPlanUsesExpectedIndex(
     explainResult, expectedKeyPattern, stageName, pipelineOptimizedAway) {
-    const planStage = pipelineOptimizedAway ? getPlanStage(explainResult, stageName)
-                                            : getAggPlanStage(explainResult, stageName);
-    assert.neq(null, planStage);
+    const optimizer = getOptimizer(explainResult);
 
-    assert.eq(planStage.keyPattern, expectedKeyPattern, tojson(planStage));
+    if (!(optimizer in stageName) || stageName[optimizer] === "") {
+        // TODO SERVER-77719: Ensure that the expected operator is defined for all optimizers. There
+        // should be an exception here.
+        return;
+    }
+
+    const planStage = pipelineOptimizedAway ? getPlanStage(explainResult, stageName[optimizer])
+                                            : getAggPlanStage(explainResult, stageName[optimizer]);
+
+    switch (optimizer) {
+        case "classic":
+            assert.neq(null, planStage);
+            assert.eq(planStage.keyPattern, expectedKeyPattern, tojson(planStage));
+            break;
+        case "CQF":
+            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+            break;
+    }
 }
 
 // Runs explain on 'command', with the hint specified by 'hintKeyPattern' when not null.
@@ -37,7 +53,10 @@ function confirmCommandUsesIndex({
     command = null,
     hintKeyPattern = null,
     expectedKeyPattern = null,
-    stageName = "IXSCAN",
+    stageName = {
+        "classic": "IXSCAN",
+        "CQF": "IndexScan"
+    },
     pipelineOptimizedAway = false
 } = {}) {
     if (hintKeyPattern) {
@@ -60,7 +79,10 @@ function confirmAggUsesIndex({
     aggPipeline = [],
     hintKeyPattern = null,
     expectedKeyPattern = null,
-    stageName = "IXSCAN",
+    stageName = {
+        "classic": "IXSCAN",
+        "CQF": "IndexScan"
+    },
     pipelineOptimizedAway = false
 } = {}) {
     let options = {};
@@ -248,16 +270,18 @@ for (let i = 0; i < 5; ++i) {
 }
 assert.commandWorked(testDB.createView(viewName, collName, []));
 
+// TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+// optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
 confirmCommandUsesIndex({
     command: {count: view.getName(), query: {x: 3}},
     expectedKeyPattern: {x: 1},
-    stageName: "COUNT_SCAN"
+    stageName: {"classic": "COUNT_SCAN", "CQF": ""}
 });
 confirmCommandUsesIndex({
     command: {count: view.getName(), query: {x: 3}},
     hintKeyPattern: {x: 1},
     expectedKeyPattern: {x: 1},
-    stageName: "COUNT_SCAN"
+    stageName: {"classic": "COUNT_SCAN", "CQF": ""}
 });
 confirmCommandUsesIndex({
     command: {count: view.getName(), query: {x: 3}},

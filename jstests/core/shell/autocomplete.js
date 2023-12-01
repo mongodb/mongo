@@ -1,8 +1,8 @@
 /**
  * Validate auto complete works for various javascript types implemented by C++.
  * @tags: [
- * # TODO SERVER-77024 enable on sharded passthrough suites when orphans hook will be supported
- *   assumes_unsharded_collection,
+ *   # TODO SERVER-77024: Shell collection creation are broken when name is a js property identifier
+ *   assumes_no_implicit_collection_creation_on_get_collection
  * ]
  */
 

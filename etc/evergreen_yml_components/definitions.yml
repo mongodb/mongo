@@ -5,13 +5,6 @@
 # Any global task, function, or taskgroup definition can be added here. Note that if
 # the definition is added to another file, YAML anchors from this file can't be used.
 
-command_type: system
-exec_timeout_secs: 21600  # 6 hours.
-oom_tracker: true
-pre_error_fails_task: true
-stepback: true
-
-
 # Files that match an ignore-list pattern will not trigger a build, if they're the only modified
 # files in the patch.
 ignore:
@@ -27,91 +20,6 @@ ignore:
 - "!/etc/evergreen.yml"
 - "README"
 
-
-## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
-parameters:
-- key: patch_compile_flags
-  description: "Additional SCons flags to be applied during scons compile invocations in this patch"
-
-- key: future_git_tag
-  description: "Future git tag to be added. If empty, we will use the most recent git tag instead."
-
-- key: last_lts_evg_version_id
-  description: "The Evergreen Version ID of the last-lts MongoDB binaries. Only binaries from release variants are used"
-
-- key: last_continuous_evg_version_id
-  description: "The Evergreen Version ID of the last-continuous MongoDB binaries. Only binaries from release variants are used"
-
-- key: antithesis_image_tag
-  description: "The docker tag to use when pushing images to Antithesis"
-
-- key: build_patch_id
-  description: "Patch id of evergreen patch to pull binaries from for testing."
-
-## Cron parameters.
-- key: project_required_suggested_cron
-  value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
-  description: "Cron schedule for required and suggested variants"
-- key: project_nightly_cron
-  value: "0 4 * * *" # Every day starting at 0400 UTC
-  description: "Cron schedule for nightly variants"
-- key: project_weekly_cron
-  value: "0 4 * * 0" # Every week starting 0400 UTC Sunday
-  description: "Cron schedule for nightly variants"
-
-
-#######################################
-#               Modules               #
-#######################################
-# if a module is added and to be added to the manifest
-# be sure to add the module to git.get_project revisions parameter
-modules:
-- name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
-  branch: master
-
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
-
-- name: dsi
-  repo: git@github.com:10gen/dsi.git
-  prefix: ${workdir}/src
-  branch: master
-- name: genny
-  repo: git@github.com:10gen/genny.git
-  prefix: ${workdir}/src
-  branch: master
-- name: workloads
-  repo: git@github.com:10gen/workloads.git
-  prefix: ${workdir}/src
-  branch: master
-- name: linkbench
-  repo: git@github.com:10gen/linkbench.git
-  prefix: ${workdir}/src
-  branch: master
-- name: linkbench2
-  repo: git@github.com:10gen/linkbench2.git
-  prefix: ${workdir}/src
-  branch: master
-- name: tsbs
-  repo: git@github.com:mongodb-forks/tsbs.git
-  prefix: ${workdir}/src
-  branch: main
-- name: YCSB
-  repo: git@github.com:mongodb-labs/YCSB.git
-  prefix: ${workdir}/src
-  branch: production
-- name: flamegraph
-  repo: git@github.com:mongodb-forks/flamegraph.git
-  prefix: ${workdir}/src
-  branch: master
-- name: PrivateWorkloads
-  repo: git@github.com:10gen/PrivateWorkloads.git
-  prefix: ${workdir}/src
-  branch: production
 
 #######################################
 #             Variable                #
@@ -239,7 +147,7 @@ variables:
 
 - &compile_bazel_task_group_template
   name: compile_bazel_task_group_template
-  max_hosts: 1
+  max_hosts: -1
   tasks: []
   setup_group_can_fail_task: true
   setup_group:
@@ -254,6 +162,7 @@ variables:
   - func: "f_expansions_write"
   - func: "set up credentials"
   - func: "f_expansions_write"
+  - func: "get engflow creds"
 
 
 - &compile_task_group_template
@@ -272,6 +181,7 @@ variables:
   - func: "attach report"
   - func: "attach artifacts"
   - func: "attach local resmoke invocation"
+  - func: "attach multiversion download links"
   - func: "kill processes"
   - func: "save mongo coredumps"
   - func: "generate hang analyzer tasks"
@@ -544,6 +454,27 @@ functions:
       bucket: mciuploads
       extract_to: "."
 
+  "get engflow creds": &get_engflow_creds
+  - command: s3.get
+    params:
+      aws_key: ${engflow_key}
+      aws_secret: ${engflow_secret}
+      remote_file: engflow/engflow.key
+      bucket: serverengflow
+      local_file: "src/engflow.key"
+  - command: s3.get
+    params:
+      aws_key: ${engflow_key}
+      aws_secret: ${engflow_secret}
+      remote_file: engflow/engflow.cert
+      bucket: serverengflow
+      local_file: "src/engflow.cert"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/generate_evergreen_engflow_bazelrc.sh"
+
   "adjust venv": &adjust_venv
     command: subprocess.exec
     params:
@@ -636,6 +567,7 @@ functions:
       bucket: fuzzer-artifacts
       extract_to: src/corpora
       remote_file: ${mongo_fuzzer_corpus}
+      optional: true
 
   "archive new corpus": &archive_new_corpus
     command: archive.targz_pack
@@ -1447,6 +1379,17 @@ functions:
       args:
       - "src/evergreen/bazel_compile.sh"
 
+  "bazel compile (msvc)":
+  - *get_version_expansions
+  - *apply_version_expansions
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/bazel_compile.sh"
+
   "bazel run":
   - *get_version_expansions
   - *apply_version_expansions
@@ -1647,60 +1590,6 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/jepsen_docker/cleanup.sh"
-
-  "f_dsi_pre_run":
-  - command: manifest.load
-  - command: expansions.update
-    params:
-      updates: []
-
-  "f_dsi_post_run":
-  - command: shell.exec
-    params:
-      script: ./src/dsi/run-dsi post_run
-  - command: perf.send
-    params:
-      file: ./build/CedarReports/cedar_report.json
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      bucket: genny-metrics
-      region: us-east-1
-      prefix: ${task_id}_${execution}
-  - command: attach.results
-    params:
-      file_location: ./build/EvergreenResultsJson/results.json
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: ./build/Artifacts/DSIArtifacts.tgz
-      remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/dsi-artifacts-${task_name}-${build_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/x-gzip
-      display_name: DSI Artifacts - Execution ${execution}
-  # TODO: https://jira.mongodb.org/browse/EVG-21107
-  #  - command: s3.put
-  #     params:
-  #       aws_key: ${aws_key}
-  #       aws_secret: ${aws_secret}
-  #       local_file: ./build/Documentation/index.html
-  #       remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}-index.html
-  #       bucket: mciuploads
-  #       permissions: public-read
-  #       content_type: text/html
-  #       display_name: Documentation
-  # TODO https://jira.mongodb.org/browse/PERF-4829
-  #   - command: s3.put
-  #     params:
-  #       aws_key: ${aws_key}
-  #       aws_secret: ${aws_secret}
-  #       local_file: bootstrap.yml
-  #       remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/bootstrap-${task_name}-${build_id}-${execution}.yml
-  #       bucket: mciuploads
-  #       permissions: public-read
-  #       content_type: text/plain
-  #       display_name: Task Bootstrap Config
 
   "run jepsen test":
   - *f_expansions_write
@@ -2729,6 +2618,19 @@ functions:
       content_type: text/plain
       display_name: Resmoke.py Invocation for Local Usage
 
+  "attach multiversion download links":
+    command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/multiversion-downloads.json
+      remote_file: ${project}/${build_variant}/${revision}/multiversion-downloads-${task_id}-${execution}.json
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/json
+      display_name: Multiversion download links
+
   "attach multiversion exclude tags":
     command: s3.put
     params:
@@ -2750,49 +2652,6 @@ functions:
       args:
       - "./src/evergreen/antithesis_image_build_and_push.sh"
 
-# Pre task steps
-pre:
-- func: "set task expansion macros"
-- func: "f_expansions_write"
-- func: "f_dsi_pre_run"
-
-# Post task steps
-post:
-- func: "f_expansions_write"
-- func: "upload npm logs"
-- func: "attach local resmoke invocation"
-- func: "attach multiversion exclude tags"
-- func: "attach report"
-- func: "attach task errors"
-- func: "attach artifacts"
-- func: "save ec2 task artifacts"
-- func: "attach wiki page"
-- func: "upload docker compose"
-- func: "upload jstestfuzz minimized output"
-- func: "kill processes"
-- func: "save local client logs"
-- func: "save jepsen artifacts"
-- func: "save blackduck artifacts"
-- func: "save mongo coredumps"
-- func: "generate hang analyzer tasks"
-- func: "save failed unittests"
-- func: "save hang analyzer debugger files"
-- func: "save disk statistics"
-- func: "save system resource information"
-- func: "save UndoDB recordings"
-- func: "umount shared scons directory"
-- func: "umount tmp directory"
-- func: "cleanup FUSE watchdog"
-- func: "cleanup environment"
-- func: "cleanup jepsen docker test"
-- func: "f_dsi_post_run"
-
-# Timeout steps
-timeout:
-- func: "f_expansions_write"
-- func: "run hang analyzer"
-- func: "wait for resmoke to shutdown"
-
 
 #######################################
 #               Tasks                 #
@@ -2800,7 +2659,8 @@ timeout:
 tasks:
 
 ## compile - build all scons targets except unittests ##
-- name: compile_dist_test
+- &compile_dist_test
+  name: compile_dist_test
   tags: []
   depends_on:
   - name: version_expansions_gen
@@ -2813,6 +2673,11 @@ tasks:
         ${additional_compile_targets|}
       task_compile_flags: >-
         PREFIX=dist-test
+
+- <<: *compile_dist_test
+  name: compile_dist_test_future_git_tag_multiversion
+  depends_on:
+  - name: version_expansions_future_git_tag_multiversion_gen
 
 ## compile - build bazel targets ##
 ## The bazel migration is in progress & this
@@ -2830,11 +2695,10 @@ tasks:
     vars:
       targets: >-
         build/fast/mongo/db/commands/libfsync_locked.a
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
+        build/fast/mongo/db/commands/libtest_commands_enabled.a
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS=--config=local
         ICECC=
         --build-profile=fast
         --ninja=disabled
@@ -2864,11 +2728,10 @@ tasks:
     vars:
       targets: >-
         build/fast/mongo/db/commands/fsync_locked.lib
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
+        build/fast/mongo/db/commands/test_commands_enabled.lib
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS=--config=local
         ICECC=
         --build-profile=fast
         --ninja=disabled
@@ -2877,6 +2740,34 @@ tasks:
   - func: "verify build output present"
     vars:
       output: build/fast/mongo/db/commands/fsync_locked.lib
+
+- name: compile_bazel_dist_test_macos
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
+  - func: "fetch bazel"
+  - func: "scons compile"
+    vars:
+      targets: >-
+        build/fast/mongo/db/commands/libfsync_locked.a
+        build/fast/mongo/db/commands/libtest_commands_enabled.a
+      # MacOS needs the sandbox_writable_path set to tmpdir to allow the bazel sandbox to write to /data/mci/{id}/tmp
+      task_compile_flags: >-
+        BAZEL_BUILD_ENABLED=1
+        BAZEL_INTEGRATION_DEBUG=1
+        BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug --sandbox_writable_path=$TMPDIR"
+        ICECC=
+        --build-profile=fast
+        --ninja=disabled
+        --link-model=static
+        --modules=
+  - func: "verify build output present"
+    vars:
+      output: build/fast/mongo/db/commands/libfsync_locked.a
+
 
 # Validates that the bazel mongo toolchain can be used to compile targets that
 # contain C and asssembly source code files.
@@ -2909,11 +2800,9 @@ tasks:
     vars:
       targets: >-
         build/fast/third_party/unwind/libunwind.a
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS=--config=local
         ICECC=
         --build-profile=fast
         --ninja=disabled
@@ -2937,11 +2826,9 @@ tasks:
       targets: >-
         build/fast/mongo/platform/visibility_test1
       separate_debug: off
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS=--config=local
         ICECC=
         --build-profile=fast
         --ninja=disabled
@@ -2964,9 +2851,6 @@ tasks:
     vars:
       target: >-
         //src/mongo/platform:visibility_test1
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
-      args: >-
-        --config=local
 
 - name: run_bazel_program_windows
   tags: []
@@ -2980,14 +2864,9 @@ tasks:
     vars:
       target: >-
         //src/mongo/platform:visibility_test1
-      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       # TODO DEVPROD-2508 remove dbg flags when compilation_mode is synced with build_mode automatically
       # TODO DEVPROD-2513 remove "--copt /std:c++20" flag when toolchain sets this automatically
       args: >-
-        --config=local
-        --host_platform=@mongo_toolchain//:windows_amd64_msvc
-        --platforms=@mongo_toolchain//:windows_amd64_msvc
-        --//bazel/config:compiler_type=msvc
         --compilation_mode=dbg
         --//bazel/config:build_mode=dbg
         --copt /std:c++20
@@ -3048,7 +2927,8 @@ tasks:
       args:
       - "src/evergreen/gen_patch_test_tags.sh"
 
-- name: archive_dist_test
+- &archive_dist_test
+  name: archive_dist_test
   tags: []
   depends_on:
   - name: compile_dist_test
@@ -3059,15 +2939,7 @@ tasks:
         archive-dist-test
       task_compile_flags: >-
         PREFIX=dist-test
-  - command: subprocess.exec
-    params:
-      binary: bash
-      add_expansions_to_env: true
-      args:
-      - "src/evergreen/run_python_script.sh"
-      - "evergreen/macos_notary.py"
-      - "mongodb-binaries.${ext|tgz}"
-
+      sign_macos_archive: true
   - command: s3.put
     params:
       optional: true
@@ -3154,7 +3026,13 @@ tasks:
       content_type: application/tar
       display_name: Python venv (see included venv_readme.txt)
 
-- name: archive_dist_test_debug
+- <<: *archive_dist_test
+  name: archive_dist_test_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dist_test_future_git_tag_multiversion
+
+- &archive_dist_test_debug
+  name: archive_dist_test_debug
   tags: []
   depends_on:
   - name: archive_dist_test
@@ -3167,6 +3045,11 @@ tasks:
         PREFIX=dist-test
 
   - func: "upload debugsymbols"
+
+- <<: *archive_dist_test_debug
+  name: archive_dist_test_debug_future_git_tag_multiversion
+  depends_on:
+  - name: archive_dist_test_future_git_tag_multiversion
 
 - name: compile_ninja
   tags: []
@@ -3276,7 +3159,6 @@ tasks:
         --build-profile=fast
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS=--config=local
         CCACHE=
         ICECC=
   - *f_expansions_write
@@ -3438,7 +3320,8 @@ tasks:
       display_name: Libdeps Graph Data
 
 ## compile_all - build all scons targets ##
-- name: compile_all
+- &compile_all
+  name: compile_all
   tags: []
   depends_on:
   - name: compile_dist_test
@@ -3447,6 +3330,11 @@ tasks:
     vars:
       targets: install-all-meta
       compiling_for_test: true
+
+- <<: *compile_all
+  name: compile_all_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dist_test_future_git_tag_multiversion
 
 - name: compile_all_but_not_unittests
   tags: []
@@ -3498,6 +3386,11 @@ tasks:
       targets: install-unittests install-unittests-debug
       compiling_for_test: true
 
+- <<: *compile_unittests
+  name: compile_unittests_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dist_test_future_git_tag_multiversion
+
 - name: build_metrics_tasks_gen
   depends_on:
   - name: version_expansions_gen
@@ -3540,7 +3433,8 @@ tasks:
   name: compile_unittests_for_recorded_unittest
 
 ## run_unittests ##
-- name: run_unittests
+- &run_unittests
+  name: run_unittests
   tags: []
   depends_on:
   - name: compile_unittests
@@ -3554,6 +3448,11 @@ tasks:
     vars:
       suite: unittests
       install_dir: build/install/bin
+
+- <<: *run_unittests
+  name: run_unittests_future_git_tag_multiversion
+  depends_on:
+  - name: compile_unittests_future_git_tag_multiversion
 
 ## pretty_printer ##
 - <<: *task_template
@@ -3588,7 +3487,6 @@ tasks:
       - "--extraction-command=${decompress}"
       - "--change-dir=build/install/"
       - "--move-output=build/install/dist-test/pretty_printer_tests.txt:build/"
-    optional: true
   - func: "run tests"
     vars:
       suite: pretty-printer-tests
@@ -3653,6 +3551,7 @@ tasks:
 - name: fetch_and_run_libfuzzertests
   tags: []
   commands:
+  - func: "fetch corpus"
   - func: "run tests"
     vars:
       suite: libfuzzer
@@ -3686,7 +3585,8 @@ tasks:
   - func: "run tests"
 
 ## compile_dbtest ##
-- name: compile_dbtest
+- &compile_dbtest
+  name: compile_dbtest
   tags: []
   depends_on:
   - name: compile_dist_test
@@ -3696,8 +3596,14 @@ tasks:
       targets: install-dbtest install-dbtest-debug
       compiling_for_test: true
 
+- <<: *compile_dbtest
+  name: compile_dbtest_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dist_test_future_git_tag_multiversion
+
 ## run_dbtest ##
-- name: run_dbtest
+- &run_dbtest
+  name: run_dbtest
   tags: []
   depends_on:
   - name: compile_dbtest
@@ -3712,7 +3618,13 @@ tasks:
       suite: dbtest
       install_dir: build/install/bin
 
-- name: archive_dbtest
+- <<: *run_dbtest
+  name: run_dbtest_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dbtest_future_git_tag_multiversion
+
+- &archive_dbtest
+  name: archive_dbtest
   tags: []
   depends_on:
   - name: compile_dbtest
@@ -3721,6 +3633,11 @@ tasks:
     vars:
       targets: archive-dbtest archive-dbtest-debug
       compiling_for_test: true
+
+- <<: *archive_dbtest
+  name: archive_dbtest_future_git_tag_multiversion
+  depends_on:
+  - name: compile_dbtest_future_git_tag_multiversion
 
 - name: compile_integration_test
   tags: []
@@ -5589,6 +5506,16 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
+- <<: *gen_task_template
+  name: aggregation_unsplittable_collections_on_random_shard_passthrough
+  # TODO SERVER-83445 Enable on non-all-feature-flag variants.
+  tags: ["unsplittable_collections"]
+  depends_on:
+  - name: aggregation
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
 - <<: *task_template
   name: aggregation_column_store_index_passthrough
   # TODO SERVER-75026 Remove the 'feature_flag_guarded' tag and ensure this suite is run on all
@@ -5649,7 +5576,8 @@ tasks:
   - func: "upload pip requirements"
   - func: "generate version burn in"
 
-- name: version_expansions_gen
+- &version_expansions_gen
+  name: version_expansions_gen
   commands:
   - command: manifest.load
   - *git_get_project
@@ -5661,6 +5589,9 @@ tasks:
   - func: "upload pip requirements"
   - func: "generate and upload version expansions"
   - func: "generate and upload resmoke constants"
+
+- <<: *version_expansions_gen
+  name: version_expansions_future_git_tag_multiversion_gen
 
 - <<: *gen_task_template
   name: auth_audit_gen
@@ -6522,6 +6453,13 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
+  name: unsplittable_collections_created_on_any_shard_jscore_passthrough_gen
+  # TODO SERVER-83445 Enable on non-all-feature-flag variants.
+  tags: ["unsplittable_collections"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
   name: sharded_collections_jscore_passthrough_with_auto_bootstrap_gen
   tags: ["sharding", "jscore"]
   commands:
@@ -6543,6 +6481,12 @@ tasks:
 - <<: *gen_task_template
   name: sharding_jscore_passthrough_gen
   tags: ["sharding", "jscore", "common"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: embedded_router_jscore_passthrough_gen
+  tags: []
   commands:
   - func: "generate resmoke tasks"
 
@@ -6722,6 +6666,7 @@ tasks:
     - func: "generate resmoke tasks"
       vars:
         use_large_distro: "true"
+        resmoke_jobs_max: 1
 
 - <<: *gen_task_template
   name: shard_split_jscore_passthrough_gen
@@ -6900,23 +6845,7 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
-  name: native_tenant_data_isolation_with_dollar_tenant_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multitenancy_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multitenancy_dollar_tenant_with_expect_prefix_jscore_passthrough_gen
+  name: multitenancy_with_mongoq_unsigned_token_jscore_passthrough_gen
   tags: ["serverless"]
   commands:
   - func: "generate resmoke tasks"
@@ -6925,6 +6854,14 @@ tasks:
 
 - <<: *gen_task_template
   name: multitenancy_with_atlas_proxy_jscore_passthrough_gen
+  tags: ["serverless"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: concurrency_multitenancy_replication_with_atlas_proxy_gen
   tags: ["serverless"]
   commands:
   - func: "generate resmoke tasks"
@@ -7303,12 +7240,11 @@ tasks:
     vars:
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_simultaneous_replication_wiredtiger_cursor_sweeps
-  tags: ["concurrency", "repl", "cursor_sweeps"]
+- <<: *gen_task_template
+  name: concurrency_simultaneous_replication_wiredtiger_cursor_sweeps_gen
+  tags: ["concurrency", "large", "repl", "cursor_sweeps", "random_name"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
       resmoke_jobs_max: 1
 
@@ -8195,14 +8131,7 @@ tasks:
         ${additional_package_targets|}
       task_compile_flags: >-
         --legacy-tarball
-  - command: subprocess.exec
-    params:
-      binary: bash
-      add_expansions_to_env: true
-      args:
-      - "src/evergreen/run_python_script.sh"
-      - "evergreen/macos_notary.py"
-      - "mongodb-dist.${ext|tgz}"
+      sign_macos_archive: true
   - func: "f_expansions_write"
   - command: subprocess.exec
     params:
@@ -9480,7 +9409,11 @@ task_groups:
   tasks:
   - compile_bazel_dist_test_windows
   - run_bazel_program_windows
-  - compile_ninja_bazel
+
+- <<: *compile_bazel_task_group_template
+  name: compile_bazel_macos_TG
+  tasks:
+  - compile_bazel_dist_test_macos
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG
@@ -9604,28 +9537,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_archive_and_run_libfuzzertests_TG
-  setup_group_can_fail_task: false
-  setup_group:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  - func: "kill processes"
-  - func: "cleanup environment"
-  # The python virtual environment is installed in ${workdir}, which is created in
-  # "set up venv".
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "f_expansions_write"
-  - func: "configure evergreen api credentials"
-  - func: "get buildnumber"
-  - func: "f_expansions_write"
-  - func: "set up credentials"
-  - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"
-  - func: "f_expansions_write"
-  - func: "fetch corpus"
   tasks:
   - compile_and_archive_libfuzzertests
   - fetch_and_run_libfuzzertests
@@ -9642,6 +9553,19 @@ task_groups:
   - run_dbtest
   - archive_dbtest
   - compile_all
+
+- <<: *compile_task_group_template
+  name: compile_test_serial_future_git_tag_multiversion_TG
+  tasks:
+  - compile_dist_test_future_git_tag_multiversion
+  - archive_dist_test_future_git_tag_multiversion
+  - archive_dist_test_debug_future_git_tag_multiversion
+  - compile_unittests_future_git_tag_multiversion
+  - run_unittests_future_git_tag_multiversion
+  - compile_dbtest_future_git_tag_multiversion
+  - run_dbtest_future_git_tag_multiversion
+  - archive_dbtest_future_git_tag_multiversion
+  - compile_all_future_git_tag_multiversion
 
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_TG

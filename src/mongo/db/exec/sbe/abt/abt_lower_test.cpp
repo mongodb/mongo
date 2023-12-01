@@ -156,9 +156,8 @@ protected:
 
         Metadata md(scanDefs);
         auto planStage =
-            SBENodeLowering{
-                env, *runtimeEnv, *ids, inputParamToSlotMap, md, _nodeMap, ScanOrder::Forward}
-                .optimize(n, map, ridSlot);
+            SBENodeLowering{env, *runtimeEnv, *ids, inputParamToSlotMap, md, _nodeMap}.optimize(
+                n, map, ridSlot);
         sbe::DebugPrinter printer;
         stream << stripUUIDs(printer.print(*planStage)) << std::endl;
 
@@ -215,7 +214,8 @@ protected:
                               exists,
                               ce,
                               shardingMetadata,
-                              indexPathOccurrences);
+                              indexPathOccurrences,
+                              ScanOrder::Forward /* scanOrder */);
     }
 
     // Does not add the node to the Node map, must be called inside '_node()'.

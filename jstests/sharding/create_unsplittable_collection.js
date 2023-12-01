@@ -11,6 +11,15 @@
  */
 
 const kDbName = "test";
+const kTimeseriesColl = 'timeseriesColl';
+const kTimeseriesColl2 = 'timeseriesColl2';
+const kTimeseriesColl3 = 'timeseriesColl3';
+const kNss = kDbName + '.' + kTimeseriesColl;
+const kNss2 = kDbName + '.' + kTimeseriesColl2;
+const kNss3 = kDbName + '.' + kTimeseriesColl3;
+const kBucketNss = kDbName + '.system.buckets.' + kTimeseriesColl;
+const kBucketNss2 = kDbName + '.system.buckets.' + kTimeseriesColl2;
+const kBucketNss3 = kDbName + '.system.buckets.' + kTimeseriesColl3;
 
 const st = new ShardingTest({shards: 2});
 const mongos = st.s;
@@ -52,6 +61,40 @@ jsTest.log('Check that shardCollection won\'t generate an unsplittable collectio
 
     let shardedColl = mongos.getDB('config').collections.findOne({_id: kNssSharded});
     assert.eq(shardedColl.unsplittable, undefined);
+}
+
+jsTest.log('Running command to create a timeseries collection');
+{
+    assert.commandWorked(st.s.getDB(kDbName).runCommand(
+        {createUnsplittableCollection: kTimeseriesColl, timeseries: {timeField: 'time'}}));
+    const collMetadata = st.s.getCollection('config.collections').findOne({_id: kBucketNss});
+    assert.eq(1, st.s.getCollection('config.chunks').countDocuments({uuid: collMetadata.uuid}));
+}
+
+jsTest.log('Create a timeseries collection with a meta field');
+{
+    assert.commandWorked(st.s.getDB(kDbName).runCommand({
+        createUnsplittableCollection: kTimeseriesColl2,
+        timeseries: {timeField: 'time', metaField: 'tag'}
+    }));
+    const collMetadata = st.s.getCollection('config.collections').findOne({_id: kBucketNss2});
+    assert.eq(1, st.s.getCollection('config.chunks').countDocuments({uuid: collMetadata.uuid}));
+}
+
+jsTest.log('Shard an unexistent timeseries collection');
+{
+    assert.commandWorked(st.s.adminCommand(
+        {shardCollection: kNss3, key: {time: 1}, timeseries: {timeField: 'time'}}));
+    const collMetadata = st.s.getCollection('config.collections').findOne({_id: kBucketNss3});
+    assert.eq(1, st.s.getCollection('config.chunks').countDocuments({uuid: collMetadata.uuid}));
+}
+
+jsTest.log('Shard an unsplittable timeseries collection');
+{
+    assert.commandWorked(st.s.adminCommand(
+        {shardCollection: kNss, key: {time: 1}, timeseries: {timeField: 'time'}}));
+    const collMetadata = st.s.getCollection('config.collections').findOne({_id: kBucketNss});
+    assert.eq(1, st.s.getCollection('config.chunks').countDocuments({uuid: collMetadata.uuid}));
 }
 
 st.stop();

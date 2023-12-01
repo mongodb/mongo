@@ -135,6 +135,11 @@ public:
         // The exact host on which the remote command was run. Is unset if the shard could not be
         // found or no shard hosts matching the readPreference could be found.
         boost::optional<HostAndPort> shardHostAndPort;
+
+        /**
+         * Returns the effective status of the response sent by the server.
+         */
+        static Status getEffectiveStatus(const AsyncRequestsSender::Response& response);
     };
 
     typedef stdx::unordered_map<ShardId, HostAndPort> ShardHostMap;

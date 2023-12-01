@@ -45,9 +45,9 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
@@ -518,7 +518,7 @@ ReshardingDonorOplogId ReshardingDataReplication::getOplogFetcherResumeId(
     const UUID& reshardingUUID,
     const NamespaceString& oplogBufferNss,
     Timestamp minFetchTimestamp) {
-    invariant(!opCtx->lockState()->isLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     AutoGetCollection coll(opCtx, oplogBufferNss, MODE_IS);
     if (coll) {

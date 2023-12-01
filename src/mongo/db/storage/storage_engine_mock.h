@@ -180,7 +180,7 @@ public:
     }
     void startTimestampMonitor() final {}
 
-    void checkpoint(OperationContext* opCtx) final {}
+    void checkpoint() final {}
 
     StorageEngine::CheckpointIteration getCheckpointIteration() const final {
         return StorageEngine::CheckpointIteration{0};
@@ -229,6 +229,12 @@ public:
     }
 
     void dump() const final {}
+
+    Status autoCompact(OperationContext* opCtx,
+                       bool enable,
+                       boost::optional<int64_t> freeSpaceTargetMB) final {
+        return Status::OK();
+    }
 };
 
 }  // namespace mongo

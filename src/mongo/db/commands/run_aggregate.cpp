@@ -74,7 +74,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
@@ -82,6 +81,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -100,6 +100,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cqf_command_utils.h"
+#include "mongo/db/query/cqf_fast_paths.h"
 #include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
@@ -124,7 +125,6 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -143,7 +143,9 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -804,6 +806,62 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
     return execs;
 }
 
+ScopedSetShardRole setShardRole(OperationContext* opCtx,
+                                const NamespaceString& underlyingNss,
+                                const NamespaceString& viewNss,
+                                const CollectionRoutingInfo& cri) {
+    const auto optPlacementConflictTimestamp = [&]() {
+        auto originalShardVersion = OperationShardingState::get(opCtx).getShardVersion(viewNss);
+
+        // Since for requests on timeseries namespaces the ServiceEntryPoint installs shard version
+        // on the buckets collection instead of the viewNss.
+        // TODO: SERVER-80719 Remove this.
+        if (!originalShardVersion && underlyingNss.isTimeseriesBucketsCollection()) {
+            originalShardVersion =
+                OperationShardingState::get(opCtx).getShardVersion(underlyingNss);
+        }
+
+        return originalShardVersion ? originalShardVersion->placementConflictTime() : boost::none;
+    }();
+
+
+    if (cri.cm.hasRoutingTable()) {
+        const auto myShardId = ShardingState::get(opCtx)->shardId();
+
+        auto sv = cri.getShardVersion(myShardId);
+        if (optPlacementConflictTimestamp) {
+            sv.setPlacementConflictTime(*optPlacementConflictTimestamp);
+        }
+        return ScopedSetShardRole(
+            opCtx, underlyingNss, sv /*shardVersion*/, boost::none /*databaseVersion*/);
+    } else {
+        auto sv = ShardVersion::UNSHARDED();
+        if (optPlacementConflictTimestamp) {
+            sv.setPlacementConflictTime(*optPlacementConflictTimestamp);
+        }
+        return ScopedSetShardRole(opCtx,
+                                  underlyingNss,
+                                  ShardVersion::UNSHARDED() /*shardVersion*/,
+                                  cri.cm.dbVersion() /*databaseVersion*/);
+    }
+}
+
+bool canReadUnderlyingCollectionLocally(OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+    const auto myShardId = ShardingState::get(opCtx)->shardId();
+    const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+
+    const auto chunkManagerMaybeAtClusterTime =
+        atClusterTime ? ChunkManager::makeAtTime(cri.cm, atClusterTime->asTimestamp()) : cri.cm;
+
+    if (chunkManagerMaybeAtClusterTime.isSharded()) {
+        return false;
+    } else if (chunkManagerMaybeAtClusterTime.isUnsplittable()) {
+        return chunkManagerMaybeAtClusterTime.getMinKeyShardIdWithSimpleCollation() == myShardId;
+    } else {
+        return chunkManagerMaybeAtClusterTime.dbPrimary() == myShardId;
+    }
+}
+
 Status runAggregateOnView(OperationContext* opCtx,
                           const NamespaceString& origNss,
                           const AggregateCommandRequest& request,
@@ -844,15 +902,6 @@ Status runAggregateOnView(OperationContext* opCtx,
     // With the view & collation resolved, we can relinquish locks.
     resetContextFn();
 
-    // Set this operation's shard version for the underlying collection to unsharded.
-    // This is prerequisite for future shard versioning checks.
-    boost::optional<ScopedSetShardRole> scopeSetShardRole;
-    if (!serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-        scopeSetShardRole.emplace(opCtx,
-                                  resolvedView.getNamespace(),
-                                  ShardVersion::UNSHARDED() /* shardVersion */,
-                                  boost::none /* databaseVersion */);
-    };
     uassert(std::move(resolvedView),
             "Explain of a resolved view must be executed by mongos",
             !ShardingState::get(opCtx)->enabled() || !request.getExplain());
@@ -862,21 +911,60 @@ Status runAggregateOnView(OperationContext* opCtx,
     auto newCmd = aggregation_request_helper::serializeToCommandObj(newRequest);
 
     auto status{Status::OK()};
-    try {
+    if (!OperationShardingState::get(opCtx).isComingFromRouter(opCtx)) {
+        // Non sharding-aware operation.
+        // Run the translated query on the view on this node.
         status = runAggregate(opCtx, newRequest, newCmd, privileges, result, resolvedView, request);
-    } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
-        // Since we expect the view to be UNSHARDED, if we reached to this point there are
-        // two possibilities:
-        //   1. The shard doesn't know what its shard version/state is and needs to recover
-        //      it (in which case we throw so that the shard can run recovery)
-        //   2. The collection references by the view is actually SHARDED, in which case the
-        //      router must execute it
-        if (const auto staleInfo{ex.extraInfo<StaleConfigInfo>()}) {
-            uassert(std::move(resolvedView),
-                    "Resolved views on sharded collections must be executed by mongos",
-                    !staleInfo->getVersionWanted());
-        }
-        throw;
+    } else {
+        // Sharding-aware operation.
+        sharding::router::CollectionRouter router(opCtx->getServiceContext(),
+                                                  resolvedView.getNamespace());
+        status = router.route(
+            opCtx,
+            "runAggregateOnView",
+            [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                const auto readUnderlyingCollectionLocally =
+                    canReadUnderlyingCollectionLocally(opCtx, cri);
+
+                boost::optional<ScopedUnsetImplicitTimeSeriesBucketsShardRole>
+                    scopedUnsetImplicitTimeSeriesBucketsShardRole;
+                if (resolvedView.timeseries()) {
+                    scopedUnsetImplicitTimeSeriesBucketsShardRole.emplace(
+                        opCtx, resolvedView.getNamespace());
+                }
+
+                // Setup the opCtx's OperationShardingState with the expected placement versions for
+                // the underlying collection. Use the same 'placementConflictTime' from the original
+                // request, if present.
+                const auto scopedShardRole =
+                    setShardRole(opCtx, resolvedView.getNamespace(), origNss, cri);
+
+                // If the underlying collection is unsharded and is located on this shard, then we
+                // can execute the view aggregation locally. Otherwise, we need to kick-back to the
+                // router.
+                if (readUnderlyingCollectionLocally) {
+                    // Run the resolved aggregation locally.
+                    return runAggregate(
+                        opCtx, newRequest, newCmd, privileges, result, resolvedView, request);
+                } else {
+                    // Cannot execute the resolved aggregation locally. The router must do it.
+                    //
+                    // Before throwing the kick-back exception, validate the routing table
+                    // we are basing this decision on. We do so by briefly entering into
+                    // the shard-role by acquiring the underlying collection.
+                    const auto underlyingColl = acquireCollectionMaybeLockFree(
+                        opCtx,
+                        CollectionAcquisitionRequest::fromOpCtx(
+                            opCtx,
+                            resolvedView.getNamespace(),
+                            AcquisitionPrerequisites::OperationType::kRead));
+
+                    // Throw the kick-back exception.
+                    uasserted(std::move(resolvedView),
+                              "Resolved views on collections that do not exclusively live on the "
+                              "db-primary shard must be executed by mongos");
+                }
+            });
     }
 
     {
@@ -1081,7 +1169,7 @@ Status runAggregate(OperationContext* opCtx,
     // replication rollback, which at the storage layer waits for all cursors to be closed under the
     // global MODE_X lock, after having sent interrupt signals to read operations. This operation
     // must never hold open storage cursors while ignoring interrupt.
-    InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
+    InterruptibleLockGuard interruptibleLockAcquisition(shard_role_details::getLocker(opCtx));
 
     auto initContext = [&](auto_get_collection::ViewMode m) -> void {
         ctx.emplace(opCtx,
@@ -1349,16 +1437,36 @@ Status runAggregate(OperationContext* opCtx,
             optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
             const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
             auto timeBegin = Date_t::now();
-            auto maybeExec = getSBEExecutorViaCascadesOptimizer(opCtx,
-                                                                expCtx,
-                                                                nss,
-                                                                collections,
-                                                                std::move(queryHints),
-                                                                request.getHint(),
-                                                                pipeline.get());
+            auto maybeExec = [&] {
+                // If the query is eligible for a fast path, use the fast path plan instead of
+                // invoking the optimizer.
+                if (auto fastPathExec = optimizer::fast_path::tryGetSBEExecutorViaFastPath(
+                        opCtx,
+                        expCtx,
+                        nss,
+                        collections,
+                        request.getExplain().has_value(),
+                        request.getHint().has_value(),
+                        pipeline.get())) {
+                    return fastPathExec;
+                }
+
+                return getSBEExecutorViaCascadesOptimizer(opCtx,
+                                                          expCtx,
+                                                          nss,
+                                                          collections,
+                                                          std::move(queryHints),
+                                                          request.getHint(),
+                                                          pipeline.get());
+            }();
             if (maybeExec) {
-                execs.emplace_back(
-                    uassertStatusOK(makeExecFromParams(nullptr, std::move(*maybeExec))));
+                // Pass ownership of the pipeline to the executor. This is done to allow binding of
+                // parameters to use views onto the constants living in the MatchExpression (in the
+                // DocumentSourceMatch in the Pipeline), so we can avoid copying them into the SBE
+                // runtime environment. We must ensure that the MatchExpression lives at least as
+                // long as the executor.
+                execs.emplace_back(uassertStatusOK(
+                    makeExecFromParams(nullptr, std::move(pipeline), std::move(*maybeExec))));
             } else {
                 // If we had an optimization failure, only error if we're not in tryBonsai.
                 bonsaiExecSuccess = false;
@@ -1432,7 +1540,6 @@ Status runAggregate(OperationContext* opCtx,
                 cmdObj,
                 &bodyBuilder);
         }
-        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsKey));
     } else {
         auto maybePinnedCursor = executeUntilFirstBatch(
             opCtx, expCtx, request, cmdObj, privileges, origNss, extDataSrcGuard, execs, result);

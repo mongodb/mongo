@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/matcher/in_list_data.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
@@ -103,6 +104,33 @@ TEST(ConstEvalTest, FoldRedundantExists) {
 ExprHolder getParam(TypeTags typeTag) {
     return _fn(
         kParameterFunctionName, "0"_cint64, ExprHolder{Constant::int32(static_cast<int>(typeTag))});
+}
+
+TEST(ConstEvalTest, FoldIsInListDataForConstants) {
+    ABT abt = make<FunctionCall>("isInListData", makeSeq(Constant::int32(1)));
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    abt = _fn("isInListData", getParam(TypeTags::Array))._n;
+    ConstEval::constFold(abt);
+    // Can't simplify this expression because child of FunctionCall[isInListData] is not a Constant
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "FunctionCall [isInListData]\n"
+        "FunctionCall [getParam]\n"
+        "|   Const [15]\n"
+        "Const [0]\n",
+        abt);
+
+    InListData* inList = nullptr;
+    abt = make<FunctionCall>("isInListData",
+                             makeSeq(make<Constant>(TypeTags::inListData,
+                                                    sbe::value::bitcastFrom<InListData*>(inList))));
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
 }
 
 TEST(ConstEvalTest, GetParamMinKey) {
@@ -225,5 +253,48 @@ TEST(ConstEvalTest, GetParamTwoParams) {
         abt);
 }
 
+TEST(ConstEvalTest, GetParamNaN) {
+    ABT abt = _binary("Eq", _cNaN(), getParam(TypeTags::NumberInt32))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    abt = _binary("Lt", _cNaN(), getParam(TypeTags::StringSmall))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    abt = _binary("Lte", _cNaN(), getParam(TypeTags::NumberDouble))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    abt = _binary("Gt", _cNaN(), getParam(TypeTags::ObjectId))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    abt = _binary("Gte", _cNaN(), getParam(TypeTags::MinKey))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    abt = _binary("Cmp3w", getParam(TypeTags::Boolean), _cNaN())._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [1]\n",
+        abt);
+
+    abt = _binary("Cmp3w", getParam(TypeTags::NumberDecimal), _cNaN())._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [1]\n",
+        abt);
+}
 }  // namespace
 }  // namespace mongo::optimizer

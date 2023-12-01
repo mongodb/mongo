@@ -47,17 +47,31 @@ struct MakeObjSpec {
     enum class NonObjInputBehavior { kReturnNothing, kReturnInput, kNewObj };
     enum class ActionType : uint8_t { kKeep, kDrop, kValueArg, kLambdaArg, kMakeObj };
 
-    struct Keep {};
-    struct Drop {};
+    struct Keep {
+        bool operator==(const Keep& other) const = default;
+    };
+
+    struct Drop {
+        bool operator==(const Drop& other) const = default;
+    };
+
     struct ValueArg {
         size_t argIdx;
+        bool operator==(const ValueArg& other) const = default;
     };
+
     struct LambdaArg {
         size_t argIdx;
         bool returnsNothingOnMissingInput;
+        bool operator==(const LambdaArg& other) const = default;
     };
+
     struct MakeObj {
         std::unique_ptr<MakeObjSpec> spec;
+
+        bool operator==(const MakeObj& other) const {
+            return *spec == *other.spec;
+        }
     };
 
     /**
@@ -133,6 +147,11 @@ struct MakeObjSpec {
                 (isLambdaArg() && !getLambdaArg().returnsNothingOnMissingInput) ||
                 (isMakeObj() && !getMakeObjSpec()->returnsNothingOnMissingInput());
         }
+
+        bool operator==(const FieldAction& other) const = default;
+
+        template <typename H>
+        friend H AbslHashValue(H hashState, const FieldAction& fi);
 
     private:
         VariantType _data;
@@ -218,6 +237,8 @@ struct MakeObjSpec {
 
     std::string toString() const;
 
+    bool operator==(const MakeObjSpec& other) const = default;
+
     size_t getApproximateSize() const;
 
 private:
@@ -268,5 +289,42 @@ public:
 
     // Searchable vector of fields of interest.
     StringListSet fields;
+
+    template <typename H>
+    friend H AbslHashValue(H hashState, const MakeObjSpec& mos);
 };
+
+template <typename H>
+H AbslHashValue(H hashState, const MakeObjSpec& mos) {
+    hashState = H::combine(std::move(hashState), mos.fieldsScope, mos.nonObjInputBehavior);
+    if (mos.traversalDepth) {
+        hashState = H::combine(std::move(hashState), *mos.traversalDepth);
+    }
+    for (size_t i = 0; i < mos.fields.size(); i++) {
+        hashState = H::combine(std::move(hashState), mos.fields[i], mos.actions[i]);
+    }
+    return hashState;
+}
+
+template <typename H>
+H AbslHashValue(H hashState, const MakeObjSpec::FieldAction& fi) {
+    // Hash the index of the variant alternative to differentiate the different types in the hash.
+    hashState = H::combine(std::move(hashState), fi._data.index());
+
+    if (fi.isValueArg()) {
+        hashState = H::combine(std::move(hashState), fi.getValueArgIdx());
+
+    } else if (fi.isLambdaArg()) {
+        const auto& lambdaArg = fi.getLambdaArg();
+        hashState = H::combine(
+            std::move(hashState), lambdaArg.argIdx, lambdaArg.returnsNothingOnMissingInput);
+
+    } else if (fi.isMakeObj()) {
+        hashState = H::combine(std::move(hashState), *(fi.getMakeObjSpec()));
+    }
+
+    // If Keep{} or Drop{}, don't update hash state, as the variant index() will differentiate them.
+    return hashState;
+}
+
 }  // namespace mongo::sbe

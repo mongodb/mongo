@@ -49,6 +49,20 @@ kv_table::contains_any(const data_value &key, const data_value &value, timestamp
 }
 
 /*
+ * kv_table::contains_any --
+ *     Check whether the table contains the given key-value pair. If there are multiple values
+ *     associated with the given timestamp, return true if any of them match.
+ */
+bool
+kv_table::contains_any(kv_checkpoint_ptr ckpt, const data_value &key, const data_value &value) const
+{
+    const kv_table_item *item = item_if_exists(key);
+    if (item == nullptr)
+        return false;
+    return item->contains_any(ckpt, value);
+}
+
+/*
  * kv_table::get --
  *     Get the value. Return a copy of the value if is found, or NONE if not found. Throw an
  *     exception on error.
@@ -60,6 +74,20 @@ kv_table::get(const data_value &key, timestamp_t timestamp) const
     if (item == nullptr)
         return NONE;
     return item->get(timestamp);
+}
+
+/*
+ * kv_table::get --
+ *     Get the value. Return a copy of the value if is found, or NONE if not found. Throw an
+ *     exception on error.
+ */
+data_value
+kv_table::get(kv_checkpoint_ptr ckpt, const data_value &key, timestamp_t timestamp) const
+{
+    const kv_table_item *item = item_if_exists(key);
+    if (item == nullptr)
+        return NONE;
+    return item->get(ckpt, timestamp);
 }
 
 /*
@@ -83,13 +111,25 @@ kv_table::get(kv_transaction_ptr txn, const data_value &key) const
 int
 kv_table::get_ext(const data_value &key, data_value &out, timestamp_t timestamp) const
 {
-    const kv_table_item *item = item_if_exists(key);
-    if (item == nullptr) {
-        out = NONE;
-        return WT_NOTFOUND;
-    }
     try {
-        out = item->get(timestamp);
+        out = get(key, timestamp);
+        return out == NONE ? WT_NOTFOUND : 0;
+    } catch (wiredtiger_exception &e) {
+        out = NONE;
+        return e.error();
+    }
+}
+
+/*
+ * kv_table::get_ext --
+ *     Get the value and return the error code instead of throwing an exception.
+ */
+int
+kv_table::get_ext(
+  kv_checkpoint_ptr ckpt, const data_value &key, data_value &out, timestamp_t timestamp) const
+{
+    try {
+        out = get(ckpt, key, timestamp);
         return out == NONE ? WT_NOTFOUND : 0;
     } catch (wiredtiger_exception &e) {
         out = NONE;
@@ -104,13 +144,8 @@ kv_table::get_ext(const data_value &key, data_value &out, timestamp_t timestamp)
 int
 kv_table::get_ext(kv_transaction_ptr txn, const data_value &key, data_value &out) const
 {
-    const kv_table_item *item = item_if_exists(key);
-    if (item == nullptr) {
-        out = NONE;
-        return WT_NOTFOUND;
-    }
     try {
-        out = item->get(txn);
+        out = get(txn, key);
         return out == NONE ? WT_NOTFOUND : 0;
     } catch (wiredtiger_exception &e) {
         out = NONE;

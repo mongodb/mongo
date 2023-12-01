@@ -37,8 +37,8 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -108,6 +108,7 @@ template <ErrorCodes::Error ec>
  * modify that document, this exception will get thrown by one of them.
  */
 [[noreturn]] inline void throwWriteConflictException(StringData context) {
+    using namespace fmt::literals;
     error_details::throwExceptionFor<ErrorCodes::WriteConflict>(
         "Caused by :: {} :: Please retry your operation or multi-document transaction."_format(
             context));
@@ -153,7 +154,7 @@ auto writeConflictRetry(OperationContext* opCtx,
                         F&& f,
                         boost::optional<size_t> retryLimit = boost::none) {
     invariant(opCtx);
-    invariant(opCtx->lockState());
+    invariant(shard_role_details::getLocker(opCtx));
     invariant(opCtx->recoveryUnit());
 
     // This failpoint disables exception handling for write conflicts. Only allow this exception to
@@ -161,7 +162,7 @@ auto writeConflictRetry(OperationContext* opCtx,
     // this exception handler to avoid crashing.
     bool userSkipWriteConflictRetry = MONGO_unlikely(skipWriteConflictRetries.shouldFail()) &&
         opCtx->getClient()->isFromUserConnection();
-    if (opCtx->lockState()->inAWriteUnitOfWork() || userSkipWriteConflictRetry) {
+    if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork() || userSkipWriteConflictRetry) {
         try {
             return f();
         } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable> const& e) {

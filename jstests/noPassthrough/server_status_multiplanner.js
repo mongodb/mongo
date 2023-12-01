@@ -1,5 +1,7 @@
 /**
  * Tests the serverStatus and FTDC metrics for multi planner execution (both classic and SBE).
+ *
+ * @tags: [requires_sbe]
  */
 function sumHistogramBucketCounts(histogram) {
     let sum = 0;
@@ -10,7 +12,6 @@ function sumHistogramBucketCounts(histogram) {
 }
 
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const collName = jsTestName();
 const dbName = jsTestName();
@@ -19,14 +20,6 @@ const dbName = jsTestName();
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB(dbName);
-
-// This test assumes that SBE is being used for most queries.
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
-
 let coll = db.getCollection(collName);
 coll.drop();
 

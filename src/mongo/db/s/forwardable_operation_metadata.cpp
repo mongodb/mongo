@@ -70,6 +70,12 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
             setImpersonatedUserMetadata(metadata);
         }
     }
+    boost::optional<StringData> originalSecurityToken = boost::none;
+    const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+    if (vts != boost::none && !vts->getOriginalToken().empty()) {
+        originalSecurityToken = vts->getOriginalToken();
+    }
+    setValidatedTenancyScopeToken(originalSecurityToken);
 
     setMayBypassWriteBlocking(WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
 }
@@ -92,6 +98,12 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
     }
 
     WriteBlockBypass::get(opCtx).set(getMayBypassWriteBlocking());
+    boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope = boost::none;
+    const auto originalToken = getValidatedTenancyScopeToken();
+    if (originalToken != boost::none && !originalToken->empty()) {
+        validatedTenancyScope = auth::ValidatedTenancyScope(client, *originalToken);
+    }
+    auth::ValidatedTenancyScope::set(opCtx, validatedTenancyScope);
 }
 
 }  // namespace mongo

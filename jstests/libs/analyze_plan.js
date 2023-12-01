@@ -3,6 +3,7 @@
 // scan or whether the plan is covered (index only).
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {usedBonsaiOptimizer} from "jstests/libs/optimizer_utils.js";
 
 /**
  * Utility to return the 'queryPlanner' section of 'explain'.
@@ -64,6 +65,18 @@ export function getWinningPlanFromExplain(explain) {
         }
     }
 
+    if (explain.hasOwnProperty("pipeline")) {
+        const pipeline = explain.pipeline;
+        // Pipeline stages' explain output come in two shapes:
+        // 1. When in single node, as a single object array
+        // 2. When in sharded, as an object.
+        if (pipeline.constructor === Array) {
+            return getWinningPlanFromExplain(pipeline[0].$cursor);
+        } else {
+            return getWinningPlanFromExplain(pipeline);
+        }
+    }
+
     let queryPlanner = getQueryPlanner(explain);
     return getWinningPlan(queryPlanner);
 }
@@ -92,11 +105,13 @@ export function getCachedPlan(cachedPlan) {
  * Given the root stage of explain's JSON representation of a query plan ('root'), returns all
  * subdocuments whose stage is 'stage'. Returns an empty array if the plan does not have the
  * requested stage. if 'stage' is 'null' returns all the stages in 'root'.
+ *
+ * This helper function can be used for any optimizer.
  */
 export function getPlanStages(root, stage) {
     var results = [];
 
-    if (root.stage === stage || stage === undefined) {
+    if (root.stage === stage || stage === undefined || root.nodeType === stage) {
         results.push(root);
     }
 
@@ -128,6 +143,22 @@ export function getPlanStages(root, stage) {
 
     if ("innerStage" in root) {
         results = results.concat(getPlanStages(root.innerStage, stage));
+    }
+
+    if ("queryPlan" in root) {
+        results = results.concat(getPlanStages(root.queryPlan, stage));
+    }
+
+    if ("child" in root) {
+        results = results.concat(getPlanStages(root.child, stage));
+    }
+
+    if ("leftChild" in root) {
+        results = results.concat(getPlanStages(root.leftChild, stage));
+    }
+
+    if ("rightChild" in root) {
+        results = results.concat(getPlanStages(root.rightChild, stage));
     }
 
     if ("shards" in root) {
@@ -162,6 +193,7 @@ export function getAllPlanStages(root) {
  * Asserts that no more than one stage is a match.
  */
 export function getPlanStage(root, stage) {
+    assert(stage, "Stage was not defined in getPlanStage.")
     var planStageList = getPlanStages(root, stage);
 
     if (planStageList.length === 0) {
@@ -195,7 +227,13 @@ export function getRejectedPlans(root) {
  * the query planner reports at least one rejected alternative plan, and false otherwise.
  */
 export function hasRejectedPlans(root) {
-    function sectionHasRejectedPlans(explainSection) {
+    function sectionHasRejectedPlans(explainSection, optimizer = "classic") {
+        if (optimizer == "CQF") {
+            // TODO SERVER-77719: The existence of alternative/rejected plans will be re-evaluated
+            // in the future.
+            return true;
+        }
+
         assert(explainSection.hasOwnProperty("rejectedPlans"), tojson(explainSection));
         return explainSection.rejectedPlans.length !== 0;
     }
@@ -220,17 +258,31 @@ export function hasRejectedPlans(root) {
         return cursorStages.find((cursorStage) => cursorStageHasRejectedPlans(cursorStage)) !==
             undefined;
     } else {
+        let optimizer = getOptimizer(root);
+
         // This is some sort of query explain.
         assert(root.hasOwnProperty("queryPlanner"), tojson(root));
         assert(root.queryPlanner.hasOwnProperty("winningPlan"), tojson(root));
         if (!root.queryPlanner.winningPlan.hasOwnProperty("shards")) {
+            // SERVER-77719: Update regarding the expected behavior of the CQF optimizer. Currently
+            // CQF explains are empty, when the optimizer returns alternative plans, we should
+            // address this.
+
             // This is an unsharded explain.
-            return sectionHasRejectedPlans(root.queryPlanner);
+            return sectionHasRejectedPlans(root.queryPlanner, optimizer);
         }
+
+        if ("SINGLE_SHARD" == root.queryPlanner.winningPlan.stage) {
+            var shards = root.queryPlanner.winningPlan.shards;
+            shards.forEach(function assertShardHasRejectedPlans(shard) {
+                sectionHasRejectedPlans(shard, optimizer);
+            });
+        }
+
         // This is a sharded explain. Each entry in the shards array contains a 'winningPlan' and
         // 'rejectedPlans'.
         return root.queryPlanner.winningPlan.shards.find(
-                   (shard) => sectionHasRejectedPlans(shard)) !== undefined;
+                   (shard) => sectionHasRejectedPlans(shard, optimizer)) !== undefined;
     }
 }
 
@@ -290,6 +342,7 @@ export function getShardQueryPlans(root) {
  * structure matches expected format.
  */
 export function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
+    assert(stage, "Stage was not defined in getAggPlanStages.");
     let results = [];
 
     function getDocumentSources(docSourceArray) {
@@ -383,6 +436,7 @@ export function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
  * will be used to lookup the given 'stage', even if 'executionStats' section is available.
  */
 export function getAggPlanStage(root, stage, useQueryPlannerSection = false) {
+    assert(stage, "Stage was not defined in getAggPlanStage.")
     let planStageList = getAggPlanStages(root, stage, useQueryPlannerSection);
 
     if (planStageList.length === 0) {
@@ -414,6 +468,7 @@ export function aggPlanHasStage(root, stage) {
  * on one node's query plan, an error will be thrown.
  */
 export function planHasStage(db, root, stage) {
+    assert(stage, "Stage was not defined in planHasStage.")
     const matchingStages = getPlanStages(root, stage);
 
     // If we are executing against a mongos, we may get more than one occurrence of the stage.
@@ -432,17 +487,32 @@ export function planHasStage(db, root, stage) {
  *
  * Given the root stage of explain's BSON representation of a query plan ('root'),
  * returns true if the plan is index only. Otherwise returns false.
+ *
+ * This helper function can be used for any optimizer.
  */
 export function isIndexOnly(db, root) {
-    return !planHasStage(db, root, "FETCH") && !planHasStage(db, root, "COLLSCAN");
+    // SERVER-77719: Ensure that the decision for using the scan lines up with CQF optimizer.
+    return !planHasStage(db, root, "FETCH") && !planHasStage(db, root, "COLLSCAN") &&
+        !planHasStage(db, root, "PhysicalScan") && !planHasStage(db, root, "CoScan") &&
+        !planHasStage(db, root, "Seek");
 }
 
 /**
  * Returns true if the BSON representation of a plan rooted at 'root' is using
  * an index scan, and false otherwise.
+ *
+ * This helper function can be used for any optimizer.
  */
 export function isIxscan(db, root) {
-    return planHasStage(db, root, "IXSCAN");
+    // SERVER-77719: Ensure that the decision for using the scan lines up with CQF optimizer.
+    return planHasStage(db, root, "IXSCAN") || planHasStage(db, root, "IndexScan");
+}
+
+/**
+ * Returns true if the plan is formed of a single EOF stage. False otherwise.
+ */
+export function isEofPlan(db, root) {
+    return planHasStage(db, root, "EOF");
 }
 
 /**
@@ -450,18 +520,30 @@ export function isIxscan(db, root) {
  * the idhack fast path, and false otherwise.
  */
 export function isIdhack(db, root) {
+    // SERVER-77719: Ensure that the decision for using the scan lines up with CQF optimizer.
     return planHasStage(db, root, "IDHACK");
+}
+
+/**
+ * Returns true if the BSON representation of a plan indicates that this plan was generated by the
+ * fastpath logic of the Bonsai optimiser.
+ */
+export function isBonsaiFastPathPlan(db, explain) {
+    return planHasStage(db, explain, "FASTPATH");
 }
 
 /**
  * Returns true if the BSON representation of a plan rooted at 'root' is using
  * a collection scan, and false otherwise.
+ *
+ * This helper function can be used for any optimizer.
  */
 export function isCollscan(db, root) {
-    return planHasStage(db, root, "COLLSCAN");
+    return planHasStage(db, root, "COLLSCAN") || planHasStage(db, root, "PhysicalScan");
 }
 
 export function isClusteredIxscan(db, root) {
+    // SERVER-77719: Ensure that the decision for using the scan lines up with CQF optimizer.
     return planHasStage(db, root, "CLUSTERED_IXSCAN");
 }
 
@@ -572,17 +654,34 @@ export function assertExplainCount({explainResults, expectedCount}) {
 
 /**
  * Verifies that a given query uses an index and is covered when used in a count command.
+ *
+ * This helper function can be used for any optimizer.
  */
 export function assertCoveredQueryAndCount({collection, query, project, count}) {
     let explain = collection.find(query, project).explain();
-    assert(isIndexOnly(db, getWinningPlan(explain.queryPlanner)),
-           "Winning plan was not covered: " + tojson(explain.queryPlanner.winningPlan));
+    // SERVER-77719: Update regarding the expected behavior of the CQF optimizer.
+    switch (getOptimizer(explain)) {
+        case "classic":
+            assert(isIndexOnly(db, getWinningPlan(explain.queryPlanner)),
+                   "Winning plan was not covered: " + tojson(explain.queryPlanner.winningPlan));
+            break;
+        default:
+            break
+    }
 
     // Same query as a count command should also be covered.
     explain = collection.explain("executionStats").find(query).count();
-    assert(isIndexOnly(db, getWinningPlan(explain.queryPlanner)),
-           "Winning plan for count was not covered: " + tojson(explain.queryPlanner.winningPlan));
-    assertExplainCount({explainResults: explain, expectedCount: count});
+    // SERVER-77719: Update regarding the expected behavior of the CQF optimizer.
+    switch (getOptimizer(explain)) {
+        case "classic":
+            assert(isIndexOnly(db, getWinningPlan(explain.queryPlanner)),
+                   "Winning plan for count was not covered: " +
+                       tojson(explain.queryPlanner.winningPlan));
+            assertExplainCount({explainResults: explain, expectedCount: count});
+            break;
+        default:
+            break
+    }
 }
 
 /**
@@ -708,70 +807,88 @@ export function assertFetchFilter({coll, predicate, expectedFilter, nReturned}) 
 }
 
 /**
- * Asserts that a pipeline runs with the engine that is passed in as a parameter.
+ * Recursively checks if a javascript object contains a nested property key. Note, this only
+ * recurses into other objects, array elements are ignored.
  */
-export function assertEngine(pipeline, engine, coll) {
-    const explain = coll.explain().aggregate(pipeline);
-    assert(explain.hasOwnProperty("explainVersion"), explain);
-    assert.eq(explain.explainVersion, engine === "sbe" ? "2" : "1", explain);
-}
-
-/**
- * Checks whether the explain output has a descendant with the given field.
- * Return true if there is such a stage anywhere in the hierarchy of the explain output.
- */
-function explainHasDescendant(explain, field) {
-    if (explain.hasOwnProperty("stages")) {
-        for (let j = 0; j < explain.stages.length; j++) {
-            let stageName = Object.keys(explain.stages[j]);
-            if (explainHasDescendant(explain.stages[j][stageName], field)) {
-                return true;
-            }
-        }
-    }
-
-    if (explain.hasOwnProperty("queryPlanner")) {
-        return explainHasDescendant(explain.queryPlanner, field);
-    }
-
-    if (explain.hasOwnProperty("winningPlan")) {
-        return explainHasDescendant(explain.winningPlan, field);
-    }
-
-    if (explain.hasOwnProperty(field)) {
+function hasNestedProperty(object, key) {
+    if (typeof object !== "object")
+        return false;
+    if (object.hasOwnProperty(key))
         return true;
+    for (const child of Object.values(object)) {
+        if (hasNestedProperty(child, key))
+            return true;
     }
     return false;
 }
 
 /**
  * Recognizes the query engine used by the query (sbe/classic).
+ *
+ * This helper function can be used for any optimizer.
  */
 export function getEngine(explain) {
-    if (explain.hasOwnProperty("explainVersion")) {
-        switch (explain.explainVersion) {
-            case "1":
-                return "classic";
-            case "2":
-                return "sbe";
-        }
-    }
+    const queryPlanner = {...getQueryPlanner(explain)};
+    return hasNestedProperty(queryPlanner, "slotBasedPlan") ? "sbe" : "classic";
+}
 
-    if (explain.hasOwnProperty("shards")) {
-        for (const shardName in explain.shards) {
-            return getEngine(explain.shards[shardName]);
-        }
-    }
+/**
+ * Asserts that a pipeline runs with the engine that is passed in as a parameter.
+ */
+export function assertEngine(pipeline, engine, coll) {
+    const explain = coll.explain().aggregate(pipeline);
+    assert.eq(getEngine(explain), engine);
+}
 
-    // there are cases where explain outputs does not provide "explainVersion"
-    let hasSbePlan = explainHasDescendant(explain, "slotBasedPlan");
-
-    const winningPlan = getWinningPlanFromExplain(explain);
-    let propertyExists = winningPlan.hasOwnProperty("queryPlan");
-
-    if (propertyExists || hasSbePlan) {
-        return "sbe"
+/**
+ * Returns the optimizer (name string) used to generate the explain output ("classic" or "CQF")
+ *
+ * This helper function can be used for any optimizer.
+ */
+export function getOptimizer(explain) {
+    if (usedBonsaiOptimizer(explain)) {
+        return "CQF";
     } else {
         return "classic";
     }
+}
+
+/**
+ * Returns the number of index scans in a query plan.
+ *
+ * This helper function can be used for any optimizer.
+ */
+export function getNumberOfIndexScans(explain) {
+    let stages = {"classic": "IXSCAN", "CQF": "IndexScan"};
+    let optimizer = getOptimizer(explain);
+    const indexScans = getPlanStages(getWinningPlan(explain.queryPlanner), stages[optimizer]);
+    return indexScans.length;
+}
+
+/**
+ * Returns the number of column scans in a query plan.
+ *
+ * This helper function can be used for any optimizer.
+ */
+export function getNumberOfColumnScans(explain) {
+    // SERVER-77719: Update regarding the expected behavior of the CQF optimizer (what is the stage
+    // name for CQF for a column scan).
+    let stages = {"classic": "COLUMN_SCAN"};
+    let optimizer = getOptimizer(explain);
+    if (optimizer == "CQF") {
+        return 0;
+    }
+    const columnIndexScans = getPlanStages(getWinningPlan(explain.queryPlanner), stages[optimizer]);
+    return columnIndexScans.length;
+}
+
+/*
+ * Returns whether a query is using a multikey index.
+ *
+ * This helper function can be used only for "classic" optimizer.
+ */
+export function isIxscanMultikey(winningPlan) {
+    // SERVER-77719: Update to expected this method to allow also use with CQF optimizer.
+    let ixscanStage = getPlanStage(winningPlan, "IXSCAN");
+    return ixscanStage.isMultiKey;
 }

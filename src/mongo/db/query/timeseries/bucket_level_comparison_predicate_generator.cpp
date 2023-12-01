@@ -52,6 +52,14 @@ static const long long max32BitEpochMillis =
     static_cast<long long>(std::numeric_limits<uint32_t>::max()) * 1000;
 
 /**
+ * Helper function to make comparison match expressions.
+ */
+template <typename T, typename V>
+auto makeCmpMatchExpr(StringData path, V val) {
+    return std::make_unique<T>(path, val);
+}
+
+/**
  * Creates an ObjectId initialized with an appropriate timestamp corresponding to 'rhs' and
  * returns it as a Value.
  */

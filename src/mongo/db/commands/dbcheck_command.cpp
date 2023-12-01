@@ -109,6 +109,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeExtraIndexKeysHashing);
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeDbCheckLogOp);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingDbCheckRun);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingFirstBatch);
 
@@ -306,6 +307,11 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
             indexName = invocation.getSecondaryIndex().value();
         }
 
+        if (invocation.getBsonValidateMode()) {
+            secondaryIndexCheckParameters->setBsonValidateMode(
+                invocation.getBsonValidateMode().value());
+        }
+
         // TODO SERVER-78399: Remove special handling start/end being optional once feature flag is
         // removed.
 
@@ -345,7 +351,10 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                             maxBytesPerSec,
                                             maxBatchTimeMillis,
                                             invocation.getBatchWriteConcern(),
-                                            secondaryIndexCheckParameters};
+                                            secondaryIndexCheckParameters,
+                                            {opCtx, [&]() {
+                                                 return gMaxDbCheckMBperSec.load();
+                                             }}};
     auto result = std::make_unique<DbCheckRun>();
     result->push_back(info);
     return result;
@@ -389,7 +398,10 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                    maxBytesPerSec,
                                    maxBatchTimeMillis,
                                    invocation.getBatchWriteConcern(),
-                                   boost::none};
+                                   boost::none,
+                                   {opCtx, [&]() {
+                                        return gMaxDbCheckMBperSec.load();
+                                    }}};
         result->push_back(info);
         return true;
     };
@@ -598,6 +610,18 @@ boost::optional<key_string::Value> DbChecker::getExtraIndexKeysCheckLookupStart(
         return boost::none;
     }
 
+    // TODO (SERVER-83074): Enable special indexes in dbcheck.
+    if (index->getAccessMethodName() != IndexNames::BTREE &&
+        index->getAccessMethodName() != IndexNames::HASHED) {
+        LOGV2_DEBUG(8033901,
+                    3,
+                    "Skip checking unsupported index.",
+                    "collection"_attr = _info.nss,
+                    "uuid"_attr = _info.uuid,
+                    "indexName"_attr = index->indexName());
+        return boost::none;
+    }
+
     // TODO SERVER-79846: Add testing for progress meter
     // {
     //     const std::string curOpMessage = "Scanning index " + indexName +
@@ -650,20 +674,9 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
 
     int64_t totalBytesSeen = 0;
     int64_t totalKeysSeen = 0;
-    using Clock = stdx::chrono::system_clock;
-    using TimePoint = stdx::chrono::time_point<Clock>;
-    TimePoint lastStart = Clock::now();
-    int64_t docsInCurrentInterval = 0;
-
     do {
-        using namespace std::literals::chrono_literals;
-
-        if (Clock::now() - lastStart > 1s) {
-            lastStart = Clock::now();
-            docsInCurrentInterval = 0;
-        }
-
         DbCheckExtraIndexKeysBatchStats batchStats = {0};
+        batchStats.deadline = Date_t::now() + Milliseconds(_info.maxBatchTimeMillis);
 
         // 1. Get batch bounds (stored in batchStats) and run reverse lookup if
         // skipLookupForExtraKeys is not set.
@@ -735,21 +748,11 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
         // 5. Check if we've exceeded any limits.
         _batchesProcessed++;
         totalBytesSeen += batchStats.nBytes;
-        totalKeysSeen += batchStats.nDocs;
-        docsInCurrentInterval += batchStats.nDocs;
+        totalKeysSeen += batchStats.nKeys;
 
-        bool tooManyDocs = totalKeysSeen >= _info.maxCount;
+        bool tooManyKeys = totalKeysSeen >= _info.maxCount;
         bool tooManyBytes = totalBytesSeen >= _info.maxSize;
-        reachedEnd = batchStats.finishedIndexCheck || tooManyDocs || tooManyBytes;
-
-        if (docsInCurrentInterval > _info.maxRate && _info.maxRate > 0) {
-            // If an extremely low max rate has been set (substantially smaller than the
-            // batch size) we might want to sleep for multiple seconds between batches.
-            int64_t timesExceeded = docsInCurrentInterval / _info.maxRate;
-
-            stdx::this_thread::sleep_for(timesExceeded * 1s - (Clock::now() - lastStart));
-        }
-
+        reachedEnd = batchStats.finishedIndexCheck || tooManyKeys || tooManyBytes;
     } while (!reachedEnd);
 
     // TODO SERVER-79846: Add testing for progress meter
@@ -778,19 +781,17 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
     // longer than the time it takes between starting and replicating a batch on the
     // primary. Otherwise, the readTimestamp will not be available on a secondary by the
     // time it processes the oplog entry.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+    const auto readSource = ReadSourceWithTimestamp{RecoveryUnit::ReadSource::kNoOverlap};
 
-    // dbCheck writes to the oplog, so we need to take an IX global lock. We don't need to write
-    // to the collection, however, so we use acquireCollectionMaybeLockFree with a read
-    // acquisition request.
-    Lock::GlobalLock glob(opCtx, MODE_IX);
-
-    const CollectionAcquisition collAcquisition = acquireCollectionMaybeLockFree(
+    const DbCheckAcquisition acquisition(
         opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, _info.nss, AcquisitionPrerequisites::OperationType::kRead));
-    if (!collAcquisition.exists() ||
-        collAcquisition.getCollectionPtr().get()->uuid() != _info.uuid) {
+        _info.nss,
+        readSource,
+        // On the primary we must always block on prepared updates to guarantee snapshot isolation.
+        PrepareConflictBehavior::kEnforce);
+
+    if (!acquisition.coll.exists() ||
+        acquisition.coll.getCollectionPtr().get()->uuid() != _info.uuid) {
         Status status = Status(ErrorCodes::IndexNotFound,
                                str::stream() << "cannot find collection for ns "
                                              << _info.nss.toStringForErrorMsg() << " and uuid "
@@ -808,7 +809,7 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
 
         return status;
     }
-    const CollectionPtr& collection = collAcquisition.getCollectionPtr();
+    const CollectionPtr& collection = acquisition.coll.getCollectionPtr();
 
     // TODO SERVER-80347: Add check for stepdown here.
     auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
@@ -848,20 +849,20 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
     boost::optional<DbCheckHasher> hasher;
     try {
         hasher.emplace(opCtx,
-                       collection,
+                       acquisition,
                        firstBson,
                        lastBson,
                        _info.secondaryIndexCheckParameters,
+                       &_info.dataThrottle,
                        indexName,
                        std::min(_info.maxDocsPerBatch, _info.maxCount),
-                       std::min(_info.maxBytesPerBatch, _info.maxSize));
+                       _info.maxSize);
     } catch (const DBException& e) {
         return e.toStatus();
     }
 
-    const auto batchDeadline = Date_t::now() + Milliseconds(_info.maxBatchTimeMillis);
-    Status status = hasher->hashForExtraIndexKeysCheck(
-        opCtx, collection.get(), batchFirst, batchLast, batchDeadline);
+    Status status =
+        hasher->hashForExtraIndexKeysCheck(opCtx, collection.get(), batchFirst, batchLast);
     if (!status.isOK()) {
         return status;
     }
@@ -892,7 +893,7 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
                 "firstKeyString"_attr = firstBson,
                 "lastKeyString"_attr = lastBson,
                 "md5"_attr = md5,
-                "keysHashed"_attr = hasher->docsSeen(),
+                "keysHashed"_attr = hasher->keysSeen(),
                 "bytesHashed"_attr = hasher->bytesSeen(),
                 "readTimestamp"_attr = readTimestamp,
                 "indexName"_attr = indexName,
@@ -901,7 +902,7 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
 
     BSONObjBuilder builder;
     builder.append("success", true);
-    builder.append("count", hasher->docsSeen());
+    builder.append("count", hasher->keysSeen());
     builder.append("bytes", hasher->bytesSeen());
     builder.append("md5", batchStats->md5);
     builder.append("minKey", firstBson);
@@ -1040,8 +1041,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     const auto ordering = iam->getSortedDataInterface()->getOrdering();
 
 
-    std::unique_ptr<SortedDataInterface::Cursor> indexCursor =
-        iam->newCursor(opCtx, true /* forward */);
+    auto indexCursor =
+        std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_info.dataThrottle);
 
 
     // Set the index cursor's end position based on the inputted end parameter for when to stop
@@ -1062,7 +1063,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         logAttrs(_info.nss),
         "uuid"_attr = _info.uuid);
 
-    auto currIndexKey = indexCursor->seekForKeyString(lookupStart);
+    auto currIndexKey = indexCursor->seekForKeyString(opCtx, lookupStart);
 
     // Note that if we can't find lookupStart (e.g. it was deleted in between snapshots),
     // seekForKeyString will automatically return the next adjacent keystring in the storage
@@ -1072,6 +1073,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         LOGV2_DEBUG(7844803,
                     3,
                     "could not find any keys in index",
+                    "endPosition"_attr = maxKey,
                     "lookupStartKeyStringBson"_attr =
                         key_string::toBsonSafe(lookupStart.getBuffer(),
                                                lookupStart.getSize(),
@@ -1125,9 +1127,9 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         numBytes += keyString.getSize();
         numKeys++;
         batchStats.nBytes += keyString.getSize();
-        batchStats.nDocs++;
+        batchStats.nKeys++;
 
-        currIndexKey = indexCursor->nextKeyString();
+        currIndexKey = indexCursor->nextKeyString(opCtx);
 
         // Set nextLookupStart.
         if (currIndexKey) {
@@ -1139,8 +1141,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         // snapshot/batch, so skip this check.
         if (!(currIndexKey && (keyString == currIndexKey.get().keyString))) {
             // Check if we should finish this batch.
-            if (batchStats.nBytes >= _info.maxBytesPerBatch ||
-                batchStats.nDocs >= _info.maxDocsPerBatch) {
+            if (batchStats.nKeys >= _info.maxDocsPerBatch) {
                 batchStats.finishedIndexBatch = true;
                 break;
             }
@@ -1148,6 +1149,11 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
             if (numKeys >= repl::dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot.load()) {
                 break;
             }
+        }
+
+        if (Date_t::now() > batchStats.deadline) {
+            batchStats.finishedIndexBatch = true;
+            break;
         }
     }
 
@@ -1188,9 +1194,12 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
         }
         MONGO_UNREACHABLE;
     }();
-    RecordData record;
-    bool res = collection->getRecordStore()->findRecord(opCtx, recordId, &record);
-    if (!res) {
+
+    auto seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
+        opCtx, collection->getRecordStore(), &_info.dataThrottle);
+
+    auto record = seekRecordStoreCursor->seekExact(opCtx, recordId);
+    if (!record) {
         LOGV2_DEBUG(7844802,
                     3,
                     "reverse lookup failed to find record data",
@@ -1224,7 +1233,7 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
     }
 
     // Found record in record store.
-    auto recordBson = record.toBson();
+    auto recordBson = record->data.toBson();
 
     // Generate the set of keys for the record data and check that it includes the
     // index key.
@@ -1364,20 +1373,7 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
     int64_t totalBytesSeen = 0;
     int64_t totalDocsSeen = 0;
 
-    // Limit the rate of the check.
-    using Clock = stdx::chrono::system_clock;
-    using TimePoint = stdx::chrono::time_point<Clock>;
-    TimePoint lastStart = Clock::now();
-    int64_t docsInCurrentInterval = 0;
-
     do {
-        using namespace std::literals::chrono_literals;
-
-        if (Clock::now() - lastStart > 1s) {
-            lastStart = Clock::now();
-            docsInCurrentInterval = 0;
-        }
-
         auto result = _runBatch(opCtx, start);
 
         if (_done) {
@@ -1497,7 +1493,6 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         // Update our running totals.
         totalDocsSeen += stats.nDocs;
         totalBytesSeen += stats.nBytes;
-        docsInCurrentInterval += stats.nDocs;
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());
             progress.get(lk)->hit(stats.nDocs);
@@ -1508,14 +1503,6 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         bool tooManyDocs = totalDocsSeen >= _info.maxCount;
         bool tooManyBytes = totalBytesSeen >= _info.maxSize;
         reachedEnd = reachedLast || tooManyDocs || tooManyBytes;
-
-        if (docsInCurrentInterval > _info.maxRate && _info.maxRate > 0) {
-            // If an extremely low max rate has been set (substantially smaller than the
-            // batch size) we might want to sleep for multiple seconds between batches.
-            int64_t timesExceeded = docsInCurrentInterval / _info.maxRate;
-
-            stdx::this_thread::sleep_for(timesExceeded * 1s - (Clock::now() - lastStart));
-        }
     } while (!reachedEnd);
 
     {
@@ -1531,29 +1518,27 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
     // longer than the time it takes between starting and replicating a batch on the
     // primary. Otherwise, the readTimestamp will not be available on a secondary by the
     // time it processes the oplog entry.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+    const auto readSource = ReadSourceWithTimestamp{RecoveryUnit::ReadSource::kNoOverlap};
 
-    // dbCheck writes to the oplog, so we need to take an IX global lock. We don't need to
-    // write to the collection, however, so we use acquireCollectionMaybeLockFree with a
-    // read acquisition request.
-    Lock::GlobalLock glob(opCtx, MODE_IX);
-
-    const CollectionAcquisition collAcquisition = acquireCollectionMaybeLockFree(
+    // Acquires locks and sets appropriate state on the RecoveryUnit.
+    const DbCheckAcquisition acquisition(
         opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, _info.nss, AcquisitionPrerequisites::OperationType::kRead));
+        _info.nss,
+        readSource,
+        // On the primary we must always block on prepared updates to guarantee snapshot isolation.
+        PrepareConflictBehavior::kEnforce);
 
     if (_stepdownHasOccurred(opCtx, _info.nss)) {
         _done = true;
         return Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated due to stepdown");
     }
 
-    if (!collAcquisition.exists()) {
+    if (!acquisition.coll.exists()) {
         const auto msg = "Collection under dbCheck no longer exists";
         return {ErrorCodes::NamespaceNotFound, msg};
     }
     // The CollectionPtr needs to outlive the DbCheckHasher as it's used internally.
-    const CollectionPtr& collectionPtr = collAcquisition.getCollectionPtr();
+    const CollectionPtr& collectionPtr = acquisition.coll.getCollectionPtr();
     if (collectionPtr.get()->uuid() != _info.uuid) {
         const auto msg = "Collection under dbCheck no longer exists";
         return {ErrorCodes::NamespaceNotFound, msg};
@@ -1567,13 +1552,14 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
     Status status = Status::OK();
     try {
         hasher.emplace(opCtx,
-                       collectionPtr,
+                       acquisition,
                        first,
                        _info.end,
                        _info.secondaryIndexCheckParameters,
+                       &_info.dataThrottle,
                        boost::none,
                        std::min(_info.maxDocsPerBatch, _info.maxCount),
-                       std::min(_info.maxBytesPerBatch, _info.maxSize));
+                       _info.maxSize);
 
         const auto batchDeadline = Date_t::now() + Milliseconds(_info.maxBatchTimeMillis);
         status = hasher->hashForCollectionCheck(opCtx, collectionPtr, batchDeadline);
@@ -1617,6 +1603,11 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
         // Otherwise set minKey/maxKey in BSONKey format.
         batch.setMinKey(BSONKey::parseFromBSON(first.firstElement()));
         batch.setMaxKey(BSONKey::parseFromBSON(hasher->lastKey().firstElement()));
+    }
+
+    if (MONGO_unlikely(hangBeforeDbCheckLogOp.shouldFail())) {
+        LOGV2(8230500, "Hanging dbcheck due to failpoint 'hangBeforeDbCheckLogOp'");
+        hangBeforeDbCheckLogOp.pauseWhileSet();
     }
 
     // Send information on this batch over the oplog.

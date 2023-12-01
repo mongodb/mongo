@@ -42,7 +42,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/member_config.h"
@@ -361,7 +361,7 @@ void ReplicationCoordinatorImpl::ElectionState::_writeLastVoteForMyElection(
         // Any operation that occurs as part of an election process is critical to the operation of
         // the cluster. We mark the operation as having Immediate priority to skip ticket
         // acquisition and flow control.
-        ScopedAdmissionPriorityForLock priority(opCtx->lockState(),
+        ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx.get()),
                                                 AdmissionContext::Priority::kImmediate);
 
         LOGV2(6015300,

@@ -657,6 +657,12 @@ public:
      */
     int deleteMaxSizeMbFromShardEntries(OperationContext* opCtx);
 
+    /**
+     * Updates the config.settings schema for FCV upgrade and downgrade.
+     * TODO (SERVER-83264): Remove once 8.0 becomes last LTS.
+     */
+    Status upgradeDowngradeConfigSettings(OperationContext* opCtx);
+
 private:
     /**
      * Performs the necessary checks for version compatibility and creates a new config.version
@@ -852,13 +858,12 @@ private:
     /**
      * Execute the migration chunk updates using the internal transaction API.
      */
-    void _commitChunkMigrationInTransaction(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        std::shared_ptr<const ChunkType> migratedChunk,
-        std::shared_ptr<const std::vector<ChunkType>> splitChunks,
-        std::shared_ptr<ChunkType> controlChunk,
-        const ShardId& donorShardId);
+    void _commitChunkMigrationInTransaction(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const ChunkType& migratedChunk,
+                                            const std::vector<ChunkType>& splitChunks,
+                                            const boost::optional<ChunkType>& controlChunk,
+                                            const ShardId& donorShardId);
 
     /**
      * Inserts new entries into the config catalog to describe the shard being added (and the

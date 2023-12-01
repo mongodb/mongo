@@ -147,6 +147,13 @@ public:
     static void removeUselessColumnScanRowStoreExpression(QuerySolutionNode& root);
 
     /**
+     * Walk the solution tree, and trim out useless imprecise filters that are guaranteed to be
+     * applied again by a later filter.
+     */
+    static void removeImpreciseInternalExprFilters(const QueryPlannerParams& params,
+                                                   QuerySolutionNode& root);
+
+    /**
      * For the provided 'foreignCollName' and 'foreignFieldName' corresponding to an EqLookupNode,
      * returns what join algorithm should be used to execute it. In particular:
      * - An empty array is produced for each document if the foreign collection does not exist.

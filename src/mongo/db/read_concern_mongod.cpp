@@ -54,10 +54,10 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -333,7 +333,8 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
     // wait for read concern. This is fine, since the outer operation should have handled waiting
     // for read concern. We don't want to ignore prepare conflicts because reads in transactions
     // should block on prepared transactions.
-    if (opCtx->getClient()->isInDirectClient() && opCtx->lockState()->isLocked()) {
+    if (opCtx->getClient()->isInDirectClient() &&
+        shard_role_details::getLocker(opCtx)->isLocked()) {
         return Status::OK();
     }
 
@@ -540,7 +541,8 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
                                           const Milliseconds readConcernTimeout) {
     // If we are in a direct client that's holding a global lock, then this means this is a
     // sub-operation of the parent. In this case we delegate the wait to the parent.
-    if (opCtx->getClient()->isInDirectClient() && opCtx->lockState()->isLocked()) {
+    if (opCtx->getClient()->isInDirectClient() &&
+        shard_role_details::getLocker(opCtx)->isLocked()) {
         return Status::OK();
     }
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -598,7 +600,8 @@ Status waitForSpeculativeMajorityReadConcernImpl(
 
     // If we are in a direct client that's holding a global lock, then this means this is a
     // sub-operation of the parent. In this case we delegate the wait to the parent.
-    if (opCtx->getClient()->isInDirectClient() && opCtx->lockState()->isLocked()) {
+    if (opCtx->getClient()->isInDirectClient() &&
+        shard_role_details::getLocker(opCtx)->isLocked()) {
         return Status::OK();
     }
 

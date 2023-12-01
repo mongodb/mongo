@@ -35,7 +35,7 @@
 #include <boost/none.hpp>
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -64,7 +64,7 @@ WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, bool groupOplogEntries
         opObserver->onBatchedWriteStart(_opCtx);
     }
 
-    _opCtx->lockState()->beginWriteUnitOfWork();
+    shard_role_details::getLocker(_opCtx)->beginWriteUnitOfWork();
     if (_toplevel) {
         _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx->readOnly());
         _opCtx->_ruState = RecoveryUnitState::kActiveUnitOfWork;
@@ -90,7 +90,7 @@ WriteUnitOfWork::~WriteUnitOfWork() {
             _opCtx->recoveryUnit()->endReadOnlyUnitOfWork();
             _opCtx->recoveryUnit()->abortRegisteredChanges();
         }
-        _opCtx->lockState()->endWriteUnitOfWork();
+        shard_role_details::getLocker(_opCtx)->endWriteUnitOfWork();
     }
 
     if (_groupOplogEntries) {
@@ -160,7 +160,7 @@ void WriteUnitOfWork::commit() {
 
         _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
     }
-    _opCtx->lockState()->endWriteUnitOfWork();
+    shard_role_details::getLocker(_opCtx)->endWriteUnitOfWork();
     _committed = true;
 }
 
