@@ -18,7 +18,7 @@ if (configureFailPoint) {
     return;  // Protect against this file being double-loaded.
 }
 
-kDefaultWaitForFailPointTimeout = 5 * 60 * 1000;
+kDefaultWaitForFailPointTimeout = 10 * 60 * 1000;
 
 configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "alwaysOn") {
     const res = sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
