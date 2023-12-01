@@ -217,11 +217,9 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
             }
 
             case Section::kSecurityToken: {
-                if (MultitenancyCheck::getPtr()) {
-                    uassert(ErrorCodes::Unauthorized,
-                            "Unsupported Security Token provided",
-                            gMultitenancySupport);
-                }
+                uassert(ErrorCodes::Unauthorized,
+                        "Unsupported Security Token provided",
+                        gMultitenancySupport);
                 securityToken = sectionsBuf.readCStr();
                 break;
             }

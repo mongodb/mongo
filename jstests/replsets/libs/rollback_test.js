@@ -108,26 +108,25 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
     // Make sure we have a replica set up and running.
     replSet = (replSet === undefined) ? performStandardSetup(nodeOptions) : replSet;
 
-    // Runs the passed in cmdObj on db with a security token if multitenancy support is activated.
-    let runWithTenantIfNeeded = (function() {
+    // Return an helper function to set a tenantId on commands if it is required.
+    let addTenantIdIfNeeded = (function() {
         const adminDB = replSet.getPrimary().getDB("admin");
         const featureFlagRequireTenantID = FeatureFlagUtil.isEnabled(adminDB, "RequireTenantID");
-        const featureFlagSecurityToken = FeatureFlagUtil.isEnabled(adminDB, "SecurityToken");
         const multitenancyDoc =
             assert.commandWorked(adminDB.adminCommand({getParameter: 1, multitenancySupport: 1}));
+        const fcvDoc = assert.commandWorked(
+            adminDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
         if (multitenancyDoc.hasOwnProperty("multitenancySupport") &&
-            multitenancyDoc.multitenancySupport && featureFlagRequireTenantID &&
-            featureFlagSecurityToken) {
-            return function(dbinst, cmdObj) {
-                const tenantId = ObjectId();
-                dbinst.getMongo()._setSecurityToken(_createTenantToken({tenant: tenantId}));
-                assert.commandWorked(dbinst.runCommand(cmdObj));
-                dbinst.getMongo()._setSecurityToken(undefined);
-            }
+            multitenancyDoc.multitenancySupport && featureFlagRequireTenantID) {
+            const tenantId = ObjectId();
+
+            return function(cmdObj) {
+                return Object.assign(cmdObj, {'$tenant': tenantId});
+            };
         } else {
-            return function(dbinst, cmdObj) {
-                assert.commandWorked(dbinst.runCommand(cmdObj));
-            }
+            return function(cmdObj) {
+                return cmdObj;
+            };
         }
     })();
 
@@ -206,11 +205,11 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         // nodes, with the exception of ephemeral and in-memory storage engines where
         // journaling isn't supported.
 
-        runWithTenantIfNeeded(curPrimary.getDB(dbName), {
+        assert.commandWorked(curPrimary.getDB(dbName).runCommand(addTenantIdIfNeeded({
             insert: "ensureSyncSource",
             documents: [{thisDocument: 'is inserted to ensure any node can sync from any other'}],
             writeConcern: {w: 3, j: config.writeConcernMajorityJournalDefault}
-        });
+        })));
     }
 
     /**
@@ -483,11 +482,11 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         // storage engines are an exception because journaling isn't supported.
         let writeConcern = TestData.rollbackShutdowns ? {w: 1, j: true} : {w: 1};
         let dbName = "EnsureThereIsAtLeastOneOpToRollback";
-        runWithTenantIfNeeded(curPrimary.getDB(dbName), {
+        assert.commandWorked(curPrimary.getDB(dbName).runCommand(addTenantIdIfNeeded({
             insert: "ensureRollback",
             documents: [{thisDocument: 'is inserted to ensure rollback is not skipped'}],
             writeConcern
-        });
+        })));
 
         log(`Isolating the primary ${curPrimary.host} so it will step down`);
         // We should have already disconnected the primary from the secondary during the first stage
