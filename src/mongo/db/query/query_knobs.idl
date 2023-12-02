@@ -47,6 +47,11 @@ enums:
         values:
             # Force the classic query engine for all queries.
             kForceClassicEngine: "forceClassicEngine"
+            # Only allow pushdown of certain agg stages to SBE including $group, $lookup,
+            # $_internalUnpackBucket, and search. If none of these stages are present and can be
+            # pushed down, fall back to the classic engine. 'featureFlagSbeFull' can override this,
+            # and allow for all supported stages to be pushed down.
+            kTrySbeRestricted: "trySbeRestricted"
             # Attempt to use SBE for eligible queries, otherwise fallback to the classic engine.
             kTrySbeEngine: "trySbeEngine"
             # Attempt to use the Bonsai optimizer and lower to SBE for eligible queries, otherwise

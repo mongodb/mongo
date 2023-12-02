@@ -1118,6 +1118,7 @@ boost::optional<bool> shouldForceEligibility(QueryFrameworkControlEnum framework
     switch (frameworkControl) {
         case QueryFrameworkControlEnum::kForceClassicEngine:
         case QueryFrameworkControlEnum::kTrySbeEngine:
+        case QueryFrameworkControlEnum::kTrySbeRestricted:
             return false;
         case QueryFrameworkControlEnum::kTryBonsai:
             // Return boost::none to indicate that we should not force eligibility of bonsai nor the

@@ -81,6 +81,7 @@
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -1445,13 +1446,22 @@ bool shouldPlanningResultUseSbe(const SlotBasedPrepareExecutionResult& planningR
  * Function which returns true if 'cq' uses features that are currently supported in SBE without
  * 'featureFlagSbeFull' being set; false otherwise.
  */
-bool shouldUseRegularSbe(const CanonicalQuery& cq) {
+bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq) {
     auto sbeCompatLevel = cq.getExpCtx()->sbeCompatibility;
     // We shouldn't get here if there are expressions in the query which are completely unsupported
     // by SBE.
     tassert(7248600,
             "Unexpected SBE compatibility value",
             sbeCompatLevel != SbeCompatibility::notCompatible);
+
+    // If we can't push down any agg stages when internalQueryFrameworkControl is set to
+    // "trySbeRestricted", we return false.
+    if (QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp() ==
+            QueryFrameworkControlEnum::kTrySbeRestricted &&
+        cq.pipeline().empty()) {
+        return false;
+    }
+
     // The 'ExpressionContext' may indicate that there are expressions which are only supported in
     // SBE when 'featureFlagSbeFull' is set, or fully supported regardless of the value of the
     // feature flag. This function should only return true in the latter case.
@@ -1486,7 +1496,7 @@ attemptToGetSlotBasedExecutor(
     // (Ignore FCV check): This is intentional because we always want to use this feature once the
     // feature flag is enabled.
     const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
-    const bool canUseRegularSbe = shouldUseRegularSbe(*canonicalQuery);
+    const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery);
 
     // If 'canUseRegularSbe' is true, then only the subset of SBE which is currently on by default
     // is used by the query. If 'sbeFull' is true, then the server is configured to run any
