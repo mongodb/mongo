@@ -47,6 +47,11 @@ enums:
         values:
             # Force the classic query engine for all queries.
             kForceClassicEngine: "forceClassicEngine"
+            # Only allow pushdown of certain agg stages to SBE including $group, $lookup,
+            # $_internalUnpackBucket, and search. If none of these stages are present and can be
+            # pushed down, fall back to the classic engine. 'featureFlagSbeFull' can override this,
+            # and allow for all supported stages to be pushed down.
+            kTrySbeRestricted: "trySbeRestricted"
             # Attempt to use SBE for eligible queries, otherwise fallback to the classic engine.
             kTrySbeEngine: "trySbeEngine"
             # Attempt to use the Bonsai optimizer and lower to SBE for eligible queries, otherwise
@@ -867,16 +872,16 @@ server_parameters:
     default: 100
     validator:
       gte: 1
-  
+
   internalCascadesOptimizerSampleSizeMax:
     description: "Controls the maximum collection size to use sampling for CE."
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerSampleSizeMax"
     cpp_vartype: AtomicWord<int>
     default: 10000
-    validator: 
+    validator:
       gte: 1
-  
+
   internalCascadesOptimizerEnableSqrtSampleSize:
     description: "Use sqrt(numDocs) for sample size when enabled, otherwise numDocs"
     set_at: [ startup, runtime ]
@@ -955,7 +960,7 @@ server_parameters:
     cpp_varname: "internalCascadesOptimizerSamplingCEFallBackForFilterNode"
     cpp_vartype: AtomicWord<bool>
     default: true
-  
+
   internalCascadesOptimizerDisableFastPath:
     description: "Disables fast paths that shortcut the optimizer for some trivial queries."
     set_at: [ startup, runtime ]

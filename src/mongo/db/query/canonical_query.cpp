@@ -78,6 +78,7 @@ bool isBonsaiEnabled(QueryFrameworkControlEnum frameworkControl) {
     switch (frameworkControl) {
         case QueryFrameworkControlEnum::kForceClassicEngine:
         case QueryFrameworkControlEnum::kTrySbeEngine:
+        case QueryFrameworkControlEnum::kTrySbeRestricted:
             return false;
         case QueryFrameworkControlEnum::kTryBonsai:
         case QueryFrameworkControlEnum::kTryBonsaiExperimental:

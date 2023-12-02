@@ -1586,6 +1586,27 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 }  // getSlotBasedExecutor
 
 /**
+ * Function which returns true if 'cq' uses features that are currently supported in SBE without
+ * 'featureFlagSbeFull' being set; false otherwise.
+ */
+bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, const bool sbeFull) {
+    // If we can't push down any agg stages when internalQueryFrameworkControl is set to
+    // "trySbeRestricted", we return false.
+    if (QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp() ==
+            QueryFrameworkControlEnum::kTrySbeRestricted &&
+        cq.cqPipeline().empty()) {
+        return false;
+    }
+
+    // Return true if all the expressions in the CanonicalQuery's filter and projection are SBE
+    // compatible.
+    SbeCompatibility minRequiredCompatibility =
+        sbeFull ? SbeCompatibility::flagGuarded : SbeCompatibility::fullyCompatible;
+
+    return cq.getExpCtx()->sbeCompatibility >= minRequiredCompatibility;
+}
+
+/**
  * Attempts to create a slot-based executor for the query, if the query plan is eligible for SBE
  * execution. This function has three possible return values:
  *
@@ -1610,16 +1631,12 @@ attemptToGetSlotBasedExecutor(
         extractAndAttachPipelineStages(canonicalQuery.get(), true /* attachOnly */);
     }
 
-    // (Ignore FCV check): featureFlagSbeFull does not change the semantics of queries, so it can
-    // safely be enabled on some nodes and disabled on other nodes during upgrade/downgrade.
-    SbeCompatibility minRequiredCompatibility =
-        feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe()
-        ? SbeCompatibility::flagGuarded
-        : SbeCompatibility::fullyCompatible;
+    // (Ignore FCV check): This is intentional because we always want to use this feature once the
+    // feature flag is enabled.
+    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
+    const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
 
-    // Try to construct an SBE plan executor if all the expressions in the CanonicalQuery's filter
-    // and projection are SBE compatible.
-    if (canonicalQuery->getExpCtx()->sbeCompatibility >= minRequiredCompatibility) {
+    if (canUseRegularSbe || sbeFull) {
         auto sbeYieldPolicy =
             PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, canonicalQuery->nss());
         SlotBasedPrepareExecutionHelper helper{
