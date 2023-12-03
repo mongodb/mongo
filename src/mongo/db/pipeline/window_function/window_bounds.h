@@ -68,7 +68,7 @@ struct WindowBounds {
     struct Unbounded {};
     struct Current {};
     template <class T>
-    using Bound = stdx::variant<Unbounded, Current, T>;
+    using Bound = std::variant<Unbounded, Current, T>;
 
     struct DocumentBased {
         Bound<int> lower;
@@ -80,7 +80,7 @@ struct WindowBounds {
         boost::optional<TimeUnit> unit;
     };
 
-    stdx::variant<DocumentBased, RangeBased> bounds;
+    std::variant<DocumentBased, RangeBased> bounds;
 
     static WindowBounds defaultBounds() {
         return WindowBounds{DocumentBased{Unbounded{}, Unbounded{}}};

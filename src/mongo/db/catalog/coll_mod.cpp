@@ -101,7 +101,6 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
@@ -597,7 +596,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
                                   << "' option is only supported on collections clustered by _id"};
         }
 
-        auto status = stdx::visit(
+        auto status = visit(
             OverloadedVisitor{
                 [&oplogEntryBuilder](const std::string& value) -> Status {
                     if (value != "off") {
@@ -651,43 +650,43 @@ void _setClusteredExpireAfterSeconds(
     OperationContext* opCtx,
     const CollectionOptions& oldCollOptions,
     Collection* coll,
-    const stdx::variant<std::string, std::int64_t>& clusteredIndexExpireAfterSeconds) {
+    const std::variant<std::string, std::int64_t>& clusteredIndexExpireAfterSeconds) {
     invariant(oldCollOptions.clusteredIndex);
 
     boost::optional<int64_t> oldExpireAfterSeconds = oldCollOptions.expireAfterSeconds;
 
-    stdx::visit(
-        OverloadedVisitor{
-            [&](const std::string& newExpireAfterSeconds) {
-                invariant(newExpireAfterSeconds == "off");
-                if (!oldExpireAfterSeconds) {
-                    // expireAfterSeconds is already disabled on the clustered index.
-                    return;
-                }
+    visit(OverloadedVisitor{
+              [&](const std::string& newExpireAfterSeconds) {
+                  invariant(newExpireAfterSeconds == "off");
+                  if (!oldExpireAfterSeconds) {
+                      // expireAfterSeconds is already disabled on the clustered index.
+                      return;
+                  }
 
-                coll->updateClusteredIndexTTLSetting(opCtx, boost::none);
-            },
-            [&](std::int64_t newExpireAfterSeconds) {
-                if (oldExpireAfterSeconds && *oldExpireAfterSeconds == newExpireAfterSeconds) {
-                    // expireAfterSeconds is already the requested value on the clustered index.
-                    return;
-                }
+                  coll->updateClusteredIndexTTLSetting(opCtx, boost::none);
+              },
+              [&](std::int64_t newExpireAfterSeconds) {
+                  if (oldExpireAfterSeconds && *oldExpireAfterSeconds == newExpireAfterSeconds) {
+                      // expireAfterSeconds is already the requested value on the clustered index.
+                      return;
+                  }
 
-                // If this collection was not previously TTL, inform the TTL monitor when we commit.
-                if (!oldExpireAfterSeconds) {
-                    auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
-                    opCtx->recoveryUnit()->onCommit(
-                        [ttlCache, uuid = coll->uuid()](OperationContext*,
-                                                        boost::optional<Timestamp>) {
-                            ttlCache->registerTTLInfo(
-                                uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
-                        });
-                }
+                  // If this collection was not previously TTL, inform the TTL monitor when we
+                  // commit.
+                  if (!oldExpireAfterSeconds) {
+                      auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
+                      opCtx->recoveryUnit()->onCommit([ttlCache, uuid = coll->uuid()](
+                                                          OperationContext*,
+                                                          boost::optional<Timestamp>) {
+                          ttlCache->registerTTLInfo(
+                              uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
+                      });
+                  }
 
-                invariant(newExpireAfterSeconds >= 0);
-                coll->updateClusteredIndexTTLSetting(opCtx, newExpireAfterSeconds);
-            }},
-        clusteredIndexExpireAfterSeconds);
+                  invariant(newExpireAfterSeconds >= 0);
+                  coll->updateClusteredIndexTTLSetting(opCtx, newExpireAfterSeconds);
+              }},
+          clusteredIndexExpireAfterSeconds);
 }
 
 Status _processCollModDryRunMode(OperationContext* opCtx,

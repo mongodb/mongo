@@ -70,7 +70,6 @@
 #include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
@@ -187,9 +186,9 @@ void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
         }
     });
 
-    const auto& mergeAction = stdx::get<MergeAllChunksOnShardInfo>(action);
+    const auto& mergeAction = get<MergeAllChunksOnShardInfo>(action);
 
-    const auto& swResponse = stdx::get<StatusWith<NumMergedChunks>>(response);
+    const auto& swResponse = get<StatusWith<NumMergedChunks>>(response);
     if (swResponse.isOK()) {
         auto numMergedChunks = swResponse.getValue();
         if (numMergedChunks > 0) {

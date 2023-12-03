@@ -59,7 +59,7 @@ public:
         ClockSource* clockSource,
         int yieldFrequency,
         Milliseconds yieldPeriod,
-        stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+        std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
         std::unique_ptr<YieldPolicyCallbacks> callbacks = nullptr);
 
     /**
@@ -83,7 +83,7 @@ private:
                        ClockSource* clockSource,
                        int yieldFrequency,
                        Milliseconds yieldPeriod,
-                       stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+                       std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
                        std::unique_ptr<YieldPolicyCallbacks> callbacks);
 
     void saveState(OperationContext* opCtx) override;

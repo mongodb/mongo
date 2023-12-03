@@ -100,7 +100,7 @@ const HostAndPort kTestHosts[] = {
 
 Status getMockDuplicateKeyError() {
     return {DuplicateKeyErrorInfo(
-                BSON("mock" << 1), BSON("" << 1), BSONObj{}, stdx::monostate{}, boost::none),
+                BSON("mock" << 1), BSON("" << 1), BSONObj{}, std::monostate{}, boost::none),
             "Mock duplicate key error"};
 }
 

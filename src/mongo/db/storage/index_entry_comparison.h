@@ -295,7 +295,7 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
                               const std::string& indexName,
                               const BSONObj& keyPattern,
                               const BSONObj& indexCollation,
-                              DuplicateKeyErrorInfo::FoundValue&& foundValue = stdx::monostate{},
+                              DuplicateKeyErrorInfo::FoundValue&& foundValue = std::monostate{},
                               boost::optional<RecordId> duplicateRid = boost::none);
 
 Status buildDupKeyErrorStatus(const key_string::Value& keyString,

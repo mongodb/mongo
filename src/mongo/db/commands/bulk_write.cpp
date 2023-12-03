@@ -996,24 +996,24 @@ BSONObj makeSingleOpSampledBulkWriteCommandRequest(OperationContext* opCtx,
 
     // Make a copy of the operation and adjust its namespace index to 0.
     auto newOp = req.getOps()[opIdx];
-    stdx::visit(OverloadedVisitor{
-                    [&](mongo::BulkWriteInsertOp& op) { MONGO_UNREACHABLE },
-                    [&](mongo::BulkWriteUpdateOp& op) {
-                        op.setUpdate(0);
-                        if (req.getOriginalQuery() || req.getOriginalCollation()) {
-                            op.setFilter(req.getOriginalQuery().get_value_or({}));
-                            op.setCollation(req.getOriginalCollation());
-                        }
-                    },
-                    [&](mongo::BulkWriteDeleteOp& op) {
-                        op.setDeleteCommand(0);
-                        if (req.getOriginalQuery() || req.getOriginalCollation()) {
-                            op.setFilter(req.getOriginalQuery().get_value_or({}));
-                            op.setCollation(req.getOriginalCollation());
-                        }
-                    },
-                },
-                newOp);
+    visit(OverloadedVisitor{
+              [&](mongo::BulkWriteInsertOp& op) { MONGO_UNREACHABLE },
+              [&](mongo::BulkWriteUpdateOp& op) {
+                  op.setUpdate(0);
+                  if (req.getOriginalQuery() || req.getOriginalCollation()) {
+                      op.setFilter(req.getOriginalQuery().get_value_or({}));
+                      op.setCollation(req.getOriginalCollation());
+                  }
+              },
+              [&](mongo::BulkWriteDeleteOp& op) {
+                  op.setDeleteCommand(0);
+                  if (req.getOriginalQuery() || req.getOriginalCollation()) {
+                      op.setFilter(req.getOriginalQuery().get_value_or({}));
+                      op.setCollation(req.getOriginalCollation());
+                  }
+              },
+          },
+          newOp);
 
     BulkWriteCommandRequest singleOpRequest;
     singleOpRequest.setOps({newOp});

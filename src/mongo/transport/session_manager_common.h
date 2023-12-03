@@ -32,10 +32,10 @@
 #include "mongo/transport/session_manager.h"
 
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "mongo/db/client.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/transport/client_transport_observer.h"
 #include "mongo/util/net/cidr.h"
 
@@ -103,7 +103,7 @@ protected:
  * Returns true if a session with remote/local addresses should be exempted from maxConns.
  */
 bool shouldOverrideMaxConns(const std::shared_ptr<Session>& session,
-                            const std::vector<stdx::variant<CIDR, std::string>>& exemptions);
+                            const std::vector<std::variant<CIDR, std::string>>& exemptions);
 
 }  // namespace transport
 }  // namespace mongo

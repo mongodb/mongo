@@ -44,7 +44,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
-#include "mongo/stdx/variant.h"
 
 namespace mongo {
 namespace {
@@ -67,8 +66,7 @@ MigrationSecondaryThrottleOptions MigrationSecondaryThrottleOptions::create(
 MigrationSecondaryThrottleOptions MigrationSecondaryThrottleOptions::createWithWriteConcern(
     const WriteConcernOptions& writeConcern) {
     // Optimize on write concern, which makes no difference
-    if (stdx::holds_alternative<int64_t>(writeConcern.w) &&
-        stdx::get<int64_t>(writeConcern.w) <= 1) {
+    if (holds_alternative<int64_t>(writeConcern.w) && get<int64_t>(writeConcern.w) <= 1) {
         return MigrationSecondaryThrottleOptions(kOff, boost::none);
     }
 

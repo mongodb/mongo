@@ -2431,7 +2431,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_serializer_method_variant_helper(self, field, template_params, builder='builder'):
         # type: (ast.Field, Dict[str, str], str) -> None
 
-        with self._block('stdx::visit(OverloadedVisitor{', '}, ${access_member});'):
+        with self._block('visit(OverloadedVisitor{', '}, ${access_member});'):
             for variant_type in itertools.chain(
                     field.type.variant_types,
                     field.type.variant_struct_types if field.type.variant_struct_types else []):

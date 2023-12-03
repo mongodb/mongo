@@ -250,24 +250,24 @@ SbExpr::SbExpr(const abt::HolderPtr& a) : _storage(abt::wrap(a->_value)) {}
 
 TypedExpression SbExpr::extractExpr(StageBuilderState& state) {
     if (hasSlot()) {
-        auto slotId = stdx::get<sbe::value::SlotId>(_storage);
+        auto slotId = get<sbe::value::SlotId>(_storage);
         return {sbe::makeE<sbe::EVariable>(slotId), TypeSignature::kAnyScalarType};
     }
 
-    if (stdx::holds_alternative<LocalVarInfo>(_storage)) {
-        auto [frameId, slotId] = stdx::get<LocalVarInfo>(_storage);
+    if (holds_alternative<LocalVarInfo>(_storage)) {
+        auto [frameId, slotId] = get<LocalVarInfo>(_storage);
         return {sbe::makeE<sbe::EVariable>(frameId, slotId), TypeSignature::kAnyScalarType};
     }
 
-    if (stdx::holds_alternative<abt::HolderPtr>(_storage)) {
-        return abtToExpr(stdx::get<abt::HolderPtr>(_storage)->_value, state);
+    if (holds_alternative<abt::HolderPtr>(_storage)) {
+        return abtToExpr(get<abt::HolderPtr>(_storage)->_value, state);
     }
 
-    if (stdx::holds_alternative<bool>(_storage)) {
+    if (holds_alternative<bool>(_storage)) {
         return {EExpr{}, TypeSignature::kAnyScalarType};
     }
 
-    return {std::move(stdx::get<EExpr>(_storage)), TypeSignature::kAnyScalarType};
+    return {std::move(get<EExpr>(_storage)), TypeSignature::kAnyScalarType};
 }
 
 TypedExpression SbExpr::getExpr(StageBuilderState& state) const {
@@ -276,20 +276,20 @@ TypedExpression SbExpr::getExpr(StageBuilderState& state) const {
 
 abt::HolderPtr SbExpr::extractABT() {
     if (hasSlot()) {
-        auto slotId = stdx::get<sbe::value::SlotId>(_storage);
+        auto slotId = get<sbe::value::SlotId>(_storage);
         return abt::wrap(makeABTVariable(slotId));
     }
 
-    if (stdx::holds_alternative<LocalVarInfo>(_storage)) {
-        auto [frameId, slotId] = stdx::get<LocalVarInfo>(_storage);
+    if (holds_alternative<LocalVarInfo>(_storage)) {
+        auto [frameId, slotId] = get<LocalVarInfo>(_storage);
         return abt::wrap(makeABTLocalVariable(frameId, slotId));
     }
 
     tassert(6950800,
             "Unexpected: extractABT() method invoked on an EExpression object",
-            stdx::holds_alternative<abt::HolderPtr>(_storage));
+            holds_alternative<abt::HolderPtr>(_storage));
 
-    return std::move(stdx::get<abt::HolderPtr>(_storage));
+    return std::move(get<abt::HolderPtr>(_storage));
 }
 
 void SbExpr::set(sbe::FrameId frameId, sbe::value::SlotId slotId) {

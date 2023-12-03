@@ -62,7 +62,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/cidr.h"
@@ -476,7 +475,7 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
 
 Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
     const WriteConcernOptions& writeConcern) const {
-    if (auto wNumNodes = stdx::get_if<int64_t>(&writeConcern.w)) {
+    if (auto wNumNodes = get_if<int64_t>(&writeConcern.w)) {
         if (*wNumNodes > getNumDataBearingMembers()) {
             return Status(ErrorCodes::UnsatisfiableWriteConcern, "Not enough data-bearing nodes");
         }
@@ -485,9 +484,9 @@ Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
     }
 
     StatusWith<ReplSetTagPattern> tagPatternStatus = [&]() {
-        auto wMode = stdx::get_if<std::string>(&writeConcern.w);
+        auto wMode = get_if<std::string>(&writeConcern.w);
         return wMode ? findCustomWriteMode(*wMode)
-                     : makeCustomWriteMode(stdx::get<WTags>(writeConcern.w));
+                     : makeCustomWriteMode(get<WTags>(writeConcern.w));
     }();
 
     if (!tagPatternStatus.isOK()) {
@@ -508,9 +507,9 @@ Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
     // Even if all the nodes in the set had a given write it still would not satisfy this
     // write concern mode.
     auto wModeForError = [&]() {
-        auto wMode = stdx::get_if<std::string>(&writeConcern.w);
+        auto wMode = get_if<std::string>(&writeConcern.w);
         return wMode ? fmt::format("\"{}\"", *wMode)
-                     : fmt::format("{}", stdx::get<WTags>(writeConcern.w));
+                     : fmt::format("{}", get<WTags>(writeConcern.w));
     }();
 
     return Status(ErrorCodes::UnsatisfiableWriteConcern,
@@ -783,8 +782,7 @@ bool ReplSetConfig::containsCustomizedGetLastErrorDefaults() const {
     // Since the ReplSetConfig always has a WriteConcernOptions, the only way to know if it has been
     // customized through getLastErrorDefaults is if it's different from { w: 1, wtimeout: 0 }.
     const auto& getLastErrorDefaults = getDefaultWriteConcern();
-    if (auto wNumNodes = stdx::get_if<int64_t>(&getLastErrorDefaults.w);
-        !wNumNodes || *wNumNodes != 1)
+    if (auto wNumNodes = get_if<int64_t>(&getLastErrorDefaults.w); !wNumNodes || *wNumNodes != 1)
         return true;
     if (getLastErrorDefaults.wTimeout != Milliseconds::zero())
         return true;
@@ -795,7 +793,7 @@ bool ReplSetConfig::containsCustomizedGetLastErrorDefaults() const {
 
 Status ReplSetConfig::validateWriteConcern(const WriteConcernOptions& writeConcern) const {
     if (writeConcern.hasCustomWriteMode()) {
-        return findCustomWriteMode(stdx::get<std::string>(writeConcern.w)).getStatus();
+        return findCustomWriteMode(get<std::string>(writeConcern.w)).getStatus();
     }
     return Status::OK();
 }

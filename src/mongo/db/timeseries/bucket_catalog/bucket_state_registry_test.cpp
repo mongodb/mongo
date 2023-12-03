@@ -57,7 +57,6 @@
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -82,15 +81,14 @@ public:
             return false;
         }
 
-        return stdx::visit(OverloadedVisitor{[](BucketState bucketState) {
-                                                 return bucketState == BucketState::kCleared ||
-                                                     bucketState ==
-                                                     BucketState::kPreparedAndCleared;
-                                             },
-                                             [](DirectWriteCounter dwcount) {
-                                                 return false;
-                                             }},
-                           *state);
+        return visit(OverloadedVisitor{[](BucketState bucketState) {
+                                           return bucketState == BucketState::kCleared ||
+                                               bucketState == BucketState::kPreparedAndCleared;
+                                       },
+                                       [](DirectWriteCounter dwcount) {
+                                           return false;
+                                       }},
+                     *state);
     }
 
     Bucket& createBucket(const internal::CreationInfo& info) {
@@ -141,19 +139,19 @@ public:
         if (!state.has_value()) {
             // We don't expect the bucket to be tracked within the BucketStateRegistry.
             return !expectedBucketState.has_value();
-        } else if (stdx::holds_alternative<DirectWriteCounter>(*state)) {
+        } else if (holds_alternative<DirectWriteCounter>(*state)) {
             // If the state is tracked by a direct write counter, then the states are not equal.
             return false;
         }
 
         // Interpret the variant value as BucketState and check it against the expected value.
-        auto bucketState = stdx::get<BucketState>(*state);
+        auto bucketState = std::get<BucketState>(*state);
         return bucketState == expectedBucketState.value();
     }
 
     bool doesBucketHaveDirectWrite(const BucketId& bucketId) {
         auto state = getBucketState(bucketStateRegistry, bucketId);
-        return state.has_value() && stdx::holds_alternative<DirectWriteCounter>(*state);
+        return state.has_value() && holds_alternative<DirectWriteCounter>(*state);
     }
 
     WithLock withLock = WithLock::withoutLock();
@@ -383,11 +381,11 @@ TEST_F(BucketStateRegistryTest, TransitionsFromDirectWriteState) {
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     auto bucketState = addDirectWrite(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
-    auto originalDirectWriteCount = stdx::get<DirectWriteCounter>(bucketState);
+    auto originalDirectWriteCount = std::get<DirectWriteCounter>(bucketState);
 
     // We expect future direct writes to add-on.
     bucketState = addDirectWrite(bucketStateRegistry, bucket.bucketId);
-    auto newDirectWriteCount = stdx::get<DirectWriteCounter>(bucketState);
+    auto newDirectWriteCount = std::get<DirectWriteCounter>(bucketState);
     ASSERT_GT(newDirectWriteCount, originalDirectWriteCount);
 
     // We expect untracking to leave the state unaffected.
@@ -697,7 +695,7 @@ TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
     // If no direct write has been initiated, the direct write counter should be 0.
     auto state = getBucketState(bucketStateRegistry, bucketId);
     ASSERT_TRUE(state.has_value());
-    ASSERT_TRUE(stdx::holds_alternative<BucketState>(*state));
+    ASSERT_TRUE(holds_alternative<BucketState>(*state));
 
     // Start a direct write and ensure the counter is incremented correctly.
     while (dwCounter < 4) {

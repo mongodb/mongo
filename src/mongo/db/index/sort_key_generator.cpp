@@ -49,7 +49,6 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/shared_buffer_fragment.h"
 
@@ -279,7 +278,7 @@ boost::optional<Value> SortKeyGenerator::extractKeyPart(
         invariant(!patternPart.expression);
         auto keyVariant = doc.getNestedFieldNonCaching(*patternPart.fieldPath);
 
-        auto key = stdx::visit(
+        auto key = visit(
             OverloadedVisitor{
                 // In this case, the document has an array along the path given. This means the
                 // document is ineligible for taking the fast path for index key generation.
@@ -300,7 +299,7 @@ boost::optional<Value> SortKeyGenerator::extractKeyPart(
                     }
                     return Value(elt);
                 },
-                [](stdx::monostate none) -> boost::optional<Value> { return Value(); },
+                [](std::monostate none) -> boost::optional<Value> { return Value(); },
             },
             keyVariant);
 

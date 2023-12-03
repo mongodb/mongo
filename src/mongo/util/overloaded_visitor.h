@@ -36,7 +36,7 @@ namespace mongo {
  * See https://www.modernescpp.com/index.php/visiting-a-std-variant-with-the-overload-pattern
  * Example usage:
  *
- * auto r = stdx::visit(OverloadedVisitor{
+ * auto r = visit(OverloadedVisitor{
  *                         [](int v) { return intStuff(v); },
  *                         [](StringData v) { return stringStuff(v); },
  *                      },

@@ -45,7 +45,6 @@
 #include "mongo/idl/generic_args_with_types_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
@@ -162,7 +161,7 @@ public:
                   return CommandErrorProvenance::kLocal;
               return CommandErrorProvenance::kRemote;
           }()},
-          _error{[&]() -> stdx::variant<Status, RemoteError> {
+          _error{[&]() -> std::variant<Status, RemoteError> {
               if (_prov == CommandErrorProvenance::kLocal) {
                   return rcr.status;
               } else {
@@ -188,11 +187,11 @@ public:
     }
 
     const RemoteError& asRemote() const {
-        return stdx::get<RemoteError>(_error);
+        return get<RemoteError>(_error);
     }
 
     Status asLocal() const {
-        return stdx::get<Status>(_error);
+        return get<Status>(_error);
     }
 
     boost::optional<HostAndPort> getTargetAttempted() const {
@@ -210,7 +209,7 @@ public:
 private:
     AsyncRPCErrorInfo(RemoteError err) : _prov{CommandErrorProvenance::kRemote}, _error{err} {}
     CommandErrorProvenance _prov;
-    stdx::variant<Status, RemoteError> _error;
+    std::variant<Status, RemoteError> _error;
     boost::optional<HostAndPort> _targetAttempted;
 };
 

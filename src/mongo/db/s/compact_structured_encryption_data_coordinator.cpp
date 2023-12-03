@@ -227,7 +227,7 @@ bool doRenameOperation(const CompactionState& state,
         mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
         CreateCollectionRequest request;
         request.setClusteredIndex(
-            stdx::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
+            std::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
         createCmd.setCreateCollectionRequest(std::move(request));
         auto status = doRunCommand(opCtx.get(), ecocNss.dbName(), createCmd);
         if (!status.isOK()) {

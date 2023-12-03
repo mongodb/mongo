@@ -70,7 +70,7 @@ struct ParameterizedIndexScanSlots {
     // In the case that the parameterized plan will always consist of a single interval index scan,
     // this holds the SingleInterval struct. Otherwise, holds the necessary slots for a fully
     // generic parameterized index scan plan.
-    stdx::variant<SingleIntervalPlan, GenericPlan> slots;
+    std::variant<SingleIntervalPlan, GenericPlan> slots;
 };
 
 // Holds the slots for the clustered collection scan bounds.

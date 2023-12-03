@@ -91,7 +91,7 @@ public:
             }
         } else {
             _serviceContext = std::make_unique<QueryTestServiceContext>();
-            _testOpCtx = stdx::get<std::unique_ptr<QueryTestServiceContext>>(_serviceContext)
+            _testOpCtx = get<std::unique_ptr<QueryTestServiceContext>>(_serviceContext)
                              ->makeOperationContext();
         }
 
@@ -224,7 +224,7 @@ public:
                 return ctx->getServiceContext();
             }
         };
-        return stdx::visit(Visitor{}, _serviceContext);
+        return visit(Visitor{}, _serviceContext);
     }
 
 private:
@@ -238,7 +238,7 @@ private:
         timeZoneDatabase = TimeZoneDatabase::get(serviceContext);
     }
 
-    stdx::variant<ServiceContext*, std::unique_ptr<QueryTestServiceContext>> _serviceContext;
+    std::variant<ServiceContext*, std::unique_ptr<QueryTestServiceContext>> _serviceContext;
     ServiceContext::UniqueOperationContext _testOpCtx;
 };
 

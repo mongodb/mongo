@@ -39,7 +39,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/text.h"                // IWYU pragma: keep
@@ -60,7 +59,7 @@ DuplicateKeyErrorInfo::DuplicateKeyErrorInfo(const BSONObj& keyPattern,
       _keyValue(keyValue.getOwned()),
       _collation(collation.getOwned()),
       _foundValue(std::move(foundValue)) {
-    if (auto foundValueObj = stdx::get_if<BSONObj>(&_foundValue)) {
+    if (auto foundValueObj = get_if<BSONObj>(&_foundValue)) {
         _foundValue = foundValueObj->getOwned();
     }
     if (duplicateRid) {
@@ -104,16 +103,16 @@ void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
         bob->append("collation", _collation);
     }
 
-    stdx::visit(OverloadedVisitor{
-                    [](stdx::monostate) {},
-                    [bob](const RecordId& rid) { rid.serializeToken("foundValue", bob); },
-                    [bob](const BSONObj& obj) {
-                        if (obj.objsize() < BSONObjMaxUserSize / 2) {
-                            bob->append("foundValue", obj);
-                        }
-                    },
-                },
-                _foundValue);
+    visit(OverloadedVisitor{
+              [](std::monostate) {},
+              [bob](const RecordId& rid) { rid.serializeToken("foundValue", bob); },
+              [bob](const BSONObj& obj) {
+                  if (obj.objsize() < BSONObjMaxUserSize / 2) {
+                      bob->append("foundValue", obj);
+                  }
+              },
+          },
+          _foundValue);
 
     if (_duplicateRid) {
         _duplicateRid->serializeToken("duplicateRid", bob);

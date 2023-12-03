@@ -90,7 +90,6 @@
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/decorable.h"
@@ -421,7 +420,7 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
     return bucketDoc.uncompressedBucket;
 }
 
-stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
+std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
     const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements) {
     // A bucket will be fully deleted if no measurements are passed in.
     if (measurements.empty()) {
@@ -598,16 +597,16 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                 auto& insertResult = swResult.getValue();
 
                 if (auto* reopeningContext =
-                        stdx::get_if<bucket_catalog::ReopeningContext>(&insertResult)) {
+                        get_if<bucket_catalog::ReopeningContext>(&insertResult)) {
                     BSONObj suitableBucket;
 
-                    if (auto* bucketId = stdx::get_if<OID>(&reopeningContext->candidate)) {
+                    if (auto* bucketId = get_if<OID>(&reopeningContext->candidate)) {
                         DBDirectClient client{opCtx};
                         suitableBucket =
                             client.findOne(bucketsColl->ns(), BSON("_id" << *bucketId));
                         reopeningContext->fetchedBucket = true;
-                    } else if (auto* pipeline = stdx::get_if<std::vector<BSONObj>>(
-                                   &reopeningContext->candidate)) {
+                    } else if (auto* pipeline =
+                                   get_if<std::vector<BSONObj>>(&reopeningContext->candidate)) {
                         // Resort to Query-Based reopening approach.
                         DBDirectClient client{opCtx};
 
@@ -652,8 +651,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                                                       measurementDoc,
                                                       combine,
                                                       reopeningContext);
-                } else if (auto* waiter =
-                               stdx::get_if<bucket_catalog::InsertWaiter>(&insertResult)) {
+                } else if (auto* waiter = get_if<bucket_catalog::InsertWaiter>(&insertResult)) {
                     // Need to wait for another operation to finish, then retry. This could be
                     // another reopening request or a previously prepared write batch for the same
                     // series (metaField value). The easiest way to retry here is to reset swResult
@@ -727,7 +725,7 @@ TimeseriesBatches insertIntoBucketCatalogForUpdate(OperationContext* opCtx,
                                     measurement,
                                     bucket_catalog::CombineWithInsertsFromOtherClients::kDisallow,
                                     /*fromUpdates=*/true));
-        auto* insertResult = stdx::get_if<bucket_catalog::SuccessfulInsertion>(&result);
+        auto* insertResult = get_if<bucket_catalog::SuccessfulInsertion>(&result);
         invariant(insertResult);
         batches.emplace_back(std::move(insertResult->batch));
     }
@@ -739,8 +737,8 @@ void performAtomicWrites(
     OperationContext* opCtx,
     const CollectionPtr& coll,
     const RecordId& recordId,
-    const boost::optional<stdx::variant<write_ops::UpdateCommandRequest,
-                                        write_ops::DeleteCommandRequest>>& modificationOp,
+    const boost::optional<std::variant<write_ops::UpdateCommandRequest,
+                                       write_ops::DeleteCommandRequest>>& modificationOp,
     const std::vector<write_ops::InsertCommandRequest>& insertOps,
     const std::vector<write_ops::UpdateCommandRequest>& updateOps,
     bool fromMigrate,
@@ -766,7 +764,7 @@ void performAtomicWrites(
     WriteUnitOfWork wuow{opCtx, groupOplogEntries};
 
     if (modificationOp) {
-        stdx::visit(
+        visit(
             OverloadedVisitor{[&](const write_ops::UpdateCommandRequest& updateOp) {
                                   updateTimeseriesDocument(
                                       opCtx, coll, updateOp, &curOp->debug(), fromMigrate, stmtId);
@@ -811,8 +809,8 @@ void commitTimeseriesBucketsAtomically(
     bucket_catalog::BucketCatalog& sideBucketCatalog,
     const CollectionPtr& coll,
     const RecordId& recordId,
-    const boost::optional<stdx::variant<write_ops::UpdateCommandRequest,
-                                        write_ops::DeleteCommandRequest>>& modificationOp,
+    const boost::optional<std::variant<write_ops::UpdateCommandRequest,
+                                       write_ops::DeleteCommandRequest>>& modificationOp,
     TimeseriesBatches* batches,
     const NamespaceString& bucketsNs,
     bool fromMigrate,

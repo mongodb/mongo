@@ -53,7 +53,7 @@ public:
     /**
      * Updates the internal status of the policy by notifying the result of an action previously
      * retrieved through getNextStreamingAction().
-     * The types of action and response are expected to match - or an stdx::bad_variant_access
+     * The types of action and response are expected to match - or an std::bad_variant_access
      * error will be thrown.
      */
     virtual void applyActionResult(OperationContext* opCtx,

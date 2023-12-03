@@ -41,7 +41,7 @@ namespace mongo {
 PlanYieldPolicyImpl::PlanYieldPolicyImpl(
     PlanExecutorImpl* exec,
     PlanYieldPolicy::YieldPolicy policy,
-    stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
     : PlanYieldPolicy(exec->getOpCtx(),
                       policy,

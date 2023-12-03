@@ -126,17 +126,17 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
 }
 
 const std::string& getTopLevelField(const sv::CellBlock::PathRequest& pathReq) {
-    return std::get<sv::CellBlock::Get>(pathReq.path[0]).field;
+    return get<sv::CellBlock::Get>(pathReq.path[0]).field;
 }
 
 std::string getFullPath(const sv::CellBlock::PathRequest& pathReq) {
     StringBuilder sb;
     for (const auto& path : pathReq.path) {
-        if (std::holds_alternative<sv::CellBlock::Get>(path)) {
+        if (holds_alternative<sv::CellBlock::Get>(path)) {
             if (sb.len() != 0) {
                 sb.append(".");
             }
-            sb.append(std::get<sv::CellBlock::Get>(path).field);
+            sb.append(get<sv::CellBlock::Get>(path).field);
         }
     }
     return sb.str();

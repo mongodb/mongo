@@ -64,7 +64,6 @@
 #include "mongo/db/cst/path.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -2523,13 +2522,13 @@ yyreduce:
                     {
                         auto projection = YY_MOVE(yystack_[0].value.as<CNode>());
                         yylhs.value.as<CNode>() =
-                            stdx::holds_alternative<CNode::ObjectChildren>(projection.payload) &&
-                                stdx::holds_alternative<FieldnamePath>(
+                            holds_alternative<CNode::ObjectChildren>(projection.payload) &&
+                                holds_alternative<FieldnamePath>(
                                     projection.objectChildren()[0].first)
                             ? c_node_disambiguation::disambiguateCompoundProjection(
                                   std::move(projection))
                             : std::move(projection);
-                        if (stdx::holds_alternative<CompoundInconsistentKey>(
+                        if (holds_alternative<CompoundInconsistentKey>(
                                 yylhs.value.as<CNode>().payload))
                             // TODO SERVER-50498: error() instead of uasserting
                             uasserted(ErrorCodes::FailedToParse,
@@ -2836,8 +2835,8 @@ yyreduce:
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
-                        if (stdx::holds_alternative<PositionalProjectionPath>(
-                                stdx::get<FieldnamePath>(yylhs.value.as<CNode::Fieldname>())))
+                        if (holds_alternative<PositionalProjectionPath>(
+                                get<FieldnamePath>(yylhs.value.as<CNode::Fieldname>())))
                             error(yystack_[0].location,
                                   "positional projection forbidden in $project aggregation "
                                   "pipeline stage");
@@ -7908,9 +7907,8 @@ yyreduce:
                     case 627:  // sortFieldname: valueFieldname
 #line 2645 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() =
-                            SortPath{makeVector<std::string>(stdx::get<UserFieldname>(
-                                YY_MOVE(yystack_[0].value.as<CNode::Fieldname>())))};
+                        yylhs.value.as<CNode::Fieldname>() = SortPath{makeVector<std::string>(
+                            get<UserFieldname>(YY_MOVE(yystack_[0].value.as<CNode::Fieldname>())))};
                     }
 #line 7126 "parser_gen.cpp"
                     break;
@@ -8014,13 +8012,13 @@ yyreduce:
                     {
                         auto projection = YY_MOVE(yystack_[0].value.as<CNode>());
                         yylhs.value.as<CNode>() =
-                            stdx::holds_alternative<CNode::ObjectChildren>(projection.payload) &&
-                                stdx::holds_alternative<FieldnamePath>(
+                            holds_alternative<CNode::ObjectChildren>(projection.payload) &&
+                                holds_alternative<FieldnamePath>(
                                     projection.objectChildren()[0].first)
                             ? c_node_disambiguation::disambiguateCompoundProjection(
                                   std::move(projection))
                             : std::move(projection);
-                        if (stdx::holds_alternative<CompoundInconsistentKey>(
+                        if (holds_alternative<CompoundInconsistentKey>(
                                 yylhs.value.as<CNode>().payload))
                             // TODO SERVER-50498: error() instead of uasserting
                             uasserted(ErrorCodes::FailedToParse,

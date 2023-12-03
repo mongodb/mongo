@@ -75,7 +75,6 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -291,13 +290,13 @@ struct SnapshotedServices {
 SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
                                            const CollectionCatalog& catalog,
                                            const AcquisitionPrerequisites& prerequisites) {
-    if (stdx::holds_alternative<AcquisitionPrerequisites::PlacementConcernPlaceholder>(
+    if (holds_alternative<AcquisitionPrerequisites::PlacementConcernPlaceholder>(
             prerequisites.placementConcern)) {
         return SnapshotedServices{
             acquireLocalCollectionOrView(opCtx, catalog, prerequisites), boost::none, boost::none};
     }
 
-    const auto& placementConcern = stdx::get<PlacementConcern>(prerequisites.placementConcern);
+    const auto& placementConcern = get<PlacementConcern>(prerequisites.placementConcern);
 
     auto collOrView = acquireLocalCollectionOrView(opCtx, catalog, prerequisites);
     const auto& nss = prerequisites.nss;
@@ -317,9 +316,8 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
         : boost::none;
 
     // TODO: This will be removed when we no longer snapshot sharding state on CollectionPtr.
-    if (std::holds_alternative<CollectionPtr>(collOrView) && collectionDescription.isSharded()) {
-        std::get<CollectionPtr>(collOrView)
-            .setShardKeyPattern(collectionDescription.getKeyPattern());
+    if (holds_alternative<CollectionPtr>(collOrView) && collectionDescription.isSharded()) {
+        get<CollectionPtr>(collOrView).setShardKeyPattern(collectionDescription.getKeyPattern());
     }
 
     return SnapshotedServices{
@@ -351,11 +349,10 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
 
         auto snapshotedServices = acquireServicesSnapshot(opCtx, catalog, prerequisites);
         const bool isCollection =
-            std::holds_alternative<CollectionPtr>(snapshotedServices.collectionPtrOrView);
+            holds_alternative<CollectionPtr>(snapshotedServices.collectionPtrOrView);
 
         if (isCollection) {
-            const auto& collectionPtr =
-                std::get<CollectionPtr>(snapshotedServices.collectionPtrOrView);
+            const auto& collectionPtr = get<CollectionPtr>(snapshotedServices.collectionPtrOrView);
             invariant(!prerequisites.uuid || prerequisites.uuid == collectionPtr->uuid());
             if (!prerequisites.uuid && collectionPtr) {
                 // If the uuid wasn't originally set on the AcquisitionRequest, set it now on the
@@ -385,18 +382,18 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
                      std::move(acquisitionRequest.second.acquisitionLocks),
                      std::move(snapshotedServices.collectionDescription),
                      std::move(snapshotedServices.ownershipFilter),
-                     std::move(std::get<CollectionPtr>(snapshotedServices.collectionPtrOrView))});
+                     std::move(get<CollectionPtr>(snapshotedServices.collectionPtrOrView))});
 
             CollectionAcquisition acquisition(txnResources, acquiredCollection);
             acquisitions.emplace(prerequisites.nss, std::move(acquisition));
         } else {
             // It's a view.
-            auto& acquiredView = txnResources.addAcquiredView(
-                {prerequisites,
-                 std::move(acquisitionRequest.second.dbLock),
-                 std::move(acquisitionRequest.second.collLock),
-                 std::move(std::get<std::shared_ptr<const ViewDefinition>>(
-                     snapshotedServices.collectionPtrOrView))});
+            auto& acquiredView =
+                txnResources.addAcquiredView({prerequisites,
+                                              std::move(acquisitionRequest.second.dbLock),
+                                              std::move(acquisitionRequest.second.collLock),
+                                              std::move(get<std::shared_ptr<const ViewDefinition>>(
+                                                  snapshotedServices.collectionPtrOrView))});
 
             ViewAcquisition acquisition(txnResources, acquiredView);
             acquisitions.emplace(prerequisites.nss, std::move(acquisition));
@@ -1161,9 +1158,9 @@ CollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
                                  AcquisitionPrerequisites::ViewMode::kMustBeCollection);
 
     auto collOrView = acquireLocalCollectionOrView(opCtx, *catalog, prerequisites);
-    invariant(std::holds_alternative<CollectionPtr>(collOrView));
+    invariant(holds_alternative<CollectionPtr>(collOrView));
 
-    auto& coll = std::get<CollectionPtr>(collOrView);
+    auto& coll = get<CollectionPtr>(collOrView);
     if (coll)
         prerequisites.uuid = boost::optional<UUID>(coll->uuid());
 
@@ -1256,7 +1253,7 @@ YieldedTransactionResources yieldTransactionResourcesFromOperationContext(Operat
     for (auto& acquisition : transactionResources.acquiredCollections) {
         // Yielding kLocalCatalogOnlyWithPotentialDataLoss acquisitions is not allowed.
         invariant(
-            !stdx::holds_alternative<AcquisitionPrerequisites::PlacementConcernPlaceholder>(
+            !holds_alternative<AcquisitionPrerequisites::PlacementConcernPlaceholder>(
                 acquisition.prerequisites.placementConcern),
             str::stream() << "Collection " << acquisition.prerequisites.nss.toStringForErrorMsg()
                           << " acquired with special placement concern and cannot be yielded");
@@ -1292,7 +1289,7 @@ void stashTransactionResourcesFromOperationContext(OperationContext* opCtx,
     for (auto& acquisition : transactionResources.acquiredCollections) {
         // Yielding kLocalCatalogOnlyWithPotentialDataLoss acquisitions is not allowed.
         invariant(
-            !stdx::holds_alternative<AcquisitionPrerequisites::PlacementConcernPlaceholder>(
+            !holds_alternative<AcquisitionPrerequisites::PlacementConcernPlaceholder>(
                 acquisition.prerequisites.placementConcern),
             str::stream() << "Collection " << acquisition.prerequisites.nss.toStringForErrorMsg()
                           << " acquired with special placement concern and cannot be yielded");
@@ -1374,20 +1371,19 @@ void restoreTransactionResourcesToOperationContext(
                 // that upon restore 'acquireLocalCollectionOrView' snapshoted a view -- it
                 // would not have met the prerequisite that the collection instance is still the
                 // same as the one before yielding.
-                invariant(std::holds_alternative<CollectionPtr>(collOrView));
-                if (!acquiredCollection.collectionPtr != !std::get<CollectionPtr>(collOrView)) {
+                invariant(holds_alternative<CollectionPtr>(collOrView));
+                if (!acquiredCollection.collectionPtr != !get<CollectionPtr>(collOrView)) {
                     uassertCollectionAppearedAfterRestore();
                 }
 
                 // Update the services snapshot on TransactionResources
-                acquiredCollection.collectionPtr = std::move(std::get<CollectionPtr>(collOrView));
+                acquiredCollection.collectionPtr = std::move(get<CollectionPtr>(collOrView));
             } else {
                 // Make sure that the placement is still correct.
-                if (std::holds_alternative<PlacementConcern>(prerequisites.placementConcern)) {
-                    checkPlacementVersion(
-                        opCtx,
-                        prerequisites.nss,
-                        std::get<PlacementConcern>(prerequisites.placementConcern));
+                if (holds_alternative<PlacementConcern>(prerequisites.placementConcern)) {
+                    checkPlacementVersion(opCtx,
+                                          prerequisites.nss,
+                                          get<PlacementConcern>(prerequisites.placementConcern));
                 }
 
                 auto reacquiredServicesSnapshot =
@@ -1397,16 +1393,16 @@ void restoreTransactionResourcesToOperationContext(
                 // that upon restore 'acquireLocalCollectionOrView' snapshoted a view -- it
                 // would not have met the prerequisite that the collection instance is still the
                 // same as the one before yielding.
-                invariant(std::holds_alternative<CollectionPtr>(
+                invariant(holds_alternative<CollectionPtr>(
                     reacquiredServicesSnapshot.collectionPtrOrView));
                 if (!acquiredCollection.collectionPtr !=
-                    !std::get<CollectionPtr>(reacquiredServicesSnapshot.collectionPtrOrView)) {
+                    !get<CollectionPtr>(reacquiredServicesSnapshot.collectionPtrOrView)) {
                     uassertCollectionAppearedAfterRestore();
                 }
 
                 // Update the services snapshot on TransactionResources
-                acquiredCollection.collectionPtr = std::move(
-                    std::get<CollectionPtr>(reacquiredServicesSnapshot.collectionPtrOrView));
+                acquiredCollection.collectionPtr =
+                    std::move(get<CollectionPtr>(reacquiredServicesSnapshot.collectionPtrOrView));
                 acquiredCollection.collectionDescription =
                     std::move(reacquiredServicesSnapshot.collectionDescription);
                 acquiredCollection.ownershipFilter =

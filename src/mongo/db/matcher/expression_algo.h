@@ -60,7 +60,7 @@ using NodeTraversalFunc = std::function<void(MatchExpression*, std::string)>;
  */
 bool hasExistencePredicateOnPath(const MatchExpression& expr, StringData path);
 
-using PathOrExprMatchExpression = stdx::variant<PathMatchExpression*, ExprMatchExpression*>;
+using PathOrExprMatchExpression = std::variant<PathMatchExpression*, ExprMatchExpression*>;
 using Renameables = std::vector<std::pair<PathOrExprMatchExpression, std::string>>;
 
 /**

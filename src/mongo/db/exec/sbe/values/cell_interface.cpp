@@ -49,13 +49,13 @@ std::string pathToString(const CellBlock::Path& p) {
     std::string out;
     size_t idx = 0;
     for (auto& component : p) {
-        if (std::holds_alternative<CellBlock::Id>(component)) {
+        if (holds_alternative<CellBlock::Id>(component)) {
             out += "Id";
-        } else if (std::holds_alternative<CellBlock::Get>(component)) {
+        } else if (holds_alternative<CellBlock::Get>(component)) {
             out += "Get(";
-            out += std::get<CellBlock::Get>(component).field;
+            out += get<CellBlock::Get>(component).field;
             out += ')';
-        } else if (std::holds_alternative<CellBlock::Traverse>(component)) {
+        } else if (holds_alternative<CellBlock::Traverse>(component)) {
             out += "Traverse";
         }
         ++idx;

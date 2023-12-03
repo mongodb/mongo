@@ -116,7 +116,7 @@ class ReopeningContext {
 public:
     // A reopening candidate can be an OID for archive-based reopening, or an aggregation pipeline
     // for query-based reopening.
-    using CandidateType = stdx::variant<std::monostate, OID, std::vector<BSONObj>>;
+    using CandidateType = std::variant<std::monostate, OID, std::vector<BSONObj>>;
 
     ReopeningContext() = delete;
     ~ReopeningContext();

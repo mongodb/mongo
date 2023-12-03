@@ -69,18 +69,18 @@ void PlanExecutor::checkFailPointPlanExecAlwaysFails() {
 }
 
 const CollectionPtr& VariantCollectionPtrOrAcquisition::getCollectionPtr() const {
-    return *stdx::visit(OverloadedVisitor{
-                            [](const CollectionPtr* collectionPtr) { return collectionPtr; },
-                            [](const CollectionAcquisition& collectionAcquisition) {
-                                return &collectionAcquisition.getCollectionPtr();
-                            },
-                        },
-                        _collectionPtrOrAcquisition);
+    return *visit(OverloadedVisitor{
+                      [](const CollectionPtr* collectionPtr) { return collectionPtr; },
+                      [](const CollectionAcquisition& collectionAcquisition) {
+                          return &collectionAcquisition.getCollectionPtr();
+                      },
+                  },
+                  _collectionPtrOrAcquisition);
 }
 
 boost::optional<ScopedCollectionFilter> VariantCollectionPtrOrAcquisition::getShardingFilter(
     OperationContext* opCtx) const {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{
             [&](const CollectionPtr* collPtr) -> boost::optional<ScopedCollectionFilter> {
                 auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(

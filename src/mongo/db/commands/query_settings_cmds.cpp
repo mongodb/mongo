@@ -44,7 +44,6 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/platform/basic.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -277,15 +276,15 @@ public:
                     feature_flags::gFeatureFlagQuerySettings.isEnabled(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             auto response =
-                stdx::visit(OverloadedVisitor{
-                                [&](const query_shape::QueryShapeHash& queryShapeHash) {
-                                    return setQuerySettingsByQueryShapeHash(opCtx, queryShapeHash);
-                                },
-                                [&](const QueryInstance& queryInstance) {
-                                    return setQuerySettingsByQueryInstance(opCtx, queryInstance);
-                                },
-                            },
-                            request().getCommandParameter());
+                visit(OverloadedVisitor{
+                          [&](const query_shape::QueryShapeHash& queryShapeHash) {
+                              return setQuerySettingsByQueryShapeHash(opCtx, queryShapeHash);
+                          },
+                          [&](const QueryInstance& queryInstance) {
+                              return setQuerySettingsByQueryInstance(opCtx, queryInstance);
+                          },
+                      },
+                      request().getCommandParameter());
             return response;
         }
 
@@ -341,21 +340,21 @@ public:
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             auto tenantId = request().getDbName().tenantId();
             auto queryShapeHash =
-                stdx::visit(OverloadedVisitor{
-                                [&](const query_shape::QueryShapeHash& queryShapeHash) {
-                                    return queryShapeHash;
-                                },
-                                [&](const QueryInstance& queryInstance) {
-                                    // Converts 'queryInstance' into QueryShapeHash, for convenient
-                                    // comparison during search for the matching
-                                    // QueryShapeConfiguration.
-                                    auto representativeQueryInfo =
-                                        createRepresentativeInfo(queryInstance, opCtx, tenantId);
+                visit(OverloadedVisitor{
+                          [&](const query_shape::QueryShapeHash& queryShapeHash) {
+                              return queryShapeHash;
+                          },
+                          [&](const QueryInstance& queryInstance) {
+                              // Converts 'queryInstance' into QueryShapeHash, for convenient
+                              // comparison during search for the matching
+                              // QueryShapeConfiguration.
+                              auto representativeQueryInfo =
+                                  createRepresentativeInfo(queryInstance, opCtx, tenantId);
 
-                                    return representativeQueryInfo.queryShapeHash;
-                                },
-                            },
-                            request().getCommandParameter());
+                              return representativeQueryInfo.queryShapeHash;
+                          },
+                      },
+                      request().getCommandParameter());
 
             // Build the new 'settingsArray' by removing the QueryShapeConfiguration with a matching
             // QueryShapeHash.

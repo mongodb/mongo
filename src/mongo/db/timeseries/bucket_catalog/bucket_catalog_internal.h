@@ -212,7 +212,7 @@ StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& ca
  * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, and 'mode'
  * is set to 'kYes', we will create a new bucket and insert into that bucket.
  */
-stdx::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
+std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     OperationContext* opCtx,
     BucketCatalog& catalog,
     Stripe& stripe,

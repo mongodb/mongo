@@ -66,7 +66,6 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -281,7 +280,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAddSingleChunkCollectionTr
                                              DefragmentationPhaseEnum::kMergeAndMeasureChunks);
     // 2. The action returned by the stream should be now an actionable DataSizeCommand...
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    DataSizeInfo dataSizeAction = get<DataSizeInfo>(*nextAction);
     // 3. with the expected content
     ASSERT_EQ(coll.getNss(), dataSizeAction.nss);
     ASSERT_BSONOBJ_EQ(kKeyAtMin, dataSizeAction.chunkRange.getMin());
@@ -327,7 +326,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
     _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction.has_value());
-    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    DataSizeInfo dataSizeAction = get<DataSizeInfo>(*nextAction);
 
     auto resp = StatusWith(DataSizeResponse(2000, 4, false));
     _defragmentationPolicy.applyActionResult(operationContext(), dataSizeAction, resp);
@@ -355,7 +354,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
     _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction.has_value());
-    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    DataSizeInfo dataSizeAction = get<DataSizeInfo>(*nextAction);
 
     auto resp = StatusWith(DataSizeResponse(2000, 4, true));
     _defragmentationPolicy.applyActionResult(operationContext(), dataSizeAction, resp);
@@ -380,7 +379,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRetriableFailedDataSizeActionGetsR
     auto coll = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1)});
     _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    DataSizeInfo failingDataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    DataSizeInfo failingDataSizeAction = get<DataSizeInfo>(*nextAction);
     StatusWith<DataSizeResponse> response(
         Status(ErrorCodes::NetworkTimeout, "Testing error response"));
     _defragmentationPolicy.applyActionResult(operationContext(), failingDataSizeAction, response);
@@ -388,7 +387,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRetriableFailedDataSizeActionGetsR
     // Under the setup of this test, the stream should only contain one more action - which (version
     // aside) matches the failed one.
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto replayedDataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    auto replayedDataSizeAction = get<DataSizeInfo>(*nextAction);
     ASSERT_BSONOBJ_EQ(failingDataSizeAction.chunkRange.getMin(),
                       replayedDataSizeAction.chunkRange.getMin());
     ASSERT_BSONOBJ_EQ(failingDataSizeAction.chunkRange.getMax(),
@@ -409,7 +408,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRemoveCollectionEndsDefragmentatio
     auto coll = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1)});
     _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    DataSizeInfo dataSizeAction = get<DataSizeInfo>(*nextAction);
 
     auto resp = StatusWith(DataSizeResponse(2000, 4, false));
     _defragmentationPolicy.applyActionResult(operationContext(), dataSizeAction, resp);
@@ -448,7 +447,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestNonRetriableErrorRebuildsCurrentPh
     auto coll = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1)});
     _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    DataSizeInfo failingDataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    DataSizeInfo failingDataSizeAction = get<DataSizeInfo>(*nextAction);
     StatusWith<DataSizeResponse> response(
         Status(ErrorCodes::IllegalOperation, "Testing error response"));
 
@@ -461,7 +460,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestNonRetriableErrorRebuildsCurrentPh
                                              DefragmentationPhaseEnum::kMergeAndMeasureChunks);
     // 2. The action returned by the stream should be now an actionable DataSizeCommand...
     ASSERT_TRUE(nextAction.has_value());
-    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    DataSizeInfo dataSizeAction = get<DataSizeInfo>(*nextAction);
     // 3. with the expected content
     ASSERT_EQ(coll.getNss(), dataSizeAction.nss);
     ASSERT_BSONOBJ_EQ(kKeyAtMin, dataSizeAction.chunkRange.getMin());
@@ -479,9 +478,9 @@ TEST_F(BalancerDefragmentationPolicyTest,
              kUuid1, ChunkRange(kKeyAtTen, kKeyAtMax), kCollectionPlacementVersion, kShardId1}});
     _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    DataSizeInfo failingDataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    DataSizeInfo failingDataSizeAction = get<DataSizeInfo>(*nextAction);
     auto nextAction2 = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    DataSizeInfo secondDataSizeAction = stdx::get<DataSizeInfo>(*nextAction2);
+    DataSizeInfo secondDataSizeAction = get<DataSizeInfo>(*nextAction2);
     StatusWith<DataSizeResponse> response(
         Status(ErrorCodes::NamespaceNotFound, "Testing error response"));
 
@@ -502,8 +501,8 @@ TEST_F(BalancerDefragmentationPolicyTest,
     nextAction2 = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction.has_value());
     ASSERT_TRUE(nextAction2.has_value());
-    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
-    DataSizeInfo dataSizeAction2 = stdx::get<DataSizeInfo>(*nextAction2);
+    DataSizeInfo dataSizeAction = get<DataSizeInfo>(*nextAction);
+    DataSizeInfo dataSizeAction2 = get<DataSizeInfo>(*nextAction2);
 }
 
 TEST_F(BalancerDefragmentationPolicyTest,
@@ -512,14 +511,14 @@ TEST_F(BalancerDefragmentationPolicyTest,
     auto coll = setupCollectionWithPhase(kNss1, {makeMergeableConfigChunkEntries(kUuid1)});
     _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto mergeChunksAction = stdx::get<MergeInfo>(*nextAction);
+    auto mergeChunksAction = get<MergeInfo>(*nextAction);
 
     _defragmentationPolicy.applyActionResult(operationContext(), mergeChunksAction, Status::OK());
 
     // Under the setup of this test, the stream should only contain only a data size action over the
     // recently merged range.
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    auto dataSizeAction = get<DataSizeInfo>(*nextAction);
     ASSERT_BSONOBJ_EQ(dataSizeAction.chunkRange.getMin(), mergeChunksAction.chunkRange.getMin());
     ASSERT_BSONOBJ_EQ(dataSizeAction.chunkRange.getMax(), mergeChunksAction.chunkRange.getMax());
     ASSERT_EQ(dataSizeAction.uuid, mergeChunksAction.uuid);
@@ -535,7 +534,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneFailedMergeChunksActionGet
     auto coll = setupCollectionWithPhase(kNss1, {makeMergeableConfigChunkEntries(kUuid1)});
     _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto failingMergeChunksAction = stdx::get<MergeInfo>(*nextAction);
+    auto failingMergeChunksAction = get<MergeInfo>(*nextAction);
 
     _defragmentationPolicy.applyActionResult(
         operationContext(),
@@ -544,7 +543,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneFailedMergeChunksActionGet
     // Under the setup of this test, the stream should only contain one more action - which (version
     // aside) matches the failed one.
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    auto replayedMergeChunksAction = stdx::get<MergeInfo>(*nextAction);
+    auto replayedMergeChunksAction = get<MergeInfo>(*nextAction);
     ASSERT_EQ(failingMergeChunksAction.uuid, replayedMergeChunksAction.uuid);
     ASSERT_EQ(failingMergeChunksAction.shardId, replayedMergeChunksAction.shardId);
     ASSERT_EQ(failingMergeChunksAction.nss, replayedMergeChunksAction.nss);
@@ -565,7 +564,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAcknowledgeSuccessfulMerge
     _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction.has_value());
-    MergeInfo mergeInfoAction = stdx::get<MergeInfo>(*nextAction);
+    MergeInfo mergeInfoAction = get<MergeInfo>(*nextAction);
     ASSERT_BSONOBJ_EQ(mergeInfoAction.chunkRange.getMin(), kKeyAtMin);
     ASSERT_BSONOBJ_EQ(mergeInfoAction.chunkRange.getMax(), kKeyAtMax);
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
@@ -573,7 +572,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAcknowledgeSuccessfulMerge
     _defragmentationPolicy.applyActionResult(operationContext(), mergeInfoAction, Status::OK());
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction.has_value());
-    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    DataSizeInfo dataSizeAction = get<DataSizeInfo>(*nextAction);
     ASSERT_EQ(mergeInfoAction.nss, dataSizeAction.nss);
     ASSERT_BSONOBJ_EQ(mergeInfoAction.chunkRange.getMin(), dataSizeAction.chunkRange.getMin());
     ASSERT_BSONOBJ_EQ(mergeInfoAction.chunkRange.getMax(), dataSizeAction.chunkRange.getMax());
@@ -614,8 +613,8 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAllConsecutive) {
     ASSERT_TRUE(nextAction2.has_value());
     // Verify the content of the received merge actions
     // (Note: there is no guarantee on the order provided by the stream)
-    MergeInfo mergeAction = stdx::get<MergeInfo>(*nextAction);
-    MergeInfo mergeAction2 = stdx::get<MergeInfo>(*nextAction2);
+    MergeInfo mergeAction = get<MergeInfo>(*nextAction);
+    MergeInfo mergeAction2 = get<MergeInfo>(*nextAction2);
     if (mergeAction.chunkRange.getMin().woCompare(kKeyAtMin) == 0) {
         ASSERT_BSONOBJ_EQ(mergeAction.chunkRange.getMin(), kKeyAtMin);
         ASSERT_BSONOBJ_EQ(mergeAction.chunkRange.getMax(), BSON("x" << 5));
@@ -660,28 +659,28 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
     uint8_t timesUpperRangeMergeFound = 0;
     uint8_t timesMiddleRangeDataSizeFound = 0;
     auto inspectAction = [&](const BalancerStreamAction& action) {
-        stdx::visit(OverloadedVisitor{
-                        [&](const MergeInfo& mergeAction) {
-                            if (mergeAction.chunkRange.getMin().woCompare(kKeyAtMin) == 0 &&
-                                mergeAction.chunkRange.getMax().woCompare(BSON("x" << 5)) == 0) {
-                                ++timesLowerRangeMergeFound;
-                            }
-                            if (mergeAction.chunkRange.getMin().woCompare(BSON("x" << 6)) == 0 &&
-                                mergeAction.chunkRange.getMax().woCompare(kKeyAtMax) == 0) {
-                                ++timesUpperRangeMergeFound;
-                            }
-                        },
-                        [&](const DataSizeInfo& dataSizeAction) {
-                            if (dataSizeAction.chunkRange.getMin().woCompare(BSON("x" << 5)) == 0 &&
-                                dataSizeAction.chunkRange.getMax().woCompare(BSON("x" << 6)) == 0) {
-                                ++timesMiddleRangeDataSizeFound;
-                            }
-                        },
-                        [](const MigrateInfo& _) { FAIL("Unexpected action type"); },
-                        [](const MergeAllChunksOnShardInfo& _) {
-                            FAIL("Unexpected action type");
-                        }},
-                    action);
+        visit(OverloadedVisitor{
+                  [&](const MergeInfo& mergeAction) {
+                      if (mergeAction.chunkRange.getMin().woCompare(kKeyAtMin) == 0 &&
+                          mergeAction.chunkRange.getMax().woCompare(BSON("x" << 5)) == 0) {
+                          ++timesLowerRangeMergeFound;
+                      }
+                      if (mergeAction.chunkRange.getMin().woCompare(BSON("x" << 6)) == 0 &&
+                          mergeAction.chunkRange.getMax().woCompare(kKeyAtMax) == 0) {
+                          ++timesUpperRangeMergeFound;
+                      }
+                  },
+                  [&](const DataSizeInfo& dataSizeAction) {
+                      if (dataSizeAction.chunkRange.getMin().woCompare(BSON("x" << 5)) == 0 &&
+                          dataSizeAction.chunkRange.getMax().woCompare(BSON("x" << 6)) == 0) {
+                          ++timesMiddleRangeDataSizeFound;
+                      }
+                  },
+                  [](const MigrateInfo& _) { FAIL("Unexpected action type"); },
+                  [](const MergeAllChunksOnShardInfo& _) {
+                      FAIL("Unexpected action type");
+                  }},
+              action);
     };
     inspectAction(*nextAction);
     inspectAction(*nextAction2);
@@ -714,7 +713,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoMissingDataSizeRestartsPha
     ASSERT_EQ(0, pendingMigrations.size());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction.has_value());
-    auto dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+    auto dataSizeAction = get<DataSizeInfo>(*nextAction);
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWithSibling) {
@@ -776,7 +775,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWi
     ASSERT_TRUE(pendingMigrations.empty());
     ASSERT_EQ(0, numOfUsedShards);
 
-    auto mergeAction = stdx::get<MergeInfo>(*nextAction);
+    auto mergeAction = get<MergeInfo>(*nextAction);
     ASSERT_EQ(smallestChunk.getShard(), mergeAction.shardId);
     ASSERT_TRUE(ChunkRange(biggestChunk.getMin(), smallestChunk.getMax()) ==
                 mergeAction.chunkRange);

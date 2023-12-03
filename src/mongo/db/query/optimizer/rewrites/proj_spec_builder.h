@@ -157,7 +157,7 @@ public:
     // KeepDrop constructor: used to construct simple inclusion/exclusion projections.
     ProjSpecBuilder(FieldListScope fieldListScope, std::vector<std::string> fields)
         : _state(Valid(sbe::MakeObjSpec::NonObjInputBehavior::kReturnInput, fieldListScope)) {
-        auto& valid = std::get<Valid>(_state);
+        auto& valid = get<Valid>(_state);
         valid.namedFabs.reserve(fields.size());
         for (const auto& field : fields) {
             valid.namedFabs.emplace_back(field, FieldActionBuilder());
@@ -169,14 +169,14 @@ public:
 
     void setCurrentPath(std::string currentPath, sbe::MakeObjSpec::NonObjInputBehavior behavior) {
         tassert(7936700, "Cannot override current path", needsPath());
-        auto& np = std::get<NeedsPath>(_state);
+        auto& np = get<NeedsPath>(_state);
         Valid v(behavior, FieldListScope::kOpen);
         v.namedFabs.emplace_back(currentPath, std::move(np.orphan));
         _state = std::move(v);
     }
 
     void setTraversalDepth(boost::optional<int32_t> depth) {
-        std::get<Valid>(_state).traversalDepth = std::move(depth);
+        get<Valid>(_state).traversalDepth = std::move(depth);
     }
 
     // Helper to combine this builder with another when translating a PathComposeM. It encodes the
@@ -188,25 +188,25 @@ public:
     bool absorb(std::unique_ptr<ProjSpecBuilder> other);
 
     bool isValid() const {
-        return std::holds_alternative<Valid>(_state);
+        return holds_alternative<Valid>(_state);
     }
 
     // Used to determine if we should avoid placing a make obj primitive because lowering and
     // const-folding would simplify this expression.
     bool isTrivial() const {
-        return isValid() && std::get<Valid>(_state).isTrivial();
+        return isValid() && get<Valid>(_state).isTrivial();
     }
 
     bool needsPath() const {
-        return std::holds_alternative<NeedsPath>(_state);
+        return holds_alternative<NeedsPath>(_state);
     }
 
     auto traversalDepth() const {
-        return std::get<Valid>(_state).traversalDepth;
+        return get<Valid>(_state).traversalDepth;
     }
 
     sbe::MakeObjSpec::NonObjInputBehavior nonObjInputBehavior() {
-        return std::get<Valid>(_state).nonObjInputBehavior;
+        return get<Valid>(_state).nonObjInputBehavior;
     }
 
     // Builder method generating final MakeObjSpec. May only be called if isValid() evaluates to

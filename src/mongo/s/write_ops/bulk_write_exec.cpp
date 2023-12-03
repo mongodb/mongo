@@ -710,7 +710,7 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
     // A single bulk command request batch may contain operations of different
     // types, i.e. they may be inserts, updates or deletes.
     std::vector<
-        stdx::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>>
+        std::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>>
         ops;
     std::vector<NamespaceInfoEntry> nsInfo = _clientRequest.getNsInfo();
 
@@ -723,7 +723,7 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
         ops.push_back(_clientRequest.getOps().at(writeOpRef.first));
 
         if (targetedWrite->sampleId.has_value()) {
-            stdx::visit(
+            visit(
                 OverloadedVisitor{
                     [&](mongo::BulkWriteInsertOp& op) { return; },
                     [&](mongo::BulkWriteUpdateOp& op) { op.setSampleId(targetedWrite->sampleId); },
@@ -760,7 +760,7 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
         // retryable write/transaction.
         if (bulkWriteOp.getType() == BulkWriteCRUDOp::OpType::kUpdate &&
             allowShardKeyUpdatesWithoutFullShardKeyInQuery.has_value()) {
-            auto mutableUpdateOp = stdx::get_if<BulkWriteUpdateOp>(&ops.back());
+            auto mutableUpdateOp = get_if<BulkWriteUpdateOp>(&ops.back());
             mutableUpdateOp->setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
                 allowShardKeyUpdatesWithoutFullShardKeyInQuery);
         }
@@ -1348,7 +1348,7 @@ int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {
 
 void addIdsForInserts(BulkWriteCommandRequest& origCmdRequest) {
     std::vector<
-        stdx::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>>
+        std::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>>
         newOps;
     newOps.reserve(origCmdRequest.getOps().size());
 

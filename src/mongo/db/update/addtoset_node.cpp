@@ -172,10 +172,10 @@ void AddToSetNode::logUpdate(LogBuilderInterface* logBuilder,
         // This update only modified the array by appending entries to the end. Rather than writing
         // out the entire contents of the array, we create oplog entries for the newly appended
         // elements.
-        invariant(std::holds_alternative<ModifyResult::ArrayAppendUpdateDescription>(
+        invariant(holds_alternative<ModifyResult::ArrayAppendUpdateDescription>(
             modifyResult.description));
         const auto numAppended =
-            std::get<ModifyResult::ArrayAppendUpdateDescription>(modifyResult.description).inserted;
+            get<ModifyResult::ArrayAppendUpdateDescription>(modifyResult.description).inserted;
         const auto arraySize = countChildren(element);
 
         std::vector<mutablebson::Element> added;

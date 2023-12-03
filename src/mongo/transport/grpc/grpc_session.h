@@ -223,7 +223,7 @@ public:
     }
 
     bool shouldOverrideMaxConns(
-        const std::vector<stdx::variant<CIDR, std::string>>& exemptions) const override {
+        const std::vector<std::variant<CIDR, std::string>>& exemptions) const override {
         return false;
     }
 

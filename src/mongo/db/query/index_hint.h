@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/stdx/variant.h"
 
 namespace mongo {
 
@@ -78,7 +77,7 @@ public:
 
     void append(BSONArrayBuilder* builder) const;
 
-    const stdx::variant<IndexKeyPattern, IndexName, NaturalOrderHint>& getHint() const {
+    const std::variant<IndexKeyPattern, IndexName, NaturalOrderHint>& getHint() const {
         return _hint;
     }
     boost::optional<const IndexKeyPattern&> getIndexKeyPattern() const;
@@ -88,7 +87,7 @@ public:
     size_t hash() const;
 
 private:
-    stdx::variant<IndexKeyPattern, IndexName, NaturalOrderHint> _hint;
+    std::variant<IndexKeyPattern, IndexName, NaturalOrderHint> _hint;
 };  // namespace index_hint
 
 

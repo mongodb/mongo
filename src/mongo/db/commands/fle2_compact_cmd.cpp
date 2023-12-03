@@ -190,7 +190,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
         mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
         CreateCollectionRequest request;
         request.setClusteredIndex(
-            stdx::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
+            std::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
         createCmd.setCreateCollectionRequest(std::move(request));
         auto status = createCollection(opCtx, createCmd);
         if (!status.isOK()) {

@@ -50,7 +50,6 @@
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_range.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_shift.h"
-#include "mongo/stdx/variant.h"
 
 namespace mongo {
 
@@ -91,7 +90,7 @@ std::unique_ptr<WindowFunctionExec> translateDocumentWindow(
     MemoryUsageTracker::Impl* memTracker) {
     auto inputExpr = translateInputExpression(expr, sortBy);
 
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{
             [&](const WindowBounds::Unbounded&) -> std::unique_ptr<WindowFunctionExec> {
                 // A left unbounded window will always be non-removable regardless of the upper
@@ -158,46 +157,45 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
 
     WindowBounds bounds = functionStmt.expr->bounds();
 
-    return stdx::visit(
-        OverloadedVisitor{
-            [&](const WindowBounds::DocumentBased& docBounds) {
-                return translateDocumentWindow(
-                    iter, functionStmt.expr, sortBy, docBounds, &functionMemTracker);
-            },
-            [&](const WindowBounds::RangeBased& rangeBounds)
-                -> std::unique_ptr<WindowFunctionExec> {
-                // These checks should be enforced already during parsing.
-                tassert(5429401,
-                        "Range-based window needs a non-compound sortBy",
-                        sortBy != boost::none && sortBy->size() == 1);
-                SortPattern::SortPatternPart part = *sortBy->begin();
-                tassert(5429410,
-                        "Range-based window doesn't work on expression-sortBy",
-                        part.fieldPath != boost::none && !part.expression);
-                auto sortByExpr = ExpressionFieldPath::createPathFromString(
-                    expCtx, part.fieldPath->fullPath(), expCtx->variablesParseState);
+    return visit(OverloadedVisitor{
+                     [&](const WindowBounds::DocumentBased& docBounds) {
+                         return translateDocumentWindow(
+                             iter, functionStmt.expr, sortBy, docBounds, &functionMemTracker);
+                     },
+                     [&](const WindowBounds::RangeBased& rangeBounds)
+                         -> std::unique_ptr<WindowFunctionExec> {
+                         // These checks should be enforced already during parsing.
+                         tassert(5429401,
+                                 "Range-based window needs a non-compound sortBy",
+                                 sortBy != boost::none && sortBy->size() == 1);
+                         SortPattern::SortPatternPart part = *sortBy->begin();
+                         tassert(5429410,
+                                 "Range-based window doesn't work on expression-sortBy",
+                                 part.fieldPath != boost::none && !part.expression);
+                         auto sortByExpr = ExpressionFieldPath::createPathFromString(
+                             expCtx, part.fieldPath->fullPath(), expCtx->variablesParseState);
 
-                auto inputExpr = translateInputExpression(functionStmt.expr, sortBy);
-                if (stdx::holds_alternative<WindowBounds::Unbounded>(rangeBounds.lower)) {
-                    return std::make_unique<WindowFunctionExecNonRemovableRange>(
-                        iter,
-                        inputExpr,
-                        std::move(sortByExpr),
-                        functionStmt.expr->buildAccumulatorOnly(),
-                        bounds,
-                        &functionMemTracker);
-                } else {
-                    return std::make_unique<WindowFunctionExecRemovableRange>(
-                        iter,
-                        inputExpr,
-                        std::move(sortByExpr),
-                        functionStmt.expr->buildRemovable(),
-                        bounds,
-                        &functionMemTracker);
-                }
-            },
-        },
-        bounds.bounds);
+                         auto inputExpr = translateInputExpression(functionStmt.expr, sortBy);
+                         if (holds_alternative<WindowBounds::Unbounded>(rangeBounds.lower)) {
+                             return std::make_unique<WindowFunctionExecNonRemovableRange>(
+                                 iter,
+                                 inputExpr,
+                                 std::move(sortByExpr),
+                                 functionStmt.expr->buildAccumulatorOnly(),
+                                 bounds,
+                                 &functionMemTracker);
+                         } else {
+                             return std::make_unique<WindowFunctionExecRemovableRange>(
+                                 iter,
+                                 inputExpr,
+                                 std::move(sortByExpr),
+                                 functionStmt.expr->buildRemovable(),
+                                 bounds,
+                                 &functionMemTracker);
+                         }
+                     },
+                 },
+                 bounds.bounds);
 }
 
 }  // namespace mongo

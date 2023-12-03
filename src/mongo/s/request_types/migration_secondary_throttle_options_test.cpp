@@ -38,7 +38,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -99,8 +98,8 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInCommandBSONWithSimpleWriteConce
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT(stdx::holds_alternative<int64_t>(writeConcern.w));
-    ASSERT_EQ(2, stdx::get<int64_t>(writeConcern.w));
+    ASSERT(holds_alternative<int64_t>(writeConcern.w));
+    ASSERT_EQ(2, get<int64_t>(writeConcern.w));
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::UNSET),
               static_cast<int>(writeConcern.syncMode));
     ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);
@@ -115,8 +114,8 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInCommandBSONWithCompleteWriteCon
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT(stdx::holds_alternative<int64_t>(writeConcern.w));
-    ASSERT_EQ(3, stdx::get<int64_t>(writeConcern.w));
+    ASSERT(holds_alternative<int64_t>(writeConcern.w));
+    ASSERT_EQ(3, get<int64_t>(writeConcern.w));
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::JOURNAL),
               static_cast<int>(writeConcern.syncMode));
     ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);
@@ -153,8 +152,8 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInBalancerConfigWithSimpleWriteCo
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT(stdx::holds_alternative<int64_t>(writeConcern.w));
-    ASSERT_EQ(2, stdx::get<int64_t>(writeConcern.w));
+    ASSERT(holds_alternative<int64_t>(writeConcern.w));
+    ASSERT_EQ(2, get<int64_t>(writeConcern.w));
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::UNSET),
               static_cast<int>(writeConcern.syncMode));
     ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);
@@ -168,8 +167,8 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInBalancerConfigWithCompleteWrite
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT(stdx::holds_alternative<int64_t>(writeConcern.w));
-    ASSERT_EQ(3, stdx::get<int64_t>(writeConcern.w));
+    ASSERT(holds_alternative<int64_t>(writeConcern.w));
+    ASSERT_EQ(3, get<int64_t>(writeConcern.w));
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::JOURNAL),
               static_cast<int>(writeConcern.syncMode));
     ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);

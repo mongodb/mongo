@@ -68,7 +68,6 @@
 #include "mongo/logv2/ramlog.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_utils.h"
@@ -253,8 +252,8 @@ template <>
 OkReply LogRotateCmd::Invocation::typedRun(OperationContext* opCtx) {
     auto arg = request().getCommandParameter();
     boost::optional<StringData> logType = boost::none;
-    if (stdx::holds_alternative<std::string>(arg)) {
-        logType = stdx::get<std::string>(arg);
+    if (holds_alternative<std::string>(arg)) {
+        logType = std::get<std::string>(arg);
     }
 
     logv2::LogRotateErrorAppender minorErrors;

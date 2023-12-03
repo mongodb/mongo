@@ -95,7 +95,6 @@
 #include "mongo/shell/encrypted_dbclient_base.h"
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_gen.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/database_name_util.h"
@@ -297,7 +296,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::runCommandWith
     OpMsgRequest request) {
     EncryptedDBClientBase::RunCommandParams params(request);
     auto result = handleEncryptionRequest(std::move(params));
-    auto returnConn = stdx::get<DBClientBase*>(result.returnConn);
+    auto returnConn = get<DBClientBase*>(result.returnConn);
     return {std::move(result.returnReply), returnConn};
 }
 
@@ -306,7 +305,7 @@ EncryptedDBClientBase::runCommandWithTarget(OpMsgRequest request,
                                             std::shared_ptr<DBClientBase> conn) {
     EncryptedDBClientBase::RunCommandParams params(request, conn);
     auto result = handleEncryptionRequest(std::move(params));
-    auto returnConn = stdx::get<std::shared_ptr<DBClientBase>>(result.returnConn);
+    auto returnConn = get<std::shared_ptr<DBClientBase>>(result.returnConn);
     return {std::move(result.returnReply), returnConn};
 }
 

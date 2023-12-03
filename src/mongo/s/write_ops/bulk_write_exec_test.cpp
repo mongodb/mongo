@@ -1541,7 +1541,7 @@ TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_NonTransientTransactionError) {
 }
 
 using BulkOp =
-    stdx::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>;
+    std::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>;
 
 BulkOp makeTestInsertOp(BSONObj document) {
     BulkWriteInsertOp op;
@@ -2882,18 +2882,17 @@ public:
 
         for (size_t i = 0; i < remoteShards.size(); i++) {
             ShardType shardType;
-            shardType.setName(std::get<0>(remoteShards[i]).toString());
-            shardType.setHost(std::get<1>(remoteShards[i]).toString());
+            shardType.setName(get<0>(remoteShards[i]).toString());
+            shardType.setHost(get<1>(remoteShards[i]).toString());
 
             shards.push_back(shardType);
 
             std::unique_ptr<RemoteCommandTargeterMock> targeter(
                 std::make_unique<RemoteCommandTargeterMock>());
-            targeter->setConnectionStringReturnValue(
-                ConnectionString(std::get<1>(remoteShards[i])));
-            targeter->setFindHostReturnValue(std::get<1>(remoteShards[i]));
+            targeter->setConnectionStringReturnValue(ConnectionString(get<1>(remoteShards[i])));
+            targeter->setFindHostReturnValue(get<1>(remoteShards[i]));
 
-            targeterFactory()->addTargeterToReturn(ConnectionString(std::get<1>(remoteShards[i])),
+            targeterFactory()->addTargeterToReturn(ConnectionString(get<1>(remoteShards[i])),
                                                    std::move(targeter));
         }
 

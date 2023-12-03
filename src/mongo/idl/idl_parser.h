@@ -428,7 +428,7 @@ public:
      * Check that the collection name or UUID in 'element' is valid. Throws an exception if not
      * valid. Returns either the collection name or UUID otherwise.
      */
-    static stdx::variant<UUID, StringData> checkAndAssertCollectionNameOrUUID(
+    static std::variant<UUID, StringData> checkAndAssertCollectionNameOrUUID(
         const BSONElement& element);
 
     /**

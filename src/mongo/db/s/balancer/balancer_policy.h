@@ -204,10 +204,10 @@ struct DataSizeResponse {
 
 typedef int NumMergedChunks;
 
-typedef stdx::variant<MergeInfo, DataSizeInfo, MigrateInfo, MergeAllChunksOnShardInfo>
+typedef std::variant<MergeInfo, DataSizeInfo, MigrateInfo, MergeAllChunksOnShardInfo>
     BalancerStreamAction;
 
-typedef stdx::variant<Status, StatusWith<DataSizeResponse>, StatusWith<NumMergedChunks>>
+typedef std::variant<Status, StatusWith<DataSizeResponse>, StatusWith<NumMergedChunks>>
     BalancerStreamActionResponse;
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;

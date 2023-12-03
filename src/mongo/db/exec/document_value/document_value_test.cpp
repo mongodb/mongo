@@ -62,7 +62,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -206,17 +205,17 @@ TEST(DocumentGetFieldNonCaching, UncachedTopLevelFields) {
     // Should be able to get all top level fields without caching.
     for (auto&& elt : bson) {
         auto valueVariant = document.getNestedFieldNonCaching(elt.fieldNameStringData());
-        ASSERT_TRUE(stdx::holds_alternative<BSONElement>(valueVariant));
-        ASSERT_TRUE(stdx::get<BSONElement>(valueVariant).binaryEqual(elt));
+        ASSERT_TRUE(holds_alternative<BSONElement>(valueVariant));
+        ASSERT_TRUE(get<BSONElement>(valueVariant).binaryEqual(elt));
 
         // Get the field again to be sure it wasn't cached during the access above.
         auto valueVariantAfterAccess = document.getNestedFieldNonCaching(elt.fieldNameStringData());
-        ASSERT_TRUE(stdx::holds_alternative<BSONElement>(valueVariantAfterAccess));
+        ASSERT_TRUE(holds_alternative<BSONElement>(valueVariantAfterAccess));
     }
 
     // Try to get a top level field which doesn't exist.
     auto nonExistentFieldVariant = document.getNestedFieldNonCaching("doesnotexist");
-    ASSERT_TRUE(stdx::holds_alternative<stdx::monostate>(nonExistentFieldVariant));
+    ASSERT_TRUE(holds_alternative<std::monostate>(nonExistentFieldVariant));
 
     assertRoundTrips(document);
 }
@@ -231,15 +230,15 @@ TEST(DocumentGetFieldNonCaching, CachedTopLevelFields) {
     // Attempt to access scalar2 with the non caching accessor. It should be cached already.
     {
         auto valueVariant = document.getNestedFieldNonCaching("scalar2");
-        ASSERT_TRUE(stdx::holds_alternative<Value>(valueVariant));
-        ASSERT_EQ(stdx::get<Value>(valueVariant).getBool(), true);
+        ASSERT_TRUE(holds_alternative<Value>(valueVariant));
+        ASSERT_EQ(get<Value>(valueVariant).getBool(), true);
     }
 
     // Attempt to access 'array' with the non caching accessor. It should not be cached.
     {
         auto valueVariant = document.getNestedFieldNonCaching("array");
-        ASSERT_TRUE(stdx::holds_alternative<BSONElement>(valueVariant));
-        auto elt = stdx::get<BSONElement>(valueVariant);
+        ASSERT_TRUE(holds_alternative<BSONElement>(valueVariant));
+        auto elt = get<BSONElement>(valueVariant);
         ASSERT_TRUE(bson["array"].binaryEqual(elt));
     }
 
@@ -249,8 +248,8 @@ TEST(DocumentGetFieldNonCaching, CachedTopLevelFields) {
     // Check that 'array' is cached and that we can read it with the non caching accessor.
     {
         auto valueVariant = document.getNestedFieldNonCaching("array");
-        ASSERT_TRUE(stdx::holds_alternative<Value>(valueVariant));
-        ASSERT_EQ(stdx::get<Value>(valueVariant).getArrayLength(), 3);
+        ASSERT_TRUE(holds_alternative<Value>(valueVariant));
+        ASSERT_EQ(get<Value>(valueVariant).getArrayLength(), 3);
     }
 }
 
@@ -263,29 +262,29 @@ TEST(DocumentGetFieldNonCaching, NonArrayDottedPaths) {
     {
         // Get a nested field without caching.
         auto zipVariant = document.getNestedFieldNonCaching("address.zip");
-        ASSERT_TRUE(stdx::holds_alternative<BSONElement>(zipVariant));
-        ASSERT_EQ(stdx::get<BSONElement>(zipVariant).numberInt(), 123);
+        ASSERT_TRUE(holds_alternative<BSONElement>(zipVariant));
+        ASSERT_EQ(get<BSONElement>(zipVariant).numberInt(), 123);
 
         // Check that it was not cached.
         auto zipVariantAfterAccess = document.getNestedFieldNonCaching("address.zip");
-        ASSERT_TRUE(stdx::holds_alternative<BSONElement>(zipVariantAfterAccess));
+        ASSERT_TRUE(holds_alternative<BSONElement>(zipVariantAfterAccess));
 
         // Check that the top level field isn't cached after accessing one of its children.
         auto addressVariant = document.getNestedFieldNonCaching("address");
-        ASSERT_TRUE(stdx::holds_alternative<BSONElement>(addressVariant));
+        ASSERT_TRUE(holds_alternative<BSONElement>(addressVariant));
 
         // Get a dotted field which does not exist.
         auto nonExistentVariant = document.getNestedFieldNonCaching("address.doesnotexist");
-        ASSERT_TRUE(stdx::holds_alternative<stdx::monostate>(nonExistentVariant));
+        ASSERT_TRUE(holds_alternative<std::monostate>(nonExistentVariant));
 
         // Check that the top level field isn't cached after a failed attempt to access one of its
         // children.
         addressVariant = document.getNestedFieldNonCaching("address");
-        ASSERT_TRUE(stdx::holds_alternative<BSONElement>(addressVariant));
+        ASSERT_TRUE(holds_alternative<BSONElement>(addressVariant));
 
         // Get a dotted field which extends past a scalar.
         auto pathPastScalarVariant = document.getNestedFieldNonCaching("address.zip.doesnotexist");
-        ASSERT_TRUE(stdx::holds_alternative<stdx::monostate>(pathPastScalarVariant));
+        ASSERT_TRUE(holds_alternative<std::monostate>(pathPastScalarVariant));
     }
 
     // Now force 'address.street' to be cached.
@@ -295,23 +294,23 @@ TEST(DocumentGetFieldNonCaching, NonArrayDottedPaths) {
     {
         // The top level field should be cached.
         auto topLevelVariant = document.getNestedFieldNonCaching("address");
-        ASSERT_TRUE(stdx::holds_alternative<Value>(topLevelVariant));
+        ASSERT_TRUE(holds_alternative<Value>(topLevelVariant));
 
         auto variant = document.getNestedFieldNonCaching("address.street");
-        ASSERT_TRUE(stdx::holds_alternative<Value>(variant));
-        ASSERT_EQ(stdx::get<Value>(variant).getString(), "foo");
+        ASSERT_TRUE(holds_alternative<Value>(variant));
+        ASSERT_EQ(get<Value>(variant).getString(), "foo");
     }
 
     // Check that the other subfield, 'zip' is not cached.
     {
         auto variant = document.getNestedFieldNonCaching("address.zip");
-        ASSERT_TRUE(stdx::holds_alternative<BSONElement>(variant));
+        ASSERT_TRUE(holds_alternative<BSONElement>(variant));
     }
 
     // Check that attempting to get a subfield of 'address.street' returns monostate.
     {
         auto variant = document.getNestedFieldNonCaching("address.street.doesnotexist");
-        ASSERT_TRUE(stdx::holds_alternative<stdx::monostate>(variant));
+        ASSERT_TRUE(holds_alternative<std::monostate>(variant));
     }
 }
 
@@ -322,8 +321,8 @@ TEST(DocumentGetFieldNonCaching, NonArrayLongDottedPath) {
     // Not cached.
     {
         auto variant = document.getNestedFieldNonCaching("a.b.c.d.e");
-        ASSERT_TRUE(stdx::holds_alternative<BSONElement>(variant));
-        ASSERT_EQ(stdx::get<BSONElement>(variant).numberInt(), 1);
+        ASSERT_TRUE(holds_alternative<BSONElement>(variant));
+        ASSERT_EQ(get<BSONElement>(variant).numberInt(), 1);
     }
 
     // Force part of the path to get cached.
@@ -332,8 +331,8 @@ TEST(DocumentGetFieldNonCaching, NonArrayLongDottedPath) {
     // The function should be able to traverse a path which is part Value and part BSONElement.
     {
         auto variant = document.getNestedFieldNonCaching("a.b.c.d.e");
-        ASSERT_TRUE(stdx::holds_alternative<BSONElement>(variant));
-        ASSERT_EQ(stdx::get<BSONElement>(variant).numberInt(), 1);
+        ASSERT_TRUE(holds_alternative<BSONElement>(variant));
+        ASSERT_EQ(get<BSONElement>(variant).numberInt(), 1);
     }
 
     // Force the entire path to be cached.
@@ -341,8 +340,8 @@ TEST(DocumentGetFieldNonCaching, NonArrayLongDottedPath) {
 
     {
         auto variant = document.getNestedFieldNonCaching("a.b.c.d.e");
-        ASSERT_TRUE(stdx::holds_alternative<Value>(variant));
-        ASSERT_EQ(stdx::get<Value>(variant).getInt(), 1);
+        ASSERT_TRUE(holds_alternative<Value>(variant));
+        ASSERT_EQ(get<Value>(variant).getInt(), 1);
     }
 }
 
@@ -354,12 +353,12 @@ TEST(DocumentGetFieldNonCaching, TraverseArray) {
 
     auto checkArrayTagIsReturned = [&document]() {
         auto topLevelArrayVariant = document.getNestedFieldNonCaching("topLevelArray.foo");
-        ASSERT_TRUE(stdx::holds_alternative<Document::TraversesArrayTag>(topLevelArrayVariant));
+        ASSERT_TRUE(holds_alternative<Document::TraversesArrayTag>(topLevelArrayVariant));
 
         // Attempting to traverse an uncached nested array results in TraversesArrayTag being
         // returned.
         auto subArrayVariant = document.getNestedFieldNonCaching("subObj.subArray.foobar");
-        ASSERT_TRUE(stdx::holds_alternative<Document::TraversesArrayTag>(subArrayVariant));
+        ASSERT_TRUE(holds_alternative<Document::TraversesArrayTag>(subArrayVariant));
     };
 
     // Check with no fields cached.

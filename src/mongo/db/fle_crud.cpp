@@ -93,7 +93,6 @@
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
@@ -994,8 +993,8 @@ bool hasIndexedFieldsInSchema(const std::vector<EncryptedField>& fields) {
     for (const auto& field : fields) {
         if (field.getQueries().has_value()) {
             const auto& queries = field.getQueries().get();
-            if (stdx::holds_alternative<std::vector<mongo::QueryTypeConfig>>(queries)) {
-                const auto& vec = stdx::get<0>(queries);
+            if (holds_alternative<std::vector<mongo::QueryTypeConfig>>(queries)) {
+                const auto& vec = get<0>(queries);
                 if (!vec.empty()) {
                     return true;
                 }

@@ -33,9 +33,9 @@
 
 #include <numeric>
 #include <string>
+#include <variant>
 #include <vector>
 
-#include "mongo/stdx/variant.h"
 
 namespace mongo {
 
@@ -135,11 +135,11 @@ inline auto vectorToString(const PathType& path) {
 /**
  * A path in the fieldname position in input BSON syntax. Such as "a.b" in '{"a.b": ""}'.
  */
-using FieldnamePath = stdx::variant<ProjectionPath, PositionalProjectionPath, SortPath>;
+using FieldnamePath = std::variant<ProjectionPath, PositionalProjectionPath, SortPath>;
 
 /**
  * A path in the value position in input BSON syntax. Such as "$a.b" in '{"": "$a.b"}'.
  */
-using ValuePath = stdx::variant<AggregationPath, AggregationVariablePath>;
+using ValuePath = std::variant<AggregationPath, AggregationVariablePath>;
 
 }  // namespace mongo

@@ -45,7 +45,7 @@ class BSONObjBuilder;
 class NamespaceString;
 class OperationContext;
 
-using IndexArgument = stdx::variant<std::string, std::vector<std::string>, mongo::BSONObj>;
+using IndexArgument = std::variant<std::string, std::vector<std::string>, mongo::BSONObj>;
 
 /**
  * Drops one or more ready indexes, or aborts a single index builder from the "nss" collection that

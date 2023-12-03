@@ -32,7 +32,7 @@
 namespace mongo::transport::util {
 bool shouldOverrideMaxConns(const SockAddr& ra,
                             const SockAddr& la,
-                            const std::vector<stdx::variant<CIDR, std::string>>& exemptions) {
+                            const std::vector<std::variant<CIDR, std::string>>& exemptions) {
     if (exemptions.empty())
         return false;
 
@@ -41,7 +41,7 @@ bool shouldOverrideMaxConns(const SockAddr& ra,
         remoteCIDR = uassertStatusOK(CIDR::parse(ra.getAddr()));
 
     return std::any_of(exemptions.begin(), exemptions.end(), [&](const auto& exemption) {
-        return stdx::visit(
+        return visit(
             [&](auto&& ex) {
                 using Alt = std::decay_t<decltype(ex)>;
                 if constexpr (std::is_same_v<Alt, CIDR>)

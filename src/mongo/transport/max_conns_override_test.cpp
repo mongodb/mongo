@@ -45,10 +45,10 @@
 namespace mongo {
 namespace {
 
-using ExemptionVector = std::vector<stdx::variant<CIDR, std::string>>;
+using ExemptionVector = std::vector<std::variant<CIDR, std::string>>;
 
 template <typename T>
-stdx::variant<CIDR, std::string> makeExemption(T exemption) {
+std::variant<CIDR, std::string> makeExemption(T exemption) {
     auto swCIDR = CIDR::parse(exemption);
     if (swCIDR.isOK()) {
         return swCIDR.getValue();

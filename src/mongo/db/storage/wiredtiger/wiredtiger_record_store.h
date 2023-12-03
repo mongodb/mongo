@@ -293,7 +293,7 @@ public:
         return _oplogTruncateMarkers.get();
     };
 
-    typedef stdx::variant<int64_t, WiredTigerItem> CursorKey;
+    typedef std::variant<int64_t, WiredTigerItem> CursorKey;
 
     RecordId getLargestKey(OperationContext* opCtx) const final;
 

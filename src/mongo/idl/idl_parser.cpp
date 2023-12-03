@@ -260,7 +260,7 @@ StringData IDLParserContext::checkAndAssertCollectionName(const BSONElement& ele
     return element.valueStringData();
 }
 
-stdx::variant<UUID, StringData> IDLParserContext::checkAndAssertCollectionNameOrUUID(
+std::variant<UUID, StringData> IDLParserContext::checkAndAssertCollectionNameOrUUID(
     const BSONElement& element) {
     if (element.type() == BinData && element.binDataType() == BinDataType::newUUID) {
         return uassertStatusOK(UUID::parse(element));

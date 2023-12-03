@@ -191,10 +191,10 @@ public:
      * ends with an array. For example, the document {a: {b:[1,2]}} and the path "a.b" will return
      * a BSONElement or Value for the array [1, 2].
      *
-     * If the field is not found, stdx::monostate is returned.
+     * If the field is not found, std::monostate is returned.
      */
     struct TraversesArrayTag {};
-    stdx::variant<BSONElement, Value, TraversesArrayTag, stdx::monostate> getNestedFieldNonCaching(
+    std::variant<BSONElement, Value, TraversesArrayTag, std::monostate> getNestedFieldNonCaching(
         const FieldPath& dottedField) const;
 
     // Number of fields in this document. Exp. runtime O(n).
@@ -440,7 +440,7 @@ private:
         return (_storage ? *_storage : DocumentStorage::emptyDoc());
     }
 
-    stdx::variant<BSONElement, Value, TraversesArrayTag, stdx::monostate>
+    std::variant<BSONElement, Value, TraversesArrayTag, std::monostate>
     getNestedFieldNonCachingHelper(const FieldPath& dottedField, size_t level) const;
 
     boost::intrusive_ptr<const DocumentStorage> _storage;

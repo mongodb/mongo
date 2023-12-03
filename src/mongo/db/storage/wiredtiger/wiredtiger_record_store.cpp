@@ -93,7 +93,6 @@
 #include "mongo/logv2/log_options.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/debug_util.h"
@@ -2444,9 +2443,9 @@ RecordId StandardWiredTigerRecordStore::getKey(WT_CURSOR* cursor) const {
 }
 
 void StandardWiredTigerRecordStore::setKey(WT_CURSOR* cursor, const CursorKey* key) const {
-    if (auto itemPtr = stdx::get_if<WiredTigerItem>(key)) {
+    if (auto itemPtr = get_if<WiredTigerItem>(key)) {
         cursor->set_key(cursor, itemPtr->Get());
-    } else if (auto longPtr = stdx::get_if<int64_t>(key)) {
+    } else if (auto longPtr = get_if<int64_t>(key)) {
         cursor->set_key(cursor, *longPtr);
     }
 }
@@ -2462,9 +2461,9 @@ WiredTigerRecordStoreStandardCursor::WiredTigerRecordStoreStandardCursor(
 
 void WiredTigerRecordStoreStandardCursor::setKey(
     WT_CURSOR* cursor, const WiredTigerRecordStore::CursorKey* key) const {
-    if (auto itemPtr = stdx::get_if<WiredTigerItem>(key)) {
+    if (auto itemPtr = get_if<WiredTigerItem>(key)) {
         cursor->set_key(cursor, itemPtr->Get());
-    } else if (auto longPtr = stdx::get_if<int64_t>(key)) {
+    } else if (auto longPtr = get_if<int64_t>(key)) {
         cursor->set_key(cursor, *longPtr);
     }
 }

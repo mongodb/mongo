@@ -74,7 +74,7 @@ TEST(WriteConcernOptionsTest, ParseSetsSyncModeToJournelIfJIsTrue) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::JOURNAL == options.syncMode);
-    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(1, get<int64_t>(options.w));
     ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
@@ -83,7 +83,7 @@ TEST(WriteConcernOptionsTest, ParseSetsSyncModeToFSyncIfFSyncIsTrue) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::FSYNC == options.syncMode);
-    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(1, get<int64_t>(options.w));
     ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
@@ -92,7 +92,7 @@ TEST(WriteConcernOptionsTest, ParseSetsSyncModeToNoneIfJIsFalse) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::NONE == options.syncMode);
-    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(1, get<int64_t>(options.w));
     ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
@@ -101,7 +101,7 @@ TEST(WriteConcernOptionsTest, ParseLeavesSyncModeAsUnsetIfFSyncIsFalse) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(1, get<int64_t>(options.w));
     ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
@@ -124,7 +124,7 @@ TEST(WriteConcernOptionsTest, ParseSetsWNumNodesIfWIsANumber) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS(3, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(3, get<int64_t>(options.w));
     ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
@@ -134,7 +134,7 @@ TEST(WriteConcernOptionsTest, ParseSetsWTimeoutToZeroIfWTimeoutIsNotANumber) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(1, get<int64_t>(options.w));
     ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
@@ -143,7 +143,7 @@ TEST(WriteConcernOptionsTest, ParseWTimeoutAsNumber) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(1, get<int64_t>(options.w));
     ASSERT_EQUALS(Milliseconds{123}, options.wTimeout);
 }
 
@@ -153,7 +153,7 @@ TEST(WriteConcernOptionsTest, ParseWTimeoutAsNaNDouble) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(1, get<int64_t>(options.w));
     ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
@@ -175,7 +175,7 @@ void _testIgnoreWriteConcernField(const char* fieldName) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(1, get<int64_t>(options.w));
     ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 TEST(WriteConcernOptionsTest, ParseIgnoresSpecialFields) {
@@ -203,7 +203,7 @@ TEST(WriteConcernOptionsTest, ParseWithTags) {
     ASSERT_EQ(wc.wTimeout, WriteConcernOptions::kNoTimeout);
     ASSERT_TRUE(wc.needToWaitForOtherNodes());
 
-    auto tags = stdx::get<WTags>(wc.w);
+    auto tags = get<WTags>(wc.w);
     ASSERT(tags == (WTags{{"abc", 1}}));
     ASSERT_BSONOBJ_EQ(wc.toBSON(), BSON("w" << BSON("abc" << 1) << "wtimeout" << 0));
 

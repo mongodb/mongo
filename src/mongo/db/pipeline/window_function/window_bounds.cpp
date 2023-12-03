@@ -51,7 +51,6 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/sort_pattern.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -90,7 +89,7 @@ template <class T>
 Value serializeBound(const WindowBounds::Bound<T>& bound,
                      const SerializationOptions& opts,
                      const Value& representativeValue) {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{
             [&](const WindowBounds::Unbounded&) { return Value(WindowBounds::kValUnbounded); },
             [&](const WindowBounds::Current&) { return Value(WindowBounds::kValCurrent); },
@@ -112,15 +111,15 @@ void checkBoundsForward(WindowBounds::Bound<T> lower, WindowBounds::Bound<T> upp
     // First normalize by treating 'current' as 0.
     // Then, if both bounds are numeric, require lower <= upper.
     auto normalize = [](WindowBounds::Bound<T>& bound) {
-        if (stdx::holds_alternative<WindowBounds::Current>(bound)) {
+        if (holds_alternative<WindowBounds::Current>(bound)) {
             bound = T(0);
         }
     };
     normalize(lower);
     normalize(upper);
-    if (stdx::holds_alternative<T>(lower) && stdx::holds_alternative<T>(upper)) {
-        T lowerVal = stdx::get<T>(lower);
-        T upperVal = stdx::get<T>(upper);
+    if (holds_alternative<T>(lower) && holds_alternative<T>(upper)) {
+        T lowerVal = get<T>(lower);
+        T upperVal = get<T>(upper);
         uassert(5339900,
                 str::stream() << "Lower bound must not exceed upper bound: ["
                               << Value(lowerVal).toString() << ", " << Value(upperVal).toString()
@@ -139,10 +138,10 @@ void checkBoundsForward(WindowBounds::Bound<Value> lower, WindowBounds::Bound<Va
 
 bool WindowBounds::isUnbounded() const {
     auto unbounded = [](const auto& bounds) {
-        return stdx::holds_alternative<WindowBounds::Unbounded>(bounds.lower) &&
-            stdx::holds_alternative<WindowBounds::Unbounded>(bounds.upper);
+        return holds_alternative<WindowBounds::Unbounded>(bounds.lower) &&
+            holds_alternative<WindowBounds::Unbounded>(bounds.upper);
     };
-    return stdx::visit(unbounded, bounds);
+    return visit(unbounded, bounds);
 }
 
 WindowBounds WindowBounds::parse(BSONElement args,
@@ -254,7 +253,7 @@ WindowBounds WindowBounds::parse(BSONElement args,
     }
 }
 void WindowBounds::serialize(MutableDocument& args, const SerializationOptions& opts) const {
-    stdx::visit(
+    visit(
         OverloadedVisitor{
             [&](const DocumentBased& docBounds) {
                 args[kArgDocuments] = Value{std::vector<Value>{

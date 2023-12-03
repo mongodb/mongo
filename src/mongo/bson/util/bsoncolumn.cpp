@@ -50,7 +50,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/simple8b_type_util.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/time_support.h"
@@ -313,7 +312,7 @@ BSONColumn::Iterator::Iterator(boost::intrusive_ptr<ElementStorage> allocator,
                                const char* end)
     : _index(0), _control(pos), _end(end), _allocator(std::move(allocator)), _mode(Regular{}) {
     // Initialize the iterator state to the first element
-    _incrementRegular(stdx::get<Regular>(_mode));
+    _incrementRegular(get<Regular>(_mode));
 }
 
 void BSONColumn::Iterator::_initializeInterleaving() {
@@ -342,11 +341,11 @@ void BSONColumn::Iterator::_initializeInterleaving() {
 BSONColumn::Iterator& BSONColumn::Iterator::operator++() {
     ++_index;
 
-    stdx::visit(OverloadedVisitor{[&](Regular& regular) { _incrementRegular(regular); },
-                                  [&](Interleaved& interleaved) {
-                                      _incrementInterleaved(interleaved);
-                                  }},
-                _mode);
+    visit(OverloadedVisitor{[&](Regular& regular) { _incrementRegular(regular); },
+                            [&](Interleaved& interleaved) {
+                                _incrementInterleaved(interleaved);
+                            }},
+          _mode);
 
     return *this;
 }
@@ -354,13 +353,13 @@ BSONColumn::Iterator& BSONColumn::Iterator::operator++() {
 void BSONColumn::Iterator::_incrementRegular(Regular& regular) {
     DecodingState& state = regular.state;
 
-    if (auto d64 = stdx::get_if<DecodingState::Decoder64>(&state.decoder)) {
+    if (auto d64 = get_if<DecodingState::Decoder64>(&state.decoder)) {
         // Traverse current Simple8b block for 64bit values if it exists
         if (d64->pos.valid() && (++d64->pos).more()) {
             _decompressed = state.loadDelta(*_allocator, *d64);
             return;
         }
-    } else if (auto d128 = stdx::get_if<DecodingState::Decoder128>(&state.decoder)) {
+    } else if (auto d128 = get_if<DecodingState::Decoder128>(&state.decoder)) {
         // Traverse current Simple8b block for 128bit values if it exists
         if (d128->pos.valid() && (++d128->pos).more()) {
             _decompressed = state.loadDelta(*_allocator, *d128);
@@ -424,10 +423,10 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
             // we are iterating the second time we are going to allocate new memory. This is a
             // tradeoff to avoid a decoded list of literals for every state that will only be used
             // if we iterate multiple times.
-            if (auto d64 = stdx::get_if<DecodingState::Decoder64>(&state.decoder);
+            if (auto d64 = get_if<DecodingState::Decoder64>(&state.decoder);
                 d64 && d64->pos.valid() && (++d64->pos).more()) {
                 elem = state.loadDelta(*_allocator, *d64);
-            } else if (auto d128 = stdx::get_if<DecodingState::Decoder128>(&state.decoder);
+            } else if (auto d128 = get_if<DecodingState::Decoder128>(&state.decoder);
                        d128 && d128->pos.valid() && (++d128->pos).more()) {
                 elem = state.loadDelta(*_allocator, *d128);
             } else if (*_control == EOO) {
@@ -602,39 +601,38 @@ BSONColumn::Iterator::DecodingState::loadControl(ElementStorage& allocator,
     // Instantiate decoder and load first value, every Simple-8b block should have at least one
     // value
     BSONElement deltaElem;
-    stdx::visit(OverloadedVisitor{
-                    [&](DecodingState::Decoder64& d64) {
-                        // Simple-8b delta block, load its scale factor and validate for sanity
-                        d64.scaleIndex = kControlToScaleIndex[(control & 0xF0) >> 4];
-                        uassert(6067606,
-                                "Invalid control byte in BSON Column",
-                                d64.scaleIndex != kInvalidScaleIndex);
+    visit(OverloadedVisitor{
+              [&](DecodingState::Decoder64& d64) {
+                  // Simple-8b delta block, load its scale factor and validate for sanity
+                  d64.scaleIndex = kControlToScaleIndex[(control & 0xF0) >> 4];
+                  uassert(6067606,
+                          "Invalid control byte in BSON Column",
+                          d64.scaleIndex != kInvalidScaleIndex);
 
-                        // If Double, scale last value according to this scale factor
-                        auto type = lastValue.type();
-                        if (type == NumberDouble) {
-                            auto encoded = Simple8bTypeUtil::encodeDouble(lastValue._numberDouble(),
-                                                                          d64.scaleIndex);
-                            uassert(6067607, "Invalid double encoding in BSON Column", encoded);
-                            d64.lastEncodedValue = *encoded;
-                        }
+                  // If Double, scale last value according to this scale factor
+                  auto type = lastValue.type();
+                  if (type == NumberDouble) {
+                      auto encoded =
+                          Simple8bTypeUtil::encodeDouble(lastValue._numberDouble(), d64.scaleIndex);
+                      uassert(6067607, "Invalid double encoding in BSON Column", encoded);
+                      d64.lastEncodedValue = *encoded;
+                  }
 
-                        // We can read the last known value from the decoder iterator even as it has
-                        // reached end.
-                        boost::optional<uint64_t> lastSimple8bValue =
-                            d64.pos.valid() ? *d64.pos : 0;
-                        d64.pos = Simple8b<uint64_t>(buffer + 1, size, lastSimple8bValue).begin();
-                        deltaElem = loadDelta(allocator, d64);
-                    },
-                    [&](DecodingState::Decoder128& d128) {
-                        // We can read the last known value from the decoder iterator even as it has
-                        // reached end.
-                        boost::optional<uint128_t> lastSimple8bValue =
-                            d128.pos.valid() ? *d128.pos : uint128_t(0);
-                        d128.pos = Simple8b<uint128_t>(buffer + 1, size, lastSimple8bValue).begin();
-                        deltaElem = loadDelta(allocator, d128);
-                    }},
-                decoder);
+                  // We can read the last known value from the decoder iterator even as it has
+                  // reached end.
+                  boost::optional<uint64_t> lastSimple8bValue = d64.pos.valid() ? *d64.pos : 0;
+                  d64.pos = Simple8b<uint64_t>(buffer + 1, size, lastSimple8bValue).begin();
+                  deltaElem = loadDelta(allocator, d64);
+              },
+              [&](DecodingState::Decoder128& d128) {
+                  // We can read the last known value from the decoder iterator even as it has
+                  // reached end.
+                  boost::optional<uint128_t> lastSimple8bValue =
+                      d128.pos.valid() ? *d128.pos : uint128_t(0);
+                  d128.pos = Simple8b<uint128_t>(buffer + 1, size, lastSimple8bValue).begin();
+                  deltaElem = loadDelta(allocator, d128);
+              }},
+          decoder);
 
     return {deltaElem, size + 1};
 }

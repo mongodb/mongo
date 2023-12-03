@@ -258,7 +258,7 @@ protected:
         nsEntry.setNs(nss);
         cmd.setNsInfo({nsEntry});
 
-        std::vector<stdx::variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>> ops;
+        std::vector<std::variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>> ops;
         for (const auto& updateOp : updateOps) {
             BulkWriteUpdateOp op;
             op.setUpdate(0);
@@ -302,7 +302,7 @@ protected:
         nsEntry.setNs(nss);
         cmd.setNsInfo({nsEntry});
 
-        std::vector<stdx::variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>> ops;
+        std::vector<std::variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>> ops;
         for (const auto& deleteOp : deleteOps) {
             BulkWriteDeleteOp op;
             op.setDeleteCommand(0);

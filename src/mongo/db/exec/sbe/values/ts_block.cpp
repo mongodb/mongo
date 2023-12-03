@@ -55,9 +55,9 @@ TsBucketPathExtractor::TsBucketPathExtractor(std::vector<CellBlock::PathRequest>
     for (auto& req : _pathReqs) {
         tassert(7796405,
                 "Path must start with a Get operation",
-                std::holds_alternative<CellBlock::Get>(req.path[0]));
+                holds_alternative<CellBlock::Get>(req.path[0]));
 
-        StringData field = std::get<CellBlock::Get>(req.path[0]).field;
+        StringData field = get<CellBlock::Get>(req.path[0]).field;
         _topLevelFieldToIdxes[field].push_back(idx);
 
         if (req.path.size() > 2) {
@@ -182,9 +182,9 @@ TsBucketPathExtractor::extractCellBlocks(const BSONObj& bucketObj) {
         bool allUsedFastPath = true;
         for (auto pathIdx : nonTopLevelIdxesForCurrentField) {
             if (_pathReqs[pathIdx].path.size() == 3 &&
-                std::holds_alternative<CellBlock::Get>(_pathReqs[pathIdx].path[0]) &&
-                std::holds_alternative<CellBlock::Traverse>(_pathReqs[pathIdx].path[1]) &&
-                std::holds_alternative<CellBlock::Id>(_pathReqs[pathIdx].path[2]) &&
+                holds_alternative<CellBlock::Get>(_pathReqs[pathIdx].path[0]) &&
+                holds_alternative<CellBlock::Traverse>(_pathReqs[pathIdx].path[1]) &&
+                holds_alternative<CellBlock::Id>(_pathReqs[pathIdx].path[2]) &&
                 (tsBlock->tryHasNoArrays().get_value_or(false))) {
                 // In this case the top level TsCellBlockForTopLevelField (representing the [Get
                 // <field> Id]) is identical to the path [Get <field> Traverse Id]. We make a top

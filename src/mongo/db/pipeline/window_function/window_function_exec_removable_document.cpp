@@ -37,7 +37,6 @@
 
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -55,25 +54,25 @@ WindowFunctionExecRemovableDocument::WindowFunctionExecRemovableDocument(
                                   std::move(function),
 
                                   memTracker) {
-    stdx::visit(OverloadedVisitor{
-                    [](const WindowBounds::Unbounded&) {
-                        // If the window is left unbounded we should use the non-removable executor.
-                        MONGO_UNREACHABLE_TASSERT(5339802);
-                    },
-                    [&](const WindowBounds::Current&) { _lowerBound = 0; },
-                    [&](const int& lowerIndex) { _lowerBound = lowerIndex; },
-                },
-                bounds.lower);
+    visit(OverloadedVisitor{
+              [](const WindowBounds::Unbounded&) {
+                  // If the window is left unbounded we should use the non-removable executor.
+                  MONGO_UNREACHABLE_TASSERT(5339802);
+              },
+              [&](const WindowBounds::Current&) { _lowerBound = 0; },
+              [&](const int& lowerIndex) { _lowerBound = lowerIndex; },
+          },
+          bounds.lower);
 
-    stdx::visit(OverloadedVisitor{
-                    [](const WindowBounds::Unbounded&) {
-                        // Pass. _upperBound defaults to boost::none which represents no upper
-                        // bound.
-                    },
-                    [&](const WindowBounds::Current&) { _upperBound = 0; },
-                    [&](const int& upperIndex) { _upperBound = upperIndex; },
-                },
-                bounds.upper);
+    visit(OverloadedVisitor{
+              [](const WindowBounds::Unbounded&) {
+                  // Pass. _upperBound defaults to boost::none which represents no upper
+                  // bound.
+              },
+              [&](const WindowBounds::Current&) { _upperBound = 0; },
+              [&](const int& upperIndex) { _upperBound = upperIndex; },
+          },
+          bounds.upper);
 }
 
 void WindowFunctionExecRemovableDocument::initialize() {

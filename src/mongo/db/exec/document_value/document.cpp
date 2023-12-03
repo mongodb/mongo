@@ -44,7 +44,6 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -67,13 +66,13 @@ void assertFieldPathLengthOK(const std::vector<Position>& path) {
             path.size() < BSONDepth::getMaxAllowableDepth());
 }
 
-stdx::variant<BSONElement, Value, Document::TraversesArrayTag, stdx::monostate>
+std::variant<BSONElement, Value, Document::TraversesArrayTag, std::monostate>
 getNestedFieldHelperBSON(BSONElement elt, const FieldPath& fp, size_t level) {
     if (level == fp.getPathLength()) {
         if (elt.ok()) {
             return elt;
         } else {
-            return stdx::monostate{};
+            return std::monostate{};
         }
     }
 
@@ -85,7 +84,7 @@ getNestedFieldHelperBSON(BSONElement elt, const FieldPath& fp, size_t level) {
     }
 
     // The path continues "past" a scalar, and therefore does not exist.
-    return stdx::monostate{};
+    return std::monostate{};
 }
 }  // namespace
 
@@ -671,25 +670,24 @@ MutableValue MutableDocument::getNestedField(const vector<Position>& positions) 
 }
 
 
-stdx::variant<BSONElement, Value, Document::TraversesArrayTag, stdx::monostate>
+std::variant<BSONElement, Value, Document::TraversesArrayTag, std::monostate>
 Document::getNestedFieldNonCachingHelper(const FieldPath& dottedField, size_t level) const {
     if (!_storage) {
-        return stdx::monostate{};
+        return std::monostate{};
     }
 
     StringData fieldName = dottedField.getFieldName(level);
     auto bsonEltOrValue = _storage->getFieldNonCaching(fieldName);
 
-    if (stdx::holds_alternative<BSONElement>(bsonEltOrValue)) {
-        return getNestedFieldHelperBSON(
-            stdx::get<BSONElement>(bsonEltOrValue), dottedField, level + 1);
+    if (holds_alternative<BSONElement>(bsonEltOrValue)) {
+        return getNestedFieldHelperBSON(get<BSONElement>(bsonEltOrValue), dottedField, level + 1);
     }
 
-    const Value& val = stdx::get<Value>(bsonEltOrValue);
+    const Value& val = get<Value>(bsonEltOrValue);
 
     if (level + 1 == dottedField.getPathLength()) {
         if (val.missing()) {
-            return stdx::monostate{};
+            return std::monostate{};
         } else {
             return val;
         }
@@ -702,10 +700,10 @@ Document::getNestedFieldNonCachingHelper(const FieldPath& dottedField, size_t le
     }
 
     // The path extends beyond a scalar, so it does not exist.
-    return stdx::monostate{};
+    return std::monostate{};
 }
 
-stdx::variant<BSONElement, Value, Document::TraversesArrayTag, stdx::monostate>
+std::variant<BSONElement, Value, Document::TraversesArrayTag, std::monostate>
 Document::getNestedFieldNonCaching(const FieldPath& dottedField) const {
     return getNestedFieldNonCachingHelper(dottedField, 0);
 }

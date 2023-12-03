@@ -46,29 +46,28 @@
 
 namespace mongo {
 
-PlanYieldPolicy::PlanYieldPolicy(
-    OperationContext* opCtx,
-    YieldPolicy policy,
-    ClockSource* cs,
-    int yieldIterations,
-    Milliseconds yieldPeriod,
-    stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
-    std::unique_ptr<const YieldPolicyCallbacks> callbacks)
+PlanYieldPolicy::PlanYieldPolicy(OperationContext* opCtx,
+                                 YieldPolicy policy,
+                                 ClockSource* cs,
+                                 int yieldIterations,
+                                 Milliseconds yieldPeriod,
+                                 std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+                                 std::unique_ptr<const YieldPolicyCallbacks> callbacks)
     : _policy(getPolicyOverrideForOperation(opCtx, policy)),
       _yieldable(yieldable),
       _callbacks(std::move(callbacks)),
       _elapsedTracker(cs, yieldIterations, yieldPeriod) {
-    stdx::visit(OverloadedVisitor{[&](const Yieldable* collectionPtr) {
-                                      invariant(!collectionPtr || collectionPtr->yieldable() ||
-                                                policy == YieldPolicy::WRITE_CONFLICT_RETRY_ONLY ||
-                                                policy == YieldPolicy::INTERRUPT_ONLY ||
-                                                policy == YieldPolicy::ALWAYS_TIME_OUT ||
-                                                policy == YieldPolicy::ALWAYS_MARK_KILLED);
-                                  },
-                                  [&](const YieldThroughAcquisitions& yieldThroughAcquisitions) {
-                                      // CollectionAcquisitions are always yieldable.
-                                  }},
-                _yieldable);
+    visit(OverloadedVisitor{[&](const Yieldable* collectionPtr) {
+                                invariant(!collectionPtr || collectionPtr->yieldable() ||
+                                          policy == YieldPolicy::WRITE_CONFLICT_RETRY_ONLY ||
+                                          policy == YieldPolicy::INTERRUPT_ONLY ||
+                                          policy == YieldPolicy::ALWAYS_TIME_OUT ||
+                                          policy == YieldPolicy::ALWAYS_MARK_KILLED);
+                            },
+                            [&](const YieldThroughAcquisitions& yieldThroughAcquisitions) {
+                                // CollectionAcquisitions are always yieldable.
+                            }},
+          _yieldable);
 }
 
 PlanYieldPolicy::YieldPolicy PlanYieldPolicy::getPolicyOverrideForOperation(
@@ -164,15 +163,15 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                 if (usesCollectionAcquisitions()) {
                     performYieldWithAcquisitions(opCtx, whileYieldingFn);
                 } else {
-                    const Yieldable* yieldablePtr = stdx::get<const Yieldable*>(yieldable);
+                    const Yieldable* yieldablePtr = get<const Yieldable*>(yieldable);
                     invariant(yieldablePtr);
                     performYield(opCtx, *yieldablePtr, whileYieldingFn);
                 }
             }
 
             restoreState(opCtx,
-                         stdx::holds_alternative<const Yieldable*>(yieldable)
-                             ? stdx::get<const Yieldable*>(yieldable)
+                         holds_alternative<const Yieldable*>(yieldable)
+                             ? get<const Yieldable*>(yieldable)
                              : nullptr);
             return Status::OK();
         } catch (const StorageUnavailableException& e) {

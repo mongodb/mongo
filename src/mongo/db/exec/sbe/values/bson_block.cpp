@@ -66,24 +66,23 @@ struct BsonWalkNode {
         if (pathIdx == 0) {
             // Check some invariants about the path.
             tassert(7953501, "Cannot be given empty path", !path.empty());
-            tassert(7953502,
-                    "Path must end with Id",
-                    std::holds_alternative<CellBlock::Id>(path.back()));
+            tassert(
+                7953502, "Path must end with Id", holds_alternative<CellBlock::Id>(path.back()));
         }
 
-        if (std::holds_alternative<CellBlock::Get>(path[pathIdx])) {
+        if (holds_alternative<CellBlock::Get>(path[pathIdx])) {
             auto& get = std::get<CellBlock::Get>(path[pathIdx]);
             auto [it, inserted] =
                 getChildren.insert(std::pair(get.field, std::make_unique<BsonWalkNode>()));
             it->second->add(path, out, recorder, pathIdx + 1);
-        } else if (std::holds_alternative<CellBlock::Traverse>(path[pathIdx])) {
+        } else if (holds_alternative<CellBlock::Traverse>(path[pathIdx])) {
             invariant(pathIdx != 0);
             if (!traverseChild) {
                 traverseChild = std::make_unique<BsonWalkNode>();
                 traverseChild->isTraverse = true;
             }
             traverseChild->add(path, out, recorder, pathIdx + 1);
-        } else if (std::holds_alternative<CellBlock::Id>(path[pathIdx])) {
+        } else if (holds_alternative<CellBlock::Id>(path[pathIdx])) {
             invariant(pathIdx != 0);
             filterPosInfoRecorder = recorder;
             outBlock = out;

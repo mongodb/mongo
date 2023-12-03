@@ -123,7 +123,6 @@
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -1700,15 +1699,15 @@ std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCu
 
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>,
-                  AggregateCommandRequest,
-                  std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>>
+    std::variant<std::unique_ptr<Pipeline, PipelineDeleter>,
+                 AggregateCommandRequest,
+                 std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>>
         targetRequest,
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
     auto&& [aggRequest, pipeline] = [&] {
-        return stdx::visit(
+        return visit(
             OverloadedVisitor{
                 [&](std::unique_ptr<Pipeline, PipelineDeleter>&& pipeline) {
                     return std::make_pair(

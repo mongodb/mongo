@@ -73,7 +73,6 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
@@ -104,7 +103,7 @@ auto translateLiteralObjectToValue(const CNode::ObjectChildren& object) {
     auto fields = std::vector<std::pair<StringData, Value>>{};
     static_cast<void>(
         std::transform(object.begin(), object.end(), std::back_inserter(fields), [&](auto&& field) {
-            return std::pair{StringData{stdx::get<UserFieldname>(field.first)},
+            return std::pair{StringData{get<UserFieldname>(field.first)},
                              translateLiteralToValue(field.second)};
         }));
     return Value{Document{std::move(fields)}};
@@ -116,16 +115,16 @@ auto translateLiteralObjectToValue(const CNode::ObjectChildren& object) {
  * uncollapsed otherwise.
  */
 Value translateLiteralToValue(const CNode& cst) {
-    return stdx::visit(OverloadedVisitor{[](const CNode::ArrayChildren& array) {
-                                             return translateLiteralArrayToValue(array);
-                                         },
-                                         [](const CNode::ObjectChildren& object) {
-                                             return translateLiteralObjectToValue(object);
-                                         },
-                                         [&](auto&& payload) {
-                                             return translateLiteralLeaf(cst);
-                                         }},
-                       cst.payload);
+    return visit(OverloadedVisitor{[](const CNode::ArrayChildren& array) {
+                                       return translateLiteralArrayToValue(array);
+                                   },
+                                   [](const CNode::ObjectChildren& object) {
+                                       return translateLiteralObjectToValue(object);
+                                   },
+                                   [&](auto&& payload) {
+                                       return translateLiteralLeaf(cst);
+                                   }},
+                 cst.payload);
 }
 
 /**
@@ -155,7 +154,7 @@ auto translateLiteralObject(const CNode::ObjectChildren& object,
     auto fields = std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>{};
     static_cast<void>(
         std::transform(object.begin(), object.end(), std::back_inserter(fields), [&](auto&& field) {
-            return std::pair{std::string{stdx::get<UserFieldname>(field.first)},
+            return std::pair{std::string{get<UserFieldname>(field.first)},
                              translateExpression(field.second, expCtx, vps)};
         }));
     return ExpressionObject::create(expCtx, std::move(fields));
@@ -170,7 +169,7 @@ auto transformInputExpression(const CNode::ObjectChildren& object,
                               ExpressionContext* expCtx,
                               const VariablesParseState& vps) {
     auto expressions = std::vector<boost::intrusive_ptr<Expression>>{};
-    stdx::visit(
+    visit(
         OverloadedVisitor{
             [&](const CNode::ArrayChildren& array) {
                 static_cast<void>(std::transform(
@@ -213,7 +212,7 @@ bool verifyFieldnames(const std::vector<CNode::Fieldname>& expected,
  * Caller must ensure the ExpressionContext outlives the result.
  */
 auto translateMeta(const CNode::ObjectChildren& object, ExpressionContext* expCtx) {
-    switch (stdx::get<KeyValue>(object[0].second.payload)) {
+    switch (get<KeyValue>(object[0].second.payload)) {
         case KeyValue::geoNearDistance:
             return make_intrusive<ExpressionMeta>(expCtx, DocumentMetadataFields::kGeoNearDist);
         case KeyValue::geoNearPoint:
@@ -248,7 +247,7 @@ auto translateFilter(const CNode::ObjectChildren& object,
                      ExpressionContext* expCtx,
                      const VariablesParseState& vps) {
     // $filter's syntax guarantees that it's payload is ObjectChildren
-    auto&& children = stdx::get<CNode::ObjectChildren>(object[0].second.payload);
+    auto&& children = get<CNode::ObjectChildren>(object[0].second.payload);
     auto&& inputElem = children[0].second;
     auto&& asElem = children[1].second;
     auto&& condElem = children[2].second;
@@ -256,7 +255,7 @@ auto translateFilter(const CNode::ObjectChildren& object,
     // argument is defined.
     auto vpsSub = VariablesParseState{vps};
     auto varName = [&]() -> std::string {
-        if (auto x = stdx::get_if<UserString>(&asElem.payload)) {
+        if (auto x = get_if<UserString>(&asElem.payload)) {
             return *x;
         }
         return "this"s;
@@ -279,19 +278,19 @@ boost::intrusive_ptr<Expression> translateFunctionObject(const CNode::ObjectChil
                                                          ExpressionContext* expCtx,
                                                          const VariablesParseState& vps) {
     // Constants require using Value instead of Expression to build the tree in agg.
-    if (stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::constExpr ||
-        stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::literal)
+    if (get<KeyFieldname>(object[0].first) == KeyFieldname::constExpr ||
+        get<KeyFieldname>(object[0].first) == KeyFieldname::literal)
         return make_intrusive<ExpressionConstant>(expCtx,
                                                   translateLiteralToValue(object[0].second));
     // Meta is an exception since it has no Expression children but rather an enum member.
-    if (stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::meta)
+    if (get<KeyFieldname>(object[0].first) == KeyFieldname::meta)
         return translateMeta(object, expCtx);
     // Filter is an exception because its Expression children need to be given particular variable
     // states before they are translated.
-    if (stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::filter)
+    if (get<KeyFieldname>(object[0].first) == KeyFieldname::filter)
         return translateFilter(object, expCtx, vps);
     auto expressions = transformInputExpression(object, expCtx, vps);
-    switch (stdx::get<KeyFieldname>(object[0].first)) {
+    switch (get<KeyFieldname>(object[0].first)) {
         case KeyFieldname::add:
             return make_intrusive<ExpressionAdd>(expCtx, std::move(expressions));
         case KeyFieldname::atan2:
@@ -553,7 +552,7 @@ boost::intrusive_ptr<Expression> translateFunctionObject(const CNode::ObjectChil
                                                          std::move(expressions[1]),
                                                          std::move(expressions[2]));
         case KeyFieldname::dateFromParts:
-            if (stdx::get<KeyFieldname>(object[0].second.objectChildren().front().first) ==
+            if (get<KeyFieldname>(object[0].second.objectChildren().front().first) ==
                 KeyFieldname::yearArg) {
                 return make_intrusive<ExpressionDateFromParts>(expCtx,
                                                                std::move(expressions[0]),
@@ -684,15 +683,14 @@ auto translateCompoundProjection(const CompoundPayload& payload,
     auto translateProjectionObject =
         [&](auto&& recurse, auto&& children, auto&& previousPath) -> void {
         for (auto&& child : children) {
-            auto&& components =
-                stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(child.first)).components;
+            auto&& components = get<ProjectionPath>(get<FieldnamePath>(child.first)).components;
             auto currentPath = previousPath;
             for (auto&& component : components)
                 currentPath.emplace_back(component);
             // In this context we have a project path object to recurse over.
-            if (auto recursiveChildren = stdx::get_if<CNode::ObjectChildren>(&child.second.payload);
+            if (auto recursiveChildren = get_if<CNode::ObjectChildren>(&child.second.payload);
                 recursiveChildren &&
-                stdx::holds_alternative<FieldnamePath>((*recursiveChildren)[0].first))
+                holds_alternative<FieldnamePath>((*recursiveChildren)[0].first))
                 recurse(recurse, *recursiveChildren, std::as_const(currentPath));
             // Alternatively we have a key indicating inclusion/exclusion.
             else if (child.second.projectionType())
@@ -725,12 +723,12 @@ auto translateProjectInclusion(const CNode& cst,
         const auto path = CNode::fieldnameIsId(name)
             ? makeVector<StringData>("_id"_sd)
             : std::vector<StringData>{
-                  stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.begin(),
-                  stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.end()};
+                  get<ProjectionPath>(get<FieldnamePath>(name)).components.begin(),
+                  get<ProjectionPath>(get<FieldnamePath>(name)).components.end()};
         if (auto type = child.projectionType())
             switch (*type) {
                 case ProjectionType::inclusion:
-                    if (auto payload = stdx::get_if<CompoundInclusionKey>(&child.payload))
+                    if (auto payload = get_if<CompoundInclusionKey>(&child.payload))
                         for (auto&& [compoundPath, expr] :
                              translateCompoundProjection(*payload, path, expCtx.get()))
                             if (expr)
@@ -780,8 +778,8 @@ auto translateProjectExclusion(const CNode& cst,
         const auto path = CNode::fieldnameIsId(name)
             ? makeVector<StringData>("_id"_sd)
             : std::vector<StringData>{
-                  stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.begin(),
-                  stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.end()};
+                  get<ProjectionPath>(get<FieldnamePath>(name)).components.begin(),
+                  get<ProjectionPath>(get<FieldnamePath>(name)).components.end()};
         if (auto type = child.projectionType())
             switch (*type) {
                 case ProjectionType::inclusion:
@@ -789,7 +787,7 @@ auto translateProjectExclusion(const CNode& cst,
                     // nothing here since including _id is the default.
                     break;
                 case ProjectionType::exclusion:
-                    if (auto payload = stdx::get_if<CompoundExclusionKey>(&child.payload))
+                    if (auto payload = get_if<CompoundExclusionKey>(&child.payload))
                         for (auto&& [compoundPath, unused] :
                              translateCompoundProjection(*payload, path, expCtx.get()))
                             executor->getRoot()->addProjectionForPath(std::move(compoundPath));
@@ -875,7 +873,7 @@ boost::intrusive_ptr<DocumentSource> translateSource(
 boost::intrusive_ptr<Expression> translateExpression(const CNode& cst,
                                                      ExpressionContext* expCtx,
                                                      const VariablesParseState& vps) {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{
             // When we're not inside an agg operator/function, this is a non-leaf literal.
             [&](const CNode::ArrayChildren& array) -> boost::intrusive_ptr<Expression> {
@@ -883,7 +881,7 @@ boost::intrusive_ptr<Expression> translateExpression(const CNode& cst,
             },
             // This is either a literal object or an agg operator/function.
             [&](const CNode::ObjectChildren& object) -> boost::intrusive_ptr<Expression> {
-                if (!object.empty() && stdx::holds_alternative<KeyFieldname>(object[0].first))
+                if (!object.empty() && holds_alternative<KeyFieldname>(object[0].first))
                     return translateFunctionObject(object, expCtx, vps);
                 else
                     return translateLiteralObject(object, expCtx, vps);
@@ -900,7 +898,7 @@ boost::intrusive_ptr<Expression> translateExpression(const CNode& cst,
             },
             [](const NonZeroKey&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
             [&](const ValuePath& vp) -> boost::intrusive_ptr<Expression> {
-                return stdx::visit(
+                return visit(
                     OverloadedVisitor{[&](const AggregationPath& ap) {
                                           return ExpressionFieldPath::createPathFromString(
                                               expCtx, path::vectorToString(ap.components), vps);
@@ -935,7 +933,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> translatePipeline(
  * Walk a literal leaf CNode and produce an agg Value.
  */
 Value translateLiteralLeaf(const CNode& cst) {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{// These are illegal since they're non-leaf.
                           [](const CNode::ArrayChildren&) -> Value { MONGO_UNREACHABLE; },
                           [](const CNode::ObjectChildren&) -> Value { MONGO_UNREACHABLE; },

@@ -64,7 +64,6 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -1107,12 +1106,12 @@ void applyRenamesToExpression(const StringMap<std::string>& renames,
                               const Renameables* renameables) {
     tassert(7585301, "Invalid argument", renameables);
     for (auto&& [matchExpr, newPath] : *renameables) {
-        if (stdx::holds_alternative<PathMatchExpression*>(matchExpr)) {
+        if (holds_alternative<PathMatchExpression*>(matchExpr)) {
             // PathMatchExpression.
-            stdx::get<PathMatchExpression*>(matchExpr)->setPath(newPath);
+            get<PathMatchExpression*>(matchExpr)->setPath(newPath);
         } else {
             // ExprMatchExpression.
-            stdx::get<ExprMatchExpression*>(matchExpr)->applyRename(renames);
+            get<ExprMatchExpression*>(matchExpr)->applyRename(renames);
         }
     }
 }

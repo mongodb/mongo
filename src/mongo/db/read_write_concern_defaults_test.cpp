@@ -49,7 +49,6 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/vector_clock_test_fixture.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -117,9 +116,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentCWRWCWithImplicitWC
     ASSERT(defaults.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kImplicit);
 
     ASSERT(defaults.getDefaultWriteConcern());
-    ASSERT(stdx::holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(WriteConcernOptions::kMajority,
-              stdx::get<std::string>(defaults.getDefaultWriteConcern()->w));
+              get<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT(!defaults.getUpdateOpTime());
     ASSERT(!defaults.getUpdateWallClockTime());
     ASSERT_EQ(Date_t(), defaults.localUpdateWallClockTime());
@@ -163,9 +162,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNeverSetWithImplicit
     ASSERT(defaults.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kImplicit);
 
     ASSERT(defaults.getDefaultWriteConcern());
-    ASSERT(stdx::holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(WriteConcernOptions::kMajority,
-              stdx::get<std::string>(defaults.getDefaultWriteConcern()->w));
+              get<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT(!defaults.getUpdateOpTime());
     ASSERT(!defaults.getUpdateWallClockTime());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
@@ -214,9 +213,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetCWRWCWithImplicitWCM
     ASSERT(defaults.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kImplicit);
 
     ASSERT(defaults.getDefaultWriteConcern());
-    ASSERT(stdx::holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(WriteConcernOptions::kMajority,
-              stdx::get<std::string>(defaults.getDefaultWriteConcern()->w));
+              get<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
@@ -260,8 +259,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImp
     ASSERT(defaults.getDefaultReadConcernSource());
     ASSERT(defaults.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kGlobal);
 
-    ASSERT(stdx::holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
-    ASSERT_EQ(4, stdx::get<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT_EQ(4, get<int64_t>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
@@ -282,9 +281,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImp
     ASSERT(oldDefaults.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kImplicit);
 
     ASSERT(oldDefaults.getDefaultWriteConcern());
-    ASSERT(stdx::holds_alternative<std::string>(oldDefaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<std::string>(oldDefaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(WriteConcernOptions::kMajority,
-              stdx::get<std::string>(oldDefaults.getDefaultWriteConcern()->w));
+              get<std::string>(oldDefaults.getDefaultWriteConcern()->w));
     ASSERT(!oldDefaults.getUpdateOpTime());
     ASSERT(!oldDefaults.getUpdateWallClockTime());
     ASSERT_GT(oldDefaults.localUpdateWallClockTime(), Date_t());
@@ -308,8 +307,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImp
     ASSERT(defaults.getDefaultReadConcernSource());
     ASSERT(defaults.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kGlobal);
 
-    ASSERT(stdx::holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
-    ASSERT_EQ(4, stdx::get<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT_EQ(4, get<int64_t>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
@@ -336,8 +335,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCW1)
     ASSERT(defaults.getDefaultReadConcernSource());
     ASSERT(defaults.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kGlobal);
 
-    ASSERT(stdx::holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
-    ASSERT_EQ(4, stdx::get<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT_EQ(4, get<int64_t>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
@@ -364,8 +363,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCMaj
     ASSERT(defaults.getDefaultReadConcernSource());
     ASSERT(defaults.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kGlobal);
 
-    ASSERT(stdx::holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
-    ASSERT_EQ(4, stdx::get<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT_EQ(4, get<int64_t>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
@@ -393,9 +392,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWriteConcernSourceImplicitWit
 
     // The default write concern source should be set to implicit if wc.usedDefaultConstructedWC is
     // true
-    ASSERT(stdx::holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(WriteConcernOptions::kMajority,
-              stdx::get<std::string>(defaults.getDefaultWriteConcern()->w));
+              get<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
@@ -469,9 +468,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplic
     ASSERT(defaults.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kGlobal);
 
     ASSERT(defaults.getDefaultWriteConcern());
-    ASSERT(stdx::holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(WriteConcernOptions::kMajority,
-              stdx::get<std::string>(defaults.getDefaultWriteConcern()->w));
+              get<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
@@ -494,9 +493,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplic
     ASSERT(defaults.getDefaultReadConcernSource());
     ASSERT(defaults.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kImplicit);
 
-    ASSERT(stdx::holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(WriteConcernOptions::kMajority,
-              stdx::get<std::string>(defaults.getDefaultWriteConcern()->w));
+              get<std::string>(defaults.getDefaultWriteConcern()->w));
     ASSERT_EQ(Timestamp(1, 3), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
@@ -602,8 +601,8 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
     ASSERT(defaults2.getDefaultReadConcernSource());
     ASSERT(defaults2.getDefaultReadConcernSource() == DefaultReadConcernSourceEnum::kGlobal);
 
-    ASSERT(stdx::holds_alternative<int64_t>(defaults2.getDefaultWriteConcern()->w));
-    ASSERT_EQ(4, stdx::get<int64_t>(defaults2.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<int64_t>(defaults2.getDefaultWriteConcern()->w));
+    ASSERT_EQ(4, get<int64_t>(defaults2.getDefaultWriteConcern()->w));
     ASSERT_EQ(Timestamp(3, 4), *defaults2.getUpdateOpTime());
     ASSERT_EQ(5678, defaults2.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults2.localUpdateWallClockTime(), Date_t());
@@ -757,8 +756,8 @@ protected:
         // default read concern source is not saved on disk.
         ASSERT(!defaults.getDefaultReadConcernSource());
 
-        ASSERT(stdx::holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
-        ASSERT_EQ(4, stdx::get<int64_t>(defaults.getDefaultWriteConcern()->w));
+        ASSERT(holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
+        ASSERT_EQ(4, get<int64_t>(defaults.getDefaultWriteConcern()->w));
         ASSERT(defaults.getUpdateOpTime());
         ASSERT(defaults.getUpdateWallClockTime());
         // Default write concern source is not saved on disk.
@@ -857,8 +856,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
            repl::ReadConcernLevel::kMajorityReadConcern);
     ASSERT(!defaults.getDefaultReadConcernSource());
 
-    ASSERT(stdx::holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
-    ASSERT_EQ(5, stdx::get<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT_EQ(5, get<int64_t>(defaults.getDefaultWriteConcern()->w));
     ASSERT_LT(*oldDefaults.getUpdateOpTime(), *defaults.getUpdateOpTime());
     ASSERT_LT(*oldDefaults.getUpdateWallClockTime(), *defaults.getUpdateWallClockTime());
     // Default write concern source is not saved on disk.
@@ -927,8 +926,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
            defaults.getDefaultReadConcern()->getLevel());
     ASSERT(!defaults.getDefaultReadConcernSource());
 
-    ASSERT(stdx::holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
-    ASSERT_EQ(5, stdx::get<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT_EQ(5, get<int64_t>(defaults.getDefaultWriteConcern()->w));
     ASSERT_LT(*oldDefaults.getUpdateOpTime(), *defaults.getUpdateOpTime());
     ASSERT_LT(*oldDefaults.getUpdateWallClockTime(), *defaults.getUpdateWallClockTime());
     // Default write concern source is not saved on disk.
@@ -969,8 +968,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
         uassertStatusOK(WriteConcernOptions::parse(BSON("w" << 5))));
     ASSERT(newDefaults.getDefaultReadConcern()->getLevel() ==
            defaults.getDefaultReadConcern()->getLevel());
-    ASSERT(stdx::holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
-    ASSERT_EQ(5, stdx::get<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<int64_t>(defaults.getDefaultWriteConcern()->w));
+    ASSERT_EQ(5, get<int64_t>(defaults.getDefaultWriteConcern()->w));
     // Default write concern source is not saved on disk.
     ASSERT(!defaults.getDefaultWriteConcernSource());
 
@@ -978,8 +977,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     _rwcd.refreshIfNecessary(operationContext());
     newDefaults = _rwcd.getDefault(operationContext());
     ASSERT(newDefaults.getDefaultWriteConcern());
-    ASSERT(stdx::holds_alternative<int64_t>(newDefaults.getDefaultWriteConcern()->w));
-    ASSERT_EQ(5, stdx::get<int64_t>(newDefaults.getDefaultWriteConcern()->w));
+    ASSERT(holds_alternative<int64_t>(newDefaults.getDefaultWriteConcern()->w));
+    ASSERT_EQ(5, get<int64_t>(newDefaults.getDefaultWriteConcern()->w));
     // Default write concern source is calculated through 'getDefault'.
     ASSERT(newDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
 }

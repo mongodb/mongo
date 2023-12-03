@@ -56,7 +56,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
@@ -380,20 +379,20 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
         options.timeseries = std::move(*timeseries);
     }
     if (auto clusteredIndex = cmd.getClusteredIndex()) {
-        stdx::visit(OverloadedVisitor{
-                        [&](bool isClustered) {
-                            if (isClustered) {
-                                options.clusteredIndex =
-                                    clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-                            } else {
-                                options.clusteredIndex = boost::none;
-                            }
-                        },
-                        [&](const ClusteredIndexSpec& clusteredIndexSpec) {
-                            options.clusteredIndex =
-                                clustered_util::makeCanonicalClusteredInfo(clusteredIndexSpec);
-                        }},
-                    *clusteredIndex);
+        visit(OverloadedVisitor{
+                  [&](bool isClustered) {
+                      if (isClustered) {
+                          options.clusteredIndex =
+                              clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
+                      } else {
+                          options.clusteredIndex = boost::none;
+                      }
+                  },
+                  [&](const ClusteredIndexSpec& clusteredIndexSpec) {
+                      options.clusteredIndex =
+                          clustered_util::makeCanonicalClusteredInfo(clusteredIndexSpec);
+                  }},
+              *clusteredIndex);
     }
     if (auto expireAfterSeconds = cmd.getExpireAfterSeconds()) {
         options.expireAfterSeconds = expireAfterSeconds;

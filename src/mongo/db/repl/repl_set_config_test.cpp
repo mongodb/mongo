@@ -47,7 +47,6 @@
 #include "mongo/db/repl/repl_set_config_test.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -108,8 +107,8 @@ TEST(ReplSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS(1, config.getConfigTerm());
     ASSERT_EQUALS(1, config.getNumMembers());
     ASSERT_EQUALS(MemberId(0), config.membersBegin()->getId());
-    ASSERT(stdx::holds_alternative<int64_t>(config.getDefaultWriteConcern().w));
-    ASSERT_EQUALS(1, stdx::get<int64_t>(config.getDefaultWriteConcern().w));
+    ASSERT(holds_alternative<int64_t>(config.getDefaultWriteConcern().w));
+    ASSERT_EQUALS(1, get<int64_t>(config.getDefaultWriteConcern().w));
     ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
     ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatTimeoutPeriod,
                   config.getHeartbeatTimeoutPeriod());

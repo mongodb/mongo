@@ -127,14 +127,14 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::make(CanonicalQueryP
 
 CanonicalQuery::CanonicalQuery(CanonicalQueryParams&& params) {
     setExplain(params.explain);
-    auto parsedFind = uassertStatusOK(stdx::visit(
-        OverloadedVisitor{[](std::unique_ptr<ParsedFindCommand> parsedFindRequest) {
-                              return StatusWith(std::move(parsedFindRequest));
-                          },
-                          [&](ParsedFindCommandParams p) {
-                              return parsed_find_command::parse(params.expCtx, std::move(p));
-                          }},
-        std::move(params.parsedFind)));
+    auto parsedFind = uassertStatusOK(
+        visit(OverloadedVisitor{[](std::unique_ptr<ParsedFindCommand> parsedFindRequest) {
+                                    return StatusWith(std::move(parsedFindRequest));
+                                },
+                                [&](ParsedFindCommandParams p) {
+                                    return parsed_find_command::parse(params.expCtx, std::move(p));
+                                }},
+              std::move(params.parsedFind)));
 
     initCq(std::move(params.expCtx),
            std::move(parsedFind),

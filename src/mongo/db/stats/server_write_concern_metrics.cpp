@@ -42,7 +42,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/stats/server_write_concern_metrics_gen.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -116,7 +115,7 @@ BSONObj ServerWriteConcernMetrics::toBSON() const {
 
 void ServerWriteConcernMetrics::WriteConcernCounters::recordWriteConcern(
     const WriteConcernOptions& writeConcernOptions, size_t numOps) {
-    if (auto wMode = stdx::get_if<std::string>(&writeConcernOptions.w)) {
+    if (auto wMode = get_if<std::string>(&writeConcernOptions.w)) {
         if (writeConcernOptions.isMajority()) {
             wMajorityCount += numOps;
             return;
@@ -126,12 +125,12 @@ void ServerWriteConcernMetrics::WriteConcernCounters::recordWriteConcern(
         return;
     }
 
-    if (stdx::holds_alternative<WTags>(writeConcernOptions.w)) {
+    if (holds_alternative<WTags>(writeConcernOptions.w)) {
         // wTags is an internal feature that we don't track metrics for
         return;
     }
 
-    wNumCounts[stdx::get<int64_t>(writeConcernOptions.w)] += numOps;
+    wNumCounts[std::get<int64_t>(writeConcernOptions.w)] += numOps;
 }
 
 void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::recordWriteConcern(

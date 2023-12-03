@@ -228,17 +228,17 @@ protected:
         };
     };
 
-    using RunCommandReturnConn = stdx::variant<DBClientBase*, std::shared_ptr<DBClientBase>>;
+    using RunCommandReturnConn = std::variant<DBClientBase*, std::shared_ptr<DBClientBase>>;
 
     struct RunCommandReturn {
         rpc::UniqueReply returnReply;
         RunCommandReturnConn returnConn;
 
         RunCommandReturn(std::pair<rpc::UniqueReply, DBClientBase*> pair)
-            : returnReply(std::move(std::get<0>(pair))), returnConn(std::get<1>(pair)) {}
+            : returnReply(std::move(get<0>(pair))), returnConn(get<1>(pair)) {}
 
         RunCommandReturn(std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> pair)
-            : returnReply(std::move(std::get<0>(pair))), returnConn(std::get<1>(pair)) {}
+            : returnReply(std::move(get<0>(pair))), returnConn(get<1>(pair)) {}
 
         RunCommandReturn(rpc::UniqueReply reply, RunCommandReturn& result)
             : returnReply(std::move(reply)), returnConn(result.returnConn) {}

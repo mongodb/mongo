@@ -279,7 +279,7 @@ void validateQuerySettingsNamespacesNotAmbiguous(
         return;
     }
 
-    auto hints = stdx::visit(
+    auto hints = visit(
         OverloadedVisitor{
             [](const std::vector<mongo::query_settings::IndexHintSpec>& hints) { return hints; },
             [](const mongo::query_settings::IndexHintSpec& hints) { return std::vector{hints}; },

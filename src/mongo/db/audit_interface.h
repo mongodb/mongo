@@ -369,7 +369,7 @@ public:
      */
     virtual void logGetClusterParameter(
         Client* client,
-        const stdx::variant<std::string, std::vector<std::string>>& requestedParameters) const = 0;
+        const std::variant<std::string, std::vector<std::string>>& requestedParameters) const = 0;
 
     /**
      * Logs old and new value of given tenant's cluster server parameter when it is updated via
@@ -626,7 +626,7 @@ public:
 
     void logGetClusterParameter(
         Client* client,
-        const stdx::variant<std::string, std::vector<std::string>>& requestedParameters) const {};
+        const std::variant<std::string, std::vector<std::string>>& requestedParameters) const {};
 
     void logSetClusterParameter(Client* client,
                                 const BSONObj& oldValue,

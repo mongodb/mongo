@@ -56,7 +56,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -77,11 +76,11 @@ namespace {
 // not 'off', boost::none otherwise.
 boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
     ChangeStreamOptions& changeStreamOptions) {
-    const stdx::variant<std::string, std::int64_t>& expireAfterSeconds =
+    const std::variant<std::string, std::int64_t>& expireAfterSeconds =
         changeStreamOptions.getPreAndPostImages().getExpireAfterSeconds();
 
-    if (!stdx::holds_alternative<std::string>(expireAfterSeconds)) {
-        return stdx::get<std::int64_t>(expireAfterSeconds);
+    if (!holds_alternative<std::string>(expireAfterSeconds)) {
+        return get<std::int64_t>(expireAfterSeconds);
     }
 
     return boost::none;

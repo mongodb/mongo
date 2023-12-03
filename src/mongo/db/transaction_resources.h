@@ -78,7 +78,7 @@ struct AcquisitionPrerequisites {
         kLocalCatalogOnlyWithPotentialDataLoss,
     };
 
-    using PlacementConcernVariant = stdx::variant<PlacementConcern, PlacementConcernPlaceholder>;
+    using PlacementConcernVariant = std::variant<PlacementConcern, PlacementConcernPlaceholder>;
 
     enum ViewMode { kMustBeCollection, kCanBeView };
 

@@ -60,7 +60,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
@@ -123,7 +122,7 @@ public:
             RenameCollectionRequest renameCollReq(request().getTo());
             renameCollReq.setStayTemp(request().getStayTemp());
             renameCollReq.setExpectedSourceUUID(request().getCollectionUUID());
-            stdx::visit(
+            visit(
                 OverloadedVisitor{
                     [&renameCollReq](bool dropTarget) { renameCollReq.setDropTarget(dropTarget); },
                     [&renameCollReq](const UUID& uuid) {

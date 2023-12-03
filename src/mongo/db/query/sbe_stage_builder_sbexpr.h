@@ -257,35 +257,34 @@ public:
     }
 
     boost::optional<sbe::value::SlotId> getSlot() const noexcept {
-        return hasSlot() ? boost::make_optional(stdx::get<sbe::value::SlotId>(_storage))
-                         : boost::none;
+        return hasSlot() ? boost::make_optional(get<sbe::value::SlotId>(_storage)) : boost::none;
     }
 
     bool hasSlot() const noexcept {
-        return stdx::holds_alternative<sbe::value::SlotId>(_storage);
+        return holds_alternative<sbe::value::SlotId>(_storage);
     }
 
     bool hasABT() const noexcept {
-        return stdx::holds_alternative<sbe::value::SlotId>(_storage) ||
-            stdx::holds_alternative<LocalVarInfo>(_storage) ||
-            stdx::holds_alternative<abt::HolderPtr>(_storage);
+        return holds_alternative<sbe::value::SlotId>(_storage) ||
+            holds_alternative<LocalVarInfo>(_storage) ||
+            holds_alternative<abt::HolderPtr>(_storage);
     }
 
     SbExpr clone() const {
         if (hasSlot()) {
-            return stdx::get<sbe::value::SlotId>(_storage);
+            return get<sbe::value::SlotId>(_storage);
         }
 
-        if (stdx::holds_alternative<LocalVarInfo>(_storage)) {
-            return stdx::get<LocalVarInfo>(_storage);
+        if (holds_alternative<LocalVarInfo>(_storage)) {
+            return get<LocalVarInfo>(_storage);
         }
 
-        if (stdx::holds_alternative<abt::HolderPtr>(_storage)) {
-            return stdx::get<abt::HolderPtr>(_storage);
+        if (holds_alternative<abt::HolderPtr>(_storage)) {
+            return get<abt::HolderPtr>(_storage);
         }
 
-        if (stdx::holds_alternative<EExpr>(_storage)) {
-            const auto& expr = stdx::get<EExpr>(_storage);
+        if (holds_alternative<EExpr>(_storage)) {
+            const auto& expr = get<EExpr>(_storage);
             return expr->clone();
         }
 
@@ -293,7 +292,7 @@ public:
     }
 
     bool isNull() const noexcept {
-        return stdx::holds_alternative<bool>(_storage);
+        return holds_alternative<bool>(_storage);
     }
 
     explicit operator bool() const noexcept {
@@ -325,7 +324,7 @@ private:
     void set(sbe::FrameId frameId, sbe::value::SlotId slotId);
 
     // The bool type as the first option is used to represent the empty storage.
-    stdx::variant<bool, EExpr, sbe::value::SlotId, LocalVarInfo, abt::HolderPtr> _storage;
+    std::variant<bool, EExpr, sbe::value::SlotId, LocalVarInfo, abt::HolderPtr> _storage;
 };
 
 /**

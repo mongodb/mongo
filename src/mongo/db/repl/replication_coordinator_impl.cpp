@@ -142,7 +142,6 @@
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
@@ -1994,18 +1993,18 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
     invariant(writeConcern.syncMode != WriteConcernOptions::SyncMode::UNSET);
 
     const bool useDurableOpTime = writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL;
-    if (!stdx::holds_alternative<std::string>(writeConcern.w)) {
-        if (auto wTags = stdx::get_if<WTags>(&writeConcern.w)) {
+    if (!holds_alternative<std::string>(writeConcern.w)) {
+        if (auto wTags = std::get_if<WTags>(&writeConcern.w)) {
             auto tagPattern = uassertStatusOK(_rsConfig.makeCustomWriteMode(*wTags));
             return _topCoord->haveTaggedNodesReachedOpTime(opTime, tagPattern, useDurableOpTime);
         }
 
         return _topCoord->haveNumNodesReachedOpTime(
-            opTime, stdx::get<int64_t>(writeConcern.w), useDurableOpTime);
+            opTime, std::get<int64_t>(writeConcern.w), useDurableOpTime);
     }
 
     StringData patternName;
-    auto wMode = stdx::get<std::string>(writeConcern.w);
+    auto wMode = std::get<std::string>(writeConcern.w);
     if (wMode == WriteConcernOptions::kMajority) {
         if (_externalState->snapshotsEnabled() && !gTestingSnapshotBehaviorInIsolation) {
             // Make sure we have a valid "committed" snapshot up to the needed optime.

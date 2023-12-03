@@ -144,12 +144,12 @@ public:
 
         if (_clusterAuthX509Config._configCriteria) {
             containsClusterMembershipConfig =
-                stdx::visit(visitor, _clusterAuthX509Config._configCriteria.value());
+                visit(visitor, _clusterAuthX509Config._configCriteria.value());
         }
 
         if (_clusterAuthX509Config._overrideCriteria) {
             containsOverrideClusterMembershipConfig =
-                stdx::visit(visitor, _clusterAuthX509Config._overrideCriteria.value());
+                visit(visitor, _clusterAuthX509Config._overrideCriteria.value());
         }
 
         return containsClusterMembershipConfig || containsOverrideClusterMembershipConfig;
@@ -170,12 +170,12 @@ private:
 
         // Optionally contains either an SSLX509Name representing net.tls.clusterAuthX509.attributes
         // or a string representing net.tls.clusterAuthX509.extensionValue.
-        boost::optional<stdx::variant<SSLX509Name, std::string>> _configCriteria;
+        boost::optional<std::variant<SSLX509Name, std::string>> _configCriteria;
 
         // Optionally contains either an SSLX509Name representing
         // tlsClusterAuthX509Override.attributes or a string representing
         // tlsClusterAuthX509Override.extensionValue.
-        boost::optional<stdx::variant<SSLX509Name, std::string>> _overrideCriteria;
+        boost::optional<std::variant<SSLX509Name, std::string>> _overrideCriteria;
     };
 
     ClusterAuthX509Config _clusterAuthX509Config;

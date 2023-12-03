@@ -69,7 +69,6 @@
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/db/storage/key_string.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::input_params {
@@ -431,7 +430,7 @@ void bindSingleIntervalPlanSlots(const stage_builder::IndexBoundsEvaluationInfo&
     tassert(6584700, "Can only bind a single index interval", intervals.size() == 1);
     auto&& [lowKey, highKey] = intervals[0];
     const auto singleInterval =
-        stdx::get<mongo::stage_builder::ParameterizedIndexScanSlots::SingleIntervalPlan>(
+        get<mongo::stage_builder::ParameterizedIndexScanSlots::SingleIntervalPlan>(
             indexBoundsInfo.slots.slots);
     runtimeEnvironment->resetSlot(singleInterval.lowKey,
                                   sbe::value::TypeTags::ksValue,
@@ -448,9 +447,8 @@ void bindGenericPlanSlots(const stage_builder::IndexBoundsEvaluationInfo& indexB
                           stage_builder::IndexIntervals intervals,
                           std::unique_ptr<IndexBounds> bounds,
                           sbe::RuntimeEnvironment* runtimeEnvironment) {
-    const auto indexSlots =
-        stdx::get<mongo::stage_builder::ParameterizedIndexScanSlots::GenericPlan>(
-            indexBoundsInfo.slots.slots);
+    const auto indexSlots = get<mongo::stage_builder::ParameterizedIndexScanSlots::GenericPlan>(
+        indexBoundsInfo.slots.slots);
     const bool isGenericScan = intervals.empty();
     runtimeEnvironment->resetSlot(indexSlots.isGenericScan,
                                   sbe::value::TypeTags::Boolean,
@@ -492,9 +490,9 @@ void bindIndexBounds(
                                                     indexBoundsInfo.direction == 1,
                                                     indexBoundsInfo.keyStringVersion,
                                                     indexBoundsInfo.ordering);
-    const bool isSingleIntervalSolution = stdx::holds_alternative<
-        mongo::stage_builder::ParameterizedIndexScanSlots::SingleIntervalPlan>(
-        indexBoundsInfo.slots.slots);
+    const bool isSingleIntervalSolution =
+        holds_alternative<mongo::stage_builder::ParameterizedIndexScanSlots::SingleIntervalPlan>(
+            indexBoundsInfo.slots.slots);
     if (isSingleIntervalSolution) {
         bindSingleIntervalPlanSlots(indexBoundsInfo, std::move(intervals), runtimeEnvironment);
     } else {

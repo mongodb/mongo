@@ -101,7 +101,7 @@ namespace mongo {
 
 namespace {
 std::unique_ptr<ChangeStreamOptions> populateChangeStreamPreImageOptions(
-    stdx::variant<std::string, std::int64_t> expireAfterSeconds) {
+    std::variant<std::string, std::int64_t> expireAfterSeconds) {
     PreAndPostImagesOptions preAndPostImagesOptions;
     preAndPostImagesOptions.setExpireAfterSeconds(expireAfterSeconds);
 

@@ -234,10 +234,10 @@ ValidatedTenancyScope::ValidatedTenancyScope(Client* client, StringData security
             jwt.getIssuer() == kTestOnlyIssuer);
     uassert(ErrorCodes::BadValue,
             "Security token must use aud == '{}'"_format(kTestOnlyAudience),
-            stdx::holds_alternative<std::string>(jwt.getAudience()));
+            holds_alternative<std::string>(jwt.getAudience()));
     uassert(ErrorCodes::BadValue,
             "Security token must use aud == '{}'"_format(kTestOnlyAudience),
-            stdx::get<std::string>(jwt.getAudience()) == kTestOnlyAudience);
+            std::get<std::string>(jwt.getAudience()) == kTestOnlyAudience);
 
     auto swUserName = UserName::parse(jwt.getSubject(), jwt.getTenantId());
     uassertStatusOK(swUserName.getStatus().withContext("Invalid subject name"));
@@ -296,12 +296,12 @@ boost::optional<ValidatedTenancyScope> ValidatedTenancyScope::create(Client* cli
 }
 
 bool ValidatedTenancyScope::hasAuthenticatedUser() const {
-    return stdx::holds_alternative<UserName>(_tenantOrUser);
+    return holds_alternative<UserName>(_tenantOrUser);
 }
 
 const UserName& ValidatedTenancyScope::authenticatedUser() const {
     invariant(hasAuthenticatedUser());
-    return stdx::get<UserName>(_tenantOrUser);
+    return std::get<UserName>(_tenantOrUser);
 }
 
 const boost::optional<ValidatedTenancyScope>& ValidatedTenancyScope::get(OperationContext* opCtx) {

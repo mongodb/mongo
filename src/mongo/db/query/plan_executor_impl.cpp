@@ -70,7 +70,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
@@ -102,7 +101,7 @@ namespace {
 std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(
     PlanExecutorImpl* exec,
     PlanYieldPolicy::YieldPolicy policy,
-    stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable) {
+    std::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable) {
     switch (policy) {
         case PlanYieldPolicy::YieldPolicy::YIELD_AUTO:
         case PlanYieldPolicy::YieldPolicy::YIELD_MANUAL:
@@ -165,19 +164,18 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
     }
 
     // There's no point in yielding if the collection doesn't exist.
-    const stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable =
-        stdx::visit(
-            OverloadedVisitor{[](const CollectionPtr* coll) {
-                                  return stdx::variant<const Yieldable*,
-                                                       PlanYieldPolicy::YieldThroughAcquisitions>(
-                                      *coll ? coll : nullptr);
-                              },
-                              [](const CollectionAcquisition& coll) {
-                                  return stdx::variant<const Yieldable*,
-                                                       PlanYieldPolicy::YieldThroughAcquisitions>(
-                                      PlanYieldPolicy::YieldThroughAcquisitions{});
-                              }},
-            collection.get());
+    const std::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable =
+        visit(OverloadedVisitor{[](const CollectionPtr* coll) {
+                                    return std::variant<const Yieldable*,
+                                                        PlanYieldPolicy::YieldThroughAcquisitions>(
+                                        *coll ? coll : nullptr);
+                                },
+                                [](const CollectionAcquisition& coll) {
+                                    return std::variant<const Yieldable*,
+                                                        PlanYieldPolicy::YieldThroughAcquisitions>(
+                                        PlanYieldPolicy::YieldThroughAcquisitions{});
+                                }},
+              collection.get());
 
     _yieldPolicy = makeYieldPolicy(this,
                                    collectionExists ? yieldPolicy

@@ -674,7 +674,7 @@ StatusWith<bool> WiredTigerIndex::_checkDups(OperationContext* opCtx,
         _indexName,
         _keyPattern,
         _collation,
-        stdx::monostate(),
+        std::monostate(),
         foundRecordId);
 }
 

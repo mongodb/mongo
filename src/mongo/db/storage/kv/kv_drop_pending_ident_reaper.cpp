@@ -62,28 +62,27 @@ namespace mongo {
 bool KVDropPendingIdentReaper::IdentInfo::isExpired(const KVEngine* engine,
                                                     const Timestamp& ts) const {
     return identState == IdentInfo::State::kNotDropped && dropToken.expired() &&
-        stdx::visit(OverloadedVisitor{[&](const Timestamp& dropTs) {
-                                          return dropTs < ts || dropTs == Timestamp::min();
-                                      },
-                                      [&](const StorageEngine::CheckpointIteration& iteration) {
-                                          return engine->hasDataBeenCheckpointed(iteration);
-                                      }},
-                    dropTime);
+        visit(OverloadedVisitor{[&](const Timestamp& dropTs) {
+                                    return dropTs < ts || dropTs == Timestamp::min();
+                                },
+                                [&](const StorageEngine::CheckpointIteration& iteration) {
+                                    return engine->hasDataBeenCheckpointed(iteration);
+                                }},
+              dropTime);
 }
 
 KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(engine) {}
 
 void KVDropPendingIdentReaper::addDropPendingIdent(
-    const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
+    const std::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
     std::shared_ptr<Ident> ident,
     StorageEngine::DropIdentCallback&& onDrop) {
     stdx::lock_guard<Latch> lock(_mutex);
-    auto dropTimestamp =
-        stdx::visit(OverloadedVisitor{[](const Timestamp& ts) { return ts; },
-                                      [](const StorageEngine::CheckpointIteration&) {
-                                          return Timestamp::min();
-                                      }},
-                    dropTime);
+    auto dropTimestamp = visit(OverloadedVisitor{[](const Timestamp& ts) { return ts; },
+                                                 [](const StorageEngine::CheckpointIteration&) {
+                                                     return Timestamp::min();
+                                                 }},
+                               dropTime);
     const auto equalRange = _dropPendingIdents.equal_range(dropTimestamp);
     const auto& lowerBound = equalRange.first;
     const auto& upperBound = equalRange.second;

@@ -32,6 +32,7 @@
 #include <memory>
 #include <ostream>
 #include <tuple>
+#include <variant>
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -2844,7 +2845,7 @@ struct RemoveImprecisePredicateTestCase {
     struct AssertPredicateRewritten {
         std::string predicateStr;
     };
-    stdx::variant<AssertTriviallyTrue, AssertTriviallyFalse, AssertPredicateRewritten> expected;
+    std::variant<AssertTriviallyTrue, AssertTriviallyFalse, AssertPredicateRewritten> expected;
 };
 
 void testRemoveImprecisePredicates(const RemoveImprecisePredicateTestCase& testCase) {
@@ -2852,20 +2853,20 @@ void testRemoveImprecisePredicates(const RemoveImprecisePredicateTestCase& testC
     auto newExpr = expression::assumeImpreciseInternalExprNodesReturnTrue(predicate.release());
 
 
-    stdx::visit(OverloadedVisitor{
-                    [&](RemoveImprecisePredicateTestCase::AssertTriviallyTrue) {
-                        ASSERT(newExpr->isTriviallyTrue());
-                    },
-                    [&](RemoveImprecisePredicateTestCase::AssertTriviallyFalse) {
-                        ASSERT(newExpr->isTriviallyFalse());
-                    },
-                    [&](RemoveImprecisePredicateTestCase::AssertPredicateRewritten a) {
-                        auto expected = ParsedMatchExpressionForTest(a.predicateStr).release();
-                        MatchExpression::sortTree(expected.get());
-                        ASSERT(expected->equivalent(newExpr.get()));
-                    },
-                },
-                testCase.expected);
+    visit(OverloadedVisitor{
+              [&](RemoveImprecisePredicateTestCase::AssertTriviallyTrue) {
+                  ASSERT(newExpr->isTriviallyTrue());
+              },
+              [&](RemoveImprecisePredicateTestCase::AssertTriviallyFalse) {
+                  ASSERT(newExpr->isTriviallyFalse());
+              },
+              [&](RemoveImprecisePredicateTestCase::AssertPredicateRewritten a) {
+                  auto expected = ParsedMatchExpressionForTest(a.predicateStr).release();
+                  MatchExpression::sortTree(expected.get());
+                  ASSERT(expected->equivalent(newExpr.get()));
+              },
+          },
+          testCase.expected);
 }
 
 TEST(RemoveImprecisePredicates, ImprecisePredicateInTopLevelOrBecomesAlwaysTrue) {

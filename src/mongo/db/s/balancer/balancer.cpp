@@ -101,7 +101,6 @@
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/debug_util.h"
@@ -621,62 +620,62 @@ void Balancer::_consumeActionStreamLoop() {
         _actionStreamsStateUpdated.store(true);
 
         _outstandingStreamingOps.fetchAndAdd(1);
-        stdx::visit(
-            OverloadedVisitor{
-                [&, stream = sourcedStream](MergeInfo&& mergeAction) {
-                    applyThrottling(Milliseconds(chunkDefragmentationThrottlingMS.load()));
-                    auto result =
-                        _commandScheduler
-                            ->requestMergeChunks(opCtx.get(),
-                                                 mergeAction.nss,
-                                                 mergeAction.shardId,
-                                                 mergeAction.chunkRange,
-                                                 mergeAction.collectionPlacementVersion)
-                            .thenRunOn(*executor)
-                            .onCompletion([this, stream, action = std::move(mergeAction)](
-                                              const Status& status) {
-                                _applyStreamingActionResponseToPolicy(action, status, stream);
-                            });
-                },
-                [&, stream = sourcedStream](DataSizeInfo&& dataSizeAction) {
-                    auto result =
-                        _commandScheduler
-                            ->requestDataSize(opCtx.get(),
-                                              dataSizeAction.nss,
-                                              dataSizeAction.shardId,
-                                              dataSizeAction.chunkRange,
-                                              dataSizeAction.version,
-                                              dataSizeAction.keyPattern,
-                                              dataSizeAction.estimatedValue,
-                                              dataSizeAction.maxSize)
-                            .thenRunOn(*executor)
-                            .onCompletion([this, stream, action = std::move(dataSizeAction)](
-                                              const StatusWith<DataSizeResponse>& swDataSize) {
-                                _applyStreamingActionResponseToPolicy(action, swDataSize, stream);
-                            });
-                },
-                [&, stream = sourcedStream](MergeAllChunksOnShardInfo&& mergeAllChunksAction) {
-                    if (mergeAllChunksAction.applyThrottling) {
-                        applyThrottling(Milliseconds(autoMergerThrottlingMS.load()));
-                    }
+        visit(OverloadedVisitor{
+                  [&, stream = sourcedStream](MergeInfo&& mergeAction) {
+                      applyThrottling(Milliseconds(chunkDefragmentationThrottlingMS.load()));
+                      auto result =
+                          _commandScheduler
+                              ->requestMergeChunks(opCtx.get(),
+                                                   mergeAction.nss,
+                                                   mergeAction.shardId,
+                                                   mergeAction.chunkRange,
+                                                   mergeAction.collectionPlacementVersion)
+                              .thenRunOn(*executor)
+                              .onCompletion([this, stream, action = std::move(mergeAction)](
+                                                const Status& status) {
+                                  _applyStreamingActionResponseToPolicy(action, status, stream);
+                              });
+                  },
+                  [&, stream = sourcedStream](DataSizeInfo&& dataSizeAction) {
+                      auto result =
+                          _commandScheduler
+                              ->requestDataSize(opCtx.get(),
+                                                dataSizeAction.nss,
+                                                dataSizeAction.shardId,
+                                                dataSizeAction.chunkRange,
+                                                dataSizeAction.version,
+                                                dataSizeAction.keyPattern,
+                                                dataSizeAction.estimatedValue,
+                                                dataSizeAction.maxSize)
+                              .thenRunOn(*executor)
+                              .onCompletion([this, stream, action = std::move(dataSizeAction)](
+                                                const StatusWith<DataSizeResponse>& swDataSize) {
+                                  _applyStreamingActionResponseToPolicy(action, swDataSize, stream);
+                              });
+                  },
+                  [&, stream = sourcedStream](MergeAllChunksOnShardInfo&& mergeAllChunksAction) {
+                      if (mergeAllChunksAction.applyThrottling) {
+                          applyThrottling(Milliseconds(autoMergerThrottlingMS.load()));
+                      }
 
-                    auto result =
-                        _commandScheduler
-                            ->requestMergeAllChunksOnShard(
-                                opCtx.get(), mergeAllChunksAction.nss, mergeAllChunksAction.shardId)
-                            .thenRunOn(*executor)
-                            .onCompletion(
-                                [this, stream, action = mergeAllChunksAction](
-                                    const StatusWith<NumMergedChunks>& swNumMergedChunks) {
-                                    _applyStreamingActionResponseToPolicy(
-                                        action, swNumMergedChunks, stream);
-                                });
-                },
-                [](MigrateInfo&& _) {
-                    uasserted(ErrorCodes::BadValue,
-                              "Migrations cannot be processed as Streaming Actions");
-                }},
-            std::move(nextAction.value()));
+                      auto result =
+                          _commandScheduler
+                              ->requestMergeAllChunksOnShard(opCtx.get(),
+                                                             mergeAllChunksAction.nss,
+                                                             mergeAllChunksAction.shardId)
+                              .thenRunOn(*executor)
+                              .onCompletion(
+                                  [this, stream, action = mergeAllChunksAction](
+                                      const StatusWith<NumMergedChunks>& swNumMergedChunks) {
+                                      _applyStreamingActionResponseToPolicy(
+                                          action, swNumMergedChunks, stream);
+                                  });
+                  },
+                  [](MigrateInfo&& _) {
+                      uasserted(ErrorCodes::BadValue,
+                                "Migrations cannot be processed as Streaming Actions");
+                  }},
+              std::move(nextAction.value()));
     }
 }
 

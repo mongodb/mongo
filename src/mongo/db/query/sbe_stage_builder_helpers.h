@@ -1021,7 +1021,7 @@ public:
     };
     using Slice = std::pair<int32_t, boost::optional<int32_t>>;
 
-    using VariantType = stdx::variant<Bool, Expr, SbExpr, Slice>;
+    using VariantType = std::variant<Bool, Expr, SbExpr, Slice>;
 
     struct Keep {};
     struct Drop {};
@@ -1039,26 +1039,26 @@ public:
     ProjectNode(const ProjectionSliceASTNode* n) : _data(Slice{n->limit(), n->skip()}) {}
 
     ProjectNode clone() const {
-        return stdx::visit(OverloadedVisitor{[](const Bool& b) {
-                                                 return b.value ? ProjectNode(Keep{})
-                                                                : ProjectNode(Drop{});
-                                             },
-                                             [](const Expr& e) { return ProjectNode(e.expr); },
-                                             [](const SbExpr& e) { return ProjectNode(e.clone()); },
-                                             [](const Slice& s) {
-                                                 return ProjectNode(s);
-                                             }},
-                           _data);
+        return visit(OverloadedVisitor{[](const Bool& b) {
+                                           return b.value ? ProjectNode(Keep{})
+                                                          : ProjectNode(Drop{});
+                                       },
+                                       [](const Expr& e) { return ProjectNode(e.expr); },
+                                       [](const SbExpr& e) { return ProjectNode(e.clone()); },
+                                       [](const Slice& s) {
+                                           return ProjectNode(s);
+                                       }},
+                     _data);
     }
 
     Type type() const {
-        return stdx::visit(OverloadedVisitor{[](const Bool&) { return Type::kBool; },
-                                             [](const Expr&) { return Type::kExpr; },
-                                             [](const SbExpr&) { return Type::kSbExpr; },
-                                             [](const Slice&) {
-                                                 return Type::kSlice;
-                                             }},
-                           _data);
+        return visit(OverloadedVisitor{[](const Bool&) { return Type::kBool; },
+                                       [](const Expr&) { return Type::kExpr; },
+                                       [](const SbExpr&) { return Type::kSbExpr; },
+                                       [](const Slice&) {
+                                           return Type::kSlice;
+                                       }},
+                     _data);
     }
 
     bool isBool() const {
@@ -1076,30 +1076,30 @@ public:
 
     bool getBool() const {
         tassert(7580702, "getBool() expected type() to be kBool", isBool());
-        return stdx::get<Bool>(_data).value;
+        return get<Bool>(_data).value;
     }
     Expression* getExpr() const {
         tassert(7580703, "getExpr() expected type() to be kExpr", isExpr());
-        return stdx::get<Expr>(_data).expr;
+        return get<Expr>(_data).expr;
     }
     SbExpr getSbExpr() const {
         tassert(7580715, "getSbExpr() expected type() to be kSbExpr", isSbExpr());
-        return stdx::get<SbExpr>(_data).clone();
+        return get<SbExpr>(_data).clone();
     }
     SbExpr extractSbExpr() {
         tassert(7580716, "getSbExpr() expected type() to be kSbExpr", isSbExpr());
-        return std::move(stdx::get<SbExpr>(_data));
+        return std::move(get<SbExpr>(_data));
     }
     Slice getSlice() const {
         tassert(7580704, "getSlice() expected type() to be kSlice", isSlice());
-        return stdx::get<Slice>(_data);
+        return get<Slice>(_data);
     }
 
     bool isKeep() const {
-        return type() == Type::kBool && stdx::get<Bool>(_data).value == true;
+        return type() == Type::kBool && get<Bool>(_data).value == true;
     }
     bool isDrop() const {
-        return type() == Type::kBool && stdx::get<Bool>(_data).value == false;
+        return type() == Type::kBool && get<Bool>(_data).value == false;
     }
 
 private:

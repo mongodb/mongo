@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/exec/mock_stage.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
@@ -53,17 +52,17 @@ PlanStage::StageState MockStage::doWork(WorkingSetID* out) {
     auto nextResult = _results.front();
     _results.pop();
 
-    auto returnState = stdx::visit(
-        OverloadedVisitor{
-            [](WorkingSetID wsid) -> PlanStage::StageState { return PlanStage::ADVANCED; },
-            [](PlanStage::StageState state) -> PlanStage::StageState { return state; },
-            [](Status status) -> PlanStage::StageState {
-                uassertStatusOK(status);
-                MONGO_UNREACHABLE;
-            }},
-        nextResult);
+    auto returnState =
+        visit(OverloadedVisitor{
+                  [](WorkingSetID wsid) -> PlanStage::StageState { return PlanStage::ADVANCED; },
+                  [](PlanStage::StageState state) -> PlanStage::StageState { return state; },
+                  [](Status status) -> PlanStage::StageState {
+                      uassertStatusOK(status);
+                      MONGO_UNREACHABLE;
+                  }},
+              nextResult);
     if (returnState == PlanStage::ADVANCED) {
-        *out = stdx::get<WorkingSetID>(nextResult);
+        *out = get<WorkingSetID>(nextResult);
     }
     return returnState;
 }

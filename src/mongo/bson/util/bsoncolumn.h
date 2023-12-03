@@ -51,7 +51,6 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/util/simple8b.h"
 #include "mongo/platform/int128.h"
-#include "mongo/stdx/variant.h"
 
 namespace mongo {
 
@@ -223,7 +222,7 @@ public:
 
             // Last encoded values used to calculate delta and delta-of-delta
             BSONElement lastValue;
-            stdx::variant<Decoder64, Decoder128> decoder = Decoder64{};
+            std::variant<Decoder64, Decoder128> decoder = Decoder64{};
         };
 
         /**
@@ -258,7 +257,7 @@ public:
         void _incrementRegular(Regular& regular);
         void _incrementInterleaved(Interleaved& interleaved);
 
-        stdx::variant<Regular, Interleaved> _mode = Regular{};
+        std::variant<Regular, Interleaved> _mode = Regular{};
     };
 
     /**

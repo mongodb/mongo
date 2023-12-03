@@ -171,7 +171,7 @@ public:
         return 0;
     }
     void addDropPendingIdent(
-        const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
+        const std::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
         std::shared_ptr<Ident> ident,
         DropIdentCallback&& onDrop) final {}
     void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) final {}
