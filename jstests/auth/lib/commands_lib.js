@@ -2315,6 +2315,20 @@ export const authCommandsLib = {
           ],
         },
         {
+            testname: "autoCompact",
+            // Not need to actually enable background compaction, just verify the user can run this command
+            command: {autoCompact: false},
+            skipSharded: true,
+            testcases: [
+                {
+                  runOnDb: adminDbName,
+                  roles: roles_hostManager,
+                  privileges:
+                      [{resource: {cluster: true}, actions: ["compact"]}]
+                }
+            ]
+          },
+        {
           testname: "buildInfo",
           command: {buildInfo: 1},
           testcases: [
