@@ -466,11 +466,11 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
 
 MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);
 
-void logStartupTimeElapsedStatistics(ServiceContext* serviceContext,
-                                     Date_t beginInitAndListen,
-                                     BSONObjBuilder* startupTimeElapsedBuilder,
-                                     BSONObjBuilder* startupInfoBuilder,
-                                     StorageEngine::LastShutdownState lastShutdownState) {
+void logMongodStartupTimeElapsedStatistics(ServiceContext* serviceContext,
+                                           Date_t beginInitAndListen,
+                                           BSONObjBuilder* startupTimeElapsedBuilder,
+                                           BSONObjBuilder* startupInfoBuilder,
+                                           StorageEngine::LastShutdownState lastShutdownState) {
     mongo::Milliseconds elapsedInitAndListen =
         serviceContext->getFastClockSource()->now() - beginInitAndListen;
     startupTimeElapsedBuilder->append("_initAndListen total elapsed time",
@@ -479,7 +479,7 @@ void logStartupTimeElapsedStatistics(ServiceContext* serviceContext,
                                lastShutdownState == StorageEngine::LastShutdownState::kClean);
     startupInfoBuilder->append("Statistics", startupTimeElapsedBuilder->obj());
     LOGV2_INFO(8423403,
-               "initAndListen complete",
+               "mongod startup complete",
                "Summary of time elapsed"_attr = startupInfoBuilder->obj());
 }
 
@@ -537,10 +537,15 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     serviceContext->getService(ClusterRole::ShardServer)
         ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
 
-    // Set up the periodic runner for background job execution. This is required to be running
-    // before both the storage engine or the transport layer are initialized.
-    auto runner = makePeriodicRunner(serviceContext);
-    serviceContext->setPeriodicRunner(std::move(runner));
+    {
+        // Set up the periodic runner for background job execution. This is required to be running
+        // before both the storage engine or the transport layer are initialized.
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Set up periodic runner",
+                                                  &startupTimeElapsedBuilder);
+        auto runner = makePeriodicRunner(serviceContext);
+        serviceContext->setPeriodicRunner(std::move(runner));
+    }
 
     // When starting the server with --queryableBackupMode or --recoverFromOplogAsStandalone, we are
     // in read-only mode and don't allow user-originating operations to perform writes
@@ -550,7 +555,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
 #ifdef MONGO_CONFIG_SSL
-    OCSPManager::start(serviceContext);
+    {
+        TimeElapsedBuilderScopedTimer scopedTimer(
+            serviceContext->getFastClockSource(),
+            "Set up online certificate status protocol manager",
+            &startupTimeElapsedBuilder);
+        OCSPManager::start(serviceContext);
+    }
     CertificateExpirationMonitor::get()->start(serviceContext);
 #endif
 
@@ -592,11 +603,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                                 &startupTimeElapsedBuilder,
                                 &startupInfoBuilder,
                                 lastShutdownState] {
-        logStartupTimeElapsedStatistics(serviceContext,
-                                        beginInitAndListen,
-                                        &startupTimeElapsedBuilder,
-                                        &startupInfoBuilder,
-                                        lastShutdownState);
+        logMongodStartupTimeElapsedStatistics(serviceContext,
+                                              beginInitAndListen,
+                                              &startupTimeElapsedBuilder,
+                                              &startupInfoBuilder,
+                                              lastShutdownState);
     });
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
@@ -1021,11 +1032,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             // shutdown task to complete and return.
 
             logStartupStats.dismiss();
-            logStartupTimeElapsedStatistics(serviceContext,
-                                            beginInitAndListen,
-                                            &startupTimeElapsedBuilder,
-                                            &startupInfoBuilder,
-                                            lastShutdownState);
+            logMongodStartupTimeElapsedStatistics(serviceContext,
+                                                  beginInitAndListen,
+                                                  &startupTimeElapsedBuilder,
+                                                  &startupInfoBuilder,
+                                                  lastShutdownState);
 
             MONGO_IDLE_THREAD_BLOCK;
             return waitForShutdown();
@@ -1159,11 +1170,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     logStartupStats.dismiss();
-    logStartupTimeElapsedStatistics(serviceContext,
-                                    beginInitAndListen,
-                                    &startupTimeElapsedBuilder,
-                                    &startupInfoBuilder,
-                                    lastShutdownState);
+    logMongodStartupTimeElapsedStatistics(serviceContext,
+                                          beginInitAndListen,
+                                          &startupTimeElapsedBuilder,
+                                          &startupInfoBuilder,
+                                          lastShutdownState);
 
     MONGO_IDLE_THREAD_BLOCK;
     return waitForShutdown();
@@ -1541,17 +1552,17 @@ struct ShutdownContext {
 ServiceContext::Decoration<ShutdownContext> getShutdownContext =
     ServiceContext::declareDecoration<ShutdownContext>();
 
-void logShutdownTimeElapsedStatistics(ServiceContext* serviceContext,
-                                      Date_t beginShutdownTask,
-                                      BSONObjBuilder* shutdownTimeElapsedBuilder,
-                                      BSONObjBuilder* shutdownInfoBuilder) {
+void logMongodShutdownTimeElapsedStatistics(ServiceContext* serviceContext,
+                                            Date_t beginShutdownTask,
+                                            BSONObjBuilder* shutdownTimeElapsedBuilder,
+                                            BSONObjBuilder* shutdownInfoBuilder) {
     mongo::Milliseconds elapsedInitAndListen =
         serviceContext->getFastClockSource()->now() - beginShutdownTask;
     shutdownTimeElapsedBuilder->append("shutdownTask total elapsed time",
                                        elapsedInitAndListen.toString());
     shutdownInfoBuilder->append("Statistics", shutdownTimeElapsedBuilder->obj());
     LOGV2_INFO(8423404,
-               "shutdownTask complete",
+               "mongod shutdown complete",
                "Summary of time elapsed"_attr = shutdownInfoBuilder->obj());
 }
 
@@ -1587,10 +1598,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     Date_t beginShutdownTask = serviceContext->getFastClockSource()->now();
     ScopeGuard logShutdownStats(
         [serviceContext, beginShutdownTask, &shutdownTimeElapsedBuilder, &shutdownInfoBuilder] {
-            logShutdownTimeElapsedStatistics(serviceContext,
-                                             beginShutdownTask,
-                                             &shutdownTimeElapsedBuilder,
-                                             &shutdownInfoBuilder);
+            logMongodShutdownTimeElapsedStatistics(serviceContext,
+                                                   beginShutdownTask,
+                                                   &shutdownTimeElapsedBuilder,
+                                                   &shutdownInfoBuilder);
         });
 
     // If we don't have shutdownArgs, we're shutting down from a signal, or other clean shutdown
@@ -1765,6 +1776,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     if (auto storageEngine = serviceContext->getStorageEngine()) {
         if (storageEngine->supportsReadConcernSnapshot()) {
+            TimeElapsedBuilderScopedTimer scopedTimer(
+                serviceContext->getFastClockSource(),
+                "Shut down the thread that aborts expired transactions",
+                &shutdownTimeElapsedBuilder);
             LOGV2(4784908, "Shutting down the PeriodicThreadToAbortExpiredTransactions");
             PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->stop();
         }
@@ -2045,7 +2060,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     FlowControl::shutdown(serviceContext);
 #ifdef MONGO_CONFIG_SSL
-    OCSPManager::shutdown(serviceContext);
+    {
+        TimeElapsedBuilderScopedTimer scopedTimer(
+            serviceContext->getFastClockSource(),
+            "Shut down online certificate status protocol manager",
+            &shutdownTimeElapsedBuilder);
+        OCSPManager::shutdown(serviceContext);
+    }
 #endif
 }
 
