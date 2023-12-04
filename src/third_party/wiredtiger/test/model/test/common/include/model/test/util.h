@@ -54,4 +54,10 @@ extern "C" {
  */
 std::string create_tmp_file(const char *dir, const char *prefix, const char *suffix = nullptr);
 
+/*
+ * verify_using_debug_log --
+ *     Verify the database using the debug log. Try both the regular and the JSON version.
+ */
+void verify_using_debug_log(TEST_OPTS *opts, const char *home, bool test_failing = false);
+
 #endif

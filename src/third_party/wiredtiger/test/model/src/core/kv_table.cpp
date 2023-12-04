@@ -284,6 +284,29 @@ kv_table::rollback_updates(const data_value &key, txn_id_t txn_id)
 }
 
 /*
+ * kv_table::clear --
+ *     Clear the contents of the table.
+ */
+void
+kv_table::clear()
+{
+    std::lock_guard lock_guard(_lock);
+    _data.clear();
+}
+
+/*
+ * kv_table::rollback_to_stable --
+ *     Roll back the database table to the latest stable timestamp and transaction snapshot.
+ */
+void
+kv_table::rollback_to_stable(timestamp_t timestamp, kv_transaction_snapshot_ptr snapshot)
+{
+    std::lock_guard lock_guard(_lock);
+    for (auto &p : _data)
+        p.second.rollback_to_stable(timestamp, snapshot);
+}
+
+/*
  * kv_table::verify_cursor --
  *     Create a verification cursor for the table. This method is not thread-safe. In fact, nothing
  *     is thread-safe until the returned cursor stops being used!

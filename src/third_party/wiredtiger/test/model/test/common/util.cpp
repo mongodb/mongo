@@ -33,12 +33,16 @@
 #include <iostream>
 #include <stdexcept>
 #include <unistd.h>
+#include <vector>
 
 extern "C" {
 #include "test_util.h"
 }
 
+#include "model/driver/debug_log_parser.h"
 #include "model/test/util.h"
+#include "model/test/wiredtiger_util.h"
+#include "model/util.h"
 
 /*
  * create_tmp_file --
@@ -62,4 +66,53 @@ create_tmp_file(const char *dir, const char *prefix, const char *suffix)
     testutil_check(close(fd));
 
     return std::string(buf);
+}
+
+/*
+ * verify_using_debug_log --
+ *     Verify the database using the debug log. Try both the regular and the JSON version.
+ */
+void
+verify_using_debug_log(TEST_OPTS *opts, const char *home, bool test_failing)
+{
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+
+    testutil_wiredtiger_open(
+      opts, home, "log=(enabled,file_max=10M,remove=false)", nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    std::vector<std::string> tables = model::wt_list_tables(conn);
+
+    /* Verify using the debug log. */
+    model::kv_database db_from_debug_log;
+    model::debug_log_parser::from_debug_log(db_from_debug_log, conn);
+    for (auto &t : tables)
+        testutil_assert(db_from_debug_log.table(t.c_str())->verify_noexcept(conn));
+
+    /*
+     * Print the debug log to JSON. Note that the debug log has not changed from above, because each
+     * database can be opened by only one WiredTiger instance at a time.
+     */
+    std::string tmp_json = create_tmp_file(home, "debug-log-", ".json");
+    wt_print_debug_log(conn, tmp_json.c_str());
+
+    /* Verify again using the debug log JSON. */
+    model::kv_database db_from_debug_log_json;
+    model::debug_log_parser::from_json(db_from_debug_log_json, tmp_json.c_str());
+    for (auto &t : tables)
+        testutil_assert(db_from_debug_log_json.table(t.c_str())->verify_noexcept(conn));
+
+    /* Now try to get the verification to fail, just to make sure it's working. */
+    if (test_failing)
+        for (auto &t : tables) {
+            model::data_value key("A key that does not exists");
+            model::data_value value("A data value");
+            model::kv_table_ptr p = db_from_debug_log.table(t.c_str());
+            p->insert(key, value, 100 * 1000);
+            testutil_assert(!p->verify_noexcept(conn));
+        }
+
+    /* Clean up. */
+    testutil_check(session->close(session, nullptr));
+    testutil_check(conn->close(conn, nullptr));
 }
