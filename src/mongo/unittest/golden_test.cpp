@@ -42,6 +42,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/golden_test.h"
+#include "mongo/util/shell_exec.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -75,9 +76,24 @@ void GoldenTestContext::onError(const std::string& message,
 
     auto diff_cmd = unittest::GoldenTestEnvironment::getInstance()->diffCmd(
         getExpectedOutputPath().string(), getActualOutputPath().string());
-    std::cout << std::flush;
-    int status = std::system(diff_cmd.c_str());
-    (void)status;
+
+    // Execute a diff shell command and forward it's output to the current process output.
+    // The output pipe of the subprocess is explictly captured to discourage the child process
+    // from using interactive pagination, that otherwise might happen if the test process is
+    // executed in interactive shell.
+    const size_t kShellMaxLenBytes = 32 * 1024 * 1024;
+    constexpr Seconds kShellDiffTimeout{60};
+    auto diffOutput =
+        shellExec(diff_cmd, kShellDiffTimeout, kShellMaxLenBytes, /*ignoreExitCode*/ true);
+    if (diffOutput.isOK()) {
+        std::cout << diffOutput.getValue() << std::endl;
+    } else {
+        LOGV2_ERROR(8336201,
+                    "Failed to execute diff command",
+                    "diff_cmd"_attr = diff_cmd,
+                    "code"_attr = diffOutput.getStatus().codeString(),
+                    "reason"_attr = diffOutput.getStatus().reason());
+    }
 
     throw TestAssertionFailureException(_testInfo->file().toString(), _testInfo->line(), message);
 }

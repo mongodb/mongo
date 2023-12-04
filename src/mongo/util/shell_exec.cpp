@@ -294,7 +294,8 @@ private:
 }  // namespace mongo
 mongo::StatusWith<std::string> mongo::shellExec(const std::string& cmd,
                                                 Milliseconds timeout,
-                                                size_t maxlen) try {
+                                                size_t maxlen,
+                                                bool ignoreExitCode) try {
     if (durationCount<Milliseconds>(timeout) <= 0) {
         return {ErrorCodes::OperationFailed, str::stream() << "Invalid timeout: " << timeout};
     }
@@ -316,7 +317,7 @@ mongo::StatusWith<std::string> mongo::shellExec(const std::string& cmd,
     }
 
     auto exitcode = process.close();
-    if (exitcode) {
+    if (!ignoreExitCode && exitcode) {
         return {ErrorCodes::OperationFailed,
                 str::stream() << "Process returned non-zero exit code: " << exitcode};
     }
