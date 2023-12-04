@@ -1283,7 +1283,7 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
     cfg << "verbose=[";
 
     // Enable WiredTiger progress messages.
-    cfg << "recovery_progress:1,checkpoint_progress:1,compact_progress:1,checkpoint_cleanup:1";
+    cfg << "recovery_progress:1,checkpoint_progress:1,compact_progress:1";
 
     // Process each LOGV2 WiredTiger component and set the desired verbosity level.
     for (const auto& [component, componentStr] : *wtVerboseComponents) {
@@ -1312,10 +1312,6 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
             default:
                 level = WT_VERBOSE_INFO;
                 break;
-        }
-
-        if (componentStr == "checkpoint" && gWiredTigerStressConfig) {
-            level = WT_VERBOSE_DEBUG_1;
         }
 
         cfg << componentStr << ":" << level;
