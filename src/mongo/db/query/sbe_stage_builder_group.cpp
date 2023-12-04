@@ -749,25 +749,39 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     tassert(6023414, "buildGroup() does not support kSortKey", !reqs.hasSortKeys());
 
     auto groupNode = static_cast<const GroupNode*>(root);
-    auto nodeId = groupNode->nodeId();
-    const auto& idExpr = groupNode->groupByExpression;
 
     tassert(
         5851600, "should have one and only one child for GROUP", groupNode->children.size() == 1);
-    tassert(5851601, "GROUP should have had group-by key expression", idExpr);
     tassert(
         6360401,
         "GROUP cannot propagate a record id slot, but the record id was requested by the parent",
         !reqs.has(kRecordId));
 
     const auto& childNode = groupNode->children[0].get();
-    const auto& accStmts = groupNode->accumulators;
 
     // Builds the child and gets the child result slot. If we don't need the full result object, we
     // can process block values.
-    auto childReqs = computeChildReqsForGroup(reqs, *groupNode)
-                         .setCanProcessBlockValues(!reqs.has(PlanStageSlots::kResult));
-    auto [childStage, childOutputs] = build(childNode, childReqs);
+    auto [childStage, childOutputs] =
+        build(childNode,
+              computeChildReqsForGroup(reqs, *groupNode)
+                  .setCanProcessBlockValues(!reqs.has(PlanStageSlots::kResult)));
+
+    // Build the group stage in a separate helper method, so that the variables that are not needed
+    // to setup the recursive call to build() don't consume precious stack.
+    return buildGroupImpl(groupNode, reqs, std::move(childStage), std::move(childOutputs));
+}
+
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildGroupImpl(
+    const GroupNode* groupNode,
+    const PlanStageReqs& reqs,
+    std::unique_ptr<sbe::PlanStage> childStage,
+    PlanStageSlots childOutputs) {
+    auto nodeId = groupNode->nodeId();
+
+    const auto& idExpr = groupNode->groupByExpression;
+    tassert(5851601, "GROUP should have had group-by key expression", idExpr);
+
+    const auto& accStmts = groupNode->accumulators;
 
     // Map of field paths referenced by group. Useful for de-duplicating fields and clearing the
     // slots corresponding to fields in 'childOutputs' so that they are not mistakenly referenced by

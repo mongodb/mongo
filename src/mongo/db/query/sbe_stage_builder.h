@@ -1021,6 +1021,12 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildGroup(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildGroupImpl(
+        const GroupNode* groupNode,
+        const PlanStageReqs& reqs,
+        std::unique_ptr<sbe::PlanStage> childStage,
+        PlanStageSlots childOutputs);
+
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildLookup(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
