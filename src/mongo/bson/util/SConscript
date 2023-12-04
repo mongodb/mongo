@@ -66,3 +66,14 @@ env.Benchmark(
         'bson_column',
     ],
 )
+
+env.CppLibfuzzerTest(
+    target='simple8b_fuzzer',
+    source=[
+        'simple8b_fuzzer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'bson_column',
+    ],
+)
