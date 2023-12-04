@@ -872,7 +872,7 @@ void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const Record
 
     int64_t old_length = old_value.size;
 
-    ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
+    ret = WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(opCtx), c));
     invariantWTOK(ret, c->session);
 
     auto keyLength = computeRecordIdSize(id);
@@ -1123,7 +1123,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         setKey(c, &key);
         WiredTigerItem value(record.data.data(), record.data.size());
         c->set_value(c, value.Get());
-        int ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
+        int ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(opCtx), c));
 
         if (ret == WT_DUPLICATE_KEY) {
             invariant(!_overwrite);
@@ -1316,10 +1316,13 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
         if ((ret = wiredtiger_calc_modify(
                  c->session, &old_value, value.Get(), kMaxDiffBytes, entries.data(), &nentries)) ==
             0) {
-            invariantWTOK(WT_OP_CHECK(nentries == 0 ? c->reserve(c)
-                                                    : wiredTigerCursorModify(
-                                                          opCtx, c, entries.data(), nentries)),
-                          c->session);
+            invariantWTOK(
+                WT_OP_CHECK(
+                    nentries == 0
+                        ? c->reserve(c)
+                        : wiredTigerCursorModify(
+                              *WiredTigerRecoveryUnit::get(opCtx), c, entries.data(), nentries)),
+                c->session);
 
             size_t modifiedDataSize = 0;
             // Don't perform a range-based for loop because there may be fewer calculated entries
@@ -1345,7 +1348,7 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
 
     if (!skip_update) {
         c->set_value(c, value.Get());
-        ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
+        ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(opCtx), c));
 
         auto keyLength = computeRecordIdSize(id);
         metricsCollector.incrementOneDocWritten(_uri, value.size + keyLength);
@@ -1394,7 +1397,8 @@ StatusWith<RecordData> WiredTigerRecordStore::doUpdateWithDamages(
     if (nentries == 0)
         invariantWTOK(WT_OP_CHECK(c->search(c)), c->session);
     else
-        invariantWTOK(WT_OP_CHECK(wiredTigerCursorModify(opCtx, c, entries.data(), nentries)),
+        invariantWTOK(WT_OP_CHECK(wiredTigerCursorModify(
+                          *WiredTigerRecoveryUnit::get(opCtx), c, entries.data(), nentries)),
                       c->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);

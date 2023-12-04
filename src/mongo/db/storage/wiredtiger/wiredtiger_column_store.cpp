@@ -190,7 +190,7 @@ void WiredTigerColumnStore::WriteCursor::insert(PathView path, RowId rid, CellVi
 
     c()->set_key(c(), keyItem.Get());
     c()->set_value(c(), valueItem.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorInsert(_opCtx, c()));
+    int ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(_opCtx), c()));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
     metricsCollector.incrementOneIdxEntryWritten(c()->uri, keyItem.size);
@@ -211,7 +211,7 @@ void WiredTigerColumnStore::WriteCursor::remove(PathView path, RowId rid) {
     auto key = makeKey(path, rid);
     auto keyItem = WiredTigerItem(key);
     c()->set_key(c(), keyItem.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorRemove(_opCtx, c()));
+    int ret = WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(_opCtx), c()));
     if (ret == WT_NOTFOUND) {
         return;
     }
@@ -237,7 +237,7 @@ void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellVi
 
     c()->set_key(c(), keyItem.Get());
     c()->set_value(c(), valueItem.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorUpdate(_opCtx, c()));
+    int ret = WT_OP_CHECK(wiredTigerCursorUpdate(*WiredTigerRecoveryUnit::get(_opCtx), c()));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
     metricsCollector.incrementOneIdxEntryWritten(c()->uri, keyItem.size);
@@ -514,7 +514,8 @@ public:
         WiredTigerItem cellItem(cell.rawData(), cell.size());
         _cursor->set_value(_cursor.get(), cellItem.Get());
 
-        invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor.get()), _cursor->session);
+        invariantWTOK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(_opCtx), _cursor.get()),
+                      _cursor->session);
 
         ResourceConsumption::MetricsCollector::get(_opCtx).incrementOneIdxEntryWritten(
             _cursor->uri, keyItem.size);

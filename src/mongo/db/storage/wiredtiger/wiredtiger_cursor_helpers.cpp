@@ -42,9 +42,8 @@
 namespace mongo {
 
 namespace {
-void handleWriteContextForDebugging(OperationContext* opCtx, WT_CURSOR* cursor) {
-    auto* ru = WiredTigerRecoveryUnit::get(opCtx);
-    if (ru->gatherWriteContextForDebugging()) {
+void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
+    if (ru.gatherWriteContextForDebugging()) {
         BSONObjBuilder builder;
 
         std::string s;
@@ -54,54 +53,54 @@ void handleWriteContextForDebugging(OperationContext* opCtx, WT_CURSOR* cursor) 
 
         builder.append("uri", cursor->uri);
 
-        ru->storeWriteContextForDebugging(builder.obj());
+        ru.storeWriteContextForDebugging(builder.obj());
     }
 }
 }  // namespace
 
-int wiredTigerCursorInsert(OperationContext* opCtx, WT_CURSOR* cursor) {
+int wiredTigerCursorInsert(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     int ret = cursor->insert(cursor);
     if (MONGO_likely(ret == 0)) {
-        WiredTigerRecoveryUnit::get(opCtx)->setTxnModified();
+        ru.setTxnModified();
     }
     if (TestingProctor::instance().isEnabled()) {
-        handleWriteContextForDebugging(opCtx, cursor);
+        handleWriteContextForDebugging(ru, cursor);
     }
     return ret;
 }
 
-int wiredTigerCursorModify(OperationContext* opCtx,
+int wiredTigerCursorModify(WiredTigerRecoveryUnit& ru,
                            WT_CURSOR* cursor,
                            WT_MODIFY* entries,
                            int nentries) {
     int ret = cursor->modify(cursor, entries, nentries);
     if (MONGO_likely(ret == 0)) {
-        WiredTigerRecoveryUnit::get(opCtx)->setTxnModified();
+        ru.setTxnModified();
     }
     if (TestingProctor::instance().isEnabled()) {
-        handleWriteContextForDebugging(opCtx, cursor);
+        handleWriteContextForDebugging(ru, cursor);
     }
     return ret;
 }
 
-int wiredTigerCursorUpdate(OperationContext* opCtx, WT_CURSOR* cursor) {
+int wiredTigerCursorUpdate(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     int ret = cursor->update(cursor);
     if (MONGO_likely(ret == 0)) {
-        WiredTigerRecoveryUnit::get(opCtx)->setTxnModified();
+        ru.setTxnModified();
     }
     if (TestingProctor::instance().isEnabled()) {
-        handleWriteContextForDebugging(opCtx, cursor);
+        handleWriteContextForDebugging(ru, cursor);
     }
     return ret;
 }
 
-int wiredTigerCursorRemove(OperationContext* opCtx, WT_CURSOR* cursor) {
+int wiredTigerCursorRemove(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     int ret = cursor->remove(cursor);
     if (MONGO_likely(ret == 0)) {
-        WiredTigerRecoveryUnit::get(opCtx)->setTxnModified();
+        ru.setTxnModified();
     }
     if (TestingProctor::instance().isEnabled()) {
-        handleWriteContextForDebugging(opCtx, cursor);
+        handleWriteContextForDebugging(ru, cursor);
     }
     return ret;
 }
