@@ -36,8 +36,6 @@ selector:
   # TODO (SERVER-80831): Explain.
   # - jstests/sharding/timeseries_update_multi_explain.js
   exclude_files:
-  # TODO (SERVER-80174): Handle transaction errors.
-  - jstests/sharding/updateOne_without_shard_key/errors.js
   # Update API version tests should not be run with bulkWrite override.
   - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_stable_api_test.js
 
