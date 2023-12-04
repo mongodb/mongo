@@ -30,12 +30,12 @@ global:
   cpp_namespace: "mongo::analyze_shard_key"
   cpp_includes:
     - "mongo/client/read_preference.h"
-    - "mongo/s/analyze_shard_key_util.h"
 
 imports:
   - "mongo/client/read_preference_setting.idl"
   - "mongo/db/basic_types.idl"
   - "mongo/db/keypattern.idl"
+  - "mongo/s/analyze_shard_key_common.idl"
 
 enums:
   MonotonicityType:

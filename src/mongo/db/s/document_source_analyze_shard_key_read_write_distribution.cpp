@@ -401,5 +401,25 @@ DocumentSource::GetNextResult DocumentSourceAnalyzeShardKeyReadWriteDistribution
     return {Document(response.toBSON())};
 }
 
+std::unique_ptr<DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed>
+DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse(const NamespaceString& nss,
+                                                                      const BSONElement& specElem) {
+    uassert(
+        ErrorCodes::IllegalOperation,
+        str::stream() << kStageName << " is not supported on a standalone mongod",
+        repl::ReplicationCoordinator::get(getGlobalServiceContext())->getSettings().isReplSet());
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << kStageName << " is not supported on a multitenant replica set",
+            !gMultitenancySupport);
+    uassert(6875700,
+            str::stream() << kStageName << " must take a nested object but found: " << specElem,
+            specElem.type() == BSONType::Object);
+    uassertStatusOK(validateNamespace(nss));
+
+    auto spec = DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec::parse(
+        IDLParserContext(kStageName), specElem.embeddedObject());
+    return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));
+}
+
 }  // namespace analyze_shard_key
 }  // namespace mongo

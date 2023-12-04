@@ -179,13 +179,20 @@ env.Library(
 )
 
 env.Library(
-    target='sharded_agg_helpers', source=[
+    target='sharded_agg_helpers',
+    source=[
         'sharded_agg_helpers.cpp',
-    ], LIBDEPS=[
+    ],
+    LIBDEPS=[
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/query/cluster_query',
         'aggregation',
-    ], LIBDEPS_PRIVATE=['$BUILD_DIR/mongo/db/shard_role_api'])
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/shard_role_api',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
+    ],
+)
 
 env.Library(
     target='lite_parsed_document_source',
@@ -425,7 +432,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/executor/task_executor_cursor',
         '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/s/analyze_shard_key_util',
+        '$BUILD_DIR/mongo/s/analyze_shard_key_common',
         '$BUILD_DIR/mongo/s/grid',
     ],
 )

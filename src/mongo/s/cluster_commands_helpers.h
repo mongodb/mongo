@@ -338,19 +338,6 @@ RawResponsesResult appendRawResponses(
     bool appendWriteConcernError = true);
 
 /**
- * Extracts the query from a query-embedding command ('query' or 'q' fields). If the command does
- * not have an embedded query, returns an empty BSON object.
- */
-BSONObj extractQuery(const BSONObj& cmdObj);
-
-/**
- * Extracts the collation from a collation-embedding command ('collation' field). If the command
- * does not specify a collation, returns an empty BSON object. If the 'collation' field is of wrong
- * type, throws.
- */
-BSONObj extractCollation(const BSONObj& cmdObj);
-
-/**
  * Utility function to return an empty result set from a command.
  */
 bool appendEmptyResultSet(OperationContext* opCtx,

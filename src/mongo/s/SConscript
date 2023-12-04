@@ -40,13 +40,11 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/bulk_write_common',
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/fle_crud',
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
         '$BUILD_DIR/mongo/db/ops/parsed_update',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface',
-        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_metadata',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
@@ -66,13 +64,15 @@ env.Library(
 env.Library(
     target='query_analysis_sampler',
     source=[
+        'query_analysis_client.cpp',
         'query_analysis_sampler.cpp',
         'query_analysis_sampler_util.cpp',
         'query_analysis_server_status.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
         'analyze_shard_key_common',
-        'analyze_shard_key_util',
         'grid',
     ],
 )
@@ -133,10 +133,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/executor/async_multicaster',
         '$BUILD_DIR/mongo/executor/connection_pool_executor',
+        '$BUILD_DIR/mongo/executor/scoped_task_executor',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        'analyze_shard_key_util',
         'catalog/sharding_catalog_client_impl',
         'coreshard',
+        'query_analysis_sampler',
         'sharding_task_executor',
     ],
 )
@@ -175,6 +176,7 @@ env.Library(
 env.Library(
     target='analyze_shard_key_common',
     source=[
+        'analyze_shard_key_common.cpp',
         'analyze_shard_key_common.idl',
         'analyze_shard_key_documents.idl',
         'analyze_shard_key_server_parameters.idl',
@@ -183,22 +185,11 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl',
+        '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/repl_settings',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
-    ],
-)
-
-env.Library(
-    target='analyze_shard_key_util',
-    source=[
-        'analyze_shard_key_util.cpp',
-        'query_analysis_client.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/shard_role',
     ],
 )
 
@@ -319,9 +310,11 @@ env.Library(
         'sharding_task_executor.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/operation_time_tracker',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/operation_time_tracker',
+        '$BUILD_DIR/mongo/db/server_base',
         'client/sharding_client',
         'sharding_router_api',
     ],
@@ -428,10 +421,8 @@ env.Library(
         'service_entry_point_mongos.cpp',
         'sharding_uptime_reporter.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-    ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/curop_metrics',
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
@@ -641,6 +632,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'catalog/sharding_catalog_client_impl',
         'coreshard',
+        'sharding_router_api',
         'sharding_task_executor',
         'sharding_test_fixture_common',
     ],

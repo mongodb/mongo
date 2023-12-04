@@ -28,6 +28,8 @@
 
 global:
   cpp_namespace: "mongo::analyze_shard_key"
+  cpp_includes:
+    - "mongo/s/analyze_shard_key_common.h"
 
 imports:
   - "mongo/db/basic_types.idl"

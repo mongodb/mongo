@@ -171,8 +171,8 @@ assert.commandWorked(systemColl.createIndex({a: 1}));
 // BadValue on old implementation.
 assert.commandFailedWithCode(systemColl.hideIndex("a_1"), [
     ErrorCodes.ShardingStateNotInitialized,
-    ErrorCodes.BadValue,  // TODO (SERVER-83326): Remove this code
-    ErrorCodes.NoShardingEnabled_OBSOLETE
+    ErrorCodes.BadValue,                    // TODO (SERVER-83326): Remove this code
+    ErrorCodes.NoShardingEnabled_OBSOLETE,  // TODO (SERVER-83326): Remove this code
 ]);
 assert.commandFailedWithCode(systemColl.createIndex({a: 1}, {hidden: true}), 2);
 

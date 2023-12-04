@@ -19,7 +19,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/query_common',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
-        '$BUILD_DIR/mongo/s/sharding_router_api',
         'async_results_merger',
         'cluster_cursor_cleanup_job',
         'cluster_cursor_manager',
@@ -28,6 +27,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
     ],
 )
 
@@ -70,6 +70,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
         'async_results_merger',
     ],
 )
@@ -98,11 +99,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_common',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/sharding_router_api',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/executor/async_multicaster',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
     ],
 )
 

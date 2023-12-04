@@ -57,7 +57,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
-#include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
