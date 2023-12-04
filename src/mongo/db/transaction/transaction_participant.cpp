@@ -2092,7 +2092,12 @@ void TransactionParticipant::Participant::_commitStorageTransaction(OperationCon
                                                                     bool isSplitPreparedTxn) {
     invariant(opCtx->getWriteUnitOfWork());
     invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() || isSplitPreparedTxn);
-    opCtx->getWriteUnitOfWork()->commit();
+    try {
+        opCtx->getWriteUnitOfWork()->commit();
+    } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
+        CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+        throw;
+    }
     opCtx->setWriteUnitOfWork(nullptr);
 
     // We must clear the recovery unit and locker for the 'config.transactions' and oplog entry

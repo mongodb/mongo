@@ -170,6 +170,9 @@ auto writeConflictRetry(OperationContext* opCtx,
                 convertToWCEAndRethrow(opCtx, opStr, e);
             }
             throw;
+        } catch (ExceptionFor<ErrorCodes::WriteConflict>&) {
+            CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+            throw;
         }
     }
 

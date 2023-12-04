@@ -10,7 +10,7 @@
 //  # attempt to retry an aborted transaction as mongods do when not running as a shardsvr.
 //  directly_against_shardsvrs_incompatible,
 //]
-// TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
+// TODO (SERVER-39704): Remove the following load after SERVER-39704 is completed
 import {retryOnceOnTransientOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";

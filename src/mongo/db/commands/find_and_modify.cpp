@@ -554,10 +554,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
 
     const bool inTransaction = opCtx->inMultiDocumentTransaction();
 
-    // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it
-    // is executing a findAndModify. This is done to ensure that we can always match,
-    // modify, and return the document under concurrency, if a matching document exists.
-    return writeConflictRetry(opCtx, "findAndModify", nsString, [&] {
+    auto doWork = [&] {
         if (req.getRemove().value_or(false)) {
             DeleteRequest deleteRequest;
             makeDeleteRequest(opCtx, req, false, &deleteRequest);
@@ -648,7 +645,17 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 }
             }
         }
-    });
+    };
+
+    // No need to call writeConflictRetry() since it does not retry if in a transaction,
+    // but calling it can cause WCE to be double counted.
+    if (inTransaction) {
+        return doWork();
+    }
+    // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it
+    // is executing a findAndModify. This is done to ensure that we can always match,
+    // modify, and return the document under concurrency, if a matching document exists.
+    return writeConflictRetry(opCtx, "findAndModify", nsString, doWork);
 }
 
 void CmdFindAndModify::Invocation::appendMirrorableRequest(BSONObjBuilder* bob) const {

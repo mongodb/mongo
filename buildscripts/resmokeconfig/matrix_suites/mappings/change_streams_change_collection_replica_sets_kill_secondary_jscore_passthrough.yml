@@ -1,4 +1,4 @@
-# This suite tests that secondaries getting abrubptly killed while performing change collection
+# This suite tests that secondaries getting abruptly killed while performing change collection
 # removal do not display consistency holes when recovering. The primary is prevented from performing
 # any removal so that a secondary containing a hole is detected as the documents when read in
 # descending order (most recent -> oldest) wouldn't match.

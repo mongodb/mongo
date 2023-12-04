@@ -8,7 +8,7 @@
 //   uses_snapshot_read_concern
 // ]
 
-// TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
+// TODO (SERVER-39704): Remove the following load after SERVER-39704 is completed
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
