@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bsoncolumn.h"
 
 #include <absl/numeric/int128.h>
@@ -45,18 +46,20 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/simple8b_builder.h"
-#include "mongo/bson/util/simple8b_type_util.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/time_support.h"
+
+using namespace mongo::bsoncolumn;
 
 namespace mongo {
 namespace {
@@ -6471,6 +6474,167 @@ TEST_F(BSONColumnTest, FTDCRoundTrip) {
     ASSERT_EQ(roundtrip(compressed), compressed);
 }
 #endif
+
+class TestMaterializer {
+public:
+    // Dummy allocator is not used
+    // Normally a materializer either has its own Allocator definition, or templates on an external
+    // allocator and simply declares
+    //
+    // using Allocator = typename TemplateAllocator;
+    class Allocator {
+    public:
+        Allocator() {}
+    };
+    using Element = std::
+        variant<std::monostate, bool, int32_t, int64_t, double, Timestamp, Date_t, OID, StringData>;
+
+    template <typename T>
+    static Element materialize(Allocator& a, const T& val) {
+        return val;
+    }
+
+    template <typename T>
+    static Element materialize(Allocator& a, const BSONElement& val) {
+        return std::monostate();
+    }
+
+
+    static Element materializeMissing(Allocator& a) {
+        return std::monostate();
+    }
+};
+
+// Some compilers require that specializations be defined outside of class
+template <>
+TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(Allocator& a,
+                                                                     const BSONBinData& val) {
+    return StringData((const char*)val.data, val.length);
+}
+
+template <>
+TestMaterializer::Element TestMaterializer::materialize<BSONCode>(Allocator& a,
+                                                                  const BSONCode& val) {
+    return val.code;
+}
+
+template <>
+TestMaterializer::Element TestMaterializer::materialize<bool>(Allocator& a,
+                                                              const BSONElement& val) {
+    return val.Bool();
+}
+
+template <>
+TestMaterializer::Element TestMaterializer::materialize<int32_t>(Allocator& a,
+                                                                 const BSONElement& val) {
+    return (int32_t)val.Int();
+}
+
+template <>
+TestMaterializer::Element TestMaterializer::materialize<int64_t>(Allocator& a,
+                                                                 const BSONElement& val) {
+    return (int64_t)val.Int();
+}
+
+template <>
+TestMaterializer::Element TestMaterializer::materialize<double>(Allocator& a,
+                                                                const BSONElement& val) {
+    return val.Double();
+}
+
+template <>
+TestMaterializer::Element TestMaterializer::materialize<unsigned long long>(
+    Allocator& a, const BSONElement& val) {
+    return val.date();
+}
+
+template <>
+TestMaterializer::Element TestMaterializer::materialize<Date_t>(Allocator& a,
+                                                                const BSONElement& val) {
+    return val.Date();
+}
+
+template <>
+TestMaterializer::Element TestMaterializer::materialize<OID>(Allocator& a, const BSONElement& val) {
+    return val.OID();
+}
+
+template <>
+TestMaterializer::Element TestMaterializer::materialize<StringData>(Allocator& a,
+                                                                    const BSONElement& val) {
+    return val.valueStringData();
+}
+
+template <>
+TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(Allocator& a,
+                                                                     const BSONElement& val) {
+    int size = 0;
+    return StringData(val.binData(size), size);
+}
+
+template <>
+TestMaterializer::Element TestMaterializer::materialize<BSONCode>(Allocator& a,
+                                                                  const BSONElement& val) {
+    return val.valueStringData();
+}
+
+TEST_F(BSONColumnTest, TestCollector) {
+    TestMaterializer::Allocator allocator;
+    std::vector<TestMaterializer::Element> collection;
+    Collector<TestMaterializer, std::vector<TestMaterializer::Element>> collector(collection,
+                                                                                  allocator);
+    size_t expectedSize = 0;
+
+    collector.append(true);
+    ASSERT_EQ(collection.size(), ++expectedSize);
+    ASSERT_EQ(true, std::get<bool>(collection.back()));
+
+    collector.append((int64_t)1);
+    ASSERT_EQ(collection.size(), ++expectedSize);
+    ASSERT_EQ(1, std::get<int64_t>(collection.back()));
+
+    BSONBinData bsonBinData;
+    bsonBinData.data = "foo";
+    bsonBinData.length = 3;
+    bsonBinData.type = BinDataGeneral;
+    collector.append(bsonBinData);
+    ASSERT_EQ(collection.size(), ++expectedSize);
+    StringData result = std::get<StringData>(collection.back());
+    ASSERT_EQ(3, result.size());
+    ASSERT_EQ(0, memcmp("foo", result.data(), 3));
+
+    BSONCode bsonCode;
+    bsonCode.code = "bar";
+    collector.append(bsonCode);
+    ASSERT_EQ(collection.size(), ++expectedSize);
+    result = std::get<StringData>(collection.back());
+    ASSERT_EQ(3, result.size());
+    ASSERT_EQ(0, memcmp("bar", result.data(), 3));
+
+    BSONElement doubleVal = createElementDouble(2.0);
+    collector.append<double>(doubleVal);
+    ASSERT_EQ(collection.size(), ++expectedSize);
+    ASSERT_EQ(2.0, std::get<double>(collection.back()));
+
+    BSONElement stringVal = createElementString(StringData("bam", 3));
+    collector.append<StringData>(stringVal);
+    ASSERT_EQ(collection.size(), ++expectedSize);
+    result = std::get<StringData>(collection.back());
+    ASSERT_EQ(3, result.size());
+    ASSERT_EQ(0, memcmp("bam", result.data(), 3));
+
+    BSONElement codeVal = createElementCode(StringData("baz", 3));
+    collector.append<BSONCode>(codeVal);
+    ASSERT_EQ(collection.size(), ++expectedSize);
+    result = std::get<StringData>(collection.back());
+    ASSERT_EQ(3, result.size());
+    ASSERT_EQ(0, memcmp("baz", result.data(), 3));
+
+    collector.appendMissing();
+    ASSERT_EQ(collection.size(), ++expectedSize);
+    ASSERT_EQ(std::monostate(), std::get<std::monostate>(collection.back()));
+}
+
 
 }  // namespace
 }  // namespace mongo

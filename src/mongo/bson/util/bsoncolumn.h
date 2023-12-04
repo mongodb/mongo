@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/timestamp.h"
 #include <absl/numeric/int128.h>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
@@ -50,6 +51,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/util/simple8b.h"
+#include "mongo/bson/util/simple8b_type_util.h"
 #include "mongo/platform/int128.h"
 
 namespace mongo {
@@ -463,6 +465,165 @@ private:
 /**
  * Work in progress, do not use.
  */
+namespace bsoncolumn {
+
+/**
+ * Interface for a buffer to receive decoded elements from block-based
+ * BSONColumn decompression.
+ */
+template <class T>
+concept Appendable =
+    requires(T& t, StringData strVal, BSONBinData binVal, BSONCode codeVal, BSONElement bsonVal) {
+    t.append(true);
+    t.append((int32_t)1);
+    t.append((int64_t)1);
+    t.append(Decimal128());
+    t.append((double)1.0);
+    t.append((Timestamp)1);
+    t.append(Date_t::now());
+    t.append(OID::gen());
+    t.append(strVal);
+    t.append(binVal);
+    t.append(codeVal);
+
+    // Strings can arrive either in 128-bit encoded format, or as
+    // literals (BSONElement)
+
+    // Takes pre-allocated BSONElement
+    t.template append<bool>(bsonVal);
+    t.template append<int32_t>(bsonVal);
+    t.template append<int64_t>(bsonVal);
+    t.template append<Decimal128>(bsonVal);
+    t.template append<double>(bsonVal);
+    t.template append<Timestamp>(bsonVal);
+    t.template append<Date_t>(bsonVal);
+    t.template append<OID>(bsonVal);
+    t.template append<StringData>(bsonVal);
+    t.template append<BSONBinData>(bsonVal);
+    t.template append<BSONCode>(bsonVal);
+
+    t.appendMissing();
+};
+
+/**
+ * Interface to accept elements decoded from BSONColumn and materialize them
+ * as Elements of user-defined type.
+ */
+template <class T>
+concept Materializer = requires(T& t,
+                                typename T::Allocator alloc,
+                                StringData strVal,
+                                BSONBinData binVal,
+                                BSONCode codeVal,
+                                BSONElement bsonVal) {
+    { T::materialize(alloc, true) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (int32_t)1) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (int64_t)1) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, Decimal128()) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (double)1.0) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, (Timestamp)1) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, Date_t::now()) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, OID::gen()) } -> std::same_as<typename T::Element>;
+
+    { T::materialize(alloc, strVal) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, binVal) } -> std::same_as<typename T::Element>;
+    { T::materialize(alloc, codeVal) } -> std::same_as<typename T::Element>;
+
+    { T::template materialize<bool>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<int32_t>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<int64_t>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<Decimal128>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<double>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<Timestamp>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<Date_t>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<OID>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+
+    { T::template materialize<StringData>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<BSONBinData>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+    { T::template materialize<BSONCode>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
+
+
+    { T::materializeMissing(alloc) } -> std::same_as<typename T::Element>;
+};
+
+/**
+ * Implements Appendable and utilizes a user-defined Materializer to receive output of
+ * BSONColumn decoding and fill a container of user-defined elements.  Container can
+ * be user-defined or any STL container can be used.
+ */
+template <class CMaterializer, class Container>
+requires Materializer<CMaterializer>
+class Collector {
+    using Element = typename CMaterializer::Element;
+    using CAllocator = class CMaterializer::Allocator;
+
+public:
+    Collector(Container& collection, CAllocator& allocator)
+        : _collection(collection), _allocator(allocator) {}
+
+    void append(bool val) {
+        collect(CMaterializer::materialize(_allocator, val));
+    }
+
+    void append(int32_t val) {
+        collect(CMaterializer::materialize(_allocator, val));
+    }
+
+    void append(int64_t val) {
+        collect(CMaterializer::materialize(_allocator, val));
+    }
+
+    void append(Decimal128 val) {
+        collect(CMaterializer::materialize(_allocator, val));
+    }
+
+    void append(double val) {
+        collect(CMaterializer::materialize(_allocator, val));
+    }
+
+    void append(Timestamp val) {
+        collect(CMaterializer::materialize(_allocator, val));
+    }
+
+    void append(Date_t val) {
+        collect(CMaterializer::materialize(_allocator, val));
+    }
+
+    void append(OID val) {
+        collect(CMaterializer::materialize(_allocator, val));
+    }
+
+    void append(const StringData& val) {
+        collect(CMaterializer::materialize(_allocator, val));
+    }
+
+    void append(const BSONBinData& val) {
+        collect(CMaterializer::materialize(_allocator, val));
+    }
+
+    void append(const BSONCode& val) {
+        collect(CMaterializer::materialize(_allocator, val));
+    }
+
+    template <typename T>
+    void append(const BSONElement& val) {
+        collect(CMaterializer::template materialize<T>(_allocator, val));
+    }
+
+    void appendMissing() {
+        collect(CMaterializer::materializeMissing(_allocator));
+    }
+
+private:
+    inline void collect(Element val) {
+        _collection.insert(_collection.end(), val);
+    }
+
+    Container& _collection;
+    CAllocator& _allocator;
+};
+
+
 class BSONColumnBlockBased {
 
 public:
@@ -471,9 +632,21 @@ public:
     /**
      * Decompress entire BSONColumn
      *
-     * TODO: change signature from function to buffer
      */
-    void decompress(std::function<void(BSONElement, int)> callback) const;
+    template <class Buffer>
+    requires Appendable<Buffer>
+    void decompress(Buffer& buffer) const;
+
+    /**
+     * Wrapper that expects the caller to define a Materializer and
+     * a Container to receive a collection of elements from block decoding
+     */
+    template <class CMaterializer, class Container>
+    requires Materializer<CMaterializer>
+    void decompress(Container& collection, typename CMaterializer::Allocator& allocator) const {
+        Collector<CMaterializer, Container> collector(collection, allocator);
+        decompress(collector);
+    }
 
     /**
      * Return first non-missing element stored in this BSONColumn
@@ -528,5 +701,7 @@ public:
 
 private:
 };
+
+}  // namespace bsoncolumn
 
 }  // namespace mongo

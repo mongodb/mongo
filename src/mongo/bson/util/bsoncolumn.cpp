@@ -48,7 +48,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/bsoncolumn_util.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/simple8b_type_util.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
@@ -869,9 +868,13 @@ boost::intrusive_ptr<ElementStorage> BSONColumn::release() {
     return previous;
 }
 
+namespace bsoncolumn {
+
 BSONColumnBlockBased::BSONColumnBlockBased(const char* buffer, size_t size) {}
 
-void BSONColumnBlockBased::decompress(std::function<void(BSONElement, int)> callback) const {
+template <class Buffer>
+requires Appendable<Buffer>
+void BSONColumnBlockBased::decompress(Buffer& buffer) const {
     invariant(false, "not implemented");
 }
 
@@ -914,5 +917,7 @@ bool BSONColumnBlockBased::contains(BSONType type) const {
     invariant(false, "not implemented");
     return false;
 }
+
+}  // namespace bsoncolumn
 
 }  // namespace mongo
