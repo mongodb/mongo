@@ -9,8 +9,6 @@ selector:
   exclude_files:
   # These tests are run in sharded_jscore_txns.
   - jstests/core/txns/**/*.js
-  # TODO: SERVER-81495 Enable timeseries tests
-  - jstests/core/timeseries/**/*.js
   # TODO: SERVER-83396 Enable once unsplittable collections are created through the create command
   - jstests/core/ddl/create_collection.js
   - jstests/core/failcommand_failpoint.js
@@ -26,6 +24,15 @@ selector:
   # TODO: SERVER-83399 Enable after fix
   - src/mongo/db/modules/enterprise/jstests/fle2/cleanup_collection.js
   - src/mongo/db/modules/enterprise/jstests/fle2/compact_collection.js
+  # TODO: SERVER-83349 Enable once dataShard is randomized through a fail point
+  - jstests/core/timeseries/timeseries_create.js
+  - jstests/core/timeseries/timeseries_create_collection.js
+  # TODO: SERVER-83784 Enable once collmod timeseries options is fixed
+  - jstests/core/timeseries/bucket_granularity.js
+  - jstests/core/timeseries/bucket_timestamp_rounding.js
+  - jstests/core/timeseries/bucket_unpacking_group_reorder_fixed_buckets.js
+  - jstests/core/timeseries/bucket_unpacking_with_match_fixed_buckets.js
+  - jstests/core/timeseries/timeseries_collmod.js
   # The following tests fail because a certain command or functionality is not supported on
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/**/apitest_db.js  # serverStatus output doesn't have storageEngine.
@@ -61,6 +68,7 @@ selector:
   - jstests/core/query/plan_cache/plan_cache_list_plans.js
   - jstests/core/index/index_filter_commands.js
   - jstests/core/index/index_stats.js
+  - jstests/core/timeseries/timeseries_filter_extended_range.js
   # TODO: SERVER-83582 Enable after fix
   - jstests/core/write/insert/insert_id_undefined.js
   exclude_with_any_tags:
@@ -71,8 +79,6 @@ selector:
   - assumes_no_implicit_collection_creation_on_get_collection
   # TODO: SERVER-81937 Enable transaction tests
   - uses_transactions
-  # TODO: SERVER-83268 Enable timeseries tests
-  - requires_timeseries
 
 executor:
   archive:
