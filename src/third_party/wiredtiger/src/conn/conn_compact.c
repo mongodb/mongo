@@ -686,8 +686,8 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
     WT_ERR(__wt_config_getones(session, config, "background", &cval));
     enable = cval.val;
 
-    /* Strip the unused fields from the configuration to check if the configuration has changed. */
-    WT_ERR(__wt_config_merge(session, cfg, "background=,exclude=", &stripped_config));
+    /* Strip the toggle field from the configuration to check if the configuration has changed. */
+    WT_ERR(__wt_config_merge(session, cfg, "background=", &stripped_config));
 
     /* The background compact configuration cannot be changed while it's already running. */
     if (enable && running && strcmp(stripped_config, conn->background_compact.config) != 0)
@@ -698,7 +698,7 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
     if (enable == running)
         goto err;
 
-    /* Update the excluded tables when the server is turned on. */
+    /* Update the excluded tables when the server is enabled. */
     if (enable) {
         __background_compact_exclude_list_clear(session, false);
         WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "exclude", &cval), false);
