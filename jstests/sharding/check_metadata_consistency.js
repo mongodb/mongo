@@ -10,7 +10,10 @@
 // Configure initial sharding cluster
 const st = new ShardingTest({});
 const mongos = st.s;
-const configDB = mongos.getDB("config");
+
+// Use retryWrites when writing to the configsvr because mongos does not automatically retry those.
+const mongosSession = mongos.startSession({retryWrites: true});
+const configDB = mongosSession.getDatabase("config");
 
 const dbName = "testCheckMetadataConsistencyDB";
 var dbCounter = 0;
