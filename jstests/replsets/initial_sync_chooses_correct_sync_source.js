@@ -19,13 +19,15 @@ const waitForHeartbeats = initialSyncNode => {
         maxTimeMS: kDefaultWaitForFailPointTimeout
     }));
 
-    // Wait for heartbeats from the primary to increase the ping time.
+    // Wait until the initial sync node knows who the primary is, and for heartbeats from the
+    // primary to increase the ping time.
     assert.soon(() => {
         const replSetGetStatus =
             assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
         // The primary should always be node 0, since node 1 has priority 0.
         const primaryPingTime = replSetGetStatus.members[0].pingMs;
-        return (primaryPingTime > 60);
+        const primaryState = replSetGetStatus.members[0].state;
+        return (primaryState == 1 && primaryPingTime > 60);
     });
 
     // Allow the node to advance past the sync source selection stage.
