@@ -355,14 +355,12 @@ conn_stats = [
     ##########################################
     # Capacity statistics
     ##########################################
-    CapacityStat('capacity_bytes_chunkcache', 'bytes written for chunk cache'),
     CapacityStat('capacity_bytes_ckpt', 'bytes written for checkpoint'),
     CapacityStat('capacity_bytes_evict', 'bytes written for eviction'),
     CapacityStat('capacity_bytes_log', 'bytes written for log'),
     CapacityStat('capacity_bytes_read', 'bytes read'),
     CapacityStat('capacity_bytes_written', 'bytes written total'),
     CapacityStat('capacity_threshold', 'threshold to call fsync'),
-    CapacityStat('capacity_time_chunkcache', 'time waiting for chunk cache IO bandwidth (usecs)'),
     CapacityStat('capacity_time_ckpt', 'time waiting during checkpoint (usecs)'),
     CapacityStat('capacity_time_evict', 'time waiting during eviction (usecs)'),
     CapacityStat('capacity_time_log', 'time waiting during logging (usecs)'),

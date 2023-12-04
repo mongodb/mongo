@@ -58,8 +58,7 @@ struct __wt_chunkcache_chunk {
     wt_shared volatile uint32_t valid; /* Availability to read data from the chunk marked. */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CHUNK_FROM_METADATA 0x1u
-#define WT_CHUNK_PINNED 0x2u
+#define WT_CHUNK_PINNED 0x1u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };

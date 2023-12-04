@@ -564,7 +564,6 @@ struct __wt_connection_stats {
     int64_t fsync_all_time;
     int64_t capacity_bytes_read;
     int64_t capacity_bytes_ckpt;
-    int64_t capacity_bytes_chunkcache;
     int64_t capacity_bytes_evict;
     int64_t capacity_bytes_log;
     int64_t capacity_bytes_written;
@@ -574,7 +573,6 @@ struct __wt_connection_stats {
     int64_t capacity_time_evict;
     int64_t capacity_time_log;
     int64_t capacity_time_read;
-    int64_t capacity_time_chunkcache;
     int64_t checkpoint_snapshot_acquired;
     int64_t checkpoint_skipped;
     int64_t checkpoint_fsync_post;
