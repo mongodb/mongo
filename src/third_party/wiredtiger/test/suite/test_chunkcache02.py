@@ -33,6 +33,7 @@ import threading
 import time
 import wiredtiger, wttest
 
+from test_chunkcache01 import stat_assert_greater
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -71,12 +72,6 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
             extlist.skip_if_missing = True
         extlist.extension('storage_sources', 'dir_store')
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def read_and_verify(self, rows, ds):
         session = self.conn.open_session()
         cursor = session.open_cursor(self.uri)
@@ -100,7 +95,7 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
         self.session.checkpoint('flush_tier=(enabled)')
 
         # Assert the new chunks are ingested.
-        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables), 0)
+        stat_assert_greater(self.session, wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables, 0)
 
         # Reopen wiredtiger to migrate all data to disk.
         self.reopen_conn()
@@ -123,5 +118,5 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
             thread.join()
 
         # Check relevant chunk cache stats.
-        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_inuse), 0)
-        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_evicted), 0)
+        stat_assert_greater(self.session, wiredtiger.stat.conn.chunkcache_chunks_inuse, 0)
+        stat_assert_greater(self.session, wiredtiger.stat.conn.chunkcache_chunks_evicted, 0)
