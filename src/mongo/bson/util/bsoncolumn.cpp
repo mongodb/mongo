@@ -146,44 +146,43 @@ private:
 
 }  // namespace
 
-BSONColumn::ElementStorage::Element::Element(char* buffer, int nameSize, int valueSize)
+ElementStorage::Element::Element(char* buffer, int nameSize, int valueSize)
     : _buffer(buffer), _nameSize(nameSize), _valueSize(valueSize) {}
 
-char* BSONColumn::ElementStorage::Element::value() {
+char* ElementStorage::Element::value() {
     // Skip over type byte and null terminator for field name
     return _buffer + _nameSize + kElementValueOffset;
 }
 
-int BSONColumn::ElementStorage::Element::size() const {
+int ElementStorage::Element::size() const {
     return _valueSize;
 }
 
-BSONElement BSONColumn::ElementStorage::Element::element() const {
+BSONElement ElementStorage::Element::element() const {
     return {_buffer,
             _nameSize + 1,
             _valueSize + _nameSize + kElementValueOffset,
             BSONElement::TrustedInitTag{}};
 }
 
-BSONColumn::ElementStorage::ContiguousBlock::ContiguousBlock(ElementStorage& storage)
-    : _storage(storage) {
+ElementStorage::ContiguousBlock::ContiguousBlock(ElementStorage& storage) : _storage(storage) {
     _storage._beginContiguous();
 }
 
-BSONColumn::ElementStorage::ContiguousBlock::~ContiguousBlock() {
+ElementStorage::ContiguousBlock::~ContiguousBlock() {
     if (!_finished) {
         _storage._endContiguous();
     }
 }
 
-std::pair<const char*, int> BSONColumn::ElementStorage::ContiguousBlock::done() {
+std::pair<const char*, int> ElementStorage::ContiguousBlock::done() {
     auto ptr = _storage.contiguous();
     int size = _storage._endContiguous();
     _finished = true;
     return std::make_pair(ptr, size);
 }
 
-char* BSONColumn::ElementStorage::allocate(int bytes) {
+char* ElementStorage::allocate(int bytes) {
     // If current block doesn't have enough capacity we need to allocate a new one.
     if (_capacity - _pos < bytes) {
         // Keep track of current block if it exists.
@@ -217,27 +216,27 @@ char* BSONColumn::ElementStorage::allocate(int bytes) {
     return _block.get() + pos;
 }
 
-void BSONColumn::ElementStorage::deallocate(int bytes) {
+void ElementStorage::deallocate(int bytes) {
     _pos -= bytes;
 }
 
-BSONColumn::ElementStorage::ContiguousBlock BSONColumn::ElementStorage::startContiguous() {
+ElementStorage::ContiguousBlock ElementStorage::startContiguous() {
     return ContiguousBlock(*this);
 }
 
-void BSONColumn::ElementStorage::_beginContiguous() {
+void ElementStorage::_beginContiguous() {
     _contiguousPos = _pos;
     _contiguousEnabled = true;
 }
 
-int BSONColumn::ElementStorage::_endContiguous() {
+int ElementStorage::_endContiguous() {
     _contiguousEnabled = false;
     return _pos - _contiguousPos;
 }
 
-BSONColumn::ElementStorage::Element BSONColumn::ElementStorage::allocate(BSONType type,
-                                                                         StringData fieldName,
-                                                                         int valueSize) {
+ElementStorage::Element ElementStorage::allocate(BSONType type,
+                                                 StringData fieldName,
+                                                 int valueSize) {
     // Size needed for this BSONElement
     auto fieldNameSize = fieldName.size();
     int size = valueSize + fieldNameSize + kElementValueOffset;
@@ -864,7 +863,7 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
     return false;
 }
 
-boost::intrusive_ptr<BSONColumn::ElementStorage> BSONColumn::release() {
+boost::intrusive_ptr<ElementStorage> BSONColumn::release() {
     auto previous = _allocator;
     _allocator = new ElementStorage();
     return previous;
