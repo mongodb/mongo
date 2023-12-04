@@ -882,8 +882,6 @@ enum class Builtin : uint16_t {
     aggRemovableMinMaxNRemove,
     aggRemovableMinNFinalize,
     aggRemovableMaxNFinalize,
-    aggRemovableMinFinalize,
-    aggRemovableMaxFinalize,
     aggRemovableTopNInit,
     aggRemovableTopNAdd,
     aggRemovableTopNRemove,
@@ -2092,9 +2090,6 @@ private:
         ArityType arity);
     template <AccumulatorMinMaxN::MinMaxSense S>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableMinMaxNFinalize(
-        ArityType arity);
-    template <AccumulatorMinMax::Sense S>
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableMinMaxFinalize(
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtin(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> linearFillInterpolate(

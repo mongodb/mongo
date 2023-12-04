@@ -8890,33 +8890,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinM
     return {true, resultArrayTag, resultArrayVal};
 }
 
-template <AccumulatorMinMax::Sense S>
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinMaxFinalize(
-    ArityType arity) {
-    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
-
-    auto [stateArr, accMultiSetTag, accMultiSetVal, n, memUsage, memLimit] =
-        accumulatorNState(stateTag, stateVal);
-    tassert(8155725,
-            "accumulator should be of type MultiSet",
-            accMultiSetTag == value::TypeTags::ArrayMultiSet);
-    auto accMultiSet = value::getArrayMultiSetView(accMultiSetVal);
-
-    if (accMultiSet->size() == 0) {
-        return {true, value::TypeTags::Null, 0};
-    }
-
-    if constexpr (S == AccumulatorMinMax::Sense::kMin) {
-        auto it = accMultiSet->values().cbegin();
-        auto [cTag, cValue] = value::copyValue(it->first, it->second);
-        return {true, cTag, cValue};
-    }
-
-    auto it = accMultiSet->values().crbegin();
-    auto [cTag, cValue] = value::copyValue(it->first, it->second);
-    return {true, cTag, cValue};
-}
-
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableTopBottomNInit(
     ArityType arity) {
     auto [maxSizeOwned, maxSizeTag, maxSizeVal] = getFromStack(0);
@@ -9450,10 +9423,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggRemovableMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMin>(arity);
         case Builtin::aggRemovableMaxNFinalize:
             return builtinAggRemovableMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMax>(arity);
-        case Builtin::aggRemovableMinFinalize:
-            return builtinAggRemovableMinMaxFinalize<AccumulatorMinMax::Sense::kMin>(arity);
-        case Builtin::aggRemovableMaxFinalize:
-            return builtinAggRemovableMinMaxFinalize<AccumulatorMinMax::Sense::kMax>(arity);
         case Builtin::aggRemovableTopNInit:
         case Builtin::aggRemovableBottomNInit:
             return builtinAggRemovableTopBottomNInit(arity);
@@ -9939,10 +9908,6 @@ std::string builtinToString(Builtin b) {
             return "aggRemovableMinNFinalize";
         case Builtin::aggRemovableMaxNFinalize:
             return "aggRemovableMaxNFinalize";
-        case Builtin::aggRemovableMinFinalize:
-            return "aggRemovableMinFinalize";
-        case Builtin::aggRemovableMaxFinalize:
-            return "aggRemovableMaxFinalize";
         case Builtin::aggRemovableTopNInit:
             return "aggRemovableTopNInit";
         case Builtin::aggRemovableTopNAdd:
