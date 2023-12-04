@@ -37,6 +37,7 @@
 #include <string>
 
 #include "mongo/stdx/type_traits.h"
+#include <string_view>
 #define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 #include "mongo/util/invariant.h"
 #undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
@@ -174,6 +175,9 @@ public:
     }
     std::string toString() const {
         return std::string(_data, size());
+    }
+    std::string_view toStringView() const{
+        return std::string_view(_data, size());
     }
     constexpr char operator[](unsigned pos) const {
         return _data[pos];

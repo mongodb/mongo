@@ -108,6 +108,9 @@ public:
         }
     }
 
+    explicit RecordId(const std::string& str) : RecordId(str.data(), str.size()) {}
+    explicit RecordId(std::string_view str) : RecordId(str.data(), str.size()) {}
+    
     /**
      * Construct a RecordId from two halves.
      * TODO consider removing.
