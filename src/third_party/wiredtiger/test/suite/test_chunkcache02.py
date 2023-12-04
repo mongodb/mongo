@@ -52,19 +52,26 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
         ('row_string', dict(key_format='S', value_format='S')),
     ]
 
+    # This is one of the more IO-intensive chunk cache tests. Exercise throttling.
+    io_capacities = [
+        ('loads', dict(io_capacity='10G')),
+        ('notmuch', dict(io_capacity='5M')),
+    ]
+
     cache_types = [('in-memory', dict(chunk_cache_type='DRAM'))]
     if sys.byteorder == 'little':
         # WT's filesystem layer doesn't support mmap on big-endian platforms.
         cache_types.append(('on-disk', dict(chunk_cache_type='FILE')))
 
-    scenarios = make_scenarios(format_values, cache_types)
+    scenarios = make_scenarios(format_values, cache_types, io_capacities)
 
     def conn_config(self):
         if not os.path.exists('bucket2'):
             os.mkdir('bucket2')
 
         return 'tiered_storage=(auth_token=Secret,bucket=bucket2,bucket_prefix=pfx_,name=dir_store),' \
-            'chunk_cache=[enabled=true,chunk_size=512KB,capacity=20MB,type={},storage_path=WiredTigerChunkCache],'.format(self.chunk_cache_type)
+            'chunk_cache=[enabled=true,chunk_size=512KB,capacity=20MB,type={},storage_path=WiredTigerChunkCache],' \
+            'io_capacity=(total=100G,chunk_cache={})'.format(self.chunk_cache_type, self.io_capacity)
 
     def conn_extensions(self, extlist):
         if os.name == 'nt':
@@ -125,3 +132,6 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
         # Check relevant chunk cache stats.
         self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_inuse), 0)
         self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_evicted), 0)
+
+        if self.io_capacity == '5M':
+            self.assertGreater(self.get_stat(wiredtiger.stat.conn.capacity_time_chunkcache), 0)
