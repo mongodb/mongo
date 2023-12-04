@@ -203,6 +203,20 @@ public:
     virtual bool isSharded(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
     /**
+     * TODO SERVER-79508 validate callers of this function remain correct.
+     *
+     * Returns false if the current request only handles parsing and validating queries. In other
+     * words, we are not executing queries. Examples include query analysis for queryable
+     * encryption, executing pipeline-style operations in the Update system, and creating a Query
+     * Shape. This function only returns false when the process interface is of type
+     * 'StubMongoProcessInterface'.
+     *
+     */
+    virtual bool isExpectedToExecuteQueries() {
+        return true;
+    }
+
+    /**
      * Advances the proxied write time associated with the client in ReplClientInfo to
      * be at least as high as the one tracked by the OperationTimeTracker associated with the
      * given operation context.
