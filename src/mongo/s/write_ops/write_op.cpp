@@ -142,6 +142,10 @@ const write_ops::WriteError& WriteOp::getOpError() const {
     return *_error;
 }
 
+bool WriteOp::hasBulkWriteReplyItem() const {
+    return _bulkWriteReplyItem != boost::none;
+}
+
 BulkWriteReplyItem WriteOp::takeBulkWriteReplyItem() {
     invariant(_state == WriteOpState_Completed);
     invariant(_bulkWriteReplyItem);

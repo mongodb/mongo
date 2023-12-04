@@ -652,7 +652,7 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
     }
 
     LOGV2_DEBUG(7263701, 4, "Finished execution of bulkWrite");
-    return bulkWriteOp.generateReplyInfo(clientRequest.getErrorsOnly());
+    return bulkWriteOp.generateReplyInfo();
 }
 
 BulkWriteOp::BulkWriteOp(OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest)
@@ -787,6 +787,7 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
     request.setOrdered(_clientRequest.getOrdered());
     request.setBypassDocumentValidation(_clientRequest.getBypassDocumentValidation());
     request.setLet(_clientRequest.getLet());
+    request.setErrorsOnly(_clientRequest.getErrorsOnly());
 
     if (_isRetryableWrite) {
         request.setStmtIds(stmtIds);
@@ -935,18 +936,43 @@ void BulkWriteOp::noteChildBatchResponse(
     const boost::optional<std::vector<StmtId>>& retriedStmtIds,
     boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace) {
 
-    int index = -1;
+    // To support errorsOnly:true we need to keep separate track of the index in the replyItems
+    // array and the index of the write ops we need to mark. This is because with errorsOnly we do
+    // not guarantee that writeOps.size == replyItems.size, successful writes do not return a reply.
+    // We need to be able to check if the write
+    // op has the same index as the next reply we received, which is why we need to track 2
+    // different indexes in this loop. Our goal is to iterate the arrays as such
+    // writes:  [0, 1, 2, 3] -> [0, 1, 2, 3] -> [0, 1, 2, 3] -> [0, 1, 2, 3]
+    //           ^                  ^                  ^                  ^
+    // replies: [1, 3]       -> [1, 3]       -> [1, 3]       -> [1, 3]
+    //           ^               ^                  ^               ^
+    // Only moving forward in replies when we see a matching write op.
+    int replyIndex = -1;
     bool ordered = _clientRequest.getOrdered();
     boost::optional<write_ops::WriteError> lastError;
-    for (const auto& write : targetedBatch.getWrites()) {
-        ++index;
+    for (int writeOpIdx = 0; writeOpIdx < (int)targetedBatch.getWrites().size(); ++writeOpIdx) {
+        const auto& write = targetedBatch.getWrites()[writeOpIdx];
         WriteOp& writeOp = _writeOps[write->writeOpRef.first];
+
+        // This is only possible if we ran an errorsOnly:true command and succeeded all writes.
+        if (replyItems.size() == 0) {
+            tassert(8266001,
+                    "bulkWrite should always get replies when not in errorsOnly",
+                    _clientRequest.getErrorsOnly());
+            writeOp.noteWriteComplete(*write);
+            continue;
+        }
+
+        replyIndex++;
+
         // When an error is encountered on an ordered bulk write, it is impossible for any of the
         // remaining operations to have been executed. For that reason we reset them here so they
         // may be retargeted and retried if the error we saw is one we can retry after (e.g.
         // StaleConfig.).
         if (ordered && lastError) {
-            invariant(index >= (int)replyItems.size());
+            tassert(8266002,
+                    "bulkWrite should not see replies after an error when ordered:true",
+                    replyIndex >= (int)replyItems.size());
             writeOp.resetWriteToReady();
             continue;
         }
@@ -966,18 +992,36 @@ void BulkWriteOp::noteChildBatchResponse(
              ErrorCodes::isStaleShardVersionError(lastError->getStatus()) ||
              lastError->getStatus().code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
              lastError->getStatus() == ErrorCodes::CannotImplicitlyCreateCollection) &&
-            (index == (int)replyItems.size())) {
-            // Decrement the index so it keeps pointing to the same error (i.e. the
+            (replyIndex == (int)replyItems.size())) {
+            // Decrement the replyIndex so it keeps pointing to the same error (i.e. the
             // last error, which is a staleness error).
             LOGV2_DEBUG(7695304,
                         4,
                         "Duplicating the error for op",
                         "opIdx"_attr = write->writeOpRef.first,
                         "error"_attr = lastError->getStatus());
-            index--;
+            replyIndex--;
         }
 
-        auto& reply = replyItems[index];
+        auto& reply = replyItems[replyIndex];
+
+        // This can only happen when running an errorsOnly:true bulkWrite. We will only receive a
+        // bulkWriteReplyItem for an error response when this flag is enabled. This means that
+        // any writeOp which does not have a reply must have succeeded.
+        // Since both the writeOps and the replies are stored in ascending index order this is
+        // a safe assumption.
+        // writeOpIdx can be > than reply.getIdx when we are duplicating the last error
+        // as described in the block above.
+        if (writeOpIdx < reply.getIdx()) {
+            tassert(8266003,
+                    "bulkWrite should get a reply for every write op when not in errorsOnly mode",
+                    _clientRequest.getErrorsOnly());
+            writeOp.noteWriteComplete(*write);
+            // We need to keep the replyIndex where it is until we see the op matching its index.
+            replyIndex--;
+            continue;
+        }
+
         if (reply.getStatus().isOK()) {
             writeOp.noteWriteComplete(*write, reply);
         } else {
@@ -1161,7 +1205,7 @@ void BulkWriteOp::noteWriteOpFinalResponse(
     }
 }
 
-BulkWriteReplyInfo BulkWriteOp::generateReplyInfo(bool errorsOnly) {
+BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
     dassert(isFinished());
     std::vector<BulkWriteReplyItem> replyItems;
     SummaryFields summary;
@@ -1197,7 +1241,7 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo(bool errorsOnly) {
         }
 
         if (writeOpState == WriteOpState_Completed) {
-            if (!errorsOnly) {
+            if (writeOp.hasBulkWriteReplyItem()) {
                 replyItems.push_back(writeOp.takeBulkWriteReplyItem());
             }
         } else if (writeOpState == WriteOpState_Error) {

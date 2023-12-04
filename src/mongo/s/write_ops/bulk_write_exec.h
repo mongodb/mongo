@@ -262,7 +262,7 @@ public:
      * Returns a vector of BulkWriteReplyItem based on the end state of each individual write in
      * this bulkWrite operation, along with the number of error replies contained in the vector.
      */
-    BulkWriteReplyInfo generateReplyInfo(bool errorsOnly);
+    BulkWriteReplyInfo generateReplyInfo();
 
     /**
      * Creates a BulkWriteWriteConcernError object which combines write concern errors

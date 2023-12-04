@@ -159,6 +159,15 @@ public:
     const write_ops::WriteError& getOpError() const;
 
     /**
+     * Check if we have a stashed BulkWriteReplyItem so we can safely call
+     * takeBulkWriteReplyItem. A writeOp for bulkWrite may not have one if
+     * the command was run with errorsOnly=true.
+     *
+     * Can only be used in state _Complete.
+     */
+    bool hasBulkWriteReplyItem() const;
+
+    /**
      * Take's the op's underlying BulkWriteReplyItem. This method must only be called one time
      * as the original value will be moved out when it is called.
      *

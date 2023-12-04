@@ -455,7 +455,7 @@ TEST_F(BulkWriteOpTest, TargetErrorsInTxn) {
     bulkWriteOp.processTargetingError(targetStatus);
     ASSERT(bulkWriteOp.isFinished());
 
-    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(summaryFields.nErrors, 1);
     ASSERT_EQ(replies.size(), 1);
     ASSERT_NOT_OK(replies[0].getStatus());
@@ -1419,7 +1419,7 @@ TEST_F(BulkWriteOpTest, NoteResponseRetriedStmtIds) {
 
     ASSERT(bulkWriteOp.isFinished());
 
-    auto replyInfo = bulkWriteOp.generateReplyInfo(false);
+    auto replyInfo = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replyInfo.replyItems.size(), 3);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.wcErrors, boost::none);
@@ -1447,7 +1447,7 @@ TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_WriteConcernError) {
     ASSERT_EQUALS(bulkWriteOp.getWriteConcernErrors()[0].error.toStatus().code(),
                   ErrorCodes::UnsatisfiableWriteConcern);
 
-    auto replyInfo = bulkWriteOp.generateReplyInfo(false);
+    auto replyInfo = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replyInfo.replyItems.size(), 1);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.wcErrors->getCode(), ErrorCodes::UnsatisfiableWriteConcern);
@@ -1533,7 +1533,7 @@ TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_NonTransientTransactionError) {
     // Since we are in a txn and we saw an error, the command should be considered finished.
     ASSERT(bulkWriteOp.isFinished());
 
-    auto replyInfo = bulkWriteOp.generateReplyInfo(false);
+    auto replyInfo = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replyInfo.replyItems.size(), 1);
     ASSERT_EQ(replyInfo.replyItems[0].getStatus().code(), ErrorCodes::Interrupted);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
@@ -1932,7 +1932,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalCallbackCanceledErrorNotInShutdown) 
     // The error for the first op should be the cancellation error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
               kCallbackCanceledResponse.swResponse.getStatus());
-    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus(), kCallbackCanceledResponse.swResponse.getStatus());
     ASSERT_EQ(summaryFields.nErrors, 1);
@@ -1998,7 +1998,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNetworkErrorOrdered) {
     // The error for the first op should be the network error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
               kNetworkErrorResponse.swResponse.getStatus());
-    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
     ASSERT_EQ(summaryFields.nErrors, 1);
@@ -2038,7 +2038,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNetworkErrorUnordered) {
               kNetworkErrorResponse.swResponse.getStatus());
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
               kNetworkErrorResponse.swResponse.getStatus());
-    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 4);
     ASSERT_EQ(replies[0].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
     ASSERT_EQ(replies[1].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
@@ -2109,7 +2109,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnOrd
     // The error for the first op should be the interruption error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
               kInterruptedErrorResponse.swResponse.getStatus());
-    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
     ASSERT_EQ(summaryFields.nErrors, 1);
@@ -2228,7 +2228,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnUno
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
                   kInterruptedErrorResponse.swResponse.getStatus());
 
-        auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+        auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
         ASSERT_EQ(replies.size(), 2);
         ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
         ASSERT_EQ(replies[1].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
@@ -2268,7 +2268,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnUno
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
                   kInterruptedErrorResponse.swResponse.getStatus());
 
-        auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+        auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
         ASSERT_EQ(replies.size(), 4);
         ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
         ASSERT_EQ(replies[1].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
@@ -2301,7 +2301,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteErrorOrdered) {
     // The error for the first op should be the interrupted error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
               ErrorCodes::Interrupted);
-    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::Interrupted);
     ASSERT_EQ(summaryFields.nErrors, 1);
@@ -2342,7 +2342,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteErrorUnordered) {
               ErrorCodes::Interrupted);
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus().code(),
               ErrorCodes::Interrupted);
-    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 4);
     ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::Interrupted);
     ASSERT_EQ(replies[1].getStatus().code(), ErrorCodes::Interrupted);
@@ -2381,7 +2381,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnOr
     // The error for the first op should be the interruption error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
               ErrorCodes::Interrupted);
-    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::Interrupted);
     ASSERT_EQ(summaryFields.nErrors, 1);
@@ -2437,7 +2437,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, WouldChangeOwningShardInTxn) {
     // The error for the first op should be the WCOS error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
               ErrorCodes::WouldChangeOwningShard);
-    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::WouldChangeOwningShard);
     ASSERT_EQ(summaryFields.nErrors, 1);
@@ -2515,7 +2515,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnUn
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus().code(),
                   ErrorCodes::Interrupted);
 
-        auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+        auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
         ASSERT_EQ(replies.size(), 2);
         ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::Interrupted);
         ASSERT_EQ(replies[1].getStatus(), ErrorCodes::Interrupted);
@@ -2556,7 +2556,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnUn
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
                   ErrorCodes::Interrupted);
 
-        auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+        auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo();
         ASSERT_EQ(replies.size(), 4);
         ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::Interrupted);
         ASSERT_EQ(replies[1].getStatus().code(), ErrorCodes::Interrupted);
@@ -2713,7 +2713,7 @@ TEST_F(BulkWriteOpTest, SuccessfulShardRepliesAreSavedAfterRetargeting) {
     // We should now be done.
     ASSERT(op.isFinished());
 
-    auto [replies, summaryFields, _, __] = op.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = op.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(summaryFields.nErrors, 0);
     ASSERT_OK(replies[0].getStatus());
@@ -2767,7 +2767,7 @@ TEST_F(BulkWriteOpTest, ShardGetsSuccessfullyRetargetedOnCannotRefreshCacheError
     // We should now be done.
     ASSERT(op.isFinished());
 
-    auto [replies, summaryFields, _, __] = op.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = op.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(summaryFields.nErrors, 0);
     ASSERT_OK(replies[0].getStatus());
@@ -2847,7 +2847,7 @@ TEST_F(BulkWriteOpTest, UnorderedBulkInsertGetsRepeatedOnCannotRefreshShardCache
     // We should now be done.
     ASSERT(op.isFinished());
 
-    auto [replies, summaryFields, _, __] = op.generateReplyInfo(false);
+    auto [replies, summaryFields, _, __] = op.generateReplyInfo();
     ASSERT_EQ(replies.size(), 3);
     ASSERT_EQ(summaryFields.nErrors, 0);
     ASSERT_OK(replies[0].getStatus());
