@@ -827,12 +827,16 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         WaitForMajorityService::get(serviceContext).startup(serviceContext);
     }
 
-    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        // A config shard initializes sharding awareness after setting up its config server state.
+    if (auto shardIdentityDoc =
+            ShardingInitializationMongoD::getShardIdentityDoc(startupOpCtx.get())) {
+        if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            // A config shard initializes sharding awareness after setting up its config server
+            // state.
 
-        // This function may take the global lock.
-        initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get(),
-                                                                 &startupTimeElapsedBuilder);
+            // This function will take the global lock.
+            initializeShardingAwarenessAndLoadGlobalSettings(
+                startupOpCtx.get(), *shardIdentityDoc, &startupTimeElapsedBuilder);
+        }
     }
 
     try {
@@ -884,16 +888,22 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                     serviceContext->getFastClockSource(),
                     "Initialize the sharding components for a config server",
                     &startupTimeElapsedBuilder);
+
                 initializeGlobalShardingStateForConfigServerIfNeeded(startupOpCtx.get());
             }
 
-            // This function may take the global lock.
-            initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get(),
-                                                                     &startupTimeElapsedBuilder);
+            // TODO: SERVER-82965 We shouldn't need to read the doc multiple times once we are
+            // in sharding only development since config servers can always create it themselves.
+            if (auto shardIdentityDoc =
+                    ShardingInitializationMongoD::getShardIdentityDoc(startupOpCtx.get())) {
+                // This function will take the global lock.
+                initializeShardingAwarenessAndLoadGlobalSettings(
+                    startupOpCtx.get(), *shardIdentityDoc, &startupTimeElapsedBuilder);
 
-            // Sharding is always ready when there is at least one shard at startup (either the
-            // config shard or a dedicated shard server).
-            ShardingReady::get(startupOpCtx.get())->setIsReadyIfShardExists(startupOpCtx.get());
+                // Sharding is always ready when there is at least one shard at startup (either the
+                // config shard or a dedicated shard server).
+                ShardingReady::get(startupOpCtx.get())->setIsReadyIfShardExists(startupOpCtx.get());
+            }
         } else if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
             // TODO SERVER-83135: Replace this 'else if' with an 'if' once we support
             // config shard + embedded router.
@@ -903,8 +913,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             serviceContext->getService(ClusterRole::RouterServer)
                 ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
 
-            // This function may take the global lock.
-            initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get());
+            // TODO: SERVER-82965 We shouldn't need to read the doc multiple times
+            if (auto shardIdentityDoc =
+                    ShardingInitializationMongoD::getShardIdentityDoc(startupOpCtx.get())) {
+                // This function will take the global lock.
+                initializeShardingAwarenessAndLoadGlobalSettings(
+                    startupOpCtx.get(), *shardIdentityDoc, nullptr);
+            }
         } else {
             // On a dedicated shard server, ShardingReady is always set because there is guaranteed
             // to be at least one shard in the sharded cluster (either the config shard or a

@@ -68,23 +68,10 @@ public:
     static ShardingInitializationMongoD* get(ServiceContext* service);
 
     /**
-     * If on a node capabale of serving as a shard, initializes sharding awareness from the
-     * shardIdentity document on disk, if there is one.
-     *
-     * If started with --shardsvr in queryableBackupMode, initializes sharding awareness from the
-     * shardIdentity document passed through the --overrideShardIdentity startup parameter.
-     *
-     * If it returns true, the '_initFunc' was called, meaning all the core classes for sharding
-     * were initialized, but no networking calls were made yet (with the exception of the duplicate
-     * ShardRegistry reload in ShardRegistry::startup() (see SERVER-26123). Outgoing networking
-     * calls to cluster members can now be made.
-     *
-     * If it returns false, this means the node is not yet sharding aware.
-     *
-     * NOTE: this function might be called more than once.
-     * NOTE: this function briefly takes the global lock to determine primary/secondary state.
+     * Returns the shard identity document for this shard if it exists. This method
+     * will also take into account the --overrideShardIdentity startup parameter
      */
-    bool initializeShardingAwarenessIfNeeded(OperationContext* opCtx);
+    static boost::optional<ShardIdentity> getShardIdentityDoc(OperationContext* opCtx);
 
     /**
      * Initializes the sharding state of this server from the shard identity document argument and
@@ -174,7 +161,9 @@ void initializeGlobalShardingStateForEmbeddedRouterIfNeeded(OperationContext* op
  * this function into one single builder that records the time elapsed during startup. Its default
  * value is nullptr because we only want to time this function when it is called during startup.
  */
-void initializeShardingAwarenessIfNeededAndLoadGlobalSettings(
-    OperationContext* opCtx, BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
+void initializeShardingAwarenessAndLoadGlobalSettings(
+    OperationContext* opCtx,
+    const ShardIdentity& shardIdentity,
+    BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
 
 }  // namespace mongo
