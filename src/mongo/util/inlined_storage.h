@@ -34,6 +34,8 @@
 #include <initializer_list>
 #include <ostream>
 
+#include "mongo/platform/compiler.h"
+
 namespace mongo {
 /**
  * An InlinedStorage is a simplifed version of `absl::InlinedVector`, and optimized for perfomance
@@ -67,7 +69,7 @@ public:
         }
     }
 
-    InlinedStorage(InlinedStorage&& other) : _size(other._size), _buffer(other._buffer) {
+    InlinedStorage(InlinedStorage&& other) : _buffer(other._buffer), _size(other._size) {
         other._size = 0;
     }
 
@@ -124,15 +126,15 @@ public:
         }
     }
 
-    inline BlockType& operator[](size_t index) {
+    MONGO_COMPILER_ALWAYS_INLINE BlockType& operator[](size_t index) {
         return data()[index];
     }
 
-    inline const BlockType& operator[](size_t index) const {
+    MONGO_COMPILER_ALWAYS_INLINE const BlockType& operator[](size_t index) const {
         return data()[index];
     }
 
-    inline BlockType* data() {
+    MONGO_COMPILER_ALWAYS_INLINE BlockType* data() {
         if (isInlined()) {
             return _buffer.inlined;
         } else {
@@ -140,7 +142,7 @@ public:
         }
     }
 
-    inline const BlockType* data() const {
+    MONGO_COMPILER_ALWAYS_INLINE MONGO_COMPILER_RETURNS_NONNULL const BlockType* data() const {
         if (isInlined()) {
             return _buffer.inlined;
         } else {
@@ -148,7 +150,7 @@ public:
         }
     }
 
-    inline size_t size() const noexcept {
+    MONGO_COMPILER_ALWAYS_INLINE size_t size() const noexcept {
         return _size;
     }
 
@@ -173,11 +175,11 @@ public:
     }
 
 private:
-    inline bool isInlined() const noexcept {
+    MONGO_COMPILER_ALWAYS_INLINE bool isInlined() const noexcept {
         return _size <= InlinedCapacity;
     }
 
-    inline bool willBeInlined(size_t size) const noexcept {
+    MONGO_COMPILER_ALWAYS_INLINE bool willBeInlined(size_t size) const noexcept {
         return size <= InlinedCapacity;
     }
 
@@ -247,11 +249,11 @@ private:
         _size = newSize;
     }
 
-    size_t _size;
     union {
         BlockType inlined[InlinedCapacity]{0};
         BlockType* onHeap;
     } _buffer;
+    size_t _size;
 };
 
 template <typename BT, size_t InlinedCapacity>

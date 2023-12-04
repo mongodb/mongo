@@ -768,6 +768,7 @@ icuEnv.CppUnitTest(
         'dns_name_test.cpp',
         'dns_query_test.cpp',
         'duration_test.cpp',
+        'dynamic_bitset_test.cpp',
         'dynamic_catch_test.cpp',
         'errno_util_test.cpp',
         'fail_point_test.cpp',

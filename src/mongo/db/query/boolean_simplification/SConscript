@@ -32,6 +32,7 @@ env.Benchmark(
     target="quine_mccluskey_bm",
     source=[
         "bitset_algebra_bm.cpp",
+        "dynamic_bitset_bm.cpp",
         "match_expression_bm.cpp",
         "quine_mccluskey_bm.cpp",
     ],
