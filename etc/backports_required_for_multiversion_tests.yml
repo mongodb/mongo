@@ -527,6 +527,8 @@ last-continuous:
     ticket: SERVER-78066
   - test_file: jstests/sharding/server_status_cluster_parameters.js
     ticket: SERVER-81277
+  - test_file: jstests/core/query/explode_for_sort_plan_cache.js
+    ticket: SERVER-83777
   suites: null
 last-lts:
   all:
@@ -1112,4 +1114,6 @@ last-lts:
     ticket: SERVER-39336
   - test_file: jstests/sharding/server_status_cluster_parameters.js
     ticket: SERVER-81277
+  - test_file: jstests/core/query/explode_for_sort_plan_cache.js
+    ticket: SERVER-83777
   suites: null

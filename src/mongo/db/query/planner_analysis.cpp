@@ -68,7 +68,7 @@
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/projection.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_solution.h"
@@ -1118,7 +1118,8 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
     }
 
     // Too many ixscans spoil the performance.
-    if (totalNumScans > (size_t)internalQueryMaxScansToExplode.load()) {
+    if (totalNumScans >
+        QueryKnobConfiguration::decoration(query.getOpCtx()).getMaxScansToExplodeForOp()) {
         (*solnRoot)->hitScanLimit = true;
         LOGV2_DEBUG(
             20950,

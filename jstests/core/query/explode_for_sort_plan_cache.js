@@ -68,12 +68,16 @@ function assertIsNotExplodeForSort(query) {
     assert.eq(sortMerges.length, 0, explain);
 }
 
-function assertExplodeForSortCacheParameterizedCorrectly(
-    {query, queryCount, newQuery, newQueryCount, reuseEntry}) {
+function assertQueryParameterizedCorrectly(
+    {query, queryCount, newQuery, newQueryCount, reuseEntry, isExplode = true}) {
     // Clear plan cache to have a fresh test case.
     coll.getPlanCache().clear();
 
-    assertIsExplodeForSort(query);
+    if (isExplode) {
+        assertIsExplodeForSort(query);
+    } else {
+        assertIsNotExplodeForSort(query);
+    }
 
     // Run the query for the first time to create an inactive plan cache entry.
     assert.eq(queryCount, coll.find(query).sort(sortSpec).itcount());
@@ -131,7 +135,7 @@ for (let a = 1; a <= 3; a++) {
 assertIsNotExplodeForSort({a: {$gte: 1, $lte: 1}, b: {$in: [1, 2]}});
 
 // Changing the $eq predicate value should reuse the plan cache and gives correct results.
-assertExplodeForSortCacheParameterizedCorrectly({
+assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: [1, 2]}},
     queryCount: 3,
     newQuery: {a: {$eq: 2}, b: {$in: [1, 2]}},
@@ -141,7 +145,7 @@ assertExplodeForSortCacheParameterizedCorrectly({
 
 // Changing the $expr-$eq predicate value should not reuse the SBE plan cache because agg expression
 // is not parameterized.
-assertExplodeForSortCacheParameterizedCorrectly({
+assertQueryParameterizedCorrectly({
     query: {$and: [{$expr: {$eq: ["$a", 1]}}, {b: {$in: [1, 2]}}]},
     queryCount: 3,
     newQuery: {$and: [{$expr: {$eq: ["$a", 2]}}, {b: {$in: [1, 2]}}]},
@@ -152,7 +156,7 @@ assertExplodeForSortCacheParameterizedCorrectly({
 });
 
 // Rewriting the $in predicate with $or should reuse the plan cache and gives correct results.
-assertExplodeForSortCacheParameterizedCorrectly({
+assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: [1, 2]}},
     queryCount: 3,
     newQuery: {$and: [{a: {$eq: 2}}, {$or: [{b: {$eq: 1}}, {b: {$eq: 2}}]}]},
@@ -162,7 +166,7 @@ assertExplodeForSortCacheParameterizedCorrectly({
 
 // Changing the $or predicate value should reuse the plan cache and gives correct results, since $or
 // is rewritten as $in.
-assertExplodeForSortCacheParameterizedCorrectly({
+assertQueryParameterizedCorrectly({
     query: {$and: [{a: {$eq: 1}}, {$or: [{b: {$eq: 1}}, {b: {$eq: 2}}]}]},
     queryCount: 3,
     newQuery: {$and: [{a: {$eq: 1}}, {$or: [{b: {$eq: 1}}, {b: {$eq: 3}}]}]},
@@ -172,7 +176,7 @@ assertExplodeForSortCacheParameterizedCorrectly({
 
 // Changing the $in predicate values but not size should reuse the plan cache and gives correct
 // results.
-assertExplodeForSortCacheParameterizedCorrectly({
+assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: [1, 2]}},
     queryCount: 3,
     newQuery: {a: {$eq: 1}, b: {$in: [1, 3]}},
@@ -182,7 +186,7 @@ assertExplodeForSortCacheParameterizedCorrectly({
 
 // Changing the $in predicate size should not reuse the SBE plan cache but still gives correct
 // results.
-assertExplodeForSortCacheParameterizedCorrectly({
+assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: [1, 2]}},
     queryCount: 3,
     newQuery: {a: {$eq: 1}, b: {$in: [1, 2, 3]}},
@@ -193,14 +197,14 @@ assertExplodeForSortCacheParameterizedCorrectly({
 // Special values in the predicate will not be parameterized hence the SBE plan cache will not be
 // reused.
 for (let specialValue of [null, {x: 1}, [1]]) {
-    assertExplodeForSortCacheParameterizedCorrectly({
+    assertQueryParameterizedCorrectly({
         query: {a: {$eq: 1}, b: {$in: [1, 2]}},
         queryCount: 3,
         newQuery: {a: {$eq: specialValue}, b: {$in: [1, 2]}},
         newQueryCount: 0,
         reuseEntry: !isSBEEnabled,
     });
-    assertExplodeForSortCacheParameterizedCorrectly({
+    assertQueryParameterizedCorrectly({
         query: {a: {$eq: 1}, b: {$in: [1, 2]}},
         queryCount: 3,
         newQuery: {a: {$eq: 1}, b: {$in: [0, specialValue]}},
@@ -210,10 +214,51 @@ for (let specialValue of [null, {x: 1}, [1]]) {
 }
 
 // Regex in $in predicate will not reuse plan cache.
-assertExplodeForSortCacheParameterizedCorrectly({
+assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: [1, 2]}},
     queryCount: 3,
     newQuery: {a: {$eq: 1}, b: {$in: [0, /a|regex/]}},
     newQueryCount: 0,
     reuseEntry: false,
+});
+
+const maxScansToExplode = assert.commandWorked(db.adminCommand(
+    {getParameter: 1, internalQueryMaxScansToExplode: 1}))["internalQueryMaxScansToExplode"];
+
+const maxExplodeIn = [];
+for (let i = 0; i < maxScansToExplode; ++i) {
+    maxExplodeIn.push(i);
+}
+const tooLargeToExplodeIn = maxExplodeIn.concat([maxScansToExplode]);
+const evenLargerIn = tooLargeToExplodeIn.concat([maxScansToExplode + 1]);
+
+// Test that an $in with as many elements as the "max scans to explode" parameter uses explode for
+// sort and is parameterized correctly.
+assertQueryParameterizedCorrectly({
+    query: {a: {$eq: 1}, b: {$in: maxExplodeIn}},
+    queryCount: 6,
+    newQuery: {a: {$eq: 2}, b: {$in: maxExplodeIn}},
+    newQueryCount: 12,
+    reuseEntry: true,
+});
+
+// Test that in SBE a query with explode for sort optimization will use different plan cache
+// entry than the same query with too many scans to explode.
+assertQueryParameterizedCorrectly({
+    query: {a: {$eq: 1}, b: {$in: maxExplodeIn}},
+    queryCount: 6,
+    newQuery: {a: {$eq: 1}, b: {$in: tooLargeToExplodeIn}},
+    newQueryCount: 6,
+    reuseEntry: !isSBEEnabled,
+});
+
+// Test that a query with more than "max scans to explode" will use the same plan cache
+// entry for any number of elements in $in.
+assertQueryParameterizedCorrectly({
+    query: {a: {$eq: 1}, b: {$in: tooLargeToExplodeIn}},
+    queryCount: 6,
+    newQuery: {a: {$eq: 1}, b: {$in: evenLargerIn}},
+    newQueryCount: 6,
+    reuseEntry: true,
+    isExplode: false
 });
