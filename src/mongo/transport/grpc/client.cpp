@@ -281,9 +281,8 @@ public:
                 channel_args.SetMaxSendMessageSize(MaxMessageSizeBytes);
                 channel_args.SetCompressionAlgorithm(
                     ::grpc_compression_algorithm::GRPC_COMPRESS_NONE);
-
                 return ::grpc::CreateCustomChannel(
-                    util::formatHostAndPortForGRPC(remote), credentials, channel_args);
+                    uri, ::grpc::SslCredentials(_sslOps), channel_args);
             },
             [](std::shared_ptr<::grpc::Channel>& channel, Milliseconds connectTimeout) {
                 iassert(ErrorCodes::NetworkTimeout,
