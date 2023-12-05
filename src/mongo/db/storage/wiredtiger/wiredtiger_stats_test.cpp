@@ -28,7 +28,9 @@
  */
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include <memory>
@@ -165,6 +167,12 @@ protected:
 };
 
 TEST_F(WiredTigerStatsTest, EmptySession) {
+    // Increase log component verbosity for WiredTiger
+    auto verbosityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kWiredTiger,
+                                                               logv2::LogSeverity::Debug(5)};
+    auto verboseConfig = WiredTigerUtil::generateWTVerboseConfiguration();
+    ASSERT_OK(wtRCToStatus(_conn->reconfigure(_conn, verboseConfig.c_str()), nullptr));
+
     // Read and write statistics should be empty. Check "data" field does not exist. "wait" fields
     // such as the schemaLock might have some value.
     auto statsBson = WiredTigerStats{_session}.toBSON();
