@@ -36,7 +36,7 @@ std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(
     const MultipleCollectionAccessor& collections,
     NamespaceString nss) {
 
-    stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable;
+    std::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable;
     if (collections.isAcquisition()) {
         yieldable = PlanYieldPolicy::YieldThroughAcquisitions{};
     } else {
@@ -58,7 +58,7 @@ std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(
     ClockSource* clockSource,
     int yieldFrequency,
     Milliseconds yieldPeriod,
-    stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks) {
     return std::unique_ptr<PlanYieldPolicySBE>(new PlanYieldPolicySBE(
         opCtx, policy, clockSource, yieldFrequency, yieldPeriod, yieldable, std::move(callbacks)));
@@ -70,7 +70,7 @@ PlanYieldPolicySBE::PlanYieldPolicySBE(
     ClockSource* clockSource,
     int yieldFrequency,
     Milliseconds yieldPeriod,
-    stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
     : PlanYieldPolicy(
           opCtx, policy, clockSource, yieldFrequency, yieldPeriod, yieldable, std::move(callbacks)),

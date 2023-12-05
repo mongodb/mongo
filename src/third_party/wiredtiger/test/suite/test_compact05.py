@@ -27,15 +27,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_compact05.py
-#   Test compaction through the background compaction server.
+#   Test if foreground compaction proceeds depending on the free_space_target field.
 #
 
 import wttest
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# Test if compaction proceeds depending on the free_space_target field used by the background
-# compaction server.
 class test_compact05(wttest.WiredTigerTestCase):
 
     free_space_target = [

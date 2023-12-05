@@ -29,11 +29,12 @@
 
 #pragma once
 
+#include <variant>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
@@ -636,23 +637,23 @@ public:
     NamedAttribute(const char* n, const T& val) : name(n), value(mapValue(val)) {}
 
     const char* name = nullptr;
-    stdx::variant<int,
-                  unsigned int,
-                  long long,
-                  unsigned long long,
-                  bool,
-                  double,
-                  StringData,
-                  Nanoseconds,
-                  Microseconds,
-                  Milliseconds,
-                  Seconds,
-                  Minutes,
-                  Hours,
-                  Days,
-                  BSONObj,
-                  BSONArray,
-                  CustomAttributeValue>
+    std::variant<int,
+                 unsigned int,
+                 long long,
+                 unsigned long long,
+                 bool,
+                 double,
+                 StringData,
+                 Nanoseconds,
+                 Microseconds,
+                 Milliseconds,
+                 Seconds,
+                 Minutes,
+                 Hours,
+                 Days,
+                 BSONObj,
+                 BSONArray,
+                 CustomAttributeValue>
         value;
 };
 
@@ -774,7 +775,7 @@ public:
     template <typename Func>
     void apply(Func&& f) const {
         std::for_each(_data, _data + _size, [&](const auto& attr) {
-            stdx::visit([&](auto&& val) { f(attr.name, val); }, attr.value);
+            visit([&](auto&& val) { f(attr.name, val); }, attr.value);
         });
     }
 

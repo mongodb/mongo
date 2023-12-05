@@ -90,8 +90,8 @@ public:
 
         int estimateUpdateSizeBytes(const BatchObject& batchObject,
                                     UpsertType type) const override {
-            int size = std::get<write_ops::UpdateModification>(batchObject).objsize();
-            if (auto vars = std::get<boost::optional<BSONObj>>(batchObject)) {
+            int size = get<write_ops::UpdateModification>(batchObject).objsize();
+            if (auto vars = get<boost::optional<BSONObj>>(batchObject)) {
                 size += vars->objsize();
             }
             return size;
@@ -120,9 +120,9 @@ public:
         int estimateUpdateSizeBytes(const BatchObject& batchObject,
                                     UpsertType type) const override {
             return getUpdateSizeEstimate(
-                       std::get<BSONObj>(batchObject),
-                       std::get<write_ops::UpdateModification>(batchObject),
-                       std::get<boost::optional<BSONObj>>(batchObject),
+                       get<BSONObj>(batchObject),
+                       get<write_ops::UpdateModification>(batchObject),
+                       get<boost::optional<BSONObj>>(batchObject),
                        type != UpsertType::kNone /* includeUpsertSupplied */,
                        boost::none /* collation */,
                        boost::none /* arrayFilters */,

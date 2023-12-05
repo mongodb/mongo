@@ -137,6 +137,7 @@ void convertToWCEAndRethrow(OperationContext* opCtx,
     // WriteConflict to allow users of multi-document transactions to retry without changing
     // any behavior.
     temporarilyUnavailableErrorsConvertedToWriteConflict.increment(1);
+    CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
     throwWriteConflictException(e.reason());
 }
 

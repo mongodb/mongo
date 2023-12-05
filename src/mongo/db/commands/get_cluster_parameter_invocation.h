@@ -48,7 +48,7 @@ public:
     using Request = GetClusterParameter;
     using Reply = GetClusterParameter::Reply;
     using Map = ServerParameterSet::Map;
-    using CmdBody = stdx::variant<std::string, std::vector<std::string>>;
+    using CmdBody = std::variant<std::string, std::vector<std::string>>;
 
     GetClusterParameterInvocation() = default;
 

@@ -26,9 +26,30 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, sys, wiredtiger, wttest
+import os, sys, time, wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
+
+def get_stat(session, stat):
+    # This could be made more sophisticated, but there's no need yet.
+    time.sleep(0.5)
+
+    stat_cursor = session.open_cursor('statistics:')
+    val = stat_cursor[stat][2]
+    stat_cursor.close()
+
+    return val
+
+# These raise an exception since they don't have access to assertGreater and friends.
+def stat_assert_equal(session, stat, expected):
+    val = get_stat(session, stat)
+    if val != expected:
+        raise Exception("expected {} ({}) to be equal to {}".format(stat, val, expected))
+
+def stat_assert_greater(session, stat, expected):
+    val = get_stat(session, stat)
+    if val <= expected:
+        raise Exception("expected {} ({}) to be greater than {}".format(stat, val, expected))
 
 # Basic functional chunk cache test - put some data in, make sure it
 # comes back out unscathed.
@@ -47,12 +68,6 @@ class test_chunkcache01(wttest.WiredTigerTestCase):
         cache_types.append(('on-disk', dict(chunk_cache_type='FILE')))
 
     scenarios = make_scenarios(format_values, cache_types)
-
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
 
     def conn_config(self):
         if not os.path.exists('bucket1'):
@@ -75,9 +90,9 @@ class test_chunkcache01(wttest.WiredTigerTestCase):
         ds.check()
 
         # Assert the new chunks are ingested.
-        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables), 0)
+        stat_assert_greater(self.session, wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables, 0)
 
         self.close_conn()
         self.reopen_conn()
         ds.check()
-        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_bytes_inuse), 0)
+        stat_assert_greater(self.session, wiredtiger.stat.conn.chunkcache_bytes_inuse, 0)

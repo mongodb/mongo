@@ -50,7 +50,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/itoa.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
@@ -91,7 +90,7 @@ class DocumentDiffReader;
 
 class ArrayDiffReader {
 public:
-    using ArrayModification = stdx::variant<BSONElement, DocumentDiffReader, ArrayDiffReader>;
+    using ArrayModification = std::variant<BSONElement, DocumentDiffReader, ArrayDiffReader>;
 
     explicit ArrayDiffReader(const Diff& diff);
 
@@ -133,7 +132,7 @@ public:
     boost::optional<StringData> nextDelete();
     boost::optional<BSONElement> nextUpdate();
     boost::optional<BSONElement> nextInsert();
-    boost::optional<std::pair<StringData, stdx::variant<DocumentDiffReader, ArrayDiffReader>>>
+    boost::optional<std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>>
     nextSubDiff();
 
 private:
@@ -176,7 +175,7 @@ struct InsertNode : public Node {
     NodeType type() const override {
         return NodeType::kInsert;
     }
-    stdx::variant<mutablebson::Element, BSONElement> elt;
+    std::variant<mutablebson::Element, BSONElement> elt;
 };
 
 /**
@@ -189,7 +188,7 @@ struct UpdateNode : public Node {
     NodeType type() const override {
         return NodeType::kUpdate;
     }
-    stdx::variant<mutablebson::Element, BSONElement> elt;
+    std::variant<mutablebson::Element, BSONElement> elt;
 };
 
 /**

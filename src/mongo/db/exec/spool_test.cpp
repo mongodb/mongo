@@ -50,7 +50,6 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
@@ -76,16 +75,16 @@ public:
     /**
      * Create a new working set member with the given record id.
      */
-    WorkingSetID makeRecord(const stdx::variant<std::string, long>& recordId) {
+    WorkingSetID makeRecord(const std::variant<std::string, long>& recordId) {
         WorkingSetID id = ws.allocate();
         WorkingSetMember* wsm = ws.get(id);
-        stdx::visit(OverloadedVisitor{
-                        [&](long value) { wsm->recordId = RecordId(value); },
-                        [&](const std::string& value) {
-                            wsm->recordId = RecordId(value.c_str(), value.size());
-                        },
-                    },
-                    recordId);
+        visit(OverloadedVisitor{
+                  [&](long value) { wsm->recordId = RecordId(value); },
+                  [&](const std::string& value) {
+                      wsm->recordId = RecordId(value.c_str(), value.size());
+                  },
+              },
+              recordId);
         ws.transitionToRecordIdAndObj(id);
         return id;
     }
@@ -97,7 +96,7 @@ public:
     void workAndAssertStateAndRecordId(
         SpoolStage& spool,
         PlanStage::StageState expectedState,
-        const stdx::variant<stdx::monostate, std::string, long>& expectedId = stdx::monostate{},
+        const std::variant<std::monostate, std::string, long>& expectedId = std::monostate{},
         bool childHasMoreRecords = true) {
         ASSERT_FALSE(spool.isEOF());
 
@@ -108,18 +107,18 @@ public:
         if (expectedId.index() != 0) {
             auto member = ws.get(id);
             ASSERT_TRUE(member->hasRecordId());
-            stdx::visit(OverloadedVisitor{
-                            [&](long value) {
-                                ASSERT_TRUE(member->recordId.isLong());
-                                ASSERT_EQUALS(member->recordId.getLong(), value);
-                            },
-                            [&](const std::string& value) {
-                                ASSERT_TRUE(member->recordId.isStr());
-                                ASSERT_EQUALS(member->recordId.getStr(), value);
-                            },
-                            [&](const stdx::monostate&) {},
-                        },
-                        expectedId);
+            visit(OverloadedVisitor{
+                      [&](long value) {
+                          ASSERT_TRUE(member->recordId.isLong());
+                          ASSERT_EQUALS(member->recordId.getLong(), value);
+                      },
+                      [&](const std::string& value) {
+                          ASSERT_TRUE(member->recordId.isStr());
+                          ASSERT_EQUALS(member->recordId.getStr(), value);
+                      },
+                      [&](const std::monostate&) {},
+                  },
+                  expectedId);
             _memUsage += member->recordId.memUsage();
         }
 
@@ -251,7 +250,7 @@ TEST_F(SpoolStageTest, onlyNeedYieldAndNeedTime) {
     workAndAssertStateAndRecordId(spool, PlanStage::NEED_YIELD);
     workAndAssertStateAndRecordId(spool, PlanStage::NEED_TIME);
     workAndAssertStateAndRecordId(
-        spool, PlanStage::NEED_YIELD, stdx::monostate{}, false /* childHasMoreRecords */);
+        spool, PlanStage::NEED_YIELD, std::monostate{}, false /* childHasMoreRecords */);
 
     assertEofState(spool);
 }

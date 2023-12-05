@@ -39,7 +39,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/stdx/variant.h"
 
 namespace mongo {
 namespace rename_collection {
@@ -49,8 +48,8 @@ Status checkAuthForRenameCollectionCommand(Client* client, const RenameCollectio
     const auto& targetNS = request.getTo();
     const bool dropTarget = [&] {
         const auto dropTarget = request.getDropTarget();
-        if (stdx::holds_alternative<bool>(dropTarget)) {
-            return stdx::get<bool>(dropTarget);
+        if (holds_alternative<bool>(dropTarget)) {
+            return get<bool>(dropTarget);
         }
 
         // UUID alternative is "trueish"

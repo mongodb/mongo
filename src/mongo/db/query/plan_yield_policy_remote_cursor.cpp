@@ -45,7 +45,7 @@ std::unique_ptr<PlanYieldPolicyRemoteCursor> PlanYieldPolicyRemoteCursor::make(
     const MultipleCollectionAccessor& collections,
     NamespaceString nss,
     PlanExecutor* exec) {
-    stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable;
+    std::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable;
     if (collections.isAcquisition()) {
         yieldable = PlanYieldPolicy::YieldThroughAcquisitions{};
     } else {
@@ -61,7 +61,7 @@ std::unique_ptr<PlanYieldPolicyRemoteCursor> PlanYieldPolicyRemoteCursor::make(
 PlanYieldPolicyRemoteCursor::PlanYieldPolicyRemoteCursor(
     OperationContext* opCtx,
     PlanYieldPolicy::YieldPolicy policy,
-    stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
     : PlanYieldPolicy(opCtx,
                       policy,

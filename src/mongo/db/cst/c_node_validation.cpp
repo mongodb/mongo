@@ -53,7 +53,6 @@
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variable_validation.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
@@ -219,8 +218,8 @@ Status addPathsFromTreeToSet(const CNode::ObjectChildren& children,
         // currentPath. FieldnamePath may introduce more than one if it originated from syntax
         // like '{"a.b": 1}'.
         auto currentPath = previousPath;
-        if (auto&& fieldname = stdx::get_if<FieldnamePath>(&child.first))
-            for (auto&& component : stdx::visit(
+        if (auto&& fieldname = get_if<FieldnamePath>(&child.first))
+            for (auto&& component : visit(
                      [](auto&& fn) -> auto&& { return fn.components; }, *fieldname))
                 currentPath.emplace_back(component);
         // Or add a translaiton of _id if we have a key for that.
@@ -229,11 +228,11 @@ Status addPathsFromTreeToSet(const CNode::ObjectChildren& children,
 
         // Ensure that the tree is constructed correctly. Confirm anything that's not a
         // FieldnamePath is actually _id.
-        dassert(stdx::holds_alternative<FieldnamePath>(child.first) ||
-                (stdx::holds_alternative<KeyFieldname>(child.first) &&
-                 stdx::get<KeyFieldname>(child.first) == KeyFieldname::id));
+        dassert(holds_alternative<FieldnamePath>(child.first) ||
+                (holds_alternative<KeyFieldname>(child.first) &&
+                 get<KeyFieldname>(child.first) == KeyFieldname::id));
 
-        if (auto status = stdx::visit(
+        if (auto status = visit(
                 OverloadedVisitor{
                     [&](const CompoundInclusionKey& compoundKey) {
                         // In this context we have a compound inclusion key to descend into.
@@ -250,7 +249,7 @@ Status addPathsFromTreeToSet(const CNode::ObjectChildren& children,
                             seenPaths);
                     },
                     [&](const CNode::ObjectChildren& objectChildren) {
-                        if (stdx::holds_alternative<FieldnamePath>(objectChildren[0].first))
+                        if (holds_alternative<FieldnamePath>(objectChildren[0].first))
                             // In this context we have a project path object to recurse over.
                             return addPathsFromTreeToSet(objectChildren, currentPath, seenPaths);
                         else
@@ -288,7 +287,7 @@ Status validateNumericType(T num) {
 }
 
 Status validateSingleType(const CNode& element) {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{
             [&](const UserDouble& dbl) { return validateNumericType(dbl); },
             [&](const UserInt& num) { return validateNumericType(num); },
@@ -396,7 +395,7 @@ Status validateSortPath(const std::vector<std::string>& pathComponents) {
 
 Status validateTypeOperatorArgument(const CNode& types) {
     // If the CNode is an array, we need to validate all of the types within it.
-    if (auto&& children = stdx::get_if<CNode::ArrayChildren>(&types.payload)) {
+    if (auto&& children = get_if<CNode::ArrayChildren>(&types.payload)) {
         for (auto&& child : (*children)) {
             if (auto status = validateSingleType(child); !status.isOK()) {
                 return status;

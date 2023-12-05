@@ -29,7 +29,8 @@
 
 #pragma once
 
-#include "mongo/stdx/variant.h"
+#include <variant>
+
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/system_tick_source.h"

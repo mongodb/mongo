@@ -360,6 +360,36 @@ kv_table_item::has_prepared_nolock(timestamp_t timestamp) const
 }
 
 /*
+ * kv_table_item::rollback_to_stable --
+ *     Roll back the table item to the latest stable timestamp and transaction snapshot.
+ */
+void
+kv_table_item::rollback_to_stable(timestamp_t timestamp, kv_transaction_snapshot_ptr snapshot)
+{
+    std::lock_guard lock_guard(_lock);
+    for (auto i = _updates.begin(); i != _updates.end();) {
+        std::shared_ptr<kv_update> u = *i;
+        kv_transaction_state state = u->txn_state();
+        if (state != kv_transaction_state::prepared && state != kv_transaction_state::committed)
+            throw model_exception("Unexpected transaction state during RTS");
+
+        /*
+         * Remove an update if one or more of the following conditions are satisfied:
+         *   1. It is not in the transaction snapshot (if provided).
+         *   2. It is a prepared transaction.
+         *   3. Its durable timestamp is after the stable timestamp.
+         */
+        if ((snapshot && !snapshot->contains(*u)) || (state == kv_transaction_state::prepared) ||
+          (u->durable_timestamp() > timestamp)) {
+            /* Need to remove the transaction object, so that we don't leak memory. */
+            (*i)->remove_txn();
+            i = _updates.erase(i);
+        } else
+            i++;
+    }
+}
+
+/*
  * kv_table_item::rollback_updates --
  *     Roll back updates of an aborted transaction.
  */

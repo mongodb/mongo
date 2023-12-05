@@ -49,7 +49,6 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update_index_data.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
@@ -67,17 +66,17 @@ struct Insert {
 struct Delete {};
 struct SubDiff {
     DiffType type() const {
-        return stdx::holds_alternative<DocumentDiffReader>(reader) ? DiffType::kDocument
-                                                                   : DiffType::kArray;
+        return holds_alternative<DocumentDiffReader>(reader) ? DiffType::kDocument
+                                                             : DiffType::kArray;
     }
 
-    stdx::variant<DocumentDiffReader, ArrayDiffReader> reader;
+    std::variant<DocumentDiffReader, ArrayDiffReader> reader;
 };
 
 // This struct stores the tables we build from an object diff before applying it.
 struct DocumentDiffTables {
     // Types of modifications that can be done to a field.
-    using FieldModification = stdx::variant<Delete, Update, Insert, SubDiff>;
+    using FieldModification = std::variant<Delete, Update, Insert, SubDiff>;
 
     /**
      * Inserts to the table and throws if the key exists already, which would mean that the
@@ -258,54 +257,53 @@ int32_t computeDamageOnObject(const BSONObj& preImageRoot,
             continue;
         }
 
-        stdx::visit(
-            OverloadedVisitor{
-                [&](Delete) {
-                    appendDamage(damages, 0, 0, targetOffset, elt.size());
-                    diffSize -= elt.size();
-                },
+        visit(OverloadedVisitor{
+                  [&](Delete) {
+                      appendDamage(damages, 0, 0, targetOffset, elt.size());
+                      diffSize -= elt.size();
+                  },
 
-                [&](const Update& update) {
-                    auto newElt = update.newElt;
-                    // Updates with the new BSONElement.
-                    appendDamage(
-                        damages, bufBuilder->len(), newElt.size(), targetOffset, elt.size());
-                    diffSize += newElt.size() - elt.size();
-                    bufBuilder->appendBuf(newElt.rawdata(), newElt.size());
-                    fieldsToSkipInserting.insert(elt.fieldNameStringData());
-                },
+                  [&](const Update& update) {
+                      auto newElt = update.newElt;
+                      // Updates with the new BSONElement.
+                      appendDamage(
+                          damages, bufBuilder->len(), newElt.size(), targetOffset, elt.size());
+                      diffSize += newElt.size() - elt.size();
+                      bufBuilder->appendBuf(newElt.rawdata(), newElt.size());
+                      fieldsToSkipInserting.insert(elt.fieldNameStringData());
+                  },
 
-                [&](const Insert&) {
-                    // Deletes the pre-image version of the field. We'll add it at the end.
-                    appendDamage(damages, 0, 0, targetOffset, elt.size());
-                    diffSize -= elt.size();
-                },
+                  [&](const Insert&) {
+                      // Deletes the pre-image version of the field. We'll add it at the end.
+                      appendDamage(damages, 0, 0, targetOffset, elt.size());
+                      diffSize -= elt.size();
+                  },
 
-                [&](const SubDiff& subDiff) {
-                    const auto type = subDiff.type();
-                    if (elt.type() == BSONType::Object && type == DiffType::kDocument) {
-                        addElementPrefix(elt, damages, bufBuilder, targetOffset);
-                        auto reader = stdx::get<DocumentDiffReader>(subDiff.reader);
-                        diffSize += computeDamageOnObject(preImageRoot,
-                                                          elt.embeddedObject(),
-                                                          &reader,
-                                                          damages,
-                                                          bufBuilder,
-                                                          offsetRoot + diffSize,
-                                                          mustCheckExistenceForInsertOperations);
-                    } else if (elt.type() == BSONType::Array && type == DiffType::kArray) {
-                        addElementPrefix(elt, damages, bufBuilder, targetOffset);
-                        auto reader = stdx::get<ArrayDiffReader>(subDiff.reader);
-                        diffSize += computeDamageOnArray(preImageRoot,
-                                                         elt.embeddedObject(),
-                                                         &reader,
-                                                         damages,
-                                                         bufBuilder,
-                                                         offsetRoot + diffSize,
-                                                         mustCheckExistenceForInsertOperations);
-                    }
-                }},
-            it->second);
+                  [&](const SubDiff& subDiff) {
+                      const auto type = subDiff.type();
+                      if (elt.type() == BSONType::Object && type == DiffType::kDocument) {
+                          addElementPrefix(elt, damages, bufBuilder, targetOffset);
+                          auto reader = get<DocumentDiffReader>(subDiff.reader);
+                          diffSize += computeDamageOnObject(preImageRoot,
+                                                            elt.embeddedObject(),
+                                                            &reader,
+                                                            damages,
+                                                            bufBuilder,
+                                                            offsetRoot + diffSize,
+                                                            mustCheckExistenceForInsertOperations);
+                      } else if (elt.type() == BSONType::Array && type == DiffType::kArray) {
+                          addElementPrefix(elt, damages, bufBuilder, targetOffset);
+                          auto reader = get<ArrayDiffReader>(subDiff.reader);
+                          diffSize += computeDamageOnArray(preImageRoot,
+                                                           elt.embeddedObject(),
+                                                           &reader,
+                                                           damages,
+                                                           bufBuilder,
+                                                           offsetRoot + diffSize,
+                                                           mustCheckExistenceForInsertOperations);
+                      }
+                  }},
+              it->second);
     }
 
     for (auto&& elt : tables.fieldsToInsert) {
@@ -340,63 +338,63 @@ int32_t computeDamageForArrayIndex(const BSONObj& preImageRoot,
                                    size_t offsetRoot,
                                    bool mustCheckExistenceForInsertOperations) {
     int32_t diffSize = 0;
-    stdx::visit(
-        OverloadedVisitor{
-            [&](const BSONElement& update) {
-                invariant(!update.eoo());
-                auto preValuePos = arrayPreImage.end()->rawdata();
-                auto targetSize = 0;
-                if (preImageValue) {
-                    preValuePos = preImageValue->rawdata();
-                    targetSize = preImageValue->size();
-                }
-                // The start of 'preImageValue' if existed otherwise the end of the array, with the
-                // offset from the updates made already.
-                auto targetOffset =
-                    targetOffsetInPostImage(preValuePos, preImageRoot.objdata(), offsetRoot);
-                // Updates with the new BSONElement except for the 'u' byte.
-                auto sourceSize = update.size() - 1;
-                appendDamage(damages, bufBuilder->len(), sourceSize, targetOffset, targetSize);
-                diffSize += sourceSize - targetSize;
-                auto source = update.rawdata();
-                appendTypeByte(bufBuilder, *source++);
-                // Skips the byte of 'u' and appends the data after the type byte.
-                bufBuilder->appendBuf(source + 1, sourceSize - 1);
-            },
-            [&](auto reader) {
-                if (preImageValue) {
-                    auto targetOffset = targetOffsetInPostImage(
-                        preImageValue->rawdata(), preImageRoot.objdata(), offsetRoot);
-                    if constexpr (std::is_same_v<decltype(reader), ArrayDiffReader>) {
-                        if (preImageValue->type() == BSONType::Array) {
-                            addElementPrefix(*preImageValue, damages, bufBuilder, targetOffset);
-                            diffSize += computeDamageOnArray(preImageRoot,
-                                                             preImageValue->embeddedObject(),
-                                                             &reader,
-                                                             damages,
-                                                             bufBuilder,
-                                                             offsetRoot,
-                                                             mustCheckExistenceForInsertOperations);
-                            return;
-                        }
-                    } else if constexpr (std::is_same_v<decltype(reader), DocumentDiffReader>) {
-                        if (preImageValue->type() == BSONType::Object) {
-                            addElementPrefix(*preImageValue, damages, bufBuilder, targetOffset);
-                            diffSize +=
-                                computeDamageOnObject(preImageRoot,
-                                                      preImageValue->embeddedObject(),
-                                                      &reader,
-                                                      damages,
-                                                      bufBuilder,
-                                                      offsetRoot,
-                                                      mustCheckExistenceForInsertOperations);
-                            return;
-                        }
-                    }
-                }
-            },
-        },
-        modification);
+    visit(OverloadedVisitor{
+              [&](const BSONElement& update) {
+                  invariant(!update.eoo());
+                  auto preValuePos = arrayPreImage.end()->rawdata();
+                  auto targetSize = 0;
+                  if (preImageValue) {
+                      preValuePos = preImageValue->rawdata();
+                      targetSize = preImageValue->size();
+                  }
+                  // The start of 'preImageValue' if existed otherwise the end of the array, with
+                  // the offset from the updates made already.
+                  auto targetOffset =
+                      targetOffsetInPostImage(preValuePos, preImageRoot.objdata(), offsetRoot);
+                  // Updates with the new BSONElement except for the 'u' byte.
+                  auto sourceSize = update.size() - 1;
+                  appendDamage(damages, bufBuilder->len(), sourceSize, targetOffset, targetSize);
+                  diffSize += sourceSize - targetSize;
+                  auto source = update.rawdata();
+                  appendTypeByte(bufBuilder, *source++);
+                  // Skips the byte of 'u' and appends the data after the type byte.
+                  bufBuilder->appendBuf(source + 1, sourceSize - 1);
+              },
+              [&](auto reader) {
+                  if (preImageValue) {
+                      auto targetOffset = targetOffsetInPostImage(
+                          preImageValue->rawdata(), preImageRoot.objdata(), offsetRoot);
+                      if constexpr (std::is_same_v<decltype(reader), ArrayDiffReader>) {
+                          if (preImageValue->type() == BSONType::Array) {
+                              addElementPrefix(*preImageValue, damages, bufBuilder, targetOffset);
+                              diffSize +=
+                                  computeDamageOnArray(preImageRoot,
+                                                       preImageValue->embeddedObject(),
+                                                       &reader,
+                                                       damages,
+                                                       bufBuilder,
+                                                       offsetRoot,
+                                                       mustCheckExistenceForInsertOperations);
+                              return;
+                          }
+                      } else if constexpr (std::is_same_v<decltype(reader), DocumentDiffReader>) {
+                          if (preImageValue->type() == BSONType::Object) {
+                              addElementPrefix(*preImageValue, damages, bufBuilder, targetOffset);
+                              diffSize +=
+                                  computeDamageOnObject(preImageRoot,
+                                                        preImageValue->embeddedObject(),
+                                                        &reader,
+                                                        damages,
+                                                        bufBuilder,
+                                                        offsetRoot,
+                                                        mustCheckExistenceForInsertOperations);
+                              return;
+                          }
+                      }
+                  }
+              },
+          },
+          modification);
     return diffSize;
 }
 
@@ -526,49 +524,49 @@ public:
             }
             FieldRef::FieldRefTempAppend tempAppend(*path, elt.fieldNameStringData());
 
-            stdx::visit(
-                OverloadedVisitor{
-                    [this, &path](Delete) {
-                        // Do not append anything.
-                    },
+            visit(OverloadedVisitor{
+                      [this, &path](Delete) {
+                          // Do not append anything.
+                      },
 
-                    [this, &path, &builder, &elt, &fieldsToSkipInserting](const Update& update) {
-                        builder->append(update.newElt);
-                        fieldsToSkipInserting.insert(elt.fieldNameStringData());
-                    },
+                      [this, &path, &builder, &elt, &fieldsToSkipInserting](const Update& update) {
+                          builder->append(update.newElt);
+                          fieldsToSkipInserting.insert(elt.fieldNameStringData());
+                      },
 
-                    [](const Insert&) {
-                        // Skip the pre-image version of the field. We'll add it at the end.
-                    },
+                      [](const Insert&) {
+                          // Skip the pre-image version of the field. We'll add it at the end.
+                      },
 
-                    [this, &builder, &elt, &path](const SubDiff& subDiff) {
-                        const auto type = subDiff.type();
-                        if (elt.type() == BSONType::Object && type == DiffType::kDocument) {
-                            BSONObjBuilder subBob(builder->subobjStart(elt.fieldNameStringData()));
-                            auto reader = stdx::get<DocumentDiffReader>(subDiff.reader);
-                            applyDiffToObject(elt.embeddedObject(), path, &reader, &subBob);
-                        } else if (elt.type() == BSONType::Array && type == DiffType::kArray) {
-                            BSONArrayBuilder subBob(
-                                builder->subarrayStart(elt.fieldNameStringData()));
-                            auto reader = stdx::get<ArrayDiffReader>(subDiff.reader);
-                            applyDiffToArray(elt.embeddedObject(), path, &reader, &subBob);
-                        } else {
-                            // There's a type mismatch. The diff was expecting one type but the pre
-                            // image contains a value of a different type. This means we are
-                            // re-applying a diff.
+                      [this, &builder, &elt, &path](const SubDiff& subDiff) {
+                          const auto type = subDiff.type();
+                          if (elt.type() == BSONType::Object && type == DiffType::kDocument) {
+                              BSONObjBuilder subBob(
+                                  builder->subobjStart(elt.fieldNameStringData()));
+                              auto reader = get<DocumentDiffReader>(subDiff.reader);
+                              applyDiffToObject(elt.embeddedObject(), path, &reader, &subBob);
+                          } else if (elt.type() == BSONType::Array && type == DiffType::kArray) {
+                              BSONArrayBuilder subBob(
+                                  builder->subarrayStart(elt.fieldNameStringData()));
+                              auto reader = get<ArrayDiffReader>(subDiff.reader);
+                              applyDiffToArray(elt.embeddedObject(), path, &reader, &subBob);
+                          } else {
+                              // There's a type mismatch. The diff was expecting one type but the
+                              // pre image contains a value of a different type. This means we are
+                              // re-applying a diff.
 
-                            // There must be some future operation which changed the type of this
-                            // field from object/array to something else. So we set this field to
-                            // null and expect the future value to overwrite the value here.
+                              // There must be some future operation which changed the type of this
+                              // field from object/array to something else. So we set this field to
+                              // null and expect the future value to overwrite the value here.
 
-                            builder->appendNull(elt.fieldNameStringData());
-                        }
+                              builder->appendNull(elt.fieldNameStringData());
+                          }
 
-                        // Note: There's no need to update 'fieldsToSkipInserting' here, because a
-                        // field cannot appear in both the sub-diff and insert section.
-                    },
-                },
-                it->second);
+                          // Note: There's no need to update 'fieldsToSkipInserting' here, because a
+                          // field cannot appear in both the sub-diff and insert section.
+                      },
+                  },
+                  it->second);
         }
 
         // Whether we have already determined whether indexes are affected for the base path; that
@@ -613,7 +611,7 @@ private:
                                      FieldRef* path,
                                      const ArrayDiffReader::ArrayModification& modification,
                                      BSONArrayBuilder* builder) {
-        stdx::visit(
+        visit(
             OverloadedVisitor{
                 [this, &path, builder](const BSONElement& update) {
                     invariant(!update.eoo());

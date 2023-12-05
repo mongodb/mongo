@@ -991,7 +991,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
         "    |   |           ce: 1000\n"
         "    |   |           requirementCEs: \n"
         "    |   |               refProjection: ptest1, path: 'PathGet [a] PathIdentity []', ce: "
-        "1000\n"
+        "1000, mode: heuristic\n"
         "    |   |       projections: \n"
         "    |   |           a\n"
         "    |   |           ptest1\n"
@@ -1044,7 +1044,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
         "    |   |           ce: 1000\n"
         "    |   |           requirementCEs: \n"
         "    |   |               refProjection: ptest2, path: 'PathGet [a] PathIdentity []', ce: "
-        "1000\n"
+        "1000, mode: heuristic\n"
         "    |   |       projections: \n"
         "    |   |           a\n"
         "    |   |           ptest2\n"
@@ -1183,9 +1183,9 @@ TEST(LogicalRewriter, SargableCE) {
         "    |   |           ce: 5.62341\n"
         "    |   |           requirementCEs: \n"
         "    |   |               refProjection: ptest, path: 'PathGet [a] PathIdentity []', ce: "
-        "31.6228\n"
+        "31.6228, mode: heuristic\n"
         "    |   |               refProjection: ptest, path: 'PathGet [b] PathIdentity []', ce: "
-        "31.6228\n"
+        "31.6228, mode: heuristic\n"
         "    |   |       projections: \n"
         "    |   |           ptest\n"
         "    |   |       indexingAvailability: \n"
@@ -1265,7 +1265,7 @@ TEST(LogicalRewriter, SargableCEWithIdEq) {
     // Assert that the cost estimate of a simple _id lookup is 1.
     ASSERT_EQ(1.0, ceProperty.getEstimate()._value);
     ASSERT_EQ(1, ceProperty.getPartialSchemaKeyCE().size());
-    ASSERT_EQ(1.0, ceProperty.getPartialSchemaKeyCE().front().second._value);
+    ASSERT_EQ(1.0, ceProperty.getPartialSchemaKeyCE().front().second._ce._value);
 
     // Construct a query which tests a traverse.
     ABT rootNode1 = NodeBuilder{}
@@ -1281,7 +1281,7 @@ TEST(LogicalRewriter, SargableCEWithIdEq) {
     // Assert that the cost estimate of a traverse into a simple _id lookup is 1.
     ASSERT_EQ(1.0, ceProperty.getEstimate()._value);
     ASSERT_EQ(1, ceProperty.getPartialSchemaKeyCE().size());
-    ASSERT_EQ(1.0, ceProperty.getPartialSchemaKeyCE().front().second._value);
+    ASSERT_EQ(1.0, ceProperty.getPartialSchemaKeyCE().front().second._ce._value);
 }
 
 TEST(LogicalRewriter, RemoveNoopFilter) {

@@ -59,7 +59,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
-#include "mongo/db/op_observer/oplog_writer_impl.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
@@ -160,7 +160,7 @@ protected:
         auto opObserverRegistry =
             dynamic_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
         opObserverRegistry->addObserver(
-            std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+            std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
     }
 
     std::tuple<int64_t, int64_t> getNumRecordsAndDataSize(

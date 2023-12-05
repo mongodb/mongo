@@ -29,26 +29,22 @@
 
 #pragma once
 
-#include "mongo/db/op_observer/oplog_writer.h"
+#include "mongo/db/op_observer/operation_logger.h"
 
 namespace mongo {
 
-class OplogWriterMock : public OplogWriter {
-    OplogWriterMock(const OplogWriterMock&) = delete;
-    OplogWriterMock& operator=(const OplogWriterMock&) = delete;
+class OperationLoggerEmbedded : public OperationLogger {
+    OperationLoggerEmbedded(const OperationLoggerEmbedded&) = delete;
+    OperationLoggerEmbedded& operator=(const OperationLoggerEmbedded&) = delete;
 
 public:
-    OplogWriterMock() = default;
-    virtual ~OplogWriterMock() = default;
+    OperationLoggerEmbedded() = default;
+    virtual ~OperationLoggerEmbedded() = default;
 
     void appendOplogEntryChainInfo(OperationContext* opCtx,
                                    repl::MutableOplogEntry* oplogEntry,
                                    repl::OplogLink* oplogLink,
                                    const std::vector<StmtId>& stmtIds) override {}
-
-    repl::OpTime logOp(OperationContext* opCtx, repl::MutableOplogEntry* oplogEntry) override {
-        return {};
-    }
 
     void logOplogRecords(OperationContext* opCtx,
                          const NamespaceString& nss,
@@ -59,15 +55,12 @@ public:
                          Date_t wallTime,
                          bool isAbortIndexBuild) override {}
 
-    /**
-     * Returns a vector of 'count' non-null OpTimes.
-     * Some tests have to populate test collections, which may require OpObserverImpl::onInserts()
-     * to be able to acquire non-null optimes for insert operations even though no oplog entries
-     * are appended to the oplog.
-     * If the test requires actual OpTimes to work, use OplogWriterImpl instead.
-     */
+    repl::OpTime logOp(OperationContext* opCtx, repl::MutableOplogEntry* oplogEntry) override {
+        return {};
+    }
+
     std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override {
-        return std::vector<OplogSlot>{count, OplogSlot(Timestamp(1, 1), /*term=*/1LL)};
+        return {};
     }
 };
 

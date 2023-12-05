@@ -38,7 +38,7 @@ namespace mongo {
 template <typename Base, typename... StateEnums>
 class WithStateManagementForCumulativeMetrics : public Base {
 public:
-    using AnyState = stdx::variant<StateEnums...>;
+    using AnyState = std::variant<StateEnums...>;
     using StateFieldNameMap = stdx::unordered_map<AnyState, StringData>;
 
     using Base::Base;
@@ -73,12 +73,12 @@ private:
 
     template <typename StateEnum>
     auto& getHolderFor() const {
-        return std::get<HolderType<StateEnum>>(_holders);
+        return get<HolderType<StateEnum>>(_holders);
     }
 
     template <typename StateEnum>
     auto& getHolderFor() {
-        return std::get<HolderType<StateEnum>>(_holders);
+        return get<HolderType<StateEnum>>(_holders);
     }
 
     template <typename StateEnum>

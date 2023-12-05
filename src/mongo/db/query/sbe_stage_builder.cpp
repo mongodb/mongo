@@ -232,12 +232,13 @@ sbe::value::SlotVector getSlotsOrderedByName(const PlanStageReqs& reqs,
     return outputSlots;
 }
 
-sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
+sbe::value::SlotVector getSlotsToForward(PlanStageStaticData* data,
+                                         const PlanStageReqs& reqs,
                                          const PlanStageSlots& outputs,
                                          const sbe::value::SlotVector& exclude) {
     auto requiredNamedSlots = outputs.getRequiredSlotsUnique(reqs);
 
-    auto slots = sbe::makeSV();
+    auto slots = data->metadataSlots.getSlotVector();
 
     if (exclude.empty()) {
         for (const TypedSlot& slot : requiredNamedSlots) {
@@ -1549,7 +1550,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto ridSlot = _slotIdGenerator.generate();
     auto fieldSlots = _slotIdGenerator.generateMultiple(fields.size());
 
-    auto relevantSlots = getSlotsToForward(forwardingReqs, outputs);
+    auto relevantSlots = getSlotsToForward(_data.get(), forwardingReqs, outputs);
 
     stage = makeLoopJoinForFetch(std::move(stage),
                                  resultSlot,
@@ -2032,7 +2033,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Slots for sort stage to forward to parent stage. Values in these slots are not used during
     // sorting.
-    auto forwardedSlots = getSlotsToForward(forwardingReqs, outputs);
+    auto forwardedSlots = getSlotsToForward(_data.get(), forwardingReqs, outputs);
 
     stage =
         sbe::makeS<sbe::SortStage>(std::move(stage),
@@ -2118,7 +2119,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Slots for sort stage to forward to parent stage. Values in these slots are not used during
     // sorting.
-    auto forwardedSlots = getSlotsToForward(childReqs, outputs, orderBy);
+    auto forwardedSlots = getSlotsToForward(_data.get(), childReqs, outputs, orderBy);
 
     stage =
         sbe::makeS<sbe::SortStage>(std::move(stage),
@@ -4450,8 +4451,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto rootSlotOpt = outputs.getIfExists(kResult);
 
     // Create a tuple of slots for each new slot added.
-    sbe::value::SlotVector currSlots;
-    sbe::value::SlotVector boundTestingSlots;
+    sbe::value::SlotVector currSlots = _data->metadataSlots.getSlotVector();
+    sbe::value::SlotVector boundTestingSlots = _slotIdGenerator.generateMultiple(currSlots.size());
     std::vector<sbe::value::SlotVector> windowFrameFirstSlots;
     std::vector<sbe::value::SlotVector> windowFrameLastSlots;
     auto ensureSlotInBuffer = [&](sbe::value::SlotId slot) {
@@ -4635,24 +4636,23 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             auto isValueBoundRemovable = [](const int&) {
                 return true;
             };
-            return stdx::visit(OverloadedVisitor{isUnboundedBoundRemovable,
-                                                 isCurrentBoundRemovable,
-                                                 isValueBoundRemovable},
-                               document.lower);
+            return visit(OverloadedVisitor{isUnboundedBoundRemovable,
+                                           isCurrentBoundRemovable,
+                                           isValueBoundRemovable},
+                         document.lower);
         };
         auto isRangeWindowRemovable = [&](const WindowBounds::RangeBased& range) {
             auto isValueBoundRemovable = [](const Value&) {
                 return true;
             };
-            return stdx::visit(OverloadedVisitor{isUnboundedBoundRemovable,
-                                                 isCurrentBoundRemovable,
-                                                 isValueBoundRemovable},
-                               range.lower);
+            return visit(OverloadedVisitor{isUnboundedBoundRemovable,
+                                           isCurrentBoundRemovable,
+                                           isValueBoundRemovable},
+                         range.lower);
         };
         const auto& windowBounds = outputField.expr->bounds();
-        auto removable =
-            stdx::visit(OverloadedVisitor{isDocumentWindowRemovable, isRangeWindowRemovable},
-                        windowBounds.bounds);
+        auto removable = visit(OverloadedVisitor{isDocumentWindowRemovable, isRangeWindowRemovable},
+                               windowBounds.bounds);
 
         // Create a fake accumulation statement for non-removable window bounds.
         auto accStmt = createFakeAccumulationStatement(_state, outputField);
@@ -4968,12 +4968,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     highBoundTestingSlot,
                     {sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int>(v)});
             };
-            stdx::visit(
-                OverloadedVisitor{makeLowUnboundedExpr, makeLowCurrentExpr, makeLowValueExpr},
-                document.lower);
-            stdx::visit(
-                OverloadedVisitor{makeHighUnboundedExpr, makeHighCurrentExpr, makeHighValueExpr},
-                document.upper);
+            visit(OverloadedVisitor{makeLowUnboundedExpr, makeLowCurrentExpr, makeLowValueExpr},
+                  document.lower);
+            visit(OverloadedVisitor{makeHighUnboundedExpr, makeHighCurrentExpr, makeHighValueExpr},
+                  document.upper);
         };
         auto rangeCase = [&](const WindowBounds::RangeBased& range) {
             auto rangeBoundSlot = getRangeBoundSlot(range.unit).first;
@@ -4986,15 +4984,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 window.highBoundExpr = makeHighBoundExpr(
                     rangeBoundSlot, rangeBoundTestingSlot, sbe::value::makeValue(v), range.unit);
             };
-            stdx::visit(
-                OverloadedVisitor{makeLowUnboundedExpr, makeLowCurrentExpr, makeLowValueExpr},
-                range.lower);
-            stdx::visit(
-                OverloadedVisitor{makeHighUnboundedExpr, makeHighCurrentExpr, makeHighValueExpr},
-                range.upper);
+            visit(OverloadedVisitor{makeLowUnboundedExpr, makeLowCurrentExpr, makeLowValueExpr},
+                  range.lower);
+            visit(OverloadedVisitor{makeHighUnboundedExpr, makeHighCurrentExpr, makeHighValueExpr},
+                  range.upper);
         };
 
-        stdx::visit(OverloadedVisitor{documentCase, rangeCase}, windowBounds.bounds);
+        visit(OverloadedVisitor{documentCase, rangeCase}, windowBounds.bounds);
 
         if (outputField.expr->getOpName() == "$linearFill") {
             tassert(7971215, "expected a single initExpr", window.initExprs.size() == 1);

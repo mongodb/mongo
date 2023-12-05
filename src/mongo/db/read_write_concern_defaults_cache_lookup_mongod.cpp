@@ -109,8 +109,8 @@ void readWriteConcernDefaultsMongodStartupChecks(OperationContext* opCtx, bool i
         isReplicaSet && ReadWriteConcernDefaults::get(opCtx).isCWWCSet(opCtx)) {
         auto wcDefault =
             ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx).getDefaultWriteConcern();
-        if (wcDefault && stdx::holds_alternative<int64_t>(wcDefault->w) &&
-            stdx::get<int64_t>(wcDefault->w) == 1 &&
+        if (wcDefault && holds_alternative<int64_t>(wcDefault->w) &&
+            get<int64_t>(wcDefault->w) == 1 &&
             wcDefault->wTimeout != WriteConcernOptions::kNoTimeout) {
             LOGV2_WARNING_OPTIONS(
                 8036300,

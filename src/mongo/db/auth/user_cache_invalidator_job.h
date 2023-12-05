@@ -51,7 +51,7 @@ class OperationContext;
  */
 class UserCacheInvalidator {
 public:
-    using OIDorTimestamp = stdx::variant<OID, Timestamp>;
+    using OIDorTimestamp = std::variant<OID, Timestamp>;
 
     UserCacheInvalidator(AuthorizationManager* authzManager);
 

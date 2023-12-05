@@ -53,6 +53,15 @@ public:
     };
 
     /*
+     * debug_log_parser::prev_lsn --
+     *     The prev_lsn log entry.
+     */
+    struct prev_lsn {
+        uint64_t fileid;
+        uint64_t offset;
+    };
+
+    /*
      * debug_log_parser::row_put --
      *     The row_put log entry.
      */
@@ -94,13 +103,17 @@ public:
 
     /*
      * debug_log_parser::from_debug_log --
-     *     Parse the debug log into the model.
+     *     Parse the debug log into the model. This function must be called after opening the
+     *     database but before performing any writes, because otherwise the debug log may not
+     *     contain records of the most recent operations.
      */
     static void from_debug_log(kv_database &database, WT_CONNECTION *conn);
 
     /*
      * debug_log_parser::from_json --
-     *     Parse the debug log JSON file into the model.
+     *     Parse the debug log JSON file into the model. The input debug log must be printed to JSON
+     *     after opening the database but before performing any writes, because it may otherwise
+     *     miss most recent operations.
      */
     static void from_json(kv_database &database, const char *path);
 
@@ -121,6 +134,12 @@ public:
      *     Apply the given operation to the model.
      */
     void apply(kv_transaction_ptr txn, const txn_timestamp &op);
+
+    /*
+     * debug_log_parser::apply --
+     *     Apply the given operation to the model.
+     */
+    void apply(const prev_lsn &op);
 
     /*
      * debug_log_parser::begin_transaction --

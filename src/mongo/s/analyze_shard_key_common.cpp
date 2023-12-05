@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,29 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/s/analyze_shard_key_common.h"
 
-#include <cmath>
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/transport/session.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -73,53 +54,6 @@ Status validateNamespace(const NamespaceString& nss) {
     return Status::OK();
 }
 
-StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForReadCommandMaybeLockFree collection(
-        opCtx,
-        nss,
-        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-
-    if (auto view = collection.getView()) {
-        if (view->timeseries()) {
-            return Status{ErrorCodes::IllegalOperation,
-                          "Operation not supported for a timeseries collection"};
-        }
-        return Status{ErrorCodes::CommandNotSupportedOnView, "Operation not supported for a view"};
-    }
-    if (!collection) {
-        return Status{ErrorCodes::NamespaceNotFound,
-                      str::stream() << "The namespace does not exist"};
-    }
-    if (collection->getCollectionOptions().encryptedFieldConfig.has_value()) {
-        return Status{
-            ErrorCodes::IllegalOperation,
-            str::stream()
-                << "Operation not supported for a collection with queryable encryption enabled"};
-    }
-
-    return collection->uuid();
-}
-
-Status validateIndexKey(const BSONObj& indexKey) {
-    return validateShardKeyPattern(indexKey);
-}
-
-void uassertShardKeyValueNotContainArrays(const BSONObj& value) {
-    for (const auto& element : value) {
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "The shard key contains an array field '" << element.fieldName()
-                              << "'",
-                element.type() != BSONType::Array);
-    }
-}
-
-boost::optional<UUID> getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss) {
-    auto collection = acquireCollectionMaybeLockFree(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
-    return collection.exists() ? boost::make_optional(collection.uuid()) : boost::none;
-}
-
 BSONObj extractReadConcern(OperationContext* opCtx) {
     return repl::ReadConcernArgs::get(opCtx).toBSONInner().removeField(
         ReadWriteConcernProvenanceBase::kSourceFieldName);
@@ -135,10 +69,6 @@ double calculatePercentage(double part, double whole) {
     invariant(whole > 0);
     invariant(part <= whole);
     return round(part / whole * 100, kMaxNumDecimalPlaces);
-}
-
-bool isInternalClient(OperationContext* opCtx) {
-    return (!opCtx->getClient()->session() || opCtx->getClient()->isInternalClient());
 }
 
 }  // namespace analyze_shard_key

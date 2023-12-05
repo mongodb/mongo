@@ -2,18 +2,12 @@
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
 //   featureFlagQuerySettings,
-//   does_not_support_stepdowns,
 //   simulate_atlas_proxy_incompatible,
 //   cqf_incompatible,
 // ]
 //
 
-import {
-    getEngine,
-    getPlanCacheKeyFromExplain,
-    getPlanStages,
-    getWinningPlanFromExplain
-} from "jstests/libs/analyze_plan.js";
+import {getEngine, getPlanStages, getWinningPlanFromExplain} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 

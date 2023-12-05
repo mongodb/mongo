@@ -505,7 +505,7 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
     const bool simpleIdLookup = isSimpleIdLookup(nodeRef);
     const CEType estimate = simpleIdLookup
         ? CEType{1.0}
-        : ctx._cardinalityEstimator->deriveCE(*ctx._metadata, *this, props, nodeRef);
+        : ctx._cardinalityEstimator->deriveCE(*ctx._metadata, *this, props, nodeRef)._ce;
 
     auto ceProp = properties::CardinalityEstimate(estimate);
 
@@ -531,8 +531,8 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
                                                      ScanParams{},
                                                      sargablePtr->getTarget(),
                                                      sargablePtr->getChild());
-                const CEType singularEst = simpleIdLookup
-                    ? CEType{1.0}
+                const CERecord singularEst = simpleIdLookup
+                    ? CERecord{1.0, "simpleIdLookup"}
                     : ctx._cardinalityEstimator->deriveCE(
                           *ctx._metadata, *this, props, singularReq.ref());
                 partialSchemaKeyCE.emplace_back(e.first, singularEst);

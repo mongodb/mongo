@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/time_support.h"
 
@@ -82,16 +81,16 @@ public:
     const UserName& authenticatedUser() const;
 
     bool hasTenantId() const {
-        return stdx::visit(OverloadedVisitor{
-                               [](const std::monostate&) { return false; },
-                               [](const UserName& userName) { return !!userName.getTenant(); },
-                               [](const TenantId& tenant) { return true; },
-                           },
-                           _tenantOrUser);
+        return visit(OverloadedVisitor{
+                         [](const std::monostate&) { return false; },
+                         [](const UserName& userName) { return !!userName.getTenant(); },
+                         [](const TenantId& tenant) { return true; },
+                     },
+                     _tenantOrUser);
     }
 
     const TenantId& tenantId() const {
-        return stdx::visit(
+        return visit(
             OverloadedVisitor{
                 [](const std::monostate&) -> const TenantId& { MONGO_UNREACHABLE; },
                 [](const UserName& userName) -> decltype(auto) { return *userName.getTenant(); },
@@ -169,7 +168,7 @@ private:
     // monostate represents a VTS which has not actually been validated.
     // It should only persist into construction within the shell,
     // where VTS is used for sending token data to a server via _originalBSON.
-    stdx::variant<std::monostate, UserName, TenantId> _tenantOrUser;
+    std::variant<std::monostate, UserName, TenantId> _tenantOrUser;
 
     // Define the protocol used by the connection to the server. It will only be set to AtlasProxy
     // if the token received contains `expectPrefix` to true and will be changed only once.

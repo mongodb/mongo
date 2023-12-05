@@ -275,16 +275,16 @@ public:
     }
 
     bool isCollection() const {
-        return std::holds_alternative<CollectionAcquisition>(_collectionOrViewAcquisition);
+        return holds_alternative<CollectionAcquisition>(_collectionOrViewAcquisition);
     }
 
     bool isView() const {
-        return std::holds_alternative<ViewAcquisition>(_collectionOrViewAcquisition);
+        return holds_alternative<ViewAcquisition>(_collectionOrViewAcquisition);
     }
 
     const CollectionAcquisition& getCollection() const {
         invariant(isCollection());
-        return std::get<CollectionAcquisition>(_collectionOrViewAcquisition);
+        return get<CollectionAcquisition>(_collectionOrViewAcquisition);
     }
 
     const CollectionPtr& getCollectionPtr() const {
@@ -297,7 +297,7 @@ public:
 
     const ViewAcquisition& getView() const {
         invariant(isView());
-        return std::get<ViewAcquisition>(_collectionOrViewAcquisition);
+        return get<ViewAcquisition>(_collectionOrViewAcquisition);
     }
 
     query_shape::CollectionType getCollectionType() const {

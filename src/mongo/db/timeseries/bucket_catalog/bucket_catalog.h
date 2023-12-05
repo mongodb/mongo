@@ -115,13 +115,13 @@ public:
  * outstanding 'ReopeningRequest' or a prepared 'WriteBatch' for a bucket in the series (same
  * metaField value), that represents a conflict.
  */
-using InsertWaiter = stdx::variant<std::shared_ptr<WriteBatch>, std::shared_ptr<ReopeningRequest>>;
+using InsertWaiter = std::variant<std::shared_ptr<WriteBatch>, std::shared_ptr<ReopeningRequest>>;
 
 /**
  * Variant representing the possible outcomes of 'tryInsert' or 'insert'. See 'tryInsert' and
  * 'insert' for more details.
  */
-using InsertResult = stdx::variant<SuccessfulInsertion, ReopeningContext, InsertWaiter>;
+using InsertResult = std::variant<SuccessfulInsertion, ReopeningContext, InsertWaiter>;
 
 /**
  * Struct to hold a portion of the buckets managed by the catalog.
@@ -236,9 +236,9 @@ BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& bucket);
  *
  * If a 'ReopeningContext' is returned, it contains either a bucket ID, corresponding to an archived
  * bucket which should be fetched, an aggregation pipeline that can be used to search for a
- * previously-closed bucket that can accommodate 'doc', or (in hopefully rare cases) a monostate
- * which requires no intermediate action, The caller should then proceed to call 'insert' to insert
- * 'doc', passing any fetched bucket back as a member of the 'ReopeningContext'.
+ * previously-closed bucket that can accommodate 'doc', or (in hopefully rare cases) a
+ * std::monostate which requires no intermediate action, The caller should then proceed to call
+ * 'insert' to insert 'doc', passing any fetched bucket back as a member of the 'ReopeningContext'.
  */
 StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                    BucketCatalog& catalog,

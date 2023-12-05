@@ -230,6 +230,18 @@ public:
       bool overwrite = true);
 
     /*
+     * kv_table::clear --
+     *     Clear the contents of the table.
+     */
+    void clear();
+
+    /*
+     * kv_table::rollback_to_stable --
+     *     Roll back the database table to the latest stable timestamp and transaction snapshot.
+     */
+    void rollback_to_stable(timestamp_t timestamp, kv_transaction_snapshot_ptr snapshot);
+
+    /*
      * kv_table::verify --
      *     Verify the table by comparing a WiredTiger table against the model. Throw an exception on
      *     verification error. If the checkpoint is specified, verify just that checkpoint.

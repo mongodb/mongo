@@ -33,6 +33,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <variant>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -41,7 +42,6 @@
 #include "mongo/db/baton.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/transport/session_id.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -174,7 +174,7 @@ public:
     }
 
     virtual bool shouldOverrideMaxConns(
-        const std::vector<stdx::variant<CIDR, std::string>>& exemptions) const = 0;
+        const std::vector<std::variant<CIDR, std::string>>& exemptions) const = 0;
 
 #ifdef MONGO_CONFIG_SSL
     /**

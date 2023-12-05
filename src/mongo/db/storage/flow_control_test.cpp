@@ -131,10 +131,10 @@ TEST_F(FlowControlTest, AddingSamples) {
     // becomes more sophisticated.
     const bool assertSampledTimestamps = true;
     if (assertSampledTimestamps) {
-        ASSERT_EQ(5u, std::get<0>(samples[0]));
-        ASSERT_EQ(6u, std::get<0>(samples[1]));
-        ASSERT_EQ(11u, std::get<0>(samples[2]));
-        ASSERT_EQ(21u, std::get<0>(samples[3]));
+        ASSERT_EQ(5u, get<0>(samples[0]));
+        ASSERT_EQ(6u, get<0>(samples[1]));
+        ASSERT_EQ(11u, get<0>(samples[2]));
+        ASSERT_EQ(21u, get<0>(samples[3]));
     }
 }
 
@@ -165,15 +165,15 @@ TEST_F(FlowControlTest, OutOfOrderSamplesDropped) {
     flowControl->sample(Timestamp(1), 1);
     const auto& samples = flowControl->_getSampledOpsApplied_forTest();
     ASSERT_EQ(1u, samples.size());
-    ASSERT_EQ(1u, std::get<0>(samples[0]));
+    ASSERT_EQ(1u, get<0>(samples[0]));
 
     flowControl->sample(Timestamp(3), 1);
     ASSERT_EQ(2u, samples.size());
-    ASSERT_EQ(3u, std::get<0>(samples[1]));
+    ASSERT_EQ(3u, get<0>(samples[1]));
 
     flowControl->sample(Timestamp(2), 1);
     ASSERT_EQ(2u, samples.size());
-    ASSERT_EQ(3u, std::get<0>(samples[1]));
+    ASSERT_EQ(3u, get<0>(samples[1]));
 }
 
 TEST_F(FlowControlTest, QueryingSamples) {

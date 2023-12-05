@@ -56,43 +56,42 @@ auto tabs(int num) {
 }
 
 auto printFieldname(const CNode::Fieldname& fieldname) {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{
             [](const KeyFieldname& key) { return "<KeyFieldname "s + toStringData(key) + ">"; },
             [](const UserFieldname& user) { return "<UserFieldname "s + user + ">"; },
             [](const FieldnamePath& path) {
-                return stdx::visit(
-                    OverloadedVisitor{
-                        [&](const ProjectionPath& projPath) {
-                            return "<ProjectionPath "s + path::vectorToString(projPath) + ">";
-                        },
-                        [&](const PositionalProjectionPath& posProjPath) {
-                            return "<PositionalProjectionPath "s +
-                                path::vectorToString(posProjPath) + ">";
-                        },
-                        [&](const SortPath& sortPath) {
-                            return "<SortPath "s + path::vectorToString(sortPath) + ">";
-                        }},
-                    path);
+                return visit(OverloadedVisitor{[&](const ProjectionPath& projPath) {
+                                                   return "<ProjectionPath "s +
+                                                       path::vectorToString(projPath) + ">";
+                                               },
+                                               [&](const PositionalProjectionPath& posProjPath) {
+                                                   return "<PositionalProjectionPath "s +
+                                                       path::vectorToString(posProjPath) + ">";
+                                               },
+                                               [&](const SortPath& sortPath) {
+                                                   return "<SortPath "s +
+                                                       path::vectorToString(sortPath) + ">";
+                                               }},
+                             path);
             }},
         fieldname);
 }
 
 auto printNonZeroKey(const NonZeroKey& nonZeroKey) {
-    return stdx::visit(
-        OverloadedVisitor{
-            [](const int& keyInt) { return "int "s + std::to_string(keyInt); },
-            [](const long long& keyLong) { return "long "s + std::to_string(keyLong); },
-            [](const double& keyDouble) { return "double "s + std::to_string(keyDouble); },
-            [](const Decimal128& keyDecimal) {
-                return "decimal "s + keyDecimal.toString();
-            }},
-        nonZeroKey);
+    return visit(OverloadedVisitor{
+                     [](const int& keyInt) { return "int "s + std::to_string(keyInt); },
+                     [](const long long& keyLong) { return "long "s + std::to_string(keyLong); },
+                     [](const double& keyDouble) { return "double "s + std::to_string(keyDouble); },
+                     [](const Decimal128& keyDecimal) {
+                         return "decimal "s + keyDecimal.toString();
+                     }},
+                 nonZeroKey);
 }
 
 template <typename T>
 auto printValue(const T& payload) {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{
             [](const CNode::ArrayChildren&) { return "<Array>"s; },
             [](const CNode::ObjectChildren&) { return "<Object>"s; },
@@ -104,16 +103,15 @@ auto printValue(const T& payload) {
                 return "<NonZeroKey of type "s + printNonZeroKey(nonZeroKey) + ">";
             },
             [](const ValuePath& valuePath) {
-                return stdx::visit(
-                    OverloadedVisitor{[&](const AggregationPath& aggPath) {
-                                          return "<AggregationPath "s +
-                                              path::vectorToString(aggPath) + ">";
-                                      },
-                                      [&](const AggregationVariablePath& aggVarPath) {
-                                          return "<AggregationVariablePath "s +
-                                              path::vectorToString(aggVarPath) + ">";
-                                      }},
-                    valuePath);
+                return visit(OverloadedVisitor{[&](const AggregationPath& aggPath) {
+                                                   return "<AggregationPath "s +
+                                                       path::vectorToString(aggPath) + ">";
+                                               },
+                                               [&](const AggregationVariablePath& aggVarPath) {
+                                                   return "<AggregationVariablePath "s +
+                                                       path::vectorToString(aggVarPath) + ">";
+                                               }},
+                             valuePath);
             },
             [](const UserDouble& userDouble) {
                 return "<UserDouble "s + std::to_string(userDouble) + ">";
@@ -176,7 +174,7 @@ auto printValue(const T& payload) {
 }  // namespace
 
 std::string CNode::toStringHelper(int numTabs) const {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{
             [numTabs](const ArrayChildren& children) {
                 return std::accumulate(children.cbegin(),
@@ -236,7 +234,7 @@ std::pair<BSONObj, bool> CNode::toBsonWithArrayIndicator() const {
                 BSON(std::forward<decltype(fieldname)>(fieldname) << childBson).firstElement());
     };
 
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{
             // Build an array which will lose its identity and appear as a BSONObj
             [&](const ArrayChildren& children) {
@@ -287,14 +285,14 @@ std::pair<BSONObj, bool> CNode::toBsonWithArrayIndicator() const {
 }
 
 bool CNode::isNumber() const {
-    return stdx::visit(OverloadedVisitor{
-                           [](const UserLong&) { return true; },
-                           [](const UserDouble&) { return true; },
-                           [](const UserDecimal&) { return true; },
-                           [](const UserInt&) { return true; },
-                           [](auto&&) { return false; },
-                       },
-                       payload);
+    return visit(OverloadedVisitor{
+                     [](const UserLong&) { return true; },
+                     [](const UserDouble&) { return true; },
+                     [](const UserDecimal&) { return true; },
+                     [](const UserInt&) { return true; },
+                     [](auto&&) { return false; },
+                 },
+                 payload);
 }
 
 int CNode::numberInt() const {
@@ -315,7 +313,7 @@ int CNode::numberInt() const {
 }
 
 long long CNode::numberLong() const {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{[](const UserDouble& userDouble) {
                               return (BSON("" << userDouble).firstElement()).safeNumberLong();
                           },

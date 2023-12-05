@@ -1219,7 +1219,7 @@ void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
 }
 
 void StorageEngineImpl::addDropPendingIdent(
-    const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
+    const std::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
     std::shared_ptr<Ident> ident,
     DropIdentCallback&& onDrop) {
     _dropPendingIdentReaper.addDropPendingIdent(dropTime, ident, std::move(onDrop));

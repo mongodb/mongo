@@ -47,7 +47,6 @@
 #include "mongo/logv2/log_format.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/version/releases.h"
@@ -115,7 +114,7 @@ struct ServerGlobalParams {
     std::string socket = "/tmp";  // UNIX domain socket directory
 
     size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
-    std::vector<stdx::variant<CIDR, std::string>> maxConnsOverride;
+    std::vector<std::variant<CIDR, std::string>> maxConnsOverride;
     int reservedAdminThreads = 0;
 
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket

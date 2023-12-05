@@ -92,11 +92,12 @@ sbe::value::SlotVector getSlotsOrderedByName(const PlanStageReqs& reqs,
                                              const PlanStageSlots& outputs);
 
 /**
- * Returns a vector of the unique slot IDs needed by 'reqs', ordered by slot ID. This function is
- * intended for use in situations where a join or sort or something else is being constructed and
- * a PlanStageSlot's contents need to be "forwarded" through a PlanStage.
+ * Returns a vector of the unique slot IDs needed by 'reqs', ordered by slot ID, and metadata slots.
+ * This function is intended for use in situations where a join or sort or something else is being
+ * constructed and a PlanStageSlot's contents need to be "forwarded" through a PlanStage.
  */
-sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
+sbe::value::SlotVector getSlotsToForward(PlanStageStaticData* data,
+                                         const PlanStageReqs& reqs,
                                          const PlanStageSlots& outputs,
                                          const sbe::value::SlotVector& exclude = sbe::makeSV());
 
@@ -1020,6 +1021,12 @@ private:
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildGroup(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildGroupImpl(
+        const GroupNode* groupNode,
+        const PlanStageReqs& reqs,
+        std::unique_ptr<sbe::PlanStage> childStage,
+        PlanStageSlots childOutputs);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildLookup(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);

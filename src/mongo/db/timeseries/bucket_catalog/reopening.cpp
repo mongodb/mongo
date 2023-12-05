@@ -29,7 +29,6 @@
 
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 
-#include "mongo/stdx/variant.h"
 #include <cstddef>
 
 #include <absl/container/node_hash_map.h>
@@ -47,10 +46,10 @@ boost::optional<OID> initializeRequest(BucketCatalog& catalog,
                                        const BucketKey& key,
                                        const ReopeningContext::CandidateType& candidate) {
     boost::optional<OID> oid;
-    if (stdx::holds_alternative<std::monostate>(candidate)) {
+    if (holds_alternative<std::monostate>(candidate)) {
         // No need to initialize a request.
         return oid;
-    } else if (auto* c = stdx::get_if<OID>(&candidate)) {
+    } else if (auto* c = get_if<OID>(&candidate)) {
         oid = *c;
     }
     invariant(oid.has_value() || !stripe.outstandingReopeningRequests.contains(key));
@@ -88,7 +87,7 @@ ReopeningContext::ReopeningContext(BucketCatalog& catalog,
       _stripe(&s),
       _key(k),
       _oid{initializeRequest(catalog, s, k, candidate)},
-      _cleared(stdx::holds_alternative<std::monostate>(candidate)) {}
+      _cleared(holds_alternative<std::monostate>(candidate)) {}
 
 ReopeningContext::ReopeningContext(ReopeningContext&& other)
     : catalogEra{other.catalogEra},

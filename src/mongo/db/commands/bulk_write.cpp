@@ -116,6 +116,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/analyze_shard_key_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -141,7 +142,6 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
-#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/util/assert_util.h"
@@ -996,24 +996,24 @@ BSONObj makeSingleOpSampledBulkWriteCommandRequest(OperationContext* opCtx,
 
     // Make a copy of the operation and adjust its namespace index to 0.
     auto newOp = req.getOps()[opIdx];
-    stdx::visit(OverloadedVisitor{
-                    [&](mongo::BulkWriteInsertOp& op) { MONGO_UNREACHABLE },
-                    [&](mongo::BulkWriteUpdateOp& op) {
-                        op.setUpdate(0);
-                        if (req.getOriginalQuery() || req.getOriginalCollation()) {
-                            op.setFilter(req.getOriginalQuery().get_value_or({}));
-                            op.setCollation(req.getOriginalCollation());
-                        }
-                    },
-                    [&](mongo::BulkWriteDeleteOp& op) {
-                        op.setDeleteCommand(0);
-                        if (req.getOriginalQuery() || req.getOriginalCollation()) {
-                            op.setFilter(req.getOriginalQuery().get_value_or({}));
-                            op.setCollation(req.getOriginalCollation());
-                        }
-                    },
-                },
-                newOp);
+    visit(OverloadedVisitor{
+              [&](mongo::BulkWriteInsertOp& op) { MONGO_UNREACHABLE },
+              [&](mongo::BulkWriteUpdateOp& op) {
+                  op.setUpdate(0);
+                  if (req.getOriginalQuery() || req.getOriginalCollation()) {
+                      op.setFilter(req.getOriginalQuery().get_value_or({}));
+                      op.setCollation(req.getOriginalCollation());
+                  }
+              },
+              [&](mongo::BulkWriteDeleteOp& op) {
+                  op.setDeleteCommand(0);
+                  if (req.getOriginalQuery() || req.getOriginalCollation()) {
+                      op.setFilter(req.getOriginalQuery().get_value_or({}));
+                      op.setCollation(req.getOriginalCollation());
+                  }
+              },
+          },
+          newOp);
 
     BulkWriteCommandRequest singleOpRequest;
     singleOpRequest.setOps({newOp});

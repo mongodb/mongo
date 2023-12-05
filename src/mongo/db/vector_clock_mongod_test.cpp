@@ -48,7 +48,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
-#include "mongo/db/op_observer/oplog_writer_mock.h"
+#include "mongo/db/op_observer/operation_logger_mock.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -111,7 +111,7 @@ protected:
         auto opObserverRegistry =
             checked_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
         opObserverRegistry->addObserver(
-            std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterMock>()));
+            std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerMock>()));
     }
 
 private:

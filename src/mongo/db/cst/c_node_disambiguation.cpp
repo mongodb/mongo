@@ -36,7 +36,6 @@
 
 #include "mongo/db/cst/c_node_disambiguation.h"
 #include "mongo/db/cst/compound_key.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
@@ -44,37 +43,36 @@ namespace mongo::c_node_disambiguation {
 namespace {
 
 ProjectionType disambiguateCNode(const CNode& cst) {
-    return stdx::visit(
-        OverloadedVisitor{
-            [](const CNode::ObjectChildren& children) {
-                return *std::accumulate(
-                    children.begin(),
-                    children.end(),
-                    boost::optional<ProjectionType>{},
-                    [](auto&& currentProjType, auto&& child) {
-                        const auto seenProjType =
-                            stdx::holds_alternative<FieldnamePath>(child.first)
-                            // This is part of the compound key and must be explored.
-                            ? disambiguateCNode(child.second)
-                            // This is an arbitrary expression to produce a computed field.
-                            : ProjectionType::inclusion;
-                        if (!currentProjType)
-                            return seenProjType;
-                        else if (*currentProjType != seenProjType)
-                            return ProjectionType::inconsistent;
-                        else
-                            return *currentProjType;
-                    });
-            },
-            [&](auto&&) {
-                if (auto type = cst.projectionType())
-                    // This is a key which indicates the projection type.
-                    return *type;
-                else
-                    // This is a value which will produce a computed field.
-                    return ProjectionType::inclusion;
-            }},
-        cst.payload);
+    return visit(OverloadedVisitor{
+                     [](const CNode::ObjectChildren& children) {
+                         return *std::accumulate(
+                             children.begin(),
+                             children.end(),
+                             boost::optional<ProjectionType>{},
+                             [](auto&& currentProjType, auto&& child) {
+                                 const auto seenProjType =
+                                     holds_alternative<FieldnamePath>(child.first)
+                                     // This is part of the compound key and must be explored.
+                                     ? disambiguateCNode(child.second)
+                                     // This is an arbitrary expression to produce a computed field.
+                                     : ProjectionType::inclusion;
+                                 if (!currentProjType)
+                                     return seenProjType;
+                                 else if (*currentProjType != seenProjType)
+                                     return ProjectionType::inconsistent;
+                                 else
+                                     return *currentProjType;
+                             });
+                     },
+                     [&](auto&&) {
+                         if (auto type = cst.projectionType())
+                             // This is a key which indicates the projection type.
+                             return *type;
+                         else
+                             // This is a value which will produce a computed field.
+                             return ProjectionType::inclusion;
+                     }},
+                 cst.payload);
 }
 
 }  // namespace

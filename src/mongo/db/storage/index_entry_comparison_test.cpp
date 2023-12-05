@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -54,13 +53,12 @@ void buildDupKeyErrorStatusProducesExpectedErrorObject(
     BSONObjBuilder expectedObjBuilder;
     expectedObjBuilder.append("keyPattern", keyPattern);
     expectedObjBuilder.append("keyValue", keyValueWithFieldName);
-    stdx::visit(
-        OverloadedVisitor{
-            [](stdx::monostate) {},
-            [&](const RecordId& rid) { rid.serializeToken("foundValue", &expectedObjBuilder); },
-            [&](const BSONObj& obj) { expectedObjBuilder.append("foundValue", obj); },
-        },
-        foundValue);
+    visit(OverloadedVisitor{
+              [](std::monostate) {},
+              [&](const RecordId& rid) { rid.serializeToken("foundValue", &expectedObjBuilder); },
+              [&](const BSONObj& obj) { expectedObjBuilder.append("foundValue", obj); },
+          },
+          foundValue);
     auto expectedObj = expectedObjBuilder.obj();
 
     auto dupKeyStatus = buildDupKeyErrorStatus(
@@ -88,7 +86,7 @@ void buildDupKeyErrorStatusProducesExpectedErrorObject(
 }
 
 TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
-    buildDupKeyErrorStatusProducesExpectedErrorObject(stdx::monostate{});
+    buildDupKeyErrorStatusProducesExpectedErrorObject(std::monostate{});
     buildDupKeyErrorStatusProducesExpectedErrorObject(RecordId{1});
     buildDupKeyErrorStatusProducesExpectedErrorObject(BSON("c" << 1));
 }

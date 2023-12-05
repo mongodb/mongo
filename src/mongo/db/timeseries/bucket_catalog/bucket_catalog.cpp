@@ -53,7 +53,6 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/decorable.h"
@@ -187,9 +186,9 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
 }
 
 void waitToInsert(InsertWaiter* waiter) {
-    if (auto* batch = stdx::get_if<std::shared_ptr<WriteBatch>>(waiter)) {
+    if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(waiter)) {
         getWriteBatchResult(**batch).getStatus().ignore();
-    } else if (auto* request = stdx::get_if<std::shared_ptr<ReopeningRequest>>(waiter)) {
+    } else if (auto* request = get_if<std::shared_ptr<ReopeningRequest>>(waiter)) {
         waitForReopeningRequest(**request);
     }
 }
@@ -370,7 +369,7 @@ void directWriteStart(BucketStateRegistry& registry, const NamespaceString& ns, 
     auto state = addDirectWrite(registry, BucketId{ns, oid});
     hangTimeseriesDirectModificationAfterStart.pauseWhileSet();
 
-    if (stdx::holds_alternative<DirectWriteCounter>(state)) {
+    if (holds_alternative<DirectWriteCounter>(state)) {
         // The direct write count was successfully incremented.
         return;
     }

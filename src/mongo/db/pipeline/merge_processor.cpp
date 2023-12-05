@@ -158,7 +158,7 @@ MergeStrategy makeInsertStrategy() {
         // The batch stores replacement style updates, but for this "insert" style of $merge we'd
         // like to just insert the new document without attempting any sort of replacement.
         std::transform(batch.begin(), batch.end(), objectsToInsert.begin(), [](const auto& obj) {
-            return std::get<UpdateModification>(obj).getUpdateReplacement();
+            return get<UpdateModification>(obj).getUpdateReplacement();
         });
         auto insertCommand = bcr.extractInsertRequest();
         insertCommand->setDocuments(std::move(objectsToInsert));
@@ -173,8 +173,8 @@ MergeStrategy makeInsertStrategy() {
  */
 BatchTransform makeUpdateTransform(const std::string& updateOp) {
     return [updateOp](auto& obj) {
-        std::get<UpdateModification>(obj) = UpdateModification::parseFromClassicUpdate(
-            BSON(updateOp << std::get<UpdateModification>(obj).getUpdateReplacement()));
+        get<UpdateModification>(obj) = UpdateModification::parseFromClassicUpdate(
+            BSON(updateOp << get<UpdateModification>(obj).getUpdateReplacement()));
     };
 }
 

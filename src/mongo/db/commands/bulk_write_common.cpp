@@ -306,12 +306,12 @@ BulkWriteCommandRequest makeSingleOpBulkWriteCommandRequest(
 
     // Make a copy of the operation and adjust its namespace index to 0.
     auto newOp = bulkWriteReq.getOps()[opIdx];
-    stdx::visit(OverloadedVisitor{
-                    [](mongo::BulkWriteInsertOp& op) { op.setInsert(0); },
-                    [](mongo::BulkWriteUpdateOp& op) { op.setUpdate(0); },
-                    [](mongo::BulkWriteDeleteOp& op) { op.setDeleteCommand(0); },
-                },
-                newOp);
+    visit(OverloadedVisitor{
+              [](mongo::BulkWriteInsertOp& op) { op.setInsert(0); },
+              [](mongo::BulkWriteUpdateOp& op) { op.setUpdate(0); },
+              [](mongo::BulkWriteDeleteOp& op) { op.setDeleteCommand(0); },
+          },
+          newOp);
 
     BulkWriteCommandRequest singleOpRequest;
     singleOpRequest.setOps({newOp});

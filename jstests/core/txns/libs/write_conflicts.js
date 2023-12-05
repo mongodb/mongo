@@ -1,6 +1,7 @@
 /**
  * Helper functions for testing write conflicts between concurrent, multi-document transactions.
  */
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export var WriteConflictHelpers = (function() {
     /**
@@ -21,6 +22,52 @@ export var WriteConflictHelpers = (function() {
      * w - conflicting write operation
      *
      */
+
+    function getWriteConflictsFromAllShards(coll) {
+        // Skip running commands not allowed with security token.
+        if (TestData.useSignedSecurityToken) {
+            return null;
+        }
+
+        if (typeof getWriteConflictsFromAllShards.incompatible === "undefined") {
+            const version = assert
+                                .commandWorked(coll.getDB().adminCommand(
+                                    {getParameter: 1, featureCompatibilityVersion: 1}))
+                                .featureCompatibilityVersion.version;
+            getWriteConflictsFromAllShards.incompatible =
+                MongoRunner.compareBinVersions(version, "7.3") < 0;
+            if (getWriteConflictsFromAllShards.incompatible) {
+                print(`getWriteConflictsFromAllShards skipped for mongod ${version}`);
+            }
+        }
+        // mongod older than 7.3 would not increment WCE metric in transactions.
+        if (getWriteConflictsFromAllShards.incompatible) {
+            return null;
+        }
+
+        try {
+            const results = FixtureHelpers.runCommandOnEachPrimary(
+                {db: coll.getDB(), cmdObj: {serverStatus: 1}});
+            return results.reduce((sum, res) => sum + res.metrics.operation.writeConflicts, 0);
+        } catch (e) {
+            // Errors such as "operation was interrupted" have been seen.
+            print('getWriteConflictsFromAllShards failed:', e);
+            return null;
+        }
+    }
+
+    function validateWriteConflictsBeforeAndAfter(coll, before, after) {
+        if (before != null && after != null) {
+            // Transactions on sharded collections can land on multiple shards and increment the
+            // total WCE metric by the number of shards involved. Similarly, BulkWriteOverride turns
+            // a single op into multiple writes and causes multiple WCEs.
+            if (FixtureHelpers.isSharded(coll) || TestData.runningWithBulkWriteOverride) {
+                assert.gte(after, before + 1);
+            } else {
+                assert.eq(after, before + 1);
+            }
+        }
+    }
 
     /**
      * Write conflict test case, ordering 1.
@@ -45,6 +92,7 @@ export var WriteConflictHelpers = (function() {
         session2.startTransaction();
 
         assert.commandWorked(session1Coll.runCommand(txn1Op));
+        const writeConflictsBefore = getWriteConflictsFromAllShards(coll);
         const res = session2Coll.runCommand(txn2Op);
         // Not a writeError but a total command failure
         assert.eq(res.ok, 0);
@@ -54,6 +102,9 @@ export var WriteConflictHelpers = (function() {
         assert.commandWorked(session1.commitTransaction_forTesting());
         assert.commandFailedWithCode(session2.commitTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);
+
+        const writeConflictsAfter = getWriteConflictsFromAllShards(coll);
+        validateWriteConflictsBeforeAndAfter(coll, writeConflictsBefore, writeConflictsAfter);
 
         session2.startTransaction();
         assert.commandWorked(session2Coll.runCommand(
@@ -87,6 +138,7 @@ export var WriteConflictHelpers = (function() {
         assert.commandWorked(session2Coll.runCommand(txn2Op));
         assert.commandWorked(session2.commitTransaction_forTesting());
 
+        const writeConflictsBefore = getWriteConflictsFromAllShards(coll, 0);
         const res = session1Coll.runCommand(txn1Op);
         // Not a writeError but a total command failure
         assert.eq(res.ok, 0);
@@ -94,6 +146,9 @@ export var WriteConflictHelpers = (function() {
         assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
         assert.commandFailedWithCode(session1.commitTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);
+
+        const writeConflictsAfter = getWriteConflictsFromAllShards(coll, 1);
+        validateWriteConflictsBeforeAndAfter(coll, writeConflictsBefore, writeConflictsAfter);
 
         session1.startTransaction();
         assert.commandWorked(session1Coll.runCommand(

@@ -1,4 +1,37 @@
-/*! @page chunkcache Chunkcache
+/*! @page chunkcache Chunk cache
+
+The chunk cache is a feature designed to work in conjunction with @ref
+arch-cloud-storage-extension. These extensions would typically need to do IO
+over the network, which comes with performance and API usage costs. To
+ameliorate these, WiredTiger can be configured to cache in-use content from
+these storage sources on a disk.
+
+Architecturally, the chunk cache sits between the block cache and the
+filesystem layer, caching data as it would appear "at rest". This implies
+the chunk cache stores data in its encrypted and compressed form, making it
+potentially more efficient. However, that also means it has no knowledge of
+the tree or page structure of the table, much like a file system wouldn't.
+
+The chunk cache is read-only, and will only cache read-only content. In
+practice, this means any tiered objects that have been "flushed" during a
+checkpoint and can no longer be altered. Any data that could still be
+modified will reside in any of the block cache, the in-memory page cache, or
+a regular WiredTiger data file.
+
+The cached "chunks" of files are a configurable size, but in general they
+should be large enough to mask the latency of fetching data over a network
+connection. These connections typically have a lot of bandwidth but high
+latency (when compared to a physically attached disk), so larger chunks will
+result in more efficient use of bandwidth. However, larger chunks can also
+result in less efficient utilization of cache space, as each chunk can only
+contain content from a single file (so the chunk containing the end of the
+file is still an entire chunk, even if only a single byte is needed for the
+file content).
+
+The chunk cache resides on-disk and can generate a lot of IO, so should be
+kept on a different disk to WiredTiger's home directory. The cache can reuse
+content between WiredTiger restarts, but the content can be invalidated by
+upgrading WiredTiger or salvaging the database.
 
 @section pinned Pinned Content
 
@@ -46,5 +79,14 @@ some data being re-fetched from block storage.
 The persisted chunk cache content is invalidated when a salvage operation is
 run, a WiredTiger upgrade changes the metadata format, or when any of the
 chunk cache capacity, chunk size, or number of buckets is changed.
+
+@section troubleshooting Troubleshooting
+
+It is possible for content in the chunk cache to become outdated.
+WiredTiger's in-built data validation can detect this, and retry a read
+for incorrect data when it came from the chunk cache, but only once. There
+are statistics and verbose messaging around this, and it is not a concern to
+see this happen occasionally, particularly on startup and during crash
+recovery.
 
 */

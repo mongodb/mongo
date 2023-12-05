@@ -36,6 +36,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <variant>
 
 #include "mongo/base/counter.h"
 #include "mongo/base/string_data.h"
@@ -43,7 +44,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/synchronized_value.h"
 
@@ -126,15 +126,15 @@ public:
         }
 
         const std::unique_ptr<MetricTree>& getSubtree() const {
-            return std::get<0>(_v);
+            return get<0>(_v);
         }
 
         const std::unique_ptr<ServerStatusMetric>& getMetric() const {
-            return std::get<1>(_v);
+            return get<1>(_v);
         }
 
     private:
-        stdx::variant<std::unique_ptr<MetricTree>, std::unique_ptr<ServerStatusMetric>> _v;
+        std::variant<std::unique_ptr<MetricTree>, std::unique_ptr<ServerStatusMetric>> _v;
     };
 
     using ChildMap = std::map<std::string, TreeNode, std::less<>>;

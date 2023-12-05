@@ -429,19 +429,19 @@ protected:
                     {
                         WriteUnitOfWork wuow(opCtx);
                         const auto cursor = columnStore->newWriteCursor(opCtx);
-                        if (std::holds_alternative<ReplacementFault>(corruption.fault)) {
+                        if (holds_alternative<ReplacementFault>(corruption.fault)) {
                             const auto toVal =
-                                std::get<ReplacementFault>(corruption.fault).updatedIndexValue;
+                                get<ReplacementFault>(corruption.fault).updatedIndexValue;
                             columnStore->update(opCtx,
                                                 getPath(corruptedFldIndex),
                                                 preCorruptionCell->rid,
                                                 StringData(toVal));
-                        } else if (std::holds_alternative<DeletionFault>(corruption.fault)) {
+                        } else if (holds_alternative<DeletionFault>(corruption.fault)) {
                             columnStore->remove(
                                 opCtx, getPath(corruptedFldIndex), preCorruptionCell->rid);
-                        } else if (std::holds_alternative<InsertionFault>(corruption.fault)) {
+                        } else if (holds_alternative<InsertionFault>(corruption.fault)) {
                             const auto toVal =
-                                std::get<InsertionFault>(corruption.fault).insertedIndexValue;
+                                get<InsertionFault>(corruption.fault).insertedIndexValue;
                             columnStore->insert(opCtx,
                                                 getPath(corruptedFldIndex),
                                                 RowId(docIndexToRowId(corruptedDocIndex)),
@@ -456,15 +456,15 @@ protected:
                     // transaction).
                     {
 
-                        if (std::holds_alternative<ReplacementFault>(corruption.fault)) {
+                        if (holds_alternative<ReplacementFault>(corruption.fault)) {
                             const auto toVal =
-                                std::get<ReplacementFault>(corruption.fault).updatedIndexValue;
+                                get<ReplacementFault>(corruption.fault).updatedIndexValue;
                             const auto corruptedCell =
                                 seekToCorruptedIndexEntry(corruptedFldIndex, corruptedDocIndex);
                             ASSERT_EQ(corruptedCell->path, getPath(corruptedFldIndex));
                             ASSERT_EQ(corruptedCell->rid, preCorruptionCell->rid);
                             ASSERT_EQ(corruptedCell->value, StringData(toVal));
-                        } else if (std::holds_alternative<DeletionFault>(corruption.fault)) {
+                        } else if (holds_alternative<DeletionFault>(corruption.fault)) {
                             const auto corruptedCell =
                                 seekToCorruptedIndexEntry(corruptedFldIndex, corruptedDocIndex);
                             if (numDocs == 1 || corruptedDocIndex == numDocs - 1) {
@@ -473,9 +473,9 @@ protected:
                                 ASSERT_EQ(corruptedCell->path, getPath(corruptedFldIndex));
                                 ASSERT_GT(corruptedCell->rid, preCorruptionCell->rid);
                             }
-                        } else if (std::holds_alternative<InsertionFault>(corruption.fault)) {
+                        } else if (holds_alternative<InsertionFault>(corruption.fault)) {
                             const auto toVal =
-                                std::get<InsertionFault>(corruption.fault).insertedIndexValue;
+                                get<InsertionFault>(corruption.fault).insertedIndexValue;
                             const auto corruptedCell =
                                 seekToCorruptedIndexEntry(corruptedFldIndex, corruptedDocIndex);
                             ASSERT_EQ(corruptedCell->path, getPath(corruptedFldIndex));

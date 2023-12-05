@@ -457,7 +457,8 @@ VectorClock::ComponentSet VectorClockMongoD::_gossipOutInternal() const {
 
 VectorClock::ComponentSet VectorClockMongoD::_gossipInInternal() const {
     VectorClock::ComponentSet toGossip{Component::ClusterTime};
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         toGossip.insert(Component::ConfigTime);
         toGossip.insert(Component::TopologyTime);
     }

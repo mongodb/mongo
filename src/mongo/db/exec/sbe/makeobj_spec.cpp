@@ -286,13 +286,13 @@ size_t MakeObjSpec::getApproximateSize() const {
 }
 
 MakeObjSpec::FieldAction MakeObjSpec::FieldAction::clone() const {
-    return stdx::visit(OverloadedVisitor{[](Keep k) -> FieldAction { return k; },
-                                         [](Drop d) -> FieldAction { return d; },
-                                         [](ValueArg va) -> FieldAction { return va; },
-                                         [](LambdaArg la) -> FieldAction { return la; },
-                                         [](const MakeObj& makeObj) -> FieldAction {
-                                             return MakeObj{makeObj.spec->clone()};
-                                         }},
-                       _data);
+    return visit(OverloadedVisitor{[](Keep k) -> FieldAction { return k; },
+                                   [](Drop d) -> FieldAction { return d; },
+                                   [](ValueArg va) -> FieldAction { return va; },
+                                   [](LambdaArg la) -> FieldAction { return la; },
+                                   [](const MakeObj& makeObj) -> FieldAction {
+                                       return MakeObj{makeObj.spec->clone()};
+                                   }},
+                 _data);
 }
 }  // namespace mongo::sbe

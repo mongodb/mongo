@@ -398,11 +398,11 @@ private:
     const cascades::Memo& _memo;
 };
 
-CEType HeuristicEstimator::deriveCE(const Metadata& metadata,
-                                    const cascades::Memo& memo,
-                                    const properties::LogicalProps& /*logicalProps*/,
-                                    const ABT::reference_type logicalNodeRef) const {
-    return HeuristicTransport::derive(metadata, memo, logicalNodeRef);
+CERecord HeuristicEstimator::deriveCE(const Metadata& metadata,
+                                      const cascades::Memo& memo,
+                                      const properties::LogicalProps& /*logicalProps*/,
+                                      const ABT::reference_type logicalNodeRef) const {
+    return {HeuristicTransport::derive(metadata, memo, logicalNodeRef), "heuristic"};
 }
 
 }  // namespace mongo::optimizer::ce

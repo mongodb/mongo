@@ -441,8 +441,7 @@ void logRemoveOperation(Client* client, const NamespaceString& nss, const BSONOb
  * Logs values of cluster server parameters requested via getClusterParameter.
  */
 void logGetClusterParameter(
-    Client* client,
-    const stdx::variant<std::string, std::vector<std::string>>& requestedParameters);
+    Client* client, const std::variant<std::string, std::vector<std::string>>& requestedParameters);
 
 /**
  * Logs old and new value of given tenant's cluster server parameter when it is updated via

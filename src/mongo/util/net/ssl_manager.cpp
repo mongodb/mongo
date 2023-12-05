@@ -820,7 +820,7 @@ bool SSLConfiguration::isClusterMember(
     // and/or OU from the server member certificate's subject DN match the client subject DN.
     if (_clusterAuthX509Config._configCriteria) {
         bool matchesClusterAuthX509Config =
-            stdx::visit(visitor, _clusterAuthX509Config._configCriteria.value());
+            visit(visitor, _clusterAuthX509Config._configCriteria.value());
         if (matchesClusterAuthX509Config) {
             return true;
         }
@@ -836,7 +836,7 @@ bool SSLConfiguration::isClusterMember(
     // member if tlsClusterX509AuthOverride is specified and it meets the attribute or extension
     // policy specified.
     if (_clusterAuthX509Config._overrideCriteria) {
-        return stdx::visit(visitor, _clusterAuthX509Config._overrideCriteria.value());
+        return visit(visitor, _clusterAuthX509Config._overrideCriteria.value());
     }
 
     // If tlsClusterX509AuthOverride was not specified, then the only way that it

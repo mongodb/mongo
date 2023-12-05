@@ -141,7 +141,7 @@ FieldAction FieldActionBuilder::build(FieldListScope fieldListScope, ABTVector& 
 }
 
 std::unique_ptr<sbe::MakeObjSpec> ProjSpecBuilder::build(ABTVector& argStack) {
-    auto& v = std::get<Valid>(_state);
+    auto& v = get<Valid>(_state);
 
     std::vector<std::string> fields;
     fields.reserve(v.namedFabs.size());
@@ -169,8 +169,8 @@ bool ProjSpecBuilder::absorb(std::unique_ptr<ProjSpecBuilder> other) {
     // Either both builders need paths or neither does.
     if (!valid && needsPath() && other->needsPath()) {
         // Merge orphaned FieldActions via the same logic as FieldActions on duplicate paths.
-        auto& left = std::get<NeedsPath>(_state).orphan;
-        auto& right = std::get<NeedsPath>(other->_state).orphan;
+        auto& left = get<NeedsPath>(_state).orphan;
+        auto& right = get<NeedsPath>(other->_state).orphan;
         return left.absorb(std::move(right));
 
     } else if (!valid) {
@@ -180,8 +180,8 @@ bool ProjSpecBuilder::absorb(std::unique_ptr<ProjSpecBuilder> other) {
 
     }  // Otherwise, both are valid. We may proceed.
 
-    auto& left = std::get<Valid>(_state);
-    auto& right = std::get<Valid>(other->_state);
+    auto& left = get<Valid>(_state);
+    auto& right = get<Valid>(other->_state);
 
     // We can't merge builders if they traverse to different depths.
     if (left.traversalDepth != right.traversalDepth) {

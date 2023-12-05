@@ -31,11 +31,11 @@
 
 #include <bitset>
 #include <boost/intrusive_ptr.hpp>
+#include <variant>
 
 #include "mongo/base/static_assert.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -450,7 +450,7 @@ public:
      * Given a field name either return a Value if the field resides in the cache, or a BSONElement
      * if the field resides in the backing BSON.
      */
-    stdx::variant<BSONElement, Value> getFieldNonCaching(StringData name) const {
+    std::variant<BSONElement, Value> getFieldNonCaching(StringData name) const {
         Position pos = findField(name, LookupPolicy::kCacheOnly);
         if (pos.found()) {
             return {getField(pos).val};

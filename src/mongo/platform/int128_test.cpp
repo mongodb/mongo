@@ -65,3 +65,11 @@ TEST(Int128, MaxPositiveInt) {
 TEST(Int128, MaxNegativeInt) {
     assertCastIsValid(std::numeric_limits<int128_t>::min(), 0x8000000000000000, 0);
 }
+
+TEST(Int128, Multiplication) {
+    // Verify that we can compile and execute int128 multiplication, sanitizer builds require
+    // special link flags. See: https://bugs.llvm.org/show_bug.cgi?id=16404
+    int128_t a = 5;
+    int128_t b = 10;
+    ASSERT_EQUALS(a * b, 50);
+}

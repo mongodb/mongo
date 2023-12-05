@@ -54,9 +54,9 @@ namespace mongo {
  * operation to be inserted immediately; a multi-doc transaction or a batched write (multiple write
  * ops encapsulated in a single applyOps entry).
  */
-class OplogWriter {
+class OperationLogger {
 public:
-    virtual ~OplogWriter() = default;
+    virtual ~OperationLogger() = default;
 
     /**
      * Set the "lsid", "txnNumber", "stmtId", "prevOpTime", "preImageOpTime" and "postImageOpTime"

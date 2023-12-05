@@ -652,7 +652,10 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeMin(
     sbe::value::SlotVector slots,
     boost::optional<sbe::value::SlotId> collatorSlot) {
     tassert(8124914, "Expected a single slot", slots.size() == 1);
-    return makeFunction("aggRemovableMinFinalize", makeVariable(slots[0]));
+    return makeFillEmptyNull(
+        makeFunction("getElement",
+                     makeFunction("aggRemovableMinNFinalize", makeVariable(slots[0])),
+                     makeInt32Constant(0)));
 }
 
 std::unique_ptr<sbe::EExpression> buildWindowFinalizeMax(
@@ -661,7 +664,10 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeMax(
     sbe::value::SlotVector slots,
     boost::optional<sbe::value::SlotId> collatorSlot) {
     tassert(8124915, "Expected a single slot", slots.size() == 1);
-    return makeFunction("aggRemovableMaxFinalize", makeVariable(slots[0]));
+    return makeFillEmptyNull(
+        makeFunction("getElement",
+                     makeFunction("aggRemovableMaxNFinalize", makeVariable(slots[0])),
+                     makeInt32Constant(0)));
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInitializeTopBottomN(

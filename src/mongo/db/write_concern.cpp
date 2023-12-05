@@ -65,7 +65,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -198,8 +197,7 @@ Status validateWriteConcern(OperationContext* opCtx, const WriteConcernOptions& 
     }
 
     if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
-        if (stdx::holds_alternative<int64_t>(writeConcern.w) &&
-            stdx::get<int64_t>(writeConcern.w) > 1) {
+        if (holds_alternative<int64_t>(writeConcern.w) && get<int64_t>(writeConcern.w) > 1) {
             return Status(ErrorCodes::BadValue, "cannot use 'w' > 1 when a host is not replicated");
         }
 
@@ -208,7 +206,7 @@ Status validateWriteConcern(OperationContext* opCtx, const WriteConcernOptions& 
                 ErrorCodes::BadValue,
                 fmt::format("cannot use non-majority 'w' mode \"{}\" when a host is not a "
                             "member of a replica set",
-                            stdx::get<std::string>(writeConcern.w)));
+                            get<std::string>(writeConcern.w)));
         }
     }
 

@@ -91,14 +91,14 @@ auto removeEmptyDirectory =
         }
     };
 
-BSONObj toBSON(const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& x) {
-    return stdx::visit(OverloadedVisitor{[](const Timestamp& ts) { return ts.toBSON(); },
-                                         [](const StorageEngine::CheckpointIteration& iter) {
-                                             auto underlyingValue = uint64_t{iter};
-                                             return BSON("checkpointIteration"
-                                                         << std::to_string(underlyingValue));
-                                         }},
-                       x);
+BSONObj toBSON(const std::variant<Timestamp, StorageEngine::CheckpointIteration>& x) {
+    return visit(OverloadedVisitor{[](const Timestamp& ts) { return ts.toBSON(); },
+                                   [](const StorageEngine::CheckpointIteration& iter) {
+                                       auto underlyingValue = uint64_t{iter};
+                                       return BSON("checkpointIteration"
+                                                   << std::to_string(underlyingValue));
+                                   }},
+                 x);
 }
 }  // namespace
 
@@ -168,7 +168,7 @@ void removeIndex(OperationContext* opCtx,
                 };
 
             if (isTwoPhaseDrop) {
-                stdx::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
+                std::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
                 if (!commitTimestamp) {
                     // Standalone mode and unreplicated drops will not provide a timestamp. Use the
                     // checkpoint iteration instead.
@@ -238,7 +238,7 @@ Status dropCollection(OperationContext* opCtx,
                 };
 
             if (storageEngine->supportsPendingDrops()) {
-                stdx::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
+                std::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
                 if (!commitTimestamp) {
                     // Standalone mode and unreplicated drops will not provide a timestamp. Use the
                     // checkpoint iteration instead.

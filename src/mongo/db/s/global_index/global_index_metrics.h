@@ -104,7 +104,7 @@ public:
     }
 
     using State =
-        stdx::variant<GlobalIndexCoordinatorStateEnumPlaceholder, GlobalIndexClonerStateEnum>;
+        std::variant<GlobalIndexCoordinatorStateEnumPlaceholder, GlobalIndexClonerStateEnum>;
 
     GlobalIndexMetrics(UUID instanceId,
                        BSONObj originatingCommand,

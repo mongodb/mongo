@@ -62,10 +62,10 @@ public:
     HintedEstimator(PartialSchemaSelHints pathHints, PartialSchemaIntervalSelHints intervalHints)
         : _pathHints(std::move(pathHints)), _intervalHints(std::move(intervalHints)) {}
 
-    CEType deriveCE(const Metadata& metadata,
-                    const cascades::Memo& memo,
-                    const properties::LogicalProps& logicalProps,
-                    ABT::reference_type logicalNodeRef) const override final;
+    CERecord deriveCE(const Metadata& metadata,
+                      const cascades::Memo& memo,
+                      const properties::LogicalProps& logicalProps,
+                      ABT::reference_type logicalNodeRef) const override final;
 
 private:
     // Selectivity hints per PartialSchemaKey.

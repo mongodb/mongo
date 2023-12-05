@@ -185,9 +185,8 @@ public:
     template <typename StateOrStateVariant>
     static bool mustRestoreExternallyTrackedRecipientFields(StateOrStateVariant stateOrVariant) {
         if constexpr (std::is_same_v<StateOrStateVariant, State>) {
-            return stdx::visit(
-                [](auto v) { return mustRestoreExternallyTrackedRecipientFieldsImpl(v); },
-                stateOrVariant);
+            return visit([](auto v) { return mustRestoreExternallyTrackedRecipientFieldsImpl(v); },
+                         stateOrVariant);
         } else {
             return mustRestoreExternallyTrackedRecipientFieldsImpl(stateOrVariant);
         }

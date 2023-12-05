@@ -178,7 +178,6 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -389,7 +388,7 @@ bool applyQuerySettings(const CollectionPtr& collection,
     }
 
     // Retrieving the allowed indexes for the given collection.
-    auto allowedIndexes = stdx::visit(
+    auto allowedIndexes = visit(
         OverloadedVisitor{
             [&](const std::vector<mongo::query_settings::IndexHintSpec>& hints) {
                 // TODO: SERVER-79231 Apply QuerySettings for aggregate commands.
@@ -414,17 +413,16 @@ bool applyQuerySettings(const CollectionPtr& collection,
     auto notInAllowedIndexes = [&](const IndexEntry& indexEntry) {
         return std::none_of(
             allowedIndexes.begin(), allowedIndexes.end(), [&](const IndexHint& allowedIndex) {
-                return stdx::visit(OverloadedVisitor{
-                                       [&](const mongo::IndexKeyPattern& indexKeyPattern) {
-                                           return indexKeyPattern.woCompare(
-                                                      indexEntry.keyPattern) == 0;
-                                       },
-                                       [&](const mongo::IndexName& indexName) {
-                                           return indexName == indexEntry.identifier.catalogName;
-                                       },
-                                       [](const mongo::NaturalOrderHint&) { return false; },
-                                   },
-                                   allowedIndex.getHint());
+                return visit(OverloadedVisitor{
+                                 [&](const mongo::IndexKeyPattern& indexKeyPattern) {
+                                     return indexKeyPattern.woCompare(indexEntry.keyPattern) == 0;
+                                 },
+                                 [&](const mongo::IndexName& indexName) {
+                                     return indexName == indexEntry.identifier.catalogName;
+                                 },
+                                 [](const mongo::NaturalOrderHint&) { return false; },
+                             },
+                             allowedIndex.getHint());
             });
     };
 
@@ -1586,6 +1584,27 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 }  // getSlotBasedExecutor
 
 /**
+ * Function which returns true if 'cq' uses features that are currently supported in SBE without
+ * 'featureFlagSbeFull' being set; false otherwise.
+ */
+bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, const bool sbeFull) {
+    // If we can't push down any agg stages when internalQueryFrameworkControl is set to
+    // "trySbeRestricted", we return false.
+    if (QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp() ==
+            QueryFrameworkControlEnum::kTrySbeRestricted &&
+        cq.cqPipeline().empty()) {
+        return false;
+    }
+
+    // Return true if all the expressions in the CanonicalQuery's filter and projection are SBE
+    // compatible.
+    SbeCompatibility minRequiredCompatibility =
+        sbeFull ? SbeCompatibility::flagGuarded : SbeCompatibility::fullyCompatible;
+
+    return cq.getExpCtx()->sbeCompatibility >= minRequiredCompatibility;
+}
+
+/**
  * Attempts to create a slot-based executor for the query, if the query plan is eligible for SBE
  * execution. This function has three possible return values:
  *
@@ -1595,8 +1614,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
  *  3. The canonical query. This is to return ownership of the 'canonicalQuery' argument in the case
  * where the query plan is not eligible for SBE execution but it is not an error case.
  */
-StatusWith<stdx::variant<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
-                         std::unique_ptr<CanonicalQuery>>>
+StatusWith<std::variant<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
+                        std::unique_ptr<CanonicalQuery>>>
 attemptToGetSlotBasedExecutor(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
@@ -1610,16 +1629,12 @@ attemptToGetSlotBasedExecutor(
         extractAndAttachPipelineStages(canonicalQuery.get(), true /* attachOnly */);
     }
 
-    // (Ignore FCV check): featureFlagSbeFull does not change the semantics of queries, so it can
-    // safely be enabled on some nodes and disabled on other nodes during upgrade/downgrade.
-    SbeCompatibility minRequiredCompatibility =
-        feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe()
-        ? SbeCompatibility::flagGuarded
-        : SbeCompatibility::fullyCompatible;
+    // (Ignore FCV check): This is intentional because we always want to use this feature once the
+    // feature flag is enabled.
+    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
+    const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
 
-    // Try to construct an SBE plan executor if all the expressions in the CanonicalQuery's filter
-    // and projection are SBE compatible.
-    if (canonicalQuery->getExpCtx()->sbeCompatibility >= minRequiredCompatibility) {
+    if (canUseRegularSbe || sbeFull) {
         auto sbeYieldPolicy =
             PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, canonicalQuery->nss());
         SlotBasedPrepareExecutionHelper helper{
@@ -1734,19 +1749,17 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
                     statusWithExecutor.getStatus());
             }
             auto& maybeExecutor = statusWithExecutor.getValue();
-            if (stdx::holds_alternative<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
+            if (holds_alternative<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
                     maybeExecutor)) {
-                return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
-                    std::move(stdx::get<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
-                        maybeExecutor)));
+                return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(std::move(
+                    get<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(maybeExecutor)));
             } else {
                 // The query is not eligible for SBE execution - reclaim the canonical query and
                 // fall back to classic.
                 tassert(7087103,
                         "return value must contain canonical query if not executor",
-                        stdx::holds_alternative<std::unique_ptr<CanonicalQuery>>(maybeExecutor));
-                canonicalQuery =
-                    std::move(stdx::get<std::unique_ptr<CanonicalQuery>>(maybeExecutor));
+                        holds_alternative<std::unique_ptr<CanonicalQuery>>(maybeExecutor));
+                canonicalQuery = std::move(get<std::unique_ptr<CanonicalQuery>>(maybeExecutor));
             }
         }
         // Ensure that 'sbeCompatible' is set accordingly.
@@ -1777,15 +1790,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
 
-    return getExecutor(
-        opCtx,
-        stdx::holds_alternative<CollectionAcquisition>(coll.get())
-            ? MultipleCollectionAccessor{stdx::get<CollectionAcquisition>(coll.get())}
-            : MultipleCollectionAccessor{coll.getCollectionPtr()},
-        std::move(canonicalQuery),
-        std::move(extractAndAttachPipelineStages),
-        yieldPolicy,
-        QueryPlannerParams{plannerOptions});
+    return getExecutor(opCtx,
+                       holds_alternative<CollectionAcquisition>(coll.get())
+                           ? MultipleCollectionAccessor{get<CollectionAcquisition>(coll.get())}
+                           : MultipleCollectionAccessor{coll.getCollectionPtr()},
+                       std::move(canonicalQuery),
+                       std::move(extractAndAttachPipelineStages),
+                       yieldPolicy,
+                       QueryPlannerParams{plannerOptions});
 }
 
 //
@@ -1823,13 +1835,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     bool permitYield,
     size_t plannerOptions) {
 
-    auto multi = stdx::visit(OverloadedVisitor{[](const CollectionPtr* collPtr) {
-                                                   return MultipleCollectionAccessor{*collPtr};
-                                               },
-                                               [](const CollectionAcquisition& acq) {
-                                                   return MultipleCollectionAccessor{acq};
-                                               }},
-                             coll.get());
+    auto multi = visit(OverloadedVisitor{[](const CollectionPtr* collPtr) {
+                                             return MultipleCollectionAccessor{*collPtr};
+                                         },
+                                         [](const CollectionAcquisition& acq) {
+                                             return MultipleCollectionAccessor{acq};
+                                         }},
+                       coll.get());
 
     return getExecutorFind(opCtx,
                            multi,

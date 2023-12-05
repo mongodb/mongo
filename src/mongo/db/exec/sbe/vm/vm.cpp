@@ -3224,68 +3224,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateFromStringNo
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateTrunc(ArityType arity) {
-    invariant(arity == 6);
-
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
-    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto timezoneDB = value::getTimeZoneDBView(timezoneDBValue);
-
-    // Get date.
-    auto [dateOwn, dateTag, dateValue] = getFromStack(1);
-
-    // Get unit.
-    auto [unitOwn, unitTag, unitValue] = getFromStack(2);
-    if (!value::isString(unitTag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto unitString = value::getStringView(unitTag, unitValue);
-    if (!isValidTimeUnit(unitString)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto unit = parseTimeUnit(unitString);
-
-    // Get binSize.
-    auto [binSizeOwn, binSizeTag, binSizeValue] = getFromStack(3);
-    if (!value::isNumber(binSizeTag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto [binSizeLongOwn, binSizeLongTag, binSizeLongValue] =
-        genericNumConvert(binSizeTag, binSizeValue, value::TypeTags::NumberInt64);
-    if (binSizeLongTag == value::TypeTags::Nothing) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto binSize = value::bitcastTo<int64_t>(binSizeLongValue);
-    if (binSize <= 0) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-
-    // Get timezone.
-    auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(4);
-    if (!isValidTimezone(timezoneTag, timezoneValue, timezoneDB)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
-
-    // Get startOfWeek, if 'startOfWeek' parameter was passed and time unit is the week.
-    DayOfWeek startOfWeek{kStartOfWeekDefault};
-    if (TimeUnit::week == unit) {
-        auto [startOfWeekOwn, startOfWeekTag, startOfWeekValue] = getFromStack(5);
-        if (!value::isString(startOfWeekTag)) {
-            return {false, value::TypeTags::Nothing, 0};
-        }
-        auto startOfWeekString = value::getStringView(startOfWeekTag, startOfWeekValue);
-        if (!isValidDayOfWeek(startOfWeekString)) {
-            return {false, value::TypeTags::Nothing, 0};
-        }
-        startOfWeek = parseDayOfWeek(startOfWeekString);
-    }
-
-    return dateTrunc(dateTag, dateValue, unit, binSize, timezone, startOfWeek);
-}
-
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dateTrunc(value::TypeTags dateTag,
                                                                    value::Value dateValue,
                                                                    TimeUnit unit,
@@ -8890,33 +8828,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinM
     return {true, resultArrayTag, resultArrayVal};
 }
 
-template <AccumulatorMinMax::Sense S>
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinMaxFinalize(
-    ArityType arity) {
-    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
-
-    auto [stateArr, accMultiSetTag, accMultiSetVal, n, memUsage, memLimit] =
-        accumulatorNState(stateTag, stateVal);
-    tassert(8155725,
-            "accumulator should be of type MultiSet",
-            accMultiSetTag == value::TypeTags::ArrayMultiSet);
-    auto accMultiSet = value::getArrayMultiSetView(accMultiSetVal);
-
-    if (accMultiSet->size() == 0) {
-        return {true, value::TypeTags::Null, 0};
-    }
-
-    if constexpr (S == AccumulatorMinMax::Sense::kMin) {
-        auto it = accMultiSet->values().cbegin();
-        auto [cTag, cValue] = value::copyValue(it->first, it->second);
-        return {true, cTag, cValue};
-    }
-
-    auto it = accMultiSet->values().crbegin();
-    auto [cTag, cValue] = value::copyValue(it->first, it->second);
-    return {true, cTag, cValue};
-}
-
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableTopBottomNInit(
     ArityType arity) {
     auto [maxSizeOwned, maxSizeTag, maxSizeVal] = getFromStack(0);
@@ -9450,10 +9361,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggRemovableMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMin>(arity);
         case Builtin::aggRemovableMaxNFinalize:
             return builtinAggRemovableMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMax>(arity);
-        case Builtin::aggRemovableMinFinalize:
-            return builtinAggRemovableMinMaxFinalize<AccumulatorMinMax::Sense::kMin>(arity);
-        case Builtin::aggRemovableMaxFinalize:
-            return builtinAggRemovableMinMaxFinalize<AccumulatorMinMax::Sense::kMax>(arity);
         case Builtin::aggRemovableTopNInit:
         case Builtin::aggRemovableBottomNInit:
             return builtinAggRemovableTopBottomNInit(arity);
@@ -9485,6 +9392,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockMax(arity);
         case Builtin::valueBlockCount:
             return builtinValueBlockCount(arity);
+        case Builtin::valueBlockDateTrunc:
+            return builtinValueBlockDateTrunc(arity);
         case Builtin::valueBlockSum:
             return builtinValueBlockSum(arity);
         case Builtin::valueBlockGtScalar:
@@ -9939,10 +9848,6 @@ std::string builtinToString(Builtin b) {
             return "aggRemovableMinNFinalize";
         case Builtin::aggRemovableMaxNFinalize:
             return "aggRemovableMaxNFinalize";
-        case Builtin::aggRemovableMinFinalize:
-            return "aggRemovableMinFinalize";
-        case Builtin::aggRemovableMaxFinalize:
-            return "aggRemovableMaxFinalize";
         case Builtin::aggRemovableTopNInit:
             return "aggRemovableTopNInit";
         case Builtin::aggRemovableTopNAdd:

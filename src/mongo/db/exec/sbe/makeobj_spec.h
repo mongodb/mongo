@@ -91,7 +91,7 @@ struct MakeObjSpec {
     public:
         using Type = ActionType;
 
-        using VariantType = stdx::variant<Keep, Drop, ValueArg, LambdaArg, MakeObj>;
+        using VariantType = std::variant<Keep, Drop, ValueArg, LambdaArg, MakeObj>;
 
         FieldAction() = default;
         FieldAction(size_t valueArgIdx) : _data(ValueArg{valueArgIdx}) {}
@@ -106,40 +106,40 @@ struct MakeObjSpec {
         FieldAction clone() const;
 
         Type type() const {
-            return stdx::visit(OverloadedVisitor{[](Keep) { return Type::kKeep; },
-                                                 [](Drop) { return Type::kDrop; },
-                                                 [](ValueArg) { return Type::kValueArg; },
-                                                 [](LambdaArg) { return Type::kLambdaArg; },
-                                                 [](const MakeObj&) {
-                                                     return Type::kMakeObj;
-                                                 }},
-                               _data);
+            return visit(OverloadedVisitor{[](Keep) { return Type::kKeep; },
+                                           [](Drop) { return Type::kDrop; },
+                                           [](ValueArg) { return Type::kValueArg; },
+                                           [](LambdaArg) { return Type::kLambdaArg; },
+                                           [](const MakeObj&) {
+                                               return Type::kMakeObj;
+                                           }},
+                         _data);
         }
 
         bool isKeep() const {
-            return stdx::holds_alternative<Keep>(_data);
+            return holds_alternative<Keep>(_data);
         }
         bool isDrop() const {
-            return stdx::holds_alternative<Drop>(_data);
+            return holds_alternative<Drop>(_data);
         }
         bool isValueArg() const {
-            return stdx::holds_alternative<ValueArg>(_data);
+            return holds_alternative<ValueArg>(_data);
         }
         bool isLambdaArg() const {
-            return stdx::holds_alternative<LambdaArg>(_data);
+            return holds_alternative<LambdaArg>(_data);
         }
         bool isMakeObj() const {
-            return stdx::holds_alternative<MakeObj>(_data);
+            return holds_alternative<MakeObj>(_data);
         }
 
         size_t getValueArgIdx() const {
-            return stdx::get<ValueArg>(_data).argIdx;
+            return get<ValueArg>(_data).argIdx;
         }
         const LambdaArg& getLambdaArg() const {
-            return stdx::get<LambdaArg>(_data);
+            return get<LambdaArg>(_data);
         }
         MakeObjSpec* getMakeObjSpec() const {
-            return stdx::get<MakeObj>(_data).spec.get();
+            return get<MakeObj>(_data).spec.get();
         }
 
         bool isMandatory() const {

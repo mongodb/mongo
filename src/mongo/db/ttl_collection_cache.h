@@ -38,7 +38,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/uuid.h"
 
 /**
@@ -52,7 +51,7 @@ public:
     static TTLCollectionCache& get(ServiceContext* ctx);
 
     // Specifies that a collection is clustered and is TTL.
-    class ClusteredId : public stdx::monostate {};
+    class ClusteredId : public std::monostate {};
     // Names an index that is TTL.
     using IndexName = std::string;
 

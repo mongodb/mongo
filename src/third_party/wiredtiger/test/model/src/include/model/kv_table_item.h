@@ -173,6 +173,12 @@ public:
     bool has_prepared(timestamp_t timestamp) const;
 
     /*
+     * kv_table_item::rollback_to_stable --
+     *     Roll back the table item to the latest stable timestamp and transaction snapshot.
+     */
+    void rollback_to_stable(timestamp_t timestamp, kv_transaction_snapshot_ptr snapshot);
+
+    /*
      * kv_table_item::rollback_updates --
      *     Roll back updates of an aborted transaction.
      */

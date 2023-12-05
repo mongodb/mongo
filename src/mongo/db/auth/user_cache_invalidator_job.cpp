@@ -54,7 +54,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -103,9 +102,9 @@ StatusWith<OIDorTimestamp> getCurrentCacheGeneration(OperationContext* opCtx) {
 
 std::string oidOrTimestampToString(const OIDorTimestamp& oidOrTimestamp) {
     if (oidOrTimestamp.index() == 0) {  // OID
-        return stdx::get<OID>(oidOrTimestamp).toString();
+        return get<OID>(oidOrTimestamp).toString();
     } else if (oidOrTimestamp.index() == 1) {  // Timestamp
-        return stdx::get<Timestamp>(oidOrTimestamp).toString();
+        return get<Timestamp>(oidOrTimestamp).toString();
     }
     MONGO_UNREACHABLE;
 }

@@ -44,7 +44,6 @@
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/parser_gen.hpp"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -60,7 +59,7 @@ TEST(CstExpressionTest, ParsesProjectWithAnd) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
@@ -78,7 +77,7 @@ TEST(CstExpressionTest, ParsesProjectWithOr) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
@@ -97,7 +96,7 @@ TEST(CstExpressionTest, ParsesProjectWithNot) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -114,7 +113,7 @@ TEST(CstExpressionTest, ParsesComparisonExpressions) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -183,7 +182,7 @@ TEST(CstExpressionTest, ParsesConvertExpressions) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -206,7 +205,7 @@ TEST(CstExpressionTest, ParsesConvertExpressionsNoOptArgs) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
@@ -231,7 +230,7 @@ TEST(CstExpressionTest, ParsesConvertExpressionsWithOptArgs) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
@@ -257,7 +256,7 @@ TEST(CstExpressionTest, ParsesIndexOf) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -279,7 +278,7 @@ TEST(CstExpressionTest, ParsesDateFromString) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -300,7 +299,7 @@ TEST(CstExpressionTest, ParsesDateToString) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
@@ -321,7 +320,7 @@ TEST(CstExpressionTest, ParsesReplaceStringExpressions) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
@@ -345,7 +344,7 @@ TEST(CstExpressionTest, ParsesTrim) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -367,7 +366,7 @@ TEST(CstExpressionTest, ParsesToUpperAndLower) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -386,7 +385,7 @@ TEST(CstExpressionTest, ParsesRegexExpressions) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
@@ -412,7 +411,7 @@ TEST(CstExpressionTest, ParsesSubstrExpressions) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -433,7 +432,7 @@ TEST(CstExpressionTest, ParsesStringLengthExpressions) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
@@ -451,7 +450,7 @@ TEST(CstExpressionTest, ParsesSplit) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
@@ -469,7 +468,7 @@ TEST(CstExpressionTest, ParsesStrCaseCmp) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -486,7 +485,7 @@ TEST(CstExpressionTest, ParsesConcat) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
@@ -503,7 +502,7 @@ TEST(CstExpressionTest, ParsesArrayElemAt) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -520,7 +519,7 @@ TEST(CstExpressionTest, ParsesArrayToObject) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -537,7 +536,7 @@ TEST(CstExpressionTest, ParsesConcatArrays) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -554,7 +553,7 @@ TEST(CstExpressionTest, ParsesFilter) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -573,7 +572,7 @@ TEST(CstExpressionTest, ParsesFirst) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -589,7 +588,7 @@ TEST(CstExpressionTest, ParsesIn) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
@@ -608,7 +607,7 @@ TEST(CstExpressionTest, ParsesIndexOfArray) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -625,7 +624,7 @@ TEST(CstExpressionTest, ParsesIndexOfArray) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -642,7 +641,7 @@ TEST(CstExpressionTest, ParsesIndexOfArray) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -662,7 +661,7 @@ TEST(CstExpressionTest, ParsesIsArray) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -679,7 +678,7 @@ TEST(CstExpressionTest, ParsesIsArray) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(
@@ -724,7 +723,7 @@ TEST(CstExpressionTest, ParsesDateToParts) {
     BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    auto stages = get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
@@ -747,7 +746,7 @@ TEST(CstExpressionTest, ParsesDateFromParts) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -774,7 +773,7 @@ TEST(CstExpressionTest, ParsesDateFromParts) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -801,7 +800,7 @@ TEST(CstExpressionTest, ParsesDayOfDateExpressionsWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -816,7 +815,7 @@ TEST(CstExpressionTest, ParsesDayOfDateExpressionsWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -831,7 +830,7 @@ TEST(CstExpressionTest, ParsesDayOfDateExpressionsWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -876,7 +875,7 @@ TEST(CstExpressionTest, ParsesDayOfDateExpressionsWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -890,7 +889,7 @@ TEST(CstExpressionTest, ParsesDayOfDateExpressionsWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -904,7 +903,7 @@ TEST(CstExpressionTest, ParsesDayOfDateExpressionsWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -921,7 +920,7 @@ TEST(CstExpressionTest, ParsesDayOfMonthWithArrayArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -954,7 +953,7 @@ TEST(CstExpressionTest, ParsesDayOfWeekWithArrayArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -987,7 +986,7 @@ TEST(CstExpressionTest, ParsesDayOfYearWithArrayArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1021,7 +1020,7 @@ TEST(CstExpressionTest, ParsesIsoDateExpressionsWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1036,7 +1035,7 @@ TEST(CstExpressionTest, ParsesIsoDateExpressionsWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1051,7 +1050,7 @@ TEST(CstExpressionTest, ParsesIsoDateExpressionsWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1098,7 +1097,7 @@ TEST(CstExpressionTest, ParsesIsoDateExpressionsWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1112,7 +1111,7 @@ TEST(CstExpressionTest, ParsesIsoDateExpressionsWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1126,7 +1125,7 @@ TEST(CstExpressionTest, ParsesIsoDateExpressionsWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1142,7 +1141,7 @@ TEST(CstExpressionTest, ParsesIsoDayOfWeekWithArrayArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1175,7 +1174,7 @@ TEST(CstExpressionTest, ParsesIsoWeekWithArrayArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1208,7 +1207,7 @@ TEST(CstExpressionTest, ParsesIsoWeekYearWithArrayArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1242,7 +1241,7 @@ TEST(CstExpressionTest, ParsesHourExpressionWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(
@@ -1269,7 +1268,7 @@ TEST(CstExpressionTest, ParsesMillisecondExpressionWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1296,7 +1295,7 @@ TEST(CstExpressionTest, ParsesMinuteExpressionWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(
@@ -1323,7 +1322,7 @@ TEST(CstExpressionTest, ParsesMonthExpressionWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(
@@ -1350,7 +1349,7 @@ TEST(CstExpressionTest, ParsesSecondExpressionWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(
@@ -1377,7 +1376,7 @@ TEST(CstExpressionTest, ParsesWeekExpressionWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(
@@ -1404,7 +1403,7 @@ TEST(CstExpressionTest, ParsesYearExpressionWithDocumentArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(
@@ -1431,7 +1430,7 @@ TEST(CstExpressionTest, ParsesHourExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1445,7 +1444,7 @@ TEST(CstExpressionTest, ParsesHourExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1478,7 +1477,7 @@ TEST(CstExpressionTest, ParsesMillisecondExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1492,7 +1491,7 @@ TEST(CstExpressionTest, ParsesMillisecondExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1526,7 +1525,7 @@ TEST(CstExpressionTest, ParsesMinuteExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1540,7 +1539,7 @@ TEST(CstExpressionTest, ParsesMinuteExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1573,7 +1572,7 @@ TEST(CstExpressionTest, ParsesMonthExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1587,7 +1586,7 @@ TEST(CstExpressionTest, ParsesMonthExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1620,7 +1619,7 @@ TEST(CstExpressionTest, ParsesSecondExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1634,7 +1633,7 @@ TEST(CstExpressionTest, ParsesSecondExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1667,7 +1666,7 @@ TEST(CstExpressionTest, ParsesWeekExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1681,7 +1680,7 @@ TEST(CstExpressionTest, ParsesWeekExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1714,7 +1713,7 @@ TEST(CstExpressionTest, ParsesYearExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
@@ -1728,7 +1727,7 @@ TEST(CstExpressionTest, ParsesYearExpressionWithExpressionArgument) {
         BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        auto stages = get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),

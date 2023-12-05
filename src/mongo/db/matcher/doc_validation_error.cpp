@@ -85,7 +85,6 @@
 #include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/pcre.h"
@@ -337,7 +336,7 @@ struct ValidationErrorContext {
     }
 
     bool haveLatestCompleteError() {
-        return !stdx::holds_alternative<std::monostate>(latestCompleteError);
+        return !holds_alternative<std::monostate>(latestCompleteError);
     }
 
     /**
@@ -345,38 +344,37 @@ struct ValidationErrorContext {
      */
     void appendLatestCompleteError(BSONObjBuilder* builder) {
         const static std::string kDetailsString = "details";
-        stdx::visit(
-            OverloadedVisitor{[&](const auto& details) -> void {
-                                  verifySizeAndAppend(details, kDetailsString, builder);
-                              },
-                              [&](const std::monostate& state) -> void { MONGO_UNREACHABLE },
-                              [&](const std::string& str) -> void {
-                                  MONGO_UNREACHABLE
-                              }},
-            latestCompleteError);
+        visit(OverloadedVisitor{[&](const auto& details) -> void {
+                                    verifySizeAndAppend(details, kDetailsString, builder);
+                                },
+                                [&](const std::monostate& state) -> void { MONGO_UNREACHABLE },
+                                [&](const std::string& str) -> void {
+                                    MONGO_UNREACHABLE
+                                }},
+              latestCompleteError);
     }
     /**
      * Appends the latest complete error to 'builder'. This should only be called by nodes which
      * construct an array as part of their error.
      */
     void appendLatestCompleteError(BSONArrayBuilder* builder) {
-        stdx::visit(OverloadedVisitor{
-                        [&](const BSONObj& obj) -> void { verifySizeAndAppend(obj, builder); },
-                        [&](const std::string& str) -> void { builder->append(str); },
-                        [&](const BSONArray& arr) -> void {
-                            // The '$_internalSchemaAllowedProperties' match expression represents
-                            // two JSONSchema keywords: 'additionalProperties' and
-                            // 'patternProperties'. As such, if both keywords produce an error,
-                            // their errors will be packaged into an array which the parent
-                            // expression must absorb when constructing its array of error details.
-                            for (auto&& elem : arr) {
-                                verifySizeAndAppend(elem, builder);
-                            }
-                        },
-                        [&](const std::monostate& state) -> void {
-                            MONGO_UNREACHABLE
-                        }},
-                    latestCompleteError);
+        visit(OverloadedVisitor{
+                  [&](const BSONObj& obj) -> void { verifySizeAndAppend(obj, builder); },
+                  [&](const std::string& str) -> void { builder->append(str); },
+                  [&](const BSONArray& arr) -> void {
+                      // The '$_internalSchemaAllowedProperties' match expression represents
+                      // two JSONSchema keywords: 'additionalProperties' and
+                      // 'patternProperties'. As such, if both keywords produce an error,
+                      // their errors will be packaged into an array which the parent
+                      // expression must absorb when constructing its array of error details.
+                      for (auto&& elem : arr) {
+                          verifySizeAndAppend(elem, builder);
+                      }
+                  },
+                  [&](const std::monostate& state) -> void {
+                      MONGO_UNREACHABLE
+                  }},
+              latestCompleteError);
     }
 
     /**
@@ -384,11 +382,11 @@ struct ValidationErrorContext {
      * caller expects an object.
      */
     BSONObj getLatestCompleteErrorObject() const {
-        return stdx::get<BSONObj>(latestCompleteError);
+        return get<BSONObj>(latestCompleteError);
     }
 
     BSONArray getLatestCompleteErrorArray() const {
-        return stdx::get<BSONArray>(latestCompleteError);
+        return get<BSONArray>(latestCompleteError);
     }
 
     /**
@@ -455,7 +453,7 @@ struct ValidationErrorContext {
     // in an array and passed to the parent expression.
     // - Finally, BSONObj indicates the most common case of an error: a detailed object which
     // describes the reasons for failure. The final error will be of this type.
-    stdx::variant<std::monostate, std::string, BSONObj, BSONArray> latestCompleteError =
+    std::variant<std::monostate, std::string, BSONObj, BSONArray> latestCompleteError =
         std::monostate();
     // Document which failed to match against the collection's validator.
     const BSONObj& rootDoc;

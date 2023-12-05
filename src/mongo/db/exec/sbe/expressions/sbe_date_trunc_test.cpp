@@ -39,6 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -117,7 +118,7 @@ std::pair<value::TypeTags, value::Value> makeDateValueOID(
 }  // namespace
 
 /**
- * A test for SBE built-in function "dateTrunc".
+ * A test for SBE built-in functions "dateTrunc" and "valueBlockDateTrunc".
  */
 TEST_F(SBEDateTruncTest, BasicDateTrunc) {
     value::OwnedValueAccessor timezoneDBAccessor;
@@ -133,6 +134,11 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
     value::OwnedValueAccessor startOfWeekAccessor;
     auto startOfWeekSlot = bindAccessor(&startOfWeekAccessor);
 
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    value::ViewOfValueAccessor bitsetAccessor;
+    auto bitsetSlot = bindAccessor(&bitsetAccessor);
+
     // Construct an invocation of "dateTrunc" function.
     auto dateTruncExpression =
         sbe::makeE<sbe::EFunction>("dateTrunc",
@@ -143,6 +149,18 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
                                                makeE<EVariable>(timezoneSlot),
                                                makeE<EVariable>(startOfWeekSlot)));
     auto compiledDateTrunc = compileExpression(*dateTruncExpression);
+
+    // Construct an invocation of "valueBlockDateTrunc" function.
+    auto valueBlockDateTruncExpression =
+        sbe::makeE<sbe::EFunction>("valueBlockDateTrunc",
+                                   sbe::makeEs(makeE<EVariable>(bitsetSlot),
+                                               makeE<EVariable>(blockSlot),
+                                               makeE<EVariable>(timezoneDBSlot),
+                                               makeE<EVariable>(unitSlot),
+                                               makeE<EVariable>(binSizeSlot),
+                                               makeE<EVariable>(timezoneSlot),
+                                               makeE<EVariable>(startOfWeekSlot)));
+    auto compiledValueBlockDateTrunc = compileExpression(*valueBlockDateTruncExpression);
 
     // Setup timezone database.
     auto timezoneDatabase = std::make_unique<TimeZoneDatabase>();
@@ -394,27 +412,63 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
         },
     };
 
-    int testNumber{0};
-    for (auto&& testCase : testCases) {
-        timezoneAccessor.reset(testCase.timezone.first, testCase.timezone.second);
-        dateAccessor.reset(testCase.date.first, testCase.date.second);
-        unitAccessor.reset(testCase.unit.first, testCase.unit.second);
-        binSizeAccessor.reset(testCase.binSize.first, testCase.binSize.second);
-        startOfWeekAccessor.reset(testCase.startOfWeek.first, testCase.startOfWeek.second);
+    {
+        int testNumber{0};
+        for (auto&& testCase : testCases) {
+            // Values will be freed after running block tests.
+            timezoneAccessor.reset(false, testCase.timezone.first, testCase.timezone.second);
+            dateAccessor.reset(false, testCase.date.first, testCase.date.second);
+            unitAccessor.reset(false, testCase.unit.first, testCase.unit.second);
+            binSizeAccessor.reset(false, testCase.binSize.first, testCase.binSize.second);
+            startOfWeekAccessor.reset(
+                false, testCase.startOfWeek.first, testCase.startOfWeek.second);
 
-        // Execute the "dateTrunc" function.
-        auto result = runCompiledExpression(compiledDateTrunc.get());
-        auto [resultTag, resultValue] = result;
-        value::ValueGuard resultGuard(resultTag, resultValue);
+            // Execute the "dateTrunc" function.
+            auto result = runCompiledExpression(compiledDateTrunc.get());
+            auto [resultTag, resultValue] = result;
+            value::ValueGuard resultGuard(resultTag, resultValue);
 
-        auto [compResultTag, compResultValue] = compareValue(
-            resultTag, resultValue, testCase.expectedValue.first, testCase.expectedValue.second);
-        value::ValueGuard compResultGuard(compResultTag, compResultValue);
+            auto [compResultTag, compResultValue] = compareValue(resultTag,
+                                                                 resultValue,
+                                                                 testCase.expectedValue.first,
+                                                                 testCase.expectedValue.second);
+            value::ValueGuard compResultGuard(compResultTag, compResultValue);
 
-        ASSERT_EQUALS(compResultTag, value::TypeTags::NumberInt32);
-        ASSERT_EQUALS(compResultValue, 0) << "Failed test #" << testNumber << ", result: " << result
-                                          << ", expected: " << testCase.expectedValue;
-        ++testNumber;
+            ASSERT_EQUALS(compResultTag, value::TypeTags::NumberInt32);
+            ASSERT_EQUALS(compResultValue, 0)
+                << "Failed test #" << testNumber << ", result: " << result
+                << ", expected: " << testCase.expectedValue;
+            ++testNumber;
+        }
+    }
+
+    {
+        for (auto&& testCase : testCases) {
+            timezoneAccessor.reset(testCase.timezone.first, testCase.timezone.second);
+            unitAccessor.reset(testCase.unit.first, testCase.unit.second);
+            binSizeAccessor.reset(testCase.binSize.first, testCase.binSize.second);
+            startOfWeekAccessor.reset(testCase.startOfWeek.first, testCase.startOfWeek.second);
+
+            value::HeterogeneousBlock block;
+            block.push_back(testCase.date.first, testCase.date.second);
+            blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                                value::bitcastFrom<value::ValueBlock*>(&block));
+
+            value::HeterogeneousBlock bitset;
+            bitset.push_back(makeBool(true));
+            bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
+                                 value::bitcastFrom<value::ValueBlock*>(&bitset));
+
+            // Execute the "valueBlockDateTrunc" function.
+            auto [resultTag, resultValue] =
+                runCompiledExpression(compiledValueBlockDateTrunc.get());
+            value::ValueGuard resultGuard(resultTag, resultValue);
+
+            assertBlockEq(resultTag,
+                          resultValue,
+                          std::vector{std::pair(testCase.expectedValue.first,
+                                                testCase.expectedValue.second)});
+        }
     }
 }
 

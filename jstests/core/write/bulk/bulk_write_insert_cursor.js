@@ -58,3 +58,22 @@ cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, n: 1, idx: 1});
 assert.eq(coll.find().itcount(), 2);
 assert.eq(coll1.find().itcount(), 0);
 coll.drop();
+
+// Test errorsOnly with no failues.
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [{insert: 0, document: {_id: 1}}, {insert: 0, document: {_id: 2}}],
+    nsInfo: [{ns: "test.coll"}],
+    errorsOnly: true
+});
+
+assert.commandWorked(res, "bulkWrite command response: " + tojson(res));
+cursorSizeValidator(res, 0);
+summaryFieldsValidator(
+    res, {nErrors: 0, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+
+assert(res.cursor.id == 0, "bulkWrite command response: " + tojson(res));
+assert(!res.cursor.firstBatch[0], "bulkWrite command response: " + tojson(res));
+assert.eq(res.cursor.ns, "admin.$cmd.bulkWrite", "bulkWrite command response: " + tojson(res));
+
+coll.drop();

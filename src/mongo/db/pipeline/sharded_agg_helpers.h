@@ -58,7 +58,6 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/query/owned_remote_cursor.h"
 #include "mongo/s/stale_shard_version_helpers.h"
-#include "mongo/stdx/variant.h"
 
 namespace mongo {
 namespace sharded_agg_helpers {
@@ -275,9 +274,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
  */
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>,
-                  AggregateCommandRequest,
-                  std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>>
+    std::variant<std::unique_ptr<Pipeline, PipelineDeleter>,
+                 AggregateCommandRequest,
+                 std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>>
         targetRequest,
     boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,

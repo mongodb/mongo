@@ -47,7 +47,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -112,10 +111,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     size_t plannerOptions,
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy) {
-    stdx::visit(OverloadedVisitor{[](const CollectionPtr* ptr) { dassert(ptr); },
-                                  [](const CollectionAcquisition& acq) {
-                                  }},
-                collection.get());
+    visit(OverloadedVisitor{[](const CollectionPtr* ptr) { dassert(ptr); },
+                            [](const CollectionAcquisition& acq) {
+                            }},
+          collection.get());
 
     try {
         auto execImpl = new PlanExecutorImpl(opCtx,

@@ -56,7 +56,6 @@
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
@@ -91,34 +90,32 @@ std::unique_ptr<Type> translateTreeExpr(const CNode::ArrayChildren& array,
 std::unique_ptr<MatchExpression> translateNot(const UserFieldname& fieldName,
                                               const CNode& argument) {
     // $not can accept a regex or an object expression.
-    if (auto regex = stdx::get_if<UserRegex>(&argument.payload)) {
+    if (auto regex = get_if<UserRegex>(&argument.payload)) {
         auto regexExpr = std::make_unique<RegexMatchExpression>(
             StringData(fieldName), regex->pattern, regex->flags);
         return std::make_unique<NotMatchExpression>(std::move(regexExpr));
     }
 
     auto root = std::make_unique<AndMatchExpression>();
-    root->add(
-        translatePathExpression(fieldName, stdx::get<CNode::ObjectChildren>(argument.payload)));
+    root->add(translatePathExpression(fieldName, get<CNode::ObjectChildren>(argument.payload)));
     return std::make_unique<NotMatchExpression>(std::move(root));
 }
 
 std::unique_ptr<MatchExpression> translateExists(const CNode::Fieldname& fieldName,
                                                  const CNode& argument) {
-    auto root =
-        std::make_unique<ExistsMatchExpression>(StringData(stdx::get<UserFieldname>(fieldName)));
-    if (stdx::visit(OverloadedVisitor{
-                        [&](const UserLong& userLong) { return userLong != 0; },
-                        [&](const UserDouble& userDbl) { return userDbl != 0; },
-                        [&](const UserDecimal& userDc) { return userDc.isNotEqual(Decimal128(0)); },
-                        [&](const UserInt& userInt) { return userInt != 0; },
-                        [&](const UserBoolean& b) { return b; },
-                        [&](const UserNull&) { return false; },
-                        [&](const UserUndefined&) { return false; },
-                        [&](auto&&) {
-                            return true;
-                        }},
-                    argument.payload)) {
+    auto root = std::make_unique<ExistsMatchExpression>(StringData(get<UserFieldname>(fieldName)));
+    if (visit(OverloadedVisitor{
+                  [&](const UserLong& userLong) { return userLong != 0; },
+                  [&](const UserDouble& userDbl) { return userDbl != 0; },
+                  [&](const UserDecimal& userDc) { return userDc.isNotEqual(Decimal128(0)); },
+                  [&](const UserInt& userInt) { return userInt != 0; },
+                  [&](const UserBoolean& b) { return b; },
+                  [&](const UserNull&) { return false; },
+                  [&](const UserUndefined&) { return false; },
+                  [&](auto&&) {
+                      return true;
+                  }},
+              argument.payload)) {
         return root;
     }
     return std::make_unique<NotMatchExpression>(root.release());
@@ -127,7 +124,7 @@ std::unique_ptr<MatchExpression> translateExists(const CNode::Fieldname& fieldNa
 MatcherTypeSet getMatcherTypeSet(const CNode& argument) {
     MatcherTypeSet ts;
     auto add_individual_to_type_set = [&](const CNode& a) {
-        return stdx::visit(
+        return visit(
             OverloadedVisitor{
                 [&](const UserLong& userLong) {
                     auto valueAsInt =
@@ -160,7 +157,7 @@ MatcherTypeSet getMatcherTypeSet(const CNode& argument) {
                 }},
             a.payload);
     };
-    if (auto children = stdx::get_if<CNode::ArrayChildren>(&argument.payload)) {
+    if (auto children = get_if<CNode::ArrayChildren>(&argument.payload)) {
         for (const auto& child : (*children)) {
             add_individual_to_type_set(child);
         }
@@ -185,7 +182,7 @@ MatcherTypeSet getMatcherTypeSet(const CNode& argument) {
 std::unique_ptr<MatchExpression> translatePathExpression(const UserFieldname& fieldName,
                                                          const CNode::ObjectChildren& object) {
     for (auto&& [op, argument] : object) {
-        switch (stdx::get<KeyFieldname>(op)) {
+        switch (get<KeyFieldname>(op)) {
             case KeyFieldname::notExpr:
                 return translateNot(fieldName, argument);
             case KeyFieldname::existsExpr:
@@ -194,10 +191,8 @@ std::unique_ptr<MatchExpression> translatePathExpression(const UserFieldname& fi
                 return std::make_unique<TypeMatchExpression>(StringData(fieldName),
                                                              getMatcherTypeSet(argument));
             case KeyFieldname::matchMod: {
-                const auto divisor =
-                    stdx::get<CNode::ArrayChildren>(argument.payload)[0].numberInt();
-                const auto remainder =
-                    stdx::get<CNode::ArrayChildren>(argument.payload)[1].numberInt();
+                const auto divisor = get<CNode::ArrayChildren>(argument.payload)[0].numberInt();
+                const auto remainder = get<CNode::ArrayChildren>(argument.payload)[1].numberInt();
                 return std::make_unique<ModMatchExpression>(
                     StringData(fieldName), divisor, remainder);
             }
@@ -214,7 +209,7 @@ std::unique_ptr<MatchExpression> translatePathExpression(const UserFieldname& fi
 //   getOr<int>("x", []() { return 0; }) == 0
 template <class T, class V, class F>
 T getOr(const V& myVariant, F makeDefaultValue) {
-    if (auto* value = stdx::get_if<T>(&myVariant)) {
+    if (auto* value = get_if<T>(&myVariant)) {
         return *value;
     } else {
         return makeDefaultValue();
@@ -233,7 +228,7 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
     const CNode& cst,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback& extensionsCallback) {
-    if (auto keyField = stdx::get_if<KeyFieldname>(&fieldName)) {
+    if (auto keyField = get_if<KeyFieldname>(&fieldName)) {
         // Top level match expression.
         switch (*keyField) {
             case KeyFieldname::andExpr:
@@ -275,15 +270,15 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
                     return TextMatchExpressionBase::kDiacriticSensitiveDefault;
                 });
                 params.language = getOr<std::string>(args[2].second.payload, []() { return ""s; });
-                params.query = stdx::get<std::string>(args[3].second.payload);
+                params.query = get<std::string>(args[3].second.payload);
 
                 return extensionsCallback.createText(std::move(params));
             }
             case KeyFieldname::where: {
                 std::string code;
-                if (auto str = stdx::get_if<UserString>(&cst.payload)) {
+                if (auto str = get_if<UserString>(&cst.payload)) {
                     code = *str;
-                } else if (auto js = stdx::get_if<UserJavascript>(&cst.payload)) {
+                } else if (auto js = get_if<UserJavascript>(&cst.payload)) {
                     code = std::string{js->code};
                 } else {
                     MONGO_UNREACHABLE;
@@ -295,10 +290,10 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
         }
     } else {
         // Expression is over a user fieldname.
-        return stdx::visit(
+        return visit(
             OverloadedVisitor{
                 [&](const CNode::ObjectChildren& userObject) -> std::unique_ptr<MatchExpression> {
-                    return translatePathExpression(stdx::get<UserFieldname>(fieldName), userObject);
+                    return translatePathExpression(get<UserFieldname>(fieldName), userObject);
                 },
                 [&](const CNode::ArrayChildren& userObject) -> std::unique_ptr<MatchExpression> {
                     MONGO_UNREACHABLE;
@@ -306,7 +301,7 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
                 // Other types are always treated as equality predicates.
                 [&](auto&& userValue) -> std::unique_ptr<MatchExpression> {
                     return std::make_unique<EqualityMatchExpression>(
-                        StringData{stdx::get<UserFieldname>(fieldName)},
+                        StringData{get<UserFieldname>(fieldName)},
                         cst_pipeline_translation::translateLiteralLeaf(cst),
                         nullptr, /* TODO SERVER-49486: Add ErrorAnnotation for MatchExpressions */
                         expCtx->getCollator());

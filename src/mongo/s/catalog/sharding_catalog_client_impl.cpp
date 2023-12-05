@@ -94,7 +94,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/namespace_string_util.h"
@@ -1195,7 +1194,7 @@ Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext
             }
             writeConcern = sw.getValue();
 
-            auto isValidUserManagementWriteConcern = stdx::visit(
+            auto isValidUserManagementWriteConcern = visit(
                 [](auto&& arg) {
                     using T = std::decay_t<decltype(arg)>;
                     if constexpr (std::is_same_v<T, std::string>)

@@ -282,9 +282,9 @@ __wt_chunkcache_metadata_create(WT_SESSION_IMPL *session)
       conn, "chunkcache-metadata-server", true, 0, 0, &conn->chunkcache_metadata_session));
     session = conn->chunkcache_metadata_session;
 
-    WT_ERR(__chunkcache_apply_metadata_content(session));
-
     WT_ERR(__wt_cond_alloc(session, "chunk cache metadata", &conn->chunkcache_metadata_cond));
+
+    WT_ERR(__chunkcache_apply_metadata_content(session));
 
     /* Start the thread. */
     WT_ERR(__wt_thread_create(

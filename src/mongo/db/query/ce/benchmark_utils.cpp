@@ -142,12 +142,12 @@ void Benchmark::runBenchmark(const std::string& pipeline, size_t numIterations) 
     }
 }
 
-CEType CardinalityEstimatorWrapper::deriveCE(const Metadata& metadata,
-                                             const cascades::Memo& memo,
-                                             const properties::LogicalProps& logicalProps,
-                                             ABT::reference_type logicalNodeRef) const {
+CERecord CardinalityEstimatorWrapper::deriveCE(const Metadata& metadata,
+                                               const cascades::Memo& memo,
+                                               const properties::LogicalProps& logicalProps,
+                                               ABT::reference_type logicalNodeRef) const {
     Nanoseconds elapsed(0);
-    CEType ce = [&]() {
+    CERecord ce = [&]() {
         auto timer = _benchmark->getTimer(&elapsed);
         return _estimator->deriveCE(metadata, memo, logicalProps, logicalNodeRef);
     }();

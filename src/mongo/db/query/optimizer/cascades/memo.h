@@ -322,7 +322,8 @@ private:
     };
     // For every individually estimated sargable predicate, cache its CE. We also include the input
     // groupId in the cache key.
-    opt::unordered_map<std::pair<GroupIdType, PartialSchemaEntry>, CEType, Hasher> _estimatesCache;
+    opt::unordered_map<std::pair<GroupIdType, PartialSchemaEntry>, CERecord, Hasher>
+        _estimatesCache;
 
     // Used to find nodes using particular groups as inputs.
     InputGroupsToNodeIdMap _inputGroupsToNodeIdMap;

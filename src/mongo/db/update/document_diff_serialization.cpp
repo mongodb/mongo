@@ -49,7 +49,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/update/document_diff_serialization.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -68,14 +67,14 @@ void InternalNode::ApproxBSONSizeTracker::addEntry(size_t fieldSize, const Node*
         }
         case (NodeType::kUpdate): {
             if (const auto* elem =
-                    stdx::get_if<BSONElement>(&checked_cast<const UpdateNode*>(node)->elt)) {
+                    get_if<BSONElement>(&checked_cast<const UpdateNode*>(node)->elt)) {
                 _size += elem->valuesize();
             }
             break;
         }
         case (NodeType::kInsert): {
             if (const auto* elem =
-                    stdx::get_if<BSONElement>(&checked_cast<const InsertNode*>(node)->elt)) {
+                    get_if<BSONElement>(&checked_cast<const InsertNode*>(node)->elt)) {
                 _size += elem->valuesize();
             }
             break;
@@ -133,26 +132,25 @@ Node* DocumentSubDiffNode::addChild(StringData fieldName, std::unique_ptr<Node> 
 }
 
 namespace {
-void appendElementToBuilder(stdx::variant<mutablebson::Element, BSONElement> elem,
+void appendElementToBuilder(std::variant<mutablebson::Element, BSONElement> elem,
                             StringData fieldName,
                             BSONObjBuilder* builder) {
-    stdx::visit(
-        OverloadedVisitor{[&](const mutablebson::Element& element) {
-                              if (element.hasValue()) {
-                                  builder->appendAs(element.getValue(), fieldName);
-                              } else if (element.getType() == BSONType::Object) {
-                                  BSONObjBuilder subBuilder(builder->subobjStart(fieldName));
-                                  element.writeChildrenTo(&subBuilder);
-                              } else {
-                                  invariant(element.getType() == BSONType::Array);
-                                  BSONArrayBuilder subBuilder(builder->subarrayStart(fieldName));
-                                  element.writeArrayTo(&subBuilder);
-                              }
-                          },
-                          [&](BSONElement element) {
-                              builder->appendAs(element, fieldName);
-                          }},
-        elem);
+    visit(OverloadedVisitor{[&](const mutablebson::Element& element) {
+                                if (element.hasValue()) {
+                                    builder->appendAs(element.getValue(), fieldName);
+                                } else if (element.getType() == BSONType::Object) {
+                                    BSONObjBuilder subBuilder(builder->subobjStart(fieldName));
+                                    element.writeChildrenTo(&subBuilder);
+                                } else {
+                                    invariant(element.getType() == BSONType::Array);
+                                    BSONArrayBuilder subBuilder(builder->subarrayStart(fieldName));
+                                    element.writeArrayTo(&subBuilder);
+                                }
+                            },
+                            [&](BSONElement element) {
+                                builder->appendAs(element, fieldName);
+                            }},
+          elem);
 }
 
 // Construction of the $v:2 diff needs to handle the same number of levels of recursion as the
@@ -436,7 +434,7 @@ doc_diff::DiffType identifyType(const BSONObj& diff) {
     return DiffType::kDocument;
 }
 
-stdx::variant<DocumentDiffReader, ArrayDiffReader> getReader(const Diff& diff) {
+std::variant<DocumentDiffReader, ArrayDiffReader> getReader(const Diff& diff) {
     const auto type = identifyType(diff);
     if (type == DiffType::kArray) {
         return ArrayDiffReader(diff);
@@ -503,11 +501,10 @@ boost::optional<std::pair<size_t, ArrayDiffReader::ArrayModification>> ArrayDiff
                 str::stream() << "expected sub diff at index " << idx << " but got " << next,
                 next.type() == BSONType::Object);
 
-        auto modification =
-            stdx::visit(OverloadedVisitor{[](const auto& reader) -> ArrayModification {
-                            return {reader};
-                        }},
-                        getReader(next.embeddedObject()));
+        auto modification = visit(OverloadedVisitor{[](const auto& reader) -> ArrayModification {
+                                      return {reader};
+                                  }},
+                                  getReader(next.embeddedObject()));
         return {{idx, modification}};
     } else {
         uasserted(4770502,
@@ -597,7 +594,7 @@ boost::optional<BSONElement> DocumentDiffReader::nextInsert() {
     return _inserts->next();
 }
 
-boost::optional<std::pair<StringData, stdx::variant<DocumentDiffReader, ArrayDiffReader>>>
+boost::optional<std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>>
 DocumentDiffReader::nextSubDiff() {
     if (!_subDiffs || !_subDiffs->more()) {
         return {};

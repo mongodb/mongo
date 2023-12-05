@@ -44,8 +44,8 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
-#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/namespace_string_util.h"
@@ -126,6 +126,30 @@ void DocumentSourceListSampledQueries::reattachToOperationContext(OperationConte
     if (_pipeline) {
         _pipeline->reattachToOperationContext(opCtx);
     }
+}
+
+std::unique_ptr<DocumentSourceListSampledQueries::LiteParsed>
+DocumentSourceListSampledQueries::LiteParsed::parse(const NamespaceString& nss,
+                                                    const BSONElement& specElem) {
+    uassert(6876000,
+            str::stream() << kStageName << " must take a nested object but found: " << specElem,
+            specElem.type() == BSONType::Object);
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << kStageName << " is not supported on a standalone mongod",
+            serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
+                repl::ReplicationCoordinator::get(getGlobalServiceContext())
+                    ->getSettings()
+                    .isReplSet());
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << kStageName << " is not supported on a multitenant replica set",
+            !gMultitenancySupport);
+
+    auto spec = DocumentSourceListSampledQueriesSpec::parse(IDLParserContext(kStageName),
+                                                            specElem.embeddedObject());
+    if (spec.getNamespace()) {
+        uassertStatusOK(validateNamespace(*spec.getNamespace()));
+    }
+    return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));
 }
 
 }  // namespace analyze_shard_key

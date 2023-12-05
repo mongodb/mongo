@@ -105,7 +105,6 @@ extern "C" {
 #include "mongo/platform/random.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/str.h"
@@ -4156,18 +4155,15 @@ bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType) {
         return false;
     }
 
-    return stdx::visit(OverloadedVisitor{[&](QueryTypeConfig query) {
-                                             return (query.getQueryType() == queryType);
-                                         },
-                                         [&](std::vector<QueryTypeConfig> queries) {
-                                             return std::any_of(queries.cbegin(),
-                                                                queries.cend(),
-                                                                [&](const QueryTypeConfig& qtc) {
-                                                                    return qtc.getQueryType() ==
-                                                                        queryType;
-                                                                });
-                                         }},
-                       field.getQueries().get());
+    return visit(OverloadedVisitor{
+                     [&](QueryTypeConfig query) { return (query.getQueryType() == queryType); },
+                     [&](std::vector<QueryTypeConfig> queries) {
+                         return std::any_of(
+                             queries.cbegin(), queries.cend(), [&](const QueryTypeConfig& qtc) {
+                                 return qtc.getQueryType() == queryType;
+                             });
+                     }},
+                 field.getQueries().get());
 }
 
 bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType) {

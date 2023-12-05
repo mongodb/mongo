@@ -435,14 +435,14 @@ public:
         }
 
         auto newWorks =
-            stdx::visit(OverloadedVisitor{[](const plan_ranker::StatsDetails& details) {
-                                              return details.candidatePlanStats[0]->common.works;
-                                          },
-                                          [](const plan_ranker::SBEStatsDetails& details) {
-                                              return calculateNumberOfReads(
-                                                  details.candidatePlanStats[0].get());
-                                          }},
-                        why.stats);
+            visit(OverloadedVisitor{[](const plan_ranker::StatsDetails& details) {
+                                        return details.candidatePlanStats[0]->common.works;
+                                    },
+                                    [](const plan_ranker::SBEStatsDetails& details) {
+                                        return calculateNumberOfReads(
+                                            details.candidatePlanStats[0].get());
+                                    }},
+                  why.stats);
 
         auto oldEntryWithPartitionLock = this->getWithPartitionLock(key);
         // Can't use reference to structured bindings in a lambda until C++20 so manually

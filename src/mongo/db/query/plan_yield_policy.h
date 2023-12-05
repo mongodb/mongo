@@ -39,7 +39,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -202,7 +201,7 @@ public:
                     ClockSource* cs,
                     int yieldIterations,
                     Milliseconds yieldPeriod,
-                    stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+                    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
                     std::unique_ptr<const YieldPolicyCallbacks> callbacks);
 
     virtual ~PlanYieldPolicy() = default;
@@ -295,7 +294,7 @@ public:
     }
 
     bool usesCollectionAcquisitions() const {
-        return stdx::holds_alternative<YieldThroughAcquisitions>(_yieldable);
+        return holds_alternative<YieldThroughAcquisitions>(_yieldable);
     }
 
 private:
@@ -329,7 +328,7 @@ private:
                                       std::function<void()> whileYieldingFn);
 
     const YieldPolicy _policy;
-    stdx::variant<const Yieldable*, YieldThroughAcquisitions> _yieldable;
+    std::variant<const Yieldable*, YieldThroughAcquisitions> _yieldable;
     std::unique_ptr<const YieldPolicyCallbacks> _callbacks;
 
     bool _forceYield = false;

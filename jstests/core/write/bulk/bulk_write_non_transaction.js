@@ -422,7 +422,7 @@ assert.eq(res.cursor.firstBatch[0].errmsg,
 
 coll.drop();
 
-// Test errorsOnly.
+// Test errorsOnly with a failure.
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [{insert: 0, document: {_id: 1}}, {insert: 0, document: {_id: 1}}],

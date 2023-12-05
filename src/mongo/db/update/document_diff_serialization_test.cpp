@@ -40,7 +40,6 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/document_diff_test_helpers.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -150,7 +149,7 @@ TEST(DiffSerializationTest, SubDiff) {
     {
         auto [name, subDiffVar] = *reader.nextSubDiff();
         ASSERT_EQ(name, "obj");
-        auto subReader = stdx::get<DocumentDiffReader>(subDiffVar);
+        auto subReader = get<DocumentDiffReader>(subDiffVar);
 
         ASSERT_EQ(*subReader.nextDelete(), "dField");
         ASSERT(subReader.nextDelete() == boost::none);
@@ -199,20 +198,20 @@ TEST(DiffSerializationTest, SubArrayWithSubDiff) {
     {
         auto [name, subDiffVar] = *reader.nextSubDiff();
         ASSERT_EQ(name, "arr");
-        auto subReader = stdx::get<ArrayDiffReader>(subDiffVar);
+        auto subReader = get<ArrayDiffReader>(subDiffVar);
 
         // There should be an 'update' at index 0.
         {
             auto [index, mod] = *subReader.next();
             ASSERT_EQ(index, 0);
-            ASSERT(stdx::get<BSONElement>(mod).binaryEqualValues(kDummyObj["b"]));
+            ASSERT(get<BSONElement>(mod).binaryEqualValues(kDummyObj["b"]));
         }
 
         // There should be a sub-diff at index 2.
         {
             auto [index, subSubReaderVar] = *subReader.next();
             ASSERT_EQ(index, 2);
-            auto subSubReader = stdx::get<DocumentDiffReader>(subSubReaderVar);
+            auto subSubReader = get<DocumentDiffReader>(subSubReaderVar);
 
             ASSERT_EQ(*subSubReader.nextDelete(), "dField");
             ASSERT(subSubReader.nextDelete() == boost::none);
@@ -225,7 +224,7 @@ TEST(DiffSerializationTest, SubArrayWithSubDiff) {
         {
             auto [index, mod] = *subReader.next();
             ASSERT_EQ(index, 5);
-            ASSERT(stdx::get<BSONElement>(mod).binaryEqualValues(kDummyObj["a"]));
+            ASSERT(get<BSONElement>(mod).binaryEqualValues(kDummyObj["a"]));
 
             ASSERT(subReader.next() == boost::none);
         }
@@ -291,13 +290,13 @@ TEST(DiffSerializationTest, SubArrayHighIndex) {
         auto [name, subDiffVar] = *reader.nextSubDiff();
         ASSERT_EQ(name, "subArray");
 
-        auto subReader = stdx::get<ArrayDiffReader>(subDiffVar);
+        auto subReader = get<ArrayDiffReader>(subDiffVar);
 
         // There should be an 'update' at index 254.
         {
             auto [index, bsonElem] = *subReader.next();
             ASSERT_EQ(index, 254);
-            ASSERT(stdx::get<BSONElement>(bsonElem).binaryEqualValues(kDummyObj["b"]));
+            ASSERT(get<BSONElement>(bsonElem).binaryEqualValues(kDummyObj["b"]));
         }
 
         ASSERT(subReader.newSize() == boost::none);

@@ -118,7 +118,7 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
  * Returns an update request to the bucket when the 'measurements' is non-empty. Otherwise, returns
  * a delete request to the bucket.
  */
-stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
+std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
     const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements);
 
 using TimeseriesBatches = std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>;
@@ -232,8 +232,8 @@ void performAtomicWrites(
     OperationContext* opCtx,
     const CollectionPtr& coll,
     const RecordId& recordId,
-    const boost::optional<stdx::variant<write_ops::UpdateCommandRequest,
-                                        write_ops::DeleteCommandRequest>>& modificationOp,
+    const boost::optional<std::variant<write_ops::UpdateCommandRequest,
+                                       write_ops::DeleteCommandRequest>>& modificationOp,
     const std::vector<write_ops::InsertCommandRequest>& insertOps,
     const std::vector<write_ops::UpdateCommandRequest>& updateOps,
     bool fromMigrate,

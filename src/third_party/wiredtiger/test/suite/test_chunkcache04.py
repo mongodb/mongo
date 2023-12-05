@@ -26,14 +26,15 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, sys
+import os, sys, time
 import wiredtiger, wttest
 
+from test_chunkcache01 import stat_assert_equal, stat_assert_greater
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 '''
-Functional testing for ingesting new content into the chunk cache. 
+Functional testing for ingesting new content into the chunk cache.
 - Verify ingests are taking place with both pinned and unpinned chunks.
 - Verify that when ingesting new chunks with old pinned objects, we are releasing the pin on the old objects.
 '''
@@ -69,6 +70,7 @@ class test_chunkcache04(wttest.WiredTigerTestCase):
         extlist.extension('storage_sources', 'dir_store')
 
     def get_stat(self, stat):
+        time.sleep(0.5) # Try to avoid race conditions.
         stat_cursor = self.session.open_cursor('statistics:')
         val = stat_cursor[stat][2]
         stat_cursor.close()
@@ -89,14 +91,14 @@ class test_chunkcache04(wttest.WiredTigerTestCase):
             self.insert(uris[i], dataset)
 
         # As we have not flushed yet, assert we have no newly inserted chunks.
-        self.assertEqual(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables), 0)
+        stat_assert_equal(self.session, wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables, 0)
 
         # Flush the unpinned tables into the chunk cache.
         self.session.checkpoint()
         self.session.checkpoint('flush_tier=(enabled)')
 
         # Assert that chunks are not pinned.
-        self.assertEqual(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_pinned), 0)
+        stat_assert_equal(self.session, wiredtiger.stat.conn.chunkcache_chunks_pinned, 0)
 
         # Assert the new chunks are ingested.
         first_ingest = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables)

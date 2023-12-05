@@ -92,9 +92,15 @@ public:
                                                      sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledRemove = compileAggExpression(*removeExpr, &aggAccessor);
 
-        auto finalizeExpr = sbe::makeE<sbe::EFunction>(
-            "aggRemovable" + std::string(isMin ? "Min" : "Max") + "Finalize",
-            sbe::makeEs(makeE<EVariable>(aggSlot)));
+        auto finalizeExpr = sbe::makeE<sbe::EPrimBinary>(
+            sbe::EPrimBinary::fillEmpty,
+            sbe::makeE<sbe::EFunction>(
+                "getElement",
+                sbe::makeEs(sbe::makeE<sbe::EFunction>(
+                                "aggRemovable" + std::string(isMin ? "MinN" : "MaxN") + "Finalize",
+                                sbe::makeEs(makeE<EVariable>(aggSlot))),
+                            makeE<EConstant>(value::TypeTags::NumberInt32, 0))),
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
         auto compiledFinalize = compileExpression(*finalizeExpr);
 
         auto [stateTag, stateVal] = runCompiledExpression(compiledInit.get());

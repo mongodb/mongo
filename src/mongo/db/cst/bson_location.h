@@ -31,11 +31,11 @@
 
 #include <sstream>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
@@ -45,11 +45,11 @@ namespace mongo {
  */
 class BSONLocation {
 public:
-    using LocationPrefix = stdx::variant<unsigned int, StringData>;
+    using LocationPrefix = std::variant<unsigned int, StringData>;
     // A location may be either the payload of a BSONElement, or a string representing a fieldname
     // or metadata token (e.g. '{' for the start of an object). Array indices are not represented as
     // a BSONLocation, per se, but instead are part of the list of prefix descriptors.
-    using LocationType = stdx::variant<BSONElement, StringData>;
+    using LocationType = std::variant<BSONElement, StringData>;
 
     BSONLocation() = default;
     /**
@@ -66,32 +66,31 @@ public:
      */
     std::string toString() const {
         std::ostringstream stream;
-        stdx::visit(OverloadedVisitor{[&](const BSONElement& elem) {
-                                          stream << "'" << elem.toString(false) << "'";
-                                      },
-                                      [&](const StringData& elem) {
-                                          stream << "'" << elem << "'";
-                                      }},
-                    _location);
+        visit(OverloadedVisitor{
+                  [&](const BSONElement& elem) { stream << "'" << elem.toString(false) << "'"; },
+                  [&](const StringData& elem) {
+                      stream << "'" << elem << "'";
+                  }},
+              _location);
         // The assumption is that there is always at least one prefix that represents the entry
         // point to the parser (e.g. the 'pipeline' argument for an aggregation command).
         invariant(_prefix.size() > 0);
         for (auto it = _prefix.rbegin(); it != _prefix.rend() - 1; ++it) {
-            stdx::visit(OverloadedVisitor{[&](const unsigned int& index) {
-                                              stream << " within array at index " << index;
-                                          },
-                                          [&](const StringData& pref) {
-                                              stream << " within '" << pref << "'";
-                                          }},
-                        *it);
+            visit(OverloadedVisitor{[&](const unsigned int& index) {
+                                        stream << " within array at index " << index;
+                                    },
+                                    [&](const StringData& pref) {
+                                        stream << " within '" << pref << "'";
+                                    }},
+                  *it);
         }
 
         // The final prefix (or first element in the vector) is the input description.
-        stdx::visit(OverloadedVisitor{[&](const unsigned int& index) { MONGO_UNREACHABLE; },
-                                      [&](const StringData& pref) {
-                                          stream << " of input " << pref;
-                                      }},
-                    _prefix[0]);
+        visit(OverloadedVisitor{[&](const unsigned int& index) { MONGO_UNREACHABLE; },
+                                [&](const StringData& pref) {
+                                    stream << " of input " << pref;
+                                }},
+              _prefix[0]);
         return stream.str();
     }
 

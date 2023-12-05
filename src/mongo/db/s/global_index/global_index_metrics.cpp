@@ -43,7 +43,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/s/global_index/global_index_cloner_gen.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
@@ -134,13 +133,12 @@ BSONObj GlobalIndexMetrics::getOriginalCommand(const CommonGlobalIndexMetadata& 
 }
 
 StringData GlobalIndexMetrics::getStateString() const noexcept {
-    return stdx::visit(OverloadedVisitor{[](GlobalIndexCoordinatorStateEnumPlaceholder state) {
-                                             return "TODO"_sd;
-                                         },
-                                         [](GlobalIndexClonerStateEnum state) {
-                                             return GlobalIndexClonerState_serializer(state);
-                                         }},
-                       _stateHolder.getState());
+    return visit(OverloadedVisitor{
+                     [](GlobalIndexCoordinatorStateEnumPlaceholder state) { return "TODO"_sd; },
+                     [](GlobalIndexClonerStateEnum state) {
+                         return GlobalIndexClonerState_serializer(state);
+                     }},
+                 _stateHolder.getState());
 }
 
 BSONObj GlobalIndexMetrics::reportForCurrentOp() const noexcept {

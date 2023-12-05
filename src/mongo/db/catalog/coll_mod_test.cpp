@@ -176,7 +176,7 @@ TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
     // timeseriesBucketingParametersHaveChanged() returns false.
     CollMod collModCmd(curNss);
     CollModRequest collModRequest;
-    stdx::variant<std::string, std::int64_t> expireAfterSeconds = 100;
+    std::variant<std::string, std::int64_t> expireAfterSeconds = 100;
     collModRequest.setExpireAfterSeconds(expireAfterSeconds);
     collModCmd.setCollModRequest(collModRequest);
     BSONObjBuilder result;

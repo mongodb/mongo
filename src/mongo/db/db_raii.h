@@ -35,6 +35,7 @@
 #include <set>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -51,7 +52,6 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/view.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"

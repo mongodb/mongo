@@ -289,72 +289,72 @@ public:
           _fallbackCE(std::move(fallbackCE)),
           _arrayOnlyInterval(*defaultConvertPathToInterval(make<PathArr>())) {}
 
-    CEType transport(const ABT::reference_type n,
-                     const ScanNode& node,
-                     const cascades::Memo& memo,
-                     const properties::LogicalProps& logicalProps,
-                     CEType /*bindResult*/) {
-        return {_stats->getCardinality()};
+    CERecord transport(const ABT::reference_type n,
+                       const ScanNode& node,
+                       const cascades::Memo& memo,
+                       const properties::LogicalProps& logicalProps,
+                       CERecord /*bindResult*/) {
+        return {_stats->getCardinality(), histogramLabel};
     }
 
-    CEType transport(const ABT::reference_type n,
-                     const SargableNode& node,
-                     const Metadata& metadata,
-                     const cascades::Memo& memo,
-                     const properties::LogicalProps& logicalProps,
-                     CEType childResult,
-                     CEType /*bindsResult*/,
-                     CEType /*refsResult*/) {
+    CERecord transport(const ABT::reference_type n,
+                       const SargableNode& node,
+                       const Metadata& metadata,
+                       const cascades::Memo& memo,
+                       const properties::LogicalProps& logicalProps,
+                       CERecord childResult,
+                       CERecord /*bindsResult*/,
+                       CERecord /*refsResult*/) {
         // Early out and return 0 since we don't expect to get more results.
-        if (childResult == 0.0) {
-            return {0.0};
+        if (childResult._ce == 0.0) {
+            return childResult;
         }
 
         SelectivityTreeBuilder selTreeBuilder;
         selTreeBuilder.pushDisj();
         PSRExpr::visitDisjuncts(node.getReqMap(),
                                 [&](const PSRExpr::Node& n, const PSRExpr::VisitorContext&) {
-                                    estimateConjunct(n, selTreeBuilder, childResult);
+                                    estimateConjunct(n, selTreeBuilder, childResult._ce);
                                 });
 
         if (auto selTree = selTreeBuilder.finish()) {
             const SelectivityType topLevelSel = estimateSelectivityTree(*selTree);
-            childResult *= topLevelSel;
+            childResult._ce *= topLevelSel;
         }
 
         OPTIMIZER_DEBUG_LOG(7151304,
                             5,
                             "Final estimate for SargableNode using histograms.",
                             "node"_attr = ExplainGenerator::explainV2(n),
-                            "cardinality"_attr = childResult._value);
-        return childResult;
+                            "cardinality"_attr = childResult._ce._value);
+        return {childResult._ce, histogramLabel};
     }
 
-    CEType transport(const ABT::reference_type n,
-                     const RootNode& node,
-                     const Metadata& metadata,
-                     const cascades::Memo& memo,
-                     const properties::LogicalProps& logicalProps,
-                     CEType childResult,
-                     CEType /*refsResult*/) {
+    CERecord transport(const ABT::reference_type n,
+                       const RootNode& node,
+                       const Metadata& metadata,
+                       const cascades::Memo& memo,
+                       const properties::LogicalProps& logicalProps,
+                       CERecord childResult,
+                       CERecord /*refsResult*/) {
         // Root node does not change cardinality.
-        return childResult;
+        return {childResult._ce, histogramLabel};
     }
 
     /**
      * Use fallback for other ABT types.
      */
     template <typename T, typename... Ts>
-    CEType transport(ABT::reference_type n,
-                     const T& /*node*/,
-                     const Metadata& metadata,
-                     const cascades::Memo& memo,
-                     const properties::LogicalProps& logicalProps,
-                     Ts&&...) {
+    CERecord transport(ABT::reference_type n,
+                       const T& /*node*/,
+                       const Metadata& metadata,
+                       const cascades::Memo& memo,
+                       const properties::LogicalProps& logicalProps,
+                       Ts&&...) {
         if (canBeLogicalNode<T>()) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
         }
-        return {0.0};
+        return {0.0, "Not a Node"};
     }
 
 private:
@@ -467,6 +467,8 @@ private:
     // This is a special interval indicating that we expect to use $elemMatch semantics when
     // estimating the current path.
     const IntervalReqExpr::Node _arrayOnlyInterval;
+
+    static constexpr char histogramLabel[] = "histogram";
 };
 
 HistogramEstimator::HistogramEstimator(std::shared_ptr<stats::CollectionStatistics> stats,
@@ -475,10 +477,10 @@ HistogramEstimator::HistogramEstimator(std::shared_ptr<stats::CollectionStatisti
 
 HistogramEstimator::~HistogramEstimator() {}
 
-CEType HistogramEstimator::deriveCE(const Metadata& metadata,
-                                    const cascades::Memo& memo,
-                                    const properties::LogicalProps& logicalProps,
-                                    const ABT::reference_type logicalNodeRef) const {
+CERecord HistogramEstimator::deriveCE(const Metadata& metadata,
+                                      const cascades::Memo& memo,
+                                      const properties::LogicalProps& logicalProps,
+                                      const ABT::reference_type logicalNodeRef) const {
     return algebra::transport<true>(
         logicalNodeRef, *this->_transport, metadata, memo, logicalProps);
 }

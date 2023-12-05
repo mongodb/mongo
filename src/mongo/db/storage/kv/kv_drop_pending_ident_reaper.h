@@ -90,7 +90,7 @@ public:
      * - (CheckpointIteration) The catalog has made its changes durable.
      */
     void addDropPendingIdent(
-        const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
+        const std::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
         std::shared_ptr<Ident> ident,
         StorageEngine::DropIdentCallback&& onDrop = nullptr);
 
@@ -155,7 +155,7 @@ private:
         // The collection or index data can be safely dropped when no references to this token
         // remain and the catalog has checkpointed the changes. The latter is mostly useful for
         // untimestamped writes.
-        stdx::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
+        std::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
         std::weak_ptr<Ident> dropToken;
 
         // Callback to run once the ident has been dropped.

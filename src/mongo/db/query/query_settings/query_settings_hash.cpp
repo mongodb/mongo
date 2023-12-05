@@ -44,17 +44,17 @@ size_t hash(const QuerySettings& querySettings) {
                 boost::hash_combine(hash, hint.hash());
             }
         };
-        stdx::visit(OverloadedVisitor{
-                        [&](const std::vector<IndexHintSpec>& hintSpecs) {
-                            for (const auto& hintSpec : hintSpecs) {
-                                hashVectorOfHints(hintSpec.getAllowedIndexes());
-                            }
-                        },
-                        [&](const IndexHintSpec& hintSpec) {
-                            hashVectorOfHints(hintSpec.getAllowedIndexes());
-                        },
-                    },
-                    *indexHints);
+        visit(OverloadedVisitor{
+                  [&](const std::vector<IndexHintSpec>& hintSpecs) {
+                      for (const auto& hintSpec : hintSpecs) {
+                          hashVectorOfHints(hintSpec.getAllowedIndexes());
+                      }
+                  },
+                  [&](const IndexHintSpec& hintSpec) {
+                      hashVectorOfHints(hintSpec.getAllowedIndexes());
+                  },
+              },
+              *indexHints);
     }
     return hash;
 }

@@ -315,7 +315,7 @@ void logRemoveOperation(Client* client, const NamespaceString& nss, const BSONOb
 
 void logGetClusterParameter(
     Client* client,
-    const stdx::variant<std::string, std::vector<std::string>>& requestedParameters) {
+    const std::variant<std::string, std::vector<std::string>>& requestedParameters) {
     AuditInterface::get(client->getServiceContext())
         ->logGetClusterParameter(client, requestedParameters);
 }

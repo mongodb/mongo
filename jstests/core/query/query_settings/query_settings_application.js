@@ -7,7 +7,6 @@
 //   does_not_support_transactions,
 //   directly_against_shardsvrs_incompatible,
 //   featureFlagQuerySettings,
-//   does_not_support_stepdowns,
 //   simulate_atlas_proxy_incompatible,
 //   cqf_incompatible,
 //   # 'planCacheClear' command is not allowed with the security token.

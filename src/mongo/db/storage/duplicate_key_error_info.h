@@ -39,7 +39,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/record_id.h"
-#include "mongo/stdx/variant.h"
 
 namespace mongo {
 
@@ -51,7 +50,7 @@ enum class IncludeDuplicateRecordId { kOff, kOn };
  */
 class DuplicateKeyErrorInfo final : public ErrorExtraInfo {
 public:
-    using FoundValue = stdx::variant<stdx::monostate, RecordId, BSONObj>;
+    using FoundValue = std::variant<std::monostate, RecordId, BSONObj>;
 
     static constexpr auto code = ErrorCodes::DuplicateKey;
 

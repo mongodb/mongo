@@ -121,10 +121,10 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
         auto card = cht->deriveCE(_metadata, memo, {}, abt.ref());
 
         if constexpr (kCETestLogOnly) {
-            std::cout << "CE: " << card << std::endl;
+            std::cout << "CE: {" << card._ce << ", " << card._mode << "}" << std::endl;
         }
 
-        return card;
+        return card._ce;
     }
 
     boost::optional<CEType> outCard;

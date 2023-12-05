@@ -52,6 +52,7 @@
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/s/analyze_shard_key_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -59,7 +60,6 @@
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
-#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
@@ -258,7 +258,7 @@ protected:
         nsEntry.setNs(nss);
         cmd.setNsInfo({nsEntry});
 
-        std::vector<stdx::variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>> ops;
+        std::vector<std::variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>> ops;
         for (const auto& updateOp : updateOps) {
             BulkWriteUpdateOp op;
             op.setUpdate(0);
@@ -302,7 +302,7 @@ protected:
         nsEntry.setNs(nss);
         cmd.setNsInfo({nsEntry});
 
-        std::vector<stdx::variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>> ops;
+        std::vector<std::variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>> ops;
         for (const auto& deleteOp : deleteOps) {
             BulkWriteDeleteOp op;
             op.setDeleteCommand(0);

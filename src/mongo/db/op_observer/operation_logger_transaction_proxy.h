@@ -30,12 +30,13 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <vector>
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer/oplog_writer.h"
+#include "mongo/db/op_observer/operation_logger.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -46,13 +47,18 @@
 
 namespace mongo {
 
-class OplogWriterImpl : public OplogWriter {
-    OplogWriterImpl(const OplogWriterImpl&) = delete;
-    OplogWriterImpl& operator=(const OplogWriterImpl&) = delete;
+/**
+ * Accumulates replicated operations for multi-document transactions and batched WUOW writes.
+ * When the operations are ready to be replicated, we compose the final chain of applyOps oplog
+ * entries and write it to the actual oplog referenced in '_targetOperationWriter'.
+ */
+class OperationLoggerTransactionProxy : public OperationLogger {
+    OperationLoggerTransactionProxy(const OperationLoggerTransactionProxy&) = delete;
+    OperationLoggerTransactionProxy& operator=(const OperationLoggerTransactionProxy&) = delete;
 
 public:
-    OplogWriterImpl() = default;
-    virtual ~OplogWriterImpl() = default;
+    OperationLoggerTransactionProxy(std::unique_ptr<OperationLogger> targetOperationLogger);
+    virtual ~OperationLoggerTransactionProxy() = default;
 
     void appendOplogEntryChainInfo(OperationContext* opCtx,
                                    repl::MutableOplogEntry* oplogEntry,
@@ -71,6 +77,9 @@ public:
                          bool isAbortIndexBuild) override;
 
     std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override;
+
+private:
+    std::unique_ptr<OperationLogger> _targetOperationLogger;
 };
 
 }  // namespace mongo

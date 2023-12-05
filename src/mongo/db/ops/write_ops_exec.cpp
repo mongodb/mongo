@@ -2667,7 +2667,7 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
         }
 
         auto& result = swResult.getValue();
-        auto* insertResult = stdx::get_if<timeseries::bucket_catalog::SuccessfulInsertion>(&result);
+        auto* insertResult = get_if<timeseries::bucket_catalog::SuccessfulInsertion>(&result);
         invariant(insertResult);
         batches.emplace_back(std::move(insertResult->batch), index);
         const auto& batch = batches.back().first;

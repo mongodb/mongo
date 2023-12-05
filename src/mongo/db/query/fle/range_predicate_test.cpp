@@ -51,7 +51,6 @@
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 #include "mongo/db/query/fle/range_predicate.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -91,7 +90,7 @@ protected:
     }
 
     std::vector<PrfBlock> generateTags(BSONValue payload) const override {
-        return stdx::visit(
+        return visit(
             OverloadedVisitor{[&](BSONElement p) {
                                   if (p.isABSONObj()) {
                                       std::vector<PrfBlock> allTags;

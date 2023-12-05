@@ -145,7 +145,7 @@ def _validate_cpp_type(ctxt, idl_type, syntax_type):
         return
 
     # Support variant for writeConcernW.
-    if idl_type.cpp_type == "stdx::variant<std::string, std::int64_t>":
+    if idl_type.cpp_type == "std::variant<std::string, std::int64_t>":
         return
 
     # Check for std fixed integer types which are not allowed. These are not allowed even if they
@@ -517,7 +517,7 @@ def _bind_variant_field(ctxt, ast_field, idl_type):
             for variant_type in ast_field.type.variant_struct_types:
                 yield variant_type.cpp_type
 
-    ast_field.type.cpp_type = f'stdx::variant<{", ".join(gen_cpp_types())}>'
+    ast_field.type.cpp_type = f'std::variant<{", ".join(gen_cpp_types())}>'
 
     # Validation doc_sequence types
     _validate_doc_sequence_field(ctxt, ast_field)

@@ -78,7 +78,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -629,7 +628,7 @@ StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& ca
     return existingBucket;
 }
 
-stdx::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
+std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     OperationContext* opCtx,
     BucketCatalog& catalog,
     Stripe& stripe,
@@ -800,7 +799,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
             Bucket& bucket = swBucket.getValue().get();
             auto insertionResult = insertIntoBucket(
                 opCtx, catalog, stripe, stripeLock, stripeNumber, doc, combine, mode, info, bucket);
-            auto* batch = stdx::get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
+            auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
             invariant(batch);
             return SuccessfulInsertion{std::move(*batch), std::move(closedBuckets)};
         } else {
@@ -822,11 +821,11 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
 
     auto insertionResult = insertIntoBucket(
         opCtx, catalog, stripe, stripeLock, stripeNumber, doc, combine, mode, info, *bucket);
-    if (auto* batch = stdx::get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
+    if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
         return SuccessfulInsertion{std::move(*batch), std::move(closedBuckets)};
     }
 
-    auto* reason = stdx::get_if<RolloverReason>(&insertionResult);
+    auto* reason = get_if<RolloverReason>(&insertionResult);
     invariant(reason);
     invariant(mode == AllowBucketCreation::kNo);
     if (allCommitted(*bucket)) {
@@ -847,7 +846,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                                mode,
                                                info,
                                                *alternate);
-            if (auto* batch = stdx::get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
+            if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
                 return SuccessfulInsertion{std::move(*batch), std::move(closedBuckets)};
             }
 
@@ -950,17 +949,17 @@ void removeBucket(
                 // When removing a closed bucket, the BucketStateRegistry may contain state for this
                 // bucket due to an untracked ongoing direct write (such as TTL delete).
                 if (state.has_value()) {
-                    invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()),
+                    invariant(holds_alternative<DirectWriteCounter>(state.value()),
                               bucketStateToString(*state));
-                    invariant(stdx::get<DirectWriteCounter>(state.value()) < 0,
+                    invariant(get<DirectWriteCounter>(state.value()) < 0,
                               bucketStateToString(*state));
                 }
             } else {
                 // Ensure that we are in a state of pending compression (represented by a negative
                 // direct write counter).
                 invariant(state.has_value());
-                invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()));
-                invariant(stdx::get<DirectWriteCounter>(state.value()) < 0);
+                invariant(holds_alternative<DirectWriteCounter>(state.value()));
+                invariant(get<DirectWriteCounter>(state.value()) < 0);
             }
             break;
         }

@@ -460,10 +460,12 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  * layer so that it can be executed using SBE. Unless pushdown is completely disabled by
  * {'internalQueryFrameworkControl': 'forceClassicEngine'}, a stage can be extracted from the
  * pipeline if and only if all the stages before it are extracted and it meets the criteria for its
- * stage type:
+ * stage type. When 'internalQueryFrameworkControl' is set to 'trySbeRestricted', only '$group',
+ * '$lookup', '$_internalUnpackBucket', and search can be extracted. Criteria by stage type:
+ *
  * $group via 'DocumentSourceGroup':
  *   - The 'internalQuerySlotBasedExecutionDisableGroupPushdown' knob is false and
- *   - the $group is not a mering operation that aggregates partial groups
+ *   - the $group is not a merging operation that aggregates partial groups
  *     (DocumentSourceGroupBase::doingMerge()).
  *
  * $lookup via 'DocumentSourceLookUp':
@@ -529,12 +531,19 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
     // during the same query.
     // (Ignore FCV check): featureFlagSbeFull does not change the semantics of queries, so it can
     // safely be enabled on some nodes and disabled on other nodes during upgrade/downgrade.
+    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
+
     SbeCompatibility minRequiredCompatibility =
-        feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe()
-        ? SbeCompatibility::flagGuarded
-        : SbeCompatibility::fullyCompatible;
+        sbeFullEnabled ? SbeCompatibility::flagGuarded : SbeCompatibility::fullyCompatible;
 
     auto& queryKnob = QueryKnobConfiguration::decoration(cq->getExpCtxRaw()->opCtx);
+
+    // 'trySbeRestricted' allows only $group, $lookup, $_internalUnpackBucket, and search stages to
+    // be pushed down. However, this can be overridden when 'sbeFullEnabled' is true.
+    const bool doFullPushdown = queryKnob.getInternalQueryFrameworkControlForOp() !=
+            QueryFrameworkControlEnum::kTrySbeRestricted ||
+        sbeFullEnabled;
+
     CompatiblePipelineStages allowedStages = {
         .group = !queryKnob.getSbeDisableGroupPushdownForOp(),
 
@@ -549,20 +558,24 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         .lookup = !queryKnob.getSbeDisableLookupPushdownForOp() && !isMainCollectionSharded &&
             !collections.isAnySecondaryNamespaceAViewOrSharded(),
 
-        .transform = SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
-        .match = SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
+        .transform =
+            doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
+
+        .match = doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
 
         // TODO (SERVER-80226): SBE execution of 'unwind' stages requires 'featureFlagSbeFull' to be
         // enabled.
-        .unwind = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
+        .unwind = doFullPushdown && SbeCompatibility::flagGuarded >= minRequiredCompatibility,
 
         // Note: even if its sort pattern is SBE compatible, we cannot push down a $sort stage when
         // the pipeline is the shard part of a sorted-merge query on a sharded collection. It is
         // possible that the merge operation will need a $sortKey field from the sort, and SBE plans
         // do not yet support metadata fields.
-        .sort = (SbeCompatibility::fullyCompatible >= minRequiredCompatibility) && !needsMerge,
+        .sort = doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility &&
+            !needsMerge,
 
-        .limitSkip = SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
+        .limitSkip =
+            doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
 
         // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
         // enabled.
@@ -570,12 +583,11 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         // 'featureFlagSearchInSbe' are local to this node, making it safe to ignore the FCV.
         .search = feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe(),
 
-        .window = !(SbeCompatibility::fullyCompatible < minRequiredCompatibility),
+        .window = doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
 
         // TODO (SERVER-80243): Remove 'featureFlagTimeSeriesInSbe' check.
         .unpackBucket = feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled(
                             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-
             !queryKnob.getSbeDisableTimeSeriesForOp() &&
             cq->getExpCtx()->sbePipelineCompatibility == SbeCompatibility::fullyCompatible,
     };

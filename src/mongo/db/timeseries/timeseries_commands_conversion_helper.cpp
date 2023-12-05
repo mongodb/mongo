@@ -58,7 +58,6 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -293,7 +292,7 @@ DropIndexes makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
     auto ns = makeTimeseriesBucketsNamespace(origNs);
 
     const auto& origIndex = origCmd.getIndex();
-    if (auto keyPtr = stdx::get_if<BSONObj>(&origIndex)) {
+    if (auto keyPtr = get_if<BSONObj>(&origIndex)) {
         auto bucketsIndexSpecWithStatus =
             timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(options, *keyPtr);
 

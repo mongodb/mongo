@@ -52,7 +52,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
@@ -139,32 +138,31 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
 
         ChangeStreamOptions newOptions = ChangeStreamOptions::parse(ctxt, changeStreamOptionsObj);
         auto preAndPostImages = newOptions.getPreAndPostImages();
-        stdx::visit(
-            OverloadedVisitor{
-                [&](const std::string& expireAfterSeconds) {
-                    if (expireAfterSeconds != "off"_sd) {
-                        validateStatus = {
-                            ErrorCodes::BadValue,
-                            "Non-numeric value of 'expireAfterSeconds' should be 'off'"};
-                    }
-                },
-                [&](const std::int64_t& expireAfterSeconds) {
-                    if (change_stream_serverless_helpers::isServerlessEnvironment()) {
-                        validateStatus = {
-                            ErrorCodes::CommandNotSupported,
-                            "The 'changeStreamOptions.preAndPostImages.expireAfterSeconds' is "
-                            "unsupported in serverless, consider using "
-                            "'changeStreams.expireAfterSeconds' instead."};
-                        return;
-                    }
-                    if (expireAfterSeconds <= 0) {
-                        validateStatus = {
-                            ErrorCodes::BadValue,
-                            "Numeric value of 'expireAfterSeconds' should be positive"};
-                    }
-                },
-            },
-            preAndPostImages.getExpireAfterSeconds());
+        visit(OverloadedVisitor{
+                  [&](const std::string& expireAfterSeconds) {
+                      if (expireAfterSeconds != "off"_sd) {
+                          validateStatus = {
+                              ErrorCodes::BadValue,
+                              "Non-numeric value of 'expireAfterSeconds' should be 'off'"};
+                      }
+                  },
+                  [&](const std::int64_t& expireAfterSeconds) {
+                      if (change_stream_serverless_helpers::isServerlessEnvironment()) {
+                          validateStatus = {
+                              ErrorCodes::CommandNotSupported,
+                              "The 'changeStreamOptions.preAndPostImages.expireAfterSeconds' is "
+                              "unsupported in serverless, consider using "
+                              "'changeStreams.expireAfterSeconds' instead."};
+                          return;
+                      }
+                      if (expireAfterSeconds <= 0) {
+                          validateStatus = {
+                              ErrorCodes::BadValue,
+                              "Numeric value of 'expireAfterSeconds' should be positive"};
+                      }
+                  },
+              },
+              preAndPostImages.getExpireAfterSeconds());
 
         return validateStatus;
     } catch (const AssertionException& ex) {

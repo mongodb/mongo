@@ -110,7 +110,7 @@ void createQEClusteredStateCollection(OperationContext* opCtx, const NamespaceSt
     CreateCommand createCmd(nss);
     static const mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
     CreateCollectionRequest request;
-    request.setClusteredIndex(stdx::variant<bool, mongo::ClusteredIndexSpec>(clusterIdxSpec));
+    request.setClusteredIndex(std::variant<bool, mongo::ClusteredIndexSpec>(clusterIdxSpec));
     createCmd.setCreateCollectionRequest(std::move(request));
     auto status = doRunCommand(opCtx, nss.dbName(), createCmd);
     if (!status.isOK()) {

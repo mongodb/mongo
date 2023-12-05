@@ -786,7 +786,7 @@ Future<Message> CommonAsioSession::sendHTTPResponse(const BatonHandle& baton) {
 }
 
 bool CommonAsioSession::shouldOverrideMaxConns(
-    const std::vector<stdx::variant<CIDR, std::string>>& exemptions) const {
+    const std::vector<std::variant<CIDR, std::string>>& exemptions) const {
     return transport::util::shouldOverrideMaxConns(remoteAddr(), localAddr(), exemptions);
 }
 

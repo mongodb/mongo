@@ -41,7 +41,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -63,13 +62,13 @@ StatusWith<T> AuthName<T>::parse(StringData str, const boost::optional<TenantId>
 }
 
 template <typename T>
-T AuthName<T>::parseFromVariant(const stdx::variant<std::string, BSONObj>& name,
+T AuthName<T>::parseFromVariant(const std::variant<std::string, BSONObj>& name,
                                 const boost::optional<TenantId>& tenant) {
-    if (stdx::holds_alternative<std::string>(name)) {
-        return uassertStatusOK(parse(stdx::get<std::string>(name)));
+    if (holds_alternative<std::string>(name)) {
+        return uassertStatusOK(parse(get<std::string>(name)));
     }
 
-    return parseFromBSONObj(stdx::get<BSONObj>(name), tenant);
+    return parseFromBSONObj(get<BSONObj>(name), tenant);
 }
 
 template <typename T>

@@ -41,7 +41,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/read_write_concern_provenance.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
@@ -51,7 +50,7 @@ namespace mongo {
 class Status;
 
 using WTags = StringMap<int64_t>;
-using WriteConcernW = stdx::variant<std::string, std::int64_t, WTags>;
+using WriteConcernW = std::variant<std::string, std::int64_t, WTags>;
 
 struct WriteConcernOptions {
 public:
@@ -130,22 +129,22 @@ public:
     }
 
     bool hasCustomWriteMode() const {
-        return stdx::holds_alternative<std::string>(w) &&
-            stdx::get<std::string>(w) != WriteConcernOptions::kMajority;
+        return holds_alternative<std::string>(w) &&
+            get<std::string>(w) != WriteConcernOptions::kMajority;
     }
 
     /**
      * Returns whether this write concern's w parameter is the number 0.
      */
     bool isUnacknowledged() const {
-        return stdx::holds_alternative<int64_t>(w) && stdx::get<int64_t>(w) < 1;
+        return holds_alternative<int64_t>(w) && get<int64_t>(w) < 1;
     }
 
     /**
      * Returns whether this write concern's w parameter is the string "majority".
      */
     bool isMajority() const {
-        return stdx::holds_alternative<std::string>(w) && stdx::get<std::string>(w) == kMajority;
+        return holds_alternative<std::string>(w) && get<std::string>(w) == kMajority;
     }
 
     /**
@@ -160,7 +159,7 @@ public:
      * Note that setting 'w' field to 0 requests no acknowledgment.
      */
     bool requiresWriteAcknowledgement() const {
-        return !stdx::holds_alternative<int64_t>(w) || stdx::get<int64_t>(w) != 0;
+        return !holds_alternative<int64_t>(w) || get<int64_t>(w) != 0;
     }
 
     // The w parameter for this write concern.

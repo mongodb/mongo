@@ -492,7 +492,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
             opCtx,
             bucketsColl.getCollection(),
             recordId,
-            stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{op},
+            std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{op},
             {},
             {},
             /*fromMigrate=*/false,
@@ -562,7 +562,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
             opCtx,
             bucketsColl.getCollection(),
             recordId,
-            stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{op},
+            std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{op},
             {},
             {},
             /*fromMigrate=*/false,
@@ -643,7 +643,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDeleteAndInsert) {
             opCtx,
             bucketsColl.getCollection(),
             recordId1,
-            stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{
+            std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{
                 deleteOp},
             {insertOp},
             {},
@@ -753,7 +753,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
             opCtx,
             bucketsColl.getCollection(),
             recordId1,
-            stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{
+            std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{
                 updateOp},
             {insertOp1, insertOp2},
             {},

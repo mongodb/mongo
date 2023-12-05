@@ -44,7 +44,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -54,7 +53,7 @@ using doc_diff::DocumentDiffReader;
 
 namespace {
 using DeltaUpdateDescription = change_stream_document_diff_parser::DeltaUpdateDescription;
-using FieldNameOrArrayIndex = stdx::variant<StringData, size_t>;
+using FieldNameOrArrayIndex = std::variant<StringData, size_t>;
 
 /**
  * DeltaUpdateDescriptionBuilder is responsible both for tracking the current path as we traverse
@@ -131,9 +130,9 @@ private:
     // Append the given field to the path, and update the path ambiguity information accordingly.
     void _appendFieldToPath(FieldNameOrArrayIndex field) {
         // Resolve the FieldNameOrArrayIndex to one or the other, and append it to the path.
-        const bool isArrayIndex = stdx::holds_alternative<size_t>(field);
-        _fieldRef.appendPart(isArrayIndex ? std::to_string(stdx::get<size_t>(field))
-                                          : stdx::get<StringData>(field));
+        const bool isArrayIndex = holds_alternative<size_t>(field);
+        _fieldRef.appendPart(isArrayIndex ? std::to_string(get<size_t>(field))
+                                          : get<StringData>(field));
 
         // Once a path has become ambiguous, it will remain so as new fields are added. If the final
         // path component is marked ambiguous, retain that value and add the type of the new field.
@@ -194,7 +193,7 @@ private:
 };
 
 void buildUpdateDescriptionWithDeltaOplog(
-    stdx::variant<DocumentDiffReader*, ArrayDiffReader*> reader,
+    std::variant<DocumentDiffReader*, ArrayDiffReader*> reader,
     DeltaUpdateDescriptionBuilder* builder,
     boost::optional<FieldNameOrArrayIndex> currentSubField) {
 
@@ -204,54 +203,54 @@ void buildUpdateDescriptionWithDeltaOplog(
         tempAppend.emplace(*builder, std::move(*currentSubField));
     }
 
-    stdx::visit(
-        OverloadedVisitor{
-            [&](DocumentDiffReader* reader) {
-                boost::optional<BSONElement> nextMod;
-                while ((nextMod = reader->nextUpdate()) || (nextMod = reader->nextInsert())) {
-                    builder->addToUpdatedFields(nextMod->fieldNameStringData(), Value(*nextMod));
-                }
+    visit(OverloadedVisitor{
+              [&](DocumentDiffReader* reader) {
+                  boost::optional<BSONElement> nextMod;
+                  while ((nextMod = reader->nextUpdate()) || (nextMod = reader->nextInsert())) {
+                      builder->addToUpdatedFields(nextMod->fieldNameStringData(), Value(*nextMod));
+                  }
 
-                while (auto nextDelete = reader->nextDelete()) {
-                    builder->addToRemovedFields(*nextDelete);
-                }
+                  while (auto nextDelete = reader->nextDelete()) {
+                      builder->addToRemovedFields(*nextDelete);
+                  }
 
-                while (auto nextSubDiff = reader->nextSubDiff()) {
-                    stdx::variant<DocumentDiffReader*, ArrayDiffReader*> nextReader;
-                    stdx::visit(OverloadedVisitor{[&nextReader](auto& reader) {
-                                    nextReader = &reader;
-                                }},
-                                nextSubDiff->second);
-                    buildUpdateDescriptionWithDeltaOplog(
-                        nextReader, builder, {{nextSubDiff->first}});
-                }
-            },
+                  while (auto nextSubDiff = reader->nextSubDiff()) {
+                      std::variant<DocumentDiffReader*, ArrayDiffReader*> nextReader;
+                      visit(OverloadedVisitor{[&nextReader](auto& reader) {
+                                nextReader = &reader;
+                            }},
+                            nextSubDiff->second);
+                      buildUpdateDescriptionWithDeltaOplog(
+                          nextReader, builder, {{nextSubDiff->first}});
+                  }
+              },
 
-            [&](ArrayDiffReader* reader) {
-                // Cannot be the root of the diff object, so 'fieldRef' should not be empty.
-                tassert(6697700, "Invalid diff or parsing error", builder->numParts() > 0);
+              [&](ArrayDiffReader* reader) {
+                  // Cannot be the root of the diff object, so 'fieldRef' should not be empty.
+                  tassert(6697700, "Invalid diff or parsing error", builder->numParts() > 0);
 
-                // We don't need to add a fieldname, since we already descended into the array diff.
-                if (auto newSize = reader->newSize()) {
-                    builder->addToTruncatedArrays(*newSize);
-                }
+                  // We don't need to add a fieldname, since we already descended into the array
+                  // diff.
+                  if (auto newSize = reader->newSize()) {
+                      builder->addToTruncatedArrays(*newSize);
+                  }
 
-                for (auto nextMod = reader->next(); nextMod; nextMod = reader->next()) {
-                    stdx::visit(OverloadedVisitor{
-                                    [&](BSONElement elem) {
-                                        builder->addToUpdatedFields(nextMod->first, Value(elem));
-                                    },
-
-                                    [&](auto& nextReader) {
-                                        buildUpdateDescriptionWithDeltaOplog(
-                                            &nextReader, builder, {{nextMod->first}});
-                                    },
+                  for (auto nextMod = reader->next(); nextMod; nextMod = reader->next()) {
+                      visit(OverloadedVisitor{
+                                [&](BSONElement elem) {
+                                    builder->addToUpdatedFields(nextMod->first, Value(elem));
                                 },
-                                nextMod->second);
-                }
-            },
-        },
-        reader);
+
+                                [&](auto& nextReader) {
+                                    buildUpdateDescriptionWithDeltaOplog(
+                                        &nextReader, builder, {{nextMod->first}});
+                                },
+                            },
+                            nextMod->second);
+                  }
+              },
+          },
+          reader);
     return;
 }
 

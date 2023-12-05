@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include <cstddef>
+#include <functional>
+#include <string>
+
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
-#include <cstddef>
-#include <vector>
 
 #include "mongo/bson/bson_depth.h"
 

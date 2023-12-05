@@ -29,6 +29,7 @@
 import os, sys
 import wiredtiger, wttest
 
+from test_chunkcache01 import stat_assert_equal, stat_assert_greater
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -63,12 +64,6 @@ class test_chunkcache05(wttest.WiredTigerTestCase):
             extlist.skip_if_missing = True
         extlist.extension('storage_sources', 'dir_store')
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_chunkcache05(self):
         # This test only makes sense on-disk, and WT's filesystem layer doesn't support mmap on
         # big-endian platforms.
@@ -79,8 +74,8 @@ class test_chunkcache05(wttest.WiredTigerTestCase):
         ds.populate()
 
         # Haven't persisted anything yet - check the stats agree.
-        self.assertEqual(self.get_stat(wiredtiger.stat.conn.chunkcache_created_from_metadata), 0)
-        self.assertEqual(self.get_stat(wiredtiger.stat.conn.chunkcache_bytes_read_persistent), 0)
+        stat_assert_equal(self.session, wiredtiger.stat.conn.chunkcache_created_from_metadata, 0)
+        stat_assert_equal(self.session, wiredtiger.stat.conn.chunkcache_bytes_read_persistent, 0)
 
         # Flush the tables into the chunk cache.
         self.session.checkpoint()
@@ -91,9 +86,8 @@ class test_chunkcache05(wttest.WiredTigerTestCase):
 
         # Assert the chunks are read back in on startup. Wait for the stats to indicate
         # that it's done the work.
-        while self.get_stat(wiredtiger.stat.conn.chunkcache_created_from_metadata) == 0:
-            pass
-        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_bytes_read_persistent), 0)
+        stat_assert_greater(self.session, wiredtiger.stat.conn.chunkcache_created_from_metadata, 0)
+        stat_assert_greater(self.session, wiredtiger.stat.conn.chunkcache_bytes_read_persistent, 0)
 
         # Check that our data is all intact.
         ds.check()

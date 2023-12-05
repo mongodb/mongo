@@ -65,7 +65,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
-#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -81,28 +80,7 @@ public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& specElem) {
-            uassert(6876000,
-                    str::stream() << kStageName
-                                  << " must take a nested object but found: " << specElem,
-                    specElem.type() == BSONType::Object);
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << kStageName << " is not supported on a standalone mongod",
-                    serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
-                        repl::ReplicationCoordinator::get(getGlobalServiceContext())
-                            ->getSettings()
-                            .isReplSet());
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << kStageName << " is not supported on a multitenant replica set",
-                    !gMultitenancySupport);
-
-            auto spec = DocumentSourceListSampledQueriesSpec::parse(IDLParserContext(kStageName),
-                                                                    specElem.embeddedObject());
-            if (spec.getNamespace()) {
-                uassertStatusOK(validateNamespace(*spec.getNamespace()));
-            }
-            return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));
-        }
+                                                 const BSONElement& specElem);
 
         explicit LiteParsed(std::string parseTimeName,
                             NamespaceString nss,

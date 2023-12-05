@@ -33,7 +33,6 @@
 #include <variant>
 
 #include "mongo/base/string_data.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -41,37 +40,37 @@ namespace mongo {
 namespace {
 
 TEST(OverloadedVisitorTest, StdxVisit) {
-    auto doVisit = [&](const stdx::variant<int, std::string>& var) {
-        return stdx::visit(OverloadedVisitor{
-                               [](int v) { return 1; },
-                               [](const std::string& v) { return 2; },
-                           },
-                           var);
+    auto doVisit = [&](const std::variant<int, std::string>& var) {
+        return visit(OverloadedVisitor{
+                         [](int v) { return 1; },
+                         [](const std::string& v) { return 2; },
+                     },
+                     var);
     };
     ASSERT_EQ(doVisit(123), 1);
     ASSERT_EQ(doVisit(std::string("hi")), 2);
 }
 
 TEST(OverloadedVisitorTest, Fallback) {
-    auto doVisit = [&](const stdx::variant<int, std::string>& var) {
-        return stdx::visit(OverloadedVisitor{
-                               [](int v) { return 1; },
-                               [](auto&& v) { return 2; },
-                           },
-                           var);
+    auto doVisit = [&](const std::variant<int, std::string>& var) {
+        return visit(OverloadedVisitor{
+                         [](int v) { return 1; },
+                         [](auto&& v) { return 2; },
+                     },
+                     var);
     };
     ASSERT_EQ(doVisit(123), 1);
     ASSERT_EQ(doVisit(std::string("hi")), 2);
 }
 
 TEST(OverloadedVisitorTest, IntegerRank) {
-    auto doVisit = [&](const stdx::variant<int, long, long long>& var) {
-        return stdx::visit(OverloadedVisitor{
-                               [](long long v) { return 1; },
-                               [](long v) { return 2; },
-                               [](int v) { return 3; },
-                           },
-                           var);
+    auto doVisit = [&](const std::variant<int, long, long long>& var) {
+        return visit(OverloadedVisitor{
+                         [](long long v) { return 1; },
+                         [](long v) { return 2; },
+                         [](int v) { return 3; },
+                     },
+                     var);
     };
     ASSERT_EQ(doVisit(123LL), 1);
     ASSERT_EQ(doVisit(123L), 2);
@@ -79,20 +78,20 @@ TEST(OverloadedVisitorTest, IntegerRank) {
 }
 
 TEST(OverloadedVisitorTest, MultiVisit) {
-    stdx::variant<int, std::string> var1;
-    stdx::variant<int, std::string> var2;
-    auto doVisit = [&](const stdx::variant<int, std::string>& a,
-                       const stdx::variant<int, std::string, double>& b) {
-        return stdx::visit(OverloadedVisitor{
-                               [](int a, int b) { return 0; },
-                               [](int a, const std::string& b) { return 1; },
-                               [](int a, double b) { return 2; },
-                               [](const std::string& a, int b) { return 3; },
-                               [](const std::string& a, const std::string& b) { return 4; },
-                               [](const std::string& a, double b) { return 5; },
-                           },
-                           a,
-                           b);
+    std::variant<int, std::string> var1;
+    std::variant<int, std::string> var2;
+    auto doVisit = [&](const std::variant<int, std::string>& a,
+                       const std::variant<int, std::string, double>& b) {
+        return visit(OverloadedVisitor{
+                         [](int a, int b) { return 0; },
+                         [](int a, const std::string& b) { return 1; },
+                         [](int a, double b) { return 2; },
+                         [](const std::string& a, int b) { return 3; },
+                         [](const std::string& a, const std::string& b) { return 4; },
+                         [](const std::string& a, double b) { return 5; },
+                     },
+                     a,
+                     b);
     };
     ASSERT_EQ(doVisit(123, 123), 0);
     ASSERT_EQ(doVisit(123, "b"), 1);

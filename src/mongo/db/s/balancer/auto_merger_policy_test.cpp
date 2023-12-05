@@ -63,7 +63,6 @@
 #include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/uuid.h"
@@ -397,7 +396,7 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledWhenMergeHappened) {
     // Auto-merger returns action for <shard0, test.coll> because there are mergeable chunks
     auto optAction = _automerger.getNextStreamingAction(operationContext());
     ASSERT(optAction.has_value());
-    auto action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    auto action = get<MergeAllChunksOnShardInfo>(*optAction);
     ASSERT_EQ(action.nss, nss);
     ASSERT_EQ(action.shardId, _shard0);
     _automerger.applyActionResult(
@@ -406,7 +405,7 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledWhenMergeHappened) {
     // Auto-merger returns action for <shard1, test.coll> because there are mergeable chunks
     optAction = _automerger.getNextStreamingAction(operationContext());
     ASSERT(optAction.has_value());
-    action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    action = get<MergeAllChunksOnShardInfo>(*optAction);
     ASSERT_EQ(action.nss, nss);
     ASSERT_EQ(action.shardId, _shard1);
     _automerger.applyActionResult(
@@ -416,7 +415,7 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledWhenMergeHappened) {
     // Auto-merger returns action for <shard0, test.coll> because some chunks were previously merged
     optAction = _automerger.getNextStreamingAction(operationContext());
     ASSERT(optAction.has_value());
-    action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    action = get<MergeAllChunksOnShardInfo>(*optAction);
     ASSERT_EQ(action.nss, nss);
     ASSERT_EQ(action.shardId, _shard0);
     _automerger.applyActionResult(
@@ -425,7 +424,7 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledWhenMergeHappened) {
     // Auto-merger returns action for <shard1, test.coll> because some chunks were previously merged
     optAction = _automerger.getNextStreamingAction(operationContext());
     ASSERT(optAction.has_value());
-    action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    action = get<MergeAllChunksOnShardInfo>(*optAction);
     ASSERT_EQ(action.nss, nss);
     ASSERT_EQ(action.shardId, _shard1);
     _automerger.applyActionResult(
@@ -449,7 +448,7 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledUponConflictingOperationInPro
     // Auto-merger returns action for <shard0, test.coll> because there are mergeable chunks
     auto optAction = _automerger.getNextStreamingAction(operationContext());
     ASSERT(optAction.has_value());
-    auto action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    auto action = get<MergeAllChunksOnShardInfo>(*optAction);
     ASSERT_EQ(action.nss, nss);
     ASSERT_EQ(action.shardId, _shard0);
     _automerger.applyActionResult(operationContext(),
@@ -462,7 +461,7 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledUponConflictingOperationInPro
 
     // Auto-merger returns action for <shard0, test.coll> upon ConflictingOperationInProgress
     optAction = _automerger.getNextStreamingAction(operationContext());
-    action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    action = get<MergeAllChunksOnShardInfo>(*optAction);
     ASSERT(optAction.has_value());
     ASSERT_EQ(action.nss, nss);
     ASSERT_EQ(action.shardId, _shard0);

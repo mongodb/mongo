@@ -173,4 +173,119 @@ kv_database::txn_snapshot_nolock(txn_id_t do_not_exclude)
       _last_transaction_id, std::move(active_txn_ids));
 }
 
+/*
+ * kv_database::clear_nolock --
+ *     Clear the contents of the database, assuming the relevant locks are already held.
+ */
+void
+kv_database::clear_nolock()
+{
+    /* Requires: tables lock, transactions lock. */
+
+    /*
+     * Roll back all active transactions. We cannot just clear the table of active transactions, as
+     * that would result in a memory leak due to circular dependencies between updates and
+     * transactions.
+     */
+    rollback_all_nolock();
+
+    /* Clear the tables. */
+    for (auto &p : _tables)
+        p.second->clear();
+}
+
+/*
+ * kv_database::rollback_all_nolock --
+ *     Rollback all transactions, assuming the relevant locks are already held.
+ */
+void
+kv_database::rollback_all_nolock()
+{
+    /*
+     * Fail all active transactions. We have to do this in two steps, as the map of active
+     * transactions will be modified during the calls to rollback.
+     */
+    std::vector<kv_transaction_ptr> to_rollback;
+    for (auto &p : _active_transactions)
+        to_rollback.push_back(p.second);
+    for (auto &p : to_rollback)
+        p->rollback();
+    assert(_active_transactions.empty());
+}
+
+/*
+ * kv_database::restart --
+ *     Simulate restarting the database - either a clean restart or crash and recovery.
+ */
+void
+kv_database::restart(bool crash)
+{
+    std::lock_guard lock_guard1(_tables_lock);
+    std::lock_guard lock_guard2(_transactions_lock);
+
+    /* Fail all active transactions. */
+    rollback_all_nolock();
+
+    /* If we are not crashing, create a checkpoint. */
+    if (!crash)
+        create_checkpoint();
+
+    /* Start WiredTiger. */
+    std::lock_guard lock_guard3(_checkpoints_lock);
+    start_nolock();
+}
+
+/*
+ * kv_database::rollback_to_stable --
+ *     Roll back the database to the latest stable timestamp and transaction snapshot.
+ */
+void
+kv_database::rollback_to_stable(timestamp_t timestamp, kv_transaction_snapshot_ptr snapshot)
+{
+    std::lock_guard lock_guard1(_tables_lock);
+    std::lock_guard lock_guard2(_transactions_lock);
+
+    rollback_to_stable_nolock(timestamp, snapshot);
+}
+
+/*
+ * kv_database::rollback_to_stable_nolock --
+ *     Roll back the database to the latest stable timestamp and transaction snapshot, but without
+ *     locking.
+ */
+void
+kv_database::rollback_to_stable_nolock(timestamp_t timestamp, kv_transaction_snapshot_ptr snapshot)
+{
+    if (!_active_transactions.empty())
+        throw model_exception("There are active transactions");
+
+    for (auto &p : _tables)
+        p.second->rollback_to_stable(timestamp, snapshot);
+}
+
+/*
+ * kv_database::start_nolock --
+ *     Simulate starting WiredTiger, assuming the locks are held.
+ */
+void
+kv_database::start_nolock()
+{
+    /* If there is no nameless checkpoint, we have an empty table. */
+    auto i = _checkpoints.find(std::string(WT_CHECKPOINT));
+    if (i == _checkpoints.end()) {
+        clear_nolock();
+        return;
+    }
+
+    /* Otherwise recover using rollback to stable using the checkpoint. */
+    kv_checkpoint_ptr ckpt = i->second;
+
+    /* If the checkpoint does not have a stable timestamp, do not use it during RTS. */
+    timestamp_t t = ckpt->stable_timestamp();
+    if (t == k_timestamp_none)
+        t = k_timestamp_latest;
+
+    rollback_to_stable_nolock(t, ckpt->snapshot());
+}
+
 } /* namespace model */

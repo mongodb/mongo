@@ -87,6 +87,7 @@ MONGO_WARN_UNUSED_RESULT_FUNCTION PlanStage::StageState handlePlanStageYield(
     try {
         return f();
     } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
+        CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
         yieldHandler();
         return PlanStage::NEED_YIELD;
     } catch (const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e) {

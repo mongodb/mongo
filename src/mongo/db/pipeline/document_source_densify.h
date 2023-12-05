@@ -66,7 +66,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/memory_usage_tracker.h"
@@ -80,7 +79,7 @@ namespace mongo {
 class RangeStatement;
 class DensifyValue {
 public:
-    // Delegate to the zero-argument constructor for stdx::variant<T>. This constructor is needed
+    // Delegate to the zero-argument constructor for std::variant<T>. This constructor is needed
     // for DensifyValue to be able to be the value type in a ValueUnorderedMap.
     DensifyValue() : _value() {}
     DensifyValue(Value val) : _value(val) {}
@@ -94,13 +93,13 @@ public:
      * Convert a DensifyValue into a Value for use in documents/serialization.
      */
     Value toValue() const {
-        return stdx::visit(OverloadedVisitor{[&](Value unwrappedVal) { return unwrappedVal; },
-                                             [&](Date_t dateVal) {
-                                                 return Value(dateVal);
-                                             }
+        return visit(OverloadedVisitor{[&](Value unwrappedVal) { return unwrappedVal; },
+                                       [&](Date_t dateVal) {
+                                           return Value(dateVal);
+                                       }
 
-                           },
-                           _value);
+                     },
+                     _value);
     }
 
     /**
@@ -108,16 +107,16 @@ public:
      * of (lhs - rhs). Returns -1 if lhs < rhs, 0 if lhs == rhs, and 1 if lhs > rhs.
      */
     static int compare(const DensifyValue& lhs, const DensifyValue& rhs) {
-        return stdx::visit(OverloadedVisitor{[&](Value lhsVal) {
-                                                 Value rhsVal = stdx::get<Value>(rhs._value);
-                                                 return Value::compare(lhsVal, rhsVal, nullptr);
-                                             },
-                                             [&](Date_t lhsVal) {
-                                                 Date_t rhsVal = stdx::get<Date_t>(rhs._value);
-                                                 return Value::compare(
-                                                     Value(lhsVal), Value(rhsVal), nullptr);
-                                             }},
-                           lhs._value);
+        return visit(OverloadedVisitor{[&](Value lhsVal) {
+                                           Value rhsVal = get<Value>(rhs._value);
+                                           return Value::compare(lhsVal, rhsVal, nullptr);
+                                       },
+                                       [&](Date_t lhsVal) {
+                                           Date_t rhsVal = get<Date_t>(rhs._value);
+                                           return Value::compare(
+                                               Value(lhsVal), Value(rhsVal), nullptr);
+                                       }},
+                     lhs._value);
     }
 
     /**
@@ -137,11 +136,11 @@ public:
     }
 
     std::string toString() const {
-        return stdx::visit(OverloadedVisitor{[&](Value v) { return v.toString(); },
-                                             [&](Date_t d) {
-                                                 return d.toString();
-                                             }},
-                           _value);
+        return visit(OverloadedVisitor{[&](Value v) { return v.toString(); },
+                                       [&](Date_t d) {
+                                           return d.toString();
+                                       }},
+                     _value);
     }
 
     /**
@@ -158,18 +157,18 @@ public:
      * Delegate to Value::getApproximateSize().
      */
     size_t getApproximateSize() const {
-        return stdx::visit(OverloadedVisitor{[&](Value v) { return v.getApproximateSize(); },
-                                             [&](Date_t d) {
-                                                 return Value(d).getApproximateSize();
-                                             }},
-                           _value);
+        return visit(OverloadedVisitor{[&](Value v) { return v.getApproximateSize(); },
+                                       [&](Date_t d) {
+                                           return Value(d).getApproximateSize();
+                                       }},
+                     _value);
     }
 
     /**
      * Returns true if this DensifyValue is a date.
      */
     bool isDate() const {
-        return stdx::holds_alternative<Date_t>(_value);
+        return holds_alternative<Date_t>(_value);
     }
 
     /**
@@ -177,14 +176,14 @@ public:
      */
     Date_t getDate() const {
         tassert(5733701, "DensifyValue must be a date", isDate());
-        return stdx::get<Date_t>(_value);
+        return get<Date_t>(_value);
     }
 
     /**
      * Returns true if this DensifyValue is a number.
      */
     bool isNumber() const {
-        return stdx::holds_alternative<Value>(_value);
+        return holds_alternative<Value>(_value);
     }
 
     /**
@@ -192,7 +191,7 @@ public:
      */
     Value getNumber() const {
         tassert(5733702, "DensifyValue must be a number", isNumber());
-        return stdx::get<Value>(_value);
+        return get<Value>(_value);
     }
 
     /**
@@ -244,7 +243,7 @@ public:
     }
 
 private:
-    stdx::variant<Value, Date_t> _value;
+    std::variant<Value, Date_t> _value;
 };
 class RangeStatement {
 public:
@@ -258,7 +257,7 @@ public:
     struct Full {};
     struct Partition {};
     typedef std::pair<DensifyValue, DensifyValue> ExplicitBounds;
-    using Bounds = stdx::variant<Full, Partition, ExplicitBounds>;
+    using Bounds = std::variant<Full, Partition, ExplicitBounds>;
 
     Bounds getBounds() const {
         return _bounds;
@@ -280,15 +279,15 @@ public:
     Value serialize(const SerializationOptions& opts) const {
         MutableDocument spec;
         spec[kArgStep] = opts.serializeLiteral(_step);
-        spec[kArgBounds] = stdx::visit(
-            OverloadedVisitor{[&](Full) { return Value(kValFull); },
-                              [&](Partition) { return Value(kValPartition); },
-                              [&](ExplicitBounds bounds) {
-                                  return Value(std::vector<Value>(
-                                      {opts.serializeLiteral(bounds.first.toValue()),
-                                       opts.serializeLiteral(bounds.second.toValue())}));
-                              }},
-            _bounds);
+        spec[kArgBounds] =
+            visit(OverloadedVisitor{[&](Full) { return Value(kValFull); },
+                                    [&](Partition) { return Value(kValPartition); },
+                                    [&](ExplicitBounds bounds) {
+                                        return Value(std::vector<Value>(
+                                            {opts.serializeLiteral(bounds.first.toValue()),
+                                             opts.serializeLiteral(bounds.second.toValue())}));
+                                    }},
+                  _bounds);
         if (_unit)
             spec[kArgUnit] = Value(serializeTimeUnit(*_unit));
         return spec.freezeToValue();

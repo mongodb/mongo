@@ -5375,6 +5375,7 @@ tasks:
   - *kill_processes
   - *cleanup_environment
   - *set_up_venv
+  - func: "configure evergreen api credentials"
   - func: "sync repo with copybara"
 
 - name: monitor_mongo_fork_10gen

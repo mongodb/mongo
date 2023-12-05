@@ -95,7 +95,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
@@ -825,8 +824,7 @@ Status createCollection(OperationContext* opCtx, const CreateCommand& cmd) {
     auto options = CollectionOptions::fromCreateCommand(cmd);
     auto idIndex = std::exchange(options.idIndex, {});
     bool hasExplicitlyDisabledClustering = cmd.getClusteredIndex() &&
-        stdx::holds_alternative<bool>(*cmd.getClusteredIndex()) &&
-        !stdx::get<bool>(*cmd.getClusteredIndex());
+        holds_alternative<bool>(*cmd.getClusteredIndex()) && !get<bool>(*cmd.getClusteredIndex());
     if (!hasExplicitlyDisabledClustering) {
         options = clusterByDefaultIfNecessary(cmd.getNamespace(), std::move(options), idIndex);
     }

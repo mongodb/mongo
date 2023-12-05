@@ -70,7 +70,7 @@ class OperationContext;
 
 struct CanonicalQueryParams {
     boost::intrusive_ptr<ExpressionContext> expCtx;
-    stdx::variant<std::unique_ptr<ParsedFindCommand>, ParsedFindCommandParams> parsedFind;
+    std::variant<std::unique_ptr<ParsedFindCommand>, ParsedFindCommandParams> parsedFind;
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline = {};
     bool explain = false;
     bool isCountLike = false;

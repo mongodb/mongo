@@ -50,7 +50,6 @@
 #include "mongo/db/cst/path.h"
 #include "mongo/platform/basic.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/time_support.h"
 
@@ -58,7 +57,7 @@ namespace mongo {
 
 using UserFieldname = std::string;
 // These all indicate simple inclusion projection and are used as leaves in CompoundInclusion.
-using NonZeroKey = stdx::variant<int, long long, double, Decimal128>;
+using NonZeroKey = std::variant<int, long long, double, Decimal128>;
 // These are the non-compound types from bsonspec.org.
 using UserDouble = double;
 using UserString = std::string;
@@ -123,14 +122,14 @@ struct CNode {
      * CNode does not represent an array. Const version.
      */
     auto& arrayChildren() const {
-        return stdx::get<ArrayChildren>(payload);
+        return get<ArrayChildren>(payload);
     }
     /*
      * Produce the children of this CNode representing an array. Throws a fatal exception if this
      * CNode does not represent an array. Non-const version.
      */
     auto& arrayChildren() {
-        return stdx::get<ArrayChildren>(payload);
+        return get<ArrayChildren>(payload);
     }
 
     /*
@@ -138,14 +137,14 @@ struct CNode {
      * CNode does not represent an object. Const version.
      */
     auto& objectChildren() const {
-        return stdx::get<ObjectChildren>(payload);
+        return get<ObjectChildren>(payload);
     }
     /*
      * Produce the children of this CNode representing an object. Throws a fatal exception if this
      * CNode does not represent an object. Non-const version.
      */
     auto& objectChildren() {
-        return stdx::get<ObjectChildren>(payload);
+        return get<ObjectChildren>(payload);
     }
 
     /*
@@ -155,7 +154,7 @@ struct CNode {
      */
     auto& firstKeyFieldname() const {
         dassert(objectChildren().size() > 0);
-        return stdx::get<KeyFieldname>(objectChildren().begin()->first);
+        return get<KeyFieldname>(objectChildren().begin()->first);
     }
     /*
      * Produce the KeyFieldname of the first element of this CNode representing an object. Throws a
@@ -164,7 +163,7 @@ struct CNode {
      */
     auto& firstKeyFieldname() {
         dassert(objectChildren().size() > 0);
-        return stdx::get<KeyFieldname>(objectChildren().begin()->first);
+        return get<KeyFieldname>(objectChildren().begin()->first);
     }
 
     /*
@@ -173,14 +172,13 @@ struct CNode {
      * projection which can be treated as inclusion in projection type determination contexts.
      */
     auto projectionType() const {
-        if (stdx::holds_alternative<NonZeroKey>(payload) ||
-            stdx::holds_alternative<CompoundInclusionKey>(payload) ||
-            (stdx::holds_alternative<KeyValue>(payload) &&
-             stdx::get<KeyValue>(payload) == KeyValue::trueKey))
+        if (holds_alternative<NonZeroKey>(payload) ||
+            holds_alternative<CompoundInclusionKey>(payload) ||
+            (holds_alternative<KeyValue>(payload) && get<KeyValue>(payload) == KeyValue::trueKey))
             return boost::optional<ProjectionType>{ProjectionType::inclusion};
-        else if (stdx::holds_alternative<CompoundExclusionKey>(payload) ||
-                 (stdx::holds_alternative<KeyValue>(payload) && [&] {
-                     switch (stdx::get<KeyValue>(payload)) {
+        else if (holds_alternative<CompoundExclusionKey>(payload) ||
+                 (holds_alternative<KeyValue>(payload) && [&] {
+                     switch (get<KeyValue>(payload)) {
                          case KeyValue::intZeroKey:
                          case KeyValue::longZeroKey:
                          case KeyValue::doubleZeroKey:
@@ -192,7 +190,7 @@ struct CNode {
                      }
                  }()))
             return boost::optional<ProjectionType>{ProjectionType::exclusion};
-        else if (stdx::holds_alternative<CompoundInconsistentKey>(payload))
+        else if (holds_alternative<CompoundInconsistentKey>(payload))
             return boost::optional<ProjectionType>{ProjectionType::inconsistent};
         else
             return boost::optional<ProjectionType>{};
@@ -221,36 +219,36 @@ private:
     std::string toStringHelper(int numTabs) const;
 
 public:
-    using Fieldname = stdx::variant<KeyFieldname, UserFieldname, FieldnamePath>;
+    using Fieldname = std::variant<KeyFieldname, UserFieldname, FieldnamePath>;
     using ArrayChildren = std::vector<CNode>;
     using ObjectChildren = std::vector<std::pair<Fieldname, CNode>>;
-    using Payload = stdx::variant<ArrayChildren,
-                                  ObjectChildren,
-                                  CompoundInclusionKey,
-                                  CompoundExclusionKey,
-                                  CompoundInconsistentKey,
-                                  KeyValue,
-                                  NonZeroKey,
-                                  ValuePath,
-                                  UserDouble,
-                                  UserString,
-                                  UserBinary,
-                                  UserUndefined,
-                                  UserObjectId,
-                                  UserBoolean,
-                                  UserDate,
-                                  UserNull,
-                                  UserRegex,
-                                  UserDBPointer,
-                                  UserJavascript,
-                                  UserSymbol,
-                                  UserJavascriptWithScope,
-                                  UserInt,
-                                  UserTimestamp,
-                                  UserLong,
-                                  UserDecimal,
-                                  UserMinKey,
-                                  UserMaxKey>;
+    using Payload = std::variant<ArrayChildren,
+                                 ObjectChildren,
+                                 CompoundInclusionKey,
+                                 CompoundExclusionKey,
+                                 CompoundInconsistentKey,
+                                 KeyValue,
+                                 NonZeroKey,
+                                 ValuePath,
+                                 UserDouble,
+                                 UserString,
+                                 UserBinary,
+                                 UserUndefined,
+                                 UserObjectId,
+                                 UserBoolean,
+                                 UserDate,
+                                 UserNull,
+                                 UserRegex,
+                                 UserDBPointer,
+                                 UserJavascript,
+                                 UserSymbol,
+                                 UserJavascriptWithScope,
+                                 UserInt,
+                                 UserTimestamp,
+                                 UserLong,
+                                 UserDecimal,
+                                 UserMinKey,
+                                 UserMaxKey>;
     Payload payload;
 
     CNode() = default;
@@ -260,8 +258,7 @@ public:
      * Returns whether this fieldname is the key fieldname representing the _id syntax.
      */
     static auto fieldnameIsId(const CNode::Fieldname& name) {
-        return stdx::holds_alternative<KeyFieldname>(name) &&
-            stdx::get<KeyFieldname>(name) == KeyFieldname::id;
+        return holds_alternative<KeyFieldname>(name) && get<KeyFieldname>(name) == KeyFieldname::id;
     }
 };
 

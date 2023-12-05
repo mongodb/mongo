@@ -465,7 +465,7 @@ public:
      * CheckpointIteration should be chosen when performing untimestamped drops as they
      * will make the ident wait for a catalog checkpoint before proceeding with the ident drop.
      */
-    virtual void addDropPendingIdent(const stdx::variant<Timestamp, CheckpointIteration>& dropTime,
+    virtual void addDropPendingIdent(const std::variant<Timestamp, CheckpointIteration>& dropTime,
                                      std::shared_ptr<Ident> ident,
                                      DropIdentCallback&& onDrop = nullptr) = 0;
 

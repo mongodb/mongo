@@ -71,27 +71,26 @@ struct PlanRankingDecision {
      */
     std::unique_ptr<PlanRankingDecision> clone() const {
         auto decision = std::make_unique<PlanRankingDecision>();
-        stdx::visit(
-            OverloadedVisitor{[&decision](const StatsDetails& details) {
-                                  std::vector<std::unique_ptr<PlanStageStats>> copy;
-                                  copy.reserve(details.candidatePlanStats.size());
-                                  for (auto&& stats : details.candidatePlanStats) {
-                                      invariant(stats);
-                                      copy.emplace_back(stats->clone());
-                                  }
-                                  decision->stats = StatsDetails{std::move(copy)};
-                              },
-                              [&decision](const SBEStatsDetails& details) {
-                                  std::vector<std::unique_ptr<mongo::sbe::PlanStageStats>> copy;
-                                  copy.reserve(details.candidatePlanStats.size());
-                                  for (auto&& stats : details.candidatePlanStats) {
-                                      invariant(stats);
-                                      copy.emplace_back(stats->clone());
-                                  }
-                                  decision->stats = SBEStatsDetails{std::move(copy),
-                                                                    details.serializedWinningPlan};
-                              }},
-            stats);
+        visit(OverloadedVisitor{[&decision](const StatsDetails& details) {
+                                    std::vector<std::unique_ptr<PlanStageStats>> copy;
+                                    copy.reserve(details.candidatePlanStats.size());
+                                    for (auto&& stats : details.candidatePlanStats) {
+                                        invariant(stats);
+                                        copy.emplace_back(stats->clone());
+                                    }
+                                    decision->stats = StatsDetails{std::move(copy)};
+                                },
+                                [&decision](const SBEStatsDetails& details) {
+                                    std::vector<std::unique_ptr<mongo::sbe::PlanStageStats>> copy;
+                                    copy.reserve(details.candidatePlanStats.size());
+                                    for (auto&& stats : details.candidatePlanStats) {
+                                        invariant(stats);
+                                        copy.emplace_back(stats->clone());
+                                    }
+                                    decision->stats = SBEStatsDetails{
+                                        std::move(copy), details.serializedWinningPlan};
+                                }},
+              stats);
         decision->scores = scores;
         decision->candidateOrder = candidateOrder;
         decision->failedCandidates = failedCandidates;
@@ -100,22 +99,21 @@ struct PlanRankingDecision {
 
     uint64_t estimateObjectSizeInBytes() const {
         return  // Add size of 'stats' instance.
-            stdx::visit(
-                OverloadedVisitor{
-                    [](const StatsDetails& details) {
-                        return container_size_helper::estimateObjectSizeInBytes(
-                            details.candidatePlanStats,
-                            [](auto&& stat) { return stat->estimateObjectSizeInBytes(); },
-                            true);
-                    },
-                    [](const SBEStatsDetails& details) {
-                        return details.serializedWinningPlan.objsize() +
-                            container_size_helper::estimateObjectSizeInBytes(
-                                   details.candidatePlanStats,
-                                   [](auto&& stat) { return stat->estimateObjectSizeInBytes(); },
-                                   true);
-                    }},
-                stats) +
+            visit(OverloadedVisitor{
+                      [](const StatsDetails& details) {
+                          return container_size_helper::estimateObjectSizeInBytes(
+                              details.candidatePlanStats,
+                              [](auto&& stat) { return stat->estimateObjectSizeInBytes(); },
+                              true);
+                      },
+                      [](const SBEStatsDetails& details) {
+                          return details.serializedWinningPlan.objsize() +
+                              container_size_helper::estimateObjectSizeInBytes(
+                                     details.candidatePlanStats,
+                                     [](auto&& stat) { return stat->estimateObjectSizeInBytes(); },
+                                     true);
+                      }},
+                  stats) +
             // Add size of each element in 'candidateOrder' vector.
             container_size_helper::estimateObjectSizeInBytes(candidateOrder) +
             // Add size of each element in 'failedCandidates' vector.
@@ -128,12 +126,12 @@ struct PlanRankingDecision {
 
     template <typename PlanStageStatsType>
     const auto& getStats() const {
-        return stdx::get<typename StatsToDetailMap<PlanStageStatsType>::Value>(stats);
+        return get<typename StatsToDetailMap<PlanStageStatsType>::Value>(stats);
     }
 
     template <typename PlanStageStatsType>
     auto& getStats() {
-        return stdx::get<typename StatsToDetailMap<PlanStageStatsType>::Value>(stats);
+        return get<typename StatsToDetailMap<PlanStageStatsType>::Value>(stats);
     }
 
     /*
@@ -149,7 +147,7 @@ struct PlanRankingDecision {
     }
 
     // Execution stats details for each candidate plan.
-    stdx::variant<StatsDetails, SBEStatsDetails> stats;
+    std::variant<StatsDetails, SBEStatsDetails> stats;
 
     // The "goodness" score corresponding to 'stats'.
     // Sorted in descending order.

@@ -60,7 +60,6 @@
 #include "mongo/db/update/update_oplog_entry_version.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
@@ -737,7 +736,7 @@ UpdateModification UpdateModification::parseFromBSON(BSONElement elem) {
 }
 
 int UpdateModification::objsize() const {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{
             [](const ReplacementUpdate& replacement) -> int { return replacement.bson.objsize(); },
             [](const ModifierUpdate& modifier) -> int { return modifier.bson.objsize(); },
@@ -757,7 +756,7 @@ int UpdateModification::objsize() const {
 }
 
 UpdateModification::Type UpdateModification::type() const {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{[](const ReplacementUpdate& replacement) { return Type::kReplacement; },
                           [](const ModifierUpdate& modifier) { return Type::kModifier; },
                           [](const PipelineUpdate& pipelineUpdate) { return Type::kPipeline; },
@@ -774,24 +773,24 @@ UpdateModification::Type UpdateModification::type() const {
  */
 void UpdateModification::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
 
-    stdx::visit(OverloadedVisitor{
-                    [fieldName, bob](const ReplacementUpdate& replacement) {
-                        *bob << fieldName << replacement.bson;
-                    },
-                    [fieldName, bob](const ModifierUpdate& modifier) {
-                        *bob << fieldName << modifier.bson;
-                    },
-                    [fieldName, bob](const PipelineUpdate& pipeline) {
-                        BSONArrayBuilder arrayBuilder(bob->subarrayStart(fieldName));
-                        for (auto&& stage : pipeline) {
-                            arrayBuilder << stage;
-                        }
-                        arrayBuilder.doneFast();
-                    },
-                    [fieldName, bob](const DeltaUpdate& delta) { *bob << fieldName << delta.diff; },
-                    [](const TransformUpdate& transform) {
-                    }},
-                _update);
+    visit(OverloadedVisitor{
+              [fieldName, bob](const ReplacementUpdate& replacement) {
+                  *bob << fieldName << replacement.bson;
+              },
+              [fieldName, bob](const ModifierUpdate& modifier) {
+                  *bob << fieldName << modifier.bson;
+              },
+              [fieldName, bob](const PipelineUpdate& pipeline) {
+                  BSONArrayBuilder arrayBuilder(bob->subarrayStart(fieldName));
+                  for (auto&& stage : pipeline) {
+                      arrayBuilder << stage;
+                  }
+                  arrayBuilder.doneFast();
+              },
+              [fieldName, bob](const DeltaUpdate& delta) { *bob << fieldName << delta.diff; },
+              [](const TransformUpdate& transform) {
+              }},
+          _update);
 }
 
 WriteError::WriteError(int32_t index, Status status) : _index(index), _status(std::move(status)) {}

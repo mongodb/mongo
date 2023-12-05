@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
@@ -68,49 +67,48 @@ IndexHint IndexHint::parse(const BSONElement& element) {
 }
 
 void IndexHint::append(const IndexHint& hint, StringData fieldName, BSONObjBuilder* builder) {
-    stdx::visit(
-        OverloadedVisitor{
-            [&](const IndexKeyPattern& keyPattern) { builder->append(fieldName, keyPattern); },
-            [&](const IndexName& indexName) { builder->append(fieldName, indexName); },
-            [&](const NaturalOrderHint& naturalOrderHint) {
-                builder->append(fieldName, BSON(kNaturalFieldName << naturalOrderHint.direction));
-            }},
-        hint._hint);
+    visit(OverloadedVisitor{
+              [&](const IndexKeyPattern& keyPattern) { builder->append(fieldName, keyPattern); },
+              [&](const IndexName& indexName) { builder->append(fieldName, indexName); },
+              [&](const NaturalOrderHint& naturalOrderHint) {
+                  builder->append(fieldName, BSON(kNaturalFieldName << naturalOrderHint.direction));
+              }},
+          hint._hint);
 }
 
 void IndexHint::append(BSONArrayBuilder* builder) const {
-    stdx::visit(OverloadedVisitor{
-                    [&](const IndexKeyPattern& keyPattern) { builder->append(keyPattern); },
-                    [&](const IndexName& indexName) { builder->append(indexName); },
-                    [&](const NaturalOrderHint& naturalOrderHint) {
-                        builder->append(BSON(kNaturalFieldName << naturalOrderHint.direction));
-                    }},
-                _hint);
+    visit(OverloadedVisitor{[&](const IndexKeyPattern& keyPattern) { builder->append(keyPattern); },
+                            [&](const IndexName& indexName) { builder->append(indexName); },
+                            [&](const NaturalOrderHint& naturalOrderHint) {
+                                builder->append(
+                                    BSON(kNaturalFieldName << naturalOrderHint.direction));
+                            }},
+          _hint);
 }
 
 boost::optional<const IndexKeyPattern&> IndexHint::getIndexKeyPattern() const {
-    if (!stdx::holds_alternative<IndexKeyPattern>(_hint)) {
+    if (!holds_alternative<IndexKeyPattern>(_hint)) {
         return {};
     }
-    return stdx::get<IndexKeyPattern>(_hint);
+    return get<IndexKeyPattern>(_hint);
 }
 
 boost::optional<const IndexName&> IndexHint::getIndexName() const {
-    if (!stdx::holds_alternative<IndexName>(_hint)) {
+    if (!holds_alternative<IndexName>(_hint)) {
         return {};
     }
-    return stdx::get<IndexName>(_hint);
+    return get<IndexName>(_hint);
 }
 
 boost::optional<const NaturalOrderHint&> IndexHint::getNaturalHint() const {
-    if (!stdx::holds_alternative<NaturalOrderHint>(_hint)) {
+    if (!holds_alternative<NaturalOrderHint>(_hint)) {
         return {};
     }
-    return stdx::get<NaturalOrderHint>(_hint);
+    return get<NaturalOrderHint>(_hint);
 }
 
 size_t IndexHint::hash() const {
-    return stdx::visit(
+    return visit(
         OverloadedVisitor{
             [&](const IndexKeyPattern& keyPattern) {
                 return SimpleBSONObjComparator::kInstance.hash(keyPattern);

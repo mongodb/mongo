@@ -49,7 +49,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/update/document_diff_calculator.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::doc_diff {
@@ -236,40 +235,40 @@ private:
  * value of the most inner field(s) to 'innerValue'. Otherwise, sets the value of the field to
  * 'outerValue'.
  */
-void appendFieldNested(stdx::variant<mutablebson::Element, BSONElement> elt,
+void appendFieldNested(std::variant<mutablebson::Element, BSONElement> elt,
                        StringData outerValue,
                        StringData innerValue,
                        BSONObjBuilder* bob) {
-    stdx::visit(OverloadedVisitor{
-                    [&](const mutablebson::Element& element) {
-                        auto fieldName = element.getFieldName();
-                        if (element.getType() == BSONType::Object) {
-                            auto elementObj = element.getValueObject();
-                            if (!elementObj.isEmpty()) {
-                                BSONObjBuilder subBob(bob->subobjStart(fieldName));
-                                for (const auto& subElement : elementObj) {
-                                    appendFieldNested(subElement, innerValue, innerValue, &subBob);
-                                }
-                                return;
-                            }
-                        }
-                        bob->append(fieldName, outerValue);
-                    },
-                    [&](BSONElement element) {
-                        auto fieldName = element.fieldNameStringData();
-                        if (element.type() == BSONType::Object) {
-                            auto elementObj = element.Obj();
-                            if (!elementObj.isEmpty()) {
-                                BSONObjBuilder subBob(bob->subobjStart(fieldName));
-                                for (const auto& subElement : elementObj) {
-                                    appendFieldNested(subElement, innerValue, innerValue, &subBob);
-                                }
-                                return;
-                            }
-                        }
-                        bob->append(fieldName, outerValue);
-                    }},
-                elt);
+    visit(OverloadedVisitor{
+              [&](const mutablebson::Element& element) {
+                  auto fieldName = element.getFieldName();
+                  if (element.getType() == BSONType::Object) {
+                      auto elementObj = element.getValueObject();
+                      if (!elementObj.isEmpty()) {
+                          BSONObjBuilder subBob(bob->subobjStart(fieldName));
+                          for (const auto& subElement : elementObj) {
+                              appendFieldNested(subElement, innerValue, innerValue, &subBob);
+                          }
+                          return;
+                      }
+                  }
+                  bob->append(fieldName, outerValue);
+              },
+              [&](BSONElement element) {
+                  auto fieldName = element.fieldNameStringData();
+                  if (element.type() == BSONType::Object) {
+                      auto elementObj = element.Obj();
+                      if (!elementObj.isEmpty()) {
+                          BSONObjBuilder subBob(bob->subobjStart(fieldName));
+                          for (const auto& subElement : elementObj) {
+                              appendFieldNested(subElement, innerValue, innerValue, &subBob);
+                          }
+                          return;
+                      }
+                  }
+                  bob->append(fieldName, outerValue);
+              }},
+          elt);
 }
 
 void serializeInlineDiff(diff_tree::DocumentSubDiffNode const* node, BSONObjBuilder* bob) {
@@ -365,14 +364,13 @@ void anyIndexesMightBeAffected(DocumentDiffReader* reader,
 
     for (auto subItem = reader->nextSubDiff(); subItem; subItem = reader->nextSubDiff()) {
         FieldRef::FieldRefTempAppend tempAppend(*fieldRef, subItem->first);
-        stdx::visit(
-            OverloadedVisitor{[&indexData, &fieldRef, &result](DocumentDiffReader& item) {
-                                  anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
-                              },
-                              [&indexData, &fieldRef, &result](ArrayDiffReader& item) {
-                                  anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
-                              }},
-            subItem->second);
+        visit(OverloadedVisitor{[&indexData, &fieldRef, &result](DocumentDiffReader& item) {
+                                    anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+                                },
+                                [&indexData, &fieldRef, &result](ArrayDiffReader& item) {
+                                    anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+                                }},
+              subItem->second);
         // early exit
         if (result->all()) {
             return;
@@ -398,21 +396,20 @@ void anyIndexesMightBeAffected(ArrayDiffReader* reader,
     for (auto item = reader->next(); item; item = reader->next()) {
         auto idxAsStr = std::to_string(item->first);
         FieldRef::FieldRefTempAppend tempAppend(*fieldRef, idxAsStr);
-        stdx::visit(
-            OverloadedVisitor{[&indexData, &fieldRef, &result](BSONElement& update) {
-                                  for (size_t i = 0; i < indexData.size(); i++) {
-                                      if (!(*result)[i]) {
-                                          (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
-                                      }
-                                  }
-                              },
-                              [&indexData, &fieldRef, &result](DocumentDiffReader& item) {
-                                  anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
-                              },
-                              [&indexData, &fieldRef, &result](ArrayDiffReader& item) {
-                                  anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
-                              }},
-            item->second);
+        visit(OverloadedVisitor{[&indexData, &fieldRef, &result](BSONElement& update) {
+                                    for (size_t i = 0; i < indexData.size(); i++) {
+                                        if (!(*result)[i]) {
+                                            (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
+                                        }
+                                    }
+                                },
+                                [&indexData, &fieldRef, &result](DocumentDiffReader& item) {
+                                    anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+                                },
+                                [&indexData, &fieldRef, &result](ArrayDiffReader& item) {
+                                    anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+                                }},
+              item->second);
         // early exit
         if (result->all()) {
             return;

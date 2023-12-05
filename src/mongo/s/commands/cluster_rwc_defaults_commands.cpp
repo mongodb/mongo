@@ -64,7 +64,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -108,7 +107,7 @@ public:
                     "A custom write concern is being set as the default write concern in a sharded "
                     "cluster. This set is unchecked, but if the custom write concern does not "
                     "exist on all shards in the cluster, errors will occur upon writes",
-                    "customWriteConcern"_attr = stdx::get<std::string>(optWC->w));
+                    "customWriteConcern"_attr = get<std::string>(optWC->w));
             }
         }
         ReadWriteConcernDefaults::get(opCtx).setDefault(opCtx, std::move(newDefaults));

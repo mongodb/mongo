@@ -29,22 +29,37 @@
 
 #pragma once
 
-#include "mongo/db/op_observer/oplog_writer.h"
+#include <cstddef>
+#include <vector>
+
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/operation_logger.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-class OplogWriterEmbedded : public OplogWriter {
-    OplogWriterEmbedded(const OplogWriterEmbedded&) = delete;
-    OplogWriterEmbedded& operator=(const OplogWriterEmbedded&) = delete;
+class OperationLoggerImpl : public OperationLogger {
+    OperationLoggerImpl(const OperationLoggerImpl&) = delete;
+    OperationLoggerImpl& operator=(const OperationLoggerImpl&) = delete;
 
 public:
-    OplogWriterEmbedded() = default;
-    virtual ~OplogWriterEmbedded() = default;
+    OperationLoggerImpl() = default;
+    virtual ~OperationLoggerImpl() = default;
 
     void appendOplogEntryChainInfo(OperationContext* opCtx,
                                    repl::MutableOplogEntry* oplogEntry,
                                    repl::OplogLink* oplogLink,
-                                   const std::vector<StmtId>& stmtIds) override {}
+                                   const std::vector<StmtId>& stmtIds) override;
+
+    repl::OpTime logOp(OperationContext* opCtx, repl::MutableOplogEntry* oplogEntry) override;
 
     void logOplogRecords(OperationContext* opCtx,
                          const NamespaceString& nss,
@@ -53,15 +68,9 @@ public:
                          const CollectionPtr& oplogCollection,
                          repl::OpTime finalOpTime,
                          Date_t wallTime,
-                         bool isAbortIndexBuild) override {}
+                         bool isAbortIndexBuild) override;
 
-    repl::OpTime logOp(OperationContext* opCtx, repl::MutableOplogEntry* oplogEntry) override {
-        return {};
-    }
-
-    std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override {
-        return {};
-    }
+    std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override;
 };
 
 }  // namespace mongo
