@@ -52,6 +52,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: push
+  - name: .timeseries_crud
 
 - name: macos-arm64
   display_name: macOS arm64
@@ -104,6 +105,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: push
+  - name: .timeseries_crud
 
 - name: enterprise-macos
   display_name: Enterprise macOS
@@ -145,6 +147,7 @@ buildvariants:
   - name: push
   - name: .crypt
   - name: .publish_crypt
+  - name: .timeseries_crud
 
 - name: enterprise-macos-arm64
   display_name: Enterprise macOS arm64
@@ -186,3 +189,4 @@ buildvariants:
   - name: push
   - name: .crypt
   - name: .publish_crypt
+  - name: .timeseries_crud

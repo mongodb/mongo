@@ -133,6 +133,7 @@ buildvariants:
   - name: search_ssl
   - name: secondary_reads_passthrough_gen
   - name: .serverless
+  - name: .timeseries_crud
     distros:
     - amazon2-arm64-large
   - name: session_jscore_passthrough
@@ -254,6 +255,7 @@ buildvariants:
   - name: search_ssl
   - name: secondary_reads_passthrough_gen
   - name: .serverless
+  - name: .timeseries_crud
     distros:
     - amazon2-arm64-large
   - name: session_jscore_passthrough

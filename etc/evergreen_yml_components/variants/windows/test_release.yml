@@ -62,6 +62,7 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: push
+  - name: .timeseries_crud
 
 - name: enterprise-windows
   display_name: "Enterprise Windows"
@@ -138,3 +139,4 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: push
+  - name: .timeseries_crud

@@ -82,6 +82,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu2004-package
   - name: selinux_rhel7_org
@@ -161,6 +162,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu2004-package
   - name: selinux_rhel8_org
@@ -355,6 +357,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
@@ -418,6 +421,7 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: .stitch
   - name: .crypt
+  - name: .timeseries_crud
     distros:
     - rhel82-arm64-large
   - name: .publish_crypt
@@ -476,6 +480,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu2204-large
   - name: selinux_rhel9_org
@@ -545,6 +550,7 @@ buildvariants:
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu2204-large
   - name: vector_search
@@ -602,6 +608,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu2204-arm64-small
   - name: .publish
@@ -667,6 +674,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: .stitch
   - name: .crypt
+  - name: .timeseries_crud
     distros:
     - rhel90-arm64-large
   - name: .publish_crypt

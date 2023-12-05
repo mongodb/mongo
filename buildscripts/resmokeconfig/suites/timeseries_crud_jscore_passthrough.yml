@@ -1,0 +1,180 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # Time-series collection behavior is already tested within this directory.
+  - jstests/core/timeseries/**/*.js
+  - jstests/core/write/bulk/bulk_write_timeseries_basic.js
+  # ----------------------------- Unsupported Commands -----------------------------
+  # Time-series collections are incompatible with clustered indexes.
+  - jstests/core/clustered/**/*.js
+  - jstests/core/find_with_resume_after_param.js
+  - jstests/core/query/or_use_clustered_collection.js
+  - jstests/core/columnstore/columnstore_validindex.js
+  # Time-series collections are incompatible with capped collections.
+  - jstests/core/capped/**/*.js
+  # Writing to time-series collections is not supported in transactions.
+  - jstests/core/txns/**/*.js
+  # $Merge is not allowed on time-series collections.
+  - jstests/core/command_let_variables_merge_only.js
+  # Encrypted fields cannot be used with views or timeseries collections.
+  - jstests/core/queryable_encryption/basic_crud.js
+  # Time-series is not allowed with viewOn.
+  - jstests/core/views/**/*.js
+  - jstests/core/dbstats.js
+  - jstests/core/ddl/collection_uuid_drop.js
+  - jstests/core/ddl/rename_collection_view.js
+  - jstests/core/api/api_version_test_expression.js
+  - jstests/core/api/api_version_pipeline_stages.js
+  - jstests/core/api/api_version_new_51_language_features.js
+  - jstests/core/api/api_version_pipeline_stages.js
+  - jstests/core/collation.js
+  - jstests/core/disallow_system_views_user_writes.js
+  - jstests/core/administrative/apply_ops/apply_ops_system_dot_views.js
+  - jstests/core/catalog/list_collections1.js
+  - jstests/core/query/collection_uuid_find.js
+  - jstests/core/write/collection_uuid_write_commands.js
+  - jstests/core/query/agg_hint.js
+  # Time-series is not allowed with validator.
+  - jstests/core/doc_validation/*.js
+  - jstests/core/doc_validation_with_now_variable.js
+  - jstests/core/list_namespaces_invalidation.js
+  - jstests/core/api/api_version_new_50_language_features.js
+  - jstests/core/api/api_version_new_52_language_features.js
+  - jstests/core/administrative/validate_db_metadata_command.js
+  - jstests/core/write/bulk/bulk_write_non_transaction.js
+  - jstests/core/write/bulk/bulk_write.js
+  - jstests/core/json_schema/*.js
+  # Unique indexes are not allowed on time-series collections.
+  - jstests/core/ddl/background_unique_indexes.js
+  - jstests/core/catalog/list_indexes_invalid.js
+  - jstests/core/ddl/collmod_convert_to_unique_violations.js
+  - jstests/core/ddl/collmod_convert_to_unique_violations_size_limit.js
+  - jstests/core/index/index_bigkeys.js
+  - jstests/core/single_field_hashed_index.js
+  # Sparse indexes are not supported on time-series measurements.
+  - jstests/core/index/indexes_multiple_commands.js
+  - jstests/core/index/index_signature.js
+  # Time-series' is not allowed with 'autoIndexId'.
+  - jstests/core/index/index_id_options.js
+  - jstests/core/index/index9.js
+  # TTL indexes are not supported for time-series collections.
+  - jstests/core/ddl/collmod_convert_capped_to_ttl.js
+  - jstests/core/ddl/collmod.js
+  - jstests/core/ddl/collmod_convert_to_ttl.js  # Prepare Unique doesn't fail because time-series
+                                                # collections don't support unique indexes.
+                                                # (SERVER-83370) TODO: Change comment to
+                                                # 'Time-series doesn't support `prepareUnique` index option.'
+  - jstests/core/ddl/collmod_convert_index_uniqueness.js  # Prepare Unique doesn't fail because
+                                            # time-series collections don't support unique indexes.
+  # Text indexes are not supported on time-series collections.
+  - jstests/core/index/fts/fts_index.js
+  # Creating geo sphere index causes unsupported geo index version.
+  - jstests/core/index/geo/geo_s2indexversion1.js
+  # Invalid index spex for time-series collection - hashed index.
+  - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
+  # Cannot perform a findAndModify with a query and sort on a time-series collection.
+  - jstests/core/write/find_and_modify/find_and_modify_empty_update.js
+  # ------------------------------------- Incompatible Commands -----------------------------------------
+  # Explain will return different plan than expected when a collection becomes a time-series
+  # collection. Also, query shape will be different.
+  - jstests/core/command_let_variables.js
+  - jstests/core/cover_null_queries.js
+  - jstests/core/covered_query_with_sort.js
+  - jstests/core/stage_debug/*.js
+  - jstests/core/query/or/or_to_in.js
+  - jstests/core/sbe/sbe_explain_rejected_plans.js
+  - jstests/core/index/hidden_index.js
+  - jstests/core/administrative/current_op/currentop_find.js
+  - jstests/core/query/sort/sort_merge_collation.js
+  - jstests/core/query/expr/expr_index_use.js
+  - jstests/core/administrative/current_op/currentop_find.js
+  - jstests/core/query/explain/explain_delete.js
+  - jstests/core/query/query_settings/*
+  - jstests/core/query/explain/explain_find_trivially_false_predicates_in_agg_pipelines.js
+  - jstests/core/query/explain/explain_find_trivially_false_predicates.js
+  # Profiling can lead to unexpected behavior because underlying collection is now a time-series
+  # collection.
+  - jstests/core/administrative/profile/profile2.js
+  - jstests/core/administrative/profile/profile3.js
+  - jstests/core/administrative/profile/profile_hide_index.js
+  # Creating Indexes creates more indexes than expected because each index "a"
+  # gets converted to control.min.a  and control.max.b.
+  - jstests/core/index/wildcard/*.js
+  - jstests/core/compound_index_max_fields.js # Too many compound index keys.
+  - jstests/core/compound_wildcard_index_validation.js # One wildcard index term becomes 2 because
+                                                      # of control.min and control.max.
+  # Behavior not allowed on views (the view on top of the underlying bucket collection).
+  - jstests/core/catalog/list_indexes_invalidation.js # Renaming a view.
+  - jstests/core/commands_namespace_parsing.js #Map reduce is not supported on a view.
+  - jstests/core/constructors.js # Map reduce on a view.
+  - jstests/core/datasize2.js # Taking lock on a time-series is not allowed.
+  - jstests/core/datasize_validation.js #Taking lock on a time-series is not allowed.
+  - jstests/core/ddl/collation_convert_to_capped.js # Cannot take lock on time-series.
+  - jstests/core/ddl/capped_convertToCapped1.js #Taking this lock on time-series not allowed,
+                                                # also time-series collection cannot be capped.
+  - jstests/core/ddl/collection_uuid_rename_collection.js # Cannot rename timeseries collection.
+  - jstests/core/ddl/collmod_without_uuid.js # Timeseries view does not have an UUID.
+  - jstests/core/ddl/create_collection.js #timeseries' is not allowed with 'idIndex.
+  - jstests/core/ddl/collmod_convert_to_unique_apply_ops.js # Option not supported on a view: index.
+  - jstests/core/map_reduce_validation.js
+  - jstests/core/index/index_filter_collation.js # Taking lock not allowed.
+  - jstests/core/administrative/apply_ops/*.js # Apply ops is not allowed on a view.
+  - jstests/core/administrative/validate_db_metadata_command.js
+   # Unexpected Pipeline behavior.
+  - jstests/core/benchrun_pipeline_updates.js
+  - jstests/core/catalog/list_catalog.js #listCatalog is only valid as the first stage in pipeline.
+  - jstests/core/query/project/project_with_collation.js #Cannot use positional projection in
+                                                        # aggregation projection.
+  # Validation will return the name of the underlying bucket collection rather than the namespace
+  # of the view, and because records are bucketed, the nRecords field will be different than
+  # expected.
+  - jstests/core/api/apitest_dbcollection.js
+  # Miscellaneous.
+  - jstests/core/catalog/list_collections_filter.js # Listing collections fails currently because of
+  # additional system.bucket collections
+  - jstests/core/catalog/list_collections_name_only.js # Object type is now timeseries instead of
+                                                      # collection
+  - jstests/core/catalog/list_collections_no_views.js # Unexpected inclusion of system.buckets.
+  - jstests/core/ddl/background_index_multikey.js # Indexed measurement field contains an array
+                                                  #value
+  - jstests/core/ddl/create_indexes_with_unknown_field_names.js #Invalid index specification option.
+  - jstests/core/catalog/list_indexes.js # Indexes are different because of bucket indexes.
+  - jstests/core/query/find/find_getmore_bsonsize.js # Max size doc gets pushed over the limit
+                                                      # because of additional ts fields.
+  - jstests/core/max_doc_size.js # Max size doc gets pushed over the limit because of additional
+                                #ts fields.
+  - jstests/core/query/js/js_object_properties.js # Function inputted into $where specifically
+        # checks for 2 proprties - since we are adding a third timestamp property, this doesn't work
+  - jstests/core/query/expr/expr.js # Count is diff than expected because of ts collection -
+                                  # different underlying collection structure
+  - jstests/core/query/internal_apply_oplog_update.js # Cannot add timestampFieldName to update
+              #because : "A pipeline stage specification object must contain exactly one field."
+  - jstests/core/write/update/update_arrayFilters.js # Test throws expected error, but does not
+                                                      # expect error msg to include TS field.
+  - jstests/core/query/js/js4.js # Fails because friendlyEqual not defined - scripting behavior with $where.
+  - jstests/core/write/update/collation_update.js # Index used in hint not found because it has a different form
+                                                    # control.min/control.max[hint name].
+  exclude_with_any_tags:
+  - requires_sharding
+  - requires_capped
+  - assumes_standalone_mongod
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: globalThis.testingReplication = true;; await import("jstests/libs/override_methods/implicit_timeseries_collections.js");
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagTimeseriesUpdatesSupport: true

@@ -29,3 +29,4 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: .crypt
+  - name: .timeseries_crud

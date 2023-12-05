@@ -64,6 +64,7 @@ buildvariants:
   - name: .publish_crypt
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
+  - name: .timeseries_crud
 
 - <<: *enterprise-rhel-81-ppc64le-template
   name: enterprise-rhel-81-ppc64le-dynamic
@@ -144,6 +145,7 @@ buildvariants:
   - name: .publish_crypt
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
+  - name: .timeseries_crud
 
 - <<: *enterprise-rhel-83-s390x-template
   name: enterprise-rhel-83-s390x-dynamic

@@ -52,6 +52,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu2204-large
   - name: .publish
@@ -108,6 +109,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu2004-package
   - name: .publish
@@ -173,6 +175,7 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_audit_gen
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu2004-package
   - name: .publish
@@ -238,6 +241,7 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_audit_gen
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu2204-large
   - name: test_packages_release
@@ -307,6 +311,7 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
@@ -406,6 +411,7 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu2204-arm64-large
   - name: test_packages_release

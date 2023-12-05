@@ -116,6 +116,7 @@ variables:
   - name: .crypt
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
+  - name: .timeseries_crud
     distros:
     - ubuntu2004-package
   - name: vector_search
@@ -441,6 +442,7 @@ buildvariants:
   - name: libunwind_tests
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
+  - name: timeseries_crud_jscore_passthrough_gen
   - name: .replica_sets .multi_oplog !.encrypt
   - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: sasl

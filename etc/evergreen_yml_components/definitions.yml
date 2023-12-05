@@ -9101,6 +9101,15 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
+- <<: *task_template
+  name: timeseries_crud_jscore_passthrough_gen
+  tags: ["timeseries_crud"]
+  commands:
+  - func: "generate resmoke tasks"
+  vars:
+    suite: timeseries_crud_jscore_passthrough
+
+
 - name: shared_scons_cache_pruning
   tags: []
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
