@@ -34,7 +34,6 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
@@ -183,25 +182,6 @@ protected:
         auto [resultTag, resultValue] = runCompiledExpression(compiledExpression);
         value::ValueGuard guard(resultTag, resultValue);
         ASSERT_EQUALS(resultTag, sbe::value::TypeTags::Nothing);
-    }
-
-    void assertBlockEq(value::TypeTags blockTag,
-                       value::Value blockVal,
-                       const std::vector<std::pair<value::TypeTags, value::Value>>& expected) {
-        ASSERT_EQ(blockTag, value::TypeTags::valueBlock);
-        auto* block = value::bitcastTo<value::ValueBlock*>(blockVal);
-        auto extracted = block->extract();
-        ASSERT_EQ(expected.size(), extracted.count);
-
-        for (size_t i = 0; i < extracted.count; ++i) {
-            auto [t, v] = value::compareValue(
-                extracted.tags[i], extracted.vals[i], expected[i].first, expected[i].second);
-            // ASSERT_EQ(t, value::TypeTags::NumberInt32) << extracted;
-            // ASSERT_EQ(value::bitcastTo<int32_t>(v), 0)
-            ASSERT_THAT((std::pair{t, v}), ValueEq(std::pair{value::TypeTags::NumberInt32, 0}))
-                << "Got " << extracted[i] << " expected " << expected[i] << " full extracted output"
-                << extracted;
-        }
     }
 
     static std::pair<value::TypeTags, value::Value> makeBsonArray(const BSONArray& ba) {

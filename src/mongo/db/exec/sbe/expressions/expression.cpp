@@ -923,8 +923,6 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockMax, false}},
     {"valueBlockCount",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::valueBlockCount, false}},
-    {"valueBlockDateTrunc",
-     BuiltinFn{[](size_t n) { return n == 7; }, vm::Builtin::valueBlockDateTrunc, false}},
     {"valueBlockSum",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockSum, false}},
     {"valueBlockGtScalar",
