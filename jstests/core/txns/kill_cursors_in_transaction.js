@@ -91,7 +91,7 @@ if (res.ok) {
     assert(isTransientTxnError, res);
     assert(isLockTimeout, res);
     // The transaction should have implicitly been aborted.
-    assert.commandFailedWithCode(sessionDb.abortTransaction_forTesting(),
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 }
 
