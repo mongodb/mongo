@@ -1,0 +1,60 @@
+# This is equivalent to the cqf suite, but runs with parameterization enabled.
+# TODO SERVER-84203: Delete this temporary suite
+
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/cqf/optimizer/**/*.js
+  exclude_files:
+  - jstests/cqf/optimizer/find_sort.js
+  - jstests/cqf/optimizer/sorted_merge.js
+  - jstests/cqf/optimizer/recursive_ix_nav.js
+  - jstests/cqf/optimizer/sampling.js
+  - jstests/cqf/optimizer/explain_test.js
+  - jstests/cqf/optimizer/range_descending.js
+  - jstests/cqf/optimizer/sort_compound_pred.js
+  - jstests/cqf/optimizer/nonselective_index.js
+  - jstests/cqf/optimizer/index_intersect1.js
+  - jstests/cqf/optimizer/basic_agg.js
+  - jstests/cqf/optimizer/type_bracket.js
+  - jstests/cqf/optimizer/disjunction.js
+  - jstests/cqf/optimizer/value_elemMatch.js
+  - jstests/cqf/optimizer/array_match.js
+  - jstests/cqf/optimizer/basic_find.js
+  - jstests/cqf/optimizer/split_fetching_null.js
+  - jstests/cqf/optimizer/index_intersect.js
+  - jstests/cqf/optimizer/redundant_conditions.js
+  - jstests/cqf/optimizer/index_hints.js
+  - jstests/cqf/optimizer/elemmatch_bounds.js
+  - jstests/cqf/optimizer/sampling_chunks.js
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+      eval: |
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        await import("jstests/libs/set_force_bonsai.js");
+  hooks:
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          skipValidationOnNamespaceNotFound: false
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagCommonQueryFramework: true
+        internalQueryCardinalityEstimatorMode: "sampling"
+        internalCascadesOptimizerSampleSizeMin: 1
+        internalCascadesOptimizerEnableSqrtSampleSize: false
+        internalCascadesOptimizerEnableParameterization: true

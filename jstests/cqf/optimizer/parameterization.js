@@ -77,13 +77,20 @@ function verifyCommandParameterization(cmd, find = true) {
     assert(explainStr.includes("FunctionCall [getParam]"));
 }
 
-// Collection has no indexes except default _id index
-// Verify that queries are parameterized correctly for M2 Bonsai-eligible FIND queries
-cmds.forEach(cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1])});
-cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0])});
+runWithParams(
+    [
+        // Disable fast-path since it bypasses parameterization and optimization.
+        {key: "internalCascadesOptimizerDisableFastPath", value: true},
+    ],
+    () => {
+        // Collection has no indexes except default _id index
+        // Verify that queries are parameterized correctly for M2 Bonsai-eligible FIND queries
+        cmds.forEach(cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1])});
+        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0])});
 
-// Verify that queries are parameterized correctly for M2 Bonsai-eligible AGG queries
-cmds.forEach(cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1], false)});
-cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0], false)});
+        // Verify that queries are parameterized correctly for M2 Bonsai-eligible AGG queries
+        cmds.forEach(cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1], false)});
+        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0], false)});
+    });
 
 // TODO SERVER-82185 Verify that M2-ineligible queries on indexed collections are not parameterized

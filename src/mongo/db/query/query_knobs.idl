@@ -976,6 +976,15 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
 
+  internalCascadesOptimizerEnableParameterization:
+    description: "Enables query parameterization of constants."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerEnableParameterization"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    test_only: true
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
   internalQueryFrameworkControl:
     description: "Knob to control the optimizer/execution engine to use."
     set_at: [ startup, runtime ]

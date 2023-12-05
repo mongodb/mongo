@@ -12,7 +12,8 @@ export function checkCascadesOptimizerEnabled(theDB) {
 
 // TODO SERVER-82185: Remove this once M2-eligibility checker + E2E parameterization implemented
 export function checkPlanCacheParameterization(theDB) {
-    return false;
+    return theDB.adminCommand({getParameter: 1, internalCascadesOptimizerEnableParameterization: 1})
+        .internalCascadesOptimizerEnableParameterization;
 }
 
 /**

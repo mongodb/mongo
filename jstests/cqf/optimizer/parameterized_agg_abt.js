@@ -41,14 +41,22 @@ t.drop();
 
 assert.commandWorked(t.insert({_id: 3, a: 1}));
 
-// Empty agg pipeline is ineligible for the optimizer plan cache.
-checkPipelineEligibility([], false);
+runWithParams(
+    [
+        // Disable fast-path since it bypasses parameterization and optimization.
+        {key: "internalCascadesOptimizerDisableFastPath", value: true},
+    ],
+    () => {
+        // Empty agg pipeline is ineligible for the optimizer plan cache.
+        checkPipelineEligibility([], false);
 
-// Agg pipeline with single $match stage is eligible.
-checkPipelineEligibility([{$match: {a: 2, b: 3}}], true);
+        // Agg pipeline with single $match stage is eligible.
+        checkPipelineEligibility([{$match: {a: 2, b: 3}}], true);
 
-// Agg pipeline with $match as first stage, $project as second stage is eligible.
-checkPipelineEligibility([{$match: {a: {$gte: 2}}}, {$project: {a: 1, _id: 0}}], true);
+        // Agg pipeline with $match as first stage, $project as second stage is eligible.
+        checkPipelineEligibility([{$match: {a: {$gte: 2}}}, {$project: {a: 1, _id: 0}}], true);
 
-// Agg pipeline with $match as first stage but a second stage that's not $project is ineligible.
-checkPipelineEligibility([{$match: {a: {$in: [2, 3]}}}, {$group: {_id: "$a"}}], false);
+        // Agg pipeline with $match as first stage but a second stage that's not $project is
+        // ineligible.
+        checkPipelineEligibility([{$match: {a: {$in: [2, 3]}}}, {$group: {_id: "$a"}}], false);
+    });

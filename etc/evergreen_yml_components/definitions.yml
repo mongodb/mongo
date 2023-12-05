@@ -9082,6 +9082,22 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
+# TODO SERVER-84203: Delete this temporary suite
+- <<: *task_template
+  name: cqf_parameterization_passthrough
+  tags: [cqf]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+# TODO SERVER-84203: Delete this temporary suite
+- <<: *task_template
+  name: cqf_parameterization_query_golden_passthrough
+  tags: [cqf]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
 - <<: *gen_task_template
   name: cqf_experimental_no_passthrough_gen
   tags: ["cqf"]
@@ -9108,6 +9124,22 @@ tasks:
     vars:
       suite: cqf_experimental_sharded_collections_jscore_passthrough
       use_large_distro: "true"
+
+# TODO SERVER-84203: Delete this temporary suite
+- <<: *task_template
+  name: cqf_parameterization_jscore_passthrough
+  tags: [cqf]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+# TODO SERVER-84203: Delete this temporary suite
+- <<: *task_template
+  name: cqf_parameterization_aggregation_passthrough
+  tags: [cqf]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
 
 - <<: *task_template
   name: streams
