@@ -918,6 +918,95 @@ bool BSONColumnBlockBased::contains(BSONType type) const {
     return false;
 }
 
-}  // namespace bsoncolumn
+BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, bool val) {
+    ElementStorage::Element e = allocator.allocate(Bool, "", sizeof(uint8_t));
+    DataView(e.value()).write<uint8_t>(val);
+    return e.element();
+}
 
+BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, int32_t val) {
+    ElementStorage::Element e = allocator.allocate(NumberInt, "", sizeof(int32_t));
+    DataView(e.value()).write<LittleEndian<int32_t>>(val);
+    return e.element();
+}
+
+BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, int64_t val) {
+    ElementStorage::Element e = allocator.allocate(NumberLong, "", sizeof(int64_t));
+    DataView(e.value()).write<LittleEndian<int64_t>>(val);
+    return e.element();
+}
+
+BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, double val) {
+    ElementStorage::Element e = allocator.allocate(NumberDouble, "", sizeof(double));
+    DataView(e.value()).write<LittleEndian<double>>(val);
+    return e.element();
+}
+
+BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, const Decimal128& val) {
+    auto elem = allocator.allocate(NumberDecimal, "", 16);
+    Decimal128::Value dec128Val = val.getValue();
+    DataView(elem.value()).write<LittleEndian<uint64_t>>(dec128Val.low64);
+    DataView(elem.value()).write<LittleEndian<uint64_t>>(dec128Val.high64, sizeof(uint64_t));
+    return elem.element();
+}
+
+BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, const Date_t& val) {
+    ElementStorage::Element e = allocator.allocate(Date, "", sizeof(int64_t));
+    DataView(e.value()).write<LittleEndian<int64_t>>(val.toMillisSinceEpoch());
+    return e.element();
+}
+
+BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, const Timestamp& val) {
+    ElementStorage::Element e = allocator.allocate(bsonTimestamp, "", sizeof(uint64_t));
+    DataView(e.value()).write<LittleEndian<uint64_t>>(val.asULL());
+    return e.element();
+}
+
+/**
+ * Create a BSONElement with memory from allocator. Both String and Code are treated similarly and
+ * use this helper.
+ */
+BSONElement BSONElementMaterializer::writeStringData(ElementStorage& allocator,
+                                                     BSONType bsonType,
+                                                     StringData val) {
+    // Add 5 bytes to size, strings begin with a 4 byte count and ends with a null terminator
+    ElementStorage::Element elem = allocator.allocate(bsonType, "", val.size() + 5);
+    // Write count, size includes null terminator
+    DataView(elem.value()).write<LittleEndian<int32_t>>(val.size() + 1);
+    // Write string value
+    memcpy(elem.value() + sizeof(int32_t), val.data(), val.size());
+    // Write null terminator
+    DataView(elem.value()).write<char>('\0', val.size() + sizeof(int32_t));
+    return elem.element();
+}
+
+BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, StringData val) {
+    return writeStringData(allocator, String, val);
+}
+
+BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator,
+                                                 const BSONBinData& val) {
+    // Layout of a binary element:
+    // - 4-byte length of binary data
+    // - 1-byte binary subtype
+    // - The binary data
+    constexpr auto binPrefixLen = sizeof(int32_t) + sizeof(uint8_t);
+    auto elem = allocator.allocate(BinData, "", binPrefixLen + val.length);
+    DataView(elem.value()).write<LittleEndian<int32_t>>(val.length);
+    DataView(elem.value()).write<uint8_t>(val.type, sizeof(int32_t));
+    memcpy(elem.value() + binPrefixLen, val.data, val.length);
+    return elem.element();
+}
+
+BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, const BSONCode& val) {
+    return writeStringData(allocator, Code, val.code);
+}
+
+BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, const OID& val) {
+    ElementStorage::Element e = allocator.allocate(jstOID, "", sizeof(OID));
+    DataView(e.value()).write<OID>(val);
+    return e.element();
+}
+
+}  // namespace bsoncolumn
 }  // namespace mongo

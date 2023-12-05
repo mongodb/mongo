@@ -556,7 +556,7 @@ template <class CMaterializer, class Container>
 requires Materializer<CMaterializer>
 class Collector {
     using Element = typename CMaterializer::Element;
-    using CAllocator = class CMaterializer::Allocator;
+    using CAllocator = typename CMaterializer::Allocator;
 
 public:
     Collector(Container& collection, CAllocator& allocator)
@@ -703,6 +703,43 @@ public:
 private:
 };
 
-}  // namespace bsoncolumn
+/**
+ * Implements the "materializer" concept such that the output elements are BSONElements.
+ */
+class BSONElementMaterializer {
+public:
+    using Element = BSONElement;
+    using Allocator = ElementStorage;
 
+    static BSONElement materialize(Allocator& allocator, bool val);
+    static BSONElement materialize(Allocator& allocator, int32_t val);
+    static BSONElement materialize(Allocator& allocator, int64_t val);
+    static BSONElement materialize(Allocator& allocator, double val);
+    static BSONElement materialize(Allocator& allocator, const Decimal128& val);
+    static BSONElement materialize(Allocator& allocator, const Date_t& val);
+    static BSONElement materialize(Allocator& allocator, const Timestamp& val);
+    static BSONElement materialize(Allocator& allocator, StringData val);
+    static BSONElement materialize(Allocator& allocator, const BSONBinData& val);
+    static BSONElement materialize(Allocator& allocator, const BSONCode& val);
+    static BSONElement materialize(Allocator& allocator, const OID& val);
+
+    template <typename T>
+    static BSONElement materialize(Allocator& allocator, BSONElement val) {
+        return val;
+    }
+
+    static BSONElement materializeMissing(Allocator& allocator) {
+        return BSONElement();
+    }
+
+private:
+    /**
+     * Helper function used by both BSONCode and String.
+     */
+    static BSONElement writeStringData(ElementStorage& allocator,
+                                       BSONType bsonType,
+                                       StringData val);
+};
+
+}  // namespace bsoncolumn
 }  // namespace mongo
