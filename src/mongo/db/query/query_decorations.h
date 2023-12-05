@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,34 +27,27 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/query/query_knobs_gen.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/operation_context.h"
-
+namespace mongo {
 /**
- * Namespace for static methods that are shared between explain on mongod and on mongos.
+ * A class for query-related knobs, it sets all the knob values on the first time a knob is accessed
+ * and ensures the values are same though the whole lifetime of a query.
  */
-namespace mongo::explain_common {
+class QueryKnobConfiguration {
+public:
+    static const OperationContext::Decoration<QueryKnobConfiguration> decoration;
 
-/**
- * Adds the 'serverInfo' explain section to the BSON object being built by 'out'.
- *
- * This section include the host, port, version, and gitVersion.
- */
-void generateServerInfo(BSONObjBuilder* out);
+    QueryFrameworkControlEnum getInternalQueryFrameworkControlForOp();
+    bool getSbeDisableGroupPushdownForOp();
+    bool getSbeDisableLookupPushdownForOp();
 
-/**
- * Adds the 'serverParameters' explain section to the BSON object being built by 'out'.
- *
- * This section includes various server-wide internal limits/knobs.
- */
-void generateServerParameters(OperationContext* opCtx, BSONObjBuilder* out);
+private:
+    void _tryToSetAllValues();
 
-/**
- * Conditionally appends a BSONObj to 'bob' depending on whether or not the maximum user size for a
- * BSON object will be exceeded.
- */
-bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out);
-
-}  // namespace mongo::explain_common
+    bool _isSet = false;
+    bool _sbeDisableGroupPushdownValue;
+    bool _sbeDisableLookupPushdownValue;
+    QueryFrameworkControlEnum _queryFrameworkControlValue;
+};
+}  // namespace mongo

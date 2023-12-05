@@ -131,7 +131,7 @@
 #include "mongo/db/pipeline/visitors/document_source_walker.h"
 #include "mongo/db/pipeline/visitors/transformer_interface_walker.h"
 #include "mongo/db/query/expression_walker.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/logv2/log.h"
@@ -1107,19 +1107,15 @@ bool isEligibleCommon(const RequestType& request,
         !storageGlobalParams.noTableScan.load();
 }
 
-boost::optional<bool> shouldForceEligibility() {
+boost::optional<bool> shouldForceEligibility(QueryFrameworkControlEnum frameworkControl) {
     // We don't need to consult the feature flag here, since the framework control knob can only
     // be set to enable bonsai if featureFlagCommonQueryFramework is enabled.
-    auto queryControl = ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
-        "internalQueryFrameworkControl");
-
     LOGV2_DEBUG(7325101,
                 4,
-                "internalQueryFrameworkControl={knob}",
                 "logging internalQueryFrameworkControl",
-                "knob"_attr = QueryFrameworkControl_serializer(queryControl->_data.get()));
+                "knob"_attr = QueryFrameworkControl_serializer(frameworkControl));
 
-    switch (queryControl->_data.get()) {
+    switch (frameworkControl) {
         case QueryFrameworkControlEnum::kForceClassicEngine:
         case QueryFrameworkControlEnum::kTrySbeEngine:
             return false;
@@ -1170,7 +1166,10 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
                          const Pipeline& pipeline,
                          OperationContext* opCtx,
                          const CollectionPtr& collection) {
-    if (auto forceBonsai = shouldForceEligibility(); forceBonsai.has_value()) {
+    auto frameworkControl =
+        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+
+    if (auto forceBonsai = shouldForceEligibility(frameworkControl); forceBonsai.has_value()) {
         return *forceBonsai;
     }
 
@@ -1194,7 +1193,9 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
 bool isEligibleForBonsai(const CanonicalQuery& cq,
                          OperationContext* opCtx,
                          const CollectionPtr& collection) {
-    if (auto forceBonsai = shouldForceEligibility(); forceBonsai.has_value()) {
+    auto frameworkControl =
+        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+    if (auto forceBonsai = shouldForceEligibility(frameworkControl); forceBonsai.has_value()) {
         return *forceBonsai;
     }
 

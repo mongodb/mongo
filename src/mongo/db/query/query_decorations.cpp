@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,34 +27,38 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/query/query_decorations.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/operation_context.h"
+namespace mongo {
 
-/**
- * Namespace for static methods that are shared between explain on mongod and on mongos.
- */
-namespace mongo::explain_common {
+const OperationContext::Decoration<QueryKnobConfiguration> QueryKnobConfiguration::decoration =
+    OperationContext::declareDecoration<QueryKnobConfiguration>();
 
-/**
- * Adds the 'serverInfo' explain section to the BSON object being built by 'out'.
- *
- * This section include the host, port, version, and gitVersion.
- */
-void generateServerInfo(BSONObjBuilder* out);
+void QueryKnobConfiguration::_tryToSetAllValues() {
+    if (_isSet) {
+        return;
+    }
+    _queryFrameworkControlValue = ServerParameterSet::getNodeParameterSet()
+                                      ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
+                                      ->_data.get();
+    _sbeDisableGroupPushdownValue = internalQuerySlotBasedExecutionDisableGroupPushdown.load();
+    _sbeDisableLookupPushdownValue = internalQuerySlotBasedExecutionDisableLookupPushdown.load();
+    _isSet = true;
+}
 
-/**
- * Adds the 'serverParameters' explain section to the BSON object being built by 'out'.
- *
- * This section includes various server-wide internal limits/knobs.
- */
-void generateServerParameters(OperationContext* opCtx, BSONObjBuilder* out);
+QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() {
+    _tryToSetAllValues();
+    return _queryFrameworkControlValue;
+}
 
-/**
- * Conditionally appends a BSONObj to 'bob' depending on whether or not the maximum user size for a
- * BSON object will be exceeded.
- */
-bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out);
+bool QueryKnobConfiguration::getSbeDisableGroupPushdownForOp() {
+    _tryToSetAllValues();
+    return _sbeDisableGroupPushdownValue;
+}
 
-}  // namespace mongo::explain_common
+bool QueryKnobConfiguration::getSbeDisableLookupPushdownForOp() {
+    _tryToSetAllValues();
+    return _sbeDisableLookupPushdownValue;
+}
+
+}  // namespace mongo

@@ -281,8 +281,8 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyPartialIndexDisjunction) {
 TEST_F(PlanCacheKeyInfoTest, ComputeKeyPartialIndexNestedDisjunction) {
     BSONObj filterObj = fromjson(R"(
         {$and: [
-            {$or: [{f: {$gt: 10}}, {f: {$lt: 0}}]}, 
-            {$or: [{f: {$gt: 11}}, {f: {$lt: 1}}]} 
+            {$or: [{f: {$gt: 10}}, {f: {$lt: 0}}]},
+            {$or: [{f: {$gt: 11}}, {f: {$lt: 1}}]}
         ]})");
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
@@ -534,8 +534,10 @@ TEST_F(PlanCacheKeyInfoTest, DifferentQueryEngines) {
         RAIIServerParameterControllerForTest controller{"internalQueryFrameworkControl",
                                                         forceClassicEngine ? "forceClassicEngine"
                                                                            : "trySbeEngine"};
+        QueryTestServiceContext serviceContext;
+        auto opCtx = serviceContext.makeOperationContext();
         const auto queryStr = "{a: 0}";
-        unique_ptr<CanonicalQuery> cq(canonicalize(queryStr));
+        unique_ptr<CanonicalQuery> cq(canonicalize(opCtx.get(), queryStr));
         return makeKey(*cq, indexCores);
     };
 

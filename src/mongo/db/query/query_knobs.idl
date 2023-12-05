@@ -1136,7 +1136,7 @@ server_parameters:
     default: 60000
     validator:
       gte: 0
-  
+
   internalQueryAggMulticastMaxConcurrency:
     description: "Max number of concurrent requests when aggregations are sent to all shard servers"
     set_at: startup
@@ -1179,8 +1179,8 @@ server_parameters:
       gte: 0
 
   internalQueryAutoParameterizationMaxParameterCount:
-    description: "The maximum numbers of parameters that query auto-parameterization can extract from a query. 
-     If auto parameterizating a query would result in a greater number of parameters than the limit, 
+    description: "The maximum numbers of parameters that query auto-parameterization can extract from a query.
+     If auto parameterizating a query would result in a greater number of parameters than the limit,
      then auto parameterization will not be performed.
      If set to 0, then no limit will be applied."
     set_at: [ startup, runtime ]
@@ -1212,7 +1212,7 @@ server_parameters:
     cpp_varname: internalQueryDocumentSourceWriterBatchExtraReservedBytes
     validator:
       gte: 0
-      lte: 
+      lte:
         expr: 8 * 1024 * 1024 # 8MB
     default: 0
 
@@ -1227,3 +1227,7 @@ server_parameters:
 # When adding a new query knob which flushes the SBE plan cache on update, you should test this
 # behavior by including the name of the new knob in the list at the top of the jstest
 # 'sbe_plan_cache_clear_on_param_change.js'.
+#
+# When adding a new runtime query knob, consider adding and accessing it through the
+# 'QueryKnobConfiguration' decoration, especially if it may be accessed multiple times during a
+# query lifetime.

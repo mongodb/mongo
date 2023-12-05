@@ -78,6 +78,7 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -153,16 +154,16 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
     // whether any secondary collection is a view or is sharded, not which ones are a view or are
     // sharded and which ones aren't. As such, if any secondary collection is a view or is sharded,
     // no $lookup will be eligible for pushdown.
-    const bool disallowLookupPushdown =
-        internalQuerySlotBasedExecutionDisableLookupPushdown.load() || isMainCollectionSharded ||
-        collections.isAnySecondaryNamespaceAViewOrSharded();
+    auto queryKnobs = QueryKnobConfiguration::decoration(cq->getOpCtx());
+    const bool disallowLookupPushdown = queryKnobs.getSbeDisableLookupPushdownForOp() ||
+        isMainCollectionSharded || collections.isAnySecondaryNamespaceAViewOrSharded();
 
     for (auto itr = sources.begin(); itr != sources.end(); ++itr) {
         const bool isLastSource = itr->get() == sources.back().get();
 
         // $group pushdown logic.
         if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(itr->get())) {
-            if (internalQuerySlotBasedExecutionDisableGroupPushdown.load()) {
+            if (queryKnobs.getSbeDisableGroupPushdownForOp()) {
                 break;
             }
 

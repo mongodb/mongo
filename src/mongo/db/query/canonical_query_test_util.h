@@ -41,7 +41,9 @@ protected:
         return _opCtx.get();
     }
 
+    std::unique_ptr<CanonicalQuery> canonicalize(OperationContext* opCtx, const BSONObj& queryObj);
     std::unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj);
+    std::unique_ptr<CanonicalQuery> canonicalize(OperationContext* opCtx, StringData queryObj);
     std::unique_ptr<CanonicalQuery> canonicalize(StringData queryStr);
     std::unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
                                                  BSONObj sort,

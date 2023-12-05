@@ -222,7 +222,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kAnyShard: {
                 if (verbosity) {
                     explain_common::generateServerInfo(&result);
-                    explain_common::generateServerParameters(&result);
+                    explain_common::generateServerParameters(opCtx, &result);
                 }
                 auto serialized = serializeToCommand(cmd, parsedMr, targeter.pipeline.get());
                 // When running explain, we don't explicitly pass the specified verbosity here

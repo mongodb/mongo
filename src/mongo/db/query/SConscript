@@ -22,6 +22,17 @@ env.SConscript(
 )
 
 env.Library(
+    target='query_decorations',
+    source=['query_decorations.cpp'],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/server_base',
+        'query_knobs',
+    ],
+)
+
+env.Library(
     target='canonical_query',
     source=[
         'canonical_query.cpp',
@@ -35,6 +46,7 @@ env.Library(
         'collation/collator_factory_interface',
         'collation/collator_interface',
         'projection_ast',
+        'query_decorations',
         'sort_pattern',
     ],
     LIBDEPS_PRIVATE=[

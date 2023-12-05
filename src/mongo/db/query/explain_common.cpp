@@ -31,7 +31,7 @@
 
 #include "mongo/db/query/explain_common.h"
 
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/version.h"
@@ -48,7 +48,7 @@ void generateServerInfo(BSONObjBuilder* out) {
     serverBob.doneFast();
 }
 
-void generateServerParameters(BSONObjBuilder* out) {
+void generateServerParameters(OperationContext* opCtx, BSONObjBuilder* out) {
     BSONObjBuilder serverBob(out->subobjStart("serverParameters"));
     out->appendNumber("internalQueryFacetBufferSizeBytes",
                       internalQueryFacetBufferSizeBytes.load());
@@ -65,10 +65,9 @@ void generateServerParameters(BSONObjBuilder* out) {
     out->appendNumber("internalQueryMaxAddToSetBytes", internalQueryMaxAddToSetBytes.load());
     out->appendNumber("internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
                       internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load());
-    auto queryControl = ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
-        "internalQueryFrameworkControl");
-    out->append("internalQueryFrameworkControl",
-                QueryFrameworkControl_serializer(queryControl->_data.get()));
+    auto queryControl =
+        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+    out->append("internalQueryFrameworkControl", QueryFrameworkControl_serializer(queryControl));
 }
 
 bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out) {

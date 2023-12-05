@@ -35,12 +35,13 @@ const NamespaceString CanonicalQueryTest::nss("test.collection");
 /**
  * Utility functions to create a CanonicalQuery
  */
-std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const BSONObj& queryObj) {
+std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(OperationContext* opCtx,
+                                                                 const BSONObj& queryObj) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(queryObj);
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx(),
+        CanonicalQuery::canonicalize(opCtx,
                                      std::move(findCommand),
                                      false,
                                      expCtx,
@@ -50,9 +51,18 @@ std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const BSONObj& 
     return std::move(statusWithCQ.getValue());
 }
 
-std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(StringData queryStr) {
+std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const BSONObj& queryObj) {
+    return canonicalize(opCtx(), queryObj);
+}
+
+std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(OperationContext* opCtx,
+                                                                 StringData queryStr) {
     BSONObj queryObj = fromjson(queryStr.toString());
-    return canonicalize(queryObj);
+    return canonicalize(opCtx, queryObj);
+}
+
+std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(StringData queryStr) {
+    return canonicalize(opCtx(), queryStr);
 }
 
 std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(BSONObj query,

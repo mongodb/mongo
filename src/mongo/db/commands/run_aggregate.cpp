@@ -71,7 +71,6 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/telemetry.h"

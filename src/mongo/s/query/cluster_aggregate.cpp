@@ -467,7 +467,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     if (request.getExplain()) {
         explain_common::generateServerInfo(result);
-        explain_common::generateServerParameters(result);
+        explain_common::generateServerParameters(opCtx, result);
     }
 
     auto status = [&]() {

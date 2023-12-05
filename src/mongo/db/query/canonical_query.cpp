@@ -43,6 +43,8 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/query_decorations.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/logv2/log.h"
 
@@ -179,9 +181,9 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     _expCtx = expCtx;
     _findCommand = std::move(findCommand);
 
-    _forceClassicEngine = ServerParameterSet::getNodeParameterSet()
-                              ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                              ->_data.get() == QueryFrameworkControlEnum::kForceClassicEngine;
+    _forceClassicEngine =
+        QueryKnobConfiguration::decoration(expCtx->opCtx).getInternalQueryFrameworkControlForOp() ==
+        QueryFrameworkControlEnum::kForceClassicEngine;
 
     _isCountLike = isCountLike;
 
