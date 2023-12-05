@@ -232,7 +232,7 @@ void registerRequest(OperationContext* opCtx,
 
     auto& opDebug = CurOp::get(opCtx)->debug();
 
-    if (opDebug.queryStatsRateLimited) {
+    if (opDebug.queryStatsInfo.wasRateLimited) {
         LOGV2_DEBUG(
             8288900,
             4,
@@ -241,11 +241,11 @@ void registerRequest(OperationContext* opCtx,
     }
 
     if (!shouldCollect(opCtx->getServiceContext())) {
-        opDebug.queryStatsRateLimited = true;
+        opDebug.queryStatsInfo.wasRateLimited = true;
         return;
     }
 
-    if (opDebug.queryStatsKey) {
+    if (opDebug.queryStatsInfo.key) {
         // A find() request may have already registered the shapifier. Ie, it's a find command over
         // a non-physical collection, eg view, which is implemented by generating an agg pipeline.
         LOGV2_DEBUG(7198700,
@@ -260,7 +260,7 @@ void registerRequest(OperationContext* opCtx,
     // in a BSON object that exceeds the 16 MB memory limit. In these cases, we want to exclude the
     // original query from queryStats metrics collection and let it execute normally.
     try {
-        opDebug.queryStatsKey = makeKey();
+        opDebug.queryStatsInfo.key = makeKey();
     } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
         LOGV2_DEBUG(7979400,
                     1,
@@ -269,7 +269,7 @@ void registerRequest(OperationContext* opCtx,
         queryStatsStoreWriteErrorsMetric.increment();
         return;
     }
-    opDebug.queryStatsKeyHash = absl::HashOf(*opDebug.queryStatsKey);
+    opDebug.queryStatsInfo.keyHash = absl::HashOf(*opDebug.queryStatsInfo.key);
     // TODO look up this query shape (sub-component of query stats store key) in some new shared
     // data structure that the query settings component could share. See if the query SHAPE hash has
     // been computed before. If so, record the query shape hash on the opDebug. If not, compute the

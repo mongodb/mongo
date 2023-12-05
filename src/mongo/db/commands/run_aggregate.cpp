@@ -1540,6 +1540,7 @@ Status runAggregate(OperationContext* opCtx,
                 cmdObj,
                 &bodyBuilder);
         }
+        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsInfo.key));
     } else {
         auto maybePinnedCursor = executeUntilFirstBatch(
             opCtx, expCtx, request, cmdObj, privileges, origNss, extDataSrcGuard, execs, result);
@@ -1556,7 +1557,7 @@ Status runAggregate(OperationContext* opCtx,
         if (maybePinnedCursor) {
             collectQueryStatsMongod(opCtx, *maybePinnedCursor);
         } else {
-            collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsKey));
+            collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsInfo.key));
         }
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.

@@ -284,7 +284,7 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
             expCtx, *parsedFind, query_shape::CollectionType::kCollection);
     }));
     auto& opDebug = CurOp::get(*opCtx)->debug();
-    ASSERT_EQ(opDebug.queryStatsKeyHash, boost::none);
+    ASSERT_EQ(opDebug.queryStatsInfo.keyHash, boost::none);
 }
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {

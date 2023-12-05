@@ -222,8 +222,8 @@ query_settings::QuerySettings lookupForFind(boost::intrusive_ptr<ExpressionConte
     auto& manager = query_settings::QuerySettingsManager::get(opCtx);
     auto queryShapeHashFn = [&]() {
         auto& opDebug = CurOp::get(opCtx)->debug();
-        if (opDebug.queryStatsKey) {
-            return opDebug.queryStatsKey->getQueryShapeHash(
+        if (opDebug.queryStatsInfo.key) {
+            return opDebug.queryStatsInfo.key->getQueryShapeHash(
                 opCtx, parsedRequest.findCommandRequest->getSerializationContext());
         }
 

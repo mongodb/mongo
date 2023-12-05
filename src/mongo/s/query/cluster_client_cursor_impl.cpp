@@ -87,8 +87,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
-      _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsKeyHash),
-      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsKey)) {
+      _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -107,8 +107,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
-      _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsKeyHash),
-      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsKey)) {
+      _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));

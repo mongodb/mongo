@@ -125,8 +125,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _planSummary(_exec->getPlanExplainer().getPlanSummary()),
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
-      _queryStatsKeyHash(CurOp::get(operationUsingCursor)->debug().queryStatsKeyHash),
-      _queryStatsKey(std::move(CurOp::get(operationUsingCursor)->debug().queryStatsKey)),
+      _queryStatsKeyHash(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.keyHash),
+      _queryStatsKey(std::move(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.key)),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),
       _opKey(operationUsingCursor->getOperationKey()) {
@@ -432,7 +432,7 @@ void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stat
     auto& opDebug = CurOp::get(opCtx)->debug();
     int64_t execTime = opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count();
     query_stats::writeQueryStats(opCtx,
-                                 opDebug.queryStatsKeyHash,
+                                 opDebug.queryStatsInfo.keyHash,
                                  std::move(key),
                                  execTime,
                                  execTime,

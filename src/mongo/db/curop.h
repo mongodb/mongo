@@ -333,13 +333,48 @@ public:
     boost::optional<uint32_t> planCacheKey;
     // The hash of the query's "stable" key. This represents the query's shape.
     boost::optional<uint32_t> queryHash;
-    // The shape of the original query serialized with readConcern, application name, and namespace.
-    // If boost::none, query stats should not be collected for this operation.
-    boost::optional<std::size_t> queryStatsKeyHash;
-    // The Key used by query stats to generate the query stats store key.
-    std::unique_ptr<query_stats::Key> queryStatsKey;
-    // True if the request was rate limited and stats should not be collected.
-    bool queryStatsRateLimited{false};
+
+    /* The QueryStatsInfo struct was created to bundle all the queryStats related fields of CurOp &
+     * OpDebug together (SERVER-83280).
+     *
+     * ClusterClientCursorImpl and ClientCursor also contain _queryStatsKey and _queryStatsKeyHash
+     * members but NOT a wasRateLimited member. Variable names & accesses would be more consistent
+     * across the code if ClusterClientCursorImpl and ClientCursor each also had a QueryStatsInfo
+     * struct, but we considered and rejected two different potential implementations of this:
+     *  - Option 1:
+     *    Declare a QueryStatsInfo struct in each .h file. Every struct would have key and keyHash
+     *    fields, and a wasRateLimited field would be added only to CurOp. But, it seemed confusing
+     *    to have slightly different structs with the same name declared three different times.
+     *  - Option 2:
+     *    Create a query_stats_info.h that declares QueryStatsInfo--identical to the version defined
+     *    in this file. CurOp/OpDebug, ClientCursor, and ClusterClientCursorImpl would then all
+     *    have their own QueryStatsInfo instances, potentially as a unique_ptr or boost::optional. A
+     *    benefit to this would be the ability to to just move the entire QueryStatsInfo struct from
+     *    Op to the Cursor, instead of copying it over field by field (the current method). But:
+     *      - The current code moves ownership of the key, but copies the keyHash. So, for workflows
+     *        that require multiple cursors, like sharding, one cursor would own the key, but all
+     *        cursors would have copies of the keyHash. The problem with trying to move around the
+     *        struct in its entirety is that access to the *entire* struct would be lost on the
+     *        move, meaning there's no way to retain the keyHash (that doesn't largely nullify the
+     *        benefits of having the struct).
+     *      - It seemed odd to have ClientCursor and ClusterClientCursorImpl using the struct but
+     *        never needing the wasRateLimited field.
+     */
+
+    // Note that the only case when the three fields of the below struct are null, none, and false
+    // is if the query stats feature flag is turned off.
+    struct QueryStatsInfo {
+        // Uniquely identifies one query stats entry.
+        // nullptr if `wasRateLimited` is true.
+        std::unique_ptr<query_stats::Key> key;
+        // A cached value of `absl::HashOf(key)`.
+        // Always populated if `key` is non-null. boost::none if `wasRateLimited` is true.
+        boost::optional<std::size_t> keyHash;
+        // True if the request was rate limited and stats should not be collected.
+        bool wasRateLimited = false;
+    };
+
+    QueryStatsInfo queryStatsInfo;
 
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};

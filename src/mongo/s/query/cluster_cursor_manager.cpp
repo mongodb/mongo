@@ -262,7 +262,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     cursorGuard->reattachToOperationContext(opCtx);
 
     CurOp::get(opCtx)->debug().queryHash = cursorGuard->getQueryHash();
-    CurOp::get(opCtx)->debug().queryStatsKeyHash = cursorGuard->getQueryStatsKeyHash();
+    CurOp::get(opCtx)->debug().queryStatsInfo.keyHash = cursorGuard->getQueryStatsKeyHash();
 
     return PinnedCursor(this, std::move(cursorGuard), entry->getNamespace(), cursorId);
 }
@@ -611,7 +611,7 @@ void collectQueryStatsMongos(OperationContext* opCtx, std::unique_ptr<query_stat
     auto&& opDebug = CurOp::get(opCtx)->debug();
     int64_t execTime = opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count();
     query_stats::writeQueryStats(opCtx,
-                                 opDebug.queryStatsKeyHash,
+                                 opDebug.queryStatsInfo.keyHash,
                                  std::move(key),
                                  execTime,
                                  execTime,

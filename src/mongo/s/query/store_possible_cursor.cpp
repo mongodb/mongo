@@ -115,7 +115,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     if (incomingCursorResponse.getValue().getCursorId() == CursorId(0)) {
         opDebug.cursorExhausted = true;
-        collectQueryStatsMongos(opCtx, std::move(opDebug.queryStatsKey));
+        collectQueryStatsMongos(opCtx, std::move(opDebug.queryStatsInfo.key));
         return cmdResult;
     }
 

@@ -65,7 +65,7 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
 
     RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
     auto& opDebug = CurOp::get(*opCtx)->debug();
-    ASSERT_EQ(opDebug.queryStatsRateLimited, false);
+    ASSERT_EQ(opDebug.queryStatsInfo.wasRateLimited, false);
 
     // First call to registerRequest() should be rate limited.
     queryStatsRateLimiter(opCtx->getServiceContext()) =
@@ -76,8 +76,8 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     }));
 
     // Since the query was rate limited, no key should have been created.
-    ASSERT_NULL(opDebug.queryStatsKey);
-    ASSERT_EQ(opDebug.queryStatsRateLimited, true);
+    ASSERT_NULL(opDebug.queryStatsInfo.key);
+    ASSERT_EQ(opDebug.queryStatsInfo.wasRateLimited, true);
 
     // Second call should not be rate limited.
     queryStatsRateLimiter(opCtx->getServiceContext()).get()->setSamplingRate(INT_MAX);
@@ -88,7 +88,7 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     }));
 
     // queryStatsKey should not be created for previously rate limited query.
-    ASSERT_NULL(opDebug.queryStatsKey);
-    ASSERT_EQ(opDebug.queryStatsRateLimited, true);
+    ASSERT_NULL(opDebug.queryStatsInfo.key);
+    ASSERT_EQ(opDebug.queryStatsInfo.wasRateLimited, true);
 }
 }  // namespace mongo::query_stats
