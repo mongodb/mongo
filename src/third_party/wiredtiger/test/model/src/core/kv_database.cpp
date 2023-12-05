@@ -43,7 +43,7 @@ namespace model {
  *     Create and return a new table. Throw an exception if the name is not unique.
  */
 kv_table_ptr
-kv_database::create_table(const char *name)
+kv_database::create_table(const char *name, const kv_table_config &config)
 {
     std::string s = std::string(name);
     std::lock_guard lock_guard(_tables_lock);
@@ -52,7 +52,7 @@ kv_database::create_table(const char *name)
     if (i != _tables.end())
         throw model_exception("Table already exists: " + s);
 
-    kv_table_ptr table = std::make_shared<kv_table>(name);
+    kv_table_ptr table = std::make_shared<kv_table>(name, config);
     _tables[s] = table;
     return table;
 }

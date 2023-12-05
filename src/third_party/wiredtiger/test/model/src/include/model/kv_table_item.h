@@ -158,6 +158,19 @@ public:
     }
 
     /*
+     * kv_table_item::get_latest --
+     *     Get the corresponding value, but ignore the transaction's read timestamp. Return NONE if
+     *     not found. Throw an exception on error.
+     */
+    inline data_value
+    get_latest(kv_transaction_ptr txn) const
+    {
+        if (!txn)
+            throw model_exception("Null transaction");
+        return get(txn->snapshot(), txn->id(), k_timestamp_latest);
+    }
+
+    /*
      * kv_table_item::fix_timestamps --
      *     Fix the commit and durable timestamps for the corresponding update. We need to do this,
      *     because WiredTiger transaction API specifies the commit timestamp after performing the

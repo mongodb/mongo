@@ -66,6 +66,18 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
     "log=(enabled,file_max=10M,remove=false),session_max=100," \
     "statistics=(all),statistics_log=(wait=1,json,on_close)"
 
+/* Keys. */
+const model::data_value key1("Key 1");
+const model::data_value key2("Key 2");
+const model::data_value keyX("Key X");
+
+/* Values. */
+const model::data_value value1("Value 1");
+const model::data_value value2("Value 2");
+const model::data_value value3("Value 3");
+const model::data_value value4("Value 4");
+const model::data_value value5("Value 5");
+
 /*
  * test_data_value --
  *     Data value unit tests.
@@ -73,9 +85,6 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 test_data_value(void)
 {
-    const model::data_value key1("Key 1");
-    const model::data_value key2("Key 2");
-
     testutil_assert(strcmp(key1.wt_type(), "S") == 0);
     testutil_assert(key1 == model::data_value("Key 1"));
     testutil_assert(key2 == model::data_value("Key 2"));
@@ -147,17 +156,6 @@ test_model_basic(void)
 {
     model::kv_database database;
     model::kv_table_ptr table = database.create_table("table");
-
-    /* Keys. */
-    const model::data_value key1("Key 1");
-    const model::data_value key2("Key 2");
-    const model::data_value keyX("Key X");
-
-    /* Values. */
-    const model::data_value value1("Value 1");
-    const model::data_value value2("Value 2");
-    const model::data_value value3("Value 3");
-    const model::data_value value4("Value 4");
 
     /* Populate the table with a few values and check that we get the expected results. */
     testutil_check(table->insert(key1, value1, 10));
@@ -253,24 +251,14 @@ test_model_basic_wt(void)
     model::kv_database database;
     model::kv_table_ptr table = database.create_table("table");
 
-    /* Keys. */
-    const model::data_value key1("Key 1");
-    const model::data_value key2("Key 2");
-    const model::data_value keyX("Key X");
-
-    /* Values. */
-    const model::data_value value1("Value 1");
-    const model::data_value value2("Value 2");
-    const model::data_value value3("Value 3");
-    const model::data_value value4("Value 4");
-
     /* Create the test's home directory and database. */
     WT_CONNECTION *conn;
     WT_SESSION *session;
     const char *uri = "table:table";
 
-    testutil_recreate_dir(home);
-    testutil_wiredtiger_open(opts, home, ENV_CONFIG, nullptr, &conn, false, false);
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "basic";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(
       session->create(session, uri, "key_format=S,value_format=S,log=(enabled=false)"));
@@ -351,33 +339,185 @@ test_model_basic_wt(void)
     testutil_check(table->remove(key2, 1000));
     testutil_assert(!table->verify_noexcept(conn));
 
-    /* Close and reopen the database. We must do this for debug log printing to work. */
+    /* Clean up. */
     testutil_check(session->close(session, nullptr));
     testutil_check(conn->close(conn, nullptr));
-    testutil_wiredtiger_open(opts, home, ENV_CONFIG, nullptr, &conn, false, false);
-    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
 
     /* Verify using the debug log. */
-    model::kv_database db_from_debug_log;
-    model::debug_log_parser::from_debug_log(db_from_debug_log, conn);
-    testutil_assert(db_from_debug_log.table("table")->verify_noexcept(conn));
+    verify_using_debug_log(opts, test_home.c_str(), true);
+}
 
-    /* Print the debug log to JSON. */
-    std::string tmp_json = create_tmp_file(home, "debug-log-", ".json");
-    wt_print_debug_log(conn, tmp_json.c_str());
+/*
+ * test_model_logged --
+ *     Test tables that use logging.
+ */
+static void
+test_model_logged(void)
+{
+    model::kv_database database;
 
-    /* Verify using the debug log JSON. */
-    model::kv_database db_from_debug_log_json;
-    model::debug_log_parser::from_json(db_from_debug_log_json, tmp_json.c_str());
-    testutil_assert(db_from_debug_log_json.table("table")->verify_noexcept(conn));
+    model::kv_table_config table_config;
+    table_config.log_enabled = true;
+    model::kv_table_ptr table = database.create_table("table", table_config);
 
-    /* Now try to get the verification to fail. */
-    wt_remove(session, uri, key2, 1000);
-    testutil_assert(!db_from_debug_log.table("table")->verify_noexcept(conn));
+    /* Populate the table with a few values and check that timestamps are ignored. */
+    testutil_check(table->insert(key1, value1, 10));
+    testutil_check(table->insert(key1, value2, 20));
+    testutil_check(table->remove(key1, 30));
+    testutil_check(table->insert(key1, value4, 40));
+
+    testutil_assert(table->get(key1, 5) == value4);
+    testutil_assert(table->get(key1, 10) == value4);
+    testutil_assert(table->get(key1, 20) == value4);
+    testutil_assert(table->get(key1, 30) == value4);
+    testutil_assert(table->get(key1, 40) == value4);
+    testutil_assert(table->get(key1) == value4);
+
+    /* Test non-timestamped updates. */
+    testutil_check(table->insert(key2, value1));
+    testutil_assert(table->get(key2, 0) == value1);
+    testutil_assert(table->get(key2, 10) == value1);
+    testutil_assert(table->get(key2) == value1);
+
+    testutil_check(table->remove(key2));
+    testutil_assert(table->get(key2) == model::NONE);
+
+    /* Try a missing key. */
+    testutil_assert(table->get(keyX) == model::NONE);
+
+    testutil_assert(table->remove(keyX) == WT_NOTFOUND);
+    testutil_assert(table->get(keyX) == model::NONE);
+
+    /* Try timestamped updates to the second key. */
+    testutil_check(table->insert(key2, value3, 30));
+    testutil_assert(table->get(key2, 5) == value3);
+    testutil_assert(table->get(key2, 35) == value3);
+    testutil_assert(table->get(key2) == value3);
+
+    /* Try non-timestamped updates to the same key. */
+    testutil_check(table->insert(key2, value2));
+    testutil_assert(table->get(key2) == value2);
+
+    /* Test multiple inserts. */
+    testutil_check(table->insert(key1, value1, 50));
+    testutil_check(table->insert(key1, value2, 50));
+    testutil_check(table->insert(key1, value3, 50));
+
+    testutil_assert(table->contains_any(key1, value1));
+    testutil_assert(table->contains_any(key1, value2));
+    testutil_assert(table->contains_any(key1, value3));
+    testutil_assert(!table->contains_any(key1, value5));
+
+    /* Test insert without overwrite. */
+    testutil_assert(table->insert(key1, value1, 60, false) == WT_DUPLICATE_KEY);
+    testutil_assert(table->insert(key1, value1, 65, false) == WT_DUPLICATE_KEY);
+    testutil_check(table->remove(key1, 65));
+    testutil_check(table->insert(key1, value1, 70, false));
+
+    /* Test updates. */
+    testutil_check(table->update(key1, value2, 70));
+    testutil_assert(table->get(key1, 70) == value2);
+    testutil_check(table->remove(key1, 80));
+    testutil_assert(table->update(key1, value1, 80, false) == WT_NOTFOUND);
+    testutil_assert(table->update(key1, value1, 85, false) == WT_NOTFOUND);
+}
+
+/*
+ * test_model_logged_wt --
+ *     Test tables that use logging - with WiredTiger.
+ */
+static void
+test_model_logged_wt(void)
+{
+    model::kv_database database;
+
+    model::kv_table_config table_config;
+    table_config.log_enabled = true;
+    model::kv_table_ptr table = database.create_table("table", table_config);
+
+    /* Create the test's home directory and database. */
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    const char *uri = "table:table";
+
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "logged";
+    testutil_recreate_dir(test_home.c_str());
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    testutil_check(session->create(session, uri, "key_format=S,value_format=S,log=(enabled=true)"));
+
+    /* Populate the table with a few values and check that timestamps are ignored. */
+    wt_model_insert_both(table, uri, key1, value1, 10);
+    wt_model_insert_both(table, uri, key1, value2, 20);
+    wt_model_remove_both(table, uri, key1, 30);
+    wt_model_insert_both(table, uri, key1, value4, 40);
+
+    wt_model_assert(table, uri, key1, 5);
+    wt_model_assert(table, uri, key1, 10);
+    wt_model_assert(table, uri, key1, 20);
+    wt_model_assert(table, uri, key1, 30);
+    wt_model_assert(table, uri, key1, 40);
+    wt_model_assert(table, uri, key1);
+
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Test non-timestamped updates. */
+    wt_model_insert_both(table, uri, key2, value1);
+    wt_model_assert(table, uri, key2, 0);
+    wt_model_assert(table, uri, key2, 10);
+    wt_model_assert(table, uri, key2);
+
+    wt_model_remove_both(table, uri, key2);
+    wt_model_assert(table, uri, key2);
+
+    /* Try a missing key. */
+    wt_model_assert(table, uri, keyX);
+
+    wt_model_remove_both(table, uri, keyX);
+    wt_model_assert(table, uri, keyX);
+
+    /* Try timestamped updates to the second key. */
+    wt_model_insert_both(table, uri, key2, value3, 30);
+
+    wt_model_assert(table, uri, key2, 5);
+    wt_model_assert(table, uri, key2, 35);
+    wt_model_assert(table, uri, key2);
+
+    /* Try non-timestamped updates to the same key. */
+    wt_model_insert_both(table, uri, key2, value2);
+    wt_model_assert(table, uri, key2);
+
+    /* Test multiple inserts with the same timestamp. */
+    wt_model_insert_both(table, uri, key1, value1, 50);
+    wt_model_insert_both(table, uri, key1, value2, 50);
+    wt_model_insert_both(table, uri, key1, value3, 50);
+    wt_model_insert_both(table, uri, key1, value4, 60);
+
+    wt_model_assert(table, uri, key1, 50);
+    wt_model_assert(table, uri, key1, 55);
+    wt_model_assert(table, uri, key1);
+
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Test insert without overwrite. */
+    wt_model_insert_both(table, uri, key1, value1, 60, false);
+    wt_model_insert_both(table, uri, key1, value1, 65, false);
+    wt_model_remove_both(table, uri, key1, 65);
+    wt_model_insert_both(table, uri, key1, value1, 70, false);
+
+    /* Test updates. */
+    wt_model_update_both(table, uri, key1, value2, 70);
+    wt_model_assert(table, uri, key1, 70);
+    wt_model_remove_both(table, uri, key1, 80);
+    wt_model_update_both(table, uri, key1, value1, 80, false);
+    wt_model_update_both(table, uri, key1, value1, 85, false);
 
     /* Clean up. */
     testutil_check(session->close(session, nullptr));
     testutil_check(conn->close(conn, nullptr));
+
+    /* Verify using the debug log. */
+    verify_using_debug_log(opts, test_home.c_str(), true);
 }
 
 /*
@@ -422,6 +562,7 @@ main(int argc, char *argv[])
 
     testutil_parse_end_opt(opts);
     testutil_work_dir_from_path(home, sizeof(home), opts->home);
+    testutil_recreate_dir(home);
 
     /*
      * Tests.
@@ -431,6 +572,8 @@ main(int argc, char *argv[])
         test_data_value();
         test_model_basic();
         test_model_basic_wt();
+        test_model_logged();
+        test_model_logged_wt();
     } catch (std::exception &e) {
         std::cerr << "Test failed with exception: " << e.what() << std::endl;
         ret = EXIT_FAILURE;

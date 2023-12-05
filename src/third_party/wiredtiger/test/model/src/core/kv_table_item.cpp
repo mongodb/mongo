@@ -32,6 +32,7 @@
 #include <list>
 #include <sstream>
 
+#include "model/kv_table.h"
 #include "model/kv_table_item.h"
 #include "wiredtiger.h"
 

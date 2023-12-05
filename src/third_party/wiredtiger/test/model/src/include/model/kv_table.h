@@ -43,6 +43,20 @@
 namespace model {
 
 /*
+ * kv_table_config --
+ *     Table configuration.
+ */
+struct kv_table_config {
+    bool log_enabled;
+
+    /*
+     * kv_table_config::kv_table_config --
+     *     Create the default configuration.
+     */
+    inline kv_table_config() : log_enabled(false) {}
+};
+
+/*
  * kv_table --
  *     A database table with key-value pairs.
  */
@@ -53,7 +67,9 @@ public:
      * kv_table::kv_table --
      *     Create a new instance.
      */
-    inline kv_table(const char *name) : _name(name) {}
+    inline kv_table(const char *name, const kv_table_config &config) : _name(name), _config(config)
+    {
+    }
 
     /*
      * kv_table::name --
@@ -115,6 +131,16 @@ public:
         if (_value_format.empty())
             throw model_exception("The value format was not set");
         return _value_format.c_str();
+    }
+
+    /*
+     * kv_table::timestamped --
+     *     Return whether the table uses timestamps.
+     */
+    inline bool
+    timestamped() const noexcept
+    {
+        return !_config.log_enabled;
     }
 
     /*
@@ -311,8 +337,33 @@ protected:
         return &i->second;
     }
 
+    /*
+     * kv_table::fix_timestamp --
+     *     Update the given timestamp if necessary, e.g., so that it can be ignored for
+     *     non-timestamped tables.
+     */
+    inline timestamp_t
+    fix_timestamp(timestamp_t t) const noexcept
+    {
+        return timestamped() ? t : k_timestamp_none;
+    }
+
+    /*
+     * kv_table::fix_timestamps --
+     *     Update update timestamps if necessary, e.g., so that it can be ignored for
+     *     non-timestamped tables. Return the update for call chaining.
+     */
+    inline std::shared_ptr<kv_update>
+    fix_timestamps(std::shared_ptr<kv_update> update) const noexcept
+    {
+        if (!timestamped() && update)
+            update->set_timestamps(k_timestamp_none, k_timestamp_none);
+        return update;
+    }
+
 private:
     std::string _name;
+    kv_table_config _config;
 
     std::string _key_format;
     std::string _value_format;

@@ -229,6 +229,17 @@ public:
     }
 
     /*
+     * config_map::get_bool --
+     *     Get the corresponding bool value. Throw an exception on error.
+     */
+    inline uint64_t
+    get_bool(const char *key) const
+    {
+        std::string v = std::get<std::string>(_map.find(key)->second);
+        return v == "true" || v == "1";
+    }
+
+    /*
      * config_map::get_uint64 --
      *     Get the corresponding integer value. Throw an exception on error.
      */

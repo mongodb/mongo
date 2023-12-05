@@ -45,7 +45,7 @@ kv_table::contains_any(const data_value &key, const data_value &value, timestamp
     const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return false;
-    return item->contains_any(value, timestamp);
+    return item->contains_any(value, fix_timestamp(timestamp));
 }
 
 /*
@@ -73,7 +73,7 @@ kv_table::get(const data_value &key, timestamp_t timestamp) const
     const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return NONE;
-    return item->get(timestamp);
+    return item->get(fix_timestamp(timestamp));
 }
 
 /*
@@ -87,7 +87,7 @@ kv_table::get(kv_checkpoint_ptr ckpt, const data_value &key, timestamp_t timesta
     const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return NONE;
-    return item->get(ckpt, timestamp);
+    return item->get(ckpt, fix_timestamp(timestamp));
 }
 
 /*
@@ -101,7 +101,7 @@ kv_table::get(kv_transaction_ptr txn, const data_value &key) const
     const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return NONE;
-    return item->get(txn);
+    return timestamped() ? item->get(txn) : item->get_latest(txn);
 }
 
 /*
@@ -112,7 +112,7 @@ int
 kv_table::get_ext(const data_value &key, data_value &out, timestamp_t timestamp) const
 {
     try {
-        out = get(key, timestamp);
+        out = get(key, fix_timestamp(timestamp));
         return out == NONE ? WT_NOTFOUND : 0;
     } catch (wiredtiger_exception &e) {
         out = NONE;
@@ -129,7 +129,7 @@ kv_table::get_ext(
   kv_checkpoint_ptr ckpt, const data_value &key, data_value &out, timestamp_t timestamp) const
 {
     try {
-        out = get(ckpt, key, timestamp);
+        out = get(ckpt, key, fix_timestamp(timestamp));
         return out == NONE ? WT_NOTFOUND : 0;
     } catch (wiredtiger_exception &e) {
         out = NONE;
@@ -162,7 +162,8 @@ kv_table::insert(
   const data_value &key, const data_value &value, timestamp_t timestamp, bool overwrite)
 {
     try {
-        item(key).add_update(std::move(kv_update(value, timestamp)), false, !overwrite);
+        item(key).add_update(
+          std::move(kv_update(value, fix_timestamp(timestamp))), false, !overwrite);
         return 0;
     } catch (wiredtiger_exception &e) {
         return e.error();
@@ -177,7 +178,7 @@ int
 kv_table::insert(
   kv_transaction_ptr txn, const data_value &key, const data_value &value, bool overwrite)
 {
-    std::shared_ptr<kv_update> update = std::make_shared<kv_update>(value, txn);
+    std::shared_ptr<kv_update> update = fix_timestamps(std::make_shared<kv_update>(value, txn));
     try {
         item(key).add_update(update, false, !overwrite);
         txn->add_update(*this, key, update);
@@ -198,7 +199,7 @@ kv_table::remove(const data_value &key, timestamp_t timestamp)
     if (item == nullptr)
         return WT_NOTFOUND;
     try {
-        item->add_update(std::move(kv_update(NONE, timestamp)), true, false);
+        item->add_update(std::move(kv_update(NONE, fix_timestamp(timestamp))), true, false);
         return 0;
     } catch (wiredtiger_exception &e) {
         return e.error();
@@ -216,7 +217,7 @@ kv_table::remove(kv_transaction_ptr txn, const data_value &key)
     if (item == nullptr)
         return WT_NOTFOUND;
 
-    std::shared_ptr<kv_update> update = std::make_shared<kv_update>(NONE, txn);
+    std::shared_ptr<kv_update> update = fix_timestamps(std::make_shared<kv_update>(NONE, txn));
     try {
         item->add_update(update, true, false);
         txn->add_update(*this, key, update);
@@ -235,7 +236,8 @@ kv_table::update(
   const data_value &key, const data_value &value, timestamp_t timestamp, bool overwrite)
 {
     try {
-        item(key).add_update(std::move(kv_update(value, timestamp)), !overwrite, false);
+        item(key).add_update(
+          std::move(kv_update(value, fix_timestamp(timestamp))), !overwrite, false);
         return 0;
     } catch (wiredtiger_exception &e) {
         return e.error();
@@ -250,7 +252,7 @@ int
 kv_table::update(
   kv_transaction_ptr txn, const data_value &key, const data_value &value, bool overwrite)
 {
-    std::shared_ptr<kv_update> update = std::make_shared<kv_update>(value, txn);
+    std::shared_ptr<kv_update> update = fix_timestamps(std::make_shared<kv_update>(value, txn));
     try {
         item(key).add_update(update, !overwrite, false);
         txn->add_update(*this, key, update);
@@ -302,6 +304,11 @@ void
 kv_table::rollback_to_stable(timestamp_t timestamp, kv_transaction_snapshot_ptr snapshot)
 {
     std::lock_guard lock_guard(_lock);
+
+    /* RTS works only on timestamped tables. */
+    if (!timestamped())
+        return;
+
     for (auto &p : _data)
         p.second.rollback_to_stable(timestamp, snapshot);
 }

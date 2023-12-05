@@ -50,7 +50,18 @@ kv_transaction_snapshot_by_exclusion::contains(const kv_update &update) const no
 bool
 kv_transaction_snapshot_wt::contains(const kv_update &update) const noexcept
 {
-    /* First, compare the base generation numbers to see if we are in the right restart cycle. */
+    /*
+     * First, rule out all updates that were committed after the snapshot was created. We have to do
+     * this, because when WiredTiger creates a checkpoint, its transaction snapshot may include
+     * active uncommitted transactions. This is the consequence of the checkpoint's implementation
+     * reusing the snapshot from the checkpoint's transaction. This does not matter in WiredTiger
+     * itself, because those transactions would not be included in the actual checkpoint of the
+     * tree.
+     */
+    if (update.wt_ckpt_seq_number() > _seq_number)
+        return false;
+
+    /* Second, compare the base generation numbers to see if we are in the right restart cycle. */
     write_gen_t update_write_gen = update.wt_base_write_gen();
     if (update_write_gen < _write_gen)
         return true;

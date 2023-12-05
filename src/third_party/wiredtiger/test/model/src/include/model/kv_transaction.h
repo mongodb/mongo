@@ -82,7 +82,7 @@ public:
           _durable_timestamp(k_timestamp_none), _prepare_timestamp(k_timestamp_none),
           _failed(false), _read_timestamp(read_timestamp), _snapshot(snapshot),
           _state(kv_transaction_state::in_progress), _wt_id(k_txn_none),
-          _wt_base_write_gen(k_write_gen_none)
+          _wt_base_write_gen(k_write_gen_none), _wt_ckpt_seq_number(0)
     {
         if (!snapshot)
             throw model_exception("The snapshot is NULL.");
@@ -231,13 +231,14 @@ public:
      *     This can be done only before the first update is added to the transaction.
      */
     inline void
-    set_wt_metadata(txn_id_t wt_id, write_gen_t wt_base_write_gen)
+    set_wt_metadata(txn_id_t wt_id, write_gen_t wt_base_write_gen, uint64_t wt_ckpt_seq_number)
     {
         std::lock_guard lock_guard(_lock);
         if (!_updates.empty())
             throw model_exception("There are already updates in the transaction");
         _wt_id = wt_id;
         _wt_base_write_gen = wt_base_write_gen;
+        _wt_ckpt_seq_number = wt_ckpt_seq_number;
     }
 
     /*
@@ -258,6 +259,16 @@ public:
     wt_base_write_gen() const
     {
         return _wt_base_write_gen;
+    }
+
+    /*
+     * kv_transaction::wt_ckpt_seq_number --
+     *     Get the WiredTiger checkpoint's sequence number, if available.
+     */
+    inline uint64_t
+    wt_ckpt_seq_number() const
+    {
+        return _wt_ckpt_seq_number;
     }
 
 protected:
@@ -288,6 +299,7 @@ private:
     /* Transaction information for updates imported from WiredTiger's debug log. */
     txn_id_t _wt_id;
     write_gen_t _wt_base_write_gen;
+    uint64_t _wt_ckpt_seq_number;
 };
 
 /*

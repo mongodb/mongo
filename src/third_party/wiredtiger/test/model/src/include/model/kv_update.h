@@ -125,7 +125,8 @@ public:
      */
     inline kv_update(const data_value &value, timestamp_t timestamp) noexcept
         : _value(value), _commit_timestamp(timestamp), _durable_timestamp(timestamp),
-          _txn_id(k_txn_none), _wt_txn_id(k_txn_none), _wt_base_write_gen(k_write_gen_none)
+          _txn_id(k_txn_none), _wt_txn_id(k_txn_none), _wt_base_write_gen(k_write_gen_none),
+          _wt_ckpt_seq_number(0)
     {
     }
 
@@ -137,7 +138,7 @@ public:
         : _value(value), _commit_timestamp(txn ? txn->commit_timestamp() : k_timestamp_none),
           _durable_timestamp(txn ? txn->durable_timestamp() : k_timestamp_none), _txn(txn),
           _txn_id(txn ? txn->id() : k_txn_none), _wt_txn_id(k_txn_none),
-          _wt_base_write_gen(k_write_gen_none)
+          _wt_base_write_gen(k_write_gen_none), _wt_ckpt_seq_number(0)
     {
     }
 
@@ -336,10 +337,12 @@ public:
      *     metadata.
      */
     inline void
-    set_wt_transaction_metadata(txn_id_t wt_txn_id, write_gen_t wt_base_write_gen)
+    set_wt_transaction_metadata(
+      txn_id_t wt_txn_id, write_gen_t wt_base_write_gen, uint64_t wt_ckpt_seq_number)
     {
         _wt_txn_id = wt_txn_id;
         _wt_base_write_gen = wt_base_write_gen;
+        _wt_ckpt_seq_number = wt_ckpt_seq_number;
     }
 
     /*
@@ -362,6 +365,16 @@ public:
         return _wt_base_write_gen;
     }
 
+    /*
+     * kv_update::wt_ckpt_seq_number --
+     *     Get the checkpoint's sequence number, if available.
+     */
+    inline uint64_t
+    wt_ckpt_seq_number() const
+    {
+        return _wt_ckpt_seq_number;
+    }
+
 private:
     timestamp_t _commit_timestamp;
     timestamp_t _durable_timestamp;
@@ -380,6 +393,7 @@ private:
     /* Transaction information for updates imported from WiredTiger's debug log. */
     txn_id_t _wt_txn_id;
     write_gen_t _wt_base_write_gen;
+    uint64_t _wt_ckpt_seq_number;
 };
 
 } /* namespace model */

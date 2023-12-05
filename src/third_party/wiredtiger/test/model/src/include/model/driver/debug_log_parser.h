@@ -97,7 +97,7 @@ public:
      *     lifetime of this parser object.
      */
     inline debug_log_parser(kv_database &database)
-        : _database(database), _base_write_gen(k_write_gen_first)
+        : _database(database), _base_write_gen(k_write_gen_first), _ckpt_count(0)
     {
     }
 
@@ -185,6 +185,9 @@ private:
 
     /* The current base write generation. */
     write_gen_t _base_write_gen;
+
+    /* The number of checkpoints so far. */
+    uint64_t _ckpt_count;
 
     /* Place for accumulating checkpoint metadata: TXN ID -> checkpoint name -> config map. */
     std::unordered_map<txn_id_t, std::unordered_map<std::string, std::shared_ptr<config_map>>>

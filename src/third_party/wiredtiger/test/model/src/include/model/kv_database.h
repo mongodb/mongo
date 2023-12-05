@@ -71,16 +71,16 @@ public:
      *     Create and return a new table. Throw an exception if the name is not unique.
      */
     inline kv_table_ptr
-    create_table(const std::string &name)
+    create_table(const std::string &name, const kv_table_config &config = kv_table_config{})
     {
-        return create_table(name.c_str());
+        return create_table(name.c_str(), config);
     }
 
     /*
      * kv_database::create_table --
      *     Create and return a new table. Throw an exception if the name is not unique.
      */
-    kv_table_ptr create_table(const char *name);
+    kv_table_ptr create_table(const char *name, const kv_table_config &config = kv_table_config{});
 
     /*
      * kv_database::checkpoint --

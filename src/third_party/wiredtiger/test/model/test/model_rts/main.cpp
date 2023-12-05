@@ -742,6 +742,103 @@ test_crash_wt3(void)
 }
 
 /*
+ * test_logged_wt --
+ *     Test RTS with logged tables.
+ */
+static void
+test_logged_wt(void)
+{
+    const char *uri = "table:table";
+    model::kv_database database;
+
+    model::kv_table_config table_config;
+    table_config.log_enabled = true;
+    model::kv_table_ptr table = database.create_table("table", table_config);
+
+    model::kv_transaction_ptr txn1, txn2;
+
+    /* Add some data. */
+    txn1 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key1, value1));
+    txn1->commit(10);
+    txn1 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key2, value2));
+    txn1->commit(20);
+
+    /* Add a concurrent transaction. */
+    txn2 = database.begin_transaction();
+    testutil_check(table->insert(txn2, key3, value3));
+    testutil_check(table->insert(txn2, key4, value4));
+
+    /* Create an unnamed checkpoint, crash, and verify. */
+    database.set_stable_timestamp(15);
+    database.create_checkpoint();
+    database.crash();
+    testutil_assert(table->get(key1) == value1);
+    testutil_assert(table->get(key2) == value2); /* RTS did not undo this insert. */
+    testutil_assert(table->get(key3) == model::NONE);
+    testutil_assert(table->get(key4) == model::NONE);
+    testutil_assert(table->get(key5) == model::NONE);
+
+    /* Repeat in WiredTiger. */
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "logged";
+    testutil_recreate_dir(test_home.c_str());
+    in_subprocess_abort
+    {
+        WT_CONNECTION *conn;
+        WT_SESSION *session;
+        WT_SESSION *session1;
+        WT_SESSION *session2;
+
+        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+        testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+        testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
+        testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
+        testutil_check(
+          session->create(session, uri, "key_format=S,value_format=S,log=(enabled=true)"));
+
+        /* Add some data. */
+        wt_txn_begin(session1);
+        wt_txn_insert(session1, uri, key1, value1);
+        wt_txn_commit(session1, 10);
+        wt_txn_begin(session1);
+        wt_txn_insert(session1, uri, key2, value2);
+        wt_txn_commit(session1, 20);
+
+        /* Add a concurrent transaction. */
+        wt_txn_begin(session1);
+        wt_txn_insert(session1, uri, key3, value3);
+        wt_txn_insert(session1, uri, key4, value4);
+
+        /* Create an unnamed checkpoint. */
+        wt_set_stable_timestamp(conn, 15);
+        wt_ckpt_create(session, nullptr);
+    }
+
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    WT_SESSION *session1;
+
+    /* Reopen and verify. */
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
+    wt_model_assert(table, uri, key1);
+    wt_model_assert(table, uri, key2);
+    wt_model_assert(table, uri, key3);
+    wt_model_assert(table, uri, key4);
+    wt_model_assert(table, uri, key5);
+
+    /* Clean up. */
+    testutil_check(session->close(session, nullptr));
+    testutil_check(session1->close(session1, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+
+    /* Verify using the debug log. */
+    verify_using_debug_log(opts, test_home.c_str(), true);
+}
+
+/*
  * usage --
  *     Print usage help for the program.
  */
@@ -798,6 +895,7 @@ main(int argc, char *argv[])
         test_crash_wt1();
         test_crash_wt2();
         test_crash_wt3();
+        test_logged_wt();
     } catch (std::exception &e) {
         std::cerr << "Test failed with exception: " << e.what() << std::endl;
         ret = EXIT_FAILURE;

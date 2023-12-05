@@ -251,14 +251,28 @@ debug_log_parser::metadata_apply(kv_transaction_ptr txn, const row_put &op)
         std::string source = m->get_string("source");
         _file_to_colgroup_name[source] = name;
 
-        /* Establish mapping from the file ID to the table name and table object, if possible. */
+        /* Establish mapping from the file ID to the table name. */
         auto i = _file_to_fileid.find(source);
-        if (i != _file_to_fileid.end()) {
-            _fileid_to_table_name[i->second] = name;
-            if (!_database.contains_table(name))
-                throw model_exception("The database does not yet contain table " + name);
-            _fileid_to_table[i->second] = _database.table(name);
+        if (i == _file_to_fileid.end())
+            throw model_exception("The database does not yet contain file " + source);
+        _fileid_to_table_name[i->second] = name;
+
+        /* Create the table, if it does not exist. */
+        if (!_database.contains_table(name)) {
+            std::shared_ptr<config_map> file_config = _metadata[source];
+            std::shared_ptr<config_map> table_config = _metadata["table:" + name];
+
+            kv_table_config config;
+            if (file_config->contains("log"))
+                config.log_enabled = file_config->get_map("log")->get_bool("enabled");
+
+            kv_table_ptr table = _database.create_table(name, config);
+            table->set_key_value_format(
+              table_config->get_string("key_format"), table_config->get_string("value_format"));
         }
+
+        /* Establish mapping from the file ID to the table object. */
+        _fileid_to_table[i->second] = _database.table(name);
     }
 
     /* Special handling for files. */
@@ -266,15 +280,6 @@ debug_log_parser::metadata_apply(kv_transaction_ptr txn, const row_put &op)
         uint64_t id = m->get_uint64("id");
         _fileid_to_file[id] = key;
         _file_to_fileid[key] = id;
-
-        /* Establish mapping from the file ID to the table name and table object, if possible. */
-        auto i = _file_to_colgroup_name.find(key);
-        if (i != _file_to_colgroup_name.end()) {
-            _fileid_to_table_name[id] = i->second;
-            if (!_database.contains_table(i->second))
-                throw model_exception("The database does not yet contain table " + i->second);
-            _fileid_to_table[id] = _database.table(i->second);
-        }
     }
 
     /* Special handling for LSM. */
@@ -283,11 +288,7 @@ debug_log_parser::metadata_apply(kv_transaction_ptr txn, const row_put &op)
 
     /* Special handling for tables. */
     else if (starts_with(key, "table:")) {
-        std::string name = key.substr(std::strlen("table:"));
-        if (!_database.contains_table(name)) {
-            kv_table_ptr table = _database.create_table(name);
-            table->set_key_value_format(m->get_string("key_format"), m->get_string("value_format"));
-        }
+        /* There is currently nothing to do. The table will get created with the colgroup. */
     }
 
     /* Special handling for the system prefix. */
@@ -365,13 +366,14 @@ debug_log_parser::metadata_checkpoint_apply(
         else
             snapshot_ids = std::make_shared<std::vector<uint64_t>>();
         snapshot = std::make_shared<kv_transaction_snapshot_wt>(
-          write_gen, snapshot_min, snapshot_max, *snapshot_ids);
+          _ckpt_count, write_gen, snapshot_min, snapshot_max, *snapshot_ids);
     } else
         snapshot = std::make_shared<kv_transaction_snapshot_wt>(
-          write_gen, k_txn_max, k_txn_max, std::vector<uint64_t>());
+          _ckpt_count, write_gen, k_txn_max, k_txn_max, std::vector<uint64_t>());
 
     /* Create the checkpoint. */
     _database.create_checkpoint(name.c_str(), snapshot, stable_timestamp);
+    _ckpt_count++;
 }
 
 /*
@@ -469,7 +471,7 @@ debug_log_parser::begin_transaction(const debug_log_parser::commit_header &op)
         throw model_exception("The base write generation is not set");
 
     kv_transaction_ptr txn = _database.begin_transaction();
-    txn->set_wt_metadata(op.txnid, _base_write_gen);
+    txn->set_wt_metadata(op.txnid, _base_write_gen, _ckpt_count);
     return txn;
 }
 
