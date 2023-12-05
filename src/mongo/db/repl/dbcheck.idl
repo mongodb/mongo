@@ -143,33 +143,13 @@ structs:
       maxSize:
         type: safeInt64
         default: "std::numeric_limits<int64_t>::max()"
-      maxCountPerSecond:
-        type: safeInt64
-        default: "std::numeric_limits<int64_t>::max()"
       maxDocsPerBatch:
+        description: Controls the number of records and index entries checked in a batch.
         type: safeInt64
         default: 5000
         validator:
           gte: 1
           lte: 10000
-      maxBytesPerBatch:
-        type: safeInt64
-        default: 20 * 1024 * 1024
-        validator:
-          gte: 102400
-          lte: 268435456
-      maxDocsPerSec:
-        type: safeInt64
-        default: 5000
-        validator:
-          gte: 1
-          lte: 80000
-      maxBytesPerSec:
-        type: safeInt64
-        default: 20 * 1024 * 1024
-        validator:
-          gte: 102400
-          lte: 268435456
       maxBatchTimeMillis:
         type: safeInt64
         default: 1000
@@ -206,33 +186,13 @@ structs:
       dbCheck:
         type: safeInt64
         cpp_name: tag
-      maxCountPerSecond:
-        type: safeInt64
-        default: "std::numeric_limits<int64_t>::max()"
       maxDocsPerBatch:
+        description: Controls the number of records and index entries checked in a batch.
         type: safeInt64
         default: 5000
         validator:
           gte: 1
           lte: 10000
-      maxBytesPerBatch:
-        type: safeInt64
-        default: 20 * 1024 * 1024
-        validator:
-          gte: 102400
-          lte: 268435456
-      maxDocsPerSec:
-        type: safeInt64
-        default: 5000
-        validator:
-          gte: 1
-          lte: 80000
-      maxBytesPerSec:
-        type: safeInt64
-        default: 20 * 1024 * 1024
-        validator:
-          gte: 102400
-          lte: 268435456
       maxBatchTimeMillis:
         type: safeInt64
         default: 1000
@@ -282,9 +242,6 @@ structs:
       batchEnd:
         type: object
         cpp_name: batchEnd
-        optional: true
-      maxRate:
-        type: safeInt64
         optional: true
       readTimestamp:
         type: timestamp

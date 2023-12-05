@@ -47,11 +47,7 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("tes
 
 const int64_t kDefaultMaxCount = std::numeric_limits<int64_t>::max();
 const int64_t kDefaultMaxSize = std::numeric_limits<int64_t>::max();
-const int64_t kDefaultMaxRate = std::numeric_limits<int64_t>::max();
 const int64_t kDefaultMaxDocsPerBatch = 5000;
-const int64_t kDefaultMaxBytesPerBatch = 20 * 1024 * 1024;
-const int64_t kDefaultMaxDocsPerSec = 5000;
-const int64_t kDefaultMaxBytesPerSec = 20 * 1024 * 1024;
 const int64_t kDefaultMaxBatchTimeMillis = 1000;
 
 class DbCheckTest : public CatalogTestFixture {

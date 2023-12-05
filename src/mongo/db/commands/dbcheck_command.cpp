@@ -318,11 +318,7 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
     BSONObj end;
     const auto maxCount = invocation.getMaxCount();
     const auto maxSize = invocation.getMaxSize();
-    const auto maxRate = invocation.getMaxCountPerSecond();
     const auto maxDocsPerBatch = invocation.getMaxDocsPerBatch();
-    const auto maxBytesPerBatch = invocation.getMaxBytesPerBatch();
-    const auto maxDocsPerSec = invocation.getMaxDocsPerSec();
-    const auto maxBytesPerSec = invocation.getMaxBytesPerSec();
     const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
 
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters = boost::none;
@@ -378,11 +374,7 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                             end,
                                             maxCount,
                                             maxSize,
-                                            maxRate,
                                             maxDocsPerBatch,
-                                            maxBytesPerBatch,
-                                            maxDocsPerSec,
-                                            maxBytesPerSec,
                                             maxBatchTimeMillis,
                                             invocation.getBatchWriteConcern(),
                                             secondaryIndexCheckParameters,
@@ -408,12 +400,8 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
     uassert(6769501, "dbCheck no longer supports snapshotRead:false", invocation.getSnapshotRead());
 
     const int64_t max = std::numeric_limits<int64_t>::max();
-    const auto rate = invocation.getMaxCountPerSecond();
     const auto maxDocsPerBatch = invocation.getMaxDocsPerBatch();
-    const auto maxBytesPerBatch = invocation.getMaxBytesPerBatch();
     const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
-    const auto maxDocsPerSec = invocation.getMaxDocsPerSec();
-    const auto maxBytesPerSec = invocation.getMaxBytesPerSec();
     auto result = std::make_unique<DbCheckRun>();
     auto perCollectionWork = [&](const Collection* coll) {
         if (!coll->ns().isReplicated()) {
@@ -425,11 +413,7 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                    BSON("_id" << MAXKEY),
                                    max,
                                    max,
-                                   rate,
                                    maxDocsPerBatch,
-                                   maxBytesPerBatch,
-                                   maxDocsPerSec,
-                                   maxBytesPerSec,
                                    maxBatchTimeMillis,
                                    invocation.getBatchWriteConcern(),
                                    boost::none,
@@ -1725,9 +1709,7 @@ public:
                "              maxKey: <last key, inclusive>,\n"
                "              maxCount: <try to keep a batch within maxCount number of docs>,\n"
                "              maxSize: <try to keep a batch withing maxSize of docs (bytes)>,\n"
-               "              maxCountPerSecond: <max rate in docs/sec>\n"
                "              maxDocsPerBatch: <max number of docs/batch>\n"
-               "              maxBytesPerBatch: <try to keep a batch within max bytes/batch>\n"
                "              maxBatchTimeMillis: <max time processing a batch in "
                "milliseconds>\n"
                "to check a collection.\n"

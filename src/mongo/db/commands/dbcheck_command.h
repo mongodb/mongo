@@ -50,11 +50,7 @@ struct DbCheckCollectionInfo {
     BSONObj end;
     int64_t maxCount;
     int64_t maxSize;
-    int64_t maxRate;
     int64_t maxDocsPerBatch;
-    int64_t maxBytesPerBatch;
-    int64_t maxDocsPerSec;
-    int64_t maxBytesPerSec;
     int64_t maxBatchTimeMillis;
     WriteConcernOptions writeConcern;
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters;
