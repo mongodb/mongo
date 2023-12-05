@@ -374,6 +374,14 @@ std::pair<SlotId /* keyValuesSetSlot */, SbStage> replaceEmptySetWithNullArray(
                                    makeVariable(innerRecordSlot)))};
 }
 
+// Returns the vector of local slots to be used in lookup join, including the record slot and
+// metadata slots produced by local side.
+sbe::value::SlotVector buildLocalSlots(StageBuilderState& state, SlotId localRecordSlot) {
+    auto slots = state.data->metadataSlots.getSlotVector();
+    slots.push_back(localRecordSlot);
+    return slots;
+}
+
 // Creates stages for traversing path 'fp' in the record from 'inputSlot'. Puts the set of key
 // values into 'keyValuesSetSlot. For example, if the record in the 'inputSlot' is:
 //     {a: [{b:[1,[2,3]]}, {b:4}, {b:1}, {b:2}]},
@@ -382,14 +390,14 @@ std::pair<SlotId /* keyValuesSetSlot */, SbStage> replaceEmptySetWithNullArray(
 // replaced with a set that contains a single 'null' value, so that it matches MQL semantics when
 // empty arrays and all missing are matched to 'null'.
 std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildKeySet(
+    StageBuilderState& state,
     JoinSide joinSide,
     std::unique_ptr<sbe::PlanStage> inputStage,
     SlotId recordSlot,
     const FieldPath& fp,
     boost::optional<SlotId> collatorSlot,
     const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator,
-    bool allowDiskUse) {
+    SlotIdGenerator& slotIdGenerator) {
     // Create the branch to stream individual key values from every terminal of the path.
     auto [keyValueSlot, keyValuesStage] = (joinSide == JoinSide::Local)
         ? buildLocalKeysStream(recordSlot, fp, nodeId, slotIdGenerator)
@@ -413,7 +421,7 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
         makeSV(), /* groupBy slots - "none" means creating a single group */
         makeAggExprVector(keyValuesSetSlot, nullptr, std::move(addToSetExpr)),
         boost::none /* we group _all_ key values into a single set, so collator is irrelevant */,
-        allowDiskUse,
+        state.allowDiskUse,
         makeSlotExprPairVec(spillSlot, std::move(aggSetUnionExpr)),
         nodeId);
 
@@ -430,11 +438,13 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
             nodeId);
     }
 
+    auto outerProjects =
+        joinSide == JoinSide::Local ? buildLocalSlots(state, recordSlot) : makeSV(recordSlot);
     // Attach the set of key values to the original local record.
     auto nljLocalWithKeyValuesSet =
         makeS<LoopJoinStage>(std::move(inputStage),
                              std::move(packedKeyValuesStage),  // NOLINT(bugprone-use-after-move)
-                             makeSV(recordSlot) /* outerProjects */,
+                             outerProjects,
                              makeSV(recordSlot) /* outerCorrelated */,
                              nullptr /* predicate */,
                              nodeId);
@@ -640,14 +650,14 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
     CurOp::get(state.opCtx)->debug().nestedLoopJoin += 1;
 
     // Build the outer branch that produces the set of local key values.
-    auto [localKeySlot, outerRootStage] = buildKeySet(JoinSide::Local,
+    auto [localKeySlot, outerRootStage] = buildKeySet(state,
+                                                      JoinSide::Local,
                                                       std::move(localStage),
                                                       localRecordSlot,
                                                       localFieldName,
                                                       collatorSlot,
                                                       nodeId,
-                                                      slotIdGenerator,
-                                                      state.allowDiskUse);
+                                                      slotIdGenerator);
 
     // Build the inner branch that will get the foreign key values, compare them to the local key
     // values and accumulate all matching foreign records into an array that is placed into
@@ -671,7 +681,7 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
     std::unique_ptr<sbe::PlanStage> nlj =
         makeS<LoopJoinStage>(std::move(outerRootStage),
                              std::move(innerRootStage),
-                             makeSV(localRecordSlot) /* outerProjects */,
+                             buildLocalSlots(state, localRecordSlot),
                              makeSV(localKeySlot) /* outerCorrelated */,
                              nullptr /* predicate */,
                              nodeId);
@@ -754,14 +764,14 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     const auto indexOrdering = indexAccessMethod->getSortedDataInterface()->getOrdering();
 
     // Build the outer branch that produces the correlated local key slot.
-    auto [localKeysSetSlot, localKeysSetStage] = buildKeySet(JoinSide::Local,
+    auto [localKeysSetSlot, localKeysSetStage] = buildKeySet(state,
+                                                             JoinSide::Local,
                                                              std::move(localStage),
                                                              localRecordSlot,
                                                              localFieldName,
                                                              collatorSlot,
                                                              nodeId,
-                                                             slotIdGenerator,
-                                                             state.allowDiskUse);
+                                                             slotIdGenerator);
 
     // Unwind local keys one by one into 'singleLocalValueSlot'.
     auto singleLocalValueSlot = slotIdGenerator.generate();
@@ -988,7 +998,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     // documents.
     auto nljStage = makeS<LoopJoinStage>(std::move(localKeysSetStage),
                                          std::move(foreignGroupStage),
-                                         makeSV(localRecordSlot) /* outerProjects */,
+                                         buildLocalSlots(state, localRecordSlot),
                                          makeSV(localKeysSetSlot) /* outerCorrelated */,
                                          nullptr,
                                          nodeId);
@@ -1009,24 +1019,24 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildHashJoi
     CurOp::get(state.opCtx)->debug().hashLookup += 1;
 
     // Build the outer branch that produces the set of local key values.
-    auto [localKeySlot, outerRootStage] = buildKeySet(JoinSide::Local,
+    auto [localKeySlot, outerRootStage] = buildKeySet(state,
+                                                      JoinSide::Local,
                                                       std::move(localStage),
                                                       localRecordSlot,
                                                       localFieldName,
                                                       collatorSlot,
                                                       nodeId,
-                                                      slotIdGenerator,
-                                                      state.allowDiskUse);
+                                                      slotIdGenerator);
 
     // Build the inner branch that produces the set of foreign key values.
-    auto [foreignKeySlot, foreignKeyStage] = buildKeySet(JoinSide::Foreign,
+    auto [foreignKeySlot, foreignKeyStage] = buildKeySet(state,
+                                                         JoinSide::Foreign,
                                                          std::move(foreignStage),
                                                          foreignRecordSlot,
                                                          foreignFieldName,
                                                          collatorSlot,
                                                          nodeId,
-                                                         slotIdGenerator,
-                                                         state.allowDiskUse);
+                                                         slotIdGenerator);
 
     // 'foreignKeyStage' should not participate in trial run tracking as the number of
     // reads that it performs should not influence planning decisions for 'outerRootStage'.

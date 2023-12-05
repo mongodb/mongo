@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/matcher/expression.h"
@@ -144,6 +145,34 @@ struct PlanStageMetadataSlots {
         searchSortValuesSlot.reset();
         sortKeySlot.reset();
         searchSequenceToken.reset();
+    }
+
+    sbe::value::SlotVector getSlotVector() {
+        auto slots = sbe::makeSV();
+        if (auto slot = searchScoreSlot) {
+            slots.push_back(*slot);
+        }
+
+        if (auto slot = searchHighlightsSlot) {
+            slots.push_back(*slot);
+        }
+
+        if (auto slot = searchDetailsSlot) {
+            slots.push_back(*slot);
+        }
+
+        if (auto slot = searchSortValuesSlot) {
+            slots.push_back(*slot);
+        }
+
+        if (auto slot = searchSequenceToken) {
+            slots.push_back(*slot);
+        }
+
+        if (auto slot = sortKeySlot) {
+            slots.push_back(*slot);
+        }
+        return slots;
     }
 };
 

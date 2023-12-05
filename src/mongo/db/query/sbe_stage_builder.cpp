@@ -232,12 +232,13 @@ sbe::value::SlotVector getSlotsOrderedByName(const PlanStageReqs& reqs,
     return outputSlots;
 }
 
-sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
+sbe::value::SlotVector getSlotsToForward(PlanStageStaticData* data,
+                                         const PlanStageReqs& reqs,
                                          const PlanStageSlots& outputs,
                                          const sbe::value::SlotVector& exclude) {
     auto requiredNamedSlots = outputs.getRequiredSlotsUnique(reqs);
 
-    auto slots = sbe::makeSV();
+    auto slots = data->metadataSlots.getSlotVector();
 
     if (exclude.empty()) {
         for (const TypedSlot& slot : requiredNamedSlots) {
@@ -1549,7 +1550,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto ridSlot = _slotIdGenerator.generate();
     auto fieldSlots = _slotIdGenerator.generateMultiple(fields.size());
 
-    auto relevantSlots = getSlotsToForward(forwardingReqs, outputs);
+    auto relevantSlots = getSlotsToForward(_data.get(), forwardingReqs, outputs);
 
     stage = makeLoopJoinForFetch(std::move(stage),
                                  resultSlot,
@@ -2032,7 +2033,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Slots for sort stage to forward to parent stage. Values in these slots are not used during
     // sorting.
-    auto forwardedSlots = getSlotsToForward(forwardingReqs, outputs);
+    auto forwardedSlots = getSlotsToForward(_data.get(), forwardingReqs, outputs);
 
     stage =
         sbe::makeS<sbe::SortStage>(std::move(stage),
@@ -2118,7 +2119,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Slots for sort stage to forward to parent stage. Values in these slots are not used during
     // sorting.
-    auto forwardedSlots = getSlotsToForward(childReqs, outputs, orderBy);
+    auto forwardedSlots = getSlotsToForward(_data.get(), childReqs, outputs, orderBy);
 
     stage =
         sbe::makeS<sbe::SortStage>(std::move(stage),
@@ -4450,8 +4451,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto rootSlotOpt = outputs.getIfExists(kResult);
 
     // Create a tuple of slots for each new slot added.
-    sbe::value::SlotVector currSlots;
-    sbe::value::SlotVector boundTestingSlots;
+    sbe::value::SlotVector currSlots = _data->metadataSlots.getSlotVector();
+    sbe::value::SlotVector boundTestingSlots = _slotIdGenerator.generateMultiple(currSlots.size());
     std::vector<sbe::value::SlotVector> windowFrameFirstSlots;
     std::vector<sbe::value::SlotVector> windowFrameLastSlots;
     auto ensureSlotInBuffer = [&](sbe::value::SlotId slot) {
