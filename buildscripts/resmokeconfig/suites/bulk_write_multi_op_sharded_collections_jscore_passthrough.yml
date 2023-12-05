@@ -151,9 +151,6 @@ selector:
   - jstests/core/txns/shell_prompt_in_transaction.js
   - jstests/core/write/crud_api.js
 
-  # Queries the node directly for replset information which may be inconsistent between clusters.
-  - jstests/core/txns/transaction_too_large_for_cache.js
-
   # Uses multiple sessions which the override is incapable of doing.
   - jstests/core/txns/multi_statement_transaction_abort.js
   - jstests/core/txns/commit_prepared_transaction_errors.js

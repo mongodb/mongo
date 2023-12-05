@@ -128,8 +128,6 @@ selector:
   - jstests/core/ddl/collection_uuid_index_commands.js
   # Queryable encryption tests create internal transactions which are expected to fail.
   - jstests/core/queryable_encryption/*.js
-  # TODO (SERVER-78753): setFeatureCompatibilityVersion times out waiting for replication
-  - jstests/core/transaction_too_large_for_cache.js
   # TODO (SERVER-77910): Find out why spill_to_disk.js fails to spill to disk after FCV down.
   - jstests/aggregation/spill_to_disk.js
   # TODO (SERVER-32311): These tests use getAggPlanStage(), which can't handle sharded explain output.

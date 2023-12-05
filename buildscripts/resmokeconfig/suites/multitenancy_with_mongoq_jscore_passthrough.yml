@@ -55,8 +55,6 @@ selector:
   - jstests/core/sbe_plan_cache_autoparameterize_collscan.js
   - jstests/core/timeseries/bucket_unpacking_with_sort_plan_cache.js
   - jstests/core/**/wildcard_index_cached_plans.js
-  # FixtureHelpers.getPrimaries() calls connectionStatus command which is not allowed with security token.
-  - jstests/core/txns/transaction_too_large_for_cache.js
   # defaultPrompt() calls buildInfo command which is not allowed with security token.
   - jstests/core/txns/shell_prompt_in_transaction.js
   # Cannot test the user is not allowed to create indexes in config.transactions as the

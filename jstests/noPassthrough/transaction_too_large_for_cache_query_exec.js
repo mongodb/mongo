@@ -3,23 +3,14 @@
  * infinitely.
  *
  * @tags: [
- *   assumes_no_implicit_index_creation,
- *   does_not_support_config_fuzzer,
- *   requires_fcv_63,
  *   requires_persistence,
- *   requires_non_retryable_writes,
  *   requires_wiredtiger,
- *   no_selinux
  * ]
  */
 
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {storageEngineIsWiredTiger} from "jstests/libs/storage_engine_utils.js";
-
-if (!storageEngineIsWiredTiger()) {
-    jsTestLog("Skipping test because storage engine is not WiredTiger.");
-    quit();
-}
+const replSet = new ReplSetTest({nodes: 1});
+replSet.startSet();
+replSet.initiate();
 
 const doc = {
     x: []
@@ -29,6 +20,7 @@ for (var j = 0; j < 334000; j++) {
     doc.x.push("" + Math.random() + Math.random());
 }
 
+const db = replSet.getPrimary().getDB(jsTestName());
 const coll = db[jsTestName()];
 coll.drop();
 
@@ -66,3 +58,5 @@ assert.soon(
 
 jsTestLog("Operation correctly failed with TransactionTooLargeForCache error after " + attempts +
           " attempts");
+
+replSet.stopSet();

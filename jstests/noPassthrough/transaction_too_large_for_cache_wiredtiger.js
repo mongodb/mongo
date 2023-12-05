@@ -2,21 +2,14 @@
  * Tests that an operation requiring more cache than available fails instead of retrying infinitely.
  *
  * @tags: [
- *   does_not_support_config_fuzzer,
- *   requires_fcv_63,
  *   requires_persistence,
- *   requires_non_retryable_writes,
  *   requires_wiredtiger,
- *   no_selinux
  * ]
  */
 
-import {storageEngineIsWiredTiger} from "jstests/libs/storage_engine_utils.js";
-
-if (!storageEngineIsWiredTiger()) {
-    jsTestLog("Skipping test because storage engine is not WiredTiger.");
-    quit();
-}
+const replSet = new ReplSetTest({nodes: 1});
+replSet.startSet();
+replSet.initiate();
 
 const doc = {
     x: []
@@ -26,6 +19,7 @@ for (var j = 0; j < 334000; j++) {
     doc.x.push("" + Math.random() + Math.random());
 }
 
+const db = replSet.getPrimary().getDB(jsTestName());
 const coll = db[jsTestName()];
 coll.drop();
 
@@ -51,3 +45,5 @@ assert.soon(() => {
         return false;
     }
 }, "Expected operation to eventually fail with TransactionTooLargeForCache error.");
+
+replSet.stopSet();
