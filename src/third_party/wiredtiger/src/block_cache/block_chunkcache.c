@@ -894,9 +894,12 @@ retry:
                  * Increment the access count for eviction. If we are accessing the new chunk, the
                  * access count would have been incremented on it when it was newly inserted to
                  * avoid eviction before the chunk is accessed. So we are giving two access counts
-                 * to newly inserted chunks.
+                 * to newly inserted chunks. Additionally, cap the access count to optimize the
+                 * eviction process. This capping helps particularly in focusing on evicting older
+                 * and potentially obsolete chunks, while retaining the more recently accessed ones.
                  */
-                chunk->access_count++;
+                if (chunk->access_count < WT_CHUNK_ACCESS_CAP_LIMIT)
+                    chunk->access_count++;
 
                 __wt_spin_unlock(session, WT_BUCKET_LOCK(chunkcache, bucket_id));
 
@@ -1011,6 +1014,14 @@ __wt_chunkcache_ingest(
     WT_ERR(__wt_filesize(session, fh, &size));
 
     while (already_read < size) {
+        /*
+         * Halt chunk ingestion when cache usage exceeds 90% of the eviction threshold to prevent a
+         * cycle of continuous chunk ingestion and eviction.
+         */
+        if ((chunkcache->bytes_used + chunkcache->chunk_size) >
+          chunkcache->evict_trigger * 0.9 * chunkcache->capacity / 100)
+            break;
+
         bucket_id =
           __chunkcache_tmp_hash(chunkcache, &hash_id, sp_obj_name, objectid, already_read);
 

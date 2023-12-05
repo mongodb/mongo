@@ -50,6 +50,8 @@ struct __wt_chunkcache_chunk {
     TAILQ_ENTRY(__wt_chunkcache_chunk) next_lru_item;
 
     WT_CHUNKCACHE_HASHID hash_id;
+
+#define WT_CHUNK_ACCESS_CAP_LIMIT 1000
     uint64_t access_count;
     uint64_t bucket_id; /* save hash bucket ID for quick removal */
     uint8_t *chunk_memory;
