@@ -235,6 +235,16 @@ executor::RemoteCommandResponse initWireVersion(
     return exceptionToStatus();
 }
 
+boost::optional<Milliseconds> clampTimeout(double timeoutInSec) {
+    if (timeoutInSec <= 0) {
+        return boost::none;
+    }
+    double timeout = std::floor(timeoutInSec * 1000);
+    return (timeout >= static_cast<double>(Milliseconds::max().count()))
+        ? Milliseconds::max()
+        : Milliseconds{static_cast<Milliseconds::rep>(timeout)};
+}
+
 }  // namespace
 
 void DBClientSession::connect(const HostAndPort& serverAddress,
@@ -436,15 +446,7 @@ void DBClientSession::shutdownAndDisallowReconnect() {
 }
 
 void DBClientSession::setSoTimeout(double timeout) {
-    Milliseconds::rep timeoutMs = std::floor(timeout * 1000);
-    if (timeout <= 0) {
-        _socketTimeout = boost::none;
-    } else if (timeoutMs >= Milliseconds::max().count()) {
-        _socketTimeout = Milliseconds::max();
-    } else {
-        _socketTimeout = Milliseconds{timeoutMs};
-    }
-
+    _socketTimeout = clampTimeout(timeout);
     if (_session) {
         _session->setTimeout(_socketTimeout);
     }
@@ -465,13 +467,14 @@ Status DBClientSession::appendClientMetadata(StringData applicationName, BSONObj
         "MongoDB Internal Client", versionString, applicationName, bob);
 }
 
-DBClientSession::DBClientSession(bool _autoReconnect,
-                                 double so_timeout,
+DBClientSession::DBClientSession(bool autoReconnect,
+                                 double soTimeout,
                                  MongoURI uri,
                                  const HandshakeValidationHook& hook,
                                  const ClientAPIVersionParameters* apiParameters)
     : DBClientBase(apiParameters),
-      _autoReconnect(_autoReconnect),
+      _socketTimeout(clampTimeout(soTimeout)),
+      _autoReconnect(autoReconnect),
       _hook(hook),
       _uri(std::move(uri)) {}
 

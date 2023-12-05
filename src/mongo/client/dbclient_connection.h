@@ -74,8 +74,8 @@ class DBClientCursor;
  */
 class DBClientConnection : public DBClientSession {
 public:
-    DBClientConnection(bool _autoReconnect = false,
-                       double so_timeout = 0,
+    DBClientConnection(bool autoReconnect = false,
+                       double soTimeout = 0,
                        MongoURI uri = {},
                        const HandshakeValidationHook& hook = HandshakeValidationHook(),
                        const ClientAPIVersionParameters* apiParameters = nullptr);

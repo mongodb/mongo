@@ -99,11 +99,11 @@ using std::string;
 using std::unique_ptr;
 
 DBClientConnection::DBClientConnection(bool autoReconnect,
-                                       double so_timeout,
+                                       double soTimeout,
                                        MongoURI uri,
                                        const HandshakeValidationHook& hook,
                                        const ClientAPIVersionParameters* apiParameters)
-    : DBClientSession(autoReconnect, so_timeout, uri, hook, apiParameters),
+    : DBClientSession(autoReconnect, soTimeout, uri, hook, apiParameters),
       _autoReconnectBackoff(Seconds(1), Seconds(2)) {
     _numConnections.fetchAndAdd(1);
 }

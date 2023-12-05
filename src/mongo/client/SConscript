@@ -465,6 +465,17 @@ if not env.TargetOSIs('windows'):
         ],
     )
 
+env.CppUnitTest(
+    target='dbclient_connection_test',
+    source=[
+        'dbclient_connection_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/version_impl',
+        'clientdriver_network',
+    ],
+)
+
 # The following two tests cannot be combined because the second one
 # needs to be filtered out for the repl and sharding variants of the
 # integration tests.
