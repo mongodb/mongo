@@ -713,6 +713,9 @@ void addRestorePrivileges(PrivilegeVector* privileges) {
                       // Needed for `mongorestore --preserveUUID`
                       ActionType::applyOps,
                   }));
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
+        Privilege(ResourcePattern::forCollectionName("system.views"), ActionType::dropCollection));
 }
 
 void addRootRolePrivileges(PrivilegeVector* privileges) {
