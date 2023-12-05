@@ -64,6 +64,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -424,21 +425,26 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
         return allEltsCollationCompatible;
     }
 
-    auto match = dynamic_cast<const ComparisonMatchExpression*>(conjunct);
+    auto match = dynamic_cast<const ComparisonMatchExpressionBase*>(conjunct);
     if (match == nullptr) {
         return false;  // Not a comparison match expression.
     }
 
     const BSONElement& element = match->getData();
 
-    // Set coarse min/max bounds based on type in case we can't set tight bounds.
-    BSONObjBuilder minb;
-    minb.appendMinForType("", element.type());
-    recordRange.maybeNarrowMin(minb.obj(), true /* inclusive */);
+    if (!ComparisonMatchExpressionBase::isInternalExprComparison(match->matchType())) {
+        // Internal comparisons e.g., $_internalExprGt do _not_ carry type bracketing
+        // semantics (consistent with `$expr{$gt:[a,b]}`).
+        // For other comparisons which _do_ perform type bracketing, the RecordId bounds
+        // may be tightened here.
+        BSONObjBuilder minb;
+        minb.appendMinForType("", element.type());
+        recordRange.maybeNarrowMin(minb.obj(), true /* inclusive */);
 
-    BSONObjBuilder maxb;
-    maxb.appendMaxForType("", element.type());
-    recordRange.maybeNarrowMax(maxb.obj(), true /* inclusive */);
+        BSONObjBuilder maxb;
+        maxb.appendMaxForType("", element.type());
+        recordRange.maybeNarrowMax(maxb.obj(), true /* inclusive */);
+    }
 
     bool compatible = compatibleCollator(ccCollator, queryCollator, element);
     if (!compatible) {
@@ -449,20 +455,32 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
     // Even if the collations don't match at this point, it's fine,
     // because the bounds exclude values that use it.
     const BSONObj collated = IndexBoundsBuilder::objFromElement(element, queryCollator);
-    if (dynamic_cast<const EqualityMatchExpression*>(match)) {
-        recordRange.maybeNarrowMin(collated, true /* inclusive */);
-        recordRange.maybeNarrowMax(collated, true /* inclusive */);
-    } else if (dynamic_cast<const LTMatchExpression*>(match)) {
-        recordRange.maybeNarrowMax(collated, false /* EXclusive */);
-    } else if (dynamic_cast<const LTEMatchExpression*>(match)) {
-        recordRange.maybeNarrowMax(collated, true /* inclusive */);
-    } else if (dynamic_cast<const GTMatchExpression*>(match)) {
-        recordRange.maybeNarrowMin(collated, false /* EXclusive */);
-    } else if (dynamic_cast<const GTEMatchExpression*>(match)) {
-        recordRange.maybeNarrowMin(collated, true /* inclusive */);
-    } else {
-        // This expr is _not_ redundant, it could not be re-expressed via {min,max} record
-        return true;
+    using MType = MatchExpression::MatchType;
+    switch (match->matchType()) {
+        case MType::EQ:
+        case MType::INTERNAL_EXPR_EQ:
+            recordRange.maybeNarrowMin(collated, true /* inclusive */);
+            recordRange.maybeNarrowMax(collated, true /* inclusive */);
+            break;
+        case MType::LT:
+        case MType::INTERNAL_EXPR_LT:
+            recordRange.maybeNarrowMax(collated, false /* EXclusive */);
+            break;
+        case MType::LTE:
+        case MType::INTERNAL_EXPR_LTE:
+            recordRange.maybeNarrowMax(collated, true /* inclusive */);
+            break;
+        case MType::GT:
+        case MType::INTERNAL_EXPR_GT:
+            recordRange.maybeNarrowMin(collated, false /* EXclusive */);
+            break;
+        case MType::GTE:
+        case MType::INTERNAL_EXPR_GTE:
+            recordRange.maybeNarrowMin(collated, true /* inclusive */);
+            break;
+        default:
+            // This expr is _not_ redundant, it could not be re-expressed via {min,max} record
+            return true;
     }
     // Report that this expression does not need to be retained in the filter
     // _if_ recordRange is enforced - {min,max}Record will already apply equivalent

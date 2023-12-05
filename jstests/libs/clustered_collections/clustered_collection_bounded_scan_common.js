@@ -18,8 +18,21 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         for (let i = 0; i < batchSize; i++) {
             bulk.insert({[clusterKeyFieldName]: i, a: -i});
         }
+
         assert.commandWorked(bulk.execute());
         assert.eq(coll.find().itcount(), batchSize);
+
+        // Now add additional documents with IDs of a different type.
+        // Normal exprs should be type bracketed, and should never
+        // see these documents.
+        // Internal ops are not type bracketed, and will see these
+        // documents.
+        const extra = coll.initializeUnorderedBulkOp();
+        // `null` should sort before ints.
+        extra.insert({[clusterKeyFieldName]: null, a: null});
+        // And strings should sort after.
+        extra.insert({[clusterKeyFieldName]: "foo", a: "foo"});
+        assert.commandWorked(extra.execute());
     }
 
     // Checks that the number of docs examined matches the expected number. There are separate
@@ -42,7 +55,7 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         }
     }
 
-    function testEq() {
+    function testEq(op = "$eq") {
         initAndPopulate(coll, clusterKey);
 
         const expl = assert.commandWorked(coll.getDB().runCommand({
@@ -60,7 +73,11 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         assertDocsExamined(expl.executionStats, 2, 1);
     }
 
-    function testLT(op, val, expectedNReturned, expectedDocsExaminedClassic) {
+    function testLT(op,
+                    val,
+                    expectedNReturned,
+                    expectedDocsExaminedClassic,
+                    expectedDocsExaminedSbe = expectedDocsExaminedClassic - 1) {
         initAndPopulate(coll, clusterKey);
 
         const expl = assert.commandWorked(coll.getDB().runCommand({
@@ -70,16 +87,21 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
 
         assert(getPlanStage(expl, "CLUSTERED_IXSCAN"));
         assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
-        assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
-        assert.eq(10, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
-        assert.eq(NaN, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
+        assert.eq(val, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
+
+        if (!op.startsWith("$_internal")) {
+            // Internal ops do not do type bracketing, so min record would not
+            // be expected for $_internalExprLt.
+            assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
+            assert.eq(NaN, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
+        }
 
         assert.eq(expectedNReturned, expl.executionStats.executionStages.nReturned);
 
         // In this case the scans do not hit EOF, so there is an extra cursor->next() call past the
         // end of the range in Classic, making SBE expect one fewer doc examined than Classic.
         assertDocsExamined(
-            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedClassic - 1);
+            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
     }
 
     function testGT(op,
@@ -95,10 +117,14 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         }));
 
         assert(getPlanStage(expl, "CLUSTERED_IXSCAN"));
-        assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
+        if (!op.startsWith("$_internal")) {
+            // Internal ops do not do type bracketing, so no max record would not
+            // be expected for $_internalExprGt.
+            assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
+            assert.eq(Infinity, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
+        }
         assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
-        assert.eq(Infinity, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
-        assert.eq(89, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
+        assert.eq(val, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
 
         assert.eq(expectedNReturned, expl.executionStats.executionStages.nReturned);
 
@@ -172,8 +198,30 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         assert.eq(10, expl.executionStats.executionStages.nReturned);
     }
 
+    function testInternalExprBoundedScans(coll, clusterKey) {
+        testEq("$_internalExprEq");
+
+        // The IDs expected to be in the collection are:
+        // null, 0-99, "foo"
+        // Internal operations should not perform type bracketing, so should expect
+        // to see the null and "foo" docs; the _non_ internal equivalents _do_
+        // perform type bracketing, so should behave as if null and "foo" do not
+        // exist.
+        testLT("$_internalExprLt", 10, 11, 12);
+        testLT("$_internalExprLte", 10, 12, 13);
+        testGT("$_internalExprGt", 89, 11, 12, 11);
+        testGT("$_internalExprGte", 89, 12, 12);
+        testRange("$_internalExprGt", 20, "$_internalExprLt", 40, 19, 21, 19);
+        testRange("$_internalExprGte", 20, "$_internalExprLt", 40, 20, 21, 20);
+        testRange("$_internalExprGt", 20, "$_internalExprLte", 40, 20, 22, 20);
+        testRange("$_internalExprGte", 20, "$_internalExprLte", 40, 21, 22, 21);
+    }
+
     function testBoundedScans(coll, clusterKey) {
         testEq();
+
+        // Expected set of IDs:
+        // null, 0-99, "foo"
 
         // The last argument of the following calls, 'expectedDocsExaminedClassic', and the specific
         // comments, are for Classic engine. SBE does not have the additional cursor->next() call
@@ -182,19 +230,20 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
 
         // As of SERVER-75604, clustered collection scans can be inclusive or exclusive at either
         // end; the filter does not need to examine a record at the lower bound to then discard it.
-        // Expect docsExamined == nReturned + 1 due to the by-design additional cursor 'next' beyond
-        // the range.
-        testLT("$lt", 10, 10, 11);
-        // Expect docsExamined == nReturned + 1 due to the by-design additional cursor 'next' beyond
-        // the range.
-        testLT("$lte", 10, 11, 12);
-        // Expect docsExamined (SBE) == nReturned. Note that unlike the 'testLT' cases, there's no
-        // additional cursor 'next' beyond the range because we hit EOF.
-        // However, Classic needs to examine and discard the value equal to bound, as this is an
-        // exclusive bound.
-        testGT("$gt", 89, 10, 11, 10);
-        // Expect docsExamined == nReturned.
-        testGT("$gte", 89, 11, 11);
+        // Expect docsExamined == nReturned + 1 + 1 due to (not returned, due to type bracketing)
+        // null id, and the by-design additional cursor 'next' beyond the range.
+        testLT("$lt", 10, 10, 12, 10);
+        // Expect docsExamined == nReturned + 1 + 1 due to (not returned, due to type bracketing)
+        // null id, and the by-design additional cursor 'next' beyond the range.
+        testLT("$lte", 10, 11, 13, 11);
+        // Expect docsExamined == nReturned + 1 + 1 due to (not returned, due to type bracketing)
+        // "foo" id. Note that unlike the 'testLT' cases, there's no additional cursor 'next' beyond
+        // the range because we hit EOF. However, Classic needs to examine and discard the value
+        // equal to bound, as this is an exclusive bound.
+        testGT("$gt", 89, 10, 12, 10);
+        // Expect docsExamined == nReturned + 1 due to (not returned, due to type bracketing)
+        // "foo" id.
+        testGT("$gte", 89, 11, 12, 11);
         // docsExamined reflects the fact that by design we do an additional cursor 'next' beyond
         // the range.
         // In addition, Classic needs to examine and discard the value equal to bound,
@@ -207,6 +256,7 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         testIn();
 
         testNonClusterKeyScan();
+        testInternalExprBoundedScans(coll, clusterKey);
     }
 
     return testBoundedScans(coll, clusterKey);
