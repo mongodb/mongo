@@ -3905,6 +3905,24 @@ struct __wt_config_parser {
 uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
     WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
+/*!
+ * Return a pointer to a function that calculates a CRC32C checksum given a starting CRC seed.
+ *
+ * The WiredTiger library CRC32C checksum function uses hardware support where available, else it
+ * falls back to a software implementation. Selecting a CRC32C checksum function can be slow, so the
+ * return value should be cached by the caller for repeated use. This version returns a function
+ * that accepts a starting seed value for the CRC. This version is useful where an application wants
+ * to calculate the CRC of a large buffer in smaller incremental pieces. The starting seed to
+ * calculate the CRC of a piece is then the cumulative CRC of all the previous pieces.
+ *
+ * @snippet ex_all.c Checksum a large buffer in smaller pieces
+ *
+ * @returns a pointer to a function that takes a starting seed, a buffer and length and returns the
+ * CRC32C checksum
+ */
+uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t seed, const void *, size_t)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
+
 #endif /* !defined(SWIG) */
 
 /*!

@@ -108,6 +108,7 @@ __WIREDTIGER_EXT_H_
 __WIREDTIGER_H_
 __WT_INTERNAL_H
 __wt_bswap16
+__wt_checksum_with_seed
 __wt_verbose_error
 __wt_verbose_level
 __wt_verbose_level_multi

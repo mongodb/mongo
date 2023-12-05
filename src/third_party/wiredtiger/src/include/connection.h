@@ -22,6 +22,8 @@ struct __wt_process {
 /* Checksum functions */
 #define __wt_checksum(chunk, len) __wt_process.checksum(chunk, len)
     uint32_t (*checksum)(const void *, size_t);
+#define __wt_checksum_with_seed(seed, chunk, len) __wt_process.checksum_with_seed(seed, chunk, len)
+    uint32_t (*checksum_with_seed)(uint32_t, const void *, size_t);
 
 #define WT_TSC_DEFAULT_RATIO 1.0
     double tsc_nsec_ratio; /* rdtsc ticks to nanoseconds */

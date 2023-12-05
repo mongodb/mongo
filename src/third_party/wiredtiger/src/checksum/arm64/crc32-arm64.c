@@ -51,18 +51,19 @@
     __asm__("crc32cb %w[c], %w[c], %w[v]" : [c] "+r"(*&crc) : [v] "r"(+value))
 
 /*
- * __wt_checksum_hw --
- *     Return a checksum for a chunk of memory, computed in hardware using 8 byte steps.
+ * __wt_checksum_with_seed_hw --
+ *     Return a checksum for a chunk of memory, computed in hardware using 8 byte steps. Start with
+ *     the given seed.
  */
 static uint32_t
-__wt_checksum_hw(const void *chunk, size_t len)
+__wt_checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
 {
     uint32_t crc;
     size_t nqwords;
     const uint8_t *p;
     const uint64_t *p64;
 
-    crc = 0xffffffff;
+    crc = ~seed;
 
     /* Checksum one byte at a time to the first 4B boundary. */
     for (p = chunk; ((uintptr_t)p & (sizeof(uint32_t) - 1)) != 0 && len > 0; ++p, --len) {
@@ -84,14 +85,28 @@ __wt_checksum_hw(const void *chunk, size_t len)
 
     return (~crc);
 }
+
+/*
+ * __wt_checksum_hw --
+ *     Return a checksum for a chunk of memory, computed in hardware using 8 byte steps.
+ */
+static uint32_t
+__wt_checksum_hw(const void *chunk, size_t len)
+{
+    return (__wt_checksum_with_seed_hw(0, chunk, len));
+}
 #endif
 
 extern uint32_t __wt_checksum_sw(const void *chunk, size_t len);
+extern uint32_t __wt_checksum_with_seed_sw(uint32_t, const void *chunk, size_t len);
 #if defined(__GNUC__)
 extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
   __attribute__((visibility("default")));
+extern uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t seed, const void *, size_t)
+  __attribute__((visibility("default")));
 #else
 extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t);
+extern uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t seed, const void *, size_t);
 #endif
 
 /*
@@ -119,5 +134,34 @@ uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
     return (crc32c_func = __wt_checksum_sw);
 #else
     return (crc32c_func = __wt_checksum_sw);
+#endif
+}
+
+/*
+ * wiredtiger_crc32c_with_seed_func --
+ *     WiredTiger: detect CRC hardware and return the checksum function that accepts a starting
+ *     seed.
+ */
+uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_t)
+{
+    static uint32_t (*crc32c_func)(uint32_t, const void *, size_t);
+#if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
+    unsigned long caps;
+#endif
+
+    /*
+     * This function calls slow hardware functions; if the application doesn't realize that, they
+     * may call it repeatedly rather than caching the result.
+     */
+    if (crc32c_func != NULL)
+        return (crc32c_func);
+
+#if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
+    caps = getauxval(AT_HWCAP);
+    if (caps & HWCAP_CRC32)
+        return (crc32c_func = __wt_checksum_with_seed_hw);
+    return (crc32c_func = __wt_checksum_with_seed_sw);
+#else
+    return (crc32c_func = __wt_checksum_with_seed_sw);
 #endif
 }

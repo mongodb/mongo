@@ -33,16 +33,38 @@
 
 /*
  * check --
- *     TODO: Add a comment describing this function.
+ *     Error if two given checksum values do not match to one another.
  */
 static inline void
-check(uint32_t hw, uint32_t sw, size_t len, const char *msg)
+check(uint32_t checksum1, uint32_t checksum2, size_t len, const char *msg)
 {
-    testutil_checkfmt(hw == sw ? 0 : 1,
-      "%s checksum mismatch of %" WT_SIZET_FMT " bytes: %#08x != %#08x\n", msg, len, hw, sw);
+    testutil_assertfmt(checksum1 == checksum2,
+      "%s checksum mismatch of %" WT_SIZET_FMT " bytes: %#08x != %#08x\n", msg, len, checksum1,
+      checksum2);
 }
 
 #define DATASIZE (128 * 1024)
+
+/*
+ * cumulative_checksum --
+ *     Return the checksum of the data calculated cumulatively over the chunk sizes.
+ */
+static inline uint32_t
+cumulative_checksum(uint32_t (*checksum_seed_fn)(uint32_t, const void *, size_t), size_t chunk_len,
+  uint8_t *data, size_t len)
+{
+    uint64_t chunks, i;
+    uint32_t checksum;
+
+    testutil_assert(chunk_len <= len && chunk_len != 0);
+    for (i = 0, checksum = 0, chunks = len / chunk_len; i < chunks; i++)
+        checksum = checksum_seed_fn(checksum, data + (i * chunk_len), chunk_len);
+    /* The last remaining bytes, less than a chunk. */
+    if (len - (i * chunk_len) != 0)
+        checksum = checksum_seed_fn(checksum, data + (i * chunk_len), len - (i * chunk_len));
+
+    return (checksum);
+}
 
 /*
  * main --
@@ -53,10 +75,13 @@ main(int argc, char *argv[])
 {
     TEST_OPTS *opts, _opts;
     WT_RAND_STATE rnd;
-    size_t len;
+    size_t chunk_len, len;
+    uint32_t (*hw_checksum_seed_fn)(uint32_t, const void *, size_t);
+    uint32_t cumulative_hw, cumulative_sw;
     uint32_t hw, sw;
     uint8_t *data;
-    u_int i, j;
+    uint8_t data_ff[9] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    u_int i, j, k;
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
@@ -70,6 +95,9 @@ main(int argc, char *argv[])
 
     /* Allocate aligned memory for the data. */
     data = dcalloc(DATASIZE, sizeof(uint8_t));
+
+    /* When available, get the hardware checksum function that accepts a starting seed. */
+    hw_checksum_seed_fn = wiredtiger_crc32c_with_seed_func();
 
     /*
      * Some simple known checksums.
@@ -85,18 +113,100 @@ main(int argc, char *argv[])
     check(hw, (uint32_t)0xf16177d2, len, "nul x2: hardware");
     sw = __wt_checksum_sw(data, len);
     check(sw, (uint32_t)0xf16177d2, len, "nul x2: software");
+    cumulative_hw = cumulative_checksum(hw_checksum_seed_fn, 1, data, len);
+    check(cumulative_hw, (uint32_t)0xf16177d2, len, "(cumulative calculation) nul x2: hardware");
+#if !defined(__s390x__)
+    /* FIXME-WT-12067: Re-enable after fixing CRC with seed in software on s390x. */
+    cumulative_sw = cumulative_checksum(__wt_checksum_with_seed_sw, 1, data, len);
+    check(cumulative_sw, (uint32_t)0xf16177d2, len, "(cumulative calculation) nul x2: software");
+#endif
 
     len = 3;
     hw = __wt_checksum(data, len);
     check(hw, (uint32_t)0x6064a37a, len, "nul x3: hardware");
     sw = __wt_checksum_sw(data, len);
     check(sw, (uint32_t)0x6064a37a, len, "nul x3: software");
+    for (chunk_len = 1; chunk_len < len; chunk_len++) {
+        cumulative_hw = cumulative_checksum(hw_checksum_seed_fn, chunk_len, data, len);
+        check(
+          cumulative_hw, (uint32_t)0x6064a37a, len, "(cumulative calculation) nul x3: hardware");
+    }
+    for (chunk_len = 1; chunk_len < len; chunk_len++) {
+        cumulative_sw = cumulative_checksum(__wt_checksum_with_seed_sw, chunk_len, data, len);
+#if !defined(__s390x__)
+        /* FIXME-WT-12067: Re-enable after fixing CRC with seed in software on s390x. */
+        check(
+          cumulative_sw, (uint32_t)0x6064a37a, len, "(cumulative calculation) nul x3: software");
+#endif
+    }
 
     len = 4;
     hw = __wt_checksum(data, len);
     check(hw, (uint32_t)0x48674bc7, len, "nul x4: hardware");
     sw = __wt_checksum_sw(data, len);
     check(sw, (uint32_t)0x48674bc7, len, "nul x4: software");
+    for (chunk_len = 1; chunk_len < len; chunk_len++) {
+        cumulative_hw = cumulative_checksum(hw_checksum_seed_fn, chunk_len, data, len);
+        check(
+          cumulative_hw, (uint32_t)0x48674bc7, len, "(cumulative calculation) nul x4: hardware");
+    }
+    for (chunk_len = 1; chunk_len < len; chunk_len++) {
+        cumulative_sw = cumulative_checksum(__wt_checksum_with_seed_sw, chunk_len, data, len);
+#if !defined(__s390x__)
+        /* FIXME-WT-12067: Re-enable after fixing CRC with seed in software on s390x. */
+        check(
+          cumulative_sw, (uint32_t)0x48674bc7, len, "(cumulative calculation) nul x4: software");
+#endif
+    }
+
+    len = 1;
+    hw = __wt_checksum(data_ff, len);
+    check(hw, (uint32_t)0xff000000, len, "0xff x1: hardware");
+    sw = __wt_checksum_sw(data_ff, len);
+    check(sw, (uint32_t)0xff000000, len, "0xff x1: software");
+
+    len = 2;
+    hw = __wt_checksum(data_ff, len);
+    check(hw, (uint32_t)0xffff0000, len, "0xff x2: hardware");
+    sw = __wt_checksum_sw(data_ff, len);
+    check(sw, (uint32_t)0xffff0000, len, "0xff x2: software");
+
+    len = 3;
+    hw = __wt_checksum(data_ff, len);
+    check(hw, (uint32_t)0xffffff00, len, "0xff x3: hardware");
+    sw = __wt_checksum_sw(data_ff, len);
+    check(sw, (uint32_t)0xffffff00, len, "0xff x3: software");
+
+    len = 4;
+    hw = __wt_checksum(data_ff, len);
+    check(hw, (uint32_t)0xffffffff, len, "0xff x4: hardware");
+    sw = __wt_checksum_sw(data_ff, len);
+    check(sw, (uint32_t)0xffffffff, len, "0xff x4: software");
+
+    len = 5;
+    hw = __wt_checksum(data_ff, len);
+    check(hw, (uint32_t)0x5282acae, len, "0xff x5: hardware");
+    sw = __wt_checksum_sw(data_ff, len);
+    check(sw, (uint32_t)0x5282acae, len, "0xff x5: software");
+
+    len = 9;
+    hw = __wt_checksum(data_ff, len);
+    check(hw, (uint32_t)0xe80f2564, len, "0xff x9: hardware");
+    sw = __wt_checksum_sw(data_ff, len);
+    check(sw, (uint32_t)0xe80f2564, len, "0xff x9: software");
+    for (chunk_len = 1; chunk_len < len; chunk_len++) {
+        cumulative_hw = cumulative_checksum(hw_checksum_seed_fn, chunk_len, data_ff, len);
+        check(
+          cumulative_hw, (uint32_t)0xe80f2564, len, "(cumulative calculation) 0xff x9: hardware");
+    }
+    for (chunk_len = 1; chunk_len < len; chunk_len++) {
+        cumulative_sw = cumulative_checksum(__wt_checksum_with_seed_sw, chunk_len, data_ff, len);
+#if !defined(__s390x__)
+        /* FIXME-WT-12067: Re-enable after fixing CRC with seed in software on s390x. */
+        check(
+          cumulative_sw, (uint32_t)0xe80f2564, len, "(cumulative calculation) 0xff x9: software");
+#endif
+    }
 
     len = strlen("123456789");
     memcpy(data, "123456789", len);
@@ -104,6 +214,19 @@ main(int argc, char *argv[])
     check(hw, (uint32_t)0xe3069283, len, "known string #1: hardware");
     sw = __wt_checksum_sw(data, len);
     check(sw, (uint32_t)0xe3069283, len, "known string #1: software");
+    for (chunk_len = 1; chunk_len < len; chunk_len++) {
+        cumulative_hw = cumulative_checksum(hw_checksum_seed_fn, chunk_len, data, len);
+        check(cumulative_hw, (uint32_t)0xe3069283, len,
+          "(cumulative calculation) known string #1: hardware");
+    }
+    for (chunk_len = 1; chunk_len < len; chunk_len++) {
+        cumulative_sw = cumulative_checksum(__wt_checksum_with_seed_sw, chunk_len, data, len);
+#if !defined(__s390x__)
+        /* FIXME-WT-12067: Re-enable after fixing CRC with seed in software on s390x. */
+        check(cumulative_sw, (uint32_t)0xe3069283, len,
+          "(cumulative calculation) known string #1: software");
+#endif
+    }
 
     len = strlen("The quick brown fox jumps over the lazy dog");
     memcpy(data, "The quick brown fox jumps over the lazy dog", len);
@@ -111,6 +234,19 @@ main(int argc, char *argv[])
     check(hw, (uint32_t)0x22620404, len, "known string #2: hardware");
     sw = __wt_checksum_sw(data, len);
     check(sw, (uint32_t)0x22620404, len, "known string #2: software");
+    for (chunk_len = 1; chunk_len < len; chunk_len++) {
+        cumulative_hw = cumulative_checksum(hw_checksum_seed_fn, chunk_len, data, len);
+        check(cumulative_hw, (uint32_t)0x22620404, len,
+          "(cumulative calculation) known string #2: hardware");
+    }
+    for (chunk_len = 1; chunk_len < len; chunk_len++) {
+        cumulative_sw = cumulative_checksum(__wt_checksum_with_seed_sw, chunk_len, data, len);
+#if !defined(__s390x__)
+        /* FIXME-WT-12067: Re-enable after fixing CRC with seed in software on s390x. */
+        check(cumulative_sw, (uint32_t)0x22620404, len,
+          "(cumulative calculation) known string #2: software");
+#endif
+    }
 
     /*
      * Offset the string by 1 to ensure the hardware code handles unaligned reads.
@@ -119,6 +255,20 @@ main(int argc, char *argv[])
     check(hw, (uint32_t)0xae11f7f5, len, "known string #2: hardware");
     sw = __wt_checksum_sw(data + 1, len - 1);
     check(sw, (uint32_t)0xae11f7f5, len, "known string #2: software");
+    for (chunk_len = 1; chunk_len < len - 1; chunk_len++) {
+        cumulative_hw = cumulative_checksum(hw_checksum_seed_fn, chunk_len, data + 1, len - 1);
+        check(cumulative_hw, (uint32_t)0xae11f7f5, len,
+          "(cumulative calculation) known string #2: hardware");
+    }
+    for (chunk_len = 1; chunk_len < len - 1; chunk_len++) {
+        cumulative_sw =
+          cumulative_checksum(__wt_checksum_with_seed_sw, chunk_len, data + 1, len - 1);
+#if !defined(__s390x__)
+        /* FIXME-WT-12067: Re-enable after fixing CRC with seed in software on s390x. */
+        check(cumulative_sw, (uint32_t)0xae11f7f5, len,
+          "(cumulative calculation) known string #2: software");
+#endif
+    }
 
     /*
      * Checksums of power-of-two data chunks.
@@ -129,6 +279,18 @@ main(int argc, char *argv[])
         hw = __wt_checksum(data, len);
         sw = __wt_checksum_sw(data, len);
         check(hw, sw, len, "random power-of-two");
+
+        /* Check cumulative checksum over the chunks of random size. Do this a few times. */
+        for (k = 0; k < 10; k++) {
+            chunk_len = (__wt_random(&rnd) % len) + 1; /* Avoid 0 sized chunks. */
+            cumulative_hw = cumulative_checksum(hw_checksum_seed_fn, chunk_len, data, len);
+            cumulative_sw = cumulative_checksum(__wt_checksum_with_seed_sw, chunk_len, data, len);
+            check(cumulative_hw, hw, len, "(cumulative calculation) random power-of-two: hardware");
+#if !defined(__s390x__)
+            /* FIXME-WT-12067: Re-enable after fixing CRC with seed in software on s390x. */
+            check(cumulative_sw, sw, len, "(cumulative calculation) random power-of-two: software");
+#endif
+        }
 
         len *= 2;
         if (len > DATASIZE)
@@ -145,7 +307,23 @@ main(int argc, char *argv[])
         hw = __wt_checksum(data, len);
         sw = __wt_checksum_sw(data, len);
         check(hw, sw, len, "random");
+
+        /* Check cumulative checksum over the chunks of random size. Do this a few times. */
+        for (k = 0; k < 10; k++) {
+            chunk_len = (__wt_random(&rnd) % len) + 1; /* Avoid 0 sized chunks. */
+            cumulative_hw = cumulative_checksum(hw_checksum_seed_fn, chunk_len, data, len);
+            cumulative_sw = cumulative_checksum(__wt_checksum_with_seed_sw, chunk_len, data, len);
+            check(cumulative_hw, hw, len, "(cumulative calculation) random: hardware");
+#if !defined(__s390x__)
+            /* FIXME-WT-12067: Re-enable after fixing CRC with seed in software on s390x. */
+            check(cumulative_sw, sw, len, "(cumulative calculation) random: software");
+#endif
+        }
     }
+
+#if defined(__s390x__)
+    WT_UNUSED(cumulative_sw);
+#endif
 
     free(data);
     testutil_cleanup(opts);

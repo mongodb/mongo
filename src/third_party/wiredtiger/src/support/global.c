@@ -160,6 +160,7 @@ __global_once(void)
      * doesn't have to check if it's set or not.
      */
     __wt_process.checksum = wiredtiger_crc32c_func();
+    __wt_process.checksum_with_seed = wiredtiger_crc32c_with_seed_func();
 
     __global_calibrate_ticks();
 

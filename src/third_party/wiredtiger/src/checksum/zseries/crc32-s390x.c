@@ -93,11 +93,15 @@ __wt_checksum_hw(const void *chunk, size_t len)
 #endif
 
 extern uint32_t __wt_checksum_sw(const void *chunk, size_t len);
+extern uint32_t __wt_checksum_with_seed_sw(uint32_t, const void *chunk, size_t len);
 #if defined(__GNUC__)
 extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
   __attribute__((visibility("default")));
+extern uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_t)
+  __attribute__((visibility("default")));
 #else
 extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t);
+extern uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_t);
 #endif
 
 /*
@@ -127,4 +131,24 @@ uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 #else
     return (crc32c_func = __wt_checksum_sw);
 #endif
+}
+
+/*
+ * __wt_crc32c_le_wrapper --
+ *     Wrapper function for CRC in software in the little endian format.
+ */
+static uint32_t
+__wt_crc32c_le_wrapper(uint32_t seed, const void *chunk, size_t len)
+{
+    return (~__wt_crc32c_le(~seed, chunk, len));
+}
+
+/*
+ * wiredtiger_crc32c_with_seed_func --
+ *     WiredTiger: Doesn't support hardware CRC calculation over multiple chunks on the big-endian
+ *     platform - fall back to software implementation.
+ */
+uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_t)
+{
+    return (__wt_crc32c_le_wrapper);
 }
