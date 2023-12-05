@@ -494,7 +494,7 @@ debug_log_parser::commit_transaction(kv_transaction_ptr txn)
     /* Process the checkpoint metadata, if there are any associated with the transaction. */
     auto i = _txn_ckpt_metadata.find(txn->id());
     if (i != _txn_ckpt_metadata.end()) {
-        for (auto p : i->second)
+        for (auto &p : i->second)
             metadata_checkpoint_apply(p.first, p.second);
         _txn_ckpt_metadata.erase(i);
     }
@@ -507,6 +507,15 @@ debug_log_parser::commit_transaction(kv_transaction_ptr txn)
 struct from_debug_log_helper_args {
     debug_log_parser &parser;
     kv_database &database;
+
+    /*
+     * from_debug_log_helper_args::from_debug_log_helper_args --
+     *     Create an instance of this struct.
+     */
+    inline from_debug_log_helper_args(debug_log_parser &parser_arg, kv_database &database_arg)
+        : parser(parser_arg), database(database_arg)
+    {
+    }
 };
 
 /*
@@ -745,6 +754,12 @@ debug_log_parser::from_json(kv_database &database, const char *path)
                     parser.apply(op_entry.get<prev_lsn>());
                     continue;
                 }
+
+                /* Backup IDs. */
+                if (op_type == "backup_id")
+                    continue; /* Nothing to do. */
+
+                /* Silently ignore the other operation types. */
             }
 
             continue;

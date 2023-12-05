@@ -107,8 +107,6 @@ data_value::unpack(const void *buffer, size_t length, const char *format)
     default:
         throw model_exception("Unknown type.");
     };
-
-    throw wiredtiger_exception("Cannot unpack value: ", ret);
 #undef UNPACK_TO_DATA_VALUE
 }
 
@@ -223,8 +221,6 @@ get_wt_cursor_key_or_value(
     default:
         throw model_exception("Unknown type.");
     };
-
-    throw wiredtiger_exception(cursor->session, "Cannot read value: ", ret);
 #undef GET_DATA_VALUE
 }
 

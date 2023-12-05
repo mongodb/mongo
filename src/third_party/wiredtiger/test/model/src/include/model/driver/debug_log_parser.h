@@ -69,6 +69,12 @@ public:
         uint64_t fileid;
         std::string key;
         std::string value;
+
+        /*
+         * debug_log_parser::row_put::row_put --
+         *     Default constructor.
+         */
+        inline row_put() : fileid(0) {}
     };
 
     /*
@@ -78,6 +84,12 @@ public:
     struct row_remove {
         uint64_t fileid;
         std::string key;
+
+        /*
+         * debug_log_parser::row_remove::row_remove --
+         *     Default constructor.
+         */
+        inline row_remove() : fileid(0) {}
     };
 
     /*
