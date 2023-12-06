@@ -37,12 +37,16 @@ namespace mongo::timeseries::bucket_catalog {
 namespace {
 using Entry = FlatBSONStore<SchemaElement, BSONTypeValue>::Entry;
 
-size_t emptyStoreSize() {
-    static const std::string emptyFieldName;
-    return sizeof(Entry) + emptyFieldName.capacity() + sizeof(BSONTypeValue);
+int64_t getEntrySize(std::string fieldName) {
+    return sizeof(Entry) + sizeof(BSONTypeValue) + fieldName.capacity();
 }
 
-size_t emptySchemaSize() {
+int64_t emptyStoreSize() {
+    static const std::string emptyFieldName;
+    return getEntrySize(emptyFieldName);
+}
+
+int64_t emptySchemaSize() {
     return sizeof(FlatBSONStore<SchemaElement, BSONTypeValue>) + emptyStoreSize();
 }
 
@@ -87,15 +91,13 @@ TEST(Schema, StoreMemoryUsage) {
     // empty root and the second is an empty element with just a field name.
     std::string fieldName = "twentyByteLongString";
     obj.insert(obj.end(), fieldName);
-    int64_t expectedMemoryUsage =
-        emptyStoreSize() + sizeof(Entry) + fieldName.size() + sizeof(BSONTypeValue);
+    int64_t expectedMemoryUsage = emptyStoreSize() + getEntrySize(fieldName);
     ASSERT_GTE(schemaStore.calculateMemUsage(), expectedMemoryUsage);
 
     // Insert another identical obj. SchemaStore has an entries vector that can allocate for more
     // elements than its size.
     obj.insert(obj.end(), fieldName);
-    expectedMemoryUsage =
-        emptyStoreSize() + (2 * (sizeof(Entry) + fieldName.size() + sizeof(BSONTypeValue)));
+    expectedMemoryUsage = emptyStoreSize() + (2 * getEntrySize(fieldName));
     ASSERT_GTE(schemaStore.calculateMemUsage(), expectedMemoryUsage);
 }
 
@@ -111,8 +113,7 @@ TEST(Schema, SchemaMemoryUsage) {
     std::string fieldA = "a";
     BSONObj doc1 = BSON(fieldA << 1 << "meta" << 4);
     schema.update(doc1, "meta"_sd, strCmp);
-    int64_t oneElementSchemaSize =
-        emptySchemaSize() + sizeof(Entry) + fieldA.capacity() + sizeof(BSONTypeValue);
+    int64_t oneElementSchemaSize = emptySchemaSize() + getEntrySize(fieldA);
     ASSERT_EQ(schema.calculateMemUsage(), oneElementSchemaSize);
 
     // Update same field value is a no-op and doesn't change memory usage.
@@ -139,18 +140,56 @@ TEST(Schema, NestedSchemaMemoryUsage) {
     schemaObj.update(obj, "_meta"_sd, strCmp);
 
     std::string sampleFieldName;
-    int64_t sampleElementSize = sizeof(Entry) + sampleFieldName.capacity() + sizeof(BSONTypeValue);
+    int64_t sampleEntrySize = getEntrySize(sampleFieldName);
     // 14 elements account for 8 inserted elements and 6 null elements for every
     // array sub-element.
-    int64_t approxSchemaMemUsage = emptySchemaSize() + (14 * sampleElementSize);
+    int64_t approxSchemaMemUsage = emptySchemaSize() + (14 * sampleEntrySize);
     ASSERT_GTE(schemaObj.calculateMemUsage(), approxSchemaMemUsage);
     ASSERT_LTE(schemaObj.calculateMemUsage(), approxSchemaMemUsage * 2);
 
     schemaObj.update(BSON("c" << BSON_ARRAY(BSON("z" << 1) << BSON("z" << 2))), "_meta"_sd, strCmp);
     // Additional 5 elements from 3 being inserted and 2 null elements for array sub elements.
-    approxSchemaMemUsage = emptySchemaSize() + (19 * sampleElementSize);
+    approxSchemaMemUsage = emptySchemaSize() + (19 * sampleEntrySize);
     ASSERT_GTE(schemaObj.calculateMemUsage(), approxSchemaMemUsage);
     ASSERT_LTE(schemaObj.calculateMemUsage(), approxSchemaMemUsage * 2);
+}
+
+TEST(Schema, LookupMapMemoryUsage) {
+    SchemaStore schema;
+    auto obj = schema.root();
+
+    for (int i = 0; i < 100; ++i) {
+        obj.insert(obj.end(), std::to_string(i));
+    }
+    int64_t memUsageWithoutMap = schema.calculateMemUsage();
+
+    // Trigger lookup map to be created by requiring a long search
+    ASSERT_EQ(obj.search(obj.begin(), "99")->fieldName(), "99");
+    int64_t memUsageWithMap = schema.calculateMemUsage();
+    int64_t expectedMapMemUsage =
+        ((sizeof(StringMap<uint32_t>::slot_type) * 100) + (std::to_string(0).size() + 1) * 100);
+
+    ASSERT_GTE(memUsageWithMap, memUsageWithoutMap + expectedMapMemUsage);
+    ASSERT_LTE(memUsageWithMap, memUsageWithoutMap + (2 * expectedMapMemUsage));
+
+    // Lookup map memory usage after inserting small string does not change due to small string
+    // optimizations and map capacity not increasing.
+    obj.insert(obj.end(), std::to_string(100));
+    int64_t memUsageSmallStringInsert = schema.calculateMemUsage();
+    int64_t approxEntrySize = sizeof(BSONTypeValue) + std::to_string(100).capacity();
+
+    ASSERT_GTE(memUsageSmallStringInsert, memUsageWithMap + approxEntrySize);
+    ASSERT_LTE(memUsageSmallStringInsert, memUsageWithMap + (2 * approxEntrySize));
+
+    // Try inserting large string.
+    std::string largeString = "this string should be relatively large";
+    obj.insert(obj.end(), largeString);
+    int64_t memUsageLargeStringInsert = schema.calculateMemUsage();
+    int64_t expectedAdditionalMemUsage = sizeof(BSONTypeValue) + largeString.size();
+
+    ASSERT_GTE(memUsageLargeStringInsert, memUsageSmallStringInsert + expectedAdditionalMemUsage);
+    ASSERT_LTE(memUsageLargeStringInsert,
+               memUsageSmallStringInsert + (3 * expectedAdditionalMemUsage));
 }
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

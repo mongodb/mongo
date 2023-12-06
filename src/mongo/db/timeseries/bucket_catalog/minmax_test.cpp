@@ -69,9 +69,15 @@ int64_t getElementSize(std::string fieldName,
     return fieldName.capacity() + minDataSize + maxDataSize;
 }
 
+int64_t getEntrySize(std::string fieldName,
+                     boost::optional<BSONElement> minElem,
+                     boost::optional<BSONElement> maxElem) {
+    return sizeof(Entry) + getElementSize(fieldName, minElem, maxElem);
+}
+
 int64_t emptyStoreSize() {
     static const std::string emptyFieldName;
-    return sizeof(Entry) + getElementSize(emptyFieldName, boost::none, boost::none);
+    return getEntrySize(emptyFieldName, boost::none, boost::none);
 }
 
 int64_t emptyMinMaxSize() {
@@ -341,14 +347,14 @@ TEST(MinMax, StoreMemoryUsage) {
     fieldName = "twentyByteLongString";
     obj.insert(obj.end(), fieldName);
     int64_t expectedMemoryUsage =
-        emptyStoreSize() + sizeof(Entry) + getElementSize(fieldName, boost::none, boost::none);
+        emptyStoreSize() + getEntrySize(fieldName, boost::none, boost::none);
     ASSERT_GTE(minmaxStore.calculateMemUsage(), expectedMemoryUsage);
 
     // Insert another identical obj. MinMaxStore has an entries vector that can allocate for more
     // elements than its size.
     obj.insert(obj.end(), fieldName);
-    expectedMemoryUsage = emptyStoreSize() +
-        (2 * (sizeof(Entry) + getElementSize(fieldName, boost::none, boost::none)));
+    expectedMemoryUsage =
+        emptyStoreSize() + (2 * getEntrySize(fieldName, boost::none, boost::none));
     ASSERT_GTE(minmaxStore.calculateMemUsage(), expectedMemoryUsage);
 }
 
@@ -365,7 +371,7 @@ TEST(MinMax, MinMaxMemoryUsage) {
     BSONObj docMin = BSON(fieldA << 1 << "meta" << 4);
     minmax.update(docMin, "meta"_sd, strCmp);
     int64_t numericMinMaxSize =
-        emptyMinMaxSize() + sizeof(Entry) + getElementSize(fieldA, docMin[fieldA], docMin[fieldA]);
+        emptyMinMaxSize() + getEntrySize(fieldA, docMin[fieldA], docMin[fieldA]);
     ASSERT_EQ(minmax.calculateMemUsage(), numericMinMaxSize);
 
     // Update max value with same memory usage.
@@ -378,7 +384,7 @@ TEST(MinMax, MinMaxMemoryUsage) {
                          << "meta" << 4);
     minmax.update(docMax, "meta"_sd, strCmp);
     int64_t minMaxWithStringSize =
-        emptyMinMaxSize() + sizeof(Entry) + getElementSize(fieldA, docMin[fieldA], docMax[fieldA]);
+        emptyMinMaxSize() + getEntrySize(fieldA, docMin[fieldA], docMax[fieldA]);
     ASSERT_EQ(minmax.calculateMemUsage(), minMaxWithStringSize);
     ASSERT_GT(minMaxWithStringSize, numericMinMaxSize);
 }
@@ -392,9 +398,9 @@ TEST(MinMax, NestedMinMaxMemoryUsage) {
             << BSON_ARRAY(BSON("b1" << 1) << BSON_ARRAY(BSON("bc1" << 1) << BSON("bc2" << 1))));
     minMaxObj.update(obj, "_meta"_sd, strCmp);
 
-    int64_t approxElemSize = sizeof(Entry) + getElementSize("a", obj["a"]["a1"], obj["a"]["a1"]);
+    int64_t approxEntrySize = getEntrySize("a", obj["a"]["a1"], obj["a"]["a1"]);
     // 10 elements account for 6 inserted elements and 4 null elements for every array sub-element.
-    int64_t approxMinMaxMemUsage = emptyMinMaxSize() + (10 * approxElemSize);
+    int64_t approxMinMaxMemUsage = emptyMinMaxSize() + (10 * approxEntrySize);
     int64_t initialNestedSize = minMaxObj.calculateMemUsage();
     ASSERT_GTE(initialNestedSize, approxMinMaxMemUsage);
     ASSERT_LTE(initialNestedSize, approxMinMaxMemUsage * 2);
@@ -413,6 +419,46 @@ TEST(MinMax, NestedMinMaxMemoryUsage) {
                      strCmp);
     ASSERT_GTE(minMaxObj.calculateMemUsage(), initialNestedSize);
     ASSERT_LTE(minMaxObj.calculateMemUsage(), initialNestedSize * 2);
+}
+
+TEST(MinMax, LookupMapMemoryUsage) {
+    MinMaxStore minmax;
+    auto obj = minmax.root();
+
+    for (int i = 0; i < 100; ++i) {
+        obj.insert(obj.end(), std::to_string(i));
+    }
+    int64_t memUsageWithoutMap = minmax.calculateMemUsage();
+
+    // Trigger lookup map to be created by requiring a long search.
+    ASSERT_EQ(obj.search(obj.begin(), "99")->fieldName(), "99");
+    int64_t memUsageWithMap = minmax.calculateMemUsage();
+    int64_t expectedMapMemUsage =
+        (100 * (sizeof(StringMap<uint32_t>::slot_type) + std::to_string(0).size() + 1));
+
+    ASSERT_GTE(memUsageWithMap, memUsageWithoutMap + expectedMapMemUsage);
+    ASSERT_LTE(memUsageWithMap, memUsageWithoutMap + (2 * expectedMapMemUsage));
+
+    // Lookup map memory usage after inserting small string does not change due to small string
+    // optimizations and map capacity not increasing.
+    obj.insert(obj.end(), std::to_string(100));
+    int64_t memUsageSmallStringInsert = minmax.calculateMemUsage();
+
+    ASSERT_GTE(memUsageSmallStringInsert,
+               memUsageWithMap + getElementSize(std::to_string(100), boost::none, boost::none));
+    ASSERT_LTE(memUsageSmallStringInsert,
+               memUsageWithMap + 2 * getElementSize(std::to_string(100), boost::none, boost::none));
+
+    // Try inserting large string.
+    std::string largeString = "this string should be relatively large";
+    obj.insert(obj.end(), largeString);
+    int64_t memUsageLargeStringInsert = minmax.calculateMemUsage();
+    int64_t expectedAdditionalMemUsage =
+        getElementSize(largeString, boost::none, boost::none) + largeString.size();
+
+    ASSERT_GTE(memUsageLargeStringInsert, memUsageSmallStringInsert + expectedAdditionalMemUsage);
+    ASSERT_LTE(memUsageLargeStringInsert,
+               memUsageSmallStringInsert + (3 * expectedAdditionalMemUsage));
 }
 
 }  // namespace
