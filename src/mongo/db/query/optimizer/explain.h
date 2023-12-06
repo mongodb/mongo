@@ -74,7 +74,6 @@ public:
     constexpr static StringData kStage = "stage"_sd;
     constexpr static StringData kNodeId = "planNodeId"_sd;
     constexpr static StringData kProj = "projections"_sd;
-    constexpr static StringData kCE = "cardinalityEstimate"_sd;
     constexpr static StringData kInput = "inputStage"_sd;
 
     // Specific to PhysicalScanNode.
@@ -93,7 +92,6 @@ public:
 
     // Specific to RootNode.
     constexpr static StringData kRootName = "ROOT"_sd;
-    constexpr static StringData kCost = "costEstimate"_sd;
 
     // Specific to EOF.
     constexpr static StringData kEOF = "EOF"_sd;
@@ -107,14 +105,8 @@ public:
     }
 
     void walk(const RootNode& node, BSONObjBuilder* bob, const ABT& child, const ABT& /* refs */) {
-        auto it = _nodeMap.find(&node);
-        tassert(8075600, "Failed to find node properties", it != _nodeMap.end());
-        const NodeProps& props = it->second;
-
         bob->append(kStage, kRootName);
         bob->append(kProj, "<todo>");
-        bob->append(kCE, "<todo>");
-        bob->append(kCost, props._cost.getCost());
 
         BSONObjBuilder inputBob(bob->subobjStart(kInput));
         generateExplain(child, &inputBob);
@@ -131,7 +123,6 @@ public:
         bob->append(kStage, kFilterName);
         bob->append(kNodeId, props._planNodeId);
         bob->append(kFilter, "<todo>");
-        bob->append(kCE, "<todo>");
 
         BSONObjBuilder inputBob(bob->subobjStart(kInput));
         generateExplain(child, &inputBob);
@@ -148,7 +139,6 @@ public:
         bob->append(kStage, kEvalName);
         bob->append(kNodeId, props._planNodeId);
         bob->append(kProj, "<todo>");
-        bob->append(kCE, "<todo>");
 
         BSONObjBuilder inputBob(bob->subobjStart(kInput));
         generateExplain(child, &inputBob);
@@ -175,7 +165,6 @@ public:
         }
 
         bob->append(kProj, "<todo>");
-        bob->append(kCE, "<todo>");
     }
 
     void generateExplain(const ABT::reference_type n, BSONObjBuilder* bob) {

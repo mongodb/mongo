@@ -58,7 +58,7 @@ struct NodeProps {
     CostType _localCost;
 
     // For display purposes, adjusted cardinality based on physical properties (e.g. Repetition and
-    // Limit-Skip).
+    // Limit-Skip). This is the CE per physical plan fragment that this node is in.
     CEType _adjustedCE;
 };
 

@@ -63,8 +63,6 @@ function analyzeRootStage(rootStage) {
 
     assert(rootStage.stage == "ROOT");
     assert(rootStage.hasOwnProperty("projections"));
-    assert(rootStage.hasOwnProperty("cardinalityEstimate"));
-    assert(rootStage.hasOwnProperty("costEstimate"));
     assert(rootStage.hasOwnProperty("inputStage"));
     analyzeInputStage(rootStage.inputStage);
 }
@@ -73,7 +71,6 @@ function analyzeEvaluationStage(evaluationStage) {
     assert(evaluationStage.hasOwnProperty("stage") && evaluationStage.stage == "EVALUATION");
     assert(evaluationStage.hasOwnProperty("planNodeId"));
     assert(evaluationStage.hasOwnProperty("projections"));
-    assert(evaluationStage.hasOwnProperty("cardinalityEstimate"));
     assert(evaluationStage.hasOwnProperty("inputStage"));
     analyzeInputStage(evaluationStage.inputStage);
 }
@@ -82,7 +79,6 @@ function analyzeFilterStage(filterStage) {
     assert(filterStage.hasOwnProperty("stage") && filterStage.stage == "FILTER");
     assert(filterStage.hasOwnProperty("planNodeId"));
     assert(filterStage.hasOwnProperty("filter"));
-    assert(filterStage.hasOwnProperty("cardinalityEstimate"));
     assert(filterStage.hasOwnProperty("inputStage"));
     analyzeInputStage(filterStage.inputStage);
 }
@@ -92,7 +88,6 @@ function analyzeCollScanStage(collScanStage) {
     assert(collScanStage.hasOwnProperty("planNodeId"));
     assert(collScanStage.hasOwnProperty("direction"));
     assert(collScanStage.hasOwnProperty("projections"));
-    assert(collScanStage.hasOwnProperty("cardinalityEstimate"));
     assert(!collScanStage.hasOwnProperty("inputStage"));
 }
 
