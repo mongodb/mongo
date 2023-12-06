@@ -144,8 +144,7 @@ Service::~Service() = default;
 Service::Service(ServiceContext* sc, ClusterRole role) : _sc{sc}, _role{role} {}
 
 ServiceContext::ServiceContext()
-    : _opIdRegistry(UniqueOperationIdRegistry::create()),
-      _tickSource(makeSystemTickSource()),
+    : _tickSource(makeSystemTickSource()),
       _fastClockSource(std::make_unique<SystemClockSource>()),
       _preciseClockSource(std::make_unique<SystemClockSource>()),
       _serviceSet(std::make_unique<ServiceSet>(this)) {}
@@ -291,7 +290,8 @@ void ServiceContext::ClientDeleter::operator()(Client* client) const {
 }
 
 ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Client* client) {
-    auto opCtx = std::make_unique<OperationContext>(client, _opIdRegistry->acquireSlot());
+    auto opCtx = std::make_unique<OperationContext>(
+        client, OperationIdManager::get(this).issueForClient(client));
 
     if (client->session()) {
         _numCurrentOps.addAndFetch(1);
@@ -343,13 +343,6 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     onCreateGuard.dismiss();
     batonGuard.dismiss();
 
-    {
-        stdx::lock_guard lk(_clientByOpIdMutex);
-        bool clientByOperationContextInsertionSuccessful =
-            _clientByOperationId.insert({opCtx->getOpID(), client}).second;
-        invariant(clientByOperationContextInsertionSuccessful);
-    }
-
     return UniqueOperationContext(opCtx.release());
 };
 
@@ -368,14 +361,7 @@ void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx
 }
 
 LockedClient ServiceContext::getLockedClient(OperationId id) {
-    stdx::lock_guard lk(_clientByOpIdMutex);
-
-    auto it = _clientByOperationId.find(id);
-    if (it == _clientByOperationId.end()) {
-        return {};
-    }
-
-    return LockedClient(it->second);
+    return OperationIdManager::get(this).findAndLockClient(id);
 }
 
 void ServiceContext::registerClientObserver(std::unique_ptr<ClientObserver> observer) {
@@ -442,25 +428,18 @@ void ServiceContext::killOperation(WithLock, OperationContext* opCtx, ErrorCodes
 }
 
 void ServiceContext::_delistOperation(OperationContext* opCtx) noexcept {
-    // Removing `opCtx` from `_clientByOperationId` must always precede removing the `opCtx` from
-    // its client to prevent situations that another thread could use the service context to get a
-    // hold of an `opCtx` that has been removed from its client.
+    auto client = opCtx->getClient();
     {
-        stdx::lock_guard lk(_clientByOpIdMutex);
-        if (_clientByOperationId.erase(opCtx->getOpID()) != 1) {
-            // Another thread has already delisted this `opCtx`.
+        stdx::lock_guard clientLock(*client);
+        if (!client->getOperationContext()) {
+            // We've already delisted this operation.
             return;
         }
+        // Assigning a new opCtx to the client must never precede the destruction of any existing
+        // opCtx that references the client.
+        invariant(client->getOperationContext() == opCtx);
+        client->_setOperationContext({});
     }
-
-    auto client = opCtx->getClient();
-    stdx::lock_guard clientLock(*client);
-    // Reaching here implies this call was able to remove the `opCtx` from ServiceContext.
-
-    // Assigning a new opCtx to the client must never precede the destruction of any existing opCtx
-    // that references the client.
-    invariant(client->getOperationContext() == opCtx);
-    client->_setOperationContext({});
 
     if (client->session()) {
         _numCurrentOps.subtractAndFetch(1);

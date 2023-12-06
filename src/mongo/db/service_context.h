@@ -508,7 +508,7 @@ public:
                        ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
     /**
-     * Delists the operation by removing it from "_clientByOperationId" and its client. Both
+     * Delists the operation by removing it from its client. Both
      * "opCtx->getClient()->getServiceContext()" and "this" must point to the same instance of
      * ServiceContext. Also, "opCtx" should never be deleted before this method returns. Finally,
      * the thread invoking this method must not hold the client and the service context locks.
@@ -517,7 +517,7 @@ public:
 
     /**
      * Kills the operation "opCtx" with the code "killCode", if opCtx has not already been killed,
-     * and delists the operation by removing it from "_clientByOperationId" and its client. Both
+     * and delists the operation by removing it from its client. Both
      * "opCtx->getClient()->getServiceContext()" and "this" must point to the same instance of
      * service context. Also, "opCtx" should never be deleted before this method returns. Finally,
      * the thread invoking this method must not hold (own) the client and the service context locks.
@@ -721,10 +721,10 @@ private:
     struct ServiceSet;
 
     /**
-     * Removes the operation from its client and the `_clientByOperationId` of its service context.
-     * It will acquire both client and service context locks, and should only be used internally by
-     * other ServiceContext methods. To ensure delisted operations are shortly deleted, this method
-     * should only be called after killing an operation or in its destructor.
+     * Removes the operation from its client. It will acquire both client and service context locks,
+     * and should only be used internally by other ServiceContext methods. To ensure delisted
+     * operations are shortly deleted, this method should only be called after killing an operation
+     * or in its destructor.
      */
     void _delistOperation(OperationContext* opCtx) noexcept;
 
@@ -755,13 +755,6 @@ private:
      */
     std::vector<ClientObserverHolder> _clientObservers;
     ClientSet _clients;
-
-    /**
-     * Managing classes for our issued operation IDs.
-     */
-    Mutex _clientByOpIdMutex = MONGO_MAKE_LATCH("ServiceContext::_clientByOpIdMutex");
-    std::shared_ptr<UniqueOperationIdRegistry> _opIdRegistry;
-    stdx::unordered_map<OperationId, Client*> _clientByOperationId;
 
     /**
      * The registered OpObserver.

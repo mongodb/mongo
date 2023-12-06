@@ -30,122 +30,66 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
-#include <utility>
-
-#include <absl/container/node_hash_set.h>
 
 #include "mongo/platform/mutex.h"
-#include "mongo/stdx/unordered_set.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
+class ServiceContext;
+class Client;
+class LockedClient;
 
 /**
- * Every OperationContext is expected to have a unique OperationId within the domain of its
+ * Every OperationContext is expected to have a unique OperationId within the scope of its
  * ServiceContext. Generally speaking, OperationId is used for forming maps of OperationContexts and
  * directing metaoperations like killop.
  */
 using OperationId = uint32_t;
 
 /**
- * This class issues guaranteed unique OperationIds for a given instance of this class.
+ * Facility for clients to uniquely identify their operations in the scope of a `ServiceContext`.
+ * All public APIs are thread-safe. The first OperationId issued by the OperationIdManager will
+ * always be 0.
  */
-class UniqueOperationIdRegistry : public std::enable_shared_from_this<UniqueOperationIdRegistry> {
+class OperationIdManager {
 public:
-    /**
-     * This class represents a slot issued by a UniqueOperationIdRegistry.
-     * It functions as an RAII wrapper for a unique OperationId.
-     */
-    class OperationIdSlot {
-    public:
-        explicit OperationIdSlot(OperationId id) : _id(id), _registry() {}
+    // Supports up to 4,194,304 clients for 32-bit id types.
+    // Maximum # of clients = MAX_VALUE(OperationId) / leaseSize
+    static constexpr size_t kDefaultLeaseSize = 1024;
+    MONGO_STATIC_ASSERT_MSG((kDefaultLeaseSize & (kDefaultLeaseSize - 1)) == 0,
+                            "Lease size must be a power of two");
 
-        OperationIdSlot(OperationId id, std::weak_ptr<UniqueOperationIdRegistry> registry)
-            : _id(id), _registry(std::move(registry)) {}
+    OperationIdManager();
 
-        OperationIdSlot(OperationIdSlot&& other) = default;
-
-        OperationIdSlot& operator=(OperationIdSlot&& other) noexcept {
-            if (&other == this) {
-                return *this;
-            }
-            _releaseSlot();
-            _id = std::exchange(other._id, {});
-            _registry = std::exchange(other._registry, {});
-            return *this;
-        }
-
-        // Disable copies.
-        OperationIdSlot(const OperationIdSlot&) = delete;
-        OperationIdSlot& operator=(const OperationIdSlot&) = delete;
-
-        ~OperationIdSlot() {
-            _releaseSlot();
-        }
-
-        /**
-         * Get the contained ID.
-         */
-        OperationId getId() const {
-            return _id;
-        }
-
-    private:
-        void _releaseSlot() {
-            if (auto registry = _registry.lock()) {
-                registry->_releaseSlot(_id);
-            }
-        }
-
-        OperationId _id;
-        std::weak_ptr<UniqueOperationIdRegistry> _registry;
-    };
+    static OperationIdManager& get(ServiceContext*) noexcept;
 
     /**
-     * Public factory function.
+     * Issues the next OperationId from the client's lease. May acquire a lock on client's
+     * `ServiceContext` if the client has exhausted it's lease.
      */
-    static std::shared_ptr<UniqueOperationIdRegistry> create() {
-        return std::shared_ptr<UniqueOperationIdRegistry>(new UniqueOperationIdRegistry());
-    }
+    OperationId issueForClient(Client*) noexcept;
 
     /**
-     * Gets a unique OperationIdSlot which will clear itself from the map when destroyed.
+     * Finds the client that holds the lease containing the OperationId -- the id itself will not
+     * necessarily be in the map, but the leaseStart that contains the id will be.
      */
-    OperationIdSlot acquireSlot();
+    LockedClient findAndLockClient(OperationId id) const;
 
-    /**
-     * A helper class for exposing test functions.
-     */
-    class UniqueOperationIdRegistryTestHarness {
-    public:
-        /**
-         * Returns true if the given operation ID exists.
-         */
-        static bool isActive(UniqueOperationIdRegistry& registry, OperationId id) {
-            stdx::lock_guard lk(registry._mutex);
-            return registry._activeIds.find(id) != registry._activeIds.end();
-        }
-
-        static void setNextOpId(UniqueOperationIdRegistry& registry, OperationId id) {
-            stdx::lock_guard lk(registry._mutex);
-            registry._nextOpId = id;
-        }
-    };
+    // For testing purposes only, we can change the lease size to test behavior when we run out of
+    // leases to issue. Other than for testing purposes, leaseSize can be considered a private
+    // implementation detail, and should not be modified.
+    void setLeaseSize_forTest(size_t);
 
 private:
-    UniqueOperationIdRegistry() = default;
+    struct IdPool;
+    friend struct ClientState;
 
-    /**
-     * Clears a unique ID from the set.
-     */
-    void _releaseSlot(OperationId id);
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("OperationIdManager::_mutex");
+    std::unique_ptr<IdPool> _pool;
+    stdx::unordered_map<OperationId, Client*> _clientByOperationId;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("UniqueOperationIdRegistry::_mutex");
-    stdx::unordered_set<OperationId> _activeIds;
-
-    OperationId _nextOpId = 1U;
+    size_t _leaseSize = kDefaultLeaseSize;
+    size_t _leaseStartBitMask = ~(kDefaultLeaseSize - 1);
 };
-
-using OperationIdSlot = UniqueOperationIdRegistry::OperationIdSlot;
 
 }  // namespace mongo

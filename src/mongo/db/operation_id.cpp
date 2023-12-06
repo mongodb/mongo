@@ -27,37 +27,148 @@
  *    it in the license file.
  */
 
+#include <limits>
+#include <list>
+
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/operation_id.h"
-
-
-#include <absl/container/node_hash_set.h>
-
+#include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 
-OperationIdSlot UniqueOperationIdRegistry::acquireSlot() {
-    stdx::lock_guard lk(_mutex);
+namespace {
+const auto getOperationIdManager = ServiceContext::declareDecoration<OperationIdManager>();
+}  // namespace
 
-    // Make sure the set isn't absolutely enormous. If it is, something else is wrong,
-    // and the loop below could fail.
-    invariant(_activeIds.size() < (1 << 20));
-
-    while (true) {
-        auto opId = _nextOpId++;
-        if (!_nextOpId) {
-            _nextOpId = 1U;
-        }
-        const auto&& [it, ok] = _activeIds.insert(opId);
-        if (ok) {
-            return OperationIdSlot(*it, shared_from_this());
-        }
-    }
+OperationIdManager& OperationIdManager::get(ServiceContext* svcCtx) noexcept {
+    return (*svcCtx)[getOperationIdManager];
 }
 
-void UniqueOperationIdRegistry::_releaseSlot(OperationId id) {
+struct Lease {
+    OperationId start;
+};
+
+struct OperationIdManager::IdPool {
+    Lease lease(WithLock) {
+        if (exhaustedUniqueIds) {
+            invariant(!released.empty(),
+                      "Process has run out of OperationIds. This indicates that there are too many "
+                      "open client connections for the process to handle.");
+            auto l = released.front();
+            released.pop_front();
+            return l;
+        }
+
+        auto leaseStart = nextId;
+        nextId += leaseSize;
+        if (MONGO_unlikely(std::numeric_limits<OperationId>::max() - nextId < leaseSize)) {
+            exhaustedUniqueIds = true;
+        }
+        return {leaseStart};
+    }
+
+    void releaseLease(WithLock, Lease lease) {
+        released.push_back(lease);
+    }
+
+    void setLeaseSize_forTest(size_t size) {
+        invariant(!exhaustedUniqueIds && !nextId,
+                  "Cannot change lease size after a lease is issued");
+        leaseSize = size;
+    }
+
+    bool exhaustedUniqueIds{false};
+    OperationId nextId{0};
+    std::list<Lease> released;
+    size_t leaseSize = OperationIdManager::kDefaultLeaseSize;
+};
+
+OperationIdManager::OperationIdManager() : _pool(std::make_unique<OperationIdManager::IdPool>()) {}
+
+#define VERIFY_LEASE_START(start, bitmask) invariant((start & ~bitmask) == 0)
+
+struct ClientState {
+    ~ClientState() {
+        if (svcCtx) {
+            auto& manager = getOperationIdManager(svcCtx);
+            std::lock_guard lk(manager._mutex);
+            VERIFY_LEASE_START(lease.start, manager._leaseStartBitMask);
+            manager._clientByOperationId.erase(lease.start);
+            manager._pool->releaseLease(lk, lease);
+        }
+    }
+
+    ServiceContext* svcCtx = nullptr;
+    size_t unused = 0;
+    Lease lease;
+    OperationId nextId;
+    bool isInitialized = false;
+};
+
+namespace {
+const auto getClientState = Client::declareDecoration<ClientState>();
+}  // namespace
+
+OperationId OperationIdManager::issueForClient(Client* client) noexcept {
+    auto getLease = [this, client](Lease* oldLease) {
+        stdx::lock_guard lk(_mutex);
+        auto lease = _pool->lease(lk);
+        VERIFY_LEASE_START(lease.start, _leaseStartBitMask);
+
+        bool successfullyInsertedNewClientEntry =
+            _clientByOperationId.insert({lease.start, client}).second;
+        invariant(successfullyInsertedNewClientEntry,
+                  "Attempted to overwrite an existing client assoicated with this OperationId.");
+
+        if (oldLease) {
+            VERIFY_LEASE_START(oldLease->start, _leaseStartBitMask);
+            _clientByOperationId.erase(oldLease->start);
+            _pool->releaseLease(lk, *oldLease);
+        }
+
+        return lease;
+    };
+
+    auto& state = getClientState(client);
+    if (MONGO_unlikely(state.unused == 0)) {
+        state.svcCtx = client->getServiceContext();
+        state.unused = _leaseSize;
+        state.lease = getLease(state.isInitialized ? &(state.lease) : nullptr);
+        state.nextId = state.lease.start;
+        state.isInitialized = true;
+    }
+
+    --state.unused;
+    return state.nextId++;
+}
+
+LockedClient OperationIdManager::findAndLockClient(OperationId id) const {
     stdx::lock_guard lk(_mutex);
-    invariant(_activeIds.erase(id));
+    auto it = _clientByOperationId.find(id & _leaseStartBitMask);
+    if (it == _clientByOperationId.end()) {
+        return {};
+    }
+
+    LockedClient lc(it->second);
+
+    // Confirm that the provided id matches that of the client's active opCtx.
+    if (auto opCtx = lc->getOperationContext(); opCtx && opCtx->getOpID() == id) {
+        return lc;
+    }
+
+    return {};
+}
+
+void OperationIdManager::setLeaseSize_forTest(size_t newSize) {
+    invariant(TestingProctor::instance().isEnabled());
+    invariant((newSize & (newSize - 1)) == 0, "Thew new lease size must be a power of 2");
+    _leaseSize = newSize;
+    _leaseStartBitMask = ~(_leaseSize - 1);
+    _pool->setLeaseSize_forTest(newSize);
 }
 
 }  // namespace mongo

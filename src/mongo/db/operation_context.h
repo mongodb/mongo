@@ -116,7 +116,6 @@ public:
      * CTOR if possible to avoid OperationId collisions.
      */
     OperationContext(Client* client, OperationId opId);
-    OperationContext(Client* client, OperationIdSlot&& opIdSlot);
     virtual ~OperationContext();
 
     /**
@@ -201,7 +200,7 @@ public:
      * Returns the operation ID associated with this operation.
      */
     OperationId getOpID() const {
-        return _opId.getId();
+        return _opId;
     }
 
     /**
@@ -799,7 +798,7 @@ private:
 
     Client* const _client;
 
-    const OperationIdSlot _opId;
+    const OperationId _opId;
     boost::optional<OperationKey> _opKey;
 
     boost::optional<LogicalSessionId> _lsid;
