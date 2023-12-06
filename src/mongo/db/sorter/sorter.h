@@ -50,6 +50,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/sorter/sorter_checksum_calculator.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/logv2/log_attr.h"
@@ -646,16 +647,19 @@ public:
         std::streamoff fileEndOffset,
         const Settings& settings,
         const boost::optional<DatabaseName>& dbName,
-        uint32_t checksum);
+        size_t checksum,
+        SorterChecksumVersion checksumVersion);
 
 private:
+    SorterChecksumVersion _getSorterChecksumVersion() const;
+
     const Settings _settings;
     std::shared_ptr<typename Sorter<Key, Value>::File> _file;
     BufBuilder _buffer;
 
     // Keeps track of the hash of all data objects spilled to disk. Passed to the FileIterator
     // to ensure data has not been corrupted after reading from disk.
-    uint32_t _checksum = 0;
+    SorterChecksumCalculator _checksumCalculator;
 
     // Tracks where in the file we started writing the sorted data range so that the information can
     // be given to the Iterator in done().

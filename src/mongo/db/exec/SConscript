@@ -84,7 +84,7 @@ sortExecutorEnv.Library(
         'working_set',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/sorter/sorter_idl',
+        '$BUILD_DIR/mongo/db/sorter/sorter_base',
     ],
 )
 

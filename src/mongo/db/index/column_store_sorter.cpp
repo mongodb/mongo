@@ -129,7 +129,8 @@ ColumnStoreSorter::ColumnStoreSorter(size_t maxMemoryUsageBytes,
                            range.getEndOffset(),
                            {},
                            _dbName,
-                           range.getChecksum());
+                           range.getChecksum(),
+                           range.getChecksumVersion().value_or(SorterChecksumVersion::v1));
                    });
     this->_stats.setSpilledRanges(_spilledFileIterators.size());
 }

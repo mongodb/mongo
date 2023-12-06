@@ -1244,7 +1244,7 @@ env.Library(
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
     LIBDEPS_PRIVATE=[
-        'sorter/sorter_idl',
+        'sorter/sorter_base',
     ],
 )
 
@@ -1692,7 +1692,7 @@ execEnv.Library(
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
         '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',
         '$BUILD_DIR/mongo/db/session/kill_sessions',
-        '$BUILD_DIR/mongo/db/sorter/sorter_idl',
+        '$BUILD_DIR/mongo/db/sorter/sorter_base',
         '$BUILD_DIR/mongo/db/sorter/sorter_stats',
         '$BUILD_DIR/mongo/db/stats/resource_consumption_metrics',
         '$BUILD_DIR/mongo/db/storage/record_store_base',

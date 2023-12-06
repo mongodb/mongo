@@ -426,7 +426,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/query/projection_ast',
         '$BUILD_DIR/mongo/db/query/query_settings/manager',
         '$BUILD_DIR/mongo/db/repl/image_collection_entry',
-        '$BUILD_DIR/mongo/db/sorter/sorter_idl',
+        '$BUILD_DIR/mongo/db/sorter/sorter_base',
         '$BUILD_DIR/mongo/db/sorter/sorter_stats',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',

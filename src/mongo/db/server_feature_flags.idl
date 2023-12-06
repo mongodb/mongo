@@ -125,3 +125,8 @@ feature_flags:
         cpp_varname: gfeatureFlag80MakeAllDeploymentsShardedClusters
         default: false
         shouldBeFCVGated: false
+    featureFlagUseSorterChecksumV2:
+        description: "Feature flag to enable v2 version of sorter file checksum"
+        cpp_varname: gFeatureFlagUseSorterChecksumV2
+        default: false
+        shouldBeFCVGated: true

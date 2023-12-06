@@ -49,7 +49,6 @@
 #include "mongo/db/sorter/sorter.h"
 
 #include <algorithm>
-#include <boost/filesystem/operations.hpp>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
@@ -69,6 +68,7 @@
 #include <vector>
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -79,7 +79,10 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/sorter/sorter_checksum_calculator.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/db/storage/encryption_hooks.h"
@@ -91,7 +94,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/destructor_guard.h"
-#include "mongo/util/murmur3.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
 
@@ -100,14 +102,6 @@
 namespace mongo {
 
 namespace {
-
-/**
- * Calculates and returns a new murmur hash value based on the prior murmur hash and a new piece
- * of data.
- */
-uint32_t addDataToChecksum(const char* startOfData, size_t sizeOfData, uint32_t checksum) {
-    return murmur3<sizeof(uint32_t)>(ConstDataRange{startOfData, sizeOfData}, checksum);
-}
 
 void checkNoExternalSortOnMongos(const SortOptions& opts) {
     // This should be checked by consumers, but if it isn't try to fail early.
@@ -285,13 +279,15 @@ public:
                  std::streamoff fileEndOffset,
                  const Settings& settings,
                  const boost::optional<DatabaseName>& dbName,
-                 const uint32_t checksum)
+                 const size_t checksum,
+                 const SorterChecksumVersion checksumVersion)
         : _settings(settings),
           _file(std::move(file)),
           _fileStartOffset(fileStartOffset),
           _fileCurrentOffset(fileStartOffset),
           _fileEndOffset(fileEndOffset),
           _dbName(dbName),
+          _afterReadChecksumCalculator(checksumVersion),
           _originalChecksum(checksum) {}
 
     void openSource() {}
@@ -302,7 +298,8 @@ public:
         // written to disk. Some iterators do not read back all data from the file, which prohibits
         // the _afterReadChecksum from obtaining all the information needed. Thus, we only fassert
         // if all data that was written to disk is read back and the checksums are not equivalent.
-        if (_done && _bufferReader->atEof() && (_originalChecksum != _afterReadChecksum)) {
+        if (_done && _bufferReader->atEof() &&
+            (_originalChecksum != _afterReadChecksumCalculator.checksum())) {
             fassert(31182,
                     Status(ErrorCodes::Error::ChecksumMismatch,
                            "Data read from disk does not match what was written to disk. Possible "
@@ -346,8 +343,9 @@ public:
         // will provide the length of the data that was just read.
         const char* endOfNewData = static_cast<const char*>(_bufferReader->pos());
 
-        _afterReadChecksum =
-            addDataToChecksum(_startOfNewData, endOfNewData - _startOfNewData, _afterReadChecksum);
+        if (_afterReadChecksumCalculator.version() == SorterChecksumVersion::v1) {
+            _afterReadChecksumCalculator.addData(_startOfNewData, endOfNewData - _startOfNewData);
+        }
         _startOfNewData = nullptr;
         return deserializedValue;
     }
@@ -357,7 +355,12 @@ public:
     }
 
     SorterRange getRange() const {
-        return {_fileStartOffset, _fileEndOffset, _originalChecksum};
+        SorterRange range{
+            _fileStartOffset, _fileEndOffset, static_cast<int64_t>(_originalChecksum)};
+        if (_afterReadChecksumCalculator.version() != SorterChecksumVersion::v1) {
+            range.setChecksumVersion(_afterReadChecksumCalculator.version());
+        }
+        return range;
     }
 
 private:
@@ -367,8 +370,14 @@ private:
     void _fillBufferIfNeeded() {
         invariant(!_done);
 
-        if (!_bufferReader || _bufferReader->atEof())
+        if (!_bufferReader || _bufferReader->atEof()) {
             _fillBufferFromDisk();
+            if (_afterReadChecksumCalculator.version() > SorterChecksumVersion::v1 &&
+                !_bufferReader->atEof()) {
+                _afterReadChecksumCalculator.addData(static_cast<const char*>(_bufferReader->pos()),
+                                                     _bufferReader->remaining());
+            }
+        }
     }
 
     /**
@@ -464,12 +473,12 @@ private:
     // Checksum value that is updated with each read of a data object from disk. We can compare
     // this value with _originalChecksum to check for data corruption if and only if the
     // FileIterator is exhausted.
-    uint32_t _afterReadChecksum = 0;
+    SorterChecksumCalculator _afterReadChecksumCalculator;
 
     // Checksum value retrieved from SortedFileWriter that was calculated as data was spilled
     // to disk. This is not modified, and is only used for comparison against _afterReadChecksum
     // when the FileIterator is exhausted to ensure no data corruption.
-    const uint32_t _originalChecksum;
+    const size_t _originalChecksum;
 };
 
 /**
@@ -817,7 +826,8 @@ public:
                                range.getEndOffset(),
                                this->_settings,
                                this->_opts.dbName,
-                               range.getChecksum());
+                               range.getChecksum(),
+                               range.getChecksumVersion().value_or(SorterChecksumVersion::v1));
                        });
         this->_stats.setSpilledRanges(this->_iters.size());
     }
@@ -1505,6 +1515,7 @@ SortedFileWriter<Key, Value>::SortedFileWriter(
     const Settings& settings)
     : _settings(settings),
       _file(std::move(file)),
+      _checksumCalculator(_getSorterChecksumVersion()),
       _fileStartOffset(_file->currentOffset()),
       _opts(opts) {
     // This should be checked by consumers, but if we get here don't allow writes.
@@ -1529,8 +1540,9 @@ void SortedFileWriter<Key, Value>::addAlreadySorted(const Key& key, const Value&
 
     // Serializing the key and value grows the buffer, but _buffer.buf() still points to the
     // beginning. Use _buffer.len() to determine portion of buffer containing new datum.
-    _checksum =
-        addDataToChecksum(_buffer.buf() + _nextObjPos, _buffer.len() - _nextObjPos, _checksum);
+    if (_checksumCalculator.version() == SorterChecksumVersion::v1) {
+        _checksumCalculator.addData(_buffer.buf() + _nextObjPos, _buffer.len() - _nextObjPos);
+    }
 
     if (_buffer.len() > static_cast<int>(kSortedFileBufferSize))
         writeChunk();
@@ -1543,6 +1555,10 @@ void SortedFileWriter<Key, Value>::writeChunk() {
 
     if (size == 0)
         return;
+
+    if (_checksumCalculator.version() > SorterChecksumVersion::v1) {
+        _checksumCalculator.addData(outBuffer, size);
+    }
 
     if (_opts.sorterFileStats) {
         _opts.sorterFileStats->addSpilledDataSizeUncompressed(size);
@@ -1588,8 +1604,13 @@ template <typename Key, typename Value>
 SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
     writeChunk();
 
-    return new sorter::FileIterator<Key, Value>(
-        _file, _fileStartOffset, _file->currentOffset(), _settings, _opts.dbName, _checksum);
+    return new sorter::FileIterator<Key, Value>(_file,
+                                                _fileStartOffset,
+                                                _file->currentOffset(),
+                                                _settings,
+                                                _opts.dbName,
+                                                _checksumCalculator.checksum(),
+                                                _checksumCalculator.version());
 }
 
 template <typename Key, typename Value>
@@ -1600,10 +1621,20 @@ SortedFileWriter<Key, Value>::createFileIteratorForResume(
     std::streamoff fileEndOffset,
     const Settings& settings,
     const boost::optional<DatabaseName>& dbName,
-    const uint32_t checksum) {
+    const size_t checksum,
+    const SorterChecksumVersion checksumVersion) {
 
     return std::shared_ptr<SortIteratorInterface<Key, Value>>(new sorter::FileIterator<Key, Value>(
-        file, fileStartOffset, fileEndOffset, settings, dbName, checksum));
+        file, fileStartOffset, fileEndOffset, settings, dbName, checksum, checksumVersion));
+}
+
+template <typename Key, typename Value>
+SorterChecksumVersion SortedFileWriter<Key, Value>::_getSorterChecksumVersion() const {
+    if (gFeatureFlagUseSorterChecksumV2.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return SorterChecksumVersion::v2;
+    }
+    return SorterChecksumVersion::v1;
 }
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
