@@ -215,38 +215,23 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
         nss, createCollResp.getCollectionVersion(), dbInfo->getPrimary());
 }
 
-void createLegacyUnshardedCollection(OperationContext* opCtx, const NamespaceString& nss) {
+void createCollectionWithRouterLoop(OperationContext* opCtx, const NamespaceString& nss) {
     auto dbName = nss.dbName();
-    cluster::createDatabase(opCtx, dbName);
 
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
-    router.route(
-        opCtx,
-        "cluster::createLegacyUnshardedCollection",
-        [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-            const BSONObj cmd = BSON("create" << nss.coll());
+    ShardsvrCreateCollection shardsvrCollCommand(nss);
+    ShardsvrCreateCollectionRequest request;
 
-            // TODO (SERVER-82956) Remove call to getDatabase once
-            // executeCommandAgainstDatabasePrimary is compatible with the cri.
-            const auto dbInfo =
-                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
-            auto response = uassertStatusOK(
-                executeCommandAgainstDatabasePrimary(
-                    opCtx,
-                    dbName,
-                    dbInfo,
-                    applyReadWriteConcern(
-                        opCtx, true, true, CommandHelpers::filterCommandRequestForPassthrough(cmd)),
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    Shard::RetryPolicy::kIdempotent)
-                    .swResponse);
+    request.setUnsplittable(true);
 
-            const auto createStatus = mongo::getStatusFromCommandResult(response.data);
-            if (createStatus != ErrorCodes::NamespaceExists) {
-                uassertStatusOK(createStatus);
-            }
-            uassertStatusOK(getWriteConcernStatusFromCommandResult(response.data));
-        });
+    shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
+    shardsvrCollCommand.setDbName(nss.dbName());
+
+    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
+    router.route(opCtx,
+                 "cluster::createCollectionWithRouterLoop",
+                 [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                     cluster::createCollection(opCtx, shardsvrCollCommand);
+                 });
 }
 
 }  // namespace cluster

@@ -52,6 +52,7 @@
 #include "mongo/db/s/create_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -151,6 +152,7 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             bool inTransaction = opCtx->inMultiDocumentTransaction();
             bool isUnsplittable = request().getUnsplittable();
+            bool hasShardKey = request().getShardKey().has_value();
             bool isFromCreateCommand =
                 isUnsplittable && !request().getIsFromCreateUnsplittableCollectionTestCommand();
             bool isConfigCollection = isUnsplittable && ns().isConfigDB();
@@ -163,7 +165,13 @@ public:
 
             uassert(ErrorCodes::NotImplemented,
                     "Create Collection path has not been implemented",
-                    request().getShardKey());
+                    isUnsplittable || hasShardKey);
+
+            tassert(ErrorCodes::InvalidOptions,
+                    "unsplittable collections must be created with shard key {_id: 1}",
+                    !isUnsplittable || !hasShardKey ||
+                        request().getShardKey()->woCompare(
+                            sharding_ddl_util::unsplittableCollectionShardKey().toBSON()) == 0);
 
             // TODO SERVER-81190 remove isFromCreatecommand from the check
             if (isFromCreateCommand || inTransaction || isConfigCollection) {
@@ -182,6 +190,11 @@ public:
                     uassertStatusOK(
                         timeseries::validateAndSetBucketingParameters(timeseriesOptions));
                     requestToForward.setTimeseries(std::move(timeseriesOptions));
+                }
+
+                if (isUnsplittable && !requestToForward.getShardKey()) {
+                    requestToForward.setShardKey(
+                        sharding_ddl_util::unsplittableCollectionShardKey().toBSON());
                 }
 
                 // TODO (SERVER-79304): Remove once 8.0 becomes last LTS.

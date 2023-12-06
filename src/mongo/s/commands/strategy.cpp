@@ -1157,7 +1157,7 @@ void ParseAndRunCommand::RunAndRetry::_onCannotImplicitlyCreateCollection(Status
     auto extraInfo = status.extraInfo<CannotImplicitlyCreateCollectionInfo>();
     invariant(extraInfo);
 
-    cluster::createLegacyUnshardedCollection(opCtx, extraInfo->getNss());
+    cluster::createCollectionWithRouterLoop(opCtx, extraInfo->getNss());
 }
 
 Future<void> ParseAndRunCommand::RunAndRetry::run() {

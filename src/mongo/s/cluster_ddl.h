@@ -51,14 +51,15 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
                                   const boost::optional<ShardId>& suggestedPrimaryId = boost::none);
 
 /**
- * Creates the specified sharded collection.
+ * Creates the specified collection.
  */
 void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& request);
 
 /**
- * Creates the specified unsharded collection without registering it on the config server.
+ * Creates the specified nss as an unsharded collection. Calls the above createCollection function
+ * within a router loop.
  */
-void createLegacyUnshardedCollection(OperationContext* opCtx, const NamespaceString& nss);
+void createCollectionWithRouterLoop(OperationContext* opCtx, const NamespaceString& nss);
 
 }  // namespace cluster
 }  // namespace mongo

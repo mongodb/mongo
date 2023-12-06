@@ -904,7 +904,7 @@ bool CollectionRoutingInfoTargeter::createCollectionIfNeeded(OperationContext* o
     }
 
     try {
-        cluster::createLegacyUnshardedCollection(opCtx, getNS());
+        cluster::createCollectionWithRouterLoop(opCtx, getNS());
         LOGV2_DEBUG(8037201, 3, "Successfully created collection", "nss"_attr = getNS());
     } catch (const DBException& ex) {
         LOGV2(8037200, "Could not create collection", "error"_attr = redact(ex.toStatus()));
