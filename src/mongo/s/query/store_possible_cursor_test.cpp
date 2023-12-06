@@ -109,7 +109,7 @@ TEST_F(StorePossibleCursorTest, FailsGracefullyOnBadCursorResponseDocument) {
                                                       getManager(),
                                                       PrivilegeVector());
     ASSERT_NOT_OK(outgoingCursorResponse.getStatus());
-    ASSERT_EQ(ErrorCodes::TypeMismatch, outgoingCursorResponse.getStatus());
+    ASSERT_EQ(ErrorCodes::IDLFailedToParse, outgoingCursorResponse.getStatus());
 }
 
 // Test that storePossibleCursor() passes up the command response if it is not recognized as a

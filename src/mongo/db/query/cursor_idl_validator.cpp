@@ -49,4 +49,16 @@ void validateIDLParsedCursorResponse(const CursorInitialReply* idlParsedObj) {
             "MultiResponseInitialCursor must have exactly one of 'cursor' or 'cursors' fields",
             hasCursor != hasCursors);
 }
+
+/**
+ * Function used by the IDL parser to verify that a response cursor has a firstBatch or nextBatch.
+ */
+void validateIDLParsedAnyCursor(const AnyCursor* idlParsedObj) {
+    bool hasFirst = idlParsedObj->getFirstBatch() != boost::none;
+    bool hasNext = idlParsedObj->getNextBatch() != boost::none;
+    uassert(8362701,
+            "AnyCursor must have exactly one of 'firstBatch' or 'nextBatch'",
+            hasFirst != hasNext);
+}
+
 }  // namespace mongo

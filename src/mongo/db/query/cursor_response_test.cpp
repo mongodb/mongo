@@ -270,6 +270,21 @@ TEST(CursorResponseTest, parseFromBSONMultipleVars) {
     ASSERT_BSONOBJ_EQ(response.getVarsField().value(), varsContents);
 }
 
+TEST(CursorResponseTest, parseFromBSONToleratesUnknownFields) {
+    StatusWith<CursorResponse> result =
+        CursorResponse::parseFromBSON(BSON("cursor" << BSON("id" << CursorId(123) << "ns"
+                                                                 << "db.coll"
+                                                                 << "firstBatch" << BSONArray())
+                                                    << "ok" << 1 << "otherField"
+                                                    << "value"));
+    ASSERT_OK(result.getStatus());
+
+    CursorResponse response = std::move(result.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(123));
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
+    ASSERT_EQ(response.getBatch().size(), 0U);
+}
+
 TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResultsReturned) {
     CursorResponseBuilder::Options options;
     options.isInitialResponse = true;
@@ -528,6 +543,69 @@ TEST(CursorResponseTest, serializePostBatchResumeToken) {
     ASSERT_EQ(reparsedResponse.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(reparsedResponse.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(*reparsedResponse.getPostBatchResumeToken(), postBatchResumeToken);
+}
+
+TEST(CursorResponseTest, parseFromBSONManyBasic) {
+    BSONObj cursor1 =
+        BSON("id" << CursorId(123) << "ns"
+                  << "db.coll"
+                  << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)));
+    BSONObj cursor2 =
+        BSON("id" << CursorId(234) << "ns"
+                  << "db.coll"
+                  << "firstBatch" << BSON_ARRAY(BSON("_id" << 3) << BSON("_id" << 4)));
+    std::vector<StatusWith<CursorResponse>> results = CursorResponse::parseFromBSONMany(
+        BSON("cursors" << BSON_ARRAY(BSON("cursor" << cursor1 << "ok" << 1)
+                                     << BSON("cursor" << cursor2 << "ok" << 1))));
+
+    for (auto& result : results) {
+        ASSERT_OK(result);
+    }
+
+    ASSERT_EQ(results.size(), 2);
+
+    CursorResponse response1 = std::move(results[0].getValue());
+    ASSERT_EQ(response1.getCursorId(), CursorId(123));
+    ASSERT_EQ(response1.getNSS().ns_forTest(), "db.coll");
+    ASSERT_EQ(response1.getBatch().size(), 2U);
+    ASSERT_BSONOBJ_EQ(response1.getBatch()[0], BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(response1.getBatch()[1], BSON("_id" << 2));
+
+    CursorResponse response2 = std::move(results[1].getValue());
+    ASSERT_EQ(response2.getCursorId(), CursorId(234));
+    ASSERT_EQ(response2.getNSS().ns_forTest(), "db.coll");
+    ASSERT_EQ(response2.getBatch().size(), 2U);
+    ASSERT_BSONOBJ_EQ(response2.getBatch()[0], BSON("_id" << 3));
+    ASSERT_BSONOBJ_EQ(response2.getBatch()[1], BSON("_id" << 4));
+}
+
+TEST(CursorResponseTest, parseFromBSONManySingleCursor) {
+    // In this case, parseFromBSONMany falls back to parseFromBSON
+    std::vector<StatusWith<CursorResponse>> results = CursorResponse::parseFromBSONMany(BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "db.coll"
+                              << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+                 << "ok" << 1));
+
+    ASSERT_EQ(results.size(), 1);
+
+    auto& result = results[0];
+
+    ASSERT_OK(result.getStatus());
+
+    CursorResponse response = std::move(result.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(123));
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
+    ASSERT_EQ(response.getBatch().size(), 2U);
+    ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
+}
+
+TEST(CursorResponseTest, parseFromBSONManyEmptyCursors) {
+    std::vector<StatusWith<CursorResponse>> results =
+        CursorResponse::parseFromBSONMany(BSON("cursors" << BSONArray() << "ok" << 1));
+
+    ASSERT_EQ(results.size(), 0);
 }
 
 }  // namespace

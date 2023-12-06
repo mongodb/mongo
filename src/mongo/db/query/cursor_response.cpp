@@ -39,6 +39,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -206,70 +208,32 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(
         return cmdStatus;
     }
 
-    std::string fullns;
-    BSONObj batchObj;
-    CursorId cursorId;
-
-    BSONElement cursorElt = cmdResponse[kCursorField];
-    if (cursorElt.type() != BSONType::Object) {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << "Field '" << kCursorField
-                              << "' must be a nested object in: " << cmdResponse};
-    }
-    BSONObj cursorObj = cursorElt.Obj();
-
-    BSONElement idElt = cursorObj[kIdField];
-    if (idElt.type() != BSONType::NumberLong) {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << "Field '" << kIdField
-                              << "' must be of type long in: " << cmdResponse};
-    }
-    cursorId = idElt.Long();
-
-    BSONElement nsElt = cursorObj[kNsField];
-    if (nsElt.type() != BSONType::String) {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << "Field '" << kNsField
-                              << "' must be of type string in: " << cmdResponse};
-    }
-    fullns = nsElt.String();
-
-    BSONElement varsElt = cmdResponse[kVarsField];
-    if (!varsElt.eoo() && varsElt.type() != BSONType::Object) {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << "Field '" << kVarsField
-                              << "' must be of type object in: " << cmdResponse};
+    AnyCursorResponse response;
+    try {
+        static constexpr bool apiStrict = false;
+        IDLParserContext idlCtx("CursorResponse", apiStrict, tenantId, serializationContext);
+        response = AnyCursorResponse::parse(idlCtx, cmdResponse);
+    } catch (const DBException& e) {
+        return e.toStatus();
     }
 
-    BSONElement typeElt = cursorObj[kTypeField];
-    if (!typeElt.eoo() && typeElt.type() != BSONType::String) {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << "Field '" << kTypeField << "' must be of type string but got "
-                              << typeElt.type() << " in: " << cmdResponse};
-    }
+    const auto& cursor = response.getCursor();
 
-    BSONElement batchElt = cursorObj[kBatchField];
-    if (batchElt.eoo()) {
-        batchElt = cursorObj[kBatchFieldInitial];
-    }
+    // TODO SERVER-84012: make this CursorType instead of string in the IDL.
+    // Callers use IDL to parse it from string to CursorTypeEnum, which can be avoided.
+    const boost::optional<StringData>& typeData = cursor.getCursorType();
+    boost::optional<std::string> type;
+    if (typeData)
+        type = boost::make_optional<std::string>(std::string{*typeData});
 
-    if (batchElt.type() != BSONType::Array) {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << "Must have array field '" << kBatchFieldInitial << "' or '"
-                              << kBatchField << "' in: " << cmdResponse};
-    }
-    batchObj = batchElt.Obj();
+    auto maybeBatch = cursor.getFirstBatch();
+    if (!maybeBatch)
+        maybeBatch = cursor.getNextBatch();
 
-    std::vector<BSONObj> batch;
-    for (BSONElement elt : batchObj) {
-        if (elt.type() != BSONType::Object) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "getMore response batch contains a non-object element: "
-                                  << elt};
-        }
-
-        batch.push_back(elt.Obj());
-    }
+    // IDL verifies that exactly one of these fields is present
+    tassert(
+        8362700, "CursorResponse cursor must contain one of firstBatch or nextBatch", maybeBatch);
+    auto& batch = *maybeBatch;
 
     tassert(6253102,
             "Must own one of the two arguments if there are documents in the batch",
@@ -283,73 +247,21 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(
         }
     }
 
-    auto postBatchResumeTokenElem = cursorObj[kPostBatchResumeTokenField];
-    if (postBatchResumeTokenElem && postBatchResumeTokenElem.type() != BSONType::Object) {
-        return {ErrorCodes::BadValue,
-                str::stream() << kPostBatchResumeTokenField
-                              << " format is invalid; expected Object, but found: "
-                              << postBatchResumeTokenElem.type()};
-    }
+    auto getOwnedBSONObj = [](const boost::optional<BSONObj>& unownedObj) {
+        return unownedObj ? unownedObj->getOwned() : unownedObj;
+    };
 
-    auto atClusterTimeElem = cursorObj[kAtClusterTimeField];
-    if (atClusterTimeElem && atClusterTimeElem.type() != BSONType::bsonTimestamp) {
-        return {ErrorCodes::BadValue,
-                str::stream() << kAtClusterTimeField
-                              << " format is invalid; expected Timestamp, but found: "
-                              << atClusterTimeElem.type()};
-    }
-
-    auto partialResultsReturned = cursorObj[kPartialResultsReturnedField];
-
-    if (partialResultsReturned) {
-        if (partialResultsReturned.type() != BSONType::Bool) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << kPartialResultsReturnedField
-                                  << " format is invalid; expected Bool, but found: "
-                                  << partialResultsReturned.type()};
-        }
-    }
-
-    auto invalidatedElem = cursorObj[kInvalidatedField];
-    if (invalidatedElem) {
-        if (invalidatedElem.type() != BSONType::Bool) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << kInvalidatedField
-                                  << " format is invalid; expected Bool, but found: "
-                                  << invalidatedElem.type()};
-        }
-    }
-
-    auto wasStatementExecuted = cursorObj[kWasStatementExecuted];
-    if (wasStatementExecuted) {
-        if (wasStatementExecuted.type() != BSONType::Bool) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << kWasStatementExecuted
-                                  << " format is invalid; expected Bool, but found: "
-                                  << wasStatementExecuted.type()};
-        }
-    }
-
-    auto writeConcernError = cmdResponse["writeConcernError"];
-
-    if (writeConcernError && writeConcernError.type() != BSONType::Object) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "invalid writeConcernError format; expected object but found: "
-                              << writeConcernError.type()};
-    }
-
-    return {{NamespaceStringUtil::deserialize(tenantId, fullns, serializationContext),
-             cursorId,
+    return {{cursor.getNs(),
+             cursor.getCursorId(),
              std::move(batch),
-             atClusterTimeElem ? atClusterTimeElem.timestamp() : boost::optional<Timestamp>{},
-             postBatchResumeTokenElem ? postBatchResumeTokenElem.Obj().getOwned()
-                                      : boost::optional<BSONObj>{},
-             writeConcernError ? writeConcernError.Obj().getOwned() : boost::optional<BSONObj>{},
-             varsElt ? varsElt.Obj().getOwned() : boost::optional<BSONObj>{},
-             typeElt ? boost::make_optional<std::string>(typeElt.String()) : boost::none,
-             partialResultsReturned.trueValue(),
-             invalidatedElem.trueValue(),
-             wasStatementExecuted.trueValue()}};
+             cursor.getAtClusterTime(),
+             getOwnedBSONObj(cursor.getPostBatchResumeToken()),
+             getOwnedBSONObj(response.getWriteConcernError()),
+             getOwnedBSONObj(response.getVars()),
+             std::move(type),
+             cursor.getPartialResultsReturned(),
+             cursor.getInvalidated(),
+             cursor.getWasStatementExecuted()}};
 }
 
 void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,

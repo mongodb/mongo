@@ -171,3 +171,50 @@ structs:
                 description: "A response cursor object."
                 type: GetMoreResponseCursor
                 stability: stable
+
+    # This type could be naturally expressed as a variant of InitialResponseCursor and
+    # GetMoreResponseCursor, but the IDL parser can't handle multi-struct variants in general.
+    # It needs to be able to identify the type of the struct based on the first element of the
+    # BSON object, which imposes a constraint on the order of fields in the BSON.
+    AnyCursor:
+        description: "A struct representing either an initial or subsequent cursor"
+        inline_chained_structs: true
+        cpp_validator_func: "validateIDLParsedAnyCursor"
+        chained_structs:
+            ResponseCursorBase: ResponseCursorBase
+        fields:
+            firstBatch:
+                description: "The first batch of the cursor."
+                type: array<object>
+                stability: stable
+                optional: true
+            nextBatch:
+                description: "The subsequent batch of the cursor."
+                type: array<object>
+                stability: stable
+                optional: true
+            type:
+                description: "An optional field containing disambiguation information if a reply contains multiple cursors."
+                type: string
+                cpp_name: cursorType
+                optional: true
+                stability: unstable
+
+    AnyCursorResponse:
+        description: "A struct representing a cursor response, which can contain either an initial or a subsequent cursor."
+        strict: false
+        fields:
+            writeConcernError:
+                description: "An optional field containing any write concern errors returned when the command was run."
+                type: object
+                optional: true
+                stability: unstable
+            vars:
+                description: "An optional field containing additional response information for the query."
+                type: object
+                optional: true
+                stability: unstable
+            cursor:
+                description: "A response cursor object."
+                type: AnyCursor
+                stability: unstable
