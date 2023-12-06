@@ -33,7 +33,6 @@
 #include <string>
 #include <wiredtiger.h>
 
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
@@ -50,10 +49,10 @@ public:
      * already exists, and update/remove operations will not return error if the record does not
      * exist.
      */
-    WiredTigerCursor(const std::string& uri,
+    WiredTigerCursor(WiredTigerRecoveryUnit&,
+                     const std::string& uri,
                      uint64_t tableID,
-                     bool allowOverwrite,
-                     OperationContext* opCtx);
+                     bool allowOverwrite);
 
     ~WiredTigerCursor();
 
@@ -98,7 +97,7 @@ protected:
  */
 class WiredTigerBulkLoadCursor {
 public:
-    WiredTigerBulkLoadCursor(const std::string& indexUri, OperationContext* opCtx);
+    WiredTigerBulkLoadCursor(WiredTigerRecoveryUnit&, const std::string& indexUri);
 
     ~WiredTigerBulkLoadCursor() {
         _cursor->close(_cursor);

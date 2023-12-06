@@ -306,7 +306,7 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
 
     LOGV2_TRACE_INDEX(20093, "KeyString: {keyString}", "keyString"_attr = keyString);
 
-    WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
+    WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, false);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
 
@@ -321,7 +321,7 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
     dassert(shard_role_details::getLocker(opCtx)->isLocked());
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
 
-    WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
+    WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, false);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
@@ -389,7 +389,7 @@ bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
 Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const key_string::Value& key) {
     invariant(unique());
 
-    WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
+    WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, false);
     WT_CURSOR* c = curwrap.get();
 
     if (isDup(opCtx, c, key)) {
@@ -782,7 +782,9 @@ RecordId WiredTigerIndex::_decodeRecordIdAtEnd(const void* buffer, size_t size) 
 class WiredTigerIndex::BulkBuilder : public SortedDataBuilderInterface {
 public:
     BulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx)
-        : _ordering(idx->_ordering), _opCtx(opCtx), _cursor(idx->uri(), _opCtx) {}
+        : _ordering(idx->_ordering),
+          _opCtx(opCtx),
+          _cursor(*WiredTigerRecoveryUnit::get(_opCtx), idx->uri()) {}
 
 protected:
     void setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
@@ -979,7 +981,7 @@ public:
           _collectionUUID(idx.getCollectionUUID()),
           _key(idx.getKeyStringVersion()),
           _typeBits(idx.getKeyStringVersion()) {
-        _cursor.emplace(_uri, _tableId, false, _opCtx);
+        _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, false);
     }
 
     boost::optional<IndexKeyEntry> next(KeyInclusion keyInclusion) override {
@@ -1057,7 +1059,7 @@ public:
 
     void restore() override {
         if (!_cursor) {
-            _cursor.emplace(_uri, _tableId, false, _opCtx);
+            _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, false);
         }
 
         // Ensure an active session exists, so any restored cursors will bind to it
@@ -1671,7 +1673,7 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
 void WiredTigerIndexUnique::insertWithRecordIdInValue_forTest(OperationContext* opCtx,
                                                               const key_string::Value& keyString,
                                                               RecordId rid) {
-    WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
+    WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, false);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
 

@@ -147,7 +147,7 @@ Status WiredTigerIndexUtil::compact(OperationContext* opCtx,
 bool WiredTigerIndexUtil::isEmpty(OperationContext* opCtx,
                                   const std::string& uri,
                                   uint64_t tableId) {
-    WiredTigerCursor curwrap(uri, tableId, false, opCtx);
+    WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), uri, tableId, false);
     WT_CURSOR* c = curwrap.get();
     if (!c)
         return true;

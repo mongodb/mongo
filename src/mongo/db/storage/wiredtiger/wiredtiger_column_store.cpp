@@ -151,7 +151,8 @@ std::string& WiredTigerColumnStore::makeKeyInBuffer(std::string& buffer, PathVie
 class WiredTigerColumnStore::WriteCursor final : public ColumnStore::WriteCursor {
 public:
     WriteCursor(OperationContext* opCtx, const std::string& uri, uint64_t tableId)
-        : _opCtx(opCtx), _curwrap(uri, tableId, true /* allow overwrite */, opCtx) {
+        : _opCtx(opCtx),
+          _curwrap(*WiredTigerRecoveryUnit::get(opCtx), uri, tableId, true /* allow overwrite */) {
         _curwrap.assertInActiveTxn();
     }
 
@@ -284,7 +285,7 @@ class WiredTigerColumnStore::Cursor final : public ColumnStore::Cursor,
 public:
     Cursor(OperationContext* opCtx, const WiredTigerColumnStore* idx)
         : WiredTigerIndexCursorGeneric(opCtx, true /* forward */), _idx(*idx) {
-        _cursor.emplace(_idx.uri(), _idx._tableId, false, _opCtx);
+        _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _idx.uri(), _idx._tableId, false);
     }
 
     boost::optional<FullCellView> next() override {
@@ -336,7 +337,7 @@ public:
 
     void restore() override {
         if (!_cursor) {
-            _cursor.emplace(_idx.uri(), _idx._tableId, false, _opCtx);
+            _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _idx.uri(), _idx._tableId, false);
         }
 
         // Ensure an active session exists, so any restored cursors will bind to it
@@ -504,7 +505,7 @@ std::unique_ptr<ColumnStore::Cursor> WiredTigerColumnStore::newCursor(
 class WiredTigerColumnStore::BulkBuilder final : public ColumnStore::BulkBuilder {
 public:
     BulkBuilder(WiredTigerColumnStore* idx, OperationContext* opCtx)
-        : _opCtx(opCtx), _cursor(idx->uri(), opCtx) {}
+        : _opCtx(opCtx), _cursor(*WiredTigerRecoveryUnit::get(opCtx), idx->uri()) {}
 
     void addCell(PathView path, RowId rid, CellView cell) override {
         const std::string& key = makeKeyInBuffer(_buffer, path, rid);
