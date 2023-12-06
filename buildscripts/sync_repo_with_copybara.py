@@ -144,6 +144,8 @@ def main():
             "No new changes to import for resolved ref",
             # Indicates differences exist but no changes affect the destination, for example: exclusion rules
             "Iterative workflow produced no changes in the destination for resolved ref",
+            # Indicates the commits have already been synced over with another copybara task
+            "Updates were rejected because the remote contains work that you do",
         ]
 
         if any(acceptable_message in error_message
