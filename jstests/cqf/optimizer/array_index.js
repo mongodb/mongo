@@ -1,6 +1,7 @@
 import {
     assertValueOnPlanPath,
-    checkCascadesOptimizerEnabled
+    checkCascadesOptimizerEnabled,
+    runWithFastPathsDisabled
 } from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
@@ -27,16 +28,24 @@ for (let i = 0; i < 100; i++) {
 assert.commandWorked(t.createIndex({a: 1}));
 
 {
+    const res = t.aggregate([{$match: {a: 2}}]).toArray();
+    assert.eq(4, res.length);
+}
+runWithFastPathsDisabled(() => {
     const res = t.explain("executionStats").aggregate([{$match: {a: 2}}]);
     assert.eq(4, res.executionStats.nReturned);
     assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
-}
+});
 
 {
+    const res = t.aggregate([{$match: {a: {$lt: 2}}}]).toArray();
+    assert.eq(2, res.length);
+}
+runWithFastPathsDisabled(() => {
     const res = t.explain("executionStats").aggregate([{$match: {a: {$lt: 2}}}]);
     assert.eq(2, res.executionStats.nReturned);
     assertValueOnPlanPath("IndexScan", res, "child.leftChild.child.nodeType");
-}
+});
 
 {
     let res = t.explain("executionStats").aggregate([{$match: {a: {$eq: MinKey}}}]);

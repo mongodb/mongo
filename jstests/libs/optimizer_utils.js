@@ -15,13 +15,6 @@ export function checkPlanCacheParameterization(theDB) {
     return false;
 }
 
-export function checkFastPathEnabled(theDB) {
-    const isDisabled =
-        theDB.adminCommand({getParameter: 1, internalCascadesOptimizerDisableFastPath: 1})
-            .internalCascadesOptimizerDisableFastPath;
-    return !isDisabled;
-}
-
 /**
  * Utility for checking if the experimental Cascades optimizer code path is enabled (checks
  * framework control for M4+).
@@ -384,6 +377,11 @@ export function assertValueOnPath(value, doc, path) {
 
 export function assertValueOnPlanPath(value, doc, path) {
     assertValueOnPathFn(value, doc, path, navigateToPlanPath);
+}
+
+export function runWithFastPathsDisabled(fn) {
+    const disableFastPath = [{key: "internalCascadesOptimizerDisableFastPath", value: true}];
+    return runWithParams(disableFastPath, fn);
 }
 
 export function runWithParams(keyValPairs, fn) {

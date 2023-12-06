@@ -10,7 +10,6 @@ import {isBonsaiFastPathPlan} from "jstests/libs/analyze_plan.js";
 const bonsaiSettings = {
     internalQueryFrameworkControl: "tryBonsai",
     featureFlagCommonQueryFramework: true,
-    internalCascadesOptimizerDisableFastPath: false,
 };
 
 const st = new ShardingTest({

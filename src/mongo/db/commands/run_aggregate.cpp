@@ -1446,7 +1446,7 @@ Status runAggregate(OperationContext* opCtx,
                         nss,
                         collections,
                         request.getExplain().has_value(),
-                        request.getHint().has_value(),
+                        request.getHint(),
                         pipeline.get())) {
                     return fastPathExec;
                 }

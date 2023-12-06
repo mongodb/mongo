@@ -6,7 +6,8 @@
 import {
     assertValueOnPath,
     checkCascadesOptimizerEnabled,
-    navigateToPlanPath
+    navigateToPlanPath,
+    runWithFastPathsDisabled,
 } from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
@@ -24,7 +25,9 @@ assert.commandWorked(coll.insert(Array.from({length: nDocuments}, (_, i) => {
 
 function executeAndGetScanCost(scanIncrementalCost) {
     const getScanCost = function() {
-        const explain = coll.explain("executionStats").aggregate([]);
+        // Cost estimation will be skipped if the query is optimized using a fast path.
+        const explain =
+            runWithFastPathsDisabled(() => coll.explain("executionStats").aggregate([]));
         assert.eq(nDocuments, explain.executionStats.nReturned);
 
         const scanNode = navigateToPlanPath(explain, "child");

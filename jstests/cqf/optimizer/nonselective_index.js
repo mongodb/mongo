@@ -3,7 +3,8 @@
  */
 import {
     assertValueOnPlanPath,
-    checkCascadesOptimizerEnabled
+    checkCascadesOptimizerEnabled,
+    runWithFastPathsDisabled,
 } from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
@@ -24,7 +25,8 @@ assert.commandWorked(bulk.execute());
 assert.commandWorked(t.createIndex({a: 1}));
 
 // We pick collection scan since the query is not selective.
-const res = t.explain("executionStats").aggregate([{$match: {a: {$gte: 0}}}]);
+const res = runWithFastPathsDisabled(
+    () => t.explain("executionStats").aggregate([{$match: {a: {$gte: 0}}}]));
 assert.eq(nDocs, res.executionStats.nReturned);
 
 assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");

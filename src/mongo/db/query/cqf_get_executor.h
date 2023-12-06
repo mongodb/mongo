@@ -76,11 +76,21 @@ struct ExecParams {
 optimizer::QueryHints getHintsFromQueryKnobs();
 
 /**
+ * Enforce that unsupported command options don't run through Bonsai. Note these checks are already
+ * present in the Bonsai fallback mechansim, but those checks are skipped when Bonsai is forced.
+ * This function prevents us from accidently forcing Bonsai with an unsupported option.
+ */
+void validateCommandOptions(const CanonicalQuery* query,
+                            const CollectionPtr& collection,
+                            const boost::optional<BSONObj>& indexHint,
+                            const stdx::unordered_set<NamespaceString>& involvedCollections);
+
+/**
  * Returns a the arguments to create a PlanExecutor for the given Pipeline, except the
  * CanonicalQuery which must be provided by the caller.
  *
- * The CanonicalQuery parameter allows for code reuse between functions in this file and should not
- * be set by callers.
+ * The CanonicalQuery parameter allows for code reuse between functions in this file and should
+ * not be set by callers.
  */
 boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     OperationContext* opCtx,

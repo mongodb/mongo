@@ -1,4 +1,8 @@
-import {checkCascadesOptimizerEnabled, navigateToPlanPath} from "jstests/libs/optimizer_utils.js";
+import {
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath,
+    runWithFastPathsDisabled,
+} from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
@@ -20,7 +24,7 @@ for (let i = 0; i < nDocs; i++) {
 assert.commandWorked(bulk.execute());
 assert.commandWorked(coll.createIndex({a: 1}));
 
-const res = coll.explain().aggregate([{$match: {'a': {$lt: 2}}}]);
+const res = runWithFastPathsDisabled(() => coll.explain().aggregate([{$match: {'a': {$lt: 2}}}]));
 const props = navigateToPlanPath(res, "properties");
 
 // Verify the winning plan cardinality is within roughly 25% of the expected documents.

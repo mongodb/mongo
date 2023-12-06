@@ -966,8 +966,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerDisableFastPath"
     cpp_vartype: AtomicWord<bool>
-    default: true
-    test_only: true
+    default: false
 
   internalQueryFrameworkControl:
     description: "Knob to control the optimizer/execution engine to use."

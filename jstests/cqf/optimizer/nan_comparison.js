@@ -3,7 +3,11 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getPlanSkeleton, usedBonsaiOptimizer} from "jstests/libs/optimizer_utils.js";
+import {
+    getPlanSkeleton,
+    runWithFastPathsDisabled,
+    usedBonsaiOptimizer
+} from "jstests/libs/optimizer_utils.js";
 
 const coll = db.nan_comparison;
 coll.drop();
@@ -73,10 +77,11 @@ function assertEmptyCoScan(filter) {
         }
     };
 
-    const explain = coll.explain().find(filter).finish();
+    const explain = runWithFastPathsDisabled(() => coll.explain().find(filter).finish());
     const skeleton = getPlanSkeleton(explain.queryPlanner.winningPlan.queryPlan);
     assert.eq(skeleton, expectedExplain, {filter: filter, explain: explain, skeleton: skeleton});
 }
+
 assertEmptyCoScan({a: {$lt: NaN}});
 assertEmptyCoScan({a: {$gt: NaN}});
 assertEmptyCoScan({a: {$lt: NaN, $gte: NaN}});

@@ -1,6 +1,7 @@
 import {
     assertValueOnPlanPath,
-    checkCascadesOptimizerEnabled
+    checkCascadesOptimizerEnabled,
+    runWithFastPathsDisabled,
 } from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
@@ -44,5 +45,10 @@ assert.eq(2, res.executionStats.nReturned);
 assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 
 res = coll.explain("executionStats").find({'': {$gt: 2}}).finish();
+assert.eq(1, res.executionStats.nReturned);
+
+res = coll.find({'': {$gt: 2}}).toArray();
+assert.eq(1, res.length);
+res = runWithFastPathsDisabled(() => coll.explain("executionStats").find({'': {$gt: 2}}).finish());
 assert.eq(1, res.executionStats.nReturned);
 assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");

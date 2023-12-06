@@ -6,6 +6,7 @@
  */
 
 import {runHistogramsTest} from "jstests/libs/ce_stats_utils.js";
+import {runWithFastPathsDisabled} from "jstests/libs/optimizer_utils.js";
 import {getCEDocs, getCEDocs1} from "jstests/query_golden/libs/ce_data.js";
 import {runCETestForCollection} from "jstests/query_golden/libs/run_queries_ce.js";
 
@@ -35,5 +36,6 @@ await runHistogramsTest(function() {
     // - adds execution of sampling CE strategy;
     // - prints plan skeleton.
     const ceDebugFlag = false;
-    runCETestForCollection(db, collMeta, 4, ceDebugFlag);
+    // Cardinality estimation will be skipped if the query is optimized using a fast path.
+    runWithFastPathsDisabled(() => runCETestForCollection(db, collMeta, 4, ceDebugFlag));
 });

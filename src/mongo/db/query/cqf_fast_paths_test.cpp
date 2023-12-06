@@ -99,6 +99,21 @@ TEST(FastPathPlanGeneration, SinglePredicateOnTopLevelField) {
     }
 
     {
+        auto filter = fromjson(R"({a: {$eq: [1]}})");
+        verifySbePlan(gctx, "$eq array", filter);
+    }
+
+    {
+        auto filter = BSON("a" << BSON("$eq" << MINKEY));
+        verifySbePlan(gctx, "$eq MinKey", filter);
+    }
+
+    {
+        auto filter = BSON("a" << BSON("$eq" << MAXKEY));
+        verifySbePlan(gctx, "$eq MaxKey", filter);
+    }
+
+    {
         auto filter = fromjson(R"({a: {$lt: 1}})");
         verifySbePlan(gctx, "$lt int", filter);
     }
@@ -114,6 +129,21 @@ TEST(FastPathPlanGeneration, SinglePredicateOnTopLevelField) {
     }
 
     {
+        auto filter = fromjson(R"({a: {$lt: [1]}})");
+        verifySbePlan(gctx, "$lt array", filter);
+    }
+
+    {
+        auto filter = BSON("a" << BSON("$lt" << MINKEY));
+        verifySbePlan(gctx, "$lt MinKey", filter);
+    }
+
+    {
+        auto filter = BSON("a" << BSON("$lt" << MAXKEY));
+        verifySbePlan(gctx, "$lt MaxKey", filter);
+    }
+
+    {
         auto filter = fromjson(R"({a: {$lte: 1}})");
         verifySbePlan(gctx, "$lte int", filter);
     }
@@ -126,6 +156,21 @@ TEST(FastPathPlanGeneration, SinglePredicateOnTopLevelField) {
     {
         auto filter = fromjson(R"({a: {$lte: null}})");
         verifySbePlan(gctx, "$lte null", filter);
+    }
+
+    {
+        auto filter = fromjson(R"({a: {$lte: [1]}})");
+        verifySbePlan(gctx, "$lte array", filter);
+    }
+
+    {
+        auto filter = BSON("a" << BSON("$lte" << MINKEY));
+        verifySbePlan(gctx, "$lte MinKey", filter);
+    }
+
+    {
+        auto filter = BSON("a" << BSON("$lte" << MAXKEY));
+        verifySbePlan(gctx, "$lte MaxKey", filter);
     }
 }
 

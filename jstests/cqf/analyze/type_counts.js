@@ -12,7 +12,8 @@ import {
 import {
     extractLogicalCEFromNode,
     forceCE,
-    navigateToPlanPath
+    navigateToPlanPath,
+    runWithFastPathsDisabled
 } from "jstests/libs/optimizer_utils.js";
 
 await runHistogramsTest(function testTypeCounts() {
@@ -863,9 +864,12 @@ await runHistogramsTest(function testTypeCounts() {
 
     // Note: the hint is omitted because if we hint on a 'notAPath' index, optimization fails by
     // running out of memory.
-    verifyCEForMatch({coll, predicate: {notAPath: {$eq: null}}, expected: docs});
+    runWithFastPathsDisabled(() => {
+        // Cardinality estimation will be skipped if the query is optimized using a fast path.
+        verifyCEForMatch({coll, predicate: {notAPath: {$eq: null}}, expected: docs});
+        verifyCEForMatch({coll, predicate: {notAPathEither: {$eq: 1}}, expected: []});
+    });
     verifyCEForMatch({coll, predicate: {notAPath: {$elemMatch: {$eq: null}}}, expected: []});
-    verifyCEForMatch({coll, predicate: {notAPathEither: {$eq: 1}}, expected: []});
     verifyCEForMatch({coll, predicate: {notAPathEither: {$elemMatch: {$eq: 1}}}, expected: []});
     verifyCEForMatch({
         coll,

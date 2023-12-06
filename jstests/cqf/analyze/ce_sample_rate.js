@@ -9,7 +9,7 @@ import {
     getRootCE,
     runHistogramsTest
 } from "jstests/libs/ce_stats_utils.js";
-import {forceCE, round2} from "jstests/libs/optimizer_utils.js";
+import {forceCE, round2, runWithFastPathsDisabled} from "jstests/libs/optimizer_utils.js";
 
 const field = "sampled";
 const numDocs = 1000;
@@ -33,7 +33,9 @@ function initColl(coll, docs) {
 const coll = db.sample_rate;
 
 function compareCEAndActualN(coll, predicate, expectedCE, tolerance = 0.01) {
-    const explain = coll.explain("executionStats").aggregate([{$match: {[field]: predicate}}]);
+    // Cardinality estimation will be skipped if the query is optimized using a fast path.
+    const explain = runWithFastPathsDisabled(
+        () => coll.explain("executionStats").aggregate([{$match: {[field]: predicate}}]));
     const ce = round2(getRootCE(explain));
     const n = explain.executionStats.nReturned;
     const msg = `Expected CE ${expectedCE} for predicate ${tojson(predicate)},` +

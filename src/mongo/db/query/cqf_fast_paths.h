@@ -86,7 +86,7 @@ boost::optional<ExecParams> tryGetSBEExecutorViaFastPath(
     const NamespaceString& nss,
     const MultipleCollectionAccessor& collections,
     bool hasExplain,
-    bool hasIndexHint,
+    boost::optional<BSONObj> indexHint,
     const Pipeline* pipeline,
     const CanonicalQuery* canonicalQuery = nullptr);
 }  // namespace mongo::optimizer::fast_path

@@ -25,6 +25,10 @@ function getScanCostWith(customScanCost) {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
 
+    // Cost estimation will be skipped if the query is optimized using a fast path.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalCascadesOptimizerDisableFastPath: true}));
+
     const nDocuments = 100;
     assert.commandWorked(coll.insert(Array.from({length: nDocuments}, (_, i) => {
         return {a: 3, b: 3, c: i};

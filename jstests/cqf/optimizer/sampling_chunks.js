@@ -1,4 +1,8 @@
-import {checkCascadesOptimizerEnabled, navigateToPlanPath} from "jstests/libs/optimizer_utils.js";
+import {
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath,
+    runWithFastPathsDisabled
+} from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
@@ -24,7 +28,8 @@ assert.commandWorked(bulk.execute());
 [0, 10, 100, 500, 1000].forEach(n => {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalCascadesOptimizerSampleChunks: n}));
-    const res = coll.explain().aggregate([{$match: {'a': {$lt: 2}}}]);
+    const res =
+        runWithFastPathsDisabled(() => coll.explain().aggregate([{$match: {'a': {$lt: 2}}}]));
     const estimate = navigateToPlanPath(res, "properties.adjustedCE");
 
     // Verify the winning plan cardinality is within roughly 30% of the expected documents,

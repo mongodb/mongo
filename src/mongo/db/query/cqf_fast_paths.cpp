@@ -296,8 +296,7 @@ struct EExprBuilder {
         return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                             makeFunction("typeMatch",
                                          expr->clone(),
-                                         makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
-                                                           getBSONTypeMask(BSONType::Undefined))),
+                                         makeInt32Constant(getBSONTypeMask(BSONType::jstNULL))),
                             makeBoolConstant(true));
     }
 
@@ -375,7 +374,7 @@ public:
             "traverseF",
             sbe::makeE<sbe::EVariable>(fieldSlotId),
             std::move(lambdaExpr),
-            EExprBuilder::makeConstant(sbe::value::TypeTags::Boolean, false));
+            EExprBuilder::makeBoolConstant(shouldCompareArray(props.constant)));
 
         auto sbePlan = sbe::makeS<sbe::FilterStage<false>>(
             std::move(scanStage), std::move(traverseExpr), planNodeId);
@@ -407,6 +406,14 @@ private:
         // for holding and appropriately deleting the SBE value.
         optimizer::Constant constant;
     };
+
+    bool shouldCompareArray(const optimizer::Constant& constant) const {
+        // When the constant is an array, MinKey, or MaxKey, we need to enable comparisons to
+        // arrays too.
+        const auto [constTag, constVal] = constant.get();
+        return constTag == sbe::value::TypeTags::bsonArray ||
+            constTag == sbe::value::TypeTags::MinKey || constTag == sbe::value::TypeTags::MaxKey;
+    }
 
     SinglePredicateCollScanProps makeSinglePredicateCollScanProps(const BSONObj& filter) const {
         const auto& elem = filter.firstElement();
@@ -501,9 +508,12 @@ boost::optional<ExecParams> tryGetSBEExecutorViaFastPath(
     const NamespaceString& nss,
     const MultipleCollectionAccessor& collections,
     const bool hasExplain,
-    const bool hasIndexHint,
+    const boost::optional<BSONObj> indexHint,
     const Pipeline* pipeline,
     const CanonicalQuery* canonicalQuery) {
+    validateCommandOptions(canonicalQuery, collections.getMainCollection(), indexHint, {});
+
+    const bool hasIndexHint = indexHint && !indexHint->isEmpty();
     if (!canUseFastPath(hasIndexHint, collections, canonicalQuery, pipeline)) {
         return {};
     }
@@ -552,14 +562,17 @@ boost::optional<ExecParams> tryGetSBEExecutorViaFastPath(
 
 boost::optional<ExecParams> tryGetSBEExecutorViaFastPath(
     const MultipleCollectionAccessor& collections, const CanonicalQuery* query) {
-    auto hasIndexHint = !query->getFindCommandRequest().getHint().isEmpty();
+    boost::optional<BSONObj> indexHint;
+    if (!query->getFindCommandRequest().getHint().isEmpty()) {
+        indexHint = query->getFindCommandRequest().getHint();
+    }
 
     return tryGetSBEExecutorViaFastPath(query->getOpCtx(),
                                         query->getExpCtx(),
                                         query->nss(),
                                         collections,
                                         query->getExplain(),
-                                        hasIndexHint,
+                                        indexHint,
                                         nullptr /*pipeline*/,
                                         query);
 }

@@ -2,7 +2,8 @@ import {
     assertValueOnPath,
     assertValueOnPlanPath,
     checkCascadesOptimizerEnabled,
-    navigateToPlanPath
+    navigateToPlanPath,
+    runWithFastPathsDisabled
 } from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
@@ -27,10 +28,14 @@ assert.commandWorked(t.insertMany(docs));
 assert.commandWorked(t.createIndex({a: 1}));
 
 {
+    const res = t.aggregate([{$match: {a: {$eq: [2]}}}]).toArray();
+    assert.eq(20, res.length);
+}
+runWithFastPathsDisabled(() => {
     const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: [2]}}}]);
     assert.eq(20, res.executionStats.nReturned);
     assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
-}
+});
 
 {
     // These two predicates don't make a contradiction, because they can match different array
@@ -53,7 +58,12 @@ for (let i = 0; i < docs.length; i++) {
 assert.commandWorked(t.insertMany(newDocs));
 
 {
-    const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: [2]}}}]);
+    {
+        const res = t.aggregate([{$match: {a: {$eq: [2]}}}]).toArray();
+        assert.eq(20, res.length);
+    }
+    const res = runWithFastPathsDisabled(
+        () => t.explain("executionStats").aggregate([{$match: {a: {$eq: [2]}}}]));
     assert.eq(20, res.executionStats.nReturned);
 
     const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child");
@@ -65,8 +75,14 @@ assert.commandWorked(t.insertMany(newDocs));
 }
 
 {
-    const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: []}}}]);
+    {
+        const res = t.aggregate([{$match: {a: {$eq: []}}}]).toArray();
+        assert.eq(20, res.length);
+    }
+    const res = runWithFastPathsDisabled(
+        () => t.explain("executionStats").aggregate([{$match: {a: {$eq: []}}}]));
     assert.eq(20, res.executionStats.nReturned);
+
     const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child");
     assertValueOnPath("SortedMerge", indexUnionNode, "nodeType");
     assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
