@@ -36,6 +36,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/util/interruptible.h"
 
 namespace mongo {
 
@@ -47,18 +49,19 @@ private:
     WiredTigerIndexUtil();
 
 public:
-    static bool appendCustomStats(OperationContext* opCtx,
+    static bool appendCustomStats(WiredTigerRecoveryUnit&,
                                   BSONObjBuilder* output,
                                   double scale,
                                   const std::string& uri);
 
-    static Status compact(OperationContext* opCtx,
+    static Status compact(Interruptible&,
+                          WiredTigerRecoveryUnit&,
                           const std::string& uri,
                           boost::optional<int64_t> freeSpaceTargetMB);
 
     static bool isEmpty(OperationContext* opCtx, const std::string& uri, uint64_t tableId);
 
-    static void validateStructure(OperationContext* opCtx,
+    static void validateStructure(WiredTigerRecoveryUnit&,
                                   const std::string& uri,
                                   IndexValidateResults& results);
 };

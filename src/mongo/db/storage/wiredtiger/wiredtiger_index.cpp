@@ -351,7 +351,7 @@ IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool ful
         return results;
     }
 
-    WiredTigerIndexUtil::validateStructure(opCtx, _uri, results);
+    WiredTigerIndexUtil::validateStructure(*WiredTigerRecoveryUnit::get(opCtx), _uri, results);
 
     return results;
 }
@@ -383,7 +383,8 @@ int64_t WiredTigerIndex::numEntries(OperationContext* opCtx) const {
 bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
                                         BSONObjBuilder* output,
                                         double scale) const {
-    return WiredTigerIndexUtil::appendCustomStats(opCtx, output, scale, _uri);
+    return WiredTigerIndexUtil::appendCustomStats(
+        *WiredTigerRecoveryUnit::get(opCtx), output, scale, _uri);
 }
 
 Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const key_string::Value& key) {
@@ -497,7 +498,8 @@ Status WiredTigerIndex::initAsEmpty(OperationContext* opCtx) {
 
 Status WiredTigerIndex::compact(OperationContext* opCtx,
                                 boost::optional<int64_t> freeSpaceTargetMB) {
-    return WiredTigerIndexUtil::compact(opCtx, _uri, freeSpaceTargetMB);
+    return WiredTigerIndexUtil::compact(
+        *opCtx, *WiredTigerRecoveryUnit::get(opCtx), _uri, freeSpaceTargetMB);
 }
 
 boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,

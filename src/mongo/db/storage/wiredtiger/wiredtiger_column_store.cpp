@@ -264,7 +264,7 @@ IndexValidateResults WiredTigerColumnStore::validate(OperationContext* opCtx, bo
         return results;
     }
 
-    WiredTigerIndexUtil::validateStructure(opCtx, _uri, results);
+    WiredTigerIndexUtil::validateStructure(*WiredTigerRecoveryUnit::get(opCtx), _uri, results);
 
     return results;
 }
@@ -558,13 +558,15 @@ long long WiredTigerColumnStore::getFreeStorageBytes(OperationContext* opCtx) co
 
 Status WiredTigerColumnStore::compact(OperationContext* opCtx,
                                       boost::optional<int64_t> freeSpaceTargetMB) {
-    return WiredTigerIndexUtil::compact(opCtx, _uri, freeSpaceTargetMB);
+    return WiredTigerIndexUtil::compact(
+        *opCtx, *WiredTigerRecoveryUnit::get(opCtx), _uri, freeSpaceTargetMB);
 }
 
 bool WiredTigerColumnStore::appendCustomStats(OperationContext* opCtx,
                                               BSONObjBuilder* output,
                                               double scale) const {
-    return WiredTigerIndexUtil::appendCustomStats(opCtx, output, scale, _uri);
+    return WiredTigerIndexUtil::appendCustomStats(
+        *WiredTigerRecoveryUnit::get(opCtx), output, scale, _uri);
 }
 
 }  // namespace mongo

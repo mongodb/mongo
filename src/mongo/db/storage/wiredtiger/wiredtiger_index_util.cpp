@@ -61,15 +61,13 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(WTCompactIndexEBUSY);
 MONGO_FAIL_POINT_DEFINE(WTValidateIndexStructuralDamage);
 
-bool WiredTigerIndexUtil::appendCustomStats(OperationContext* opCtx,
+bool WiredTigerIndexUtil::appendCustomStats(WiredTigerRecoveryUnit& ru,
                                             BSONObjBuilder* output,
                                             double scale,
                                             const std::string& uri) {
-    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     {
         BSONObjBuilder metadata(output->subobjStart("metadata"));
-        Status status = WiredTigerUtil::getApplicationMetadata(
-            *WiredTigerRecoveryUnit::get(opCtx), uri, &metadata);
+        Status status = WiredTigerUtil::getApplicationMetadata(ru, uri, &metadata);
         if (!status.isOK()) {
             metadata.append("error", "unable to retrieve metadata");
             metadata.append("code", static_cast<int>(status.code()));
@@ -77,10 +75,8 @@ bool WiredTigerIndexUtil::appendCustomStats(OperationContext* opCtx,
         }
     }
     std::string type, sourceURI;
-    WiredTigerUtil::fetchTypeAndSourceURI(
-        *WiredTigerRecoveryUnit::get(opCtx), uri, &type, &sourceURI);
-    StatusWith<std::string> metadataResult =
-        WiredTigerUtil::getMetadataCreate(*WiredTigerRecoveryUnit::get(opCtx), sourceURI);
+    WiredTigerUtil::fetchTypeAndSourceURI(ru, uri, &type, &sourceURI);
+    StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadataCreate(ru, sourceURI);
     StringData creationStringName("creationString");
     if (!metadataResult.isOK()) {
         BSONObjBuilder creationString(output->subobjStart(creationStringName));
@@ -93,7 +89,7 @@ bool WiredTigerIndexUtil::appendCustomStats(OperationContext* opCtx,
         output->append("type", type);
     }
 
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
+    WiredTigerSession* session = ru.getSession();
     WT_SESSION* s = session->getSession();
     Status status =
         WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri, "statistics=(fast)", output);
@@ -105,18 +101,18 @@ bool WiredTigerIndexUtil::appendCustomStats(OperationContext* opCtx,
     return true;
 }
 
-Status WiredTigerIndexUtil::compact(OperationContext* opCtx,
+Status WiredTigerIndexUtil::compact(Interruptible& interruptible,
+                                    WiredTigerRecoveryUnit& ru,
                                     const std::string& uri,
                                     boost::optional<int64_t> freeSpaceTargetMB) {
-    dassert(shard_role_details::getLocker(opCtx)->isWriteLocked());
-    WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
+    WiredTigerSessionCache* cache = ru.getSessionCache();
     if (!cache->isEphemeral()) {
-        WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
-        opCtx->recoveryUnit()->abandonSnapshot();
+        WT_SESSION* s = ru.getSession()->getSession();
+        ru.abandonSnapshot();
 
-        // Set a pointer on the WT_SESSION to the opCtx, so that WT::compact can use a callback to
-        // check for interrupts.
-        SessionDataRAII sessionRaii(s, opCtx);
+        // Set a pointer on the WT_SESSION to the interruptible, so that WT::compact can use a
+        // callback to check for interrupts.
+        SessionDataRAII sessionRaii(s, &interruptible);
 
         StringBuilder config;
         config << "timeout=0";
@@ -124,7 +120,7 @@ Status WiredTigerIndexUtil::compact(OperationContext* opCtx,
             config << ",free_space_target=" + std::to_string(*freeSpaceTargetMB) + "MB";
         }
         int ret = s->compact(s, uri.c_str(), config.str().c_str());
-        if (ret == WT_ERROR && !opCtx->checkForInterruptNoAssert().isOK()) {
+        if (ret == WT_ERROR && !interruptible.checkForInterruptNoAssert().isOK()) {
             return Status(ErrorCodes::Interrupted,
                           str::stream() << "Storage compaction interrupted on " << uri.c_str());
         }
@@ -158,10 +154,10 @@ bool WiredTigerIndexUtil::isEmpty(OperationContext* opCtx,
     return false;
 }
 
-void WiredTigerIndexUtil::validateStructure(OperationContext* opCtx,
+void WiredTigerIndexUtil::validateStructure(WiredTigerRecoveryUnit& ru,
                                             const std::string& uri,
                                             IndexValidateResults& results) {
-    if (WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->isEphemeral()) {
+    if (ru.getSessionCache()->isEphemeral()) {
         return;
     }
 
@@ -174,8 +170,7 @@ void WiredTigerIndexUtil::validateStructure(OperationContext* opCtx,
         return;
     }
 
-    auto err =
-        WiredTigerUtil::verifyTable(*WiredTigerRecoveryUnit::get(opCtx), uri, &results.errors);
+    auto err = WiredTigerUtil::verifyTable(ru, uri, &results.errors);
     if (err == EBUSY) {
         std::string msg = str::stream()
             << "Could not complete validation of " << uri << ". "
