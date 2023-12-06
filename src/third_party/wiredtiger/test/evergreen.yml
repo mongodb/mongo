@@ -813,11 +813,12 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
-        format_args="tiered_storage.storage_source=dir_store tiered_storage.flush_frequency=60 checkpoint.wait=15 runs.source=table runs.timer=10"
+        format_args="tiered_storage.storage_source=dir_store tiered_storage.flush_frequency=60 checkpoint.wait=15 runs.source=table runs.timer=10 runs.in_memory=0"
         for i in $(seq ${times}); do
           echo Iteration $i/${times}
           rm -rf RUNDIR
           ./t $format_args ${extra_args}
+          ./t -R $format_args ${extra_args}
         done
   "many dbs test":
     command: shell.exec

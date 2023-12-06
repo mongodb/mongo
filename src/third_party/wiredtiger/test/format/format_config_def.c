@@ -110,10 +110,10 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
 
   {"chunk_cache", "enable chunk cache", C_BOOL | C_IGNORE, 0, 0, 0, V_GLOBAL_CHUNK_CACHE},
 
-  {"chunk_cache.capacity", "maximum memory or storage to use for the chunk cache (MB)", 0x0, 10,
-    1024, 100 * 1024, V_GLOBAL_CHUNK_CACHE_CAPACITY},
+  {"chunk_cache.capacity", "maximum memory or storage to use for the chunk cache (MB)", 0x0, 100,
+    5120, 100 * 1024, V_GLOBAL_CHUNK_CACHE_CAPACITY},
 
-  {"chunk_cache.chunk_size", "size of cached chunks (MB)", 0x0, 1, 100, 100 * 1024,
+  {"chunk_cache.chunk_size", "size of cached chunks (MB)", 0x0, 1, 5, 100 * 1024,
     V_GLOBAL_CHUNK_CACHE_CHUNK_SIZE},
 
   {"chunk_cache.storage_path", "the on-disk storage path for the chunk cache.", C_STRING | C_IGNORE,
