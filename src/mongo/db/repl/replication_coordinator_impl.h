@@ -232,6 +232,8 @@ public:
     virtual void setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime);
     virtual void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime);
 
+    virtual void setMyLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime);
     virtual void setMyLastAppliedOpTimeAndWallTimeForward(
         const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp);
     virtual void setMyLastDurableOpTimeAndWallTimeForward(
@@ -240,6 +242,9 @@ public:
     virtual void resetMyLastOpTimes();
 
     virtual void setMyHeartbeatMessage(const std::string& msg);
+
+    virtual OpTime getMyLastWrittenOpTime() const override;
+    virtual OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime() const override;
 
     virtual OpTime getMyLastAppliedOpTime() const override;
     virtual OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime(
@@ -1159,6 +1164,9 @@ private:
 
     int _getMyId_inlock() const;
 
+    OpTime _getMyLastWrittenOpTime_inlock() const;
+    OpTimeAndWallTime _getMyLastWrittenOpTimeAndWallTime_inlock() const;
+
     OpTime _getMyLastAppliedOpTime_inlock() const;
     OpTimeAndWallTime _getMyLastAppliedOpTimeAndWallTime_inlock() const;
 
@@ -1194,8 +1202,11 @@ private:
     void _reportUpstream_inlock(stdx::unique_lock<Latch> lock);
 
     /**
-     * Helpers to set the last applied and durable OpTime.
+     * Helpers to set the last written, applied and durable OpTime.
      */
+    void _setMyLastWrittenOpTimeAndWallTime(WithLock lk,
+                                            const OpTimeAndWallTime& opTime,
+                                            bool isRollbackAllowed);
     void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,
                                             const OpTimeAndWallTime& opTime,
                                             bool isRollbackAllowed);

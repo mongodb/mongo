@@ -1431,6 +1431,13 @@ void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
     _topCoord->setMyHeartbeatMessage(_replExecutor->now(), msg);
 }
 
+void ReplicationCoordinatorImpl::setMyLastWrittenOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime& opTimeAndWallTime) {
+    stdx::unique_lock<Latch> lock(_mutex);
+    _setMyLastWrittenOpTimeAndWallTime(lock, opTimeAndWallTime, false);
+    _reportUpstream_inlock(std::move(lock));
+}
+
 void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp) {
     // Update the global timestamp before setting the last applied opTime forward so the last
@@ -1531,6 +1538,12 @@ void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<Latch>
     _externalState->forwardSecondaryProgress();  // Must do this outside _mutex
 }
 
+void ReplicationCoordinatorImpl::_setMyLastWrittenOpTimeAndWallTime(
+    WithLock lk, const OpTimeAndWallTime& opTimeAndWallTime, bool isRollbackAllowed) {
+    _topCoord->setMyLastWrittenOpTimeAndWallTime(
+        opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
+}
+
 void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
     WithLock lk, const OpTimeAndWallTime& opTimeAndWallTime, bool isRollbackAllowed) {
     const auto opTime = opTimeAndWallTime.opTime;
@@ -1590,6 +1603,16 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTime(
     // There could be replication waiters waiting for our lastDurable for {j: true}, wake up those
     // that now have their write concern satisfied.
     _wakeReadyWaiters(lk, opTimeAndWallTime.opTime);
+}
+
+OpTime ReplicationCoordinatorImpl::getMyLastWrittenOpTime() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _getMyLastWrittenOpTime_inlock();
+}
+
+OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastWrittenOpTimeAndWallTime() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _getMyLastWrittenOpTimeAndWallTime_inlock();
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastAppliedOpTime() const {
@@ -1853,6 +1876,14 @@ Status ReplicationCoordinatorImpl::awaitTimestampCommitted(OperationContext* opC
     // this timestamp, without worrying about terms.
     OpTime waitOpTime(ts, OpTime::kUninitializedTerm);
     return waitUntilMajorityOpTime(opCtx, waitOpTime);
+}
+
+OpTimeAndWallTime ReplicationCoordinatorImpl::_getMyLastWrittenOpTimeAndWallTime_inlock() const {
+    return _topCoord->getMyLastWrittenOpTimeAndWallTime();
+}
+
+OpTime ReplicationCoordinatorImpl::_getMyLastWrittenOpTime_inlock() const {
+    return _topCoord->getMyLastWrittenOpTime();
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::_getMyLastAppliedOpTimeAndWallTime_inlock() const {

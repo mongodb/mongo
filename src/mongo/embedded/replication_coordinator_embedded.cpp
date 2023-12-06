@@ -205,6 +205,11 @@ void ReplicationCoordinatorEmbedded::setMyHeartbeatMessage(const std::string&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
+void ReplicationCoordinatorEmbedded::setMyLastWrittenOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime&) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 void ReplicationCoordinatorEmbedded::setMyLastAppliedOpTimeAndWallTimeForward(
     const OpTimeAndWallTime&, bool) {
     UASSERT_NOT_IMPLEMENTED;
@@ -224,6 +229,14 @@ void ReplicationCoordinatorEmbedded::setMyLastDurableOpTimeAndWallTime(const OpT
 }
 
 void ReplicationCoordinatorEmbedded::resetMyLastOpTimes() {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+OpTimeAndWallTime ReplicationCoordinatorEmbedded::getMyLastWrittenOpTimeAndWallTime() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+OpTime ReplicationCoordinatorEmbedded::getMyLastWrittenOpTime() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 

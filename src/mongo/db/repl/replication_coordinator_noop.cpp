@@ -203,6 +203,11 @@ void ReplicationCoordinatorNoOp::setMyHeartbeatMessage(const std::string&) {
     MONGO_UNREACHABLE;
 }
 
+void ReplicationCoordinatorNoOp::setMyLastWrittenOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime&) {
+    MONGO_UNREACHABLE;
+}
+
 void ReplicationCoordinatorNoOp::setMyLastAppliedOpTimeAndWallTimeForward(const OpTimeAndWallTime&,
                                                                           bool) {
     MONGO_UNREACHABLE;
@@ -634,6 +639,14 @@ bool ReplicationCoordinatorNoOp::isRetryableWrite(OperationContext* opCtx) const
 }
 
 boost::optional<UUID> ReplicationCoordinatorNoOp::getInitialSyncId(OperationContext* opCtx) {
+    MONGO_UNREACHABLE;
+}
+
+OpTime ReplicationCoordinatorNoOp::getMyLastWrittenOpTime() const {
+    MONGO_UNREACHABLE;
+}
+
+OpTimeAndWallTime ReplicationCoordinatorNoOp::getMyLastWrittenOpTimeAndWallTime() const {
     MONGO_UNREACHABLE;
 }
 

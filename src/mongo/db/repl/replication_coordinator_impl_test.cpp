@@ -8493,6 +8493,30 @@ TEST_F(ReplCoordTest, IgnoreNonNullDurableOpTimeOrWallTimeForArbiterFromHeartbea
                       "Received non-null durable optime/walltime for arbiter from heartbeat"));
 }
 
+TEST_F(ReplCoordTest, LastWrittenGetterSetterBasic) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+
+    auto term = getTopoCoord().getTerm();
+    OpTime time1(Timestamp(100, 1), term);
+    OpTime time2(Timestamp(100, 2), term);
+    replCoordSetMyLastWrittenOpTime(time1, Date_t() + Seconds(100));
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastWrittenOpTime());
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastWrittenOpTimeAndWallTime().opTime);
+    ASSERT_EQUALS(Date_t() + Seconds(100),
+                  getReplCoord()->getMyLastWrittenOpTimeAndWallTime().wallTime);
+    replCoordSetMyLastWrittenOpTime(time2, Date_t() + Seconds(200));
+    ASSERT_EQUALS(time2, getReplCoord()->getMyLastWrittenOpTime());
+    ASSERT_EQUALS(time2, getReplCoord()->getMyLastWrittenOpTimeAndWallTime().opTime);
+    ASSERT_EQUALS(Date_t() + Seconds(200),
+                  getReplCoord()->getMyLastWrittenOpTimeAndWallTime().wallTime);
+}
+
 // TODO(schwerin): Unit test election id updating
 }  // namespace
 }  // namespace repl

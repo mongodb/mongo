@@ -182,6 +182,8 @@ public:
 
     virtual bool shouldRelaxIndexConstraints(OperationContext* opCtx, const NamespaceString& ns);
 
+    virtual void setMyLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime);
     virtual void setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime);
     virtual void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime);
 
@@ -193,6 +195,9 @@ public:
     virtual void resetMyLastOpTimes();
 
     virtual void setMyHeartbeatMessage(const std::string& msg);
+
+    virtual OpTime getMyLastWrittenOpTime() const;
+    virtual OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime() const;
 
     virtual OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime(bool rollbackSafe) const;
     virtual OpTime getMyLastAppliedOpTime() const;
@@ -512,6 +517,8 @@ private:
 
     MemberState _memberState;
     ReplSetConfig _getConfigReturnValue;
+    OpTime _myLastWrittenOpTime;
+    Date_t _myLastWrittenWallTime;
     OpTime _myLastDurableOpTime;
     Date_t _myLastDurableWallTime;
     OpTime _myLastAppliedOpTime;

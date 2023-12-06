@@ -159,6 +159,7 @@ public:
     bool isCommitQuorumSatisfied(const CommitQuorumOptions& commitQuorum,
                                  const std::vector<mongo::HostAndPort>& members) const final;
 
+    void setMyLastWrittenOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastAppliedOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime,
@@ -168,6 +169,9 @@ public:
     void resetMyLastOpTimes() final;
 
     void setMyHeartbeatMessage(const std::string&) final;
+
+    OpTime getMyLastWrittenOpTime() const final;
+    OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime() const final;
 
     OpTime getMyLastAppliedOpTime() const final;
     OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime(bool rollbackSafe = false) const final;

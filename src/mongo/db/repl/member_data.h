@@ -135,6 +135,10 @@ public:
         return _health > 0;
     }
 
+    OpTime getLastWrittenOpTime() const {
+        return _lastWrittenOpTime;
+    }
+
     OpTime getLastAppliedOpTime() const {
         return _lastAppliedOpTime;
     }
@@ -143,9 +147,14 @@ public:
         return _lastDurableOpTime;
     }
 
+    Date_t getLastWrittenWallTime() const {
+        return _lastWrittenWallTime;
+    }
+
     Date_t getLastAppliedWallTime() const {
         return _lastAppliedWallTime;
     }
+
     Date_t getLastDurableWallTime() const {
         return _lastDurableWallTime;
     }
@@ -213,6 +222,12 @@ public:
     bool isUpdatedSinceRestart() const {
         return _updatedSinceRestart;
     }
+
+    /**
+     * Performs setLastWrittenOpTime and also sets the wall clock time corresponding to the last
+     * written opTime. Should only be used on the current node.
+     */
+    void setLastWrittenOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now);
 
     /**
      * Performs setLastAppliedOpTime and also sets the wall clock time corresponding to the last
@@ -315,7 +330,11 @@ private:
     // on the primary, but not the secondaries.
     bool _lastUpdateStale = false;
 
-    // Last known OpTime that the replica has applied and journaled to.
+    // Last known OpTime that the replica has written oplog entry into memory.
+    OpTime _lastWrittenOpTime;
+    Date_t _lastWrittenWallTime = Date_t();
+
+    // Last known OpTime that the replica has journaled to.
     OpTime _lastDurableOpTime;
     Date_t _lastDurableWallTime = Date_t();
 

@@ -1353,6 +1353,23 @@ void TopologyCoordinator::resetMemberTimeouts(Date_t now,
     }
 }
 
+OpTime TopologyCoordinator::getMyLastWrittenOpTime() const {
+    return _selfMemberData().getLastWrittenOpTime();
+}
+
+OpTimeAndWallTime TopologyCoordinator::getMyLastWrittenOpTimeAndWallTime() const {
+    return {_selfMemberData().getLastWrittenOpTime(), _selfMemberData().getLastWrittenWallTime()};
+}
+
+void TopologyCoordinator::setMyLastWrittenOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
+                                                            Date_t now,
+                                                            bool isRollbackAllowed) {
+    auto opTime = opTimeAndWallTime.opTime;
+    auto& myMemberData = _selfMemberData();
+    invariant(isRollbackAllowed || opTime >= myMemberData.getLastWrittenOpTime());
+    myMemberData.setLastWrittenOpTimeAndWallTime(opTimeAndWallTime, now);
+}
+
 OpTime TopologyCoordinator::getMyLastAppliedOpTime() const {
     return _selfMemberData().getLastAppliedOpTime();
 }

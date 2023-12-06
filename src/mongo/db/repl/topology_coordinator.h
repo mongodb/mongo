@@ -569,6 +569,23 @@ public:
      */
     void resetMemberTimeouts(Date_t now, const stdx::unordered_set<HostAndPort>& member_set);
 
+
+    /*
+     * Returns the last optime that this node has written oplog entry into memory.
+     */
+    OpTime getMyLastWrittenOpTime() const;
+    OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime() const;
+
+    /*
+     * Sets the last optime that this node has written oplog entry into memory. Fails with an
+     * invariant if 'isRollbackAllowed' is false and we're attempting to set the optime backwards.
+     * The Date_t 'now' is used to track liveness; setting a node's applied optime updates its
+     * liveness information.
+     */
+    void setMyLastWrittenOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
+                                           Date_t now,
+                                           bool isRollbackAllowed);
+
     /*
      * Returns the last optime that this node has applied, whether or not it has been journaled.
      */

@@ -168,6 +168,9 @@ public:
         const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
     void setMyLastDurableOpTimeAndWallTime(
         const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
+
+    void setMyLastWrittenOpTimeAndWallTimeForward(
+        const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
     void setMyLastAppliedOpTimeAndWallTimeForward(const repl::OpTimeAndWallTime& opTimeAndWallTime,
                                                   bool advanceGlobalTime) override;
     void setMyLastDurableOpTimeAndWallTimeForward(
@@ -177,6 +180,9 @@ public:
     void resetMyLastOpTimes() override;
 
     void setMyHeartbeatMessage(const std::string&) override;
+
+    repl::OpTime getMyLastWrittenOpTime() const override;
+    repl::OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime() const override;
 
     repl::OpTime getMyLastAppliedOpTime() const override;
     repl::OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime(

@@ -276,6 +276,14 @@ void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTime(
     _myLastDurableWallTime = opTimeAndWallTime.wallTime;
 }
 
+void ReplicationCoordinatorMock::setMyLastWrittenOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime& opTimeAndWallTime) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
+    _myLastWrittenOpTime = opTimeAndWallTime.opTime;
+    _myLastWrittenWallTime = opTimeAndWallTime.wallTime;
+}
+
 void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp) {
     stdx::lock_guard<Mutex> lk(_mutex);
@@ -300,6 +308,18 @@ void ReplicationCoordinatorMock::resetMyLastOpTimes() {
 
     _myLastDurableOpTime = OpTime();
     _myLastDurableWallTime = Date_t();
+}
+
+OpTimeAndWallTime ReplicationCoordinatorMock::getMyLastWrittenOpTimeAndWallTime() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
+    return {_myLastWrittenOpTime, _myLastWrittenWallTime};
+}
+
+OpTime ReplicationCoordinatorMock::getMyLastWrittenOpTime() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+
+    return _myLastWrittenOpTime;
 }
 
 OpTimeAndWallTime ReplicationCoordinatorMock::getMyLastAppliedOpTimeAndWallTime(

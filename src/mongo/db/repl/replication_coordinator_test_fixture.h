@@ -138,6 +138,13 @@ protected:
         return _repl.get();
     }
 
+    void replCoordSetMyLastWrittenOpTime(const OpTime& opTime, Date_t wallTime = Date_t()) {
+        if (wallTime == Date_t()) {
+            wallTime = Date_t() + Seconds(opTime.getSecs());
+        }
+        getReplCoord()->setMyLastWrittenOpTimeAndWallTimeForward({opTime, wallTime});
+    }
+
     void replCoordSetMyLastAppliedOpTime(const OpTime& opTime, Date_t wallTime = Date_t()) {
         if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());

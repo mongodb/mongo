@@ -145,6 +145,14 @@ void MemberData::setAuthIssue(Date_t now) {
     _lastResponse.setSyncingTo(HostAndPort());
 }
 
+void MemberData::setLastWrittenOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
+    invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
+    _lastUpdate = now;
+    _lastUpdateStale = false;
+    _lastWrittenOpTime = opTime.opTime;
+    _lastWrittenWallTime = opTime.wallTime;
+}
+
 void MemberData::setLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
     invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
     _lastUpdate = now;
@@ -159,6 +167,7 @@ void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
     _lastUpdateStale = false;
     // Since _lastDurableOpTime is set asynchronously from _lastAppliedOpTime, it is possible that
     // 'opTime' is ahead of _lastAppliedOpTime.
+    // TODO(SERVER-47898): We should allow lastDurable to go beyond lastApplied.
     if (_lastAppliedOpTime >= opTime.opTime) {
         _lastDurableOpTime = opTime.opTime;
         _lastDurableWallTime = opTime.wallTime;

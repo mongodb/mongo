@@ -394,6 +394,13 @@ public:
     virtual void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) = 0;
 
     /**
+     * Updates our internal tracking of the last OpTime that an oplog entry is written into memory
+     * on this node.
+     */
+    virtual void setMyLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime) = 0;
+
+    /**
      * Updates our internal tracking of the last OpTime applied to this node, but only
      * if the supplied optime is later than the current last OpTime known to the replication
      * coordinator.
@@ -435,6 +442,17 @@ public:
      * Updates our the message we include in heartbeat responses.
      */
     virtual void setMyHeartbeatMessage(const std::string& msg) = 0;
+
+    /**
+     * Returns the last optime recorded by setMyLastWrittenOpTimeAndWallTimeForward.
+     */
+    virtual OpTime getMyLastWrittenOpTime() const = 0;
+
+    /*
+     * Returns the same as getMyLastWrittenOpTime() and additionally returns the wall clock time
+     * corresponding to that OpTime.
+     */
+    virtual OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime() const = 0;
 
     /**
      * Returns the last optime recorded by setMyLastAppliedOpTime.
