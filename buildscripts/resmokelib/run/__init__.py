@@ -185,7 +185,8 @@ class TestRunner(Subcommand):
     def generate_multiversion_exclude_tags(self):
         """Generate multiversion exclude tags file."""
         generate_multiversion_exclude_tags.generate_exclude_yaml(
-            config.MULTIVERSION_BIN_VERSION, config.EXCLUDE_TAGS_FILE_PATH, self._resmoke_logger)
+            config.MULTIVERSION_BIN_VERSION, config.EXCLUDE_TAGS_FILE_PATH, config.EXPANSIONS_FILE,
+            self._resmoke_logger)
 
     @staticmethod
     def _find_suites_by_test(suites: List[Suite]):
