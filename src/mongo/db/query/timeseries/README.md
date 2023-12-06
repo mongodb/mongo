@@ -50,13 +50,6 @@ classic execution engine.
 The descriptions of the optimizations below are summaries and do not list all of the requirements for
 each optimization.
 
-### Note about Slot Based Execution and Classic execution engine
-
-At the time of writing there are multiple projects in progress to lower time-series queries to SBE.
-To avoid performance regressions, time-series queries are not lowered to SBE if their optimizations
-cannot be supported in SBE. It is not listed which optimizations are supported in which engine since
-these changes are ongoing.
-
 ## $match on metaField reorder
 
 In 5.0+, a `$match` on the `metaField` that immediately follows the `$_internalUnpackBucket` stage is pushed
@@ -529,6 +522,65 @@ aggregate([{$sort: {meta: 1, time: 1}}, {hint: {meta: 1, time: 1}}])
   }
 ]
 ```
+
+# Lowering pipelines to the Slot Based Execution Engine
+
+Note there are active projects making changes to what is written below. This section will be updated as the projects finish.
+
+## When pipelines are lowered to SBE
+
+At the time of writing, to be lowered to SBE a pipeline on a time-series collection must:
+
+1. Limit the unpacked fields to a statically known set (must have the `includes` parameter in the unpack stage).
+2. Not include a `$sort` stage on the `timeField`.
+3. Not implement the last point optimization.
+4. Not use event-filters with expressions unsupported in SBE.
+5. Not use filters on the `metaField` with expressions unsupported in SBE.
+
+If the pipeline meets all of these requirements, its prefix up to a stage that isn't supported by SBE
+will be lowered to SBE. If all of the stages are supported in SBE, the entire pipeline will run in SBE.
+
+If the pipeline fails to meet any of the requirements above, the pipeline will fully run in the classic engine.
+
+## What happens when pipelines are lowered to SBE
+
+When a pipeline is lowered to SBE, the query plan will have a `UNPACK_TS_BUCKET` node instead of the
+`$_internalUnpackBucket` aggregation stage. The `UNPACK_TS_BUCKET` node uses two SBE stages
+(`TsBucketToCellBlockStage`, and `BlockToRowStage`) to transform a single bucket into a set of slots
+that can be used as input to other SBE stages.
+
+The `TsBucketToCellBlockStage` takes in a bucket as a BSON document, selects the top-level fields
+from the bucket’s `data` field and produces `CellBlock` values. A `CellBlock` contains all of the
+values at a certain field path. Some operations can be performed on these blocks as a whole in a
+vectorized manner. This process is called block processing, and it greatly improves the performance of queries
+over time-series collections. Currently, block processing supports the whole bucket filter and event filters.
+
+The `BlockToRowStage` is not specific to time-series. It takes in a block of values, which can be
+`CellBlock` values. These values might have been already processed by block processing, and therefore
+the values inside the `CellBlock` might have changed from the initial data in the bucket. This stage produces
+a set of slots, where each slot at a given time holds a single value from the source `CellBlock`s.
+We'll illustrate this with an example.
+
+**Example:**
+
+Let's suppose, `TsBucketToCellBlockStage` produces two slots containing the following blocks:
+
+```
+block for path "a" is in slot s1: {1, 2, 3, 4, 5}
+block for path "b" is in slot s2: {10, 20, 30, 40, 50}
+```
+
+From these inputs and with no filters, `BlockToRowStage` will produce two slots (`s3` and `s4`) that will
+be populated with one value from each of the source blocks at a time. For this example, we will look
+at the different states of the execution engine (labeled t1, t2, etc...) and the values in slots `s3` and `s4`.
+
+| States             | t1  | t2  | t3  | t4  | t5  |
+| ------------------ | --- | --- | --- | --- | --- |
+| value in slot `s3` | 1   | 2   | 3   | 4   | 5   |
+| value in slot `s4` | 10  | 20  | 30  | 40  | 50  |
+
+The slots `{s3, s4}` are often referred to as a "row" or the "row representation".
+Other SBE stages that process individual values can execute on slots `s3` and `s4`.
 
 # References
 
