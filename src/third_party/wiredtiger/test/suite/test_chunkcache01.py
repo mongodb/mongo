@@ -31,25 +31,33 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 def get_stat(session, stat):
-    # This could be made more sophisticated, but there's no need yet.
-    time.sleep(0.5)
-
     stat_cursor = session.open_cursor('statistics:')
     val = stat_cursor[stat][2]
     stat_cursor.close()
 
     return val
 
-# These raise an exception since they don't have access to assertGreater and friends.
-def stat_assert_equal(session, stat, expected):
+# Read a stat either 10,000 times (or for 10 seconds), whichever is greater,
+# unless the condition is met. Raises an exception since it doesn't have
+# access to assertGreater and friends.
+def stat_cond_timeout(session, stat, cond):
+    start = time.time()
     val = get_stat(session, stat)
-    if val != expected:
-        raise Exception("expected {} ({}) to be equal to {}".format(stat, val, expected))
+    elapsed = 0
+    iterations = 0
+    while (not cond(val)) and (elapsed < 10 or iterations < 10000):
+        val = get_stat(session, stat)
+        elapsed = time.time() - start
+        iterations += 1
+
+    if not cond(val):
+        raise Exception("stat {} ({}) failed check".format(stat, val))
+
+def stat_assert_equal(session, stat, expected):
+    stat_cond_timeout(session, stat, lambda x: x == expected)
 
 def stat_assert_greater(session, stat, expected):
-    val = get_stat(session, stat)
-    if val <= expected:
-        raise Exception("expected {} ({}) to be greater than {}".format(stat, val, expected))
+    stat_cond_timeout(session, stat, lambda x: x > expected)
 
 # Basic functional chunk cache test - put some data in, make sure it
 # comes back out unscathed.

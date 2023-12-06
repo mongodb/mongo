@@ -428,6 +428,8 @@ conn_stats = [
     ChunkCacheStat('chunkcache_exceeded_capacity', 'could not allocate due to exceeding capacity'),
     ChunkCacheStat('chunkcache_io_failed', 'number of times a read from storage failed'),
     ChunkCacheStat('chunkcache_lookups', 'lookups'),
+    ChunkCacheStat('chunkcache_metadata_inserted', 'number of metadata entries inserted'),
+    ChunkCacheStat('chunkcache_metadata_removed', 'number of metadata entries removed'),
     ChunkCacheStat('chunkcache_metadata_work_units_created', 'number of metadata inserts/deletes pushed to the worker thread'),
     ChunkCacheStat('chunkcache_metadata_work_units_dequeued', 'number of metadata inserts/deletes read by the worker thread'),
     ChunkCacheStat('chunkcache_metadata_work_units_dropped', 'number of metadata inserts/deletes dropped by the worker thread'),

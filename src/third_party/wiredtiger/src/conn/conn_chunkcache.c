@@ -184,11 +184,13 @@ __chunkcache_metadata_work(WT_SESSION_IMPL *session)
         if (entry == NULL)
             break;
 
-        if (entry->type == WT_CHUNKCACHE_METADATA_WORK_INS)
+        if (entry->type == WT_CHUNKCACHE_METADATA_WORK_INS) {
             WT_ERR(__chunkcache_metadata_insert(cursor, entry));
-        else if (entry->type == WT_CHUNKCACHE_METADATA_WORK_DEL)
+            WT_STAT_CONN_INCR(session, chunkcache_metadata_inserted);
+        } else if (entry->type == WT_CHUNKCACHE_METADATA_WORK_DEL) {
             WT_ERR_NOTFOUND_OK(__chunkcache_metadata_delete(cursor, entry), false);
-        else {
+            WT_STAT_CONN_INCR(session, chunkcache_metadata_removed);
+        } else {
             __wt_verbose_error(
               session, WT_VERB_CHUNKCACHE, "got invalid event type %d\n", entry->type);
             ret = -1;

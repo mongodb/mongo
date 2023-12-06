@@ -624,6 +624,8 @@ struct __wt_connection_stats {
     int64_t chunkcache_exceeded_capacity;
     int64_t chunkcache_lookups;
     int64_t chunkcache_chunks_loaded_from_flushed_tables;
+    int64_t chunkcache_metadata_inserted;
+    int64_t chunkcache_metadata_removed;
     int64_t chunkcache_metadata_work_units_dropped;
     int64_t chunkcache_metadata_work_units_created;
     int64_t chunkcache_metadata_work_units_dequeued;

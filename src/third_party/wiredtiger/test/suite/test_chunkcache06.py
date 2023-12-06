@@ -94,6 +94,9 @@ class test_chunkcache06(wttest.WiredTigerTestCase):
         self.session.checkpoint()
         self.session.checkpoint('flush_tier=(enabled)')
 
+        # Make sure we write out the metadata entries we're planning to read back.
+        stat_assert_greater(self.session, wiredtiger.stat.conn.chunkcache_metadata_inserted, 0)
+
         self.close_conn()
 
         # Damage the underlying file while WT isn't running.
