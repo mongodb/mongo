@@ -63,7 +63,8 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
     if (_isCheckpoint) {
         // Type can be "lsm" or "file".
         std::string type, sourceURI;
-        WiredTigerUtil::fetchTypeAndSourceURI(opCtx, uri, &type, &sourceURI);
+        WiredTigerUtil::fetchTypeAndSourceURI(
+            *WiredTigerRecoveryUnit::get(opCtx), uri, &type, &sourceURI);
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "LSM does not support opening cursors by checkpoint",
                 type != "lsm");

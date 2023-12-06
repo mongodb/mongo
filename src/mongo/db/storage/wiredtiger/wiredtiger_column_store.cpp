@@ -251,7 +251,7 @@ IndexValidateResults WiredTigerColumnStore::validate(OperationContext* opCtx, bo
 
     IndexValidateResults results;
 
-    WiredTigerUtil::validateTableLogging(opCtx,
+    WiredTigerUtil::validateTableLogging(*WiredTigerRecoveryUnit::get(opCtx),
                                          _uri,
                                          _isLogged,
                                          StringData{_indexName},

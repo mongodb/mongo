@@ -339,7 +339,7 @@ IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool ful
     dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
 
     IndexValidateResults results;
-    WiredTigerUtil::validateTableLogging(opCtx,
+    WiredTigerUtil::validateTableLogging(*WiredTigerRecoveryUnit::get(opCtx),
                                          _uri,
                                          _isLogged,
                                          StringData{_indexName},
@@ -703,7 +703,10 @@ void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
         auto prevVersion = _dataFormatVersion;
         // The updated data format is guaranteed to be within the supported version range.
         _dataFormatVersion = WiredTigerUtil::checkApplicationMetadataFormatVersion(
-                                 opCtx, uri, kMinimumIndexVersion, kMaximumIndexVersion)
+                                 *WiredTigerRecoveryUnit::get(opCtx),
+                                 uri,
+                                 kMinimumIndexVersion,
+                                 kMaximumIndexVersion)
                                  .getValue();
         LOGV2_WARNING(6818600,
                       "Fixing index metadata data format version",
@@ -720,7 +723,7 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                                         const IndexDescriptor* desc,
                                                         bool isLogged) {
     auto version = WiredTigerUtil::checkApplicationMetadataFormatVersion(
-        ctx, uri, kMinimumIndexVersion, kMaximumIndexVersion);
+        *WiredTigerRecoveryUnit::get(ctx), uri, kMinimumIndexVersion, kMaximumIndexVersion);
     if (!version.isOK()) {
         auto collectionNamespace = desc->getEntry()->getNSSFromCatalog(ctx);
         Status versionStatus = version.getStatus();
@@ -747,7 +750,8 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
         fassertFailedWithStatusNoTrace(31179, versionStatus);
     }
 
-    uassertStatusOK(WiredTigerUtil::setTableLogging(ctx, uri, isLogged));
+    uassertStatusOK(
+        WiredTigerUtil::setTableLogging(*WiredTigerRecoveryUnit::get(ctx), uri, isLogged));
 
     /*
      * Index data format 6, 11, and 13 correspond to KeyString version V0 and data format 8, 12, and

@@ -68,7 +68,8 @@ bool WiredTigerIndexUtil::appendCustomStats(OperationContext* opCtx,
     dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     {
         BSONObjBuilder metadata(output->subobjStart("metadata"));
-        Status status = WiredTigerUtil::getApplicationMetadata(opCtx, uri, &metadata);
+        Status status = WiredTigerUtil::getApplicationMetadata(
+            *WiredTigerRecoveryUnit::get(opCtx), uri, &metadata);
         if (!status.isOK()) {
             metadata.append("error", "unable to retrieve metadata");
             metadata.append("code", static_cast<int>(status.code()));
@@ -76,8 +77,10 @@ bool WiredTigerIndexUtil::appendCustomStats(OperationContext* opCtx,
         }
     }
     std::string type, sourceURI;
-    WiredTigerUtil::fetchTypeAndSourceURI(opCtx, uri, &type, &sourceURI);
-    StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadataCreate(opCtx, sourceURI);
+    WiredTigerUtil::fetchTypeAndSourceURI(
+        *WiredTigerRecoveryUnit::get(opCtx), uri, &type, &sourceURI);
+    StatusWith<std::string> metadataResult =
+        WiredTigerUtil::getMetadataCreate(*WiredTigerRecoveryUnit::get(opCtx), sourceURI);
     StringData creationStringName("creationString");
     if (!metadataResult.isOK()) {
         BSONObjBuilder creationString(output->subobjStart(creationStringName));
@@ -171,7 +174,8 @@ void WiredTigerIndexUtil::validateStructure(OperationContext* opCtx,
         return;
     }
 
-    auto err = WiredTigerUtil::verifyTable(opCtx, uri, &results.errors);
+    auto err =
+        WiredTigerUtil::verifyTable(*WiredTigerRecoveryUnit::get(opCtx), uri, &results.errors);
     if (err == EBUSY) {
         std::string msg = str::stream()
             << "Could not complete validation of " << uri << ". "

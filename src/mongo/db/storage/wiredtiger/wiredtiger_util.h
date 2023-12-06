@@ -46,8 +46,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/import_options.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
@@ -181,7 +181,7 @@ public:
      * Fetch the type and source fields out of the colgroup metadata.  'tableUri' must be a
      * valid table: uri.
      */
-    static void fetchTypeAndSourceURI(OperationContext* opCtx,
+    static void fetchTypeAndSourceURI(WiredTigerRecoveryUnit&,
                                       const std::string& tableUri,
                                       std::string* type,
                                       std::string* source);
@@ -248,31 +248,31 @@ public:
      *
      * This returns more information, but is slower than getMetadata().
      */
-    static StatusWith<std::string> getMetadataCreate(OperationContext* opCtx, StringData uri);
+    static StatusWith<std::string> getMetadataCreate(WiredTigerRecoveryUnit&, StringData uri);
     static StatusWith<std::string> getMetadataCreate(WT_SESSION* session, StringData uri);
 
     /**
      * Gets the entire metadata string for collection or index at URI. Accepts an OperationContext
      * or session.
      */
-    static StatusWith<std::string> getMetadata(OperationContext* opCtx, StringData uri);
+    static StatusWith<std::string> getMetadata(WiredTigerRecoveryUnit&, StringData uri);
     static StatusWith<std::string> getMetadata(WT_SESSION* session, StringData uri);
 
     /**
      * Reads app_metadata for collection/index at URI as a BSON document.
      */
-    static Status getApplicationMetadata(OperationContext* opCtx,
+    static Status getApplicationMetadata(WiredTigerRecoveryUnit&,
                                          StringData uri,
                                          BSONObjBuilder* bob);
 
-    static StatusWith<BSONObj> getApplicationMetadata(OperationContext* opCtx, StringData uri);
+    static StatusWith<BSONObj> getApplicationMetadata(WiredTigerRecoveryUnit&, StringData uri);
 
     /**
      * Validates formatVersion in application metadata for 'uri'.
      * Version must be numeric and be in the range [minimumVersion, maximumVersion].
      * URI is used in error messages only. Returns actual version.
      */
-    static StatusWith<int64_t> checkApplicationMetadataFormatVersion(OperationContext* opCtx,
+    static StatusWith<int64_t> checkApplicationMetadataFormatVersion(WiredTigerRecoveryUnit&,
                                                                      StringData uri,
                                                                      int64_t minimumVersion,
                                                                      int64_t maximumVersion);
@@ -330,7 +330,7 @@ public:
      *
      * If errors is non-NULL, all error messages will be appended to the array.
      */
-    static int verifyTable(OperationContext* opCtx,
+    static int verifyTable(WiredTigerRecoveryUnit&,
                            const std::string& uri,
                            std::vector<std::string>* errors = nullptr);
 
@@ -338,7 +338,7 @@ public:
      * Checks the table logging setting in the metadata for the given uri, comparing it against
      * 'isLogged'. Populates 'valid', 'errors', and 'warnings' accordingly.
      */
-    static void validateTableLogging(OperationContext* opCtx,
+    static void validateTableLogging(WiredTigerRecoveryUnit&,
                                      StringData uri,
                                      bool isLogged,
                                      boost::optional<StringData> indexName,
@@ -350,7 +350,7 @@ public:
 
     static bool useTableLogging(const NamespaceString& nss);
 
-    static Status setTableLogging(OperationContext* opCtx, const std::string& uri, bool on);
+    static Status setTableLogging(WiredTigerRecoveryUnit&, const std::string& uri, bool on);
 
     /**
      * Generates a WiredTiger connection configuration given the LOGV2 WiredTiger components
