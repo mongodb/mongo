@@ -220,7 +220,7 @@ def _create_revision_map(repos: List[Repo], origin_rev: Optional[str], evg_api: 
         return generate_revision_map(repos, {"mongo": origin_rev})
 
     if evg_api and task_id:
-        return generate_revision_map_from_manifest(repos, task_id, evg_api)
+        return generate_revision_map_from_manifest(repos)
 
     return {}
 

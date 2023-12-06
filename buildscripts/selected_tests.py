@@ -411,8 +411,7 @@ def run(evg_api: EvergreenApi, evg_conf: EvergreenProjectConfig,
     """
     config_dict_of_suites_and_tasks = {}
 
-    task_id = selected_tests_variant_expansions[TASK_ID_EXPANSION]
-    revision_map = generate_revision_map_from_manifest(repos, task_id, evg_api)
+    revision_map = generate_revision_map_from_manifest(repos)
     changed_files = find_changed_files_in_repos(repos, revision_map)
     changed_files = {_remove_repo_path_prefix(file_path) for file_path in changed_files}
     LOGGER.debug("Found changed files", files=changed_files)

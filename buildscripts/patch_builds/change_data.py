@@ -38,22 +38,18 @@ def generate_revision_map(repos: List[Repo], revisions_data: Dict[str, str]) -> 
     return {k: v for k, v in revision_map.items() if v}
 
 
-def generate_revision_map_from_manifest(repos: List[Repo], task_id: str,
-                                        evg_api: EvergreenApi) -> RevisionMap:
+def generate_revision_map_from_manifest(repos: List[Repo]) -> RevisionMap:
     """
     Generate a revision map for the given repositories using the revisions from the manifest.
 
     :param repos: Repositories to generate map for.
-    :param task_id: Id of evergreen task running.
-    :param evg_api: Evergreen API object.
     :return: Map of repositories to revisions
     """
-    manifest = evg_api.manifest_for_task(task_id)
-    revisions_data = {
-        module_name: module.revision
-        for module_name, module in manifest.modules.items()
-    }
-    revisions_data["mongo"] = manifest.revision
+    # This used to require hitting the manifest evergreen endpoint
+    # However, since we combined the enterprise and mongo repo we only care about a single commit
+    # which is the commit to the mongo repo which we can find by just finding the current git sha
+    revisions_data = {}
+    revisions_data["mongo"] = repos[0].head.commit.hexsha
 
     return generate_revision_map(repos, revisions_data)
 
