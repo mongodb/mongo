@@ -370,7 +370,7 @@ ServiceContext* initialize(const char* yaml_config) {
 
     // Notify the storage engine that startup is completed before repair exits below, as repair sets
     // the upgrade flag to true.
-    serviceContext->getStorageEngine()->notifyStartupComplete();
+    serviceContext->getStorageEngine()->notifyStartupComplete(startupOpCtx.get());
 
     if (storageGlobalParams.upgrade) {
         LOGV2(22553, "finished checking dbs");

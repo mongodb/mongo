@@ -167,7 +167,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
     CollectionShardingStateFactory::set(
         serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
-    serviceContext->getStorageEngine()->notifyStartupComplete();
+    serviceContext->getStorageEngine()->notifyStartupComplete(opCtx.get());
 
     if (_journalListener) {
         serviceContext->getStorageEngine()->setJournalListener(_journalListener.get());

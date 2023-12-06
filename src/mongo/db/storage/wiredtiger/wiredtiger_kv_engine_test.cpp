@@ -97,7 +97,9 @@ public:
         repl::ReplicationCoordinator::set(
             svcCtx, std::make_unique<repl::ReplicationCoordinatorMock>(svcCtx, replSettings));
         _svcCtx->setStorageEngine(makeEngine());
-        getWiredTigerKVEngine()->notifyStartupComplete();
+        auto client = _svcCtx->getService()->makeClient("opCtx");
+        auto opCtx = client->makeOperationContext();
+        getWiredTigerKVEngine()->notifyStartupComplete(opCtx.get());
     }
 
     ~WiredTigerKVHarnessHelper() {
@@ -108,7 +110,9 @@ public:
         getEngine()->cleanShutdown();
         _svcCtx->clearStorageEngine();
         _svcCtx->setStorageEngine(makeEngine());
-        getEngine()->notifyStartupComplete();
+        auto client = _svcCtx->getService()->makeClient("opCtx");
+        auto opCtx = client->makeOperationContext();
+        getEngine()->notifyStartupComplete(opCtx.get());
         return getEngine();
     }
 

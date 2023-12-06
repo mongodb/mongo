@@ -82,7 +82,7 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
             ? std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext())
             : std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext(),
                                                                  repl::ReplSettings()));
-    _engine.notifyStartupComplete();
+    _engine.notifyStartupComplete(Client::getCurrent()->makeOperationContext().get());
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(

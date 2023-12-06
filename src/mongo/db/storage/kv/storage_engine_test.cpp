@@ -786,7 +786,7 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         reinitializeStorageEngine(opCtx.get(), StorageEngineInitFlags{}, [&newPath] {
             storageGlobalParams.dbpath = newPath;
         });
-    getGlobalServiceContext()->getStorageEngine()->notifyStartupComplete();
+    getGlobalServiceContext()->getStorageEngine()->notifyStartupComplete(opCtx.get());
     LOGV2(5781103, "Started up storage engine in alternate location");
     ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
     StorageEngineTest::_storageEngine = getServiceContext()->getStorageEngine();
@@ -804,7 +804,7 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         reinitializeStorageEngine(opCtx.get(), StorageEngineInitFlags{}, [&oldPath] {
             storageGlobalParams.dbpath = oldPath;
         });
-    getGlobalServiceContext()->getStorageEngine()->notifyStartupComplete();
+    getGlobalServiceContext()->getStorageEngine()->notifyStartupComplete(opCtx.get());
     ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
     StorageEngineTest::_storageEngine = getServiceContext()->getStorageEngine();
     ASSERT_TRUE(collectionExists(opCtx.get(), coll1Ns));

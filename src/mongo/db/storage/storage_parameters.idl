@@ -178,6 +178,13 @@ server_parameters:
         cpp_varname: skipDroppingHashedShardKeyIndex
         default: false
 
+    enableAutoCompaction:
+        description: 'Enable auto compact at startup. Used for testing purposes.'
+        cpp_vartype: bool
+        cpp_varname: gEnableAutoCompaction
+        set_at: startup
+        default: false
+
 
 feature_flags:
     featureFlagLargeBatchedOperations:

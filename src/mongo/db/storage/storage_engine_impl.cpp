@@ -908,8 +908,8 @@ void StorageEngineImpl::startTimestampMonitor() {
     _timestampMonitor->addListener(&_collectionCatalogCleanupTimestampListener);
 }
 
-void StorageEngineImpl::notifyStartupComplete() {
-    _engine->notifyStartupComplete();
+void StorageEngineImpl::notifyStartupComplete(OperationContext* opCtx) {
+    _engine->notifyStartupComplete(opCtx);
 }
 
 RecoveryUnit* StorageEngineImpl::newRecoveryUnit() {

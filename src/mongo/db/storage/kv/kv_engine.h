@@ -66,7 +66,7 @@ public:
      * When all of the storage startup tasks are completed as a whole, then this function is called
      * by the external force managing the startup process.
      */
-    virtual void notifyStartupComplete() {}
+    virtual void notifyStartupComplete(OperationContext* opCtx) {}
 
     virtual RecoveryUnit* newRecoveryUnit() = 0;
 

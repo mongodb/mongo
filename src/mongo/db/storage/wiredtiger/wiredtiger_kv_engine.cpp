@@ -619,9 +619,25 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
     _sessionCache.reset(nullptr);
 }
 
-void WiredTigerKVEngine::notifyStartupComplete() {
+void WiredTigerKVEngine::notifyStartupComplete(OperationContext* opCtx) {
     unpinOldestTimestamp(kPinOldestTimestampAtStartupName);
     WiredTigerUtil::notifyStartupComplete();
+
+    if (!gEnableAutoCompaction)
+        return;
+
+    // Background compaction should not be executed if:
+    // - checkpoints are disabled or,
+    // - user writes are not allowed.
+    uassert(8373400,
+            "The autoCompact command should not be executed",
+            opCtx->getServiceContext()->userWritesAllowed() && storageGlobalParams.syncdelay > 0);
+
+    StorageEngine::AutoCompactOptions options{/*enable=*/true,
+                                              /*freeSpaceTargetMB=*/boost::none,
+                                              /*excludedIdents*/ std::vector<StringData>()};
+    auto status = autoCompact(opCtx, options);
+    uassert(8373401, "Failed to execute autoCompact.", status.isOK());
 }
 
 void WiredTigerKVEngine::appendGlobalStats(OperationContext* opCtx, BSONObjBuilder& b) {

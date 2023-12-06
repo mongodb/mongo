@@ -715,7 +715,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // the upgrade flag to true.
     auto storageEngine = serviceContext->getStorageEngine();
     invariant(storageEngine);
-    storageEngine->notifyStartupComplete();
+    storageEngine->notifyStartupComplete(startupOpCtx.get());
 
     BackupCursorHooks::initialize(serviceContext);
 
