@@ -379,6 +379,7 @@ struct __wt_connection_stats {
     int64_t block_cache_bypass_chkpt;
     int64_t block_prefetch_disk_one;
     int64_t block_prefetch_skipped;
+    int64_t block_prefetch_skipped_special_handle;
     int64_t block_prefetch_pages_fail;
     int64_t block_prefetch_pages_queued;
     int64_t block_prefetch_pages_read;
