@@ -87,7 +87,7 @@ class BitGenRef;
 //
 //   ON_CALL(absl::MockUniform<int>(), Call(bitgen, testing::_, testing::_))
 //       .WillByDefault([] (int low, int high) {
-//           return (low + high) / 2;
+//           return low + (high - low) / 2;
 //       });
 //
 //   EXPECT_EQ(absl::Uniform<int>(gen, 0, 10), 5);

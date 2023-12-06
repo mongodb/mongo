@@ -82,7 +82,7 @@ TYPED_TEST_P(LookupTest, EqualRange) {
   }
 }
 
-REGISTER_TYPED_TEST_CASE_P(LookupTest, Count, Find, EqualRange);
+REGISTER_TYPED_TEST_SUITE_P(LookupTest, Count, Find, EqualRange);
 
 }  // namespace container_internal
 ABSL_NAMESPACE_END

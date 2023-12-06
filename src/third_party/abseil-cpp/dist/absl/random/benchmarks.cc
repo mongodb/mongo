@@ -62,7 +62,7 @@ class PrecompiledSeedSeq {
  public:
   using result_type = uint32_t;
 
-  PrecompiledSeedSeq() {}
+  PrecompiledSeedSeq() = default;
 
   template <typename Iterator>
   PrecompiledSeedSeq(Iterator begin, Iterator end) {}

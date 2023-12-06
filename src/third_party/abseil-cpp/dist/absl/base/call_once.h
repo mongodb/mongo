@@ -123,7 +123,7 @@ class SchedulingHelper {
 
  private:
   base_internal::SchedulingMode mode_;
-  bool guard_result_;
+  bool guard_result_ = false;
 };
 
 // Bit patterns for call_once state machine values.  Internal implementation

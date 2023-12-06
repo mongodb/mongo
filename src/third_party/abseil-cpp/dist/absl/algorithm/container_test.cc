@@ -67,13 +67,16 @@ bool Equals(int v1, int v2) { return v1 == v2; }
 bool IsOdd(int x) { return x % 2 != 0; }
 
 TEST_F(NonMutatingTest, Distance) {
-  EXPECT_EQ(container_.size(), absl::c_distance(container_));
-  EXPECT_EQ(sequence_.size(), absl::c_distance(sequence_));
-  EXPECT_EQ(vector_.size(), absl::c_distance(vector_));
-  EXPECT_EQ(ABSL_ARRAYSIZE(array_), absl::c_distance(array_));
+  EXPECT_EQ(container_.size(),
+            static_cast<size_t>(absl::c_distance(container_)));
+  EXPECT_EQ(sequence_.size(), static_cast<size_t>(absl::c_distance(sequence_)));
+  EXPECT_EQ(vector_.size(), static_cast<size_t>(absl::c_distance(vector_)));
+  EXPECT_EQ(ABSL_ARRAYSIZE(array_),
+            static_cast<size_t>(absl::c_distance(array_)));
 
   // Works with a temporary argument.
-  EXPECT_EQ(vector_.size(), absl::c_distance(std::vector<int>(vector_)));
+  EXPECT_EQ(vector_.size(),
+            static_cast<size_t>(absl::c_distance(std::vector<int>(vector_))));
 }
 
 TEST_F(NonMutatingTest, Distance_OverloadedBeginEnd) {

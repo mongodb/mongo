@@ -25,6 +25,7 @@
 #include "absl/base/config.h"
 #include "absl/base/internal/raw_logging.h"
 #include "absl/cleanup/cleanup.h"
+#include "absl/strings/internal/cord_data_edge.h"
 #include "absl/strings/internal/cord_internal.h"
 #include "absl/strings/internal/cord_rep_test_util.h"
 #include "absl/strings/str_cat.h"
@@ -52,7 +53,6 @@ using ::absl::cordrep_testing::CordToString;
 using ::absl::cordrep_testing::CordVisitReps;
 using ::absl::cordrep_testing::CreateFlatsFromString;
 using ::absl::cordrep_testing::CreateRandomString;
-using ::absl::cordrep_testing::MakeConcat;
 using ::absl::cordrep_testing::MakeExternal;
 using ::absl::cordrep_testing::MakeFlat;
 using ::absl::cordrep_testing::MakeSubstring;
@@ -123,6 +123,16 @@ MATCHER_P2(IsSubstring, start, length,
     *result_listener << "Expected substring(" << start << ", " << length
                      << "), got substring(" << substr->start << ", "
                      << substr->length << ")";
+    return false;
+  }
+  return true;
+}
+
+MATCHER_P2(EqExtractResult, tree, rep, "Equals ExtractResult") {
+  if (arg.tree != tree || arg.extracted != rep) {
+    *result_listener << "Expected {" << static_cast<const void*>(tree) << ", "
+                     << static_cast<const void*>(rep) << "}, got {" << arg.tree
+                     << ", " << arg.extracted << "}";
     return false;
   }
   return true;
@@ -274,13 +284,14 @@ INSTANTIATE_TEST_SUITE_P(WithParam, CordRepBtreeDualTest,
 TEST(CordRepBtreeTest, SizeIsMultipleOf64) {
   // Only enforce for fully 64-bit platforms.
   if (sizeof(size_t) == 8 && sizeof(void*) == 8) {
-    EXPECT_THAT(sizeof(CordRepBtree) % 64, Eq(0)) << "Should be multiple of 64";
+    EXPECT_THAT(sizeof(CordRepBtree) % 64, Eq(0u))
+        << "Should be multiple of 64";
   }
 }
 
 TEST(CordRepBtreeTest, NewDestroyEmptyTree) {
   auto* tree = CordRepBtree::New();
-  EXPECT_THAT(tree->size(), Eq(0));
+  EXPECT_THAT(tree->size(), Eq(0u));
   EXPECT_THAT(tree->height(), Eq(0));
   EXPECT_THAT(tree->Edges(), ElementsAre());
   CordRepBtree::Destroy(tree);
@@ -288,7 +299,7 @@ TEST(CordRepBtreeTest, NewDestroyEmptyTree) {
 
 TEST(CordRepBtreeTest, NewDestroyEmptyTreeAtHeight) {
   auto* tree = CordRepBtree::New(3);
-  EXPECT_THAT(tree->size(), Eq(0));
+  EXPECT_THAT(tree->size(), Eq(0u));
   EXPECT_THAT(tree->height(), Eq(3));
   EXPECT_THAT(tree->Edges(), ElementsAre());
   CordRepBtree::Destroy(tree);
@@ -312,40 +323,31 @@ TEST(CordRepBtreeTest, EdgeData) {
   CordRepExternal* external = MakeExternal("Hello external");
   CordRep* substr1 = MakeSubstring(1, 6, CordRep::Ref(flat));
   CordRep* substr2 = MakeSubstring(1, 6, CordRep::Ref(external));
-  CordRep* concat = MakeConcat(CordRep::Ref(flat), CordRep::Ref(external));
   CordRep* bad_substr = MakeSubstring(1, 2, CordRep::Ref(substr1));
 
-  EXPECT_TRUE(CordRepBtree::IsDataEdge(flat));
-  EXPECT_THAT(CordRepBtree::EdgeDataPtr(flat),
-              TypedEq<const void*>(flat->Data()));
-  EXPECT_THAT(CordRepBtree::EdgeData(flat), Eq("Hello world"));
+  EXPECT_TRUE(IsDataEdge(flat));
+  EXPECT_THAT(EdgeData(flat).data(), TypedEq<const void*>(flat->Data()));
+  EXPECT_THAT(EdgeData(flat), Eq("Hello world"));
 
-  EXPECT_TRUE(CordRepBtree::IsDataEdge(external));
-  EXPECT_THAT(CordRepBtree::EdgeDataPtr(external),
-              TypedEq<const void*>(external->base));
-  EXPECT_THAT(CordRepBtree::EdgeData(external), Eq("Hello external"));
+  EXPECT_TRUE(IsDataEdge(external));
+  EXPECT_THAT(EdgeData(external).data(), TypedEq<const void*>(external->base));
+  EXPECT_THAT(EdgeData(external), Eq("Hello external"));
 
-  EXPECT_TRUE(CordRepBtree::IsDataEdge(substr1));
-  EXPECT_THAT(CordRepBtree::EdgeDataPtr(substr1),
-              TypedEq<const void*>(flat->Data() + 1));
-  EXPECT_THAT(CordRepBtree::EdgeData(substr1), Eq("ello w"));
+  EXPECT_TRUE(IsDataEdge(substr1));
+  EXPECT_THAT(EdgeData(substr1).data(), TypedEq<const void*>(flat->Data() + 1));
+  EXPECT_THAT(EdgeData(substr1), Eq("ello w"));
 
-  EXPECT_TRUE(CordRepBtree::IsDataEdge(substr2));
-  EXPECT_THAT(CordRepBtree::EdgeDataPtr(substr2),
+  EXPECT_TRUE(IsDataEdge(substr2));
+  EXPECT_THAT(EdgeData(substr2).data(),
               TypedEq<const void*>(external->base + 1));
-  EXPECT_THAT(CordRepBtree::EdgeData(substr2), Eq("ello e"));
+  EXPECT_THAT(EdgeData(substr2), Eq("ello e"));
 
-  EXPECT_FALSE(CordRepBtree::IsDataEdge(concat));
-  EXPECT_FALSE(CordRepBtree::IsDataEdge(bad_substr));
+  EXPECT_FALSE(IsDataEdge(bad_substr));
 #if defined(GTEST_HAS_DEATH_TEST) && !defined(NDEBUG)
-  EXPECT_DEATH(CordRepBtree::EdgeData(concat), ".*");
-  EXPECT_DEATH(CordRepBtree::EdgeDataPtr(concat), ".*");
-  EXPECT_DEATH(CordRepBtree::EdgeData(bad_substr), ".*");
-  EXPECT_DEATH(CordRepBtree::EdgeDataPtr(bad_substr), ".*");
+  EXPECT_DEATH(EdgeData(bad_substr), ".*");
 #endif
 
   CordRep::Unref(bad_substr);
-  CordRep::Unref(concat);
   CordRep::Unref(substr2);
   CordRep::Unref(substr1);
   CordRep::Unref(external);
@@ -355,7 +357,7 @@ TEST(CordRepBtreeTest, EdgeData) {
 TEST(CordRepBtreeTest, CreateUnrefLeaf) {
   auto* flat = MakeFlat("a");
   auto* leaf = CordRepBtree::Create(flat);
-  EXPECT_THAT(leaf->size(), Eq(1));
+  EXPECT_THAT(leaf->size(), Eq(1u));
   EXPECT_THAT(leaf->height(), Eq(0));
   EXPECT_THAT(leaf->Edges(), ElementsAre(flat));
   CordRepBtree::Unref(leaf);
@@ -364,7 +366,7 @@ TEST(CordRepBtreeTest, CreateUnrefLeaf) {
 TEST(CordRepBtreeTest, NewUnrefNode) {
   auto* leaf = CordRepBtree::Create(MakeFlat("a"));
   CordRepBtree* tree = CordRepBtree::New(leaf);
-  EXPECT_THAT(tree->size(), Eq(1));
+  EXPECT_THAT(tree->size(), Eq(1u));
   EXPECT_THAT(tree->height(), Eq(1));
   EXPECT_THAT(tree->Edges(), ElementsAre(leaf));
   CordRepBtree::Unref(tree);
@@ -505,7 +507,7 @@ TEST_P(CordRepBtreeTest, AppendToTreeTwoDeep) {
   for (size_t i = max_cap * max_cap + 1; i < max_cap * max_cap * max_cap; ++i) {
     // Ref top level tree based on param.
     // Ref child node once every 16 iterations, and leaf node every 4
-    // iterrations which  which should not have an observable effect other than
+    // iterations which  which should not have an observable effect other than
     //  the node and/or the leaf below it being copied.
     refs.RefIf(shared(), tree);
     refs.RefIf(i % 16 == 0, tree->Edges().back());
@@ -566,7 +568,7 @@ TEST_P(CordRepBtreeTest, PrependToTreeTwoDeep) {
   for (size_t i = max_cap * max_cap + 1; i < max_cap * max_cap * max_cap; ++i) {
     // Ref top level tree based on param.
     // Ref child node once every 16 iterations, and leaf node every 4
-    // iterrations which  which should not have an observable effect other than
+    // iterations which  which should not have an observable effect other than
     //  the node and/or the leaf below it being copied.
     refs.RefIf(shared(), tree);
     refs.RefIf(i % 16 == 0, tree->Edges().back());
@@ -652,7 +654,7 @@ TEST_P(CordRepBtreeDualTest, MergeEqualHeightTrees) {
     CordRepBtree* tree = use_append ? CordRepBtree::Append(left, right)
                                     : CordRepBtree::Prepend(right, left);
     EXPECT_THAT(tree, IsNode(1));
-    EXPECT_THAT(tree->Edges(), SizeIs(5));
+    EXPECT_THAT(tree->Edges(), SizeIs(5u));
 
     // `tree` contains all flats originally belonging to `left` and `right`.
     EXPECT_THAT(GetLeafEdges(tree), ElementsAreArray(flats));
@@ -680,7 +682,7 @@ TEST_P(CordRepBtreeDualTest, MergeLeafWithTreeNotExceedingLeafCapacity) {
     CordRepBtree* tree = use_append ? CordRepBtree::Append(left, right)
                                     : CordRepBtree::Prepend(right, left);
     EXPECT_THAT(tree, IsNode(1));
-    EXPECT_THAT(tree->Edges(), SizeIs(3));
+    EXPECT_THAT(tree->Edges(), SizeIs(3u));
 
     // `tree` contains all flats originally belonging to `left` and `right`.
     EXPECT_THAT(GetLeafEdges(tree), ElementsAreArray(flats));
@@ -708,7 +710,7 @@ TEST_P(CordRepBtreeDualTest, MergeLeafWithTreeExceedingLeafCapacity) {
     CordRepBtree* tree = use_append ? CordRepBtree::Append(left, right)
                                     : CordRepBtree::Prepend(right, left);
     EXPECT_THAT(tree, IsNode(1));
-    EXPECT_THAT(tree->Edges(), SizeIs(4));
+    EXPECT_THAT(tree->Edges(), SizeIs(4u));
 
     // `tree` contains all flats originally belonging to `left` and `right`.
     EXPECT_THAT(GetLeafEdges(tree), ElementsAreArray(flats));
@@ -737,7 +739,7 @@ TEST(CordRepBtreeTest, MergeFuzzTest) {
   auto random_leaf_count = [&]() {
     std::uniform_int_distribution<int> dist_height(0, 3);
     std::uniform_int_distribution<int> dist_leaf(0, max_cap - 1);
-    const size_t height = dist_height(rnd);
+    const int height = dist_height(rnd);
     return (height ? pow(max_cap, height) : 0) + dist_leaf(rnd);
   };
 
@@ -748,14 +750,16 @@ TEST(CordRepBtreeTest, MergeFuzzTest) {
     CordRepBtree* left = MakeTree(random_leaf_count(), coin_flip(rnd));
     GetLeafEdges(left, flats);
     if (dice_throw(rnd) == 1) {
-      std::uniform_int_distribution<int> dist(0, left->height());
+      std::uniform_int_distribution<size_t> dist(
+          0, static_cast<size_t>(left->height()));
       RefEdgesAt(dist(rnd), refs, left);
     }
 
     CordRepBtree* right = MakeTree(random_leaf_count(), coin_flip(rnd));
     GetLeafEdges(right, flats);
     if (dice_throw(rnd) == 1) {
-      std::uniform_int_distribution<int> dist(0, right->height());
+      std::uniform_int_distribution<size_t> dist(
+          0, static_cast<size_t>(right->height()));
       RefEdgesAt(dist(rnd), refs, right);
     }
 
@@ -783,7 +787,7 @@ TEST_P(CordRepBtreeTest, RemoveSuffix) {
       CordRep::Unref(node);
     }
 
-    for (int n = 1; n < data.length(); ++n) {
+    for (size_t n = 1; n < data.length(); ++n) {
       AutoUnref refs;
       auto flats = CreateFlatsFromString(data, 512);
       CordRepBtree* node = refs.RefIf(shared(), CreateTree(flats));
@@ -801,10 +805,10 @@ TEST_P(CordRepBtreeTest, RemoveSuffix) {
       const size_t last_length = rep->length - edges.size() * 512;
 
       // All flats except the last edge must be kept or copied 'as is'
-      int index = 0;
+      size_t index = 0;
       for (CordRep* edge : edges) {
         ASSERT_THAT(edge, Eq(flats[index++]));
-        ASSERT_THAT(edge->length, Eq(512));
+        ASSERT_THAT(edge->length, Eq(512u));
       }
 
       // CordRepBtree may optimize small substrings to avoid waste, so only
@@ -812,7 +816,7 @@ TEST_P(CordRepBtreeTest, RemoveSuffix) {
       if (last_length >= 500) {
         EXPECT_THAT(last_edge, Eq(flats[index++]));
         if (shared()) {
-          EXPECT_THAT(last_edge->length, Eq(512));
+          EXPECT_THAT(last_edge->length, Eq(512u));
         } else {
           EXPECT_TRUE(last_edge->refcount.IsOne());
           EXPECT_THAT(last_edge->length, Eq(last_length));
@@ -836,8 +840,8 @@ TEST(CordRepBtreeTest, SubTree) {
     node = CordRepBtree::Append(node, CordRep::Ref(flats[i]));
   }
 
-  for (int offset = 0; offset < data.length(); ++offset) {
-    for (int length = 1; length <= data.length() - offset; ++length) {
+  for (size_t offset = 0; offset < data.length(); ++offset) {
+    for (size_t length = 1; length <= data.length() - offset; ++length) {
       CordRep* rep = node->SubTree(offset, length);
       EXPECT_THAT(CordToString(rep), Eq(data.substr(offset, length)));
       CordRep::Unref(rep);
@@ -864,12 +868,12 @@ TEST(CordRepBtreeTest, SubTreeOnExistingSubstring) {
   ASSERT_THAT(result->tag, Eq(BTREE));
   CordRep::Unref(leaf);
   leaf = result->btree();
-  ASSERT_THAT(leaf->Edges(), ElementsAre(_, IsSubstring(0, 990)));
+  ASSERT_THAT(leaf->Edges(), ElementsAre(_, IsSubstring(0u, 990u)));
   EXPECT_THAT(leaf->Edges()[1]->substring()->child, Eq(flat));
 
   // Verify substring of substring.
   result = leaf->SubTree(3 + 5, 970);
-  ASSERT_THAT(result, IsSubstring(5, 970));
+  ASSERT_THAT(result, IsSubstring(5u, 970u));
   EXPECT_THAT(result->substring()->child, Eq(flat));
   CordRep::Unref(result);
 
@@ -996,50 +1000,6 @@ TEST_P(CordRepBtreeTest, AddLargeDataToLeaf) {
   }
 }
 
-TEST_P(CordRepBtreeDualTest, CreateFromConcat) {
-  AutoUnref refs;
-  CordRep* flats[] = {MakeFlat("abcdefgh"), MakeFlat("ijklm"),
-                      MakeFlat("nopqrstuv"), MakeFlat("wxyz")};
-  auto* left = MakeConcat(flats[0], flats[1]);
-  auto* right = MakeConcat(flats[2], refs.RefIf(first_shared(), flats[3]));
-  auto* concat = refs.RefIf(second_shared(), MakeConcat(left, right));
-  CordRepBtree* result = CordRepBtree::Create(concat);
-  ASSERT_TRUE(CordRepBtree::IsValid(result));
-  EXPECT_THAT(result->length, Eq(26));
-  EXPECT_THAT(CordToString(result), Eq("abcdefghijklmnopqrstuvwxyz"));
-  CordRep::Unref(result);
-}
-
-TEST_P(CordRepBtreeDualTest, AppendConcat) {
-  AutoUnref refs;
-  CordRep* flats[] = {MakeFlat("defgh"), MakeFlat("ijklm"),
-                      MakeFlat("nopqrstuv"), MakeFlat("wxyz")};
-  auto* left = MakeConcat(flats[0], flats[1]);
-  auto* right = MakeConcat(flats[2], refs.RefIf(first_shared(), flats[3]));
-  auto* concat = refs.RefIf(second_shared(), MakeConcat(left, right));
-  CordRepBtree* result = CordRepBtree::Create(MakeFlat("abc"));
-  result = CordRepBtree::Append(result, concat);
-  ASSERT_TRUE(CordRepBtree::IsValid(result));
-  EXPECT_THAT(result->length, Eq(26));
-  EXPECT_THAT(CordToString(result), Eq("abcdefghijklmnopqrstuvwxyz"));
-  CordRep::Unref(result);
-}
-
-TEST_P(CordRepBtreeDualTest, PrependConcat) {
-  AutoUnref refs;
-  CordRep* flats[] = {MakeFlat("abcdefgh"), MakeFlat("ijklm"),
-                      MakeFlat("nopqrstuv"), MakeFlat("wx")};
-  auto* left = MakeConcat(flats[0], flats[1]);
-  auto* right = MakeConcat(flats[2], refs.RefIf(first_shared(), flats[3]));
-  auto* concat = refs.RefIf(second_shared(), MakeConcat(left, right));
-  CordRepBtree* result = CordRepBtree::Create(MakeFlat("yz"));
-  result = CordRepBtree::Prepend(result, concat);
-  ASSERT_TRUE(CordRepBtree::IsValid(result));
-  EXPECT_THAT(result->length, Eq(26));
-  EXPECT_THAT(CordToString(result), Eq("abcdefghijklmnopqrstuvwxyz"));
-  CordRep::Unref(result);
-}
-
 TEST_P(CordRepBtreeTest, CreateFromTreeReturnsTree) {
   AutoUnref refs;
   CordRepBtree* leaf = CordRepBtree::Create(MakeFlat("Hello world"));
@@ -1135,7 +1095,7 @@ TEST_P(CordRepBtreeHeightTest, GetAppendBufferNotFlat) {
   for (int i = 1; i <= height(); ++i) {
     tree = CordRepBtree::New(tree);
   }
-  EXPECT_THAT(tree->GetAppendBuffer(1), SizeIs(0));
+  EXPECT_THAT(tree->GetAppendBuffer(1), SizeIs(0u));
   CordRepBtree::Unref(tree);
 }
 
@@ -1145,7 +1105,7 @@ TEST_P(CordRepBtreeHeightTest, GetAppendBufferFlatNotPrivate) {
   for (int i = 1; i <= height(); ++i) {
     tree = CordRepBtree::New(tree);
   }
-  EXPECT_THAT(tree->GetAppendBuffer(1), SizeIs(0));
+  EXPECT_THAT(tree->GetAppendBuffer(1), SizeIs(0u));
   CordRepBtree::Unref(tree);
   CordRep::Unref(flat);
 }
@@ -1159,7 +1119,7 @@ TEST_P(CordRepBtreeHeightTest, GetAppendBufferTreeNotPrivate) {
     if (i == (height() + 1) / 2) refs.Ref(tree);
     tree = CordRepBtree::New(tree);
   }
-  EXPECT_THAT(tree->GetAppendBuffer(1), SizeIs(0));
+  EXPECT_THAT(tree->GetAppendBuffer(1), SizeIs(0u));
   CordRepBtree::Unref(tree);
   CordRep::Unref(flat);
 }
@@ -1171,7 +1131,7 @@ TEST_P(CordRepBtreeHeightTest, GetAppendBufferFlatNoCapacity) {
   for (int i = 1; i <= height(); ++i) {
     tree = CordRepBtree::New(tree);
   }
-  EXPECT_THAT(tree->GetAppendBuffer(1), SizeIs(0));
+  EXPECT_THAT(tree->GetAppendBuffer(1), SizeIs(0u));
   CordRepBtree::Unref(tree);
 }
 
@@ -1182,9 +1142,9 @@ TEST_P(CordRepBtreeHeightTest, GetAppendBufferFlatWithCapacity) {
     tree = CordRepBtree::New(tree);
   }
   absl::Span<char> span = tree->GetAppendBuffer(2);
-  EXPECT_THAT(span, SizeIs(2));
+  EXPECT_THAT(span, SizeIs(2u));
   EXPECT_THAT(span.data(), TypedEq<void*>(flat->Data() + 3));
-  EXPECT_THAT(tree->length, Eq(5));
+  EXPECT_THAT(tree->length, Eq(5u));
 
   size_t avail = flat->Capacity() - 5;
   span = tree->GetAppendBuffer(avail + 100);
@@ -1395,9 +1355,9 @@ TEST(CordRepBtreeTest, AssertValid) {
 
 TEST(CordRepBtreeTest, CheckAssertValidShallowVsDeep) {
   // Restore exhaustive validation on any exit.
-  const bool exhaustive_validation = cord_btree_exhaustive_validation.load();
+  const bool exhaustive_validation = IsCordBtreeExhaustiveValidationEnabled();
   auto cleanup = absl::MakeCleanup([exhaustive_validation] {
-    cord_btree_exhaustive_validation.store(exhaustive_validation);
+    SetCordBtreeExhaustiveValidation(exhaustive_validation);
   });
 
   // Create a tree of at least 2 levels, and mess with the original flat, which
@@ -1412,7 +1372,7 @@ TEST(CordRepBtreeTest, CheckAssertValidShallowVsDeep) {
   }
   flat->length = 100;
 
-  cord_btree_exhaustive_validation.store(false);
+  SetCordBtreeExhaustiveValidation(false);
   EXPECT_FALSE(CordRepBtree::IsValid(tree));
   EXPECT_TRUE(CordRepBtree::IsValid(tree, true));
   EXPECT_FALSE(CordRepBtree::IsValid(tree, false));
@@ -1422,7 +1382,7 @@ TEST(CordRepBtreeTest, CheckAssertValidShallowVsDeep) {
   EXPECT_DEBUG_DEATH(CordRepBtree::AssertValid(tree, false), ".*");
 #endif
 
-  cord_btree_exhaustive_validation.store(true);
+  SetCordBtreeExhaustiveValidation(true);
   EXPECT_FALSE(CordRepBtree::IsValid(tree));
   EXPECT_FALSE(CordRepBtree::IsValid(tree, true));
   EXPECT_FALSE(CordRepBtree::IsValid(tree, false));
@@ -1436,11 +1396,11 @@ TEST(CordRepBtreeTest, CheckAssertValidShallowVsDeep) {
 }
 
 TEST_P(CordRepBtreeTest, Rebuild) {
-  for (size_t size : {3, 8, 100, 10000, 1000000}) {
+  for (size_t size : {3u, 8u, 100u, 10000u, 1000000u}) {
     SCOPED_TRACE(absl::StrCat("Rebuild @", size));
 
     std::vector<CordRepFlat*> flats;
-    for (int i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i) {
       flats.push_back(CordRepFlat::New(2));
       flats.back()->Data()[0] = 'x';
       flats.back()->length = 1;
@@ -1481,6 +1441,125 @@ TEST_P(CordRepBtreeTest, Rebuild) {
     });
     EXPECT_TRUE(ok && it == flats.end()) << "Rebuild edges mismatch";
   }
+}
+
+// Convenience helper for CordRepBtree::ExtractAppendBuffer
+CordRepBtree::ExtractResult ExtractLast(CordRepBtree* input, size_t cap = 1) {
+  return CordRepBtree::ExtractAppendBuffer(input, cap);
+}
+
+TEST(CordRepBtreeTest, ExtractAppendBufferLeafSingleFlat) {
+  CordRep* flat = MakeFlat("Abc");
+  CordRepBtree* leaf = CordRepBtree::Create(flat);
+  EXPECT_THAT(ExtractLast(leaf), EqExtractResult(nullptr, flat));
+  CordRep::Unref(flat);
+}
+
+TEST(CordRepBtreeTest, ExtractAppendBufferNodeSingleFlat) {
+  CordRep* flat = MakeFlat("Abc");
+  CordRepBtree* leaf = CordRepBtree::Create(flat);
+  CordRepBtree* node = CordRepBtree::New(leaf);
+  EXPECT_THAT(ExtractLast(node), EqExtractResult(nullptr, flat));
+  CordRep::Unref(flat);
+}
+
+TEST(CordRepBtreeTest, ExtractAppendBufferLeafTwoFlats) {
+  std::vector<CordRep*> flats = CreateFlatsFromString("abcdef", 3);
+  CordRepBtree* leaf = CreateTree(flats);
+  EXPECT_THAT(ExtractLast(leaf), EqExtractResult(flats[0], flats[1]));
+  CordRep::Unref(flats[0]);
+  CordRep::Unref(flats[1]);
+}
+
+TEST(CordRepBtreeTest, ExtractAppendBufferNodeTwoFlats) {
+  std::vector<CordRep*> flats = CreateFlatsFromString("abcdef", 3);
+  CordRepBtree* leaf = CreateTree(flats);
+  CordRepBtree* node = CordRepBtree::New(leaf);
+  EXPECT_THAT(ExtractLast(node), EqExtractResult(flats[0], flats[1]));
+  CordRep::Unref(flats[0]);
+  CordRep::Unref(flats[1]);
+}
+
+TEST(CordRepBtreeTest, ExtractAppendBufferNodeTwoFlatsInTwoLeafs) {
+  std::vector<CordRep*> flats = CreateFlatsFromString("abcdef", 3);
+  CordRepBtree* leaf1 = CordRepBtree::Create(flats[0]);
+  CordRepBtree* leaf2 = CordRepBtree::Create(flats[1]);
+  CordRepBtree* node = CordRepBtree::New(leaf1, leaf2);
+  EXPECT_THAT(ExtractLast(node), EqExtractResult(flats[0], flats[1]));
+  CordRep::Unref(flats[0]);
+  CordRep::Unref(flats[1]);
+}
+
+TEST(CordRepBtreeTest, ExtractAppendBufferLeafThreeFlats) {
+  std::vector<CordRep*> flats = CreateFlatsFromString("abcdefghi", 3);
+  CordRepBtree* leaf = CreateTree(flats);
+  EXPECT_THAT(ExtractLast(leaf), EqExtractResult(leaf, flats[2]));
+  CordRep::Unref(flats[2]);
+  CordRep::Unref(leaf);
+}
+
+TEST(CordRepBtreeTest, ExtractAppendBufferNodeThreeFlatsRightNoFolding) {
+  CordRep* flat = MakeFlat("Abc");
+  std::vector<CordRep*> flats = CreateFlatsFromString("defghi", 3);
+  CordRepBtree* leaf1 = CordRepBtree::Create(flat);
+  CordRepBtree* leaf2 = CreateTree(flats);
+  CordRepBtree* node = CordRepBtree::New(leaf1, leaf2);
+  EXPECT_THAT(ExtractLast(node), EqExtractResult(node, flats[1]));
+  EXPECT_THAT(node->Edges(), ElementsAre(leaf1, leaf2));
+  EXPECT_THAT(leaf1->Edges(), ElementsAre(flat));
+  EXPECT_THAT(leaf2->Edges(), ElementsAre(flats[0]));
+  CordRep::Unref(node);
+  CordRep::Unref(flats[1]);
+}
+
+TEST(CordRepBtreeTest, ExtractAppendBufferNodeThreeFlatsRightLeafFolding) {
+  CordRep* flat = MakeFlat("Abc");
+  std::vector<CordRep*> flats = CreateFlatsFromString("defghi", 3);
+  CordRepBtree* leaf1 = CreateTree(flats);
+  CordRepBtree* leaf2 = CordRepBtree::Create(flat);
+  CordRepBtree* node = CordRepBtree::New(leaf1, leaf2);
+  EXPECT_THAT(ExtractLast(node), EqExtractResult(leaf1, flat));
+  EXPECT_THAT(leaf1->Edges(), ElementsAreArray(flats));
+  CordRep::Unref(leaf1);
+  CordRep::Unref(flat);
+}
+
+TEST(CordRepBtreeTest, ExtractAppendBufferNoCapacity) {
+  std::vector<CordRep*> flats = CreateFlatsFromString("abcdef", 3);
+  CordRepBtree* leaf = CreateTree(flats);
+  size_t avail = flats[1]->flat()->Capacity() - flats[1]->length;
+  EXPECT_THAT(ExtractLast(leaf, avail + 1), EqExtractResult(leaf, nullptr));
+  EXPECT_THAT(ExtractLast(leaf, avail), EqExtractResult(flats[0], flats[1]));
+  CordRep::Unref(flats[0]);
+  CordRep::Unref(flats[1]);
+}
+
+TEST(CordRepBtreeTest, ExtractAppendBufferNotFlat) {
+  std::vector<CordRep*> flats = CreateFlatsFromString("abcdef", 3);
+  auto substr = MakeSubstring(1, 2, flats[1]);
+  CordRepBtree* leaf = CreateTree({flats[0], substr});
+  EXPECT_THAT(ExtractLast(leaf), EqExtractResult(leaf, nullptr));
+  CordRep::Unref(leaf);
+}
+
+TEST(CordRepBtreeTest, ExtractAppendBufferShared) {
+  std::vector<CordRep*> flats = CreateFlatsFromString("abcdef", 3);
+  CordRepBtree* leaf = CreateTree(flats);
+
+  CordRep::Ref(flats[1]);
+  EXPECT_THAT(ExtractLast(leaf), EqExtractResult(leaf, nullptr));
+  CordRep::Unref(flats[1]);
+
+  CordRep::Ref(leaf);
+  EXPECT_THAT(ExtractLast(leaf), EqExtractResult(leaf, nullptr));
+  CordRep::Unref(leaf);
+
+  CordRepBtree* node = CordRepBtree::New(leaf);
+  CordRep::Ref(node);
+  EXPECT_THAT(ExtractLast(node), EqExtractResult(node, nullptr));
+  CordRep::Unref(node);
+
+  CordRep::Unref(node);
 }
 
 }  // namespace

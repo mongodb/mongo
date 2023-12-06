@@ -26,7 +26,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/base/internal/raw_logging.h"
+#include "absl/log/log.h"
 #include "absl/random/internal/chi_square.h"
 #include "absl/random/internal/distribution_test_util.h"
 #include "absl/random/internal/pcg_engine.h"
@@ -146,7 +146,7 @@ TEST(DiscreteDistributionTest, ChiSquaredTest50) {
   using absl::random_internal::kChiSquared;
 
   constexpr size_t kTrials = 10000;
-  constexpr int kBuckets = 50;  // inclusive, so actally +1
+  constexpr int kBuckets = 50;  // inclusive, so actually +1
 
   // 1-in-100000 threshold, but remember, there are about 8 tests
   // in this file. And the test could fail for other reasons.
@@ -194,7 +194,7 @@ TEST(DiscreteDistributionTest, ChiSquaredTest50) {
     absl::StrAppend(&msg, kChiSquared, " p-value ", p_value, "\n");
     absl::StrAppend(&msg, "High ", kChiSquared, " value: ", chi_square, " > ",
                     kThreshold);
-    ABSL_RAW_LOG(INFO, "%s", msg.c_str());
+    LOG(INFO) << msg;
     FAIL() << msg;
   }
 }

@@ -97,7 +97,7 @@ class uniform_int_distribution {
     result_type lo_;
     unsigned_type range_;
 
-    static_assert(std::is_integral<result_type>::value,
+    static_assert(random_internal::IsIntegral<result_type>::value,
                   "Class-template absl::uniform_int_distribution<> must be "
                   "parameterized using an integral type.");
   };  // param_type
@@ -125,7 +125,7 @@ class uniform_int_distribution {
   template <typename URBG>
   result_type operator()(
       URBG& gen, const param_type& param) {  // NOLINT(runtime/references)
-    return param.a() + Generate(gen, param.range());
+    return static_cast<result_type>(param.a() + Generate(gen, param.range()));
   }
 
   result_type a() const { return param_.a(); }

@@ -48,18 +48,58 @@
 // `StrCat()` or `StrAppend()`. You may specify a minimum hex field width using
 // a `PadSpec` enum.
 //
+// User-defined types can be formatted with the `AbslStringify()` customization
+// point. The API relies on detecting an overload in the user-defined type's
+// namespace of a free (non-member) `AbslStringify()` function as a definition
+// (typically declared as a friend and implemented in-line.
+// with the following signature:
+//
+// class MyClass { ... };
+//
+// template <typename Sink>
+// void AbslStringify(Sink& sink, const MyClass& value);
+//
+// An `AbslStringify()` overload for a type should only be declared in the same
+// file and namespace as said type.
+//
+// Note that `AbslStringify()` also supports use with `absl::StrFormat()` and
+// `absl::Substitute()`.
+//
+// Example:
+//
+// struct Point {
+//   // To add formatting support to `Point`, we simply need to add a free
+//   // (non-member) function `AbslStringify()`. This method specifies how
+//   // Point should be printed when absl::StrCat() is called on it. You can add
+//   // such a free function using a friend declaration within the body of the
+//   // class. The sink parameter is a templated type to avoid requiring
+//   // dependencies.
+//   template <typename Sink> friend void AbslStringify(Sink&
+//   sink, const Point& p) {
+//     absl::Format(&sink, "(%v, %v)", p.x, p.y);
+//   }
+//
+//   int x;
+//   int y;
+// };
 // -----------------------------------------------------------------------------
 
 #ifndef ABSL_STRINGS_STR_CAT_H_
 #define ABSL_STRINGS_STR_CAT_H_
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "absl/base/attributes.h"
 #include "absl/base/port.h"
+#include "absl/strings/internal/has_absl_stringify.h"
+#include "absl/strings/internal/stringify_sink.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
 
@@ -164,6 +204,27 @@ struct Hex {
   explicit Hex(Pointee* v, PadSpec spec = absl::kNoPad)
       : Hex(spec, reinterpret_cast<uintptr_t>(v)) {}
 
+  template <typename S>
+  friend void AbslStringify(S& sink, Hex hex) {
+    static_assert(
+        numbers_internal::kFastToBufferSize >= 32,
+        "This function only works when output buffer >= 32 bytes long");
+    char buffer[numbers_internal::kFastToBufferSize];
+    char* const end = &buffer[numbers_internal::kFastToBufferSize];
+    auto real_width =
+        absl::numbers_internal::FastHexToBufferZeroPad16(hex.value, end - 16);
+    if (real_width >= hex.width) {
+      sink.Append(absl::string_view(end - real_width, real_width));
+    } else {
+      // Pad first 16 chars because FastHexToBufferZeroPad16 pads only to 16 and
+      // max pad width can be up to 20.
+      std::memset(end - 32, hex.fill, 16);
+      // Patch up everything else up to the real_width.
+      std::memset(end - real_width - 16, hex.fill, 16);
+      sink.Append(absl::string_view(end - hex.width, hex.width));
+    }
+  }
+
  private:
   Hex(PadSpec spec, uint64_t v)
       : value(v),
@@ -198,6 +259,38 @@ struct Dec {
                                              : spec - absl::kZeroPad2 + 2),
         fill(spec >= absl::kSpacePad2 ? ' ' : '0'),
         neg(v < 0) {}
+
+  template <typename S>
+  friend void AbslStringify(S& sink, Dec dec) {
+    assert(dec.width <= numbers_internal::kFastToBufferSize);
+    char buffer[numbers_internal::kFastToBufferSize];
+    char* const end = &buffer[numbers_internal::kFastToBufferSize];
+    char* const minfill = end - dec.width;
+    char* writer = end;
+    uint64_t val = dec.value;
+    while (val > 9) {
+      *--writer = '0' + (val % 10);
+      val /= 10;
+    }
+    *--writer = '0' + static_cast<char>(val);
+    if (dec.neg) *--writer = '-';
+
+    ptrdiff_t fillers = writer - minfill;
+    if (fillers > 0) {
+      // Tricky: if the fill character is ' ', then it's <fill><+/-><digits>
+      // But...: if the fill character is '0', then it's <+/-><fill><digits>
+      bool add_sign_again = false;
+      if (dec.neg && dec.fill == '0') {  // If filling with '0',
+        ++writer;                    // ignore the sign we just added
+        add_sign_again = true;       // and re-add the sign later.
+      }
+      writer -= fillers;
+      std::fill_n(writer, fillers, dec.fill);
+      if (add_sign_again) *--writer = '-';
+    }
+
+    sink.Append(absl::string_view(writer, static_cast<size_t>(end - writer)));
+  }
 };
 
 // -----------------------------------------------------------------------------
@@ -205,8 +298,10 @@ struct Dec {
 // -----------------------------------------------------------------------------
 //
 // The `AlphaNum` class acts as the main parameter type for `StrCat()` and
-// `StrAppend()`, providing efficient conversion of numeric, boolean, and
-// hexadecimal values (through the `Hex` type) into strings.
+// `StrAppend()`, providing efficient conversion of numeric, boolean, decimal,
+// and hexadecimal values (through the `Dec` and `Hex` types) into strings.
+// `AlphaNum` should only be used as a function parameter. Do not instantiate
+//  `AlphaNum` directly as a stack variable.
 
 class AlphaNum {
  public:
@@ -214,43 +309,59 @@ class AlphaNum {
   // A bool ctor would also convert incoming pointers (bletch).
 
   AlphaNum(int x)  // NOLINT(runtime/explicit)
-      : piece_(digits_,
-               numbers_internal::FastIntToBuffer(x, digits_) - &digits_[0]) {}
+      : piece_(digits_, static_cast<size_t>(
+                            numbers_internal::FastIntToBuffer(x, digits_) -
+                            &digits_[0])) {}
   AlphaNum(unsigned int x)  // NOLINT(runtime/explicit)
-      : piece_(digits_,
-               numbers_internal::FastIntToBuffer(x, digits_) - &digits_[0]) {}
+      : piece_(digits_, static_cast<size_t>(
+                            numbers_internal::FastIntToBuffer(x, digits_) -
+                            &digits_[0])) {}
   AlphaNum(long x)  // NOLINT(*)
-      : piece_(digits_,
-               numbers_internal::FastIntToBuffer(x, digits_) - &digits_[0]) {}
+      : piece_(digits_, static_cast<size_t>(
+                            numbers_internal::FastIntToBuffer(x, digits_) -
+                            &digits_[0])) {}
   AlphaNum(unsigned long x)  // NOLINT(*)
-      : piece_(digits_,
-               numbers_internal::FastIntToBuffer(x, digits_) - &digits_[0]) {}
+      : piece_(digits_, static_cast<size_t>(
+                            numbers_internal::FastIntToBuffer(x, digits_) -
+                            &digits_[0])) {}
   AlphaNum(long long x)  // NOLINT(*)
-      : piece_(digits_,
-               numbers_internal::FastIntToBuffer(x, digits_) - &digits_[0]) {}
+      : piece_(digits_, static_cast<size_t>(
+                            numbers_internal::FastIntToBuffer(x, digits_) -
+                            &digits_[0])) {}
   AlphaNum(unsigned long long x)  // NOLINT(*)
-      : piece_(digits_,
-               numbers_internal::FastIntToBuffer(x, digits_) - &digits_[0]) {}
+      : piece_(digits_, static_cast<size_t>(
+                            numbers_internal::FastIntToBuffer(x, digits_) -
+                            &digits_[0])) {}
 
   AlphaNum(float f)  // NOLINT(runtime/explicit)
       : piece_(digits_, numbers_internal::SixDigitsToBuffer(f, digits_)) {}
   AlphaNum(double f)  // NOLINT(runtime/explicit)
       : piece_(digits_, numbers_internal::SixDigitsToBuffer(f, digits_)) {}
 
-  AlphaNum(Hex hex);  // NOLINT(runtime/explicit)
-  AlphaNum(Dec dec);  // NOLINT(runtime/explicit)
-
   template <size_t size>
   AlphaNum(  // NOLINT(runtime/explicit)
-      const strings_internal::AlphaNumBuffer<size>& buf)
+      const strings_internal::AlphaNumBuffer<size>& buf
+          ABSL_ATTRIBUTE_LIFETIME_BOUND)
       : piece_(&buf.data[0], buf.size) {}
 
-  AlphaNum(const char* c_str) : piece_(c_str) {}  // NOLINT(runtime/explicit)
-  AlphaNum(absl::string_view pc) : piece_(pc) {}  // NOLINT(runtime/explicit)
+  AlphaNum(const char* c_str  // NOLINT(runtime/explicit)
+               ABSL_ATTRIBUTE_LIFETIME_BOUND)
+      : piece_(NullSafeStringView(c_str)) {}
+  AlphaNum(absl::string_view pc  // NOLINT(runtime/explicit)
+               ABSL_ATTRIBUTE_LIFETIME_BOUND)
+      : piece_(pc) {}
+
+  template <typename T, typename = typename std::enable_if<
+                            strings_internal::HasAbslStringify<T>::value>::type>
+  AlphaNum(  // NOLINT(runtime/explicit)
+      const T& v ABSL_ATTRIBUTE_LIFETIME_BOUND,
+      strings_internal::StringifySink&& sink ABSL_ATTRIBUTE_LIFETIME_BOUND = {})
+      : piece_(strings_internal::ExtractStringification(sink, v)) {}
 
   template <typename Allocator>
   AlphaNum(  // NOLINT(runtime/explicit)
-      const std::basic_string<char, std::char_traits<char>, Allocator>& str)
+      const std::basic_string<char, std::char_traits<char>, Allocator>& str
+          ABSL_ATTRIBUTE_LIFETIME_BOUND)
       : piece_(str) {}
 
   // Use string literals ":" instead of character literals ':'.
@@ -263,13 +374,24 @@ class AlphaNum {
   const char* data() const { return piece_.data(); }
   absl::string_view Piece() const { return piece_; }
 
-  // Normal enums are already handled by the integer formatters.
-  // This overload matches only scoped enums.
+  // Match unscoped enums.  Use integral promotion so that a `char`-backed
+  // enum becomes a wider integral type AlphaNum will accept.
   template <typename T,
             typename = typename std::enable_if<
-                std::is_enum<T>{} && !std::is_convertible<T, int>{}>::type>
+                std::is_enum<T>{} && std::is_convertible<T, int>{} &&
+                !strings_internal::HasAbslStringify<T>::value>::type>
   AlphaNum(T e)  // NOLINT(runtime/explicit)
-      : AlphaNum(static_cast<typename std::underlying_type<T>::type>(e)) {}
+      : AlphaNum(+e) {}
+
+  // This overload matches scoped enums.  We must explicitly cast to the
+  // underlying type, but use integral promotion for the same reason as above.
+  template <typename T,
+            typename std::enable_if<
+                std::is_enum<T>{} && !std::is_convertible<T, int>{} &&
+                    !strings_internal::HasAbslStringify<T>::value,
+                char*>::type = nullptr>
+  AlphaNum(T e)  // NOLINT(runtime/explicit)
+      : AlphaNum(+static_cast<typename std::underlying_type<T>::type>(e)) {}
 
   // vector<bool>::reference and const_reference require special help to
   // convert to `AlphaNum` because it requires two user defined conversions.

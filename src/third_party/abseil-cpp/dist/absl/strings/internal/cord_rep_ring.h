@@ -430,7 +430,7 @@ class CordRepRing : public CordRep {
   // capacity to satisfy `extra` extra nodes, and unref the old `rep` instance.
   //
   // If a new CordRepRing can not be allocated, or the new capacity would exceed
-  // the maxmimum capacity, then the input is consumed only, and an exception is
+  // the maximum capacity, then the input is consumed only, and an exception is
   // thrown.
   static CordRepRing* Mutable(CordRepRing* rep, size_t extra);
 
@@ -472,7 +472,7 @@ class CordRepRing : public CordRep {
   // Increases the data offset for entry `index` by `n`.
   void AddDataOffset(index_type index, size_t n);
 
-  // Descreases the length for entry `index` by `n`.
+  // Decreases the length for entry `index` by `n`.
   void SubLength(index_type index, size_t n);
 
   index_type head_;

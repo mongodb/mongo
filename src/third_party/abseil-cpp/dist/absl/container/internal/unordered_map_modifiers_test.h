@@ -297,11 +297,12 @@ TYPED_TEST_P(ModifiersTest, Swap) {
 // TODO(alkis): Write tests for extract.
 // TODO(alkis): Write tests for merge.
 
-REGISTER_TYPED_TEST_CASE_P(ModifiersTest, Clear, Insert, InsertHint,
-                           InsertRange, InsertWithinCapacity,
-                           InsertRangeWithinCapacity, InsertOrAssign,
-                           InsertOrAssignHint, Emplace, EmplaceHint, TryEmplace,
-                           TryEmplaceHint, Erase, EraseRange, EraseKey, Swap);
+REGISTER_TYPED_TEST_SUITE_P(ModifiersTest, Clear, Insert, InsertHint,
+                            InsertRange, InsertWithinCapacity,
+                            InsertRangeWithinCapacity, InsertOrAssign,
+                            InsertOrAssignHint, Emplace, EmplaceHint,
+                            TryEmplace, TryEmplaceHint, Erase, EraseRange,
+                            EraseKey, Swap);
 
 template <typename Type>
 struct is_unique_ptr : std::false_type {};

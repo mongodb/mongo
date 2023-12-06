@@ -26,8 +26,8 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/base/internal/raw_logging.h"
 #include "absl/base/macros.h"
+#include "absl/log/log.h"
 #include "absl/numeric/internal/representation.h"
 #include "absl/random/internal/chi_square.h"
 #include "absl/random/internal/distribution_test_util.h"
@@ -54,7 +54,7 @@ using RealTypes =
     std::conditional<absl::numeric_internal::IsDoubleDouble(),
                      ::testing::Types<float, double>,
                      ::testing::Types<float, double, long double>>::type;
-TYPED_TEST_CASE(GaussianDistributionInterfaceTest, RealTypes);
+TYPED_TEST_SUITE(GaussianDistributionInterfaceTest, RealTypes);
 
 TYPED_TEST(GaussianDistributionInterfaceTest, SerializeTest) {
   using param_type =
@@ -116,9 +116,8 @@ TYPED_TEST(GaussianDistributionInterfaceTest, SerializeTest) {
           EXPECT_LE(sample, before.max()) << before;
         }
         if (!std::is_same<TypeParam, long double>::value) {
-          ABSL_INTERNAL_LOG(
-              INFO, absl::StrFormat("Range{%f, %f}: %f, %f", mean, stddev,
-                                    sample_min, sample_max));
+          LOG(INFO) << "Range{" << mean << ", " << stddev << "}: " << sample_min
+                    << ", " << sample_max;
         }
 
         std::stringstream ss;
@@ -240,17 +239,16 @@ bool GaussianDistributionTests::SingleZTest(const double p,
       (std::pow(m.skewness, 2.0) + std::pow(m.kurtosis - 3.0, 2.0) / 4.0);
 
   if (!pass || jb > 9.21) {
-    ABSL_INTERNAL_LOG(
-        INFO, absl::StrFormat("p=%f max_err=%f\n"
-                              " mean=%f vs. %f\n"
-                              " stddev=%f vs. %f\n"
-                              " skewness=%f vs. %f\n"
-                              " kurtosis=%f vs. %f\n"
-                              " z=%f vs. 0\n"
-                              " jb=%f vs. 9.21",
-                              p, max_err, m.mean, mean(), std::sqrt(m.variance),
-                              stddev(), m.skewness, skew(), m.kurtosis,
-                              kurtosis(), z, jb));
+    // clang-format off
+    LOG(INFO)
+        << "p=" << p << " max_err=" << max_err << "\n"
+           " mean=" << m.mean << " vs. " << mean() << "\n"
+           " stddev=" << std::sqrt(m.variance) << " vs. " << stddev() << "\n"
+           " skewness=" << m.skewness << " vs. " << skew() << "\n"
+           " kurtosis=" << m.kurtosis << " vs. " << kurtosis() << "\n"
+           " z=" << z << " vs. 0\n"
+           " jb=" << jb << " vs. 9.21";
+    // clang-format on
   }
   return pass;
 }
@@ -297,16 +295,16 @@ double GaussianDistributionTests::SingleChiSquaredTest() {
 
   // Log if the chi_square value is above the threshold.
   if (chi_square > threshold) {
-    for (int i = 0; i < cutoffs.size(); i++) {
-      ABSL_INTERNAL_LOG(
-          INFO, absl::StrFormat("%d : (%f) = %d", i, cutoffs[i], counts[i]));
+    for (size_t i = 0; i < cutoffs.size(); i++) {
+      LOG(INFO) << i << " : (" << cutoffs[i] << ") = " << counts[i];
     }
 
-    ABSL_INTERNAL_LOG(
-        INFO, absl::StrCat("mean=", mean(), " stddev=", stddev(), "\n",   //
-                           " expected ", expected, "\n",                  //
-                           kChiSquared, " ", chi_square, " (", p, ")\n",  //
-                           kChiSquared, " @ 0.98 = ", threshold));
+    // clang-format off
+    LOG(INFO) << "mean=" << mean() << " stddev=" << stddev() << "\n"
+                 " expected " << expected << "\n"
+              << kChiSquared << " " << chi_square << " (" << p << ")\n"
+              << kChiSquared << " @ 0.98 = " << threshold;
+    // clang-format on
   }
   return p;
 }

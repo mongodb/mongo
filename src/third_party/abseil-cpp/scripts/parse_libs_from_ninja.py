@@ -5,6 +5,7 @@ import pathlib
 import subprocess
 import logging
 import sys
+import re
 
 # This is the list of libraries that are desired to be extracted out of the
 # ninja file
@@ -72,7 +73,10 @@ logging.info(f'Original list: {original_target_libs}')
 ninja_build_dir = pathlib.Path(__file__).parent.parent / 'dist' / 'scons_gen_build'
 if not os.path.exists(ninja_build_dir):
     os.mkdir(ninja_build_dir)
-    subprocess.run([cmake_bin_path, '-G', 'Ninja', '..'], cwd=ninja_build_dir, check=True)
+    environ = os.environ.copy()
+    environ['CC'] = '/opt/mongodbtoolchain/v4/bin/gcc'
+    environ['CXX'] = '/opt/mongodbtoolchain/v4/bin/g++'
+    subprocess.run([cmake_bin_path, '-G', 'Ninja', '..'], cwd=ninja_build_dir, check=True, env=environ)
 
 with open(ninja_build_dir / 'build.ninja') as fninja:
     content = fninja.readlines()
@@ -81,7 +85,7 @@ with open(pathlib.Path(__file__).parent.parent / 'SConscript', 'w') as sconscrip
     sconscript.write("""\
 # Generated from parse_lib_from_ninja.py   
 Import("env")
-env = env.Clone()
+env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
 env.InjectThirdParty(libraries=['abseil-cpp'])
 if env.ToolchainIs('msvc'):
     env.Append(
@@ -111,6 +115,12 @@ if env.GetOption('sanitize') and 'undefined' in env.GetOption('sanitize').split(
             '-fno-sanitize=signed-integer-overflow',
         ],
     )
+
+if env.ToolchainIs('gcc'):
+    env.Append(
+        CCFLAGS=[
+            '-Wno-error=ignored-attributes',
+        ], )
 """)
 
     # This will loop through the ninja file looking for the specified target libs.
@@ -131,10 +141,10 @@ if env.GetOption('sanitize') and 'undefined' in env.GetOption('sanitize').split(
             if line.startswith('build absl'):
                 found_target_lib = None
 
-                # check if this intersting line is referring to one of the target libs
-                for target_lib in target_libs:
-                    if f'lib{target_lib}.a: CXX_STATIC_LIBRARY_LINKER' in line:
-                        found_target_lib = target_lib
+                match = re.search(r'lib(absl_\w+)\.a: CXX_STATIC_LIBRARY_LINKER', line)
+                if match:
+                    found_target_lib = match[1]
+                    target_libs.add(found_target_lib)
 
                 # if the line does not contain our target lib or we already found this before
                 # then this line is not interesting and continue on
@@ -176,6 +186,7 @@ if env.GetOption('sanitize') and 'undefined' in env.GetOption('sanitize').split(
 
                 # because the source files are listed object file inputs to the static lib
                 # we need strip the cmake output dir, and the object file extension
+                print(f"Found library: {found_target_lib}")
                 for raw_source in raw_source_files:
                     path_elems = raw_source.split('/')
                     path_elems.remove('CMakeFiles')

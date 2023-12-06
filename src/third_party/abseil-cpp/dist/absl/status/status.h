@@ -24,11 +24,11 @@
 //   * A set of helper functions for creating status codes and checking their
 //     values
 //
-// Within Google, `absl::Status` is the primary mechanism for gracefully
-// handling errors across API boundaries (and in particular across RPC
-// boundaries). Some of these errors may be recoverable, but others may not.
-// Most functions that can produce a recoverable error should be designed to
-// return an `absl::Status` (or `absl::StatusOr`).
+// Within Google, `absl::Status` is the primary mechanism for communicating
+// errors in C++, and is used to represent error state in both in-process
+// library calls as well as RPC calls. Some of these errors may be recoverable,
+// but others may not. Most functions that can produce a recoverable error
+// should be designed to return an `absl::Status` (or `absl::StatusOr`).
 //
 // Example:
 //
@@ -51,10 +51,10 @@
 #ifndef ABSL_STATUS_STATUS_H_
 #define ABSL_STATUS_STATUS_H_
 
-#include <iostream>
+#include <ostream>
 #include <string>
+#include <utility>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/functional/function_ref.h"
 #include "absl/status/internal/status_internal.h"
 #include "absl/strings/cord.h"
@@ -398,7 +398,7 @@ inline StatusToStringMode& operator^=(StatusToStringMode& lhs,
 //
 //   * It may provide more fine-grained semantic information about the error to
 //     facilitate actionable remedies.
-//   * It may provide human-readable contexual information that is more
+//   * It may provide human-readable contextual information that is more
 //     appropriate to display to an end user.
 //
 // Example:
@@ -469,8 +469,9 @@ class Status final {
 
   // Status::ok()
   //
-  // Returns `true` if `this->ok()`. Prefer checking for an OK status using this
-  // member function.
+  // Returns `true` if `this->code()` == `absl::StatusCode::kOk`,
+  // indicating the absence of an error.
+  // Prefer checking for an OK status using this member function.
   ABSL_MUST_USE_RESULT bool ok() const;
 
   // Status::code()
@@ -532,12 +533,12 @@ class Status final {
   //----------------------------------------------------------------------------
 
   // A payload may be attached to a status to provide additional context to an
-  // error that may not be satisifed by an existing `absl::StatusCode`.
+  // error that may not be satisfied by an existing `absl::StatusCode`.
   // Typically, this payload serves one of several purposes:
   //
   //   * It may provide more fine-grained semantic information about the error
   //     to facilitate actionable remedies.
-  //   * It may provide human-readable contexual information that is more
+  //   * It may provide human-readable contextual information that is more
   //     appropriate to display to an end user.
   //
   // A payload consists of a [key,value] pair, where the key is a string
@@ -612,10 +613,6 @@ class Status final {
   const status_internal::Payloads* GetPayloads() const;
   status_internal::Payloads* GetPayloads();
 
-  // Takes ownership of payload.
-  static uintptr_t NewRep(
-      absl::StatusCode code, absl::string_view msg,
-      std::unique_ptr<status_internal::Payloads> payload);
   static bool EqualsSlow(const absl::Status& a, const absl::Status& b);
 
   // MSVC 14.0 limitation requires the const.
@@ -740,6 +737,19 @@ Status UnauthenticatedError(absl::string_view message);
 Status UnavailableError(absl::string_view message);
 Status UnimplementedError(absl::string_view message);
 Status UnknownError(absl::string_view message);
+
+// ErrnoToStatusCode()
+//
+// Returns the StatusCode for `error_number`, which should be an `errno` value.
+// See https://en.cppreference.com/w/cpp/error/errno_macros and similar
+// references.
+absl::StatusCode ErrnoToStatusCode(int error_number);
+
+// ErrnoToStatus()
+//
+// Convenience function that creates a `absl::Status` using an `error_number`,
+// which should be an `errno` value.
+Status ErrnoToStatus(int error_number, absl::string_view message);
 
 //------------------------------------------------------------------------------
 // Implementation details follow
@@ -875,6 +885,15 @@ inline Status OkStatus() { return Status(); }
 // and an empty message. It is provided only for efficiency, given that
 // message-less kCancelled errors are common in the infrastructure.
 inline Status CancelledError() { return Status(absl::StatusCode::kCancelled); }
+
+// Retrieves a message's status as a null terminated C string. The lifetime of
+// this string is tied to the lifetime of the status object itself.
+//
+// If the status's message is empty, the empty string is returned.
+//
+// StatusMessageAsCStr exists for C support. Use `status.message()` in C++.
+const char* StatusMessageAsCStr(
+    const Status& status ABSL_ATTRIBUTE_LIFETIME_BOUND);
 
 ABSL_NAMESPACE_END
 }  // namespace absl

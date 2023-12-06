@@ -394,7 +394,7 @@ inline std::size_t hashObjectId(const uint8_t* objId) noexcept {
 std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator) noexcept {
     switch (tag) {
         case TypeTags::NumberInt32:
-            return abslHash(bitcastTo<int32_t>(val));
+            return abslHash(static_cast<int64_t>(bitcastTo<int32_t>(val)));
         case TypeTags::RecordId:
             return getRecordIdView(val)->hash();
         case TypeTags::NumberInt64:

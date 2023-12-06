@@ -79,7 +79,7 @@ static void BasicTests(bool notify_before_waiting, Notification* notification) {
 
   // Allow for a slight early return, to account for quality of implementation
   // issues on various platforms.
-  const absl::Duration slop = absl::Microseconds(200);
+  const absl::Duration slop = absl::Milliseconds(5);
   EXPECT_LE(delay - slop, elapsed)
       << "WaitForNotificationWithTimeout returned " << delay - elapsed
       << " early (with " << slop << " slop), start time was " << start;

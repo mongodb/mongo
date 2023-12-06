@@ -100,7 +100,7 @@ using uniform_inferred_return_t =
 template <typename IntType, typename Tag>
 typename absl::enable_if_t<
     absl::conjunction<
-        std::is_integral<IntType>,
+        IsIntegral<IntType>,
         absl::disjunction<std::is_same<Tag, IntervalOpenClosedTag>,
                           std::is_same<Tag, IntervalOpenOpenTag>>>::value,
     IntType>
@@ -131,7 +131,7 @@ uniform_lower_bound(Tag, NumType a, NumType) {
 template <typename IntType, typename Tag>
 typename absl::enable_if_t<
     absl::conjunction<
-        std::is_integral<IntType>,
+        IsIntegral<IntType>,
         absl::disjunction<std::is_same<Tag, IntervalClosedOpenTag>,
                           std::is_same<Tag, IntervalOpenOpenTag>>>::value,
     IntType>
@@ -153,7 +153,7 @@ uniform_upper_bound(Tag, FloatType, FloatType b) {
 template <typename IntType, typename Tag>
 typename absl::enable_if_t<
     absl::conjunction<
-        std::is_integral<IntType>,
+        IsIntegral<IntType>,
         absl::disjunction<std::is_same<Tag, IntervalClosedClosedTag>,
                           std::is_same<Tag, IntervalOpenClosedTag>>>::value,
     IntType>
@@ -201,7 +201,7 @@ is_uniform_range_valid(FloatType a, FloatType b) {
 }
 
 template <typename IntType>
-absl::enable_if_t<std::is_integral<IntType>::value, bool>
+absl::enable_if_t<IsIntegral<IntType>::value, bool>
 is_uniform_range_valid(IntType a, IntType b) {
   return a <= b;
 }
@@ -210,14 +210,14 @@ is_uniform_range_valid(IntType a, IntType b) {
 // or absl::uniform_real_distribution depending on the NumType parameter.
 template <typename NumType>
 using UniformDistribution =
-    typename std::conditional<std::is_integral<NumType>::value,
+    typename std::conditional<IsIntegral<NumType>::value,
                               absl::uniform_int_distribution<NumType>,
                               absl::uniform_real_distribution<NumType>>::type;
 
 // UniformDistributionWrapper is used as the underlying distribution type
 // by the absl::Uniform template function. It selects the proper Abseil
 // uniform distribution and provides constructor overloads that match the
-// expected parameter order as well as adjusting distribtuion bounds based
+// expected parameter order as well as adjusting distribution bounds based
 // on the tag.
 template <typename NumType>
 struct UniformDistributionWrapper : public UniformDistribution<NumType> {

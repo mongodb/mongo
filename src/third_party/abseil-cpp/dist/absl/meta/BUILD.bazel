@@ -32,6 +32,7 @@ cc_library(
     linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         "//absl/base:config",
+        "//absl/base:core_headers",
     ],
 )
 
@@ -42,6 +43,9 @@ cc_test(
     linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":type_traits",
+        "//absl/base:config",
+        "//absl/base:core_headers",
+        "//absl/time",
         "@com_google_googletest//:gtest_main",
     ],
 )

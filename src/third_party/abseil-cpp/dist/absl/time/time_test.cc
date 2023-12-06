@@ -28,6 +28,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/numeric/int128.h"
+#include "absl/strings/str_format.h"
 #include "absl/time/clock.h"
 #include "absl/time/internal/test_util.h"
 
@@ -1275,6 +1276,13 @@ TEST(Time, PrevTransitionNYC) {
   t = absl::InfiniteFuture();
   EXPECT_TRUE(tz.PrevTransition(t, &trans));
   // We have a transition but we don't know which one.
+}
+
+TEST(Time, AbslStringify) {
+  // FormatTime is already well tested, so just use one test case here to
+  // verify that StrFormat("%v", t) works as expected.
+  absl::Time t = absl::Now();
+  EXPECT_EQ(absl::StrFormat("%v", t), absl::FormatTime(t));
 }
 
 }  // namespace

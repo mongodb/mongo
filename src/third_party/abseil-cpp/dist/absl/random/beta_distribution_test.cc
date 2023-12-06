@@ -28,7 +28,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/base/internal/raw_logging.h"
+#include "absl/log/log.h"
 #include "absl/numeric/internal/representation.h"
 #include "absl/random/internal/chi_square.h"
 #include "absl/random/internal/distribution_test_util.h"
@@ -45,16 +45,26 @@ namespace {
 template <typename IntType>
 class BetaDistributionInterfaceTest : public ::testing::Test {};
 
-// double-double arithmetic is not supported well by either GCC or Clang; see
-// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=99048,
-// https://bugs.llvm.org/show_bug.cgi?id=49131, and
-// https://bugs.llvm.org/show_bug.cgi?id=49132. Don't bother running these tests
-// with double doubles until compiler support is better.
-using RealTypes =
-    std::conditional<absl::numeric_internal::IsDoubleDouble(),
-                     ::testing::Types<float, double>,
-                     ::testing::Types<float, double, long double>>::type;
-TYPED_TEST_CASE(BetaDistributionInterfaceTest, RealTypes);
+constexpr bool ShouldExerciseLongDoubleTests() {
+  // long double arithmetic is not supported well by either GCC or Clang on
+  // most platforms specifically not when implemented in terms of double-double;
+  // see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=99048,
+  // https://bugs.llvm.org/show_bug.cgi?id=49131, and
+  // https://bugs.llvm.org/show_bug.cgi?id=49132.
+  // So a conservative choice here is to disable long-double tests pretty much
+  // everywhere except on x64 but only if long double is not implemented as
+  // double-double.
+#if defined(__i686__) && defined(__x86_64__)
+  return !absl::numeric_internal::IsDoubleDouble();
+#else
+  return false;
+#endif
+}
+
+using RealTypes = std::conditional<ShouldExerciseLongDoubleTests(),
+                                   ::testing::Types<float, double, long double>,
+                                   ::testing::Types<float, double>>::type;
+TYPED_TEST_SUITE(BetaDistributionInterfaceTest, RealTypes);
 
 TYPED_TEST(BetaDistributionInterfaceTest, SerializeTest) {
   // The threshold for whether std::exp(1/a) is finite.
@@ -97,8 +107,8 @@ TYPED_TEST(BetaDistributionInterfaceTest, SerializeTest) {
   };
   for (TypeParam alpha : kValues) {
     for (TypeParam beta : kValues) {
-      ABSL_INTERNAL_LOG(
-          INFO, absl::StrFormat("Smoke test for Beta(%a, %a)", alpha, beta));
+      LOG(INFO) << absl::StreamFormat("Smoke test for Beta(%a, %a)", alpha,
+                                      beta);
 
       param_type param(alpha, beta);
       absl::beta_distribution<TypeParam> before(alpha, beta);
@@ -317,15 +327,13 @@ bool BetaDistributionTest::SingleZTestOnMeanAndVariance(double p,
       absl::random_internal::Near("z", z_mean, 0.0, max_err) &&
       absl::random_internal::Near("z_variance", z_variance, 0.0, max_err);
   if (!pass) {
-    ABSL_INTERNAL_LOG(
-        INFO,
-        absl::StrFormat(
-            "Beta(%f, %f), "
-            "mean: sample %f, expect %f, which is %f stddevs away, "
-            "variance: sample %f, expect %f, which is %f stddevs away.",
-            alpha_, beta_, m.mean, Mean(),
-            std::abs(m.mean - Mean()) / mean_stddev, m.variance, Variance(),
-            std::abs(m.variance - Variance()) / variance_stddev));
+    LOG(INFO) << "Beta(" << alpha_ << ", " << beta_ << "), mean: sample "
+              << m.mean << ", expect " << Mean() << ", which is "
+              << std::abs(m.mean - Mean()) / mean_stddev
+              << " stddevs away, variance: sample " << m.variance << ", expect "
+              << Variance() << ", which is "
+              << std::abs(m.variance - Variance()) / variance_stddev
+              << " stddevs away.";
   }
   return pass;
 }
@@ -386,18 +394,15 @@ bool BetaDistributionTest::SingleChiSquaredTest(double p, size_t samples,
   const bool pass =
       (absl::random_internal::ChiSquarePValue(chi_square, dof) >= p);
   if (!pass) {
-    for (int i = 0; i < cutoffs.size(); i++) {
-      ABSL_INTERNAL_LOG(
-          INFO, absl::StrFormat("cutoff[%d] = %f, actual count %d, expected %d",
-                                i, cutoffs[i], counts[i],
-                                static_cast<int>(expected[i])));
+    for (size_t i = 0; i < cutoffs.size(); i++) {
+      LOG(INFO) << "cutoff[" << i << "] = " << cutoffs[i] << ", actual count "
+                << counts[i] << ", expected " << static_cast<int>(expected[i]);
     }
 
-    ABSL_INTERNAL_LOG(
-        INFO, absl::StrFormat(
-                  "Beta(%f, %f) %s %f, p = %f", alpha_, beta_,
-                  absl::random_internal::kChiSquared, chi_square,
-                  absl::random_internal::ChiSquarePValue(chi_square, dof)));
+    LOG(INFO) << "Beta(" << alpha_ << ", " << beta_ << ") "
+              << absl::random_internal::kChiSquared << " " << chi_square
+              << ", p = "
+              << absl::random_internal::ChiSquarePValue(chi_square, dof);
   }
   return pass;
 }
@@ -431,13 +436,13 @@ std::string ParamName(
   return absl::StrReplaceAll(name, {{"+", "_"}, {"-", "_"}, {".", "_"}});
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     TestSampleStatisticsCombinations, BetaDistributionTest,
     ::testing::Combine(::testing::Values(0.1, 0.2, 0.9, 1.1, 2.5, 10.0, 123.4),
                        ::testing::Values(0.1, 0.2, 0.9, 1.1, 2.5, 10.0, 123.4)),
     ParamName);
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     TestSampleStatistics_SelectedPairs, BetaDistributionTest,
     ::testing::Values(std::make_pair(0.5, 1000), std::make_pair(1000, 0.5),
                       std::make_pair(900, 1000), std::make_pair(10000, 20000),

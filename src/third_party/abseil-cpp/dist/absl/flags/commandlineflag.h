@@ -186,7 +186,7 @@ class CommandLineFlag {
   // command line.
   virtual bool IsSpecifiedOnCommandLine() const = 0;
 
-  // Validates supplied value usign validator or parseflag routine
+  // Validates supplied value using validator or parseflag routine
   virtual bool ValidateInputValue(absl::string_view value) const = 0;
 
   // Checks that flags default value can be converted to string and back to the

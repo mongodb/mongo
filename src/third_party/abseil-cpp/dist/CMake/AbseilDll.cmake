@@ -13,6 +13,7 @@ set(ABSL_INTERNAL_DLL_FILES
   "base/internal/atomic_hook.h"
   "base/internal/cycleclock.cc"
   "base/internal/cycleclock.h"
+  "base/internal/cycleclock_config.h"
   "base/internal/direct_mmap.h"
   "base/internal/dynamic_annotations.h"
   "base/internal/endian.h"
@@ -25,7 +26,10 @@ set(ABSL_INTERNAL_DLL_FILES
   "base/internal/low_level_alloc.cc"
   "base/internal/low_level_alloc.h"
   "base/internal/low_level_scheduling.h"
+  "base/internal/nullability_impl.h"
   "base/internal/per_thread_tls.h"
+  "base/internal/prefetch.h"
+  "base/prefetch.h"
   "base/internal/pretty_function.h"
   "base/internal/raw_logging.cc"
   "base/internal/raw_logging.h"
@@ -49,9 +53,11 @@ set(ABSL_INTERNAL_DLL_FILES
   "base/internal/unaligned_access.h"
   "base/internal/unscaledcycleclock.cc"
   "base/internal/unscaledcycleclock.h"
+  "base/internal/unscaledcycleclock_config.h"
   "base/log_severity.cc"
   "base/log_severity.h"
   "base/macros.h"
+  "base/nullability.h"
   "base/optimization.h"
   "base/options.h"
   "base/policy_checks.h"
@@ -68,6 +74,7 @@ set(ABSL_INTERNAL_DLL_FILES
   "container/internal/btree.h"
   "container/internal/btree_container.h"
   "container/internal/common.h"
+  "container/internal/common_policy_traits.h"
   "container/internal/compressed_tuple.h"
   "container/internal/container_memory.h"
   "container/internal/counting_allocator.h"
@@ -78,20 +85,38 @@ set(ABSL_INTERNAL_DLL_FILES
   "container/internal/hashtablez_sampler.cc"
   "container/internal/hashtablez_sampler.h"
   "container/internal/hashtablez_sampler_force_weak_definition.cc"
-  "container/internal/have_sse.h"
   "container/internal/inlined_vector.h"
   "container/internal/layout.h"
-  "container/internal/node_hash_policy.h"
+  "container/internal/node_slot_policy.h"
   "container/internal/raw_hash_map.h"
   "container/internal/raw_hash_set.cc"
   "container/internal/raw_hash_set.h"
   "container/internal/tracked.h"
   "container/node_hash_map.h"
   "container/node_hash_set.h"
+  "crc/crc32c.cc"
+  "crc/crc32c.h"
+  "crc/internal/cpu_detect.cc"
+  "crc/internal/cpu_detect.h"
+  "crc/internal/crc32c.h"
+  "crc/internal/crc32c_inline.h"
+  "crc/internal/crc32_x86_arm_combined_simd.h"
+  "crc/internal/crc.cc"
+  "crc/internal/crc.h"
+  "crc/internal/crc_cord_state.cc"
+  "crc/internal/crc_cord_state.h"
+  "crc/internal/crc_internal.h"
+  "crc/internal/crc_x86_arm_combined.cc"
+  "crc/internal/crc_memcpy_fallback.cc"
+  "crc/internal/crc_memcpy.h"
+  "crc/internal/crc_memcpy_x86_64.cc"
+  "crc/internal/crc_non_temporal_memcpy.cc"
+  "crc/internal/crc_x86_arm_combined.cc"
+  "crc/internal/non_temporal_arm_intrinsics.h"
+  "crc/internal/non_temporal_memcpy.h"
   "debugging/failure_signal_handler.cc"
   "debugging/failure_signal_handler.h"
   "debugging/leak_check.h"
-  "debugging/leak_check_disable.cc"
   "debugging/stacktrace.cc"
   "debugging/stacktrace.h"
   "debugging/symbolize.cc"
@@ -110,9 +135,11 @@ set(ABSL_INTERNAL_DLL_FILES
   "debugging/internal/symbolize.h"
   "debugging/internal/vdso_support.cc"
   "debugging/internal/vdso_support.h"
+  "functional/any_invocable.h"
   "functional/internal/front_binder.h"
   "functional/bind_front.h"
   "functional/function_ref.h"
+  "functional/internal/any_invocable.h"
   "functional/internal/function_ref.h"
   "hash/hash.h"
   "hash/internal/city.h"
@@ -122,6 +149,47 @@ set(ABSL_INTERNAL_DLL_FILES
   "hash/internal/spy_hash_state.h"
   "hash/internal/low_level_hash.h"
   "hash/internal/low_level_hash.cc"
+  "log/absl_check.h"
+  "log/absl_log.h"
+  "log/check.h"
+  "log/die_if_null.cc"
+  "log/die_if_null.h"
+  "log/globals.cc"
+  "log/globals.h"
+  "log/internal/append_truncated.h"
+  "log/internal/check_impl.h"
+  "log/internal/check_op.cc"
+  "log/internal/check_op.h"
+  "log/internal/conditions.cc"
+  "log/internal/conditions.h"
+  "log/internal/config.h"
+  "log/internal/globals.cc"
+  "log/internal/globals.h"
+  "log/internal/log_format.cc"
+  "log/internal/log_format.h"
+  "log/internal/log_impl.h"
+  "log/internal/log_message.cc"
+  "log/internal/log_message.h"
+  "log/internal/log_sink_set.cc"
+  "log/internal/log_sink_set.h"
+  "log/internal/nullguard.cc"
+  "log/internal/nullguard.h"
+  "log/internal/nullstream.h"
+  "log/internal/proto.h"
+  "log/internal/proto.cc"
+  "log/internal/strip.h"
+  "log/internal/structured.h"
+  "log/internal/voidify.h"
+  "log/initialize.cc"
+  "log/initialize.h"
+  "log/log.h"
+  "log/log_entry.cc"
+  "log/log_entry.h"
+  "log/log_sink.cc"
+  "log/log_sink.h"
+  "log/log_sink_registry.h"
+  "log/log_streamer.h"
+  "log/structured.h"
   "memory/memory.h"
   "meta/type_traits.h"
   "numeric/bits.h"
@@ -148,7 +216,6 @@ set(ABSL_INTERNAL_DLL_FILES
   "random/internal/fast_uniform_bits.h"
   "random/internal/generate_real.h"
   "random/internal/iostream_state_saver.h"
-  "random/internal/mock_helpers.h"
   "random/internal/nonsecure_base.h"
   "random/internal/pcg_engine.h"
   "random/internal/platform.h"
@@ -196,22 +263,29 @@ set(ABSL_INTERNAL_DLL_FILES
   "strings/charconv.h"
   "strings/cord.cc"
   "strings/cord.h"
+  "strings/cord_analysis.cc"
+  "strings/cord_analysis.h"
+  "strings/cord_buffer.cc"
+  "strings/cord_buffer.h"
   "strings/escaping.cc"
   "strings/escaping.h"
   "strings/internal/charconv_bigint.cc"
   "strings/internal/charconv_bigint.h"
   "strings/internal/charconv_parse.cc"
   "strings/internal/charconv_parse.h"
+  "strings/internal/cord_data_edge.h"
   "strings/internal/cord_internal.cc"
   "strings/internal/cord_internal.h"
-  "strings/internal/cord_rep_consume.h"
-  "strings/internal/cord_rep_consume.cc"
   "strings/internal/cord_rep_btree.cc"
   "strings/internal/cord_rep_btree.h"
   "strings/internal/cord_rep_btree_navigator.cc"
   "strings/internal/cord_rep_btree_navigator.h"
   "strings/internal/cord_rep_btree_reader.cc"
   "strings/internal/cord_rep_btree_reader.h"
+  "strings/internal/cord_rep_crc.cc"
+  "strings/internal/cord_rep_crc.h"
+  "strings/internal/cord_rep_consume.h"
+  "strings/internal/cord_rep_consume.cc"
   "strings/internal/cord_rep_flat.h"
   "strings/internal/cord_rep_ring.cc"
   "strings/internal/cord_rep_ring.h"
@@ -227,8 +301,13 @@ set(ABSL_INTERNAL_DLL_FILES
   "strings/internal/cordz_statistics.h"
   "strings/internal/cordz_update_scope.h"
   "strings/internal/cordz_update_tracker.h"
+  "strings/internal/damerau_levenshtein_distance.h"
+  "strings/internal/damerau_levenshtein_distance.cc"
   "strings/internal/stl_type_traits.h"
   "strings/internal/string_constant.h"
+  "strings/internal/stringify_sink.h"
+  "strings/internal/stringify_sink.cc"
+  "strings/internal/has_absl_stringify.h"
   "strings/match.cc"
   "strings/match.h"
   "strings/numbers.cc"
@@ -261,6 +340,7 @@ set(ABSL_INTERNAL_DLL_FILES
   "strings/internal/str_format/bind.cc"
   "strings/internal/str_format/bind.h"
   "strings/internal/str_format/checker.h"
+  "strings/internal/str_format/constexpr_parser.h"
   "strings/internal/str_format/extension.cc"
   "strings/internal/str_format/extension.h"
   "strings/internal/str_format/float_conversion.cc"
@@ -284,14 +364,26 @@ set(ABSL_INTERNAL_DLL_FILES
   "synchronization/internal/create_thread_identity.cc"
   "synchronization/internal/create_thread_identity.h"
   "synchronization/internal/futex.h"
+  "synchronization/internal/futex_waiter.h"
+  "synchronization/internal/futex_waiter.cc"
   "synchronization/internal/graphcycles.cc"
   "synchronization/internal/graphcycles.h"
   "synchronization/internal/kernel_timeout.h"
+  "synchronization/internal/kernel_timeout.cc"
   "synchronization/internal/per_thread_sem.cc"
   "synchronization/internal/per_thread_sem.h"
+  "synchronization/internal/pthread_waiter.h"
+  "synchronization/internal/pthread_waiter.cc"
+  "synchronization/internal/sem_waiter.h"
+  "synchronization/internal/sem_waiter.cc"
+  "synchronization/internal/stdcpp_waiter.h"
+  "synchronization/internal/stdcpp_waiter.cc"
   "synchronization/internal/thread_pool.h"
-  "synchronization/internal/waiter.cc"
   "synchronization/internal/waiter.h"
+  "synchronization/internal/waiter_base.h"
+  "synchronization/internal/waiter_base.cc"
+  "synchronization/internal/win32_waiter.h"
+  "synchronization/internal/win32_waiter.cc"
   "time/civil_time.cc"
   "time/civil_time.h"
   "time/clock.cc"
@@ -340,126 +432,216 @@ set(ABSL_INTERNAL_DLL_FILES
   "types/span.h"
   "types/internal/span.h"
   "types/variant.h"
+  "utility/internal/if_constexpr.h"
   "utility/utility.h"
+  "debugging/leak_check.cc"
 )
 
 set(ABSL_INTERNAL_DLL_TARGETS
-  "stacktrace"
-  "symbolize"
-  "examine_stack"
-  "failure_signal_handler"
-  "debugging_internal"
-  "demangle_internal"
-  "leak_check"
-  "leak_check_disable"
-  "stack_consumption"
-  "debugging"
-  "hash"
-  "spy_hash_state"
-  "city"
-  "memory"
-  "strings"
-  "strings_internal"
-  "cord"
-  "str_format"
-  "str_format_internal"
-  "pow10_helper"
-  "int128"
-  "numeric"
-  "utility"
-  "any"
-  "bad_any_cast"
-  "bad_any_cast_impl"
-  "span"
-  "optional"
-  "bad_optional_access"
-  "bad_variant_access"
-  "variant"
-  "compare"
+  "absl_check"
+  "absl_log"
   "algorithm"
   "algorithm_container"
-  "graphcycles_internal"
-  "kernel_timeout_internal"
-  "synchronization"
-  "thread_pool"
-  "bind_front"
-  "function_ref"
+  "any"
+  "any_invocable"
   "atomic_hook"
-  "log_severity"
-  "raw_logging_internal"
-  "spinlock_wait"
-  "config"
-  "dynamic_annotations"
-  "core_headers"
-  "malloc_internal"
-  "base_internal"
+  "bad_any_cast"
+  "bad_any_cast_impl"
+  "bad_optional_access"
+  "bad_variant_access"
   "base"
-  "throw_delegate"
-  "pretty_function"
-  "endian"
+  "base_internal"
+  "bind_front"
   "bits"
-  "exponential_biased"
-  "periodic_sampler"
-  "scoped_set_env"
-  "type_traits"
-  "meta"
-  "random_random"
-  "random_bit_gen_ref"
-  "random_distributions"
-  "random_seed_gen_exception"
-  "random_seed_sequences"
-  "random_internal_traits"
-  "random_internal_distribution_caller"
-  "random_internal_distributions"
-  "random_internal_fast_uniform_bits"
-  "random_internal_seed_material"
-  "random_internal_pool_urbg"
-  "random_internal_explicit_seed_seq"
-  "random_internal_sequence_urbg"
-  "random_internal_salted_seed_seq"
-  "random_internal_iostream_state_saver"
-  "random_internal_generate_real"
-  "random_internal_wide_multiply"
-  "random_internal_fastmath"
-  "random_internal_nonsecure_base"
-  "random_internal_pcg_engine"
-  "random_internal_randen_engine"
-  "random_internal_platform"
-  "random_internal_randen"
-  "random_internal_randen_slow"
-  "random_internal_randen_hwaes"
-  "random_internal_randen_hwaes_impl"
-  "random_internal_uniform_helper"
-  "status"
-  "time"
-  "civil_time"
-  "time_zone"
-  "container"
   "btree"
+  "check"
+  "city"
+  "civil_time"
+  "compare"
   "compressed_tuple"
-  "fixed_array"
-  "inlined_vector_internal"
-  "inlined_vector"
+  "config"
+  "container"
+  "container_common"
+  "container_memory"
+  "cord"
+  "cord_internal"
+  "cordz_functions"
+  "cordz_handle"
+  "cordz_info"
+  "cordz_sample_token"
+  "core_headers"
   "counting_allocator"
+  "crc_cord_state"
+  "crc_cpu_detect"
+  "crc_internal"
+  "crc32c"
+  "debugging"
+  "debugging_internal"
+  "demangle_internal"
+  "die_if_null"
+  "dynamic_annotations"
+  "endian"
+  "examine_stack"
+  "exponential_biased"
+  "failure_signal_handler"
+  "fixed_array"
   "flat_hash_map"
   "flat_hash_set"
-  "node_hash_map"
-  "node_hash_set"
-  "container_memory"
+  "function_ref"
+  "graphcycles_internal"
+  "hash"
   "hash_function_defaults"
   "hash_policy_traits"
-  "hashtablez_sampler"
   "hashtable_debug"
   "hashtable_debug_hooks"
-  "have_sse"
-  "node_hash_policy"
-  "raw_hash_map"
-  "container_common"
-  "raw_hash_set"
+  "hashtablez_sampler"
+  "inlined_vector"
+  "inlined_vector_internal"
+  "int128"
+  "kernel_timeout_internal"
   "layout"
-  "tracked"
+  "leak_check"
+  "log_internal_check_impl"
+  "log_internal_check_op"
+  "log_internal_conditions"
+  "log_internal_config"
+  "log_internal_format"
+  "log_internal_globals"
+  "log_internal_log_impl"
+  "log_internal_proto"
+  "log_internal_message"
+  "log_internal_log_sink_set"
+  "log_internal_nullguard"
+  "log_internal_nullstream"
+  "log_internal_strip"
+  "log_internal_voidify"
+  "log_internal_append_truncated"
+  "log_globals"
+  "log_initialize"
+  "log"
+  "log_entry"
+  "log_sink"
+  "log_sink_registry"
+  "log_streamer"
+  "log_internal_structured"
+  "log_severity"
+  "log_structured"
+  "low_level_hash"
+  "malloc_internal"
+  "memory"
+  "meta"
+  "node_hash_map"
+  "node_hash_set"
+  "node_slot_policy"
+  "non_temporal_arm_intrinsics"
+  "non_temporal_memcpy"
+  "numeric"
+  "optional"
+  "periodic_sampler"
+  "pow10_helper"
+  "pretty_function"
+  "random_bit_gen_ref"
+  "random_distributions"
+  "random_internal_distribution_caller"
+  "random_internal_distributions"
+  "random_internal_explicit_seed_seq"
+  "random_internal_fastmath"
+  "random_internal_fast_uniform_bits"
+  "random_internal_generate_real"
+  "random_internal_iostream_state_saver"
+  "random_internal_nonsecure_base"
+  "random_internal_pcg_engine"
+  "random_internal_platform"
+  "random_internal_pool_urbg"
+  "random_internal_randen"
+  "random_internal_randen_engine"
+  "random_internal_randen_hwaes"
+  "random_internal_randen_hwaes_impl"
+  "random_internal_randen_slow"
+  "random_internal_salted_seed_seq"
+  "random_internal_seed_material"
+  "random_internal_sequence_urbg"
+  "random_internal_traits"
+  "random_internal_uniform_helper"
+  "random_internal_wide_multiply"
+  "random_random"
+  "random_seed_gen_exception"
+  "random_seed_sequences"
+  "raw_hash_map"
+  "raw_hash_set"
+  "raw_logging_internal"
   "sample_recorder"
+  "scoped_set_env"
+  "span"
+  "spinlock_wait"
+  "spy_hash_state"
+  "stack_consumption"
+  "stacktrace"
+  "status"
+  "statusor"
+  "str_format"
+  "str_format_internal"
+  "strerror"
+  "strings"
+  "strings_internal"
+  "symbolize"
+  "synchronization"
+  "thread_pool"
+  "throw_delegate"
+  "time"
+  "time_zone"
+  "tracked"
+  "type_traits"
+  "utility"
+  "variant"
 )
+
+set(ABSL_INTERNAL_TEST_DLL_FILES
+  "hash/hash_testing.h"
+  "log/scoped_mock_log.cc"
+  "log/scoped_mock_log.h"
+  "random/internal/chi_square.cc"
+  "random/internal/chi_square.h"
+  "random/internal/distribution_test_util.cc"
+  "random/internal/distribution_test_util.h"
+  "random/internal/mock_helpers.h"
+  "random/internal/mock_overload_set.h"
+  "random/mocking_bit_gen.h"
+  "random/mock_distributions.h"
+  "strings/cordz_test_helpers.h"
+  "strings/cord_test_helpers.h"
+)
+
+set(ABSL_INTERNAL_TEST_DLL_TARGETS
+  "cord_test_helpers"
+  "cordz_test_helpers"
+  "hash_testing"
+  "random_mocking_bit_gen"
+  "random_internal_distribution_test_util"
+  "random_internal_mock_overload_set"
+  "scoped_mock_log"
+)
+
+include(CheckCXXSourceCompiles)
+
+check_cxx_source_compiles(
+  [==[
+#ifdef _MSC_VER
+#  if _MSVC_LANG < 201700L
+#    error "The compiler defaults or is configured for C++ < 17"
+#  endif
+#elif __cplusplus < 201700L
+#  error "The compiler defaults or is configured for C++ < 17"
+#endif
+int main() { return 0; }
+]==]
+  ABSL_INTERNAL_AT_LEAST_CXX17)
+
+if(ABSL_INTERNAL_AT_LEAST_CXX17)
+  set(ABSL_INTERNAL_CXX_STD_FEATURE cxx_std_17)
+else()
+  set(ABSL_INTERNAL_CXX_STD_FEATURE cxx_std_14)
+endif()
 
 function(absl_internal_dll_contains)
   cmake_parse_arguments(ABSL_INTERNAL_DLL
@@ -483,6 +665,28 @@ function(absl_internal_dll_contains)
   endif()
 endfunction()
 
+function(absl_internal_test_dll_contains)
+  cmake_parse_arguments(ABSL_INTERNAL_TEST_DLL
+    ""
+    "OUTPUT;TARGET"
+    ""
+    ${ARGN}
+  )
+
+  STRING(REGEX REPLACE "^absl::" "" _target ${ABSL_INTERNAL_TEST_DLL_TARGET})
+
+  list(FIND
+    ABSL_INTERNAL_TEST_DLL_TARGETS
+    "${_target}"
+    _index)
+
+  if (${_index} GREATER -1)
+    set(${ABSL_INTERNAL_TEST_DLL_OUTPUT} 1 PARENT_SCOPE)
+  else()
+    set(${ABSL_INTERNAL_TEST_DLL_OUTPUT} 0 PARENT_SCOPE)
+  endif()
+endfunction()
+
 function(absl_internal_dll_targets)
   cmake_parse_arguments(ABSL_INTERNAL_DLL
   ""
@@ -493,9 +697,12 @@ function(absl_internal_dll_targets)
 
   set(_deps "")
   foreach(dep IN LISTS ABSL_INTERNAL_DLL_DEPS)
-    absl_internal_dll_contains(TARGET ${dep} OUTPUT _contains)
-    if (_contains)
+    absl_internal_dll_contains(TARGET ${dep} OUTPUT _dll_contains)
+    absl_internal_test_dll_contains(TARGET ${dep} OUTPUT _test_dll_contains)
+    if (_dll_contains)
       list(APPEND _deps abseil_dll)
+    elseif (_test_dll_contains)
+      list(APPEND _deps abseil_test_dll)
     else()
       list(APPEND _deps ${dep})
     endif()
@@ -507,41 +714,109 @@ function(absl_internal_dll_targets)
 endfunction()
 
 function(absl_make_dll)
+  cmake_parse_arguments(ABSL_INTERNAL_MAKE_DLL
+  ""
+  "TEST"
+  ""
+  ${ARGN}
+  )
+
+  if (ABSL_INTERNAL_MAKE_DLL_TEST)
+    set(_dll "abseil_test_dll")
+    set(_dll_files ${ABSL_INTERNAL_TEST_DLL_FILES})
+    set(_dll_libs "abseil_dll" "GTest::gtest" "GTest::gmock")
+    set(_dll_compile_definitions "GTEST_LINKED_AS_SHARED_LIBRARY=1")
+    set(_dll_includes ${absl_gtest_src_dir}/googletest/include ${absl_gtest_src_dir}/googlemock/include)
+    set(_dll_consume "ABSL_CONSUME_TEST_DLL")
+    set(_dll_build "ABSL_BUILD_TEST_DLL")
+  else()
+    set(_dll "abseil_dll")
+    set(_dll_files ${ABSL_INTERNAL_DLL_FILES})
+    set(_dll_libs "")
+    set(_dll_compile_definitions "")
+    set(_dll_includes "")
+    set(_dll_consume "ABSL_CONSUME_DLL")
+    set(_dll_build "ABSL_BUILD_DLL")
+  endif()
+
   add_library(
-    abseil_dll
+    ${_dll}
     SHARED
-      "${ABSL_INTERNAL_DLL_FILES}"
+      ${_dll_files}
   )
   target_link_libraries(
-    abseil_dll
+    ${_dll}
     PRIVATE
+      ${_dll_libs}
       ${ABSL_DEFAULT_LINKOPTS}
   )
-  set_property(TARGET abseil_dll PROPERTY LINKER_LANGUAGE "CXX")
+  set_property(TARGET ${_dll} PROPERTY LINKER_LANGUAGE "CXX")
   target_include_directories(
-    abseil_dll
+    ${_dll}
     PUBLIC
       "$<BUILD_INTERFACE:${ABSL_COMMON_INCLUDE_DIRS}>"
       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    PRIVATE
+      ${_dll_includes}
   )
 
   target_compile_options(
-    abseil_dll
+    ${_dll}
     PRIVATE
       ${ABSL_DEFAULT_COPTS}
   )
 
+  foreach(cflag ${ABSL_CC_LIB_COPTS})
+    if(${cflag} MATCHES "^(-Wno|/wd)")
+      # These flags are needed to suppress warnings that might fire in our headers.
+      set(PC_CFLAGS "${PC_CFLAGS} ${cflag}")
+    elseif(${cflag} MATCHES "^(-W|/w[1234eo])")
+      # Don't impose our warnings on others.
+    else()
+      set(PC_CFLAGS "${PC_CFLAGS} ${cflag}")
+    endif()
+  endforeach()
+  string(REPLACE ";" " " PC_LINKOPTS "${ABSL_CC_LIB_LINKOPTS}")
+
+  FILE(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/lib/pkgconfig/${_dll}.pc" CONTENT "\
+prefix=${CMAKE_INSTALL_PREFIX}\n\
+exec_prefix=\${prefix}\n\
+libdir=${CMAKE_INSTALL_FULL_LIBDIR}\n\
+includedir=${CMAKE_INSTALL_FULL_INCLUDEDIR}\n\
+\n\
+Name: ${_dll}\n\
+Description: Abseil DLL library\n\
+URL: https://abseil.io/\n\
+Version: ${absl_VERSION}\n\
+Libs: -L\${libdir} $<$<NOT:$<BOOL:${ABSL_CC_LIB_IS_INTERFACE}>>:-l${_dll}> ${PC_LINKOPTS}\n\
+Cflags: -I\${includedir}${PC_CFLAGS}\n")
+  INSTALL(FILES "${CMAKE_BINARY_DIR}/lib/pkgconfig/${_dll}.pc"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+
   target_compile_definitions(
-    abseil_dll
+    ${_dll}
+    PUBLIC
+      ${_dll_compile_definitions}
     PRIVATE
-      ABSL_BUILD_DLL
+      ${_dll_build}
       NOMINMAX
     INTERFACE
       ${ABSL_CC_LIB_DEFINES}
+      ${_dll_consume}
   )
-  install(TARGETS abseil_dll EXPORT ${PROJECT_NAME}Targets
+
+  if(ABSL_PROPAGATE_CXX_STD)
+    # Abseil libraries require C++14 as the current minimum standard. When
+    # compiled with C++17 (either because it is the compiler's default or
+    # explicitly requested), then Abseil requires C++17.
+    target_compile_features(${_dll} PUBLIC ${ABSL_INTERNAL_CXX_STD_FEATURE})
+  endif()
+
+  install(TARGETS ${_dll} EXPORT ${PROJECT_NAME}Targets
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
+
+  add_library(absl::${_dll} ALIAS ${_dll})
 endfunction()

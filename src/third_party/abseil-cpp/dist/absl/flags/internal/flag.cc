@@ -30,6 +30,7 @@
 #include "absl/base/call_once.h"
 #include "absl/base/casts.h"
 #include "absl/base/config.h"
+#include "absl/base/dynamic_annotations.h"
 #include "absl/base/optimization.h"
 #include "absl/flags/config.h"
 #include "absl/flags/internal/commandlineflag.h"
@@ -160,6 +161,8 @@ void FlagImpl::Init() {
         std::memcpy(buf.data() + Sizeof(op_), &initialized,
                     sizeof(initialized));
       }
+      // Type can contain valid uninitialized bits, e.g. padding.
+      ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(buf.data(), buf.size());
       OneWordValue().store(absl::bit_cast<int64_t>(buf),
                            std::memory_order_release);
       break;
@@ -194,7 +197,7 @@ void FlagImpl::AssertValidType(FlagFastTypeId rhs_type_id,
   FlagFastTypeId lhs_type_id = flags_internal::FastTypeId(op_);
 
   // `rhs_type_id` is the fast type id corresponding to the declaration
-  // visibile at the call site. `lhs_type_id` is the fast type id
+  // visible at the call site. `lhs_type_id` is the fast type id
   // corresponding to the type specified in flag definition. They must match
   //  for this operation to be well-defined.
   if (ABSL_PREDICT_TRUE(lhs_type_id == rhs_type_id)) return;
@@ -205,7 +208,7 @@ void FlagImpl::AssertValidType(FlagFastTypeId rhs_type_id,
 
   if (lhs_runtime_type_id == rhs_runtime_type_id) return;
 
-#if defined(ABSL_FLAGS_INTERNAL_HAS_RTTI)
+#ifdef ABSL_INTERNAL_HAS_RTTI
   if (*lhs_runtime_type_id == *rhs_runtime_type_id) return;
 #endif
 
@@ -235,7 +238,7 @@ void FlagImpl::StoreValue(const void* src) {
   switch (ValueStorageKind()) {
     case FlagValueStorageKind::kValueAndInitBit:
     case FlagValueStorageKind::kOneWordAtomic: {
-      // Load the current value to avoid setting 'init' bit manualy.
+      // Load the current value to avoid setting 'init' bit manually.
       int64_t one_word_val = OneWordValue().load(std::memory_order_acquire);
       std::memcpy(&one_word_val, src, Sizeof(op_));
       OneWordValue().store(one_word_val, std::memory_order_release);
@@ -403,7 +406,7 @@ template <typename StorageT>
 StorageT* FlagImpl::OffsetValue() const {
   char* p = reinterpret_cast<char*>(const_cast<FlagImpl*>(this));
   // The offset is deduced via Flag value type specific op_.
-  size_t offset = flags_internal::ValueOffset(op_);
+  ptrdiff_t offset = flags_internal::ValueOffset(op_);
 
   return reinterpret_cast<StorageT*>(p + offset);
 }
@@ -483,7 +486,7 @@ bool FlagImpl::ReadOneBool() const {
 }
 
 void FlagImpl::ReadSequenceLockedData(void* dst) const {
-  int size = Sizeof(op_);
+  size_t size = Sizeof(op_);
   // Attempt to read using the sequence lock.
   if (ABSL_PREDICT_TRUE(seq_lock_.TryRead(dst, AtomicBufferValue(), size))) {
     return;

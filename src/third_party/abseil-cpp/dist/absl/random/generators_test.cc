@@ -49,7 +49,7 @@ void TestUniform(URBG* gen) {
   // (a, b) semantics, inferred types.
   absl::Uniform(absl::IntervalOpenOpen, *gen, 0, 1.0);  // Promoted to double
 
-  // Explict overriding of types.
+  // Explicit overriding of types.
   absl::Uniform<int>(*gen, 0, 100);
   absl::Uniform<int8_t>(*gen, 0, 100);
   absl::Uniform<int16_t>(*gen, 0, 100);
@@ -107,6 +107,8 @@ void TestPoisson(URBG* gen) {
   absl::Poisson<int64_t>(*gen);
   absl::Poisson<uint64_t>(*gen);
   absl::Poisson<uint64_t>(URBG());
+  absl::Poisson<absl::int128>(*gen);
+  absl::Poisson<absl::uint128>(*gen);
 }
 
 template <typename URBG>
@@ -114,6 +116,7 @@ void TestBernoulli(URBG* gen) {
   absl::Bernoulli(*gen, 0.5);
   absl::Bernoulli(*gen, 0.5);
 }
+
 
 template <typename URBG>
 void TestZipf(URBG* gen) {
@@ -126,6 +129,8 @@ void TestZipf(URBG* gen) {
   absl::Zipf<int64_t>(*gen, 1 << 10);
   absl::Zipf<uint64_t>(*gen, 1 << 10);
   absl::Zipf<uint64_t>(URBG(), 1 << 10);
+  absl::Zipf<absl::int128>(*gen, 1 << 10);
+  absl::Zipf<absl::uint128>(*gen, 1 << 10);
 }
 
 template <typename URBG>
@@ -146,6 +151,8 @@ void TestLogNormal(URBG* gen) {
   absl::LogUniform<int64_t>(*gen, 0, 1 << 10);
   absl::LogUniform<uint64_t>(*gen, 0, 1 << 10);
   absl::LogUniform<uint64_t>(URBG(), 0, 1 << 10);
+  absl::LogUniform<absl::int128>(*gen, 0, 1 << 10);
+  absl::LogUniform<absl::uint128>(*gen, 0, 1 << 10);
 }
 
 template <typename URBG>

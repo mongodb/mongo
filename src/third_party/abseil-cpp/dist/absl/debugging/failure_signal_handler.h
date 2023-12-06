@@ -62,7 +62,7 @@ struct FailureSignalHandlerOptions {
   // If true, try to run signal handlers on an alternate stack (if supported on
   // the given platform). An alternate stack is useful for program crashes due
   // to a stack overflow; by running on a alternate stack, the signal handler
-  // may run even when normal stack space has been exausted. The downside of
+  // may run even when normal stack space has been exhausted. The downside of
   // using an alternate stack is that extra memory for the alternate stack needs
   // to be pre-allocated.
   bool use_alternate_stack = true;

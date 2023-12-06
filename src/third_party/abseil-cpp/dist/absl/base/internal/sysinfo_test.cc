@@ -37,29 +37,6 @@ TEST(SysinfoTest, NumCPUs) {
       << "NumCPUs() should not have the default value of 0";
 }
 
-// Ensure that NominalCPUFrequency returns a reasonable value, or 1.00 on
-// platforms where the CPU frequency is not available through sysfs.
-//
-// POWER is particularly problematic here; some Linux kernels expose the CPU
-// frequency, while others do not. Since we can't predict a priori what a given
-// machine is going to do, just disable this test on POWER on Linux.
-#if !(defined(__linux) && (defined(__ppc64__) || defined(__PPC64__)))
-TEST(SysinfoTest, NominalCPUFrequency) {
-  // Linux only exposes the CPU frequency on certain architectures, and
-  // Emscripten doesn't expose it at all.
-#if defined(__linux__) &&                                                  \
-        (defined(__aarch64__) || defined(__hppa__) || defined(__mips__) || \
-         defined(__riscv) || defined(__s390x__)) ||                        \
-    defined(__EMSCRIPTEN__)
-  EXPECT_EQ(NominalCPUFrequency(), 1.0)
-      << "CPU frequency detection was fixed! Please update unittest.";
-#else
-  EXPECT_GE(NominalCPUFrequency(), 1000.0)
-      << "NominalCPUFrequency() did not return a reasonable value";
-#endif
-}
-#endif
-
 TEST(SysinfoTest, GetTID) {
   EXPECT_EQ(GetTID(), GetTID());  // Basic compile and equality test.
 #ifdef __native_client__

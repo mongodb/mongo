@@ -86,7 +86,7 @@ static void Test(bool use_new_arena, bool call_malloc_hook, int n) {
   AllocMap::iterator it;
   BlockDesc block_desc;
   int rnd;
-  LowLevelAlloc::Arena *arena = 0;
+  LowLevelAlloc::Arena *arena = nullptr;
   if (use_new_arena) {
     int32_t flags = call_malloc_hook ? LowLevelAlloc::kCallMallocHook : 0;
     arena = LowLevelAlloc::NewArena(flags);
@@ -101,11 +101,10 @@ static void Test(bool use_new_arena, bool call_malloc_hook, int n) {
     case 0:     // coin came up heads: add a block
       using_low_level_alloc = true;
       block_desc.len = rand() & 0x3fff;
-      block_desc.ptr =
-        reinterpret_cast<char *>(
-                        arena == 0
-                        ? LowLevelAlloc::Alloc(block_desc.len)
-                        : LowLevelAlloc::AllocWithArena(block_desc.len, arena));
+      block_desc.ptr = reinterpret_cast<char *>(
+          arena == nullptr
+              ? LowLevelAlloc::Alloc(block_desc.len)
+              : LowLevelAlloc::AllocWithArena(block_desc.len, arena));
       using_low_level_alloc = false;
       RandomizeBlockDesc(&block_desc);
       rnd = rand();

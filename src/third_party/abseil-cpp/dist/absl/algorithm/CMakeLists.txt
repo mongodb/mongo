@@ -35,6 +35,7 @@ absl_cc_test(
     ${ABSL_TEST_COPTS}
   DEPS
     absl::algorithm
+    absl::config
     GTest::gmock_main
 )
 

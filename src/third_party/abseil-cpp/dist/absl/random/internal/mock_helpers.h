@@ -18,6 +18,7 @@
 
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 #include "absl/base/internal/fast_type_id.h"
 #include "absl/types/optional.h"
@@ -100,7 +101,7 @@ class MockHelpers {
   template <typename KeyT, typename URBG, typename... Args>
   static auto MaybeInvokeMock(URBG* urbg, Args&&... args)
       -> absl::optional<typename KeySignature<KeyT>::result_type> {
-    // Use function overloading to dispatch to the implemenation since
+    // Use function overloading to dispatch to the implementation since
     // more modern patterns (e.g. require + constexpr) are not supported in all
     // compiler configurations.
     return InvokeMockImpl<KeyT, typename KeySignature<KeyT>::result_type,

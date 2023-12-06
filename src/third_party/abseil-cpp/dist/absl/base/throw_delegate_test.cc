@@ -78,29 +78,97 @@ void ExpectThrowNoWhat(void (*f)()) {
 #endif
 }
 
-TEST(ThrowHelper, Test) {
-  // Not using EXPECT_THROW because we want to check the .what() message too.
+TEST(ThrowDelegate, ThrowStdLogicErrorChar) {
   ExpectThrowChar<std::logic_error>(ThrowStdLogicError);
+}
+
+TEST(ThrowDelegate, ThrowStdInvalidArgumentChar) {
   ExpectThrowChar<std::invalid_argument>(ThrowStdInvalidArgument);
+}
+
+TEST(ThrowDelegate, ThrowStdDomainErrorChar) {
   ExpectThrowChar<std::domain_error>(ThrowStdDomainError);
+}
+
+TEST(ThrowDelegate, ThrowStdLengthErrorChar) {
   ExpectThrowChar<std::length_error>(ThrowStdLengthError);
+}
+
+TEST(ThrowDelegate, ThrowStdOutOfRangeChar) {
   ExpectThrowChar<std::out_of_range>(ThrowStdOutOfRange);
+}
+
+TEST(ThrowDelegate, ThrowStdRuntimeErrorChar) {
   ExpectThrowChar<std::runtime_error>(ThrowStdRuntimeError);
+}
+
+TEST(ThrowDelegate, ThrowStdRangeErrorChar) {
   ExpectThrowChar<std::range_error>(ThrowStdRangeError);
+}
+
+TEST(ThrowDelegate, ThrowStdOverflowErrorChar) {
   ExpectThrowChar<std::overflow_error>(ThrowStdOverflowError);
+}
+
+TEST(ThrowDelegate, ThrowStdUnderflowErrorChar) {
   ExpectThrowChar<std::underflow_error>(ThrowStdUnderflowError);
+}
 
+TEST(ThrowDelegate, ThrowStdLogicErrorString) {
   ExpectThrowString<std::logic_error>(ThrowStdLogicError);
-  ExpectThrowString<std::invalid_argument>(ThrowStdInvalidArgument);
-  ExpectThrowString<std::domain_error>(ThrowStdDomainError);
-  ExpectThrowString<std::length_error>(ThrowStdLengthError);
-  ExpectThrowString<std::out_of_range>(ThrowStdOutOfRange);
-  ExpectThrowString<std::runtime_error>(ThrowStdRuntimeError);
-  ExpectThrowString<std::range_error>(ThrowStdRangeError);
-  ExpectThrowString<std::overflow_error>(ThrowStdOverflowError);
-  ExpectThrowString<std::underflow_error>(ThrowStdUnderflowError);
+}
 
-  ExpectThrowNoWhat<std::bad_function_call>(ThrowStdBadFunctionCall);
+TEST(ThrowDelegate, ThrowStdInvalidArgumentString) {
+  ExpectThrowString<std::invalid_argument>(ThrowStdInvalidArgument);
+}
+
+TEST(ThrowDelegate, ThrowStdDomainErrorString) {
+  ExpectThrowString<std::domain_error>(ThrowStdDomainError);
+}
+
+TEST(ThrowDelegate, ThrowStdLengthErrorString) {
+  ExpectThrowString<std::length_error>(ThrowStdLengthError);
+}
+
+TEST(ThrowDelegate, ThrowStdOutOfRangeString) {
+  ExpectThrowString<std::out_of_range>(ThrowStdOutOfRange);
+}
+
+TEST(ThrowDelegate, ThrowStdRuntimeErrorString) {
+  ExpectThrowString<std::runtime_error>(ThrowStdRuntimeError);
+}
+
+TEST(ThrowDelegate, ThrowStdRangeErrorString) {
+  ExpectThrowString<std::range_error>(ThrowStdRangeError);
+}
+
+TEST(ThrowDelegate, ThrowStdOverflowErrorString) {
+  ExpectThrowString<std::overflow_error>(ThrowStdOverflowError);
+}
+
+TEST(ThrowDelegate, ThrowStdUnderflowErrorString) {
+  ExpectThrowString<std::underflow_error>(ThrowStdUnderflowError);
+}
+
+TEST(ThrowDelegate, ThrowStdBadFunctionCallNoWhat) {
+#ifdef ABSL_HAVE_EXCEPTIONS
+  try {
+    ThrowStdBadFunctionCall();
+    FAIL() << "Didn't throw";
+  } catch (const std::bad_function_call&) {
+  }
+#ifdef _LIBCPP_VERSION
+  catch (const std::exception&) {
+    // https://reviews.llvm.org/D92397 causes issues with the vtable for
+    // std::bad_function_call when using libc++ as a shared library.
+  }
+#endif
+#else
+  EXPECT_DEATH_IF_SUPPORTED(ThrowStdBadFunctionCall(), "");
+#endif
+}
+
+TEST(ThrowDelegate, ThrowStdBadAllocNoWhat) {
   ExpectThrowNoWhat<std::bad_alloc>(ThrowStdBadAlloc);
 }
 

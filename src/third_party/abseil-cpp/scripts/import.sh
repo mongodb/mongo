@@ -8,8 +8,8 @@ IFS=$'\n\t'
 set -vx
 
 NAME=abseil-cpp
-REVISION="20211102.0-mongo-SERVER-82704"
-VERSION="20211102.0"
+REVISION="20230802.1-mongo-SERVER-82704"
+VERSION="20230802.1"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/abseil-cpp
 if [[ -d $DEST_DIR/dist ]]; then
@@ -22,6 +22,6 @@ pushd $DEST_DIR/dist
 find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;
 rm -rf ci
 rm -rf scons_gen_build
-find absl -type d -name "testdata" -exec rm -rf {} \;
+find absl -depth -type d -name "testdata" -exec rm -rf {} \;
 find absl -type d -name "*.bazel" -exec rm -rf {} \;
 popd

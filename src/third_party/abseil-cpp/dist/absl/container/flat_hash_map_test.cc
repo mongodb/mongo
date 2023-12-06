@@ -16,12 +16,12 @@
 
 #include <memory>
 
-#include "absl/base/internal/raw_logging.h"
 #include "absl/container/internal/hash_generator_testing.h"
 #include "absl/container/internal/unordered_map_constructor_test.h"
 #include "absl/container/internal/unordered_map_lookup_test.h"
 #include "absl/container/internal/unordered_map_members_test.h"
 #include "absl/container/internal/unordered_map_modifiers_test.h"
+#include "absl/log/check.h"
 #include "absl/types/any.h"
 
 namespace absl {
@@ -40,10 +40,10 @@ struct BeforeMain {
   BeforeMain() {
     absl::flat_hash_map<int, int> x;
     x.insert({1, 1});
-    ABSL_RAW_CHECK(x.find(0) == x.end(), "x should not contain 0");
+    CHECK(x.find(0) == x.end()) << "x should not contain 0";
     auto it = x.find(1);
-    ABSL_RAW_CHECK(it != x.end(), "x should contain 1");
-    ABSL_RAW_CHECK(it->second, "1 should map to 1");
+    CHECK(it != x.end()) << "x should contain 1";
+    CHECK(it->second) << "1 should map to 1";
   }
 };
 const BeforeMain before_main;
@@ -236,33 +236,36 @@ TEST(FlatHashMap, EraseIf) {
   // Erase all elements.
   {
     flat_hash_map<int, int> s = {{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}};
-    erase_if(s, [](std::pair<const int, int>) { return true; });
+    EXPECT_EQ(erase_if(s, [](std::pair<const int, int>) { return true; }), 5);
     EXPECT_THAT(s, IsEmpty());
   }
   // Erase no elements.
   {
     flat_hash_map<int, int> s = {{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}};
-    erase_if(s, [](std::pair<const int, int>) { return false; });
+    EXPECT_EQ(erase_if(s, [](std::pair<const int, int>) { return false; }), 0);
     EXPECT_THAT(s, UnorderedElementsAre(Pair(1, 1), Pair(2, 2), Pair(3, 3),
                                         Pair(4, 4), Pair(5, 5)));
   }
   // Erase specific elements.
   {
     flat_hash_map<int, int> s = {{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}};
-    erase_if(s,
-             [](std::pair<const int, int> kvp) { return kvp.first % 2 == 1; });
+    EXPECT_EQ(erase_if(s,
+                       [](std::pair<const int, int> kvp) {
+                         return kvp.first % 2 == 1;
+                       }),
+              3);
     EXPECT_THAT(s, UnorderedElementsAre(Pair(2, 2), Pair(4, 4)));
   }
   // Predicate is function reference.
   {
     flat_hash_map<int, int> s = {{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}};
-    erase_if(s, FirstIsEven);
+    EXPECT_EQ(erase_if(s, FirstIsEven), 2);
     EXPECT_THAT(s, UnorderedElementsAre(Pair(1, 1), Pair(3, 3), Pair(5, 5)));
   }
   // Predicate is function pointer.
   {
     flat_hash_map<int, int> s = {{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}};
-    erase_if(s, &FirstIsEven);
+    EXPECT_EQ(erase_if(s, &FirstIsEven), 2);
     EXPECT_THAT(s, UnorderedElementsAre(Pair(1, 1), Pair(3, 3), Pair(5, 5)));
   }
 }
@@ -306,6 +309,14 @@ TEST(FlatHashMap, Reserve) {
       EXPECT_EQ(&a2, &a2new);
     }
   }
+}
+
+TEST(FlatHashMap, RecursiveTypeCompiles) {
+  struct RecursiveType {
+    flat_hash_map<int, RecursiveType> m;
+  };
+  RecursiveType t;
+  t.m[0] = RecursiveType{};
 }
 
 }  // namespace

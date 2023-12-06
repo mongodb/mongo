@@ -22,6 +22,16 @@
 
 namespace {
 
+struct MyStruct {
+  template <typename Sink>
+  friend void AbslStringify(Sink& sink, const MyStruct& s) {
+    sink.Append("MyStruct{.value = ");
+    sink.Append(absl::StrCat(s.value));
+    sink.Append("}");
+  }
+  int value;
+};
+
 TEST(SubstituteTest, Substitute) {
   // Basic.
   EXPECT_EQ("Hello, world!", absl::Substitute("$0, $1!", "Hello", "world"));
@@ -70,7 +80,7 @@ TEST(SubstituteTest, Substitute) {
   // Volatile Pointer.
   // Like C++ streamed I/O, such pointers implicitly become bool
   volatile int vol = 237;
-  volatile int *volatile volptr = &vol;
+  volatile int* volatile volptr = &vol;
   str = absl::Substitute("$0", volptr);
   EXPECT_EQ("true", str);
 
@@ -128,6 +138,11 @@ TEST(SubstituteTest, Substitute) {
 
   const char* null_cstring = nullptr;
   EXPECT_EQ("Text: ''", absl::Substitute("Text: '$0'", null_cstring));
+
+  MyStruct s1 = MyStruct{17};
+  MyStruct s2 = MyStruct{1043};
+  EXPECT_EQ("MyStruct{.value = 17}, MyStruct{.value = 1043}",
+            absl::Substitute("$0, $1", s1, s2));
 }
 
 TEST(SubstituteTest, SubstituteAndAppend) {
@@ -171,6 +186,12 @@ TEST(SubstituteTest, SubstituteAndAppend) {
   absl::SubstituteAndAppend(&str, "$0 $1 $2 $3 $4 $5 $6 $7 $8 $9", "a", "b",
                             "c", "d", "e", "f", "g", "h", "i", "j");
   EXPECT_EQ("a b c d e f g h i j", str);
+
+  str.clear();
+  MyStruct s1 = MyStruct{17};
+  MyStruct s2 = MyStruct{1043};
+  absl::SubstituteAndAppend(&str, "$0, $1", s1, s2);
+  EXPECT_EQ("MyStruct{.value = 17}, MyStruct{.value = 1043}", str);
 }
 
 TEST(SubstituteTest, VectorBoolRef) {
@@ -184,7 +205,67 @@ TEST(SubstituteTest, VectorBoolRef) {
   EXPECT_EQ("Logic be like: true false true false", str);
 }
 
-#ifdef GTEST_HAS_DEATH_TEST
+TEST(SubstituteTest, Enums) {
+  enum UnscopedEnum { kEnum0 = 0, kEnum1 = 1 };
+  EXPECT_EQ("0 1", absl::Substitute("$0 $1", UnscopedEnum::kEnum0,
+                                    UnscopedEnum::kEnum1));
+
+  enum class ScopedEnum { kEnum0 = 0, kEnum1 = 1 };
+  EXPECT_EQ("0 1",
+            absl::Substitute("$0 $1", ScopedEnum::kEnum0, ScopedEnum::kEnum1));
+
+  enum class ScopedEnumInt32 : int32_t { kEnum0 = 989, kEnum1 = INT32_MIN };
+  EXPECT_EQ("989 -2147483648",
+            absl::Substitute("$0 $1", ScopedEnumInt32::kEnum0,
+                             ScopedEnumInt32::kEnum1));
+
+  enum class ScopedEnumUInt32 : uint32_t { kEnum0 = 1, kEnum1 = UINT32_MAX };
+  EXPECT_EQ("1 4294967295", absl::Substitute("$0 $1", ScopedEnumUInt32::kEnum0,
+                                             ScopedEnumUInt32::kEnum1));
+
+  enum class ScopedEnumInt64 : int64_t { kEnum0 = -1, kEnum1 = 42949672950 };
+  EXPECT_EQ("-1 42949672950", absl::Substitute("$0 $1", ScopedEnumInt64::kEnum0,
+                                               ScopedEnumInt64::kEnum1));
+
+  enum class ScopedEnumUInt64 : uint64_t { kEnum0 = 1, kEnum1 = 42949672950 };
+  EXPECT_EQ("1 42949672950", absl::Substitute("$0 $1", ScopedEnumUInt64::kEnum0,
+                                              ScopedEnumUInt64::kEnum1));
+
+  enum class ScopedEnumChar : signed char { kEnum0 = -1, kEnum1 = 1 };
+  EXPECT_EQ("-1 1", absl::Substitute("$0 $1", ScopedEnumChar::kEnum0,
+                                     ScopedEnumChar::kEnum1));
+
+  enum class ScopedEnumUChar : unsigned char {
+    kEnum0 = 0,
+    kEnum1 = 1,
+    kEnumMax = 255
+  };
+  EXPECT_EQ("0 1 255", absl::Substitute("$0 $1 $2", ScopedEnumUChar::kEnum0,
+                                        ScopedEnumUChar::kEnum1,
+                                        ScopedEnumUChar::kEnumMax));
+
+  enum class ScopedEnumInt16 : int16_t { kEnum0 = -100, kEnum1 = 10000 };
+  EXPECT_EQ("-100 10000", absl::Substitute("$0 $1", ScopedEnumInt16::kEnum0,
+                                           ScopedEnumInt16::kEnum1));
+
+  enum class ScopedEnumUInt16 : uint16_t { kEnum0 = 0, kEnum1 = 10000 };
+  EXPECT_EQ("0 10000", absl::Substitute("$0 $1", ScopedEnumUInt16::kEnum0,
+                                        ScopedEnumUInt16::kEnum1));
+}
+
+enum class EnumWithStringify { Many = 0, Choices = 1 };
+
+template <typename Sink>
+void AbslStringify(Sink& sink, EnumWithStringify e) {
+  sink.Append(e == EnumWithStringify::Many ? "Many" : "Choices");
+}
+
+TEST(SubstituteTest, AbslStringifyWithEnum) {
+  const auto e = EnumWithStringify::Choices;
+  EXPECT_EQ(absl::Substitute("$0", e), "Choices");
+}
+
+#if GTEST_HAS_DEATH_TEST
 
 TEST(SubstituteDeathTest, SubstituteDeath) {
   EXPECT_DEBUG_DEATH(

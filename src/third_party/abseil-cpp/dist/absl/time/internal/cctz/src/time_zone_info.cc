@@ -45,6 +45,7 @@
 #include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/base/config.h"
 #include "absl/time/internal/cctz/include/cctz/civil_time.h"
@@ -134,6 +135,64 @@ std::int_fast64_t Decode64(const char* cp) {
   return static_cast<std::int_fast64_t>(v - s64maxU - 1) - s64max - 1;
 }
 
+struct Header {            // counts of:
+  std::size_t timecnt;     // transition times
+  std::size_t typecnt;     // transition types
+  std::size_t charcnt;     // zone abbreviation characters
+  std::size_t leapcnt;     // leap seconds (we expect none)
+  std::size_t ttisstdcnt;  // UTC/local indicators (unused)
+  std::size_t ttisutcnt;   // standard/wall indicators (unused)
+
+  bool Build(const tzhead& tzh);
+  std::size_t DataLength(std::size_t time_len) const;
+};
+
+// Builds the in-memory header using the raw bytes from the file.
+bool Header::Build(const tzhead& tzh) {
+  std::int_fast32_t v;
+  if ((v = Decode32(tzh.tzh_timecnt)) < 0) return false;
+  timecnt = static_cast<std::size_t>(v);
+  if ((v = Decode32(tzh.tzh_typecnt)) < 0) return false;
+  typecnt = static_cast<std::size_t>(v);
+  if ((v = Decode32(tzh.tzh_charcnt)) < 0) return false;
+  charcnt = static_cast<std::size_t>(v);
+  if ((v = Decode32(tzh.tzh_leapcnt)) < 0) return false;
+  leapcnt = static_cast<std::size_t>(v);
+  if ((v = Decode32(tzh.tzh_ttisstdcnt)) < 0) return false;
+  ttisstdcnt = static_cast<std::size_t>(v);
+  if ((v = Decode32(tzh.tzh_ttisutcnt)) < 0) return false;
+  ttisutcnt = static_cast<std::size_t>(v);
+  return true;
+}
+
+// How many bytes of data are associated with this header. The result
+// depends upon whether this is a section with 4-byte or 8-byte times.
+std::size_t Header::DataLength(std::size_t time_len) const {
+  std::size_t len = 0;
+  len += (time_len + 1) * timecnt;  // unix_time + type_index
+  len += (4 + 1 + 1) * typecnt;     // utc_offset + is_dst + abbr_index
+  len += 1 * charcnt;               // abbreviations
+  len += (time_len + 4) * leapcnt;  // leap-time + TAI-UTC
+  len += 1 * ttisstdcnt;            // UTC/local indicators
+  len += 1 * ttisutcnt;             // standard/wall indicators
+  return len;
+}
+
+// Does the rule for future transitions call for year-round daylight time?
+// See tz/zic.c:stringzone() for the details on how such rules are encoded.
+bool AllYearDST(const PosixTimeZone& posix) {
+  if (posix.dst_start.date.fmt != PosixTransition::N) return false;
+  if (posix.dst_start.date.n.day != 0) return false;
+  if (posix.dst_start.time.offset != 0) return false;
+
+  if (posix.dst_end.date.fmt != PosixTransition::J) return false;
+  if (posix.dst_end.date.j.day != kDaysPerYear[0]) return false;
+  const auto offset = posix.std_offset - posix.dst_offset;
+  if (posix.dst_end.time.offset + offset != kSecsPerDay) return false;
+
+  return true;
+}
+
 // Generate a year-relative offset for a PosixTransition.
 std::int_fast64_t TransOffset(bool leap_year, int jan1_weekday,
                               const PosixTransition& pt) {
@@ -202,98 +261,6 @@ inline civil_second YearShift(const civil_second& cs, year_t shift) {
 
 }  // namespace
 
-// What (no leap-seconds) UTC+seconds zoneinfo would look like.
-bool TimeZoneInfo::ResetToBuiltinUTC(const seconds& offset) {
-  transition_types_.resize(1);
-  TransitionType& tt(transition_types_.back());
-  tt.utc_offset = static_cast<std::int_least32_t>(offset.count());
-  tt.is_dst = false;
-  tt.abbr_index = 0;
-
-  // We temporarily add some redundant, contemporary (2015 through 2025)
-  // transitions for performance reasons.  See TimeZoneInfo::LocalTime().
-  // TODO: Fix the performance issue and remove the extra transitions.
-  transitions_.clear();
-  transitions_.reserve(12);
-  for (const std::int_fast64_t unix_time : {
-           -(1LL << 59),  // a "first half" transition
-           1420070400LL,  // 2015-01-01T00:00:00+00:00
-           1451606400LL,  // 2016-01-01T00:00:00+00:00
-           1483228800LL,  // 2017-01-01T00:00:00+00:00
-           1514764800LL,  // 2018-01-01T00:00:00+00:00
-           1546300800LL,  // 2019-01-01T00:00:00+00:00
-           1577836800LL,  // 2020-01-01T00:00:00+00:00
-           1609459200LL,  // 2021-01-01T00:00:00+00:00
-           1640995200LL,  // 2022-01-01T00:00:00+00:00
-           1672531200LL,  // 2023-01-01T00:00:00+00:00
-           1704067200LL,  // 2024-01-01T00:00:00+00:00
-           1735689600LL,  // 2025-01-01T00:00:00+00:00
-       }) {
-    Transition& tr(*transitions_.emplace(transitions_.end()));
-    tr.unix_time = unix_time;
-    tr.type_index = 0;
-    tr.civil_sec = LocalTime(tr.unix_time, tt).cs;
-    tr.prev_civil_sec = tr.civil_sec - 1;
-  }
-
-  default_transition_type_ = 0;
-  abbreviations_ = FixedOffsetToAbbr(offset);
-  abbreviations_.append(1, '\0');
-  future_spec_.clear();  // never needed for a fixed-offset zone
-  extended_ = false;
-
-  tt.civil_max = LocalTime(seconds::max().count(), tt).cs;
-  tt.civil_min = LocalTime(seconds::min().count(), tt).cs;
-
-  transitions_.shrink_to_fit();
-  return true;
-}
-
-// Builds the in-memory header using the raw bytes from the file.
-bool TimeZoneInfo::Header::Build(const tzhead& tzh) {
-  std::int_fast32_t v;
-  if ((v = Decode32(tzh.tzh_timecnt)) < 0) return false;
-  timecnt = static_cast<std::size_t>(v);
-  if ((v = Decode32(tzh.tzh_typecnt)) < 0) return false;
-  typecnt = static_cast<std::size_t>(v);
-  if ((v = Decode32(tzh.tzh_charcnt)) < 0) return false;
-  charcnt = static_cast<std::size_t>(v);
-  if ((v = Decode32(tzh.tzh_leapcnt)) < 0) return false;
-  leapcnt = static_cast<std::size_t>(v);
-  if ((v = Decode32(tzh.tzh_ttisstdcnt)) < 0) return false;
-  ttisstdcnt = static_cast<std::size_t>(v);
-  if ((v = Decode32(tzh.tzh_ttisutcnt)) < 0) return false;
-  ttisutcnt = static_cast<std::size_t>(v);
-  return true;
-}
-
-// How many bytes of data are associated with this header. The result
-// depends upon whether this is a section with 4-byte or 8-byte times.
-std::size_t TimeZoneInfo::Header::DataLength(std::size_t time_len) const {
-  std::size_t len = 0;
-  len += (time_len + 1) * timecnt;  // unix_time + type_index
-  len += (4 + 1 + 1) * typecnt;     // utc_offset + is_dst + abbr_index
-  len += 1 * charcnt;               // abbreviations
-  len += (time_len + 4) * leapcnt;  // leap-time + TAI-UTC
-  len += 1 * ttisstdcnt;            // UTC/local indicators
-  len += 1 * ttisutcnt;             // standard/wall indicators
-  return len;
-}
-
-// zic(8) can generate no-op transitions when a zone changes rules at an
-// instant when there is actually no discontinuity.  So we check whether
-// two transitions have equivalent types (same offset/is_dst/abbr).
-bool TimeZoneInfo::EquivTransitions(std::uint_fast8_t tt1_index,
-                                    std::uint_fast8_t tt2_index) const {
-  if (tt1_index == tt2_index) return true;
-  const TransitionType& tt1(transition_types_[tt1_index]);
-  const TransitionType& tt2(transition_types_[tt2_index]);
-  if (tt1.utc_offset != tt2.utc_offset) return false;
-  if (tt1.is_dst != tt2.is_dst) return false;
-  if (tt1.abbr_index != tt2.abbr_index) return false;
-  return true;
-}
-
 // Find/make a transition type with these attributes.
 bool TimeZoneInfo::GetTransitionType(std::int_fast32_t utc_offset, bool is_dst,
                                      const std::string& abbr,
@@ -326,6 +293,20 @@ bool TimeZoneInfo::GetTransitionType(std::int_fast32_t utc_offset, bool is_dst,
   return true;
 }
 
+// zic(8) can generate no-op transitions when a zone changes rules at an
+// instant when there is actually no discontinuity.  So we check whether
+// two transitions have equivalent types (same offset/is_dst/abbr).
+bool TimeZoneInfo::EquivTransitions(std::uint_fast8_t tt1_index,
+                                    std::uint_fast8_t tt2_index) const {
+  if (tt1_index == tt2_index) return true;
+  const TransitionType& tt1(transition_types_[tt1_index]);
+  const TransitionType& tt2(transition_types_[tt2_index]);
+  if (tt1.utc_offset != tt2.utc_offset) return false;
+  if (tt1.is_dst != tt2.is_dst) return false;
+  if (tt1.abbr_index != tt2.abbr_index) return false;
+  return true;
+}
+
 // Use the POSIX-TZ-environment-variable-style string to handle times
 // in years after the last transition stored in the zoneinfo data.
 bool TimeZoneInfo::ExtendTransitions() {
@@ -351,11 +332,19 @@ bool TimeZoneInfo::ExtendTransitions() {
   if (!GetTransitionType(posix.dst_offset, true, posix.dst_abbr, &dst_ti))
     return false;
 
-  // Extend the transitions for an additional 400 years using the
-  // future specification. Years beyond those can be handled by
-  // mapping back to a cycle-equivalent year within that range.
-  // We may need two additional transitions for the current year.
-  transitions_.reserve(transitions_.size() + 400 * 2 + 2);
+  if (AllYearDST(posix)) {  // dst only
+    // The future specification should match the last transition, and
+    // that means that handling the future will fall out naturally.
+    return EquivTransitions(transitions_.back().type_index, dst_ti);
+  }
+
+  // Extend the transitions for an additional 401 years using the future
+  // specification. Years beyond those can be handled by mapping back to
+  // a cycle-equivalent year within that range. Note that we need 401
+  // (well, at least the first transition in the 401st year) so that the
+  // end of the 400th year is mapped back to an extended year. And first
+  // we may also need two additional transitions for the current year.
+  transitions_.reserve(transitions_.size() + 2 + 401 * 2);
   extended_ = true;
 
   const Transition& last(transitions_.back());
@@ -369,7 +358,7 @@ bool TimeZoneInfo::ExtendTransitions() {
 
   Transition dst = {0, dst_ti, civil_second(), civil_second()};
   Transition std = {0, std_ti, civil_second(), civil_second()};
-  for (const year_t limit = last_year_ + 400;; ++last_year_) {
+  for (const year_t limit = last_year_ + 401;; ++last_year_) {
     auto dst_trans_off = TransOffset(leap_year, jan1_weekday, posix.dst_start);
     auto std_trans_off = TransOffset(leap_year, jan1_weekday, posix.dst_end);
     dst.unix_time = jan1_time + dst_trans_off - posix.std_offset;
@@ -386,193 +375,6 @@ bool TimeZoneInfo::ExtendTransitions() {
     leap_year = !leap_year && IsLeap(last_year_ + 1);
   }
 
-  return true;
-}
-
-bool TimeZoneInfo::Load(ZoneInfoSource* zip) {
-  // Read and validate the header.
-  tzhead tzh;
-  if (zip->Read(&tzh, sizeof(tzh)) != sizeof(tzh)) return false;
-  if (strncmp(tzh.tzh_magic, TZ_MAGIC, sizeof(tzh.tzh_magic)) != 0)
-    return false;
-  Header hdr;
-  if (!hdr.Build(tzh)) return false;
-  std::size_t time_len = 4;
-  if (tzh.tzh_version[0] != '\0') {
-    // Skip the 4-byte data.
-    if (zip->Skip(hdr.DataLength(time_len)) != 0) return false;
-    // Read and validate the header for the 8-byte data.
-    if (zip->Read(&tzh, sizeof(tzh)) != sizeof(tzh)) return false;
-    if (strncmp(tzh.tzh_magic, TZ_MAGIC, sizeof(tzh.tzh_magic)) != 0)
-      return false;
-    if (tzh.tzh_version[0] == '\0') return false;
-    if (!hdr.Build(tzh)) return false;
-    time_len = 8;
-  }
-  if (hdr.typecnt == 0) return false;
-  if (hdr.leapcnt != 0) {
-    // This code assumes 60-second minutes so we do not want
-    // the leap-second encoded zoneinfo. We could reverse the
-    // compensation, but the "right" encoding is rarely used
-    // so currently we simply reject such data.
-    return false;
-  }
-  if (hdr.ttisstdcnt != 0 && hdr.ttisstdcnt != hdr.typecnt) return false;
-  if (hdr.ttisutcnt != 0 && hdr.ttisutcnt != hdr.typecnt) return false;
-
-  // Read the data into a local buffer.
-  std::size_t len = hdr.DataLength(time_len);
-  std::vector<char> tbuf(len);
-  if (zip->Read(tbuf.data(), len) != len) return false;
-  const char* bp = tbuf.data();
-
-  // Decode and validate the transitions.
-  transitions_.reserve(hdr.timecnt + 2);
-  transitions_.resize(hdr.timecnt);
-  for (std::size_t i = 0; i != hdr.timecnt; ++i) {
-    transitions_[i].unix_time = (time_len == 4) ? Decode32(bp) : Decode64(bp);
-    bp += time_len;
-    if (i != 0) {
-      // Check that the transitions are ordered by time (as zic guarantees).
-      if (!Transition::ByUnixTime()(transitions_[i - 1], transitions_[i]))
-        return false;  // out of order
-    }
-  }
-  bool seen_type_0 = false;
-  for (std::size_t i = 0; i != hdr.timecnt; ++i) {
-    transitions_[i].type_index = Decode8(bp++);
-    if (transitions_[i].type_index >= hdr.typecnt) return false;
-    if (transitions_[i].type_index == 0) seen_type_0 = true;
-  }
-
-  // Decode and validate the transition types.
-  transition_types_.reserve(hdr.typecnt + 2);
-  transition_types_.resize(hdr.typecnt);
-  for (std::size_t i = 0; i != hdr.typecnt; ++i) {
-    transition_types_[i].utc_offset =
-        static_cast<std::int_least32_t>(Decode32(bp));
-    if (transition_types_[i].utc_offset >= kSecsPerDay ||
-        transition_types_[i].utc_offset <= -kSecsPerDay)
-      return false;
-    bp += 4;
-    transition_types_[i].is_dst = (Decode8(bp++) != 0);
-    transition_types_[i].abbr_index = Decode8(bp++);
-    if (transition_types_[i].abbr_index >= hdr.charcnt) return false;
-  }
-
-  // Determine the before-first-transition type.
-  default_transition_type_ = 0;
-  if (seen_type_0 && hdr.timecnt != 0) {
-    std::uint_fast8_t index = 0;
-    if (transition_types_[0].is_dst) {
-      index = transitions_[0].type_index;
-      while (index != 0 && transition_types_[index].is_dst) --index;
-    }
-    while (index != hdr.typecnt && transition_types_[index].is_dst) ++index;
-    if (index != hdr.typecnt) default_transition_type_ = index;
-  }
-
-  // Copy all the abbreviations.
-  abbreviations_.reserve(hdr.charcnt + 10);
-  abbreviations_.assign(bp, hdr.charcnt);
-  bp += hdr.charcnt;
-
-  // Skip the unused portions. We've already dispensed with leap-second
-  // encoded zoneinfo. The ttisstd/ttisgmt indicators only apply when
-  // interpreting a POSIX spec that does not include start/end rules, and
-  // that isn't the case here (see "zic -p").
-  bp += (8 + 4) * hdr.leapcnt;  // leap-time + TAI-UTC
-  bp += 1 * hdr.ttisstdcnt;     // UTC/local indicators
-  bp += 1 * hdr.ttisutcnt;      // standard/wall indicators
-  assert(bp == tbuf.data() + tbuf.size());
-
-  future_spec_.clear();
-  if (tzh.tzh_version[0] != '\0') {
-    // Snarf up the NL-enclosed future POSIX spec. Note
-    // that version '3' files utilize an extended format.
-    auto get_char = [](ZoneInfoSource* azip) -> int {
-      unsigned char ch;  // all non-EOF results are positive
-      return (azip->Read(&ch, 1) == 1) ? ch : EOF;
-    };
-    if (get_char(zip) != '\n') return false;
-    for (int c = get_char(zip); c != '\n'; c = get_char(zip)) {
-      if (c == EOF) return false;
-      future_spec_.push_back(static_cast<char>(c));
-    }
-  }
-
-  // We don't check for EOF so that we're forwards compatible.
-
-  // If we did not find version information during the standard loading
-  // process (as of tzh_version '3' that is unsupported), then ask the
-  // ZoneInfoSource for any out-of-bound version string it may be privy to.
-  if (version_.empty()) {
-    version_ = zip->Version();
-  }
-
-  // Trim redundant transitions. zic may have added these to work around
-  // differences between the glibc and reference implementations (see
-  // zic.c:dontmerge) and the Qt library (see zic.c:WORK_AROUND_QTBUG_53071).
-  // For us, they just get in the way when we do future_spec_ extension.
-  while (hdr.timecnt > 1) {
-    if (!EquivTransitions(transitions_[hdr.timecnt - 1].type_index,
-                          transitions_[hdr.timecnt - 2].type_index)) {
-      break;
-    }
-    hdr.timecnt -= 1;
-  }
-  transitions_.resize(hdr.timecnt);
-
-  // Ensure that there is always a transition in the first half of the
-  // time line (the second half is handled below) so that the signed
-  // difference between a civil_second and the civil_second of its
-  // previous transition is always representable, without overflow.
-  if (transitions_.empty() || transitions_.front().unix_time >= 0) {
-    Transition& tr(*transitions_.emplace(transitions_.begin()));
-    tr.unix_time = -(1LL << 59);  // -18267312070-10-26T17:01:52+00:00
-    tr.type_index = default_transition_type_;
-  }
-
-  // Extend the transitions using the future specification.
-  if (!ExtendTransitions()) return false;
-
-  // Ensure that there is always a transition in the second half of the
-  // time line (the first half is handled above) so that the signed
-  // difference between a civil_second and the civil_second of its
-  // previous transition is always representable, without overflow.
-  const Transition& last(transitions_.back());
-  if (last.unix_time < 0) {
-    const std::uint_fast8_t type_index = last.type_index;
-    Transition& tr(*transitions_.emplace(transitions_.end()));
-    tr.unix_time = 2147483647;  // 2038-01-19T03:14:07+00:00
-    tr.type_index = type_index;
-  }
-
-  // Compute the local civil time for each transition and the preceding
-  // second. These will be used for reverse conversions in MakeTime().
-  const TransitionType* ttp = &transition_types_[default_transition_type_];
-  for (std::size_t i = 0; i != transitions_.size(); ++i) {
-    Transition& tr(transitions_[i]);
-    tr.prev_civil_sec = LocalTime(tr.unix_time, *ttp).cs - 1;
-    ttp = &transition_types_[tr.type_index];
-    tr.civil_sec = LocalTime(tr.unix_time, *ttp).cs;
-    if (i != 0) {
-      // Check that the transitions are ordered by civil time. Essentially
-      // this means that an offset change cannot cross another such change.
-      // No one does this in practice, and we depend on it in MakeTime().
-      if (!Transition::ByCivilTime()(transitions_[i - 1], tr))
-        return false;  // out of order
-    }
-  }
-
-  // Compute the maximum/minimum civil times that can be converted to a
-  // time_point<seconds> for each of the zone's transition types.
-  for (auto& tt : transition_types_) {
-    tt.civil_max = LocalTime(seconds::max().count(), tt).cs;
-    tt.civil_min = LocalTime(seconds::min().count(), tt).cs;
-  }
-
-  transitions_.shrink_to_fit();
   return true;
 }
 
@@ -774,6 +576,240 @@ std::unique_ptr<ZoneInfoSource> FuchsiaZoneInfoSource::Open(
 
 }  // namespace
 
+// What (no leap-seconds) UTC+seconds zoneinfo would look like.
+bool TimeZoneInfo::ResetToBuiltinUTC(const seconds& offset) {
+  transition_types_.resize(1);
+  TransitionType& tt(transition_types_.back());
+  tt.utc_offset = static_cast<std::int_least32_t>(offset.count());
+  tt.is_dst = false;
+  tt.abbr_index = 0;
+
+  // We temporarily add some redundant, contemporary (2015 through 2025)
+  // transitions for performance reasons.  See TimeZoneInfo::LocalTime().
+  // TODO: Fix the performance issue and remove the extra transitions.
+  transitions_.clear();
+  transitions_.reserve(12);
+  for (const std::int_fast64_t unix_time : {
+           -(1LL << 59),  // a "first half" transition
+           1420070400LL,  // 2015-01-01T00:00:00+00:00
+           1451606400LL,  // 2016-01-01T00:00:00+00:00
+           1483228800LL,  // 2017-01-01T00:00:00+00:00
+           1514764800LL,  // 2018-01-01T00:00:00+00:00
+           1546300800LL,  // 2019-01-01T00:00:00+00:00
+           1577836800LL,  // 2020-01-01T00:00:00+00:00
+           1609459200LL,  // 2021-01-01T00:00:00+00:00
+           1640995200LL,  // 2022-01-01T00:00:00+00:00
+           1672531200LL,  // 2023-01-01T00:00:00+00:00
+           1704067200LL,  // 2024-01-01T00:00:00+00:00
+           1735689600LL,  // 2025-01-01T00:00:00+00:00
+       }) {
+    Transition& tr(*transitions_.emplace(transitions_.end()));
+    tr.unix_time = unix_time;
+    tr.type_index = 0;
+    tr.civil_sec = LocalTime(tr.unix_time, tt).cs;
+    tr.prev_civil_sec = tr.civil_sec - 1;
+  }
+
+  default_transition_type_ = 0;
+  abbreviations_ = FixedOffsetToAbbr(offset);
+  abbreviations_.append(1, '\0');
+  future_spec_.clear();  // never needed for a fixed-offset zone
+  extended_ = false;
+
+  tt.civil_max = LocalTime(seconds::max().count(), tt).cs;
+  tt.civil_min = LocalTime(seconds::min().count(), tt).cs;
+
+  transitions_.shrink_to_fit();
+  return true;
+}
+
+bool TimeZoneInfo::Load(ZoneInfoSource* zip) {
+  // Read and validate the header.
+  tzhead tzh;
+  if (zip->Read(&tzh, sizeof(tzh)) != sizeof(tzh)) return false;
+  if (strncmp(tzh.tzh_magic, TZ_MAGIC, sizeof(tzh.tzh_magic)) != 0)
+    return false;
+  Header hdr;
+  if (!hdr.Build(tzh)) return false;
+  std::size_t time_len = 4;
+  if (tzh.tzh_version[0] != '\0') {
+    // Skip the 4-byte data.
+    if (zip->Skip(hdr.DataLength(time_len)) != 0) return false;
+    // Read and validate the header for the 8-byte data.
+    if (zip->Read(&tzh, sizeof(tzh)) != sizeof(tzh)) return false;
+    if (strncmp(tzh.tzh_magic, TZ_MAGIC, sizeof(tzh.tzh_magic)) != 0)
+      return false;
+    if (tzh.tzh_version[0] == '\0') return false;
+    if (!hdr.Build(tzh)) return false;
+    time_len = 8;
+  }
+  if (hdr.typecnt == 0) return false;
+  if (hdr.leapcnt != 0) {
+    // This code assumes 60-second minutes so we do not want
+    // the leap-second encoded zoneinfo. We could reverse the
+    // compensation, but the "right" encoding is rarely used
+    // so currently we simply reject such data.
+    return false;
+  }
+  if (hdr.ttisstdcnt != 0 && hdr.ttisstdcnt != hdr.typecnt) return false;
+  if (hdr.ttisutcnt != 0 && hdr.ttisutcnt != hdr.typecnt) return false;
+
+  // Read the data into a local buffer.
+  std::size_t len = hdr.DataLength(time_len);
+  std::vector<char> tbuf(len);
+  if (zip->Read(tbuf.data(), len) != len) return false;
+  const char* bp = tbuf.data();
+
+  // Decode and validate the transitions.
+  transitions_.reserve(hdr.timecnt + 2);
+  transitions_.resize(hdr.timecnt);
+  for (std::size_t i = 0; i != hdr.timecnt; ++i) {
+    transitions_[i].unix_time = (time_len == 4) ? Decode32(bp) : Decode64(bp);
+    bp += time_len;
+    if (i != 0) {
+      // Check that the transitions are ordered by time (as zic guarantees).
+      if (!Transition::ByUnixTime()(transitions_[i - 1], transitions_[i]))
+        return false;  // out of order
+    }
+  }
+  bool seen_type_0 = false;
+  for (std::size_t i = 0; i != hdr.timecnt; ++i) {
+    transitions_[i].type_index = Decode8(bp++);
+    if (transitions_[i].type_index >= hdr.typecnt) return false;
+    if (transitions_[i].type_index == 0) seen_type_0 = true;
+  }
+
+  // Decode and validate the transition types.
+  transition_types_.reserve(hdr.typecnt + 2);
+  transition_types_.resize(hdr.typecnt);
+  for (std::size_t i = 0; i != hdr.typecnt; ++i) {
+    transition_types_[i].utc_offset =
+        static_cast<std::int_least32_t>(Decode32(bp));
+    if (transition_types_[i].utc_offset >= kSecsPerDay ||
+        transition_types_[i].utc_offset <= -kSecsPerDay)
+      return false;
+    bp += 4;
+    transition_types_[i].is_dst = (Decode8(bp++) != 0);
+    transition_types_[i].abbr_index = Decode8(bp++);
+    if (transition_types_[i].abbr_index >= hdr.charcnt) return false;
+  }
+
+  // Determine the before-first-transition type.
+  default_transition_type_ = 0;
+  if (seen_type_0 && hdr.timecnt != 0) {
+    std::uint_fast8_t index = 0;
+    if (transition_types_[0].is_dst) {
+      index = transitions_[0].type_index;
+      while (index != 0 && transition_types_[index].is_dst) --index;
+    }
+    while (index != hdr.typecnt && transition_types_[index].is_dst) ++index;
+    if (index != hdr.typecnt) default_transition_type_ = index;
+  }
+
+  // Copy all the abbreviations.
+  abbreviations_.reserve(hdr.charcnt + 10);
+  abbreviations_.assign(bp, hdr.charcnt);
+  bp += hdr.charcnt;
+
+  // Skip the unused portions. We've already dispensed with leap-second
+  // encoded zoneinfo. The ttisstd/ttisgmt indicators only apply when
+  // interpreting a POSIX spec that does not include start/end rules, and
+  // that isn't the case here (see "zic -p").
+  bp += (time_len + 4) * hdr.leapcnt;  // leap-time + TAI-UTC
+  bp += 1 * hdr.ttisstdcnt;            // UTC/local indicators
+  bp += 1 * hdr.ttisutcnt;             // standard/wall indicators
+  assert(bp == tbuf.data() + tbuf.size());
+
+  future_spec_.clear();
+  if (tzh.tzh_version[0] != '\0') {
+    // Snarf up the NL-enclosed future POSIX spec. Note
+    // that version '3' files utilize an extended format.
+    auto get_char = [](ZoneInfoSource* azip) -> int {
+      unsigned char ch;  // all non-EOF results are positive
+      return (azip->Read(&ch, 1) == 1) ? ch : EOF;
+    };
+    if (get_char(zip) != '\n') return false;
+    for (int c = get_char(zip); c != '\n'; c = get_char(zip)) {
+      if (c == EOF) return false;
+      future_spec_.push_back(static_cast<char>(c));
+    }
+  }
+
+  // We don't check for EOF so that we're forwards compatible.
+
+  // If we did not find version information during the standard loading
+  // process (as of tzh_version '3' that is unsupported), then ask the
+  // ZoneInfoSource for any out-of-bound version string it may be privy to.
+  if (version_.empty()) {
+    version_ = zip->Version();
+  }
+
+  // Trim redundant transitions. zic may have added these to work around
+  // differences between the glibc and reference implementations (see
+  // zic.c:dontmerge) or to avoid bugs in old readers. For us, they just
+  // get in the way when we do future_spec_ extension.
+  while (hdr.timecnt > 1) {
+    if (!EquivTransitions(transitions_[hdr.timecnt - 1].type_index,
+                          transitions_[hdr.timecnt - 2].type_index)) {
+      break;
+    }
+    hdr.timecnt -= 1;
+  }
+  transitions_.resize(hdr.timecnt);
+
+  // Ensure that there is always a transition in the first half of the
+  // time line (the second half is handled below) so that the signed
+  // difference between a civil_second and the civil_second of its
+  // previous transition is always representable, without overflow.
+  if (transitions_.empty() || transitions_.front().unix_time >= 0) {
+    Transition& tr(*transitions_.emplace(transitions_.begin()));
+    tr.unix_time = -(1LL << 59);  // -18267312070-10-26T17:01:52+00:00
+    tr.type_index = default_transition_type_;
+  }
+
+  // Extend the transitions using the future specification.
+  if (!ExtendTransitions()) return false;
+
+  // Ensure that there is always a transition in the second half of the
+  // time line (the first half is handled above) so that the signed
+  // difference between a civil_second and the civil_second of its
+  // previous transition is always representable, without overflow.
+  const Transition& last(transitions_.back());
+  if (last.unix_time < 0) {
+    const std::uint_fast8_t type_index = last.type_index;
+    Transition& tr(*transitions_.emplace(transitions_.end()));
+    tr.unix_time = 2147483647;  // 2038-01-19T03:14:07+00:00
+    tr.type_index = type_index;
+  }
+
+  // Compute the local civil time for each transition and the preceding
+  // second. These will be used for reverse conversions in MakeTime().
+  const TransitionType* ttp = &transition_types_[default_transition_type_];
+  for (std::size_t i = 0; i != transitions_.size(); ++i) {
+    Transition& tr(transitions_[i]);
+    tr.prev_civil_sec = LocalTime(tr.unix_time, *ttp).cs - 1;
+    ttp = &transition_types_[tr.type_index];
+    tr.civil_sec = LocalTime(tr.unix_time, *ttp).cs;
+    if (i != 0) {
+      // Check that the transitions are ordered by civil time. Essentially
+      // this means that an offset change cannot cross another such change.
+      // No one does this in practice, and we depend on it in MakeTime().
+      if (!Transition::ByCivilTime()(transitions_[i - 1], tr))
+        return false;  // out of order
+    }
+  }
+
+  // Compute the maximum/minimum civil times that can be converted to a
+  // time_point<seconds> for each of the zone's transition types.
+  for (auto& tt : transition_types_) {
+    tt.civil_max = LocalTime(seconds::max().count(), tt).cs;
+    tt.civil_min = LocalTime(seconds::min().count(), tt).cs;
+  }
+
+  transitions_.shrink_to_fit();
+  return true;
+}
+
 bool TimeZoneInfo::Load(const std::string& name) {
   // We can ensure that the loading of UTC or any other fixed-offset
   // zone never fails because the simple, fixed-offset state can be
@@ -793,6 +829,18 @@ bool TimeZoneInfo::Load(const std::string& name) {
         return nullptr;
       });
   return zip != nullptr && Load(zip.get());
+}
+
+std::unique_ptr<TimeZoneInfo> TimeZoneInfo::UTC() {
+  auto tz = std::unique_ptr<TimeZoneInfo>(new TimeZoneInfo);
+  tz->ResetToBuiltinUTC(seconds::zero());
+  return tz;
+}
+
+std::unique_ptr<TimeZoneInfo> TimeZoneInfo::Make(const std::string& name) {
+  auto tz = std::unique_ptr<TimeZoneInfo>(new TimeZoneInfo);
+  if (!tz->Load(name)) tz.reset();  // fallback to UTC
+  return tz;
 }
 
 // BreakTime() translation for a particular transition type.

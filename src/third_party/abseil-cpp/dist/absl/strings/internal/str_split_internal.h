@@ -132,7 +132,8 @@ class SplitIterator {
       const absl::string_view text = splitter_->text();
       const absl::string_view d = delimiter_.Find(text, pos_);
       if (d.data() == text.data() + text.size()) state_ = kLastState;
-      curr_ = text.substr(pos_, d.data() - (text.data() + pos_));
+      curr_ = text.substr(pos_,
+                          static_cast<size_t>(d.data() - (text.data() + pos_)));
       pos_ += curr_.size() + d.size();
     } while (!predicate_(curr_));
     return *this;
@@ -234,6 +235,24 @@ struct SplitterIsConvertibleTo
           HasMappedType<C>::value> {
 };
 
+template <typename StringType, typename Container, typename = void>
+struct ShouldUseLifetimeBound : std::false_type {};
+
+template <typename StringType, typename Container>
+struct ShouldUseLifetimeBound<
+    StringType, Container,
+    std::enable_if_t<
+        std::is_same<StringType, std::string>::value &&
+        std::is_same<typename Container::value_type, absl::string_view>::value>>
+    : std::true_type {};
+
+template <typename StringType, typename First, typename Second>
+using ShouldUseLifetimeBoundForPair = std::integral_constant<
+    bool, std::is_same<StringType, std::string>::value &&
+              (std::is_same<First, absl::string_view>::value ||
+               std::is_same<Second, absl::string_view>::value)>;
+
+
 // This class implements the range that is returned by absl::StrSplit(). This
 // class has templated conversion operators that allow it to be implicitly
 // converted to a variety of types that the caller may have specified on the
@@ -280,10 +299,24 @@ class Splitter {
 
   // An implicit conversion operator that is restricted to only those containers
   // that the splitter is convertible to.
-  template <typename Container,
-            typename = typename std::enable_if<
-                SplitterIsConvertibleTo<Container>::value>::type>
-  operator Container() const {  // NOLINT(runtime/explicit)
+  template <
+      typename Container,
+      std::enable_if_t<ShouldUseLifetimeBound<StringType, Container>::value &&
+                           SplitterIsConvertibleTo<Container>::value,
+                       std::nullptr_t> = nullptr>
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  operator Container() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return ConvertToContainer<Container, typename Container::value_type,
+                              HasMappedType<Container>::value>()(*this);
+  }
+
+  template <
+      typename Container,
+      std::enable_if_t<!ShouldUseLifetimeBound<StringType, Container>::value &&
+                           SplitterIsConvertibleTo<Container>::value,
+                       std::nullptr_t> = nullptr>
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  operator Container() const {
     return ConvertToContainer<Container, typename Container::value_type,
                               HasMappedType<Container>::value>()(*this);
   }
@@ -292,8 +325,27 @@ class Splitter {
   // strings returned by the begin() iterator. Either/both of .first and .second
   // will be constructed with empty strings if the iterator doesn't have a
   // corresponding value.
+  template <typename First, typename Second,
+            std::enable_if_t<
+                ShouldUseLifetimeBoundForPair<StringType, First, Second>::value,
+                std::nullptr_t> = nullptr>
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  operator std::pair<First, Second>() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return ConvertToPair<First, Second>();
+  }
+
+  template <typename First, typename Second,
+            std::enable_if_t<!ShouldUseLifetimeBoundForPair<StringType, First,
+                                                            Second>::value,
+                             std::nullptr_t> = nullptr>
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  operator std::pair<First, Second>() const {
+    return ConvertToPair<First, Second>();
+  }
+
+ private:
   template <typename First, typename Second>
-  operator std::pair<First, Second>() const {  // NOLINT(runtime/explicit)
+  std::pair<First, Second> ConvertToPair() const {
     absl::string_view first, second;
     auto it = begin();
     if (it != end()) {
@@ -305,7 +357,6 @@ class Splitter {
     return {First(first), Second(second)};
   }
 
- private:
   // ConvertToContainer is a functor converting a Splitter to the requested
   // Container of ValueType. It is specialized below to optimize splitting to
   // certain combinations of Container and ValueType.

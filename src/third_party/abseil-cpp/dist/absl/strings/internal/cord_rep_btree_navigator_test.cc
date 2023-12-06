@@ -48,7 +48,7 @@ using Position = CordRepBtreeNavigator::Position;
 // CordRepBtreeNavigatorTest is a test fixture which automatically creates a
 // tree to test navigation logic on. The parameter `count' defines the number of
 // data edges in the test tree.
-class CordRepBtreeNavigatorTest : public testing::TestWithParam<int> {
+class CordRepBtreeNavigatorTest : public testing::TestWithParam<size_t> {
  public:
   using Flats = std::vector<CordRep*>;
   static constexpr size_t kCharsPerFlat = 3;
@@ -71,12 +71,12 @@ class CordRepBtreeNavigatorTest : public testing::TestWithParam<int> {
 
   ~CordRepBtreeNavigatorTest() override { CordRep::Unref(tree_); }
 
-  int count() const { return GetParam(); }
+  size_t count() const { return GetParam(); }
   CordRepBtree* tree() { return tree_; }
   const std::string& data() const { return data_; }
   const std::vector<CordRep*>& flats() const { return flats_; }
 
-  static std::string ToString(testing::TestParamInfo<int> param) {
+  static std::string ToString(testing::TestParamInfo<size_t> param) {
     return absl::StrCat(param.param, "_Flats");
   }
 
@@ -131,15 +131,15 @@ TEST_P(CordRepBtreeNavigatorTest, NextPrev) {
 
   EXPECT_THAT(nav.Previous(), Eq(nullptr));
   EXPECT_THAT(nav.Current(), Eq(flats.front()));
-  for (int i = 1; i < flats.size(); ++i) {
+  for (size_t i = 1; i < flats.size(); ++i) {
     ASSERT_THAT(nav.Next(), Eq(flats[i]));
     EXPECT_THAT(nav.Current(), Eq(flats[i]));
   }
   EXPECT_THAT(nav.Next(), Eq(nullptr));
   EXPECT_THAT(nav.Current(), Eq(flats.back()));
-  for (int i = static_cast<int>(flats.size()) - 2; i >= 0; --i) {
-    ASSERT_THAT(nav.Previous(), Eq(flats[i]));
-    EXPECT_THAT(nav.Current(), Eq(flats[i]));
+  for (size_t i = flats.size() - 1; i > 0; --i) {
+    ASSERT_THAT(nav.Previous(), Eq(flats[i - 1]));
+    EXPECT_THAT(nav.Current(), Eq(flats[i - 1]));
   }
   EXPECT_THAT(nav.Previous(), Eq(nullptr));
   EXPECT_THAT(nav.Current(), Eq(flats.front()));
@@ -152,13 +152,13 @@ TEST_P(CordRepBtreeNavigatorTest, PrevNext) {
 
   EXPECT_THAT(nav.Next(), Eq(nullptr));
   EXPECT_THAT(nav.Current(), Eq(flats.back()));
-  for (int i = static_cast<int>(flats.size()) - 2; i >= 0; --i) {
-    ASSERT_THAT(nav.Previous(), Eq(flats[i]));
-    EXPECT_THAT(nav.Current(), Eq(flats[i]));
+  for (size_t i = flats.size() - 1; i > 0; --i) {
+    ASSERT_THAT(nav.Previous(), Eq(flats[i - 1]));
+    EXPECT_THAT(nav.Current(), Eq(flats[i - 1]));
   }
   EXPECT_THAT(nav.Previous(), Eq(nullptr));
   EXPECT_THAT(nav.Current(), Eq(flats.front()));
-  for (int i = 1; i < flats.size(); ++i) {
+  for (size_t i = 1; i < flats.size(); ++i) {
     ASSERT_THAT(nav.Next(), Eq(flats[i]));
     EXPECT_THAT(nav.Current(), Eq(flats[i]));
   }
@@ -180,21 +180,21 @@ TEST(CordRepBtreeNavigatorTest, Reset) {
 }
 
 TEST_P(CordRepBtreeNavigatorTest, Skip) {
-  int count = this->count();
+  size_t count = this->count();
   const Flats& flats = this->flats();
   CordRepBtreeNavigator nav;
   nav.InitFirst(tree());
 
-  for (int char_offset = 0; char_offset < kCharsPerFlat; ++char_offset) {
+  for (size_t char_offset = 0; char_offset < kCharsPerFlat; ++char_offset) {
     Position pos = nav.Skip(char_offset);
     EXPECT_THAT(pos.edge, Eq(nav.Current()));
     EXPECT_THAT(pos.edge, Eq(flats[0]));
     EXPECT_THAT(pos.offset, Eq(char_offset));
   }
 
-  for (int index1 = 0; index1 < count; ++index1) {
-    for (int index2 = index1; index2 < count; ++index2) {
-      for (int char_offset = 0; char_offset < kCharsPerFlat; ++char_offset) {
+  for (size_t index1 = 0; index1 < count; ++index1) {
+    for (size_t index2 = index1; index2 < count; ++index2) {
+      for (size_t char_offset = 0; char_offset < kCharsPerFlat; ++char_offset) {
         CordRepBtreeNavigator nav;
         nav.InitFirst(tree());
 
@@ -215,20 +215,20 @@ TEST_P(CordRepBtreeNavigatorTest, Skip) {
 }
 
 TEST_P(CordRepBtreeNavigatorTest, Seek) {
-  int count = this->count();
+  size_t count = this->count();
   const Flats& flats = this->flats();
   CordRepBtreeNavigator nav;
   nav.InitFirst(tree());
 
-  for (int char_offset = 0; char_offset < kCharsPerFlat; ++char_offset) {
+  for (size_t char_offset = 0; char_offset < kCharsPerFlat; ++char_offset) {
     Position pos = nav.Seek(char_offset);
     EXPECT_THAT(pos.edge, Eq(nav.Current()));
     EXPECT_THAT(pos.edge, Eq(flats[0]));
     EXPECT_THAT(pos.offset, Eq(char_offset));
   }
 
-  for (int index = 0; index < count; ++index) {
-    for (int char_offset = 0; char_offset < kCharsPerFlat; ++char_offset) {
+  for (size_t index = 0; index < count; ++index) {
+    for (size_t char_offset = 0; char_offset < kCharsPerFlat; ++char_offset) {
       size_t offset = index * kCharsPerFlat + char_offset;
       Position pos1 = nav.Seek(offset);
       ASSERT_THAT(pos1.edge, Eq(flats[index]));
@@ -249,7 +249,7 @@ TEST(CordRepBtreeNavigatorTest, InitOffset) {
   EXPECT_THAT(nav.btree(), Eq(tree));
   EXPECT_THAT(pos.edge, Eq(tree->Edges()[1]));
   EXPECT_THAT(pos.edge, Eq(nav.Current()));
-  EXPECT_THAT(pos.offset, Eq(2));
+  EXPECT_THAT(pos.offset, Eq(2u));
   CordRep::Unref(tree);
 }
 
@@ -317,6 +317,27 @@ TEST_P(CordRepBtreeNavigatorTest, ReadBeyondLengthOfTree) {
   nav.InitFirst(tree());
   ReadResult result = nav.Read(2, tree()->length);
   ASSERT_THAT(result.tree, Eq(nullptr));
+}
+
+TEST(CordRepBtreeNavigatorTest, NavigateMaximumTreeDepth) {
+  CordRepFlat* flat1 = MakeFlat("Hello world");
+  CordRepFlat* flat2 = MakeFlat("World Hello");
+
+  CordRepBtree* node = CordRepBtree::Create(flat1);
+  node = CordRepBtree::Append(node, flat2);
+  while (node->height() < CordRepBtree::kMaxHeight) {
+    node = CordRepBtree::New(node);
+  }
+
+  CordRepBtreeNavigator nav;
+  CordRep* edge = nav.InitFirst(node);
+  EXPECT_THAT(edge, Eq(flat1));
+  EXPECT_THAT(nav.Next(), Eq(flat2));
+  EXPECT_THAT(nav.Next(), Eq(nullptr));
+  EXPECT_THAT(nav.Previous(), Eq(flat1));
+  EXPECT_THAT(nav.Previous(), Eq(nullptr));
+
+  CordRep::Unref(node);
 }
 
 }  // namespace

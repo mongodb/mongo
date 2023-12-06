@@ -64,19 +64,6 @@ struct Elem<CompressedTuple<B...>, I>
 template <typename D, size_t I>
 using ElemT = typename Elem<D, I>::type;
 
-// Use the __is_final intrinsic if available. Where it's not available, classes
-// declared with the 'final' specifier cannot be used as CompressedTuple
-// elements.
-// TODO(sbenza): Replace this with std::is_final in C++14.
-template <typename T>
-constexpr bool IsFinal() {
-#if defined(__clang__) || defined(__GNUC__)
-  return __is_final(T);
-#else
-  return false;
-#endif
-}
-
 // We can't use EBCO on other CompressedTuples because that would mean that we
 // derive from multiple Storage<> instantiations with the same I parameter,
 // and potentially from multiple identical Storage<> instantiations.  So anytime
@@ -86,20 +73,15 @@ struct uses_inheritance {};
 
 template <typename T>
 constexpr bool ShouldUseBase() {
-  return std::is_class<T>::value && std::is_empty<T>::value && !IsFinal<T>() &&
+  return std::is_class<T>::value && std::is_empty<T>::value &&
+         !std::is_final<T>::value &&
          !std::is_base_of<uses_inheritance, T>::value;
 }
 
 // The storage class provides two specializations:
 //  - For empty classes, it stores T as a base class.
 //  - For everything else, it stores T as a member.
-template <typename T, size_t I,
-#if defined(_MSC_VER)
-          bool UseBase =
-              ShouldUseBase<typename std::enable_if<true, T>::type>()>
-#else
-          bool UseBase = ShouldUseBase<T>()>
-#endif
+template <typename T, size_t I, bool UseBase = ShouldUseBase<T>()>
 struct Storage {
   T value;
   constexpr Storage() = default;

@@ -12,6 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+
+load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -21,6 +24,30 @@ config_setting(
     name = "clang_compiler",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "clang",
+    },
+    visibility = [":__subpackages__"],
+)
+
+config_setting(
+    name = "gcc_compiler",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "gcc",
+    },
+    visibility = [":__subpackages__"],
+)
+
+config_setting(
+    name = "mingw_unspecified_compiler",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "mingw",
+    },
+    visibility = [":__subpackages__"],
+)
+
+config_setting(
+    name = "mingw-gcc_compiler",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "mingw-gcc",
     },
     visibility = [":__subpackages__"],
 )
@@ -64,10 +91,45 @@ config_setting(
 )
 
 config_setting(
-    name = "wasm",
+    name = "cpu_wasm",
+    values = {
+        "cpu": "wasm",
+    },
+    visibility = [":__subpackages__"],
+)
+
+config_setting(
+    name = "cpu_wasm32",
     values = {
         "cpu": "wasm32",
     },
+    visibility = [":__subpackages__"],
+)
+
+config_setting(
+    name = "platforms_wasm32",
+    constraint_values = [
+        "@platforms//cpu:wasm32",
+    ],
+    visibility = [":__subpackages__"],
+)
+
+config_setting(
+    name = "platforms_wasm64",
+    constraint_values = [
+        "@platforms//cpu:wasm64",
+    ],
+    visibility = [":__subpackages__"],
+)
+
+selects.config_setting_group(
+    name = "wasm",
+    match_any = [
+        ":cpu_wasm",
+        ":cpu_wasm32",
+        ":platforms_wasm32",
+        ":platforms_wasm64",
+    ],
     visibility = [":__subpackages__"],
 )
 
@@ -76,5 +138,14 @@ config_setting(
     values = {
         "cpu": "fuchsia",
     },
+    visibility = [":__subpackages__"],
+)
+
+selects.config_setting_group(
+    name = "mingw_compiler",
+    match_any = [
+        ":mingw_unspecified_compiler",
+        ":mingw-gcc_compiler",
+    ],
     visibility = [":__subpackages__"],
 )

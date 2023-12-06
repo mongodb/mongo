@@ -43,12 +43,14 @@ cc_test(
     linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":algorithm",
+        "//absl/base:config",
         "@com_google_googletest//:gtest_main",
     ],
 )
 
-cc_test(
+cc_binary(
     name = "algorithm_benchmark",
+    testonly = 1,
     srcs = ["equal_benchmark.cc"],
     copts = ABSL_TEST_COPTS,
     linkopts = ABSL_DEFAULT_LINKOPTS,

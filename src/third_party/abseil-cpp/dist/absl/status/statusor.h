@@ -106,7 +106,13 @@ class BadStatusOrAccess : public std::exception {
 
 // Returned StatusOr objects may not be ignored.
 template <typename T>
+#if ABSL_HAVE_CPP_ATTRIBUTE(nodiscard)
+// TODO(b/176172494): ABSL_MUST_USE_RESULT should expand to the more strict
+// [[nodiscard]]. For now, just use [[nodiscard]] directly when it is available.
+class [[nodiscard]] StatusOr;
+#else
 class ABSL_MUST_USE_RESULT StatusOr;
+#endif  // ABSL_HAVE_CPP_ATTRIBUTE(nodiscard)
 
 // absl::StatusOr<T>
 //
@@ -140,7 +146,7 @@ class ABSL_MUST_USE_RESULT StatusOr;
 //
 //   absl::StatusOr<int> i = GetCount();
 //   if (i.ok()) {
-//     updated_total += *i
+//     updated_total += *i;
 //   }
 //
 // NOTE: using `absl::StatusOr<T>::value()` when no valid value is present will
@@ -156,8 +162,8 @@ class ABSL_MUST_USE_RESULT StatusOr;
 // A `absl::StatusOr<T*>` can be constructed from a null pointer like any other
 // pointer value, and the result will be that `ok()` returns `true` and
 // `value()` returns `nullptr`. Checking the value of pointer in an
-// `absl::StatusOr<T>` generally requires a bit more care, to ensure both that a
-// value is present and that value is not null:
+// `absl::StatusOr<T*>` generally requires a bit more care, to ensure both that
+// a value is present and that value is not null:
 //
 //  StatusOr<std::unique_ptr<Foo>> result = FooFactory::MakeNewFoo(arg);
 //  if (!result.ok()) {
@@ -405,7 +411,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
       typename = typename std::enable_if<absl::conjunction<
           std::is_constructible<T, U&&>, std::is_assignable<T&, U&&>,
           absl::disjunction<
-              std::is_same<absl::remove_cv_t<absl::remove_reference_t<U>>, T>,
+              std::is_same<absl::remove_cvref_t<U>, T>,
               absl::conjunction<
                   absl::negation<std::is_convertible<U&&, absl::Status>>,
                   absl::negation<internal_statusor::
@@ -438,8 +444,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
               internal_statusor::IsDirectInitializationValid<T, U&&>,
               std::is_constructible<T, U&&>, std::is_convertible<U&&, T>,
               absl::disjunction<
-                  std::is_same<absl::remove_cv_t<absl::remove_reference_t<U>>,
-                               T>,
+                  std::is_same<absl::remove_cvref_t<U>, T>,
                   absl::conjunction<
                       absl::negation<std::is_convertible<U&&, absl::Status>>,
                       absl::negation<
@@ -455,8 +460,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
           absl::conjunction<
               internal_statusor::IsDirectInitializationValid<T, U&&>,
               absl::disjunction<
-                  std::is_same<absl::remove_cv_t<absl::remove_reference_t<U>>,
-                               T>,
+                  std::is_same<absl::remove_cvref_t<U>, T>,
                   absl::conjunction<
                       absl::negation<std::is_constructible<absl::Status, U&&>>,
                       absl::negation<
@@ -471,7 +475,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // StatusOr<T>::ok()
   //
   // Returns whether or not this `absl::StatusOr<T>` holds a `T` value. This
-  // member function is analagous to `absl::Status::ok()` and should be used
+  // member function is analogous to `absl::Status::ok()` and should be used
   // similarly to check the status of return values.
   //
   // Example:
@@ -578,7 +582,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // Reconstructs the inner value T in-place using the provided args, using the
   // T(args...) constructor. Returns reference to the reconstructed `T`.
   template <typename... Args>
-  T& emplace(Args&&... args) {
+  T& emplace(Args&&... args) ABSL_ATTRIBUTE_LIFETIME_BOUND {
     if (ok()) {
       this->Clear();
       this->MakeValue(std::forward<Args>(args)...);
@@ -594,7 +598,8 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
       absl::enable_if_t<
           std::is_constructible<T, std::initializer_list<U>&, Args&&...>::value,
           int> = 0>
-  T& emplace(std::initializer_list<U> ilist, Args&&... args) {
+  T& emplace(std::initializer_list<U> ilist,
+             Args&&... args) ABSL_ATTRIBUTE_LIFETIME_BOUND {
     if (ok()) {
       this->Clear();
       this->MakeValue(ilist, std::forward<Args>(args)...);
@@ -604,6 +609,21 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
     }
     return this->data_;
   }
+
+  // StatusOr<T>::AssignStatus()
+  //
+  // Sets the status of `absl::StatusOr<T>` to the given non-ok status value.
+  //
+  // NOTE: We recommend using the constructor and `operator=` where possible.
+  // This method is intended for use in generic programming, to enable setting
+  // the status of a `StatusOr<T>` when `T` may be `Status`. In that case, the
+  // constructor and `operator=` would assign into the inner value of type
+  // `Status`, rather than status of the `StatusOr` (b/280392796).
+  //
+  // REQUIRES: !Status(std::forward<U>(v)).ok(). This requirement is DCHECKed.
+  // In optimized builds, passing absl::OkStatus() here will have the effect
+  // of passing absl::StatusCode::kInternal as a fallback.
+  using internal_statusor::StatusOrData<T>::AssignStatus;
 
  private:
   using internal_statusor::StatusOrData<T>::Assign;

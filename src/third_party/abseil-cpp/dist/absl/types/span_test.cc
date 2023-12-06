@@ -191,7 +191,7 @@ TEST(IntSpan, SpanOfDerived) {
 }
 
 void TestInitializerList(absl::Span<const int> s, const std::vector<int>& v) {
-  EXPECT_TRUE(absl::equal(s.begin(), s.end(), v.begin(), v.end()));
+  EXPECT_TRUE(std::equal(s.begin(), s.end(), v.begin(), v.end()));
 }
 
 TEST(ConstIntSpan, InitializerListConversion) {

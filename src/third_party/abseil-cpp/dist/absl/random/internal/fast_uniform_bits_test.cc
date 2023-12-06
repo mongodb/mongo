@@ -167,7 +167,7 @@ TEST(FastUniformBitsTest, RangeSize) {
              FakeUrbg<uint64_t, 0, (std::numeric_limits<uint64_t>::max)()>>()));
 }
 
-// The constants need to be choosen so that an infinite rejection loop doesn't
+// The constants need to be chosen so that an infinite rejection loop doesn't
 // happen...
 using Urng1_5bit = FakeUrbg<uint8_t, 0, 2, 0>;  // ~1.5 bits (range 3)
 using Urng4bits = FakeUrbg<uint8_t, 1, 0x10, 2>;

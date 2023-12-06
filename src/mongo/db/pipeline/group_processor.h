@@ -32,6 +32,8 @@
 #include <memory>
 #include <utility>
 
+#include <boost/optional.hpp>
+
 #include "mongo/db/pipeline/group_processor_base.h"
 #include "mongo/db/sorter/sorter.h"
 
@@ -110,7 +112,7 @@ private:
     void spill();
 
     // Only used when '_spilled' is false.
-    GroupProcessorBase::GroupsMap::iterator _groupsIterator;
+    boost::optional<GroupProcessorBase::GroupsMap::iterator> _groupsIterator;
 
     // Tracks the size of the spill file.
     std::unique_ptr<SorterFileStats> _spillStats;

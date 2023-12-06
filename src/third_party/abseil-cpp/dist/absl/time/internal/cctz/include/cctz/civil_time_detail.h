@@ -84,14 +84,13 @@ CONSTEXPR_F bool is_leap_year(year_t y) noexcept {
   return y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
 }
 CONSTEXPR_F int year_index(year_t y, month_t m) noexcept {
-  return (static_cast<int>((y + (m > 2)) % 400) + 400) % 400;
+  const int yi = static_cast<int>((y + (m > 2)) % 400);
+  return yi < 0 ? yi + 400 : yi;
 }
-CONSTEXPR_F int days_per_century(year_t y, month_t m) noexcept {
-  const int yi = year_index(y, m);
+CONSTEXPR_F int days_per_century(int yi) noexcept {
   return 36524 + (yi == 0 || yi > 300);
 }
-CONSTEXPR_F int days_per_4years(year_t y, month_t m) noexcept {
-  const int yi = year_index(y, m);
+CONSTEXPR_F int days_per_4years(int yi) noexcept {
   return 1460 + (yi == 0 || yi > 300 || (yi - 1) % 100 < 96);
 }
 CONSTEXPR_F int days_per_year(year_t y, month_t m) noexcept {
@@ -133,17 +132,22 @@ CONSTEXPR_F fields n_day(year_t y, month_t m, diff_t d, diff_t cd, hour_t hh,
     }
   }
   if (d > 365) {
+    int yi = year_index(ey, m);  // Index into Gregorian 400 year cycle.
     for (;;) {
-      int n = days_per_century(ey, m);
+      int n = days_per_century(yi);
       if (d <= n) break;
       d -= n;
       ey += 100;
+      yi += 100;
+      if (yi >= 400) yi -= 400;
     }
     for (;;) {
-      int n = days_per_4years(ey, m);
+      int n = days_per_4years(yi);
       if (d <= n) break;
       d -= n;
       ey += 4;
+      yi += 4;
+      if (yi >= 400) yi -= 400;
     }
     for (;;) {
       int n = days_per_year(ey, m);

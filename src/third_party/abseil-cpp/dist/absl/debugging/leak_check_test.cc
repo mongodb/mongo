@@ -15,30 +15,27 @@
 #include <string>
 
 #include "gtest/gtest.h"
-#include "absl/base/internal/raw_logging.h"
+#include "absl/base/config.h"
 #include "absl/debugging/leak_check.h"
+#include "absl/log/log.h"
 
 namespace {
 
-TEST(LeakCheckTest, DetectLeakSanitizer) {
-#ifdef ABSL_EXPECT_LEAK_SANITIZER
-  EXPECT_TRUE(absl::HaveLeakSanitizer());
-  EXPECT_TRUE(absl::LeakCheckerIsActive());
-#else
-  EXPECT_FALSE(absl::HaveLeakSanitizer());
-  EXPECT_FALSE(absl::LeakCheckerIsActive());
-#endif
-}
-
 TEST(LeakCheckTest, IgnoreLeakSuppressesLeakedMemoryErrors) {
+  if (!absl::LeakCheckerIsActive()) {
+    GTEST_SKIP() << "LeakChecker is not active";
+  }
   auto foo = absl::IgnoreLeak(new std::string("some ignored leaked string"));
-  ABSL_RAW_LOG(INFO, "Ignoring leaked string %s", foo->c_str());
+  LOG(INFO) << "Ignoring leaked string " << foo;
 }
 
 TEST(LeakCheckTest, LeakCheckDisablerIgnoresLeak) {
+  if (!absl::LeakCheckerIsActive()) {
+    GTEST_SKIP() << "LeakChecker is not active";
+  }
   absl::LeakCheckDisabler disabler;
   auto foo = new std::string("some string leaked while checks are disabled");
-  ABSL_RAW_LOG(INFO, "Ignoring leaked string %s", foo->c_str());
+  LOG(INFO) << "Ignoring leaked string " << foo;
 }
 
 }  // namespace

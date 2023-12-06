@@ -21,7 +21,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/base/internal/raw_logging.h"
+#include "absl/log/log.h"
 #include "absl/random/internal/explicit_seed_seq.h"
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
@@ -645,9 +645,8 @@ TEST(RandenTest, IsFastOrSlow) {
   }
   auto duration = absl::GetCurrentTimeNanos() - start;
 
-  ABSL_INTERNAL_LOG(INFO, absl::StrCat(static_cast<double>(duration) /
-                                           static_cast<double>(kCount),
-                                       "ns"));
+  LOG(INFO) << static_cast<double>(duration) / static_cast<double>(kCount)
+            << "ns";
 
   EXPECT_GT(sum, 0);
   EXPECT_GE(duration, kCount);  // Should be slower than 1ns per call.

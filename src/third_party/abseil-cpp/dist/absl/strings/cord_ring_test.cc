@@ -44,7 +44,6 @@ using ::absl::cord_internal::CordRepFlat;
 using ::absl::cord_internal::CordRepRing;
 using ::absl::cord_internal::CordRepSubstring;
 
-using ::absl::cord_internal::CONCAT;
 using ::absl::cord_internal::EXTERNAL;
 using ::absl::cord_internal::SUBSTRING;
 
@@ -262,16 +261,6 @@ CordRepSubstring* RemoveSuffix(size_t length, CordRep* rep) {
   return MakeSubstring(0, rep->length - length, rep);
 }
 
-CordRepConcat* MakeConcat(CordRep* left, CordRep* right, int depth = 0) {
-  auto* concat = new CordRepConcat;
-  concat->tag = CONCAT;
-  concat->length = left->length + right->length;
-  concat->left = left;
-  concat->right = right;
-  concat->set_depth(depth);
-  return concat;
-}
-
 enum Composition { kMix, kAppend, kPrepend };
 
 Composition RandomComposition() {
@@ -296,7 +285,6 @@ constexpr const char* kFox = "The quick brown fox jumps over the lazy dog";
 constexpr const char* kFoxFlats[] = {"The ", "quick ", "brown ",
                                      "fox ", "jumps ", "over ",
                                      "the ", "lazy ",  "dog"};
-constexpr const char* kAlphabet = "abcdefghijklmnopqrstuvwxyz";
 
 CordRepRing* FromFlats(Span<const char* const> flats,
                        Composition composition = kAppend) {
@@ -592,35 +580,6 @@ TEST_P(CordRingCreateFromTreeTest, CreateFromSubstringOfLargeExternal) {
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result->length, Eq(str.size()));
   EXPECT_THAT(ToRawFlats(result), ElementsAre(str));
-}
-
-TEST_P(CordRingBuildInputTest, CreateFromConcat) {
-  CordRep* flats[] = {MakeFlat("abcdefgh"), MakeFlat("ijklm"),
-                      MakeFlat("nopqrstuv"), MakeFlat("wxyz")};
-  auto* left = MakeConcat(RefIfInputSharedIndirect(flats[0]), flats[1]);
-  auto* right = MakeConcat(flats[2], RefIfInputSharedIndirect(flats[3]));
-  auto* concat = RefIfInputShared(MakeConcat(left, right));
-  CordRepRing* result = NeedsUnref(CordRepRing::Create(concat));
-  ASSERT_THAT(result, IsValidRingBuffer());
-  EXPECT_THAT(result->length, Eq(26));
-  EXPECT_THAT(ToString(result), Eq(kAlphabet));
-}
-
-TEST_P(CordRingBuildInputTest, CreateFromSubstringConcat) {
-  for (size_t off = 0; off < 26; ++off) {
-    for (size_t len = 1; len < 26 - off; ++len) {
-      CordRep* flats[] = {MakeFlat("abcdefgh"), MakeFlat("ijklm"),
-                          MakeFlat("nopqrstuv"), MakeFlat("wxyz")};
-      auto* left = MakeConcat(RefIfInputSharedIndirect(flats[0]), flats[1]);
-      auto* right = MakeConcat(flats[2], RefIfInputSharedIndirect(flats[3]));
-      auto* concat = MakeConcat(left, right);
-      auto* child = RefIfInputShared(MakeSubstring(off, len, concat));
-      CordRepRing* result = NeedsUnref(CordRepRing::Create(child));
-      ASSERT_THAT(result, IsValidRingBuffer());
-      ASSERT_THAT(result->length, Eq(len));
-      ASSERT_THAT(ToString(result), string_view(kAlphabet).substr(off, len));
-    }
-  }
 }
 
 TEST_P(CordRingCreateTest, Properties) {

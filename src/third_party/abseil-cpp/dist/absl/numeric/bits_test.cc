@@ -15,6 +15,7 @@
 #include "absl/numeric/bits.h"
 
 #include <limits>
+#include <type_traits>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -23,6 +24,73 @@
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 namespace {
+
+template <typename IntT>
+class IntegerTypesTest : public ::testing::Test {};
+
+using OneByteIntegerTypes = ::testing::Types<
+    unsigned char,
+    uint8_t
+    >;
+
+TYPED_TEST_SUITE(IntegerTypesTest, OneByteIntegerTypes);
+
+TYPED_TEST(IntegerTypesTest, HandlesTypes) {
+  using UIntType = TypeParam;
+
+  EXPECT_EQ(rotl(UIntType{0x12}, 0), uint8_t{0x12});
+  EXPECT_EQ(rotr(UIntType{0x12}, -4), uint8_t{0x21});
+  static_assert(rotl(UIntType{0x12}, 0) == uint8_t{0x12}, "");
+
+  static_assert(rotr(UIntType{0x12}, 0) == uint8_t{0x12}, "");
+  EXPECT_EQ(rotr(UIntType{0x12}, 0), uint8_t{0x12});
+
+#if ABSL_INTERNAL_HAS_CONSTEXPR_CLZ
+  static_assert(countl_zero(UIntType{}) == 8, "");
+  static_assert(countl_zero(static_cast<UIntType>(-1)) == 0, "");
+
+  static_assert(countl_one(UIntType{}) == 0, "");
+  static_assert(countl_one(static_cast<UIntType>(-1)) == 8, "");
+
+  static_assert(countr_zero(UIntType{}) == 8, "");
+  static_assert(countr_zero(static_cast<UIntType>(-1)) == 0, "");
+
+  static_assert(countr_one(UIntType{}) == 0, "");
+  static_assert(countr_one(static_cast<UIntType>(-1)) == 8, "");
+
+  static_assert(popcount(UIntType{}) == 0, "");
+  static_assert(popcount(UIntType{1}) == 1, "");
+  static_assert(popcount(static_cast<UIntType>(-1)) == 8, "");
+
+  static_assert(bit_width(UIntType{}) == 0, "");
+  static_assert(bit_width(UIntType{1}) == 1, "");
+  static_assert(bit_width(UIntType{3}) == 2, "");
+  static_assert(bit_width(static_cast<UIntType>(-1)) == 8, "");
+#endif
+
+  EXPECT_EQ(countl_zero(UIntType{}), 8);
+  EXPECT_EQ(countl_zero(static_cast<UIntType>(-1)), 0);
+
+  EXPECT_EQ(countl_one(UIntType{}), 0);
+  EXPECT_EQ(countl_one(static_cast<UIntType>(-1)), 8);
+
+  EXPECT_EQ(countr_zero(UIntType{}), 8);
+  EXPECT_EQ(countr_zero(static_cast<UIntType>(-1)), 0);
+
+  EXPECT_EQ(countr_one(UIntType{}), 0);
+  EXPECT_EQ(countr_one(static_cast<UIntType>(-1)), 8);
+
+  EXPECT_EQ(popcount(UIntType{}), 0);
+  EXPECT_EQ(popcount(UIntType{1}), 1);
+
+  EXPECT_FALSE(has_single_bit(UIntType{}));
+  EXPECT_FALSE(has_single_bit(static_cast<UIntType>(-1)));
+
+  EXPECT_EQ(bit_width(UIntType{}), 0);
+  EXPECT_EQ(bit_width(UIntType{1}), 1);
+  EXPECT_EQ(bit_width(UIntType{3}), 2);
+  EXPECT_EQ(bit_width(static_cast<UIntType>(-1)), 8);
+}
 
 TEST(Rotate, Left) {
   static_assert(rotl(uint8_t{0x12}, 0) == uint8_t{0x12}, "");

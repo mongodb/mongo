@@ -16,8 +16,9 @@
 #include <winsock2.h>  // for timeval
 #endif
 
-#include <chrono>  // NOLINT(build/c++11)
+#include <array>
 #include <cfloat>
+#include <chrono>  // NOLINT(build/c++11)
 #include <cmath>
 #include <cstdint>
 #include <ctime>
@@ -28,6 +29,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/strings/str_format.h"
 #include "absl/time/time.h"
 
 namespace {
@@ -1816,6 +1818,20 @@ TEST(Duration, FormatParseRoundTrip) {
   TEST_PARSE_ROUNDTRIP(huge_range + (absl::Seconds(1) - absl::Nanoseconds(1)));
 
 #undef TEST_PARSE_ROUNDTRIP
+}
+
+TEST(Duration, AbslStringify) {
+  // FormatDuration is already well tested, so just use one test case here to
+  // verify that StrFormat("%v", d) works as expected.
+  absl::Duration d = absl::Seconds(1);
+  EXPECT_EQ(absl::StrFormat("%v", d), absl::FormatDuration(d));
+}
+
+TEST(Duration, NoPadding) {
+  // Should match the size of a struct with uint32_t alignment and no padding.
+  using NoPadding = std::array<uint32_t, 3>;
+  EXPECT_EQ(sizeof(NoPadding), sizeof(absl::Duration));
+  EXPECT_EQ(alignof(NoPadding), alignof(absl::Duration));
 }
 
 }  // namespace

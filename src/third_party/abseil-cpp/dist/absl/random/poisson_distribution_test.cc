@@ -25,9 +25,9 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/base/internal/raw_logging.h"
 #include "absl/base/macros.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/log.h"
 #include "absl/random/internal/chi_square.h"
 #include "absl/random/internal/distribution_test_util.h"
 #include "absl/random/internal/pcg_engine.h"
@@ -73,7 +73,7 @@ class PoissonDistributionInterfaceTest : public ::testing::Test {};
 
 using IntTypes = ::testing::Types<int, int8_t, int16_t, int32_t, int64_t,
                                   uint8_t, uint16_t, uint32_t, uint64_t>;
-TYPED_TEST_CASE(PoissonDistributionInterfaceTest, IntTypes);
+TYPED_TEST_SUITE(PoissonDistributionInterfaceTest, IntTypes);
 
 TYPED_TEST(PoissonDistributionInterfaceTest, SerializeTest) {
   using param_type = typename absl::poisson_distribution<TypeParam>::param_type;
@@ -134,8 +134,8 @@ TYPED_TEST(PoissonDistributionInterfaceTest, SerializeTest) {
       if (sample < sample_min) sample_min = sample;
     }
 
-    ABSL_INTERNAL_LOG(INFO, absl::StrCat("Range {", param.mean(), "}: ",
-                                         +sample_min, ", ", +sample_max));
+    LOG(INFO) << "Range {" << param.mean() << "}: " << sample_min << ", "
+              << sample_max;
 
     // Validate stream serialization.
     std::stringstream ss;
@@ -188,10 +188,9 @@ class PoissonModel {
   }
 
   void LogCDF() {
-    ABSL_INTERNAL_LOG(INFO, absl::StrCat("CDF (mean = ", mean_, ")"));
+    LOG(INFO) << "CDF (mean = " << mean_ << ")";
     for (const auto c : cdf_) {
-      ABSL_INTERNAL_LOG(INFO,
-                        absl::StrCat(c.index, ": pmf=", c.pmf, " cdf=", c.cdf));
+      LOG(INFO) << c.index << ": pmf=" << c.pmf << " cdf=" << c.cdf;
     }
   }
 
@@ -286,16 +285,15 @@ bool PoissonDistributionZTest::SingleZTest(const double p,
   const bool pass = absl::random_internal::Near("z", z, 0.0, max_err);
 
   if (!pass) {
-    ABSL_INTERNAL_LOG(
-        INFO, absl::StrFormat("p=%f max_err=%f\n"
-                              " mean=%f vs. %f\n"
-                              " stddev=%f vs. %f\n"
-                              " skewness=%f vs. %f\n"
-                              " kurtosis=%f vs. %f\n"
-                              " z=%f",
-                              p, max_err, m.mean, mean(), std::sqrt(m.variance),
-                              stddev(), m.skewness, skew(), m.kurtosis,
-                              kurtosis(), z));
+    // clang-format off
+    LOG(INFO)
+        << "p=" << p << " max_err=" << max_err << "\n"
+           " mean=" << m.mean << " vs. " << mean() << "\n"
+           " stddev=" << std::sqrt(m.variance) << " vs. " << stddev() << "\n"
+           " skewness=" << m.skewness << " vs. " << skew() << "\n"
+           " kurtosis=" << m.kurtosis << " vs. " << kurtosis() << "\n"
+           " z=" << z;
+    // clang-format on
   }
   return pass;
 }
@@ -439,17 +437,16 @@ double PoissonDistributionChiSquaredTest::ChiSquaredTestImpl() {
   if (chi_square > threshold) {
     LogCDF();
 
-    ABSL_INTERNAL_LOG(INFO, absl::StrCat("VALUES  buckets=", counts.size(),
-                                         "  samples=", kSamples));
+    LOG(INFO) << "VALUES  buckets=" << counts.size()
+              << "  samples=" << kSamples;
     for (size_t i = 0; i < counts.size(); i++) {
-      ABSL_INTERNAL_LOG(
-          INFO, absl::StrCat(cutoffs_[i], ": ", counts[i], " vs. E=", e[i]));
+      LOG(INFO) << cutoffs_[i] << ": " << counts[i] << " vs. E=" << e[i];
     }
 
-    ABSL_INTERNAL_LOG(
-        INFO,
-        absl::StrCat(kChiSquared, "(data, dof=", dof, ") = ", chi_square, " (",
-                     p, ")\n", " vs.\n", kChiSquared, " @ 0.98 = ", threshold));
+    LOG(INFO) << kChiSquared << "(data, dof=" << dof << ") = " << chi_square
+              << " (" << p << ")\n"
+              << " vs.\n"
+              << kChiSquared << " @ 0.98 = " << threshold;
   }
   return p;
 }

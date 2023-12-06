@@ -26,9 +26,9 @@
 //     support Abseil hashing without requiring you to define a hashing
 //     algorithm.
 //   * `HashState`, a type-erased class which implements the manipulation of the
-//     hash state (H) itself, contains member functions `combine()` and
-//     `combine_contiguous()`, which you can use to contribute to an existing
-//     hash state when hashing your types.
+//     hash state (H) itself; contains member functions `combine()`,
+//     `combine_contiguous()`, and `combine_unordered()`; and which you can use
+//     to contribute to an existing hash state when hashing your types.
 //
 // Unlike `std::hash` or other hashing frameworks, the Abseil hashing framework
 // provides most of its utility by abstracting away the hash algorithm (and its
@@ -39,6 +39,11 @@
 // One should assume that a hash algorithm is chosen randomly at the start of
 // each process.  E.g., `absl::Hash<int>{}(9)` in one process and
 // `absl::Hash<int>{}(9)` in another process are likely to differ.
+//
+// `absl::Hash` may also produce different values from different dynamically
+// loaded libraries. For this reason, `absl::Hash` values must never cross
+// boundaries in dynamically loaded libraries (including when used in types like
+// hash containers.)
 //
 // `absl::Hash` is intended to strongly mix input bits with a target of passing
 // an [Avalanche Test](https://en.wikipedia.org/wiki/Avalanche_effect).
@@ -74,7 +79,9 @@
 #define ABSL_HASH_HASH_H_
 
 #include <tuple>
+#include <utility>
 
+#include "absl/functional/function_ref.h"
 #include "absl/hash/internal/hash.h"
 
 namespace absl {
@@ -103,18 +110,34 @@ ABSL_NAMESPACE_BEGIN
 //   * std::unique_ptr and std::shared_ptr
 //   * All string-like types including:
 //     * absl::Cord
-//     * std::string
-//     * std::string_view (as well as any instance of std::basic_string that
-//       uses char and std::char_traits)
+//     * std::string (as well as any instance of std::basic_string that
+//       uses one of {char, wchar_t, char16_t, char32_t} and its associated
+//       std::char_traits)
+//     * std::string_view (as well as any instance of std::basic_string_view
+//       that uses one of {char, wchar_t, char16_t, char32_t} and its associated
+//       std::char_traits)
 //  * All the standard sequence containers (provided the elements are hashable)
-//  * All the standard ordered associative containers (provided the elements are
+//  * All the standard associative containers (provided the elements are
 //    hashable)
 //  * absl types such as the following:
 //    * absl::string_view
-//    * absl::InlinedVector
-//    * absl::FixedArray
 //    * absl::uint128
 //    * absl::Time, absl::Duration, and absl::TimeZone
+//  * absl containers (provided the elements are hashable) such as the
+//    following:
+//    * absl::flat_hash_set, absl::node_hash_set, absl::btree_set
+//    * absl::flat_hash_map, absl::node_hash_map, absl::btree_map
+//    * absl::btree_multiset, absl::btree_multimap
+//    * absl::InlinedVector
+//    * absl::FixedArray
+//
+// When absl::Hash is used to hash an unordered container with a custom hash
+// functor, the elements are hashed using default absl::Hash semantics, not
+// the custom hash functor.  This is consistent with the behavior of
+// operator==() on unordered containers, which compares elements pairwise with
+// operator==() rather than the custom equality functor.  It is usually a
+// mistake to use either operator==() or absl::Hash on unordered collections
+// that use functors incompatible with operator==() equality.
 //
 // Note: the list above is not meant to be exhaustive. Additional type support
 // may be added, in which case the above list will be updated.
@@ -153,7 +176,8 @@ ABSL_NAMESPACE_BEGIN
 //   that are otherwise difficult to extend using `AbslHashValue()`. (See the
 //   `HashState` class below.)
 //
-// The "hash state" concept contains two member functions for mixing hash state:
+// The "hash state" concept contains three member functions for mixing hash
+// state:
 //
 // * `H::combine(state, values...)`
 //
@@ -186,6 +210,15 @@ ABSL_NAMESPACE_BEGIN
 //    need NOT be guaranteed to produce the same hash expansion as a loop
 //    (it may perform internal optimizations). If you need this guarantee, use a
 //    loop instead.
+//
+// * `H::combine_unordered(state, begin, end)`
+//
+//    Combines a set of elements denoted by an iterator pair into a hash
+//    state, returning the updated state.  Note that the existing hash
+//    state is move-only and must be passed by value.
+//
+//    Unlike the other two methods, the hashing is order-independent.
+//    This can be used to hash unordered collections.
 //
 // -----------------------------------------------------------------------------
 // Adding Type Support to `absl::Hash`
@@ -243,8 +276,9 @@ size_t HashOf(const Types&... values) {
 // classes, virtual functions, etc.). The type erasure adds overhead so it
 // should be avoided unless necessary.
 //
-// Note: This wrapper will only erase calls to:
+// Note: This wrapper will only erase calls to
 //     combine_contiguous(H, const unsigned char*, size_t)
+//     RunCombineUnordered(H, CombinerF)
 //
 // All other calls will be handled internally and will not invoke overloads
 // provided by the wrapped class.
@@ -318,6 +352,8 @@ class HashState : public hash_internal::HashStateBase<HashState> {
  private:
   HashState() = default;
 
+  friend class HashState::HashStateBase;
+
   template <typename T>
   static void CombineContiguousImpl(void* p, const unsigned char* first,
                                     size_t size) {
@@ -329,16 +365,57 @@ class HashState : public hash_internal::HashStateBase<HashState> {
   void Init(T* state) {
     state_ = state;
     combine_contiguous_ = &CombineContiguousImpl<T>;
+    run_combine_unordered_ = &RunCombineUnorderedImpl<T>;
+  }
+
+  template <typename HS>
+  struct CombineUnorderedInvoker {
+    template <typename T, typename ConsumerT>
+    void operator()(T inner_state, ConsumerT inner_cb) {
+      f(HashState::Create(&inner_state),
+        [&](HashState& inner_erased) { inner_cb(inner_erased.Real<T>()); });
+    }
+
+    absl::FunctionRef<void(HS, absl::FunctionRef<void(HS&)>)> f;
+  };
+
+  template <typename T>
+  static HashState RunCombineUnorderedImpl(
+      HashState state,
+      absl::FunctionRef<void(HashState, absl::FunctionRef<void(HashState&)>)>
+          f) {
+    // Note that this implementation assumes that inner_state and outer_state
+    // are the same type.  This isn't true in the SpyHash case, but SpyHash
+    // types are move-convertible to each other, so this still works.
+    T& real_state = state.Real<T>();
+    real_state = T::RunCombineUnordered(
+        std::move(real_state), CombineUnorderedInvoker<HashState>{f});
+    return state;
+  }
+
+  template <typename CombinerT>
+  static HashState RunCombineUnordered(HashState state, CombinerT combiner) {
+    auto* run = state.run_combine_unordered_;
+    return run(std::move(state), std::ref(combiner));
   }
 
   // Do not erase an already erased state.
   void Init(HashState* state) {
     state_ = state->state_;
     combine_contiguous_ = state->combine_contiguous_;
+    run_combine_unordered_ = state->run_combine_unordered_;
+  }
+
+  template <typename T>
+  T& Real() {
+    return *static_cast<T*>(state_);
   }
 
   void* state_;
   void (*combine_contiguous_)(void*, const unsigned char*, size_t);
+  HashState (*run_combine_unordered_)(
+      HashState state,
+      absl::FunctionRef<void(HashState, absl::FunctionRef<void(HashState&)>)>);
 };
 
 ABSL_NAMESPACE_END

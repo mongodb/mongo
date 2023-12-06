@@ -369,7 +369,7 @@ TEST(SplitIterator, EqualityAsEndCondition) {
 TEST(Splitter, RangeIterators) {
   auto splitter = absl::StrSplit("a,b,c", ',');
   std::vector<absl::string_view> output;
-  for (const absl::string_view& p : splitter) {
+  for (absl::string_view p : splitter) {
     output.push_back(p);
   }
   EXPECT_THAT(output, ElementsAre("a", "b", "c"));

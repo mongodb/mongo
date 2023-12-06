@@ -85,7 +85,7 @@ void BM_OffsetVariable(benchmark::State& state) {
   size_t m = 5;
   size_t k = 7;
   ABSL_RAW_CHECK(L::Partial(n, m, k).template Offset<3>() == Offset,
-                 "Inavlid offset");
+                 "Invalid offset");
   for (auto _ : state) {
     DoNotOptimize(n);
     DoNotOptimize(m);

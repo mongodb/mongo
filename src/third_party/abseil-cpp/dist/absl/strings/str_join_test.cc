@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <functional>
 #include <initializer_list>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <ostream>
@@ -33,6 +34,7 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 
 namespace {
 
@@ -469,6 +471,138 @@ TEST(StrJoin, Tuple) {
   EXPECT_EQ("0x0000000a-hell-3.",
             absl::StrJoin(std::make_tuple(absl::make_unique<int>(x), &y, &z),
                           "-", absl::DereferenceFormatter(TestFormatter())));
+}
+
+// A minimal value type for `StrJoin` inputs.
+// Used to ensure we do not excessively require more a specific type, such as a
+// `string_view`.
+//
+// Anything that can be  `data()` and `size()` is OK.
+class TestValue {
+ public:
+  TestValue(const char* data, size_t size) : data_(data), size_(size) {}
+  const char* data() const { return data_; }
+  size_t size() const { return size_; }
+
+ private:
+  const char* data_;
+  size_t size_;
+};
+
+// A minimal C++20 forward iterator, used to test that we do not impose
+// excessive requirements on StrJoin inputs.
+//
+// The 2 main differences between pre-C++20 LegacyForwardIterator and the
+// C++20 ForwardIterator are:
+// 1. `operator->` is not required in C++20.
+// 2. `operator*` result does not need to be an lvalue (a reference).
+//
+// The `operator->` requirement was removed on page 17 in:
+// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1037r0.pdf
+//
+// See the `[iterator.requirements]` section of the C++ standard.
+//
+// The value type is a template parameter so that we can test the behaviour
+// of `StrJoin` specializations, e.g. the NoFormatter specialization for
+// `string_view`.
+template <typename ValueT>
+class TestIterator {
+ public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = ValueT;
+  using pointer = void;
+  using reference = const value_type&;
+  using difference_type = int;
+
+  // `data` must outlive the result.
+  static TestIterator begin(const std::vector<absl::string_view>& data) {
+    return TestIterator(&data, 0);
+  }
+
+  static TestIterator end(const std::vector<absl::string_view>& data) {
+    return TestIterator(nullptr, data.size());
+  }
+
+  bool operator==(const TestIterator& other) const {
+    return pos_ == other.pos_;
+  }
+  bool operator!=(const TestIterator& other) const {
+    return pos_ != other.pos_;
+  }
+
+  // This deliberately returns a `prvalue`.
+  // The requirement to return a reference was removed in C++20.
+  value_type operator*() const {
+    return ValueT((*data_)[pos_].data(), (*data_)[pos_].size());
+  }
+
+  // `operator->()` is deliberately omitted.
+  // The requirement to provide it was removed in C++20.
+
+  TestIterator& operator++() {
+    ++pos_;
+    return *this;
+  }
+
+  TestIterator operator++(int) {
+    TestIterator result = *this;
+    ++(*this);
+    return result;
+  }
+
+  TestIterator& operator--() {
+    --pos_;
+    return *this;
+  }
+
+  TestIterator operator--(int) {
+    TestIterator result = *this;
+    --(*this);
+    return result;
+  }
+
+ private:
+  TestIterator(const std::vector<absl::string_view>* data, size_t pos)
+      : data_(data), pos_(pos) {}
+
+  const std::vector<absl::string_view>* data_;
+  size_t pos_;
+};
+
+template <typename ValueT>
+class TestIteratorRange {
+ public:
+  // `data` must be non-null and must outlive the result.
+  explicit TestIteratorRange(const std::vector<absl::string_view>& data)
+      : begin_(TestIterator<ValueT>::begin(data)),
+        end_(TestIterator<ValueT>::end(data)) {}
+
+  const TestIterator<ValueT>& begin() const { return begin_; }
+  const TestIterator<ValueT>& end() const { return end_; }
+
+ private:
+  TestIterator<ValueT> begin_;
+  TestIterator<ValueT> end_;
+};
+
+TEST(StrJoin, TestIteratorRequirementsNoFormatter) {
+  const std::vector<absl::string_view> a = {"a", "b", "c"};
+
+  // When the value type is string-like (`std::string` or `string_view`),
+  // the NoFormatter template specialization is used internally.
+  EXPECT_EQ("a-b-c",
+            absl::StrJoin(TestIteratorRange<absl::string_view>(a), "-"));
+}
+
+TEST(StrJoin, TestIteratorRequirementsCustomFormatter) {
+  const std::vector<absl::string_view> a = {"a", "b", "c"};
+  EXPECT_EQ("a-b-c",
+            absl::StrJoin(TestIteratorRange<TestValue>(a), "-",
+                          [](std::string* out, const TestValue& value) {
+                            absl::StrAppend(
+                                out,
+                                absl::string_view(value.data(), value.size()));
+                          }));
 }
 
 }  // namespace

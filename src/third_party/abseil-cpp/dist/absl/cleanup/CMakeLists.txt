@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Internal-only target, do not depend on directly.
 absl_cc_library(
   NAME
     cleanup_internal

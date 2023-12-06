@@ -57,7 +57,7 @@ static inline void *StacktracePowerPCGetLR(void **sp) {
   // This check is in case the compiler doesn't define _CALL_SYSV.
   return *(sp+1);
 #else
-#error Need to specify the PPC ABI for your archiecture.
+#error Need to specify the PPC ABI for your architecture.
 #endif
 }
 
@@ -231,11 +231,16 @@ static int UnwindImpl(void** result, int* sizes, int max_depth, int skip_count,
     // Implementation detail: we clamp the max of frames we are willing to
     // count, so as not to spend too much time in the loop below.
     const int kMaxUnwind = 1000;
-    int j = 0;
-    for (; next_sp != nullptr && j < kMaxUnwind; j++) {
+    int num_dropped_frames = 0;
+    for (int j = 0; next_sp != nullptr && j < kMaxUnwind; j++) {
+      if (skip_count > 0) {
+        skip_count--;
+      } else {
+        num_dropped_frames++;
+      }
       next_sp = NextStackFrame<!IS_STACK_FRAMES, IS_WITH_CONTEXT>(next_sp, ucp);
     }
-    *min_dropped_frames = j;
+    *min_dropped_frames = num_dropped_frames;
   }
   return n;
 }
