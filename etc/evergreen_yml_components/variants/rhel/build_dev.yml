@@ -23,6 +23,7 @@ variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/variants/compile_static_analysis.yml
 # - etc/evergreen_yml_components/variants/rhel/build_dev.yml
+# - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &generic_linux_compile_params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
@@ -37,7 +38,7 @@ variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/variants/compile_static_analysis.yml
 # - etc/evergreen_yml_components/variants/rhel/build_dev.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+# - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
 - &generic_linux_compile_expansions  # The most commonly used compile expansions.
   scons_cache_scope: shared
   scons_cache_mode: all

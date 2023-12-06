@@ -5,6 +5,7 @@ variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/variants/compile_static_analysis.yml
 # - etc/evergreen_yml_components/variants/rhel/build_dev.yml
+# - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &generic_linux_compile_params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
@@ -19,11 +20,27 @@ variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/variants/compile_static_analysis.yml
 # - etc/evergreen_yml_components/variants/rhel/build_dev.yml
+# - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &generic_linux_compile_expansions  # The most commonly used compile expansions.
   scons_cache_scope: shared
   scons_cache_mode: all
   has_packages: false
+
+# THIS HAS COPIES IN
+# - etc/evergreen_yml_components/variants/compile_static_analysis.yml
+# - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &linux_debug_compile_expansions
+  <<: *generic_linux_compile_expansions
+  compile_flags: >-
+    --dbg=on
+    --opt=on
+    -j$(grep -c ^processor /proc/cpuinfo)
+    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    --enable-http-client=on
+    --link-model=dynamic
+  num_scons_link_jobs_available: 0.99
 
 # If you add anything to san_options, make sure the appropriate changes are
 # also made to SConstruct.
@@ -39,33 +56,14 @@ buildvariants:
   name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required  # TODO: replace with Sanitizer.
   display_name: "! Linux x86 Shared Library DEBUG Compile"
   stepback: false
-  expansions: &linux_debug_compile_expansions
-    <<: *generic_linux_compile_expansions
-    compile_flags: >-
-      --dbg=on
-      --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --enable-http-client=on
-      --link-model=dynamic
-    num_scons_link_jobs_available: 0.99
+  expansions:
+    <<: *linux_debug_compile_expansions
     compile_variant: *linux-x86-dynamic-debug-compile-required
   tasks:
   - name: compile_test_parallel_core_stream_TG
   - name: compile_test_parallel_unittest_stream_TG
   - name: compile_test_parallel_dbtest_stream_TG
   - name: generate_buildid_to_debug_symbols_mapping
-
-- <<: *generic_linux_compile_params
-  name: &linux-x86-dynamic-debug-wtdevelop-compile linux-x86-dynamic-debug-wtdevelop-compile
-  display_name: "~ Linux WiredTiger develop DEBUG Compile"
-  activate: false
-  modules:
-  - wtdevelop
-  expansions:
-    <<: *linux_debug_compile_expansions
-    use_wt_develop: true
-    compile_variant: *linux-x86-dynamic-debug-wtdevelop-compile
 
 - <<: *generic_linux_compile_params
   name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required

@@ -71,6 +71,9 @@ include:
 - filename: etc/evergreen_yml_components/variants/ubuntu/test_dev.yml
 - filename: etc/evergreen_yml_components/variants/windows/build_dev.yml
 - filename: etc/evergreen_yml_components/variants/windows/test_dev.yml
+- filename: etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
+- filename: etc/evergreen_yml_components/variants/wiredtiger/test_dev.yml
+
 
 variables:
 
@@ -192,66 +195,6 @@ variables:
     ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
 
 - ubsan_options: &ubsan_options UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
-
-# Use this template for enterprise Windows testing coverage on non-pushing
-# variants
-- &enterprise-windows-nopush-template
-  name: enterprise-windows-nopush-template
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - windows-vsCurrent-small
-  modules:
-  - enterprise
-  expansions: &enterprise-windows-nopush-expansions-template
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-      msi
-    exe: ".exe"
-    content_type: application/zip
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=windows
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
-      -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
-      --win-version-min=win10
-    num_scons_link_jobs_available: 0.5
-    python: '/cygdrive/c/python/python39/python.exe'
-    ext: zip
-    scons_cache_scope: shared
-    multiversion_platform: windows
-    multiversion_edition: enterprise
-    jstestfuzz_num_generated_files: 35
-    large_distro_name: windows-vsCurrent-large
-    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
-    external_auth_jobs_max: 1
-  tasks:
-  - name: compile_test_serial_TG
-    distros:
-    - windows-vsCurrent-large
-  - name: burn_in_tests_gen
-    depends_on:
-    - name: version_burn_in_gen
-      variant: generate-tasks-for-version
-      omit_generated_tasks: true
-    - name: archive_dist_test_debug
-  - name: .aggfuzzer .common !.feature_flag_guarded
-  - name: audit
-  - name: auth_audit_gen
-  - name: buildscripts_test
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.aggregation !.gcm !.feature_flag_guarded
-  - name: external_auth
-  - name: external_auth_aws
-  - name: external_auth_windows
-    distros:
-    - windows-2016-dc
-  - name: .jscore .common !.sharding
-  - name: .jstestfuzz .common
-  - name: replica_sets_auth_gen
-  - name: sasl
-  - name: sharding_auth_audit_gen
 
 
 parameters:
@@ -422,39 +365,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot
   - name: sharding_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
-
-- <<: *linux-64-debug-required-template
-  name: &linux-64-debug-wtdevelop linux-64-debug-wtdevelop
-  display_name: "~ Linux DEBUG WiredTiger develop"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - wtdevelop
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: &linux_x86_dynamic_debug_wtdevelop_compile_variant_name linux-x86-dynamic-debug-wtdevelop-compile
-  - name: version_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  expansions:
-    use_wt_develop: true
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    large_distro_name: rhel80-medium
-    max_sub_suites: "5"
-    target_resmoke_time: "15"
-    compile_flags: >-
-      --dbg=on
-      --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --enable-http-client=on
-      --link-model=dynamic
-    scons_cache_mode: all
-    scons_cache_scope: shared
-    num_scons_link_jobs_available: 0.99
-    test_flags: --excludeWithAnyTags=requires_http_client
-    compile_variant: *linux_x86_dynamic_debug_wtdevelop_compile_variant_name
 
 - name: &tla-plus tla-plus
   display_name: "TLA+"
@@ -1470,18 +1380,6 @@ buildvariants:
     python: '/cygdrive/c/python/python39/python.exe'
   tasks:
   - name: win_shared_scons_cache_pruning
-
-- <<: *enterprise-windows-nopush-template
-  name: &enterprise-windows-wtdevelop enterprise-windows-wtdevelop
-  display_name: "~ Enterprise Windows WiredTiger develop"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
-  - wtdevelop
-  expansions:
-    <<: *enterprise-windows-nopush-expansions-template
-    use_wt_develop: true
-    compile_variant: *enterprise-windows-wtdevelop
 
 ###########################################
 #          Copybara buildvariants           #
