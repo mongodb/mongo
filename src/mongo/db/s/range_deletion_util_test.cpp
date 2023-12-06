@@ -828,8 +828,13 @@ DEATH_TEST_F(RangeDeleterTest, RemoveDocumentsInRangeCrashesIfInputFutureHasErro
 
 TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotCrashWhenShardKeyIndexDoesNotExist) {
     auto queriesComplete = SemiFuture<void>::makeReady();
-    const std::string kNoShardKeyIndexMsg("Unable to find shard key index for");
+    const std::string kNoShardKeyIndexMsg("Unable to find range shard key index");
+    startCapturingLogMessages();
     auto logCountBefore = countTextFormatLogLinesContaining(kNoShardKeyIndexMsg);
+
+    // Insert range deletion task for this collection and range.
+    const ChunkRange range(BSON("x" << 0), BSON("x" << 10));
+    auto t = insertRangeDeletionTask(_opCtx, uuid(), range);
 
     auto cleanupComplete =
         removeDocumentsInRange(executor(),
@@ -837,19 +842,14 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotCrashWhenShardKeyIndexDoes
                                kNss,
                                uuid(),
                                BSON("x" << 1) /* shard key pattern */,
-                               ChunkRange(BSON("x" << 0), BSON("x" << 10)),
+                               range,
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
-    // Range deleter will keep on retrying when it encounters non-stepdown errors. Make it run
-    // a few iterations and then create the index to make it exit the retry loop.
-    while (countTextFormatLogLinesContaining(kNoShardKeyIndexMsg) < logCountBefore) {
+    while (countTextFormatLogLinesContaining(kNoShardKeyIndexMsg) <= logCountBefore) {
         sleepmicros(100);
     }
 
-    DBDirectClient client(_opCtx);
-    client.createIndex(kNss, BSON("x" << 1));
-
-    cleanupComplete.get();
+    ASSERT_THROWS_CODE(cleanupComplete.get(), DBException, ErrorCodes::IndexNotFound);
 }
 
 /**
