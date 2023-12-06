@@ -735,16 +735,14 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
     WT_SESSION_IMPL *session;
     size_t total_skipped, skipped;
     uint32_t flags;
-    bool key_out_of_bounds, newpage, restart, need_walk;
+    bool key_out_of_bounds, newpage, need_walk, repositioned, restart;
 #ifdef HAVE_DIAGNOSTIC
     bool inclusive_set;
 
     inclusive_set = false;
 #endif
     cursor = &cbt->iface;
-    key_out_of_bounds = false;
-    need_walk = false;
-    newpage = false;
+    key_out_of_bounds = need_walk = newpage = repositioned = false;
     session = CUR2S(cbt);
     total_skipped = 0;
 
@@ -767,6 +765,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
      * bounds, continue the prev traversal logic.
      */
     if (F_ISSET(cursor, WT_CURSTD_BOUND_UPPER) && !WT_CURSOR_IS_POSITIONED(cbt)) {
+        repositioned = true;
         WT_ERR(__wt_btcur_bounds_position(session, cbt, false, &need_walk));
         if (!need_walk) {
             __wt_value_return(cbt, cbt->upd_value);
@@ -946,10 +945,19 @@ err:
         break;
     case WT_PREPARE_CONFLICT:
         /*
-         * If prepare conflict occurs, cursor should not be reset, as current cursor position will
-         * be reused in case of a retry from user.
+         * If prepare conflict occurs, cursor should not be reset unless they have bounds and were
+         * being initially positioned, as the current cursor position will be reused in case of a
+         * retry from user.
+         *
+         * Bounded cursors don't lose their bounds if the reset call is internal, per the API.
+         * Additionally by resetting the cursor here we have a slightly different semantic to a
+         * traditional prepare conflict. We are giving up the page which may allow to be evicted but
+         * for the purposes of the bounded cursor this should be fine.
          */
-        F_SET(cbt, WT_CBT_ITERATE_RETRY_PREV);
+        if (repositioned)
+            WT_TRET(__cursor_reset(cbt));
+        else
+            F_SET(cbt, WT_CBT_ITERATE_RETRY_PREV);
         break;
     default:
         WT_TRET(__cursor_reset(cbt));
