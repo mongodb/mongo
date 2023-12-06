@@ -15,6 +15,11 @@
 bool
 __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+    /* Disable pre-fetch work on tiered tables. */
+    if (session->dhandle->type == WT_DHANDLE_TYPE_TIERED ||
+      session->dhandle->type == WT_DHANDLE_TYPE_TIERED_TREE)
+        return (false);
+
     if (S2C(session)->prefetch_queue_count > WT_MAX_PREFETCH_QUEUE)
         return (false);
 
