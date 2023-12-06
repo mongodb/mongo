@@ -147,6 +147,7 @@ let testCases = {
     _recvChunkStatus: {skip: "internal command"},
     _refreshQueryAnalyzerConfiguration: {skip: "internal command"},
     _shardsvrAbortReshardCollection: {skip: "internal command"},
+    _shardsvrChangePrimary: {skip: "internal command"},
     _shardsvrCleanupReshardCollection: {skip: "internal command"},
     _shardsvrCloneCatalogData: {skip: "internal command"},
     _shardsvrRegisterIndex: {skip: "internal command"},
@@ -285,6 +286,7 @@ let testCases = {
         skip: "requires feature flag"
     },
     captrunc: {skip: "test command"},
+    changePrimary: {skip: "does not accept read or write concern"},
     checkMetadataConsistency: {skip: "does not accept read or write concern"},
     checkShardingIndex: {skip: "does not accept read or write concern"},
     cleanupOrphaned: {skip: "only on shard server"},

@@ -336,6 +336,7 @@ let testCases = {
         // }
         skip: "requires feature flag"
     },
+    changePrimary: {skip: "reads primary shard from sharding catalog with readConcern: local"},
     checkMetadataConsistency: {
         run: {
             sendsDbVersion: true,

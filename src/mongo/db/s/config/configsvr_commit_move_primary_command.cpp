@@ -86,7 +86,8 @@ public:
                 request().getCommandParameter(),
                 request().getExpectedDatabaseVersion(),
                 request().getTo(),
-                request().getSerializationContext());
+                request().getSerializationContext(),
+                request().getCloneOnlyUntrackedColls());
         }
 
     private:

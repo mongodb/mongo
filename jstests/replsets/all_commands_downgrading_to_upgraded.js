@@ -94,6 +94,7 @@ const allCommands = {
     _recvChunkStatus: {skip: isAnInternalCommand},
     _refreshQueryAnalyzerConfiguration: {skip: isAnInternalCommand},
     _shardsvrAbortReshardCollection: {skip: isAnInternalCommand},
+    _shardsvrChangePrimary: {skip: isAnInternalCommand},
     _shardsvrCleanupStructuredEncryptionData: {skip: isAnInternalCommand},
     _shardsvrCleanupReshardCollection: {skip: isAnInternalCommand},
     _shardsvrCloneCatalogData: {skip: isAnInternalCommand},
@@ -327,6 +328,7 @@ const allCommands = {
     captrunc: {
         skip: isAnInternalCommand,
     },
+    changePrimary: {skip: cannotRunWhileDowngrading},
     checkMetadataConsistency: {
         isAdminCommand: true,
         isShardedOnly: true,

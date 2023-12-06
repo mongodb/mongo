@@ -524,6 +524,7 @@ env.Library(
         'shardsvr_cleanup_structured_encryption_data_command.cpp',
         'shardsvr_collmod_command.cpp',
         'shardsvr_collmod_participant_command.cpp',
+        'shardsvr_change_primary_command.cpp',
         'shardsvr_commit_index_participant_command.cpp',
         'shardsvr_commit_reshard_collection_command.cpp',
         'shardsvr_compact_structured_encryption_data_command.cpp',

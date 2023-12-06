@@ -471,7 +471,8 @@ public:
                            const DatabaseName& dbName,
                            const DatabaseVersion& expectedDbVersion,
                            const ShardId& toShardId,
-                           const SerializationContext& serializationContext);
+                           const SerializationContext& serializationContext,
+                           bool cloneOnlyUntrackedColls);
 
     //
     // Collection Operations

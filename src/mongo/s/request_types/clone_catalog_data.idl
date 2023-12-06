@@ -46,3 +46,8 @@ commands:
             from:
                 type: string
                 description: "The connection string of the database to clone from."
+            cloneOnlyUntrackedColls:
+                type: bool
+                description: "Whether the command should clone all collections or only untracked collections"
+                # TODO (SERVER-76436) Remove default once global balancing becomes last-lts
+                default: false

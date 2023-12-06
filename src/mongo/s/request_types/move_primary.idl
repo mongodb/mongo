@@ -58,11 +58,33 @@ commands:
         strict: false
         chained_structs:
             MovePrimaryRequestBase: MovePrimaryRequestBase
+    
+    changePrimary:
+        command_name: changePrimary
+        description: The public changePrimary command on mongos
+        cpp_name: ChangePrimary
+        namespace: type
+        type: database_name
+        api_version:
+        strict: false
+        chained_structs:
+            MovePrimaryRequestBase: MovePrimaryRequestBase
 
     _shardsvrMovePrimary:
         command_name: _shardsvrMovePrimary
         description: The internal movePrimary command on a primary shard
         cpp_name: ShardsvrMovePrimary
+        namespace: type
+        type: database_name
+        api_version:
+        strict: false
+        chained_structs:
+            MovePrimaryRequestBase: MovePrimaryRequestBase
+
+    _shardsvrChangePrimary:
+        command_name: _shardsvrChangePrimary
+        description: The internal changePrimary command to move primary without migrating unsharded collections
+        cpp_name: ShardsvrChangePrimary
         namespace: type
         type: database_name
         api_version:
@@ -113,3 +135,10 @@ commands:
             to:
                 type: shard_id
                 description: Shard serving as the destination for un-sharded collections
+            cloneOnlyUntrackedColls:
+                type: bool
+                description: >-
+                    When set, the coordinator will only move untracked, local collections such as
+                    those in the config, system, and admin databases.
+                # TODO (SERVER-76436) Remove default once global balancing becomes last-lts
+                default: false

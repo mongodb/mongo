@@ -231,6 +231,7 @@ env.Library(
         'cluster_add_shard_to_zone_cmd.cpp',
         'cluster_analyze_shard_key_cmd.cpp',
         'cluster_balancer_collection_status_cmd.cpp',
+        'cluster_change_primary_cmd.cpp',
         'cluster_check_metadata_consistency_cmd.cpp',
         'cluster_clear_jumbo_flag_cmd.cpp',
         'cluster_configure_collection_balancing.cpp',

@@ -349,7 +349,8 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                                                const DatabaseName& dbName,
                                                const DatabaseVersion& expectedDbVersion,
                                                const ShardId& toShardId,
-                                               const SerializationContext& serializationContext) {
+                                               const SerializationContext& serializationContext,
+                                               bool cloneOnlyUntrackedColls) {
     // Hold the shard lock until the entire commit finishes to serialize with removeShard.
     Lock::SharedLock shardLock(opCtx, _kShardMembershipLock);
 
@@ -374,6 +375,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                                    expectedDbVersion,
                                    toShardId,
                                    validAfter,
+                                   cloneOnlyUntrackedColls,
                                    serializationContext](
                                       const txn_api::TransactionClient& txnClient,
                                       ExecutorPtr txnExec) {
@@ -403,88 +405,97 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
         auto dbEntry = DatabaseType::parse(IDLParserContext("DatabaseType"), dbs.front());
 
-        // Find all collections in the database that are unsplittable
-        FindCommandRequest findColls(CollectionType::ConfigNS);
-        BSONObjBuilder b;
-        const auto db = DatabaseNameUtil::serialize(dbName, serializationContext);
-        b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
-        findColls.setFilter(b.obj());
-        auto colls = txnClient.exhaustiveFindSync(findColls);
+        // Only change the unsharded collection metadata on the config server if we are moving some
+        // tracked collections. Otherwise, there will be no collections or chunks to find here for
+        // the collections being moved, so we can skip the whole section.
+        if (!cloneOnlyUntrackedColls) {
+            // Find all collections in the database that are unsplittable
+            FindCommandRequest findColls(CollectionType::ConfigNS);
+            BSONObjBuilder b;
+            const auto db = DatabaseNameUtil::serialize(dbName, serializationContext);
+            b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
+            findColls.setFilter(b.obj());
+            auto colls = txnClient.exhaustiveFindSync(findColls);
 
-        // For each collection, we need to insert a placement entry for the collection and update
-        // the chunk entry.
-        std::vector<BSONObj> insertCollPlacementEntries;
-        insertCollPlacementEntries.reserve(colls.size());
-        std::vector<write_ops::UpdateOpEntry> updateChunksEntries;
-        updateChunksEntries.reserve(colls.size());
-        std::vector<int> chunkUpdateIds;
-        std::vector<int> collPlacementInsertIds;
-        for (const auto& collObj : colls) {
-            auto coll = CollectionTypeBase::parse(IDLParserContext("CommitMovePrimary"), collObj);
-            if (!coll.getUnsplittable()) {
-                continue;
-            }
-            FindCommandRequest findChunk(ChunkType::ConfigNS);
-            findChunk.setFilter(BSON(ChunkType::collectionUUID.name() << coll.getUuid()));
-            findChunk.setSingleBatch(true);
-            auto chunks = txnClient.exhaustiveFindSync(findChunk);
-            invariant(chunks.size() == 1);
-            auto chunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
-                chunks[0], *coll.getPre22CompatibleEpoch(), coll.getTimestamp()));
-            if (chunk.getShard() != dbEntry.getPrimary()) {
-                continue;
-            }
-            chunk.setShard(toShardId);
-            auto currentVersion = chunk.getVersion();
-            chunk.setVersion(ChunkVersion({*coll.getPre22CompatibleEpoch(), coll.getTimestamp()},
-                                          {currentVersion.majorVersion() + 1, 0}));
-            auto newHistory = chunk.getHistory();
-            int entriesDeleted = 0;
-            while (newHistory.size() > 1 &&
-                   newHistory.back().getValidAfter().getSecs() + 10 < validAfter.getSecs()) {
-                newHistory.pop_back();
-                ++entriesDeleted;
-            }
-            logv2::DynamicAttributes attrs;
-            attrs.add("entriesDeleted", entriesDeleted);
-            if (!newHistory.empty()) {
-                attrs.add("oldestEntryValidAfter", newHistory.back().getValidAfter());
-            }
-            chunk.setOnCurrentShardSince(validAfter);
-            newHistory.emplace(newHistory.begin(),
-                               ChunkHistory(*chunk.getOnCurrentShardSince(), toShardId));
-            chunk.setHistory(std::move(newHistory));
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(BSON(ChunkType::collectionUUID.name() << coll.getUuid()));
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(chunk.toConfigBSON()));
-            updateChunksEntries.push_back(entry);
+            // For each collection, we need to insert a placement entry for the collection and
+            // update the chunk entry.
+            std::vector<BSONObj> insertCollPlacementEntries;
+            insertCollPlacementEntries.reserve(colls.size());
+            std::vector<write_ops::UpdateOpEntry> updateChunksEntries;
+            updateChunksEntries.reserve(colls.size());
+            std::vector<int> chunkUpdateIds;
+            std::vector<int> collPlacementInsertIds;
+            for (const auto& collObj : colls) {
+                auto coll =
+                    CollectionTypeBase::parse(IDLParserContext("CommitMovePrimary"), collObj);
+                if (!coll.getUnsplittable()) {
+                    continue;
+                }
+                FindCommandRequest findChunk(ChunkType::ConfigNS);
+                findChunk.setFilter(BSON(ChunkType::collectionUUID.name() << coll.getUuid()));
+                findChunk.setSingleBatch(true);
+                auto chunks = txnClient.exhaustiveFindSync(findChunk);
+                invariant(chunks.size() == 1);
+                auto chunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
+                    chunks[0], *coll.getPre22CompatibleEpoch(), coll.getTimestamp()));
+                if (chunk.getShard() != dbEntry.getPrimary()) {
+                    continue;
+                }
+                chunk.setShard(toShardId);
+                auto currentVersion = chunk.getVersion();
+                chunk.setVersion(
+                    ChunkVersion({*coll.getPre22CompatibleEpoch(), coll.getTimestamp()},
+                                 {currentVersion.majorVersion() + 1, 0}));
+                auto newHistory = chunk.getHistory();
+                int entriesDeleted = 0;
+                while (newHistory.size() > 1 &&
+                       newHistory.back().getValidAfter().getSecs() + 10 < validAfter.getSecs()) {
+                    newHistory.pop_back();
+                    ++entriesDeleted;
+                }
+                logv2::DynamicAttributes attrs;
+                attrs.add("entriesDeleted", entriesDeleted);
+                if (!newHistory.empty()) {
+                    attrs.add("oldestEntryValidAfter", newHistory.back().getValidAfter());
+                }
+                chunk.setOnCurrentShardSince(validAfter);
+                newHistory.emplace(newHistory.begin(),
+                                   ChunkHistory(*chunk.getOnCurrentShardSince(), toShardId));
+                chunk.setHistory(std::move(newHistory));
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(BSON(ChunkType::collectionUUID.name() << coll.getUuid()));
+                entry.setU(
+                    write_ops::UpdateModification::parseFromClassicUpdate(chunk.toConfigBSON()));
+                updateChunksEntries.push_back(entry);
 
-            NamespacePlacementType placementInfo(coll.getNss(), validAfter, {toShardId});
-            placementInfo.setUuid(coll.getUuid());
-            insertCollPlacementEntries.push_back(placementInfo.toBSON());
+                NamespacePlacementType placementInfo(coll.getNss(), validAfter, {toShardId});
+                placementInfo.setUuid(coll.getUuid());
+                insertCollPlacementEntries.push_back(placementInfo.toBSON());
 
-            collPlacementInsertIds.push_back(currStmtId);
-            chunkUpdateIds.push_back(currStmtId + colls.size());
-            currStmtId++;
-        }
+                collPlacementInsertIds.push_back(currStmtId);
+                chunkUpdateIds.push_back(currStmtId + colls.size());
+                currStmtId++;
+            }
 
-        // Execute chunk and collection placement updates if there were any generated.
-        if (updateChunksEntries.size() != 0) {
-            const auto updateChunksEntryOp = [&] {
-                write_ops::UpdateCommandRequest updateOp(
-                    NamespaceString::kConfigsvrChunksNamespace);
-                updateOp.setUpdates(updateChunksEntries);
-                return updateOp;
-            }();
-            write_ops::InsertCommandRequest insertPlacementReq(
-                NamespaceString::kConfigsvrPlacementHistoryNamespace, insertCollPlacementEntries);
-            auto insertPlacementResponse =
-                txnClient.runCRUDOpSync(insertPlacementReq, collPlacementInsertIds);
-            uassertStatusOK(insertPlacementResponse.toStatus());
-            auto updateChunksResponse =
-                txnClient.runCRUDOpSync(updateChunksEntryOp, chunkUpdateIds);
-            uassertStatusOK(updateChunksResponse.toStatus());
-            currStmtId += colls.size();
+            // Execute chunk and collection placement updates if there were any generated.
+            if (updateChunksEntries.size() != 0) {
+                const auto updateChunksEntryOp = [&] {
+                    write_ops::UpdateCommandRequest updateOp(
+                        NamespaceString::kConfigsvrChunksNamespace);
+                    updateOp.setUpdates(updateChunksEntries);
+                    return updateOp;
+                }();
+                write_ops::InsertCommandRequest insertPlacementReq(
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                    insertCollPlacementEntries);
+                auto insertPlacementResponse =
+                    txnClient.runCRUDOpSync(insertPlacementReq, collPlacementInsertIds);
+                uassertStatusOK(insertPlacementResponse.toStatus());
+                auto updateChunksResponse =
+                    txnClient.runCRUDOpSync(updateChunksEntryOp, chunkUpdateIds);
+                uassertStatusOK(updateChunksResponse.toStatus());
+                currStmtId += colls.size();
+            }
         }
 
         // Update the database entry and insert a placement history entry for the database.

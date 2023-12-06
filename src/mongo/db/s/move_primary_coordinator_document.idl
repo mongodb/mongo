@@ -69,3 +69,7 @@ structs:
                 type: array<namespacestring>
                 description: "List of collections to be cloned by the destination shard."
                 optional: true
+            cloneOnlyUntrackedColls:
+                type: bool
+                description: "Whether the coordinator should move only untracked collections"
+                default: false

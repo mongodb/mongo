@@ -60,7 +60,7 @@ public:
     virtual Status copyDb(OperationContext* opCtx,
                           const DatabaseName& dbName,
                           const std::string& masterHost,
-                          const std::vector<NamespaceString>& shardedOrTrackedOutsideDbPrimary,
+                          const std::vector<NamespaceString>& trackedColls,
                           bool forceSameUUIDAsSource,
                           std::set<std::string>* clonedColls) = 0;
 
@@ -83,7 +83,7 @@ public:
     Status copyDb(OperationContext* opCtx,
                   const DatabaseName& dbName,
                   const std::string& masterHost,
-                  const std::vector<NamespaceString>& shardedOrTrackedOutsideDbPrimary,
+                  const std::vector<NamespaceString>& trackedColls,
                   bool forceSameUUIDAsSource,
                   std::set<std::string>* clonedColls) override;
 
@@ -104,7 +104,7 @@ private:
         std::string collectionName;
         BSONObj collectionInfo;
         BSONObj idIndexSpec;
-        bool shardedOrTrackedOutsideDbPrimary = false;
+        bool trackedColls = false;
         bool forceSameUUIDAsSource = false;
     };
 
@@ -152,7 +152,7 @@ public:
     Status copyDb(OperationContext* opCtx,
                   const DatabaseName& dbName,
                   const std::string& masterHost,
-                  const std::vector<NamespaceString>& shardedOrTrackedOutsideDbPrimary,
+                  const std::vector<NamespaceString>& trackedColls,
                   bool forceSameUUIDAsSource,
                   std::set<std::string>* clonedColls);
 
