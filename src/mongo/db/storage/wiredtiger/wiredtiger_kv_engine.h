@@ -257,7 +257,7 @@ public:
                             const IndexDescriptor* desc,
                             bool isForceUpdateMetadata) override;
 
-    Status alterMetadata(OperationContext* opCtx, StringData uri, StringData config);
+    Status alterMetadata(StringData uri, StringData config);
 
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 

@@ -1032,7 +1032,7 @@ Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::strin
         22432, 1, "Changing table logging settings", "uri"_attr = uri, "loggingEnabled"_attr = on);
     // Only alter the metadata once we're sure that we need to change the table settings, since
     // WT_SESSION::alter may return EBUSY and require taking a checkpoint to make progress.
-    auto status = sessionCache->getKVEngine()->alterMetadata(opCtx, uri, setting);
+    auto status = sessionCache->getKVEngine()->alterMetadata(uri, setting);
     if (!status.isOK()) {
         // Dump the storage engine's internal state to assist in diagnosis.
         sessionCache->getKVEngine()->dump();

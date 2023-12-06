@@ -1855,13 +1855,11 @@ void WiredTigerKVEngine::alterIdentMetadata(OperationContext* opCtx,
     // concurrent operations.
     std::string alterString =
         WiredTigerIndex::generateAppMetadataString(*desc) + "exclusive_refreshed=false,";
-    auto status = alterMetadata(opCtx, uri, alterString);
+    auto status = alterMetadata(uri, alterString);
     invariantStatusOK(status);
 }
 
-Status WiredTigerKVEngine::alterMetadata(OperationContext* opCtx,
-                                         StringData uri,
-                                         StringData config) {
+Status WiredTigerKVEngine::alterMetadata(StringData uri, StringData config) {
     // Use a dedicated session in an alter operation to avoid transaction issues.
     WiredTigerSession session(_conn);
     auto sessionPtr = session.getSession();
