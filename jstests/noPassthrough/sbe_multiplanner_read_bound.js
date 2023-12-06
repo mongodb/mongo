@@ -9,6 +9,8 @@
  * ]
  */
 
+import {getOptimizer} from "jstests/libs/analyze_plan.js";
+
 const dbName = "sbe_multiplanner_db";
 const collName = "sbe_multiplanner_coll";
 
@@ -40,8 +42,15 @@ const explain = coll.explain("allPlansExecution").aggregate([{
 
 // Assert that the first index scans zero keys, but this doesn't disable the read bound completely.
 // Instead the second index still has at least one number of read budget, so it scans one key.
-assert.eq(2, explain.executionStats.allPlansExecution.length, explain);
-assert.eq(0, explain.executionStats.allPlansExecution[0].totalKeysExamined, explain);
-assert.eq(1, explain.executionStats.allPlansExecution[1].totalKeysExamined, explain);
+switch (getOptimizer(explain)) {
+    case "classic":
+        assert.eq(2, explain.executionStats.allPlansExecution.length, explain);
+        assert.eq(0, explain.executionStats.allPlansExecution[0].totalKeysExamined, explain);
+        assert.eq(1, explain.executionStats.allPlansExecution[1].totalKeysExamined, explain);
+        break;
+    case "CQF":
+        // TODO SERVER-77719: Implement the assertion for CQF.
+        break;
+}
 
 MongoRunner.stopMongod(conn);

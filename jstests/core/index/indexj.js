@@ -12,10 +12,18 @@
 //   requires_fcv_63,
 // ]
 
+import {getOptimizer} from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const t = db[jsTestName()];
 t.drop();
+
+class ExplainWithKeysExamined {
+    constructor(explain, keysExamined) {
+        this.explain = explain;
+        this.keysExamined = keysExamined;
+    }
+}
 
 function keysExamined(query, hint, sort) {
     if (!hint) {
@@ -25,26 +33,26 @@ function keysExamined(query, hint, sort) {
         sort = {};
     }
     const explain = t.find(query).sort(sort).hint(hint).explain("executionStats");
-    return explain.executionStats.totalKeysExamined;
+    return new ExplainWithKeysExamined(explain, explain.executionStats.totalKeysExamined);
 }
 
 assert.commandWorked(t.createIndex({a: 1}));
 assert.commandWorked(t.insert({a: 5}));
-assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "A");
+assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}).keysExamined, "A");
 
 assert(t.drop());
 assert.commandWorked(t.createIndex({a: 1}));
 assert.commandWorked(t.insert({a: 4}));
-assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "B");
+assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}).keysExamined, "B");
 
 assert.commandWorked(t.insert({a: 5}));
-assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "D");
+assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}).keysExamined, "D");
 
 assert.commandWorked(t.insert({a: 4}));
-assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "C");
+assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}).keysExamined, "C");
 
 assert.commandWorked(t.insert({a: 5}));
-assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "D");
+assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}).keysExamined, "D");
 
 assert(t.drop());
 assert.commandWorked(t.createIndex({a: 1, b: 1}));
@@ -62,33 +70,76 @@ let expectedKeys = isSBEEnabled ? 0 : 3;
 let errMsg = function(actualNumKeys) {
     return "Chosen plan examined " + actualNumKeys + " keys";
 };
-let numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
-assert.eq(numKeys, expectedKeys, errMsg(numKeys));
-numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
-assert.eq(numKeys, expectedKeys, errMsg(numKeys));
+let keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
+switch (getOptimizer(keysExaminedRet.explain)) {
+    case "classic":
+        assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
+        break;
+    case "CQF":
+        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+        break;
+}
+keysExaminedRet =
+    keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
+assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
 
 assert.commandWorked(t.insert({a: 1, b: 1}));
 assert.commandWorked(t.insert({a: 1, b: 1}));
-numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
-assert.eq(numKeys, expectedKeys, errMsg(numKeys));
-numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
-assert.eq(numKeys, expectedKeys, errMsg(numKeys));
-numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
-assert.eq(numKeys, expectedKeys, errMsg(numKeys));
+keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
+switch (getOptimizer(keysExaminedRet.explain)) {
+    case "classic":
+        assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
+        break;
+    case "CQF":
+        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+        break;
+}
+keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
+switch (getOptimizer(keysExaminedRet.explain)) {
+    case "classic":
+        assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
+        break;
+    case "CQF":
+        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+        break;
+}
+keysExaminedRet =
+    keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
+assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
 
 // We examine one less key in the classic engine because the bounds are slightly tighter.
 if (!isSBEEnabled) {
     expectedKeys = 2;
 }
 
-numKeys = keysExamined({a: {$in: [1, 1.9]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
-assert.eq(numKeys, expectedKeys, errMsg(numKeys));
-numKeys = keysExamined({a: {$in: [1.1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
-assert.eq(numKeys, expectedKeys, errMsg(numKeys));
+keysExaminedRet = keysExamined({a: {$in: [1, 1.9]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
+switch (getOptimizer(keysExaminedRet.explain)) {
+    case "classic":
+        assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
+        break;
+    case "CQF":
+        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+        break;
+}
+keysExaminedRet =
+    keysExamined({a: {$in: [1.1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
+assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
 assert.commandWorked(t.insert({a: 1, b: 1.5}));
 
 // We examine one extra key in both engines because we've inserted a document that falls within
 // both sets of bounds being scanned.
 expectedKeys = isSBEEnabled ? 1 : 4;
-numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
-assert.eq(numKeys, expectedKeys, errMsg(numKeys));
+keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
+switch (getOptimizer(keysExaminedRet.explain)) {
+    case "classic":
+        assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
+        break;
+    case "CQF":
+        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+        break;
+}

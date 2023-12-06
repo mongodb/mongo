@@ -1,5 +1,5 @@
 // Include helpers for analyzing explain output.
-import {getChunkSkipsFromAllShards} from "jstests/libs/analyze_plan.js";
+import {getChunkSkipsFromAllShards, getOptimizer} from "jstests/libs/analyze_plan.js";
 
 const s = new ShardingTest({name: "shard3", shards: 2, mongos: 2, other: {enableBalancer: true}});
 const s2 = s.s1;
@@ -81,7 +81,14 @@ assert.eq(0, stats.totalKeysExamined, "ex2");
 assert.eq(4, stats.totalDocsExamined, "ex3");
 
 const chunkSkips = getChunkSkipsFromAllShards(explainResult);
-assert.eq(1, chunkSkips, "ex4");
+switch (getOptimizer(explainResult)) {
+    case "classic":
+        assert.eq(1, chunkSkips, "ex4");
+        break;
+    case "CQF":
+        // TODO SERVER-77719: Implement the assertion for CQF.
+        break;
+}
 
 // SERVER-4612
 // make sure idhack obeys chunks

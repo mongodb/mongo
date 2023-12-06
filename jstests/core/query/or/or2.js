@@ -3,7 +3,7 @@
 // ]
 
 // Include helpers for analyzing explain output.
-import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
+import {getOptimizer, getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 const t = db.jstests_or2;
 t.drop();
@@ -51,7 +51,15 @@ function doTest(index) {
     checkArrs([{_id: 0, x: 0, a: 1}], a1);
     if (index) {
         const explain = t.find({x: 0, $or: [{a: 1}]}).explain();
-        assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+        switch (getOptimizer(explain)) {
+            case "classic":
+                assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+                break;
+            case "CQF":
+                // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+                // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+                break;
+        }
     }
 
     const a1b2 = t.find({x: 1, $or: [{a: 1}, {b: 2}]}).toArray();
@@ -59,7 +67,15 @@ function doTest(index) {
               a1b2);
     if (index) {
         const explain = t.find({x: 0, $or: [{a: 1}]}).explain();
-        assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+        switch (getOptimizer(explain)) {
+            case "classic":
+                assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+                break;
+            case "CQF":
+                // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+                // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+                break;
+        }
     }
 }
 

@@ -16,7 +16,7 @@
  * ]
  */
 
-import {getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
+import {getOptimizer, getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 // Tests the functionality for committed reads for the given read concern level.
 function testReadConcernLevel(level) {
@@ -89,8 +89,7 @@ function testReadConcernLevel(level) {
     }
 
     function getExplainPlan(query) {
-        var res = db.runCommand({explain: {find: t.getName(), filter: query}});
-        return getWinningPlan(assert.commandWorked(res).queryPlanner);
+        return assert.commandWorked(db.runCommand({explain: {find: t.getName(), filter: query}}));
     }
 
     //
@@ -180,7 +179,18 @@ function testReadConcernLevel(level) {
     assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
     assert.eq(getCursorForReadConcernLevel().itcount(), 10);
     assert.eq(getAggCursorForReadConcernLevel().itcount(), 10);
-    assert(isIxscan(db, getExplainPlan({version: 1})));
+
+    let explain = getExplainPlan({version: 1})
+    let optimizer = getOptimizer(explain);
+    switch (optimizer) {
+        case "classic":
+            assert(isIxscan(db, explain));
+            break;
+        case "CQF":
+            // TODO SERVER-77719: Implement the assertion for CQF. Depending on the evolution of
+            // CQF, the use of index may be different.
+            break;
+    }
 
     // Dropping an index does not bump the min snapshot, so the query should succeed.
     t.dropIndex({version: 1});

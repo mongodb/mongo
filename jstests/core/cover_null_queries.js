@@ -9,7 +9,7 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {getAggPlanStages, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStages, getOptimizer, getPlanStages} from "jstests/libs/analyze_plan.js";
 import {
     ClusteredCollectionUtil
 } from "jstests/libs/clustered_collections/clustered_collection_util.js";
@@ -43,7 +43,14 @@ function validateStages({cmdObj, expectedStages, isAgg}) {
         const planStages = isAgg
             ? getAggPlanStages(explainObj, expectedStage, /* useQueryPlannerSection */ true)
             : getPlanStages(explainObj, expectedStage);
-        assert.eq(planStages.length, count, {foundStages: planStages, explain: explainObj});
+        switch (getOptimizer(explainObj)) {
+            case "classic":
+                assert.eq(planStages.length, count, {foundStages: planStages, explain: explainObj});
+                break;
+            case "CQF":
+                // TODO SERVER-77719: Implement the assertion for CQF.
+                break;
+        }
         if (count > 0) {
             for (const planStage of planStages) {
                 assert.eq(planStage.stage, expectedStage, planStage);
