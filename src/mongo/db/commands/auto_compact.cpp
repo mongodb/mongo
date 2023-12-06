@@ -34,10 +34,12 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/auto_compact.h"
 #include "mongo/db/commands/compact_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -105,8 +107,33 @@ Status autoCompact(OperationContext* opCtx,
     auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
     Lock::GlobalLock lk(opCtx, MODE_IX);
+    std::shared_ptr<const CollectionCatalog> catalog = CollectionCatalog::get(opCtx);
+    std::vector<StringData> excludedIdents;
 
-    Status status = storageEngine->autoCompact(opCtx, enable, freeSpaceTargetMB);
+    if (enable) {
+        // The oplog is always excluded when enabling auto compaction. If this is a replica set,
+        // ensure it exists, otherwise it may not and proceed.
+        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        const bool isReplSet = replCoord->getSettings().isReplSet();
+        if (isReplSet) {
+            auto state = replCoord->getMemberState();
+            uassert(ErrorCodes::NotPrimaryOrSecondary,
+                    "Can only run 'autoCompact' on a primary or secondary in steady-state",
+                    state.primary() || state.secondary());
+        }
+
+        auto collection =
+            catalog->lookupCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace);
+
+        tassert(8354800, "the oplog must exist in a replica set", collection || !isReplSet);
+
+        if (collection)
+            excludedIdents.push_back(collection->getSharedIdent()->getIdent());
+    }
+
+    StorageEngine::AutoCompactOptions options{enable, freeSpaceTargetMB, std::move(excludedIdents)};
+
+    Status status = storageEngine->autoCompact(opCtx, options);
     if (!status.isOK())
         return status;
 

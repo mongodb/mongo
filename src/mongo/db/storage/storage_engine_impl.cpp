@@ -1451,10 +1451,8 @@ void StorageEngineImpl::dump() const {
     _engine->dump();
 }
 
-Status StorageEngineImpl::autoCompact(OperationContext* opCtx,
-                                      bool enable,
-                                      boost::optional<int64_t> freeSpaceTargetMB) {
-    return _engine->autoCompact(opCtx, enable, freeSpaceTargetMB);
+Status StorageEngineImpl::autoCompact(OperationContext* opCtx, const AutoCompactOptions& options) {
+    return _engine->autoCompact(opCtx, options);
 }
 
 }  // namespace mongo

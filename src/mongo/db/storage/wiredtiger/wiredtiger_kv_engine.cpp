@@ -2769,8 +2769,7 @@ void WiredTigerKVEngine::sizeStorerPeriodicFlush() {
 }
 
 Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
-                                       bool enable,
-                                       boost::optional<int64_t> freeSpaceTargetMB) {
+                                       const StorageEngine::AutoCompactOptions& options) {
     dassert(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
@@ -2782,20 +2781,29 @@ Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
     opCtx->recoveryUnit()->abandonSnapshot();
 
     StringBuilder config;
-    if (enable) {
+    if (options.enable) {
         config << "background=true,timeout=0";
+        if (options.freeSpaceTargetMB) {
+            config << ",free_space_target=" << std::to_string(*options.freeSpaceTargetMB) << "MB";
+        }
+        if (!options.excludedIdents.empty()) {
+            // Create WiredTiger URIs from the idents.
+            config << ",exclude=[";
+            for (const auto& ident : options.excludedIdents) {
+                config << "\"" << _uri(ident) + ".wt\",";
+            }
+            config << "]";
+        }
     } else {
         config << "background=false";
     }
 
-    if (freeSpaceTargetMB && enable) {
-        config << ",free_space_target=" << std::to_string(*freeSpaceTargetMB) << "MB";
-    }
     int ret = s->compact(s, nullptr, config.str().c_str());
 
     if (ret == EBUSY) {
         StringBuilder msg;
-        msg << "Auto compact failed to " << (enable ? "start" : "stop") << ", resource busy";
+        msg << "Auto compact failed to " << (options.enable ? "start" : "stop")
+            << ", resource busy";
         return Status(ErrorCodes::ObjectIsBusy, msg.str());
     }
     uassertStatusOK(wtRCToStatus(ret, s));

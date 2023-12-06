@@ -230,9 +230,7 @@ public:
 
     void dump() const final {}
 
-    Status autoCompact(OperationContext* opCtx,
-                       bool enable,
-                       boost::optional<int64_t> freeSpaceTargetMB) final {
+    Status autoCompact(OperationContext* opCtx, const AutoCompactOptions& options) final {
         return Status::OK();
     }
 };

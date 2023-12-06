@@ -494,8 +494,7 @@ public:
      * See StorageEngine::autoCompact for details
      */
     virtual Status autoCompact(OperationContext* opCtx,
-                               bool enable,
-                               boost::optional<int64_t> freeSpaceTargetMB) {
+                               const StorageEngine::AutoCompactOptions& options) {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support auto compact");
     }
