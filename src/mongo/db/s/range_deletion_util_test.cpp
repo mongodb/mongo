@@ -879,7 +879,8 @@ DEATH_TEST_F(RangeDeleterTest, RemoveDocumentsInRangeCrashesIfInputFutureHasErro
 
 TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotCrashWhenShardKeyIndexDoesNotExist) {
     auto queriesComplete = SemiFuture<void>::makeReady();
-    const std::string kNoShardKeyIndexMsg("Unable to find shard key index for");
+    const std::string kNoShardKeyIndexMsg("Unable to find shard key index");
+    startCapturingLogMessages();
     auto logCountBefore = countTextFormatLogLinesContaining(kNoShardKeyIndexMsg);
 
     auto cleanupComplete =
@@ -895,7 +896,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotCrashWhenShardKeyIndexDoes
 
     // Range deleter will keep on retrying when it encounters non-stepdown errors. Make it run
     // a few iterations and then create the index to make it exit the retry loop.
-    while (countTextFormatLogLinesContaining(kNoShardKeyIndexMsg) < logCountBefore) {
+    while (countTextFormatLogLinesContaining(kNoShardKeyIndexMsg) <= logCountBefore) {
         sleepmicros(100);
     }
 
