@@ -41,6 +41,7 @@
 #include "mongo/db/service_context.h"
 
 namespace mongo {
+
 using SetClusterParameterImplFn = void (*)(OperationContext*,
                                            const SetClusterParameter&,
                                            boost::optional<Timestamp>,

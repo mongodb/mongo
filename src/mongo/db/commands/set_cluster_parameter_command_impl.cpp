@@ -112,6 +112,7 @@ void setClusterParameterImplRouter(OperationContext* opCtx,
                                    const SetClusterParameter& request,
                                    boost::optional<Timestamp>,
                                    boost::optional<LogicalTime>) {
+
     ConfigsvrSetClusterParameter configsvrSetClusterParameter(request.getCommandParameter());
     configsvrSetClusterParameter.setDbName(request.getDbName());
 

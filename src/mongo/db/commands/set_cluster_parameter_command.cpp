@@ -53,6 +53,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -99,6 +100,13 @@ public:
             auto service = opCtx->getService();
             invariant(service->role().hasExclusively(ClusterRole::ShardServer),
                       "Attempted to run a shard-only command directly from the router role.");
+            uassert(
+                ErrorCodes::IllegalOperation,
+                str::stream()
+                    << "Invalid cluster parameter: "
+                    << query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName,
+                !request().getCommandParameter()
+                     [query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName]);
             static auto impl = getSetClusterParameterImpl(service);
             impl(opCtx,
                  request(),

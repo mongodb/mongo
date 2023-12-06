@@ -294,19 +294,4 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
     });
 }
 
-TEST(QuerySettingsClusterParameter, ParameterValidation) {
-    // Ensure validation fails for invalid input.
-    QuerySettingsClusterParameter querySettingsParameter(
-        QuerySettingsManager::kQuerySettingsClusterParameterName,
-        ServerParameterType::kClusterWide);
-    ASSERT_NOT_OK(querySettingsParameter.validate(BSON("" << BSON("a"
-                                                                  << "b"))
-                                                      .firstElement(),
-                                                  /* tenantId */ boost::none));
-
-    // Ensure validation passes for valid input.
-    QuerySettingsClusterParameterValue parameterValue({}, {});
-    ASSERT_OK(querySettingsParameter.validate(BSON("" << parameterValue.toBSON()).firstElement(),
-                                              /* tenantId */ boost::none));
-}
 }  // namespace mongo::query_settings

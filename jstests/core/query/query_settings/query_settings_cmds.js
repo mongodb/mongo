@@ -15,8 +15,6 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());
 
-const adminDB = db.getSiblingDB("admin");
-
 /**
  * Tests query settings setQuerySettings and removeQuerySettings commands as well as $querySettings
  * agg stage.

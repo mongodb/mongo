@@ -284,19 +284,6 @@ void QuerySettingsClusterParameter::append(OperationContext* opCtx,
     querySettingsManager.appendQuerySettingsClusterParameterValue(opCtx, bob, tenantId);
 }
 
-Status QuerySettingsClusterParameter::validate(const BSONElement& newValueElement,
-                                               const boost::optional<TenantId>& tenantId) const {
-    try {
-        (void)QuerySettingsClusterParameterValue::parse(
-            IDLParserContext("querySettingsParameterValue"), newValueElement.Obj());
-        return Status::OK();
-    } catch (const AssertionException&) {
-        return {ErrorCodes::BadValue,
-                "Call setQuerySettings or removeQuerySettings commands in order to set or remove "
-                "query settings for a given query shape"};
-    }
-}
-
 Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
                                           const boost::optional<TenantId>& tenantId) {
     auto& querySettingsManager = QuerySettingsManager::get(getGlobalServiceContext());
