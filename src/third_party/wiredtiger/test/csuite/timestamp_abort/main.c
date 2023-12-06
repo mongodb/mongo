@@ -69,6 +69,7 @@ static char home[1024]; /* Program working dir */
  */
 
 #define BACKUP_BASE "backup."
+#define BACKUP_OLD "OLD." BACKUP_BASE
 #define CHECK_BASE "check."
 #define INVALID_KEY UINT64_MAX
 #define MAX_BACKUP_INVL 4 /* Maximum interval between backups */
@@ -489,7 +490,7 @@ backup_delete_old_backups(int retain)
     DIR *d;
     size_t len;
     int count, i, indexes[256], last_full, ndeleted;
-    char buf[256];
+    char fromdir[256], todir[256];
     bool done;
 
     last_full = 0;
@@ -529,8 +530,14 @@ backup_delete_old_backups(int retain)
         for (i = 0; i < count - retain; i++) {
             if (indexes[i] == last_full)
                 continue;
-            testutil_snprintf(buf, sizeof(buf), BACKUP_BASE "%d", indexes[i]);
-            testutil_remove(buf);
+            testutil_snprintf(fromdir, sizeof(fromdir), BACKUP_BASE "%d", indexes[i]);
+            testutil_snprintf(todir, sizeof(todir), BACKUP_OLD "%d", indexes[i]);
+            /*
+             * First rename the directory so that if the child process is killed during the remove
+             * the verify function doesn't attempt to open a partial database.
+             */
+            testutil_check(rename(fromdir, todir));
+            testutil_remove(todir);
             ndeleted++;
         }
     } while (!done);
