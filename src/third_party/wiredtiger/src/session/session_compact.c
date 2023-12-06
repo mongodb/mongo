@@ -428,6 +428,11 @@ __wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config
                 WT_ERR_MSG(session, EINVAL,
                   "exclude configuration cannot be set when disabling the background compaction "
                   "server.");
+            WT_ERR_NOTFOUND_OK(__wt_config_getones(session, config, "run_once", &cval), true);
+            if (ret == 0)
+                WT_ERR_MSG(session, EINVAL,
+                  "run_once configuration cannot be set when disabling the background compaction "
+                  "server.");
             WT_ERR_NOTFOUND_OK(__wt_config_getones(session, config, "timeout", &cval), true);
             if (ret == 0)
                 WT_ERR_MSG(session, EINVAL,

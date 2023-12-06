@@ -254,6 +254,10 @@ __background_compact_should_run(WT_SESSION_IMPL *session, const char *uri, int64
     if (compact_stat == NULL)
         return (true);
 
+    /* If we are running once, force compaction on the file. */
+    if (conn->background_compact.run_once)
+        return (true);
+
     /* Proceed with compaction when the file has not been compacted for some time. */
     cur_time = __wt_clock(session);
     if (WT_CLOCKDIFF_SEC(cur_time, compact_stat->prev_compact_time) >=
@@ -496,9 +500,17 @@ __background_compact_server(void *arg)
 
     for (;;) {
 
+        /* If the server is configured to run once, stop it after a full iteration. */
+        if (full_iteration && conn->background_compact.run_once) {
+            __wt_spin_lock(session, &conn->background_compact.lock);
+            conn->background_compact.running = false;
+            running = false;
+            WT_STAT_CONN_SET(session, background_compact_running, running);
+            __wt_spin_unlock(session, &conn->background_compact.lock);
+        }
+
         /* When the entire metadata file has been parsed, take a break or wait until signalled. */
         if (full_iteration || !running) {
-
             /*
              * In order to always try to parse all the candidates present in the metadata file even
              * though the compaction server may be stopped at random times, only set the URI to the
@@ -524,10 +536,19 @@ __background_compact_server(void *arg)
 
         __wt_spin_lock(session, &conn->background_compact.lock);
         running = conn->background_compact.running;
+
+        /* The server has been signalled to change state. */
         if (conn->background_compact.signalled) {
+            /* If configured to run once, start from the beginning. */
+            if (conn->background_compact.run_once) {
+                WT_ASSERT(session, running);
+                WT_ERR(__wt_buf_set(session, uri, WT_BACKGROUND_COMPACT_URI_PREFIX,
+                  strlen(WT_BACKGROUND_COMPACT_URI_PREFIX) + 1));
+            }
             conn->background_compact.signalled = false;
             WT_STAT_CONN_SET(session, background_compact_running, running);
         }
+
         __wt_spin_unlock(session, &conn->background_compact.lock);
 
         /*
@@ -738,9 +759,15 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
     if (enable == running)
         goto err;
 
-    /* Update the excluded tables when the server is enabled. */
-    if (enable)
+    /* Update the background compaction settings when the server is enabled. */
+    if (enable) {
+        /* The background compaction server can be configured to run once. */
+        WT_ERR(__wt_config_getones(session, stripped_config, "run_once", &cval));
+        conn->background_compact.run_once = cval.val;
+
+        /* Process excluded tables. */
         WT_ERR(__background_compact_exclude_list_process(session, config));
+    }
 
     /* The background compaction has been signalled successfully, update its state. */
     conn->background_compact.running = enable;

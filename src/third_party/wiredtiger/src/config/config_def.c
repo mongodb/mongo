@@ -815,6 +815,8 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_compact[] = {
     NULL},
   {"free_space_target", "int", NULL, "min=1MB", NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_INT,
     1LL * WT_MEGABYTE, INT64_MAX, NULL},
+  {"run_once", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN, INT64_MIN,
+    INT64_MAX, NULL},
   {"timeout", "int", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_INT, INT64_MIN, INT64_MAX,
     NULL},
   {NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 0, 0, NULL}};
@@ -823,7 +825,7 @@ static const uint8_t confchk_WT_SESSION_compact_jump[WT_CONFIG_JUMP_TABLE_SIZE] 
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 3, 3,
-  3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+  3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5};
 
 static const char *confchk_access_pattern_hint2_choices[] = {"none", "random", "sequential", NULL};
 
@@ -3361,8 +3363,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "commit_timestamp=,durable_timestamp=,operation_timeout_ms=0,"
     "sync=",
     confchk_WT_SESSION_commit_transaction, 4, confchk_WT_SESSION_commit_transaction_jump},
-  {"WT_SESSION.compact", "background=,exclude=,free_space_target=20MB,timeout=1200",
-    confchk_WT_SESSION_compact, 4, confchk_WT_SESSION_compact_jump},
+  {"WT_SESSION.compact",
+    "background=,exclude=,free_space_target=20MB,run_once=false,"
+    "timeout=1200",
+    confchk_WT_SESSION_compact, 5, confchk_WT_SESSION_compact_jump},
   {"WT_SESSION.create",
     "access_pattern_hint=none,allocation_size=4KB,app_metadata=,"
     "assert=(commit_timestamp=none,durable_timestamp=none,"

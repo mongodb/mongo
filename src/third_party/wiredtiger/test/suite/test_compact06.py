@@ -35,15 +35,37 @@ from wiredtiger import stat
 class test_compact06(wttest.WiredTigerTestCase):
     configuration_items = ['exclude=["table:a.wt"]', 'free_space_target=10MB', 'timeout=60']
 
+    def get_bg_compaction_files_skipped(self):
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        skipped = stat_cursor[stat.conn.background_compact_skipped][2]
+        stat_cursor.close()
+        return skipped
+
     def get_bg_compaction_running(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         compact_running = stat_cursor[stat.conn.background_compact_running][2]
         stat_cursor.close()
         return compact_running
+
+    def get_bg_compaction_success(self):
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        skipped = stat_cursor[stat.conn.background_compact_success][2]
+        stat_cursor.close()
+        return skipped
+
+    def turn_off_bg_compact(self):
+        self.session.compact(None, 'background=false')
+        while self.get_bg_compaction_running():
+            time.sleep(1)
+
+    def turn_on_bg_compact(self, config=''):
+        self.session.compact(None, f'background=true,{config}')
+        while not self.get_bg_compaction_running():
+            time.sleep(1)
     
     def test_background_compact_api(self):
-        # We cannot trigger the background compaction on a specific API. Note that the URI is not
-        # relevant here, the corresponding table does not need to exist for this check.
+        # We cannot trigger the background compaction on a specific API. Note that the URI is
+        # not relevant here, the corresponding table does not need to exist for this check.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
             self.session.compact("file:123", 'background=true'),
             '/Background compaction does not work on specific URIs/')
@@ -60,14 +82,7 @@ class test_compact06(wttest.WiredTigerTestCase):
             '/can only exclude objects of type "table"/')
 
         # Enable the background compaction server.
-        self.session.compact(None, 'background=true')
-
-        # Wait for the background server to wake up.
-        compact_running = self.get_bg_compaction_running()
-        while not compact_running:
-            time.sleep(1)
-            compact_running = self.get_bg_compaction_running()
-        self.assertEqual(compact_running, 1)
+        self.turn_on_bg_compact()
 
         # We cannot reconfigure the background server.
         for item in self.configuration_items:
@@ -76,7 +91,36 @@ class test_compact06(wttest.WiredTigerTestCase):
                 '/Cannot reconfigure background compaction while it\'s already running/')
 
         # Disable the background compaction server.
-        self.session.compact(None, 'background=false')
+        self.turn_off_bg_compact()
+
+        # The background compaction should have tried to compact the HS.
+        assert self.get_bg_compaction_files_skipped() == 0
+        assert self.get_bg_compaction_success() == 1
+
+        # Enable background and configure it to run once. Don't use the helper function as the
+        # server may go to sleep before we have the time to check it is actually running.
+        self.session.compact(None, 'background=true,run_once=true')
+
+        # Wait for background compaction to process the HS table. Even though there is no work to
+        # do, it is considered as a success.
+        while self.get_bg_compaction_success() == 1:
+            time.sleep(1)
+
+        # Ensure background compaction stops by itself.
+        while self.get_bg_compaction_running():
+            time.sleep(1)
+
+        # When running once, background compaction should not skip files.
+        assert self.get_bg_compaction_files_skipped() == 0
+        assert self.get_bg_compaction_success() == 2
+
+        # Enable the server again but with default options, the HS should be skipped.
+        self.turn_on_bg_compact()
+
+        while self.get_bg_compaction_files_skipped() != 1:
+            time.sleep(1)
+
+        self.turn_off_bg_compact()
 
         # Background compaction may have been inspecting a table when disabled, which is considered
         # as an interruption, ignore that message.

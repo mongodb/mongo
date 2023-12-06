@@ -1404,13 +1404,16 @@ struct __wt_session {
      * @configstart{WT_SESSION.compact, see dist/api_data.py}
      * @config{background, enable/disabled the background compaction server., a boolean flag;
      * default empty.}
-     * @config{exclude, A list of table objects to be excluded from background compaction.  The list
+     * @config{exclude, list of table objects to be excluded from background compaction.  The list
      * is immutable and only applied when the background compaction gets enabled.  The list is not
      * saved between the calls and needs to be reapplied each time the service is enabled.  The
      * individual objects in the list can only be of the \c table: URI type., a list of strings;
      * default empty.}
      * @config{free_space_target, minimum amount of space recoverable for compaction to proceed., an
      * integer greater than or equal to \c 1MB; default \c 20MB.}
+     * @config{run_once, configure background compaction server to run once.  In this mode\,
+     * compaction is always attempted on each table unless explicitly excluded., a boolean flag;
+     * default \c false.}
      * @config{timeout, maximum amount of time to allow for compact in seconds.  The actual amount
      * of time spent in compact may exceed the configured value.  A value of zero disables the
      * timeout., an integer; default \c 1200.}
