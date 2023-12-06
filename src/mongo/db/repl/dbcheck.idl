@@ -160,9 +160,10 @@ structs:
         type: safeBool
         default: true
       batchWriteConcern:
-        description: Wait for this writeConcern at the end of every batch. Default is w:1 with no timeout.
+        description: Wait for this writeConcern at the end of every batch.
         type: WriteConcern
-        default: WriteConcernOptions()
+        # Set to default write concern if not set.
+        optional: true
       validateMode:
         description: The type of consistency checks that dbCheck will run.
         type: DbCheckValidationMode
@@ -203,9 +204,10 @@ structs:
         type: safeBool
         default: true
       batchWriteConcern:
-        description: Wait for this writeConcern at the end of every batch. Default is w:1 with no timeout.
+        description: Wait for this writeConcern at the end of every batch.
         type: WriteConcern
-        default: WriteConcernOptions()
+        # Set to default write concern if not set.
+        optional: true
 
   DbCheckOplogBatch:
     description: "Oplog entry for a dbCheck batch"

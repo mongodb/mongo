@@ -75,6 +75,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -153,6 +154,28 @@ void _initializeCurOp(OperationContext* opCtx, boost::optional<DbCheckCollection
     curOp->setNS_inlock(info->nss);
     curOp->setOpDescription_inlock(info->toBSON());
     curOp->ensureStarted();
+}
+
+/**
+ * Returns the default write concern if 'batchWriteConcern' is not set.
+ */
+WriteConcernOptions _getBatchWriteConcern(
+    OperationContext* opCtx,
+    const boost::optional<WriteConcernOptions>& providedBatchWriteConcern) {
+    // Default constructor: {w:1, wtimeout: 0}.
+    WriteConcernOptions batchWriteConcern;
+    if (providedBatchWriteConcern) {
+        batchWriteConcern = providedBatchWriteConcern.value();
+    } else {
+        auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
+                             .getDefault(opCtx)
+                             .getDefaultWriteConcern();
+        if (wcDefault) {
+            batchWriteConcern = wcDefault.value();
+        }
+    }
+
+    return batchWriteConcern;
 }
 
 BSONObj DbCheckCollectionInfo::toBSON() const {
@@ -368,19 +391,20 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
         end = invocation.getMaxKey().obj();
     }
 
-    const auto info = DbCheckCollectionInfo{nss,
-                                            uuid.get(),
-                                            start,
-                                            end,
-                                            maxCount,
-                                            maxSize,
-                                            maxDocsPerBatch,
-                                            maxBatchTimeMillis,
-                                            invocation.getBatchWriteConcern(),
-                                            secondaryIndexCheckParameters,
-                                            {opCtx, [&]() {
-                                                 return gMaxDbCheckMBperSec.load();
-                                             }}};
+    const auto info =
+        DbCheckCollectionInfo{nss,
+                              uuid.get(),
+                              start,
+                              end,
+                              maxCount,
+                              maxSize,
+                              maxDocsPerBatch,
+                              maxBatchTimeMillis,
+                              _getBatchWriteConcern(opCtx, invocation.getBatchWriteConcern()),
+                              secondaryIndexCheckParameters,
+                              {opCtx, [&]() {
+                                   return gMaxDbCheckMBperSec.load();
+                               }}};
     auto result = std::make_unique<DbCheckRun>();
     result->push_back(info);
     return result;
@@ -415,7 +439,7 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                    max,
                                    maxDocsPerBatch,
                                    maxBatchTimeMillis,
-                                   invocation.getBatchWriteConcern(),
+                                   _getBatchWriteConcern(opCtx, invocation.getBatchWriteConcern()),
                                    boost::none,
                                    {opCtx, [&]() {
                                         return gMaxDbCheckMBperSec.load();

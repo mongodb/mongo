@@ -58,7 +58,7 @@ const getExpectedCurOp = (parameters, uuid) => {
             "maxBatchTimeMillis": NumberLong(1000),
             "maxCount": NumberLong("9223372036854775807"),
             "maxSize": NumberLong("9223372036854775807"),
-            "writeConcern": {"w": 1, "wtimeout": 0}
+            "writeConcern": {"w": "majority", "wtimeout": 0}
         },
     };
     expectedCurOp["command"]["uuid"] = uuid;
