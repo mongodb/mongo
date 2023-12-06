@@ -87,6 +87,13 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
     OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest);
 
 /**
+ * Processes a response from an FLE insert/update/delete command and converts it to equivalent
+ * BulkWriteReplyInfo.
+ */
+BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType,
+                                      const BatchedCommandResponse& response);
+
+/**
  * Executes a client bulkWrite request by sending child batches to several shard endpoints, and
  * returns a vector of BulkWriteReplyItem (each of which is a reply for an individual op) along
  * with a count of how many of those replies are errors.

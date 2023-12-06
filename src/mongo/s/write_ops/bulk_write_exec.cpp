@@ -201,9 +201,10 @@ void fillOKInsertReplies(BulkWriteReplyInfo& replyInfo, int size) {
         reply.setOk(1);
         reply.setIdx(i);
         replyInfo.replyItems.push_back(reply);
-        replyInfo.summaryFields.nInserted += 1;
     }
 }
+
+}  // namespace
 
 BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType,
                                       const BatchedCommandResponse& response) {
@@ -211,6 +212,7 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
     if (response.toStatus().isOK()) {
         if (firstOpType == BulkWriteCRUDOp::kInsert) {
             fillOKInsertReplies(replyInfo, response.getN());
+            replyInfo.summaryFields.nInserted += response.getN();
         } else {
             BulkWriteReplyItem reply;
             reply.setN(response.getN());
@@ -239,13 +241,13 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
         if (response.isErrDetailsSet()) {
             const auto& errDetails = response.getErrDetails();
             if (firstOpType == BulkWriteCRUDOp::kInsert) {
+                replyInfo.summaryFields.nInserted += response.getN();
                 fillOKInsertReplies(replyInfo, response.getN() + errDetails.size());
                 for (const auto& err : errDetails) {
                     int32_t idx = err.getIndex();
                     replyInfo.replyItems[idx].setN(0);
                     replyInfo.replyItems[idx].setOk(0);
                     replyInfo.replyItems[idx].setStatus(err.getStatus());
-                    replyInfo.summaryFields.nInserted -= 1;
                 }
             } else {
                 invariant(errDetails.size() == 1 && response.getN() == 0);
@@ -267,8 +269,6 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
     }
     return replyInfo;
 }
-
-}  // namespace
 
 std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
     OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest) {

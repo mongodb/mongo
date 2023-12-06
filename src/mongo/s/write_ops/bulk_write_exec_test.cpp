@@ -2858,6 +2858,226 @@ TEST_F(BulkWriteOpTest, UnorderedBulkInsertGetsRepeatedOnCannotRefreshShardCache
     ASSERT_EQ(replies[2].getN(), 1);
 }
 
+// Test that we combine summary field values across multiple child batch responses.
+TEST_F(BulkWriteOpTest, SummaryFieldsAreMergedAcrossReplies) {
+    NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("foo.bar");
+    NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("foo.baz");
+    auto shardId1 = ShardId("shard1");
+    auto shardId2 = ShardId("shard2");
+    auto endpoint1 = ShardEndpoint(
+        shardId1, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    auto endpoint2 = ShardEndpoint(
+        shardId2, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterFullRange(nss1, endpoint1));
+    targeters.push_back(initTargeterFullRange(nss2, endpoint2));
+
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(0, BSON("x" << 1)), /* nInserted=1 */
+         BulkWriteUpdateOp(
+             0, BSON("x" << 1), BSON("$set" << BSON("y" << 2))), /* nMatched=1, nModified=1 */
+         [] {
+             auto op = BulkWriteUpdateOp(1, BSON("x" << 2), BSON("$set" << BSON("y" << 2)));
+             op.setUpsert(true);
+             return op;
+         }(),                                   /* nUpserted=1, nMatched=0 */
+         BulkWriteDeleteOp(1, BSON("x" << 1))}, /* nDeleted=1 */
+        {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
+    request.setOrdered(false);
+
+    BulkWriteOp op(_opCtx, request);
+
+    TargetedBatchMap targeted;
+    ASSERT_OK(op.target(targeters, false, targeted));
+
+    ASSERT_EQUALS(targeted.size(), 2);
+    ASSERT_EQUALS(targeted[shardId1]->getWrites().size(), 2u);
+    ASSERT_EQUALS(targeted[shardId2]->getWrites().size(), 2u);
+
+    auto reply1 = BulkWriteCommandReply(BulkWriteCommandResponseCursor(
+                                            0,
+                                            {BulkWriteReplyItem(0), BulkWriteReplyItem(1)},
+                                            NamespaceString::makeBulkWriteNSS(boost::none)),
+                                        0,
+                                        1,
+                                        1,
+                                        1,
+                                        0,
+                                        0)
+                      .toBSON()
+                      .addFields(BSON("ok" << 1));
+    auto response1 =
+        AsyncRequestsSender::Response{shardId1,
+                                      StatusWith<executor::RemoteCommandResponse>(
+                                          executor::RemoteCommandResponse(reply1, Microseconds(0))),
+                                      boost::none};
+    op.processChildBatchResponseFromRemote(*targeted[shardId1], response1, boost::none);
+
+    auto reply2 = BulkWriteCommandReply(BulkWriteCommandResponseCursor(
+                                            0,
+                                            {BulkWriteReplyItem(0), BulkWriteReplyItem(1)},
+                                            NamespaceString::makeBulkWriteNSS(boost::none)),
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        1,
+                                        1)
+                      .toBSON()
+                      .addFields(BSON("ok" << 1));
+    auto response2 =
+        AsyncRequestsSender::Response{shardId2,
+                                      StatusWith<executor::RemoteCommandResponse>(
+                                          executor::RemoteCommandResponse(reply2, Microseconds(0))),
+                                      boost::none};
+    op.processChildBatchResponseFromRemote(*targeted[shardId2], response2, boost::none);
+
+    ASSERT(op.isFinished());
+    auto replyInfo = op.generateReplyInfo();
+    ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nInserted, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nMatched, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nModified, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nUpserted, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nDeleted, 1);
+}
+
+// Test that noteWriteOpFinalResponse correctly updates summary fields.
+TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponseUpdatesSummaryFields) {
+    ShardId shardIdA("shardA");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+
+    auto upsertOp = BulkWriteUpdateOp(0, BSON("x" << 2), BSON("y" << 1));
+    upsertOp.setUpsert(true);
+
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1)),
+                                     BulkWriteDeleteOp(0, BSON("x" << 1)),
+                                     BulkWriteUpdateOp(0, BSON("x" << 1), BSON("y" << 1)),
+                                     upsertOp},
+                                    {NamespaceInfoEntry(nss)});
+
+    auto emptyWCError = ShardWCError(shardIdA, WriteConcernErrorDetail());
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    auto insertReply = BulkWriteReplyItem(0);
+    insertReply.setN(1); /* nInserted=1 */
+    bulkWriteOp.noteWriteOpFinalResponse(0, insertReply, emptyWCError, {});
+
+    auto deleteReply = BulkWriteReplyItem(0);
+    deleteReply.setN(1); /* nDeleted=1 */
+    bulkWriteOp.noteWriteOpFinalResponse(1, deleteReply, emptyWCError, {});
+
+    auto updateReply = BulkWriteReplyItem(0);
+    updateReply.setN(1);         /* nMatched=1 */
+    updateReply.setNModified(1); /* nModified=1 */
+    bulkWriteOp.noteWriteOpFinalResponse(2, updateReply, emptyWCError, {});
+
+    auto upsertReply = BulkWriteReplyItem(0);
+    upsertReply.setN(1); /* nUpserted=1 */
+    upsertReply.setUpserted(IDLAnyTypeOwned{BSON_ARRAY("_id" << 1)[0]});
+    bulkWriteOp.noteWriteOpFinalResponse(3, upsertReply, emptyWCError, {});
+
+    ASSERT(bulkWriteOp.isFinished());
+    auto replyInfo = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nInserted, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nMatched, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nModified, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nUpserted, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nDeleted, 1);
+}
+
+// Test that processFLEResponse correctly calculates summary fields.
+TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
+    ShardId shardIdA("shardA");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+
+    auto insertReply = BatchedCommandResponse();
+    insertReply.setStatus(Status::OK());
+    insertReply.setN(2); /* nInserted=2 */
+    auto replyInfo = bulk_write_exec::processFLEResponse(BulkWriteCRUDOp::kInsert, insertReply);
+    ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nInserted, 2);
+    ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nModified, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nUpserted, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nDeleted, 0);
+
+    auto insertReplyWithError = BatchedCommandResponse();
+    insertReplyWithError.setStatus(Status::OK());
+    insertReplyWithError.setN(1); /* nInserted=1 */
+    insertReplyWithError.addToErrDetails(
+        write_ops::WriteError(1, Status(ErrorCodes::BadValue, "Dummy BadValue"))); /* nErrors=1 */
+    replyInfo = bulk_write_exec::processFLEResponse(BulkWriteCRUDOp::kInsert, insertReplyWithError);
+    ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nInserted, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nModified, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nUpserted, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nDeleted, 0);
+
+    auto deleteReply = BatchedCommandResponse();
+    deleteReply.setStatus(Status::OK());
+    deleteReply.setN(1); /* nDeleted=1 */
+    replyInfo = bulk_write_exec::processFLEResponse(BulkWriteCRUDOp::kDelete, deleteReply);
+    ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nModified, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nUpserted, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nDeleted, 1);
+
+    auto singleReplyWithError = BatchedCommandResponse();
+    singleReplyWithError.setStatus(Status::OK());
+    singleReplyWithError.addToErrDetails(
+        write_ops::WriteError(0, Status(ErrorCodes::BadValue, "Dummy BadValue"))); /* nErrors=1 */
+    replyInfo = bulk_write_exec::processFLEResponse(BulkWriteCRUDOp::kDelete, singleReplyWithError);
+    ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nModified, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nUpserted, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nDeleted, 0);
+
+    auto updateReply = BatchedCommandResponse();
+    updateReply.setStatus(Status::OK());
+    updateReply.setN(1);         /* nMatched=1 */
+    updateReply.setNModified(1); /* nModified=1 */
+    replyInfo = bulk_write_exec::processFLEResponse(BulkWriteCRUDOp::kUpdate, updateReply);
+    ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nMatched, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nModified, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nUpserted, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nDeleted, 0);
+
+    // Reuse the single error reply from delete above.
+    replyInfo = bulk_write_exec::processFLEResponse(BulkWriteCRUDOp::kUpdate, singleReplyWithError);
+    ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nModified, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nUpserted, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nDeleted, 0);
+
+    auto upsertReply = BatchedCommandResponse();
+    upsertReply.setStatus(Status::OK());
+    // This field should be ignored for upserts since we don't count upserts under nUpdated.
+    upsertReply.setN(1);
+    auto upsertDetails = std::make_unique<BatchedUpsertDetail>();
+    upsertDetails->setIndex(0);
+    upsertDetails->setUpsertedID(BSON("_id" << 1));
+    upsertReply.addToUpsertDetails(upsertDetails.release()); /* nUpserted=1 */
+    replyInfo = bulk_write_exec::processFLEResponse(BulkWriteCRUDOp::kUpdate, upsertReply);
+    ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nModified, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nUpserted, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nDeleted, 0);
+}
+
 /**
  * Mimics a sharding backend to test BulkWriteExec.
  */
