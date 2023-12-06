@@ -10,6 +10,7 @@ from buildscripts.resmokelib.run import generate_multiversion_exclude_tags as un
 from buildscripts.util.fileops import read_yaml_file
 
 EXCLUDE_TAGS_FILE = "multiversion_exclude_tags.yml"
+EXPANSIONS_FILE = "expansions.yml"
 
 
 class TestGenerateExcludeYaml(unittest.TestCase):
@@ -39,6 +40,7 @@ class TestGenerateExcludeYaml(unittest.TestCase):
 
                 output = os.path.join(self._tmpdir.name, EXCLUDE_TAGS_FILE)
                 under_test.generate_exclude_yaml(old_bin_version=old_bin_version, output=output,
+                                                 expansions_file=EXPANSIONS_FILE,
                                                  logger=MagicMock())
 
                 mock_read_yaml.assert_called_once()
