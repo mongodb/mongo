@@ -1114,9 +1114,10 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .serverless
   - name: .shard_split
-  - name: query_stats_passthrough
-  - name: query_stats_passthrough_writeonly
+  - name: query_stats_aggregation_passthrough
+  - name: query_stats_mongos_aggregation_passthrough
   - name: query_stats_mongos_passthrough
+  - name: query_stats_passthrough
   - name: .unsplittable_collections
   - name: unshard_collection_fuzzer_gen
   - name: .updatefuzzer

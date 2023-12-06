@@ -6750,7 +6750,7 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
-  name: query_stats_passthrough_writeonly
+  name: query_stats_aggregation_passthrough
   tags: []
   commands:
   - func: "do setup"
@@ -6758,6 +6758,13 @@ tasks:
 
 - <<: *task_template
   name: query_stats_mongos_passthrough
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
+  name: query_stats_mongos_aggregation_passthrough
   tags: []
   commands:
   - func: "do setup"

@@ -134,9 +134,10 @@ buildvariants:
   - name: .sharding .txns
   - name: sharding_auth_audit_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
-  - name: query_stats_passthrough
-  - name: query_stats_passthrough_writeonly
+  - name: query_stats_aggregation_passthrough
+  - name: query_stats_mongos_aggregation_passthrough
   - name: query_stats_mongos_passthrough
+  - name: query_stats_passthrough
   - name: .timeseries_crud
   - name: unittest_shell_hang_analyzer_gen
 

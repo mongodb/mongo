@@ -279,9 +279,10 @@ buildvariants:
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
-  - name: query_stats_passthrough
-  - name: query_stats_passthrough_writeonly
+  - name: query_stats_aggregation_passthrough
+  - name: query_stats_mongos_aggregation_passthrough
   - name: query_stats_mongos_passthrough
+  - name: query_stats_passthrough
 
 - &enterprise-rhel-80-64-bit-dynamic-template
   <<: *linux_x86_dynamic_compile_variant_dependency
@@ -1009,9 +1010,10 @@ buildvariants:
   - name: .shard_split
   - name: streams
   - name: streams_auth
-  - name: query_stats_passthrough
-  - name: query_stats_passthrough_writeonly
+  - name: query_stats_aggregation_passthrough
+  - name: query_stats_mongos_aggregation_passthrough
   - name: query_stats_mongos_passthrough
+  - name: query_stats_passthrough
 
 # TODO SERVER-71163: Replace this variant with a dedicated variant for stage builders once the CQF
 # feature flag is not always-disabled.
@@ -1264,9 +1266,10 @@ buildvariants:
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
-  - name: query_stats_passthrough
-  - name: query_stats_passthrough_writeonly
+  - name: query_stats_aggregation_passthrough
+  - name: query_stats_mongos_aggregation_passthrough
   - name: query_stats_mongos_passthrough
+  - name: query_stats_passthrough
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only-template
   name: enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers
