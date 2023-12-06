@@ -43,6 +43,7 @@ void QueryKnobConfiguration::_tryToSetAllValues() {
                                       ->_data.get();
     _sbeDisableGroupPushdownValue = internalQuerySlotBasedExecutionDisableGroupPushdown.load();
     _sbeDisableLookupPushdownValue = internalQuerySlotBasedExecutionDisableLookupPushdown.load();
+    _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.load());
     _isSet = true;
 }
 
@@ -59,6 +60,11 @@ bool QueryKnobConfiguration::getSbeDisableGroupPushdownForOp() {
 bool QueryKnobConfiguration::getSbeDisableLookupPushdownForOp() {
     _tryToSetAllValues();
     return _sbeDisableLookupPushdownValue;
+}
+
+size_t QueryKnobConfiguration::getMaxScansToExplodeForOp() {
+    _tryToSetAllValues();
+    return _maxScansToExplodeValue;
 }
 
 }  // namespace mongo

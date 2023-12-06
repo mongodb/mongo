@@ -44,7 +44,7 @@
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/analyze_regex.h"
 #include "mongo/db/query/projection.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
@@ -693,8 +693,10 @@ namespace {
 class MatchExpressionSbePlanCacheKeySerializationVisitor final
     : public MatchExpressionConstVisitor {
 public:
-    explicit MatchExpressionSbePlanCacheKeySerializationVisitor(BufBuilder* builder)
-        : _builder(builder) {
+    explicit MatchExpressionSbePlanCacheKeySerializationVisitor(OperationContext* opCtx,
+                                                                BufBuilder* builder)
+        : _opCtx(opCtx), _builder(builder) {
+        invariant(_opCtx);
         invariant(_builder);
     }
 
@@ -741,7 +743,15 @@ public:
         // optimized by exploding for sort, the number of unique elements in $in determines how many
         // merge branches we get in the query plan.
         if (expr->getInputParamId()) {
-            _builder->appendNum(static_cast<int>(expr->getEqualities().size()));
+            size_t maxScansToExplode =
+                QueryKnobConfiguration::decoration(_opCtx).getMaxScansToExplodeForOp();
+            // Assume that $in have n elements.
+            // If n is less than or equal to maxScansToExplode, then it is possible that explode for
+            // sort optimization will be used, so we need to add n to plan cache key.
+            // If n is greater than maxScansToExplode, then we can't explode it for sort. So we can
+            // use the same value of (maxScansToExplode + 1) for all queries, so they can share a
+            // plan cache entry.
+            _builder->appendNum(std::min(maxScansToExplode + 1, expr->getEqualities().size()));
         }
     }
 
@@ -1017,6 +1027,7 @@ private:
         _builder->appendBuf(elem.value(), elem.valuesize());
     }
 
+    OperationContext* const _opCtx;
     BufBuilder* const _builder;
 };
 
@@ -1029,8 +1040,9 @@ private:
  */
 class MatchExpressionSbePlanCacheKeySerializationWalker {
 public:
-    explicit MatchExpressionSbePlanCacheKeySerializationWalker(BufBuilder* builder)
-        : _builder{builder}, _visitor{_builder} {
+    explicit MatchExpressionSbePlanCacheKeySerializationWalker(OperationContext* opCtx,
+                                                               BufBuilder* builder)
+        : _builder{builder}, _visitor{opCtx, _builder} {
         invariant(_builder);
     }
 
@@ -1067,8 +1079,10 @@ private:
  * following property: Two match expression trees which are identical after auto-parameterization
  * have the same key, otherwise the keys must differ.
  */
-void encodeKeyForAutoParameterizedMatchSBE(MatchExpression* matchExpr, BufBuilder* builder) {
-    MatchExpressionSbePlanCacheKeySerializationWalker walker{builder};
+void encodeKeyForAutoParameterizedMatchSBE(OperationContext* opCtx,
+                                           MatchExpression* matchExpr,
+                                           BufBuilder* builder) {
+    MatchExpressionSbePlanCacheKeySerializationWalker walker{opCtx, builder};
     tree_walker::walk<true, MatchExpression>(matchExpr, &walker);
 }
 }  // namespace
@@ -1095,8 +1109,7 @@ std::string encodeSBE(const CanonicalQuery& cq) {
         kBufferSizeConstant;
 
     BufBuilder bufBuilder(bufSize);
-    encodeKeyForAutoParameterizedMatchSBE(cq.root(), &bufBuilder);
-
+    encodeKeyForAutoParameterizedMatchSBE(cq.getOpCtx(), cq.root(), &bufBuilder);
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
     bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
     bufBuilder.appendChar(kEncodeSectionDelimiter);

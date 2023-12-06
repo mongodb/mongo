@@ -429,6 +429,8 @@ last-continuous:
     ticket: SERVER-82984
   - test_file: jstests/core/timeseries/timeseries_project_pushdown.js
     ticket: SERVER-82447
+  - test_file: jstests/core/query/explode_for_sort_plan_cache.js
+    ticket: SERVER-83777
   suites: null
 last-lts:
   all:
@@ -904,4 +906,6 @@ last-lts:
     ticket: SERVER-82984
   - test_file: jstests/core/timeseries/timeseries_project_pushdown.js
     ticket: SERVER-82447
+  - test_file: jstests/core/query/explode_for_sort_plan_cache.js
+    ticket: SERVER-83777
   suites: null
