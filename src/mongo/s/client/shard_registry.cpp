@@ -54,6 +54,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_set_config_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
@@ -491,54 +492,86 @@ SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_reloadAsync(
     return _getDataAsync();
 }
 
-void ShardRegistry::updateReplicaSetOnConfigServer(ServiceContext* serviceContext,
-                                                   const ConnectionString& connStr) noexcept {
-    ThreadClient tc("UpdateReplicaSetOnConfigServer", serviceContext->getService());
-
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
-
-    auto opCtx = tc->makeOperationContext();
-    auto const grid = Grid::get(opCtx.get());
-    auto sr = grid->shardRegistry();
-
-    auto swRegistryData = sr->_getDataAsync().getNoThrow(opCtx.get());
-    if (!swRegistryData.isOK()) {
-        LOGV2_DEBUG(
-            6791401,
-            1,
-            "Error updating replica set on config servers. Failed to fetch shard registry data",
-            "replicaSetConnectionStr"_attr = connStr,
-            "error"_attr = swRegistryData.getStatus());
+void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
+    OperationContext* opCtx, const std::function<bool()>& isPrimaryFn) noexcept {
+    if (!isPrimaryFn()) {
         return;
     }
 
-    auto shard = swRegistryData.getValue()->findByRSName(connStr.getSetName());
-    if (!shard) {
-        LOGV2_DEBUG(6791402,
-                    1,
-                    "Error updating replica set on config servers. Couldn't find shard",
-                    "replicaSetConnectionStr"_attr = connStr);
-        return;
-    }
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    AsyncTry([] {
+        ThreadClient tc("UpdateReplicaSetOnConfigServer",
+                        getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
-    auto swWasUpdated = grid->catalogClient()->updateConfigDocument(
-        opCtx.get(),
-        NamespaceString::kConfigsvrShardsNamespace,
-        BSON(ShardType::name(shard->getId().toString())),
-        BSON("$set" << BSON(ShardType::host(connStr.toString()))),
-        false /* upsert */,
-        ShardingCatalogClient::kMajorityWriteConcern);
-    auto status = swWasUpdated.getStatus();
-    if (!status.isOK()) {
-        LOGV2_ERROR(22736,
-                    "Error updating replica set on config server",
-                    "replicaSetConnectionStr"_attr = connStr,
-                    "error"_attr = redact(status));
-    }
+        // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationUnkillableByStepdown(lk);
+        }
+        auto opCtxHolder = cc().makeOperationContext();
+        auto opCtx = opCtxHolder.get();
+
+        auto grid = Grid::get(opCtx);
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        auto connStr = replCoord->getConfigConnectionString();
+
+        grid->shardRegistry()->updateReplSetHosts(
+            connStr, ShardRegistry::ConnectionStringUpdateType::kPossible);
+
+        auto swRegistryData = grid->shardRegistry()->_getDataAsync().getNoThrow(opCtx);
+        if (!swRegistryData.isOK()) {
+            LOGV2_DEBUG(6791401,
+                        1,
+                        "Error updating replica set on config server. Failed to fetch shard."
+                        "registry data",
+                        "replicaSetConnectionStr"_attr = connStr,
+                        "error"_attr = swRegistryData.getStatus());
+            return swRegistryData.getStatus();
+        }
+
+        auto shard = swRegistryData.getValue()->findByRSName(connStr.getSetName());
+        if (!shard) {
+            LOGV2_DEBUG(6791402,
+                        1,
+                        "Error updating replica set on config server. Couldn't find shard.",
+                        "replicaSetConnectionStr"_attr = connStr);
+            return Status::OK();
+        }
+
+        auto replSetConfigVersion = replCoord->getConfig().getConfigVersion();
+        // Specify the config version in the filter and the update to prevent overwriting a
+        // newer connection string when there are concurrent updates.
+        auto filter =
+            BSON(ShardType::name() << shard->getId().toString() << ShardType::replSetConfigVersion()
+                                   << BSON("$lt" << replSetConfigVersion));
+        auto update = BSON("$set" << BSON(ShardType::host()
+                                          << connStr.toString() << ShardType::replSetConfigVersion()
+                                          << replSetConfigVersion));
+        auto swWasUpdated = grid->catalogClient()->updateConfigDocument(
+            opCtx,
+            NamespaceString::kConfigsvrShardsNamespace,
+            filter,
+            update,
+            false /* upsert */,
+            ShardingCatalogClient::kMajorityWriteConcern);
+        auto status = swWasUpdated.getStatus();
+        if (!status.isOK()) {
+            LOGV2_ERROR(2118501,
+                        "Error updating replica set on config server.",
+                        "replicaSetConnectionStr"_attr = connStr,
+                        "error"_attr = redact(status));
+            return status;
+        }
+        return Status::OK();
+    })
+        .until([isPrimaryFn](Status status) {
+            // Stop if the update succeeds or if this node is no longer the primary since the new
+            // primary will issue this update anyway.
+            return status.isOK() || !isPrimaryFn();
+        })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(executor, CancellationToken::uncancelable())
+        .getAsync([](auto) {});
 }
 
 SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_getDataAsync() {

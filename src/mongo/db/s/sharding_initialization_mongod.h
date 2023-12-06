@@ -128,15 +128,16 @@ private:
     void onInitialDataAvailable(OperationContext* opCtx,
                                 bool isMajorityDataAvailable) override final;
     void onShutdown() override final {}
-    void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) override final;
     void onStepUpComplete(OperationContext* opCtx, long long term) override final {}
-    void onStepDown() override final {}
+    void onStepDown() override final;
     void onRollback() override final {}
     void onBecomeArbiter() override final {}
     inline std::string getServiceName() const override final {
         return "ShardingInitializationMongoD";
     }
 
+    AtomicWord<bool> _isPrimary;
 
     // This mutex ensures that only one thread at a time executes the sharding
     // initialization/teardown sequence

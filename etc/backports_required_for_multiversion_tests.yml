@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
+    ticket: SERVER-21185
   - test_file: jstests/sharding/query/find_and_modify_without_two_phase.js
     ticket: SERVER-44422
   - test_file: jstests/sharding/query/delete_without_two_phase.js
@@ -532,6 +534,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
+    ticket: SERVER-21185
   - test_file: jstests/core/query/null_query_semantics.js
     ticket: SERVER-21929
   - test_file: jstests/core/query/or/or_to_in.js
