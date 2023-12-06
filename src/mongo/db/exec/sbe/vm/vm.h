@@ -901,6 +901,7 @@ enum class Builtin : uint16_t {
     valueBlockMin,
     valueBlockMax,
     valueBlockCount,
+    valueBlockDateTrunc,
     valueBlockSum,
     valueBlockGtScalar,
     valueBlockGteScalar,
@@ -1831,6 +1832,12 @@ private:
                                    StringData fieldName,
                                    UniqueBSONObjBuilder& bob);
 
+    template <bool IsBlockBuiltin = false>
+    bool validateDateTruncParameters(TimeUnit* unit,
+                                     int64_t* binSize,
+                                     TimeZone* timezone,
+                                     DayOfWeek* startOfWeek);
+
     FastTuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateWeekYear(ArityType arity);
@@ -2119,6 +2126,8 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMax(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCount(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockSum(ArityType arity);
+
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDateTrunc(ArityType arity);
 
     template <class Cmp, value::ColumnOpType::Flags AddFlags = value::ColumnOpType::kNoFlags>
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCmpScalar(ArityType arity);

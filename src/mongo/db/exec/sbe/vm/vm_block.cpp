@@ -44,6 +44,8 @@
 namespace mongo::sbe::vm {
 using ColumnOpType = value::ColumnOpType;
 
+namespace {
+
 static constexpr auto existsOpType = ColumnOpType{
     // TODO SERVER-82852 kOutputNonNothingOnMissingInput is already set by ReturnBoolOnMissing{}.
     ColumnOpType::kOutputNonNothingOnMissingInput | ColumnOpType::kOutputNonNothingOnExistingInput,
@@ -56,7 +58,7 @@ static const auto existsOp =
         return std::pair(value::TypeTags::Boolean,
                          value::bitcastFrom<bool>(tag != value::TypeTags::Nothing));
     });
-
+}  // namespace
 /*
  * Given a ValueBlock as input, returns a ValueBlock of true/false values indicating whether
  * each value in the input was non-Nothing (true) or Nothing (false).
