@@ -151,12 +151,11 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
             !_hasBeenKilled);
 
     if (_queryStatsKey && opCtx) {
-        query_stats::writeQueryStats(opCtx,
-                                     _queryStatsKeyHash,
-                                     std::move(_queryStatsKey),
-                                     _metrics.executionTime.value_or(Microseconds{0}).count(),
-                                     _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
-                                     _metrics.nreturned.value_or(0));
+        auto snapshot = query_stats::captureMetrics(
+            opCtx, query_stats::microsecondsToUint64(_firstResponseExecutionTime), _metrics);
+
+        query_stats::writeQueryStats(
+            opCtx, _queryStatsKeyHash, std::move(_queryStatsKey), snapshot);
     }
 
     _root->kill(opCtx);

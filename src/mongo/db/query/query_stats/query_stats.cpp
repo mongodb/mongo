@@ -205,15 +205,13 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
 
 void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
                       QueryStatsEntry& toUpdate,
-                      const uint64_t queryExecMicros,
-                      const uint64_t firstResponseExecMicros,
-                      const uint64_t docsReturned) {
+                      const QueryStatsSnapshot& snapshot) {
     toUpdate.latestSeenTimestamp = Date_t::now();
-    toUpdate.lastExecutionMicros = queryExecMicros;
+    toUpdate.lastExecutionMicros = snapshot.queryExecMicros;
     toUpdate.execCount++;
-    toUpdate.totalExecMicros.aggregate(queryExecMicros);
-    toUpdate.firstResponseExecMicros.aggregate(firstResponseExecMicros);
-    toUpdate.docsReturned.aggregate(docsReturned);
+    toUpdate.totalExecMicros.aggregate(snapshot.queryExecMicros);
+    toUpdate.firstResponseExecMicros.aggregate(snapshot.firstResponseExecMicros);
+    toUpdate.docsReturned.aggregate(snapshot.docsReturned);
 }
 
 }  // namespace
@@ -284,12 +282,23 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
     return queryStatsStoreDecoration(opCtx->getServiceContext())->getQueryStatsStore();
 }
 
+QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
+                                  int64_t firstResponseExecutionTime,
+                                  const OpDebug::AdditiveMetrics& metrics) {
+    QueryStatsSnapshot snapshot{
+        static_cast<uint64_t>(metrics.executionTime.value_or(Microseconds{0}).count()),
+        static_cast<uint64_t>(firstResponseExecutionTime),
+        static_cast<uint64_t>(metrics.nreturned.value_or(0)),
+    };
+
+    return snapshot;
+}
+
+
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
                      std::unique_ptr<Key> key,
-                     const uint64_t queryExecMicros,
-                     const uint64_t firstResponseExecMicros,
-                     const uint64_t docsReturned) {
+                     const QueryStatsSnapshot& snapshot) {
     if (!queryStatsKeyHash) {
         return;
     }
@@ -298,11 +307,7 @@ void writeQueryStats(OperationContext* opCtx,
         queryStatsStore.getWithPartitionLock(*queryStatsKeyHash);
     if (statusWithMetrics.isOK()) {
         // Found an existing entry! Just update the metrics and we're done.
-        return updateStatistics(partitionLock,
-                                *statusWithMetrics.getValue(),
-                                queryExecMicros,
-                                firstResponseExecMicros,
-                                docsReturned);
+        return updateStatistics(partitionLock, *statusWithMetrics.getValue(), snapshot);
     }
 
     // Otherwise we didn't find an existing entry. Try to create one.
@@ -326,10 +331,6 @@ void writeQueryStats(OperationContext* opCtx,
         return;
     }
 
-    return updateStatistics(partitionLock,
-                            newMetrics.getValue()->second,
-                            queryExecMicros,
-                            firstResponseExecMicros,
-                            docsReturned);
+    return updateStatistics(partitionLock, newMetrics.getValue()->second, snapshot);
 }
 }  // namespace mongo::query_stats

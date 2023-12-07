@@ -183,12 +183,11 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
     // construction call. To not trip the tassert in writeQueryStats and because all cursors are
     // guaranteed to have a copy of the hash, we check that the cursor has a key .
     if (_queryStatsKey && opCtx) {
-        query_stats::writeQueryStats(opCtx,
-                                     _queryStatsKeyHash,
-                                     std::move(_queryStatsKey),
-                                     _metrics.executionTime.value_or(Microseconds{0}).count(),
-                                     _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
-                                     _metrics.nreturned.value_or(0));
+        auto snapshot = query_stats::captureMetrics(
+            opCtx, query_stats::microsecondsToUint64(_firstResponseExecutionTime), _metrics);
+
+        query_stats::writeQueryStats(
+            opCtx, _queryStatsKeyHash, std::move(_queryStatsKey), snapshot);
     }
 
     if (now) {
@@ -430,13 +429,13 @@ void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stat
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // query stats directly.
     auto& opDebug = CurOp::get(opCtx)->debug();
-    int64_t execTime = opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count();
-    query_stats::writeQueryStats(opCtx,
-                                 opDebug.queryStatsInfo.keyHash,
-                                 std::move(key),
-                                 execTime,
-                                 execTime,
-                                 opDebug.additiveMetrics.nreturned.value_or(0));
+
+    auto snapshot = query_stats::captureMetrics(
+        opCtx,
+        query_stats::microsecondsToUint64(opDebug.additiveMetrics.executionTime),
+        opDebug.additiveMetrics);
+
+    query_stats::writeQueryStats(opCtx, opDebug.queryStatsInfo.keyHash, std::move(key), snapshot);
 }
 
 }  // namespace mongo

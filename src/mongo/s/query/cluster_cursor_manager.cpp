@@ -608,14 +608,14 @@ StatusWith<ClusterClientCursorGuard> ClusterCursorManager::_detachCursor(WithLoc
 void collectQueryStatsMongos(OperationContext* opCtx, std::unique_ptr<query_stats::Key> key) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // queryStats directly.
-    auto&& opDebug = CurOp::get(opCtx)->debug();
-    int64_t execTime = opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count();
-    query_stats::writeQueryStats(opCtx,
-                                 opDebug.queryStatsInfo.keyHash,
-                                 std::move(key),
-                                 execTime,
-                                 execTime,
-                                 opDebug.additiveMetrics.nreturned.value_or(0));
+    auto& opDebug = CurOp::get(opCtx)->debug();
+
+    auto snapshot = query_stats::captureMetrics(
+        opCtx,
+        opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),
+        opDebug.additiveMetrics);
+
+    query_stats::writeQueryStats(opCtx, opDebug.queryStatsInfo.keyHash, std::move(key), snapshot);
 }
 
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor) {

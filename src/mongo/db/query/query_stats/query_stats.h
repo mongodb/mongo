@@ -192,6 +192,29 @@ void registerRequest(OperationContext* opCtx,
                      std::function<std::unique_ptr<Key>(void)> makeKey);
 
 /**
+ * Convert an optional Duration to a count of Microseconds uint64_t.
+ */
+inline uint64_t microsecondsToUint64(boost::optional<Microseconds> duration) {
+    return static_cast<uint64_t>(duration.value_or(Microseconds{0}).count());
+}
+
+/**
+ * Snapshot of query stats from CurOp::OpDebug to store in query stats store.
+ */
+struct QueryStatsSnapshot {
+    uint64_t queryExecMicros;
+    uint64_t firstResponseExecMicros;
+    uint64_t docsReturned;
+};
+
+/**
+ * Get a snapshot of the metrics to store in query stats from CurOp::OpDebug and others.
+ */
+QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
+                                  int64_t firstResponseExecutionTime,
+                                  const OpDebug::AdditiveMetrics& metrics);
+
+/**
  * Writes query stats to the query stats store for the operation identified by `queryStatsKeyHash`.
  *
  * Direct calls to writeQueryStats in new code should be avoided in favor of calling existing
@@ -204,7 +227,6 @@ void registerRequest(OperationContext* opCtx,
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
                      std::unique_ptr<Key> key,
-                     uint64_t queryExecMicros,
-                     uint64_t firstResponseExecMicros,
-                     uint64_t docsReturned);
+                     const QueryStatsSnapshot& snapshot);
+
 }  // namespace mongo::query_stats
