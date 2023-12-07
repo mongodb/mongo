@@ -2222,9 +2222,6 @@ tasks:
               ${python_binary|python3} ../test/suite/run.py -v 4 test_prepare_hs03.py --hook timestamp
             done
 
-  # csuite-long-running-bucket1 and csuite-long-running-bucket2 test tasks each run half of the long-running tests
-  # so that each test task completes within the 5-hour time limit
-
   - name: csuite-long-running
     # Set 5 hours timeout (60 * 60 * 5)
     exec_timeout_secs: 18000
@@ -2233,8 +2230,7 @@ tasks:
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
-          # Run the first test, and then every second test
-          extra_args: -L long_running
+          extra_args: -L long_running -j ${num_jobs}
 
   # Break out Python unit tests into multiple buckets/tasks.  We have a fixed number of buckets,
   # and we use the -b option of the test/suite/run.py script to split up the tests.
