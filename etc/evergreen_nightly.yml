@@ -4,7 +4,7 @@ include:
 - filename: etc/evergreen_yml_components/configuration.yml
 - filename: etc/evergreen_yml_components/definitions.yml
 - filename: etc/evergreen_yml_components/variants/task_generation.yml
-- filename: etc/evergreen_yml_components/variants/atlas.yml
+- filename: etc/evergreen_yml_components/variants/atlas/test_release.yml
 - filename: etc/evergreen_yml_components/variants/misc_release.yml
 - filename: etc/evergreen_yml_components/variants/amazon/test_release.yml
 - filename: etc/evergreen_yml_components/variants/debian/test_release.yml
@@ -14,17 +14,19 @@ include:
 - filename: etc/evergreen_yml_components/variants/ubuntu/test_release.yml
 - filename: etc/evergreen_yml_components/variants/windows/test_release.yml
 ### Comment out when using this file for a Rapid release branch. ###
-- filename: etc/evergreen_yml_components/variants/ibm.yml
+- filename: etc/evergreen_yml_components/variants/ibm/test_release.yml
 ### Uncomment when using this file for a LTS release branch. ###
-# - filename: etc/evergreen_yml_components/variants/in_memory.yml
+# - etc/evergreen_yml_components/variants/rhel/test_in_memory.yml
+### Uncomment when using this file for a LTS release branch. ###
+# - etc/evergreen_yml_components/variants/windows/test_in_memory.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 # - filename: etc/evergreen_yml_components/variants/sanitizer/test_dev_release.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
-# - filename: etc/evergreen_yml_components/variants/ninja.yml
+# - filename: etc/evergreen_yml_components/variants/ninja/build.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 # - filename: etc/evergreen_yml_components/variants/classic_engine.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
-# - filename: etc/evergreen_yml_components/variants/config_shard.yml
+# - filename: etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 # - filename: etc/evergreen_yml_components/variants/rhel/build_dev.yml
 

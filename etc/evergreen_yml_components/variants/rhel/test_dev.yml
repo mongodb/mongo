@@ -4,7 +4,7 @@ variables:
 # THIS HAS COPIES IN:
 # - etc/evergreen.yml
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
 # - etc/evergreen_yml_components/variants/classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
@@ -23,7 +23,7 @@ variables:
 # THIS HAS COPIES IN:
 # - etc/evergreen.yml
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
 # - etc/evergreen_yml_components/variants/classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
@@ -39,7 +39,7 @@ variables:
 # THIS HAS COPIES IN:
 # - etc/evergreen.yml
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
 # - etc/evergreen_yml_components/variants/classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
