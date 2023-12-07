@@ -43,7 +43,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"

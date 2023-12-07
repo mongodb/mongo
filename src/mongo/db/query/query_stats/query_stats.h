@@ -51,7 +51,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats_entry.h"
 #include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/db/service_context.h"

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/key.h"
 
 #include "mongo/db/query/query_stats/query_stats_helpers.h"
 

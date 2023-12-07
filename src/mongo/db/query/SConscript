@@ -45,7 +45,7 @@ env.Library(
         'parsed_find_command.cpp',
         'query_shape/distinct_cmd_shape.cpp',
         'query_shape/find_cmd_shape.cpp',
-        'query_stats/find_key_generator.cpp',
+        'query_stats/find_key.cpp',
         'query_utils.cpp',
     ],
     LIBDEPS=[

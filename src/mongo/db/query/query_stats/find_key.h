@@ -34,7 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
-#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/key.h"
 
 namespace mongo::query_stats {
 

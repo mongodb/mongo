@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/db/query/query_stats/find_key_generator.h"
+#include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/idl/server_parameter_test_util.h"

@@ -68,7 +68,7 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/storage_stats.h"

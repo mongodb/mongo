@@ -42,7 +42,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/db/query/query_stats/find_key_generator.h"
+#include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/stats/counters.h"

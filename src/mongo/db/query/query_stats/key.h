@@ -205,9 +205,9 @@ static_assert(
     "If the struct's members have changed, this assert may need to be updated with a new value.");
 
 /**
- * An abstract base class to handle generating the query stats store key for a given request. All
- * query stats store entries should include some common elements, tracked in `_universalComponents`.
- * For example, everything tracked must have a `query_shape::Shape`.
+ * An abstract base class representing a query stats store key for a given request. All query stats
+ * store entries should include some common elements, tracked in `_universalComponents`.  For
+ * example, everything tracked must have a `query_shape::Shape`.
  *
  * Subclasses can add more components to include as discriminating factors in which entries should
  * be tracked separately. For example, two find commands which are identical except in their read

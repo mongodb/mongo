@@ -49,7 +49,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/logical_session_id.h"

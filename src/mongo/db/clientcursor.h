@@ -57,7 +57,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/optime.h"

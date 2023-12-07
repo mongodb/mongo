@@ -25,7 +25,7 @@ env.Library(target='query_stats_parse', source=['transform_algorithm.idl'], LIBD
 
 env.Library(
     target='query_stats',
-    source=['query_stats.cpp', 'query_stats_entry.cpp', 'key_generator.cpp'],
+    source=['query_stats.cpp', 'query_stats_entry.cpp', 'key.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
