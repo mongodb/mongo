@@ -37,6 +37,7 @@
 #include <cstdlib>
 #include <deque>
 #include <exception>
+#include <fmt/format.h>
 #include <forward_list>
 #include <fstream>  // IWYU pragma: keep
 #include <initializer_list>
@@ -143,6 +144,9 @@
 
 
 namespace mongo::logv2 {
+
+using namespace fmt::literals;
+
 namespace {
 
 using constants::kAttributesFieldName;
@@ -1614,92 +1618,342 @@ TEST_F(LogV2Test, Unicode) {
     }
 }
 
-TEST_F(LogV2Test, JsonTruncation) {
-    auto lines = makeLineCapture(JSONFormatter());
+class LogV2JsonTruncationTest : public LogV2Test {
+public:
+    static constexpr std::size_t maxAttributeOutputSize =
+        constants::kDefaultMaxAttributeOutputSizeKB * 1024;
 
-    std::size_t maxAttributeOutputSize = constants::kDefaultMaxAttributeOutputSizeKB * 1024;
+    static inline const std::string largeString = std::string(maxAttributeOutputSize * 2, 'a');
 
-    BSONObjBuilder builder;
-    BSONObjBuilder subobj = builder.subobjStart("sub"_sd);
-    subobj.append("small1", 1);
-    subobj.append("small2", "small string");
-    subobj.append("large", std::string(maxAttributeOutputSize * 2, 'a'));
-    subobj.append("small3", "small string after large object");
-    subobj.done();
+    // Represents a segment of the truncation path
+    struct TruncationPathSegment {
+        // name of the field where the truncation occurs
+        std::string fieldName;
 
-    LOGV2(20085, "{name}{attr2}", "name"_attr = builder.done(), "attr2"_attr = true);
-    auto validateTruncation = [&](const BSONObj& obj) {
-        // Check that all fields up until the large one is written
-        BSONObj sub = obj.getField(constants::kAttributesFieldName)
-                          .Obj()
-                          .getField("name"_sd)
-                          .Obj()
-                          .getField("sub"_sd)
-                          .Obj();
-        ASSERT(sub.hasField("small1"_sd));
-        ASSERT(sub.hasField("small2"_sd));
-        ASSERT(!sub.hasField("large"_sd));
-        ASSERT(!sub.hasField("small3"_sd));
-
-        // The truncated field should we witten in the truncated and size sub object
-        BSONObj truncated = obj.getField(constants::kTruncatedFieldName).Obj();
-        BSONObj truncatedInfo =
-            truncated.getField("name"_sd).Obj().getField("sub"_sd).Obj().getField("large"_sd).Obj();
-        ASSERT_EQUALS(truncatedInfo.getField("type"_sd).String(), typeName(BSONType::String));
-        ASSERT(truncatedInfo.getField("size"_sd).isNumber());
-
-        ASSERT_EQUALS(
-            obj.getField(constants::kTruncatedSizeFieldName).Obj().getField("name"_sd).Int(),
-            builder.done().objsize());
-
-        // Attributes coming after the truncated one should be written
-        ASSERT(obj.getField(constants::kAttributesFieldName).Obj().getField("attr2").Bool());
+        // number of omitted fields after fieldName
+        int omitted;
     };
-    validateTruncation(mongo::fromjson(lines.back()));
 
-    LOGV2_OPTIONS(20086, {LogTruncation::Disabled}, "{name}", "name"_attr = builder.done());
-    auto validateTruncationDisabled = [&](const BSONObj& obj) {
-        BSONObj sub = obj.getField(constants::kAttributesFieldName)
-                          .Obj()
-                          .getField("name"_sd)
-                          .Obj()
-                          .getField("sub"_sd)
-                          .Obj();
-        // No truncation should occur
-        ASSERT(sub.hasField("small1"_sd));
-        ASSERT(sub.hasField("small2"_sd));
-        ASSERT(sub.hasField("large"_sd));
-        ASSERT(sub.hasField("small3"_sd));
+    struct TruncationInfo {
+        // Truncation path is a sequence of segments for each level of the truncated BSON object,
+        // where the index in the sequence is the same as the depth of that segment in the object.
+        // The last segment in the path is the "leaf" from which the truncation started,
+        // and unlike the segments before it, it is NOT expected to appear in the truncated object,
+        // and must therefore be counted in the expected "omitted" value.
+        std::vector<TruncationPathSegment> path;
 
-        ASSERT(!obj.hasField(constants::kTruncatedFieldName));
-        ASSERT(!obj.hasField(constants::kTruncatedSizeFieldName));
+        // BSON type of the leaf element from which the truncation started
+        BSONType leafType;
     };
-    validateTruncationDisabled(mongo::fromjson(lines.back()));
 
-    BSONArrayBuilder arrBuilder;
-    // Fields will use more than one byte each so this will truncate at some point
-    for (size_t i = 0; i < maxAttributeOutputSize; ++i) {
-        arrBuilder.append("str");
+    struct TestCase {
+        // Attr object before truncation
+        BSONObj originalDoc;
+
+        // Describes the expected truncation of the attr object
+        TruncationInfo truncationInfo;
+
+        // Name for this test case
+        std::string name;
+    };
+
+    static TestCase largeStringInSubobjTest() {
+        BSONObjBuilder builder;
+        TruncationInfo truncation;
+        builder.append("lvl1_a", "a");
+        {
+            BSONObjBuilder subobj1 = builder.subobjStart("sub1"_sd);
+            subobj1.append("lvl2_a", 1);
+            subobj1.append("lvl2_b", "small string");
+            {
+                BSONObjBuilder subobj2 = subobj1.subobjStart("sub2"_sd);
+                subobj2.append("lvl3_a", 1);
+                subobj2.append("lvl3_b", "b");
+                subobj2.append("large", largeString);
+                subobj2.append("lvl3_c", "small string after large object");
+            }
+            subobj1.append("lvl2_c", 1);
+            subobj1.append("lvl2_d", 2);
+        }
+        truncation.leafType = BSONType::String;
+        truncation.path = {{"sub1", 0}, {"sub2", 2}, {"large", 2}};
+        return TestCase{builder.obj(), std::move(truncation), "large string in subobject"};
     }
 
-    BSONArray arrToLog = arrBuilder.arr();
-    LOGV2(20087, "{name}", "name"_attr = arrToLog);
-    auto validateArrayTruncation = [&](const BSONObj& obj) {
-        auto arr = obj.getField(constants::kAttributesFieldName).Obj().getField("name"_sd).Array();
-        ASSERT_LESS_THAN(arr.size(), maxAttributeOutputSize);
+    static TestCase singleLargeStringInObjTest() {
+        BSONObjBuilder builder;
+        TruncationInfo truncation;
+        builder.append("large", largeString);
+        truncation.leafType = BSONType::String;
+        truncation.path = {{"large", 1}};
+        return TestCase{builder.obj(), std::move(truncation), "single large string in object"};
+    }
 
-        std::string truncatedFieldName = std::to_string(arr.size());
-        BSONObj truncated = obj.getField(constants::kTruncatedFieldName).Obj();
-        BSONObj truncatedInfo =
-            truncated.getField("name"_sd).Obj().getField(truncatedFieldName).Obj();
-        ASSERT_EQUALS(truncatedInfo.getField("type"_sd).String(), typeName(BSONType::String));
-        ASSERT(truncatedInfo.getField("size"_sd).isNumber());
+    static TestCase largeArrayTest() {
+        BSONArrayBuilder builder;
+        TruncationInfo truncation;
+        for (size_t i = 0; i < maxAttributeOutputSize; ++i) {
+            builder.append("str");
+        }
+        truncation.leafType = BSONType::String;
+        truncation.path = {{"862", maxAttributeOutputSize - 862}};
+        return TestCase{builder.arr(), std::move(truncation), "large array"};
+    }
 
-        ASSERT_EQUALS(
-            obj.getField(constants::kTruncatedSizeFieldName).Obj().getField("name"_sd).Int(),
-            arrToLog.objsize());
-    };
-    validateArrayTruncation(mongo::fromjson(lines.back()));
+    static TestCase singleLargeStringInArrayTest() {
+        BSONArrayBuilder builder;
+        TruncationInfo truncation;
+        builder.append(largeString);
+        truncation.leafType = BSONType::String;
+        truncation.path = {{"0", 1}};
+        return TestCase{builder.arr(), std::move(truncation), "single large string in array"};
+    }
+
+    static TestCase largeStringInNestedArraysTest() {
+        BSONArrayBuilder builder;
+        TruncationInfo truncation;
+        builder.append("1_a");  // ["1_a",
+        {
+            // ["1_a", [
+            BSONArrayBuilder subarr1 = builder.subarrayStart();
+            // ["1_a", [[
+            BSONArrayBuilder{subarr1.subarrayStart()}
+                .append("3_a")
+                .append("3_b")
+                .append("3_c")
+                .append(largeString)
+                .append("3_d");
+        }
+        builder.append("1_b");
+        // ["1_a", [["3_a", "3_b", "3_c", largeString, "3_d"]], "1_b"]
+        auto array = builder.arr();
+
+        truncation.leafType = BSONType::String;
+        truncation.path = {{"1", 1}, {"0", 0}, {"3", 2}};
+        return TestCase{array, std::move(truncation), "large string in nested arrays"};
+    }
+
+    static std::vector<TestCase> generateTests() {
+        return {largeStringInSubobjTest(),
+                singleLargeStringInObjTest(),
+                largeArrayTest(),
+                singleLargeStringInArrayTest(),
+                largeStringInNestedArraysTest()};
+    }
+
+    // Validates the truncation report in the log line for attrName has the correct structure
+    // that matches the expected truncation path.
+    // For reference, an example truncation report (for largeStringInSubobj test case) looks like:
+    //  {
+    //     "truncated":{
+    //         "sub1":{
+    //             "truncated":{
+    //                 "sub2":{
+    //                     "truncated":{
+    //                         "large":{
+    //                             "type":"string",
+    //                             "size":{"$numberInt":"20485"}
+    //                         }
+    //                     },
+    //                     "omitted":{"$numberInt":"2"}
+    //                 }
+    //             },
+    //             "omitted":{"$numberInt":"2"}
+    //         }
+    //     }
+    //  }
+    static void validateTruncationReport(StringData attrName,
+                                         BSONObj report,
+                                         const TestCase& test) {
+        auto context =
+            "Failed test: {} Failing report: {}"_format(test.name, mongo::tojson(report));
+        auto& path = test.truncationInfo.path;
+
+        ASSERT_FALSE(path.empty()) << context;
+        ASSERT(report.hasField(attrName)) << context;
+
+        BSONObj fieldObj = report.getField(attrName).Obj();
+        BSONObj truncated;
+        std::string currentObjPath = attrName.toString();
+
+        // validate nested "truncated" elements except for the last (leaf) truncated element.
+        for (size_t i = 0; i < path.size(); i++) {
+            const auto& segment = path.at(i);
+
+            ASSERT(fieldObj.hasField(constants::kTruncatedFieldName))
+                << "{} - missing 'truncated' field at path: {}"_format(context, currentObjPath);
+
+            truncated = fieldObj.getField(constants::kTruncatedFieldName).Obj();
+
+            if (segment.omitted != 0) {
+                ASSERT(fieldObj.hasField(constants::kOmittedFieldName))
+                    << "{} - missing 'omitted' field at path: {}"_format(context, currentObjPath);
+                ASSERT_EQUALS(fieldObj.getField("omitted").Int(), segment.omitted)
+                    << "{} - bad 'omitted' value at path: {}"_format(context, currentObjPath);
+            } else {
+                ASSERT_FALSE(fieldObj.hasField("omitted"))
+                    << "{} - unexpected 'omitted' field at path: {}"_format(context,
+                                                                            currentObjPath);
+            }
+
+            currentObjPath += ".truncated";
+            ASSERT(truncated.hasField(segment.fieldName))
+                << "{} - missing expected subobject {} at path {}"_format(
+                       context, segment.fieldName, currentObjPath);
+
+            fieldObj = truncated.getField(segment.fieldName).Obj();
+            currentObjPath += "." + segment.fieldName;
+        }
+        // leaf reached
+        ASSERT(fieldObj.hasField("type"))
+            << "{} - missing field 'type' at path {}"_format(context, currentObjPath);
+
+        ASSERT(fieldObj.hasField("size"))
+            << "{} - missing field 'size' at path {}"_format(context, currentObjPath);
+
+        ASSERT(!fieldObj.hasField("omitted"))
+            << "{} - unexpected field 'omitted' at path {}"_format(context, currentObjPath);
+
+        ASSERT(!fieldObj.hasField("truncated"))
+            << "{} - unexpected field 'truncated' at path {}"_format(context, currentObjPath);
+
+        ASSERT_EQUALS(fieldObj.getField("type"_sd).String(), typeName(test.truncationInfo.leafType))
+            << "{} - bad 'type' value at path {}"_format(context, currentObjPath);
+
+        ASSERT(fieldObj.getField("size"_sd).isNumber())
+            << "{} - bad 'size' value at path {}"_format(context, currentObjPath);
+    }
+
+    // Validates the reported size of the truncated attr in the log line matches the size of the
+    // original BSON object.
+    static void validateTruncationSize(StringData attrName,
+                                       BSONObj truncatedSize,
+                                       const TestCase& test) {
+        auto context =
+            "Failed test: {} Failing report: {}"_format(test.name, mongo::tojson(truncatedSize));
+        ASSERT(truncatedSize.hasField(attrName)) << context;
+        auto reportedSize = truncatedSize.getField(attrName).Int();
+        auto expectedSize = test.originalDoc.objsize();
+        ASSERT_EQUALS(reportedSize, expectedSize) << context;
+    }
+
+    // At every level of the modified document, validates that only the fields before & including
+    // the truncation path are present.
+    static void validateTruncationAtPath(const BSONObj& original,
+                                         const BSONObj& modified,
+                                         const TestCase& test,
+                                         const std::string& parentPath,
+                                         size_t level) {
+        static const SimpleBSONElementComparator eltCmp;
+        auto context = "Failed test: {} Path: {}"_format(test.name, parentPath);
+
+        auto& path = test.truncationInfo.path;
+
+        ASSERT_LT(level, path.size());
+
+        BSONObjIterator originalItr(original);
+        BSONObjIterator modifiedItr(modified);
+        bool foundTruncatedElement = false;
+
+        StringData truncatedFieldName = path.at(level).fieldName;
+        bool leaf = (&path.at(level) == &path.back());
+
+        while (originalItr.more() && modifiedItr.more()) {
+            auto originalElement = originalItr.next();
+            auto modifiedElement = modifiedItr.next();
+
+            ASSERT_EQUALS(modifiedElement.fieldNameStringData(),
+                          originalElement.fieldNameStringData())
+                << "{} - mismatched field names {} vs {}"_format(
+                       context,
+                       originalElement.fieldNameStringData(),
+                       modifiedElement.fieldNameStringData());
+
+            if (originalElement.fieldNameStringData() == truncatedFieldName) {
+                foundTruncatedElement = true;
+
+                // if truncatedFieldName is present in the truncated object, but the test expects
+                // it to be a leaf, then it should have been omitted.
+                ASSERT_FALSE(leaf)
+                    << "{} - unexpected field {}"_format(context, truncatedFieldName);
+
+                ASSERT_FALSE(modifiedItr.more())
+                    << "{} - truncation did not stop at field {}"_format(context,
+                                                                         truncatedFieldName);
+
+                ASSERT(modifiedElement.isABSONObj())
+                    << "{} - unexpected leaf element {}"_format(context, truncatedFieldName);
+
+                validateTruncationAtPath(originalElement.Obj(),
+                                         modifiedElement.Obj(),
+                                         test,
+                                         "{}.{}"_format(parentPath, truncatedFieldName),
+                                         level + 1);
+            } else {
+                ASSERT(eltCmp.evaluate(originalElement == modifiedElement))
+                    << context << " - mismatched field values at "
+                    << originalElement.fieldNameStringData();
+            }
+        }
+        if (originalItr.more() && !foundTruncatedElement) {
+            // if the original object has more fields than the modified object, but the truncated
+            // field name is not in the modified object, then it MUST have been an omitted leaf
+            // element.
+            ASSERT(leaf) << "{} - missing truncated field {}"_format(context, truncatedFieldName);
+
+            // The next element in the original object must be the truncated field name
+            auto nextElement = originalItr.next();
+            ASSERT_EQUALS(nextElement.fieldNameStringData(), truncatedFieldName)
+                << "{} - unexpected field {}, expected {}"_format(
+                       context, nextElement.fieldNameStringData(), truncatedFieldName);
+
+            foundTruncatedElement = true;
+        }
+        ASSERT(foundTruncatedElement)
+            << "{} - missing truncated field {}"_format(context, truncatedFieldName);
+    }
+
+    static void validateTruncatedAttr(const TestCase& test, const BSONObj& truncatedAttr) {
+        validateTruncationAtPath(test.originalDoc, truncatedAttr, test, "", 0);
+    }
+};
+
+TEST_F(LogV2JsonTruncationTest, JsonTruncation) {
+    auto lines = makeLineCapture(JSONFormatter());
+
+    for (auto& test : generateTests()) {
+        LOGV2(20085, "message", "name"_attr = test.originalDoc, "attr2"_attr = true);
+        auto logObj = fromjson(lines.back());
+        auto loggedAttr =
+            logObj.getField(constants::kAttributesFieldName).Obj().getField("name").Obj();
+
+        // Check that all fields up until the large one is written
+        validateTruncatedAttr(test, loggedAttr);
+
+        auto report = logObj.getField(constants::kTruncatedFieldName).Obj();
+        validateTruncationReport("name", report, test);
+
+        auto size = logObj.getField(constants::kTruncatedSizeFieldName).Obj();
+        validateTruncationSize("name", size, test);
+
+        // Attributes coming after the truncated one should be written
+        ASSERT(logObj.getField(constants::kAttributesFieldName).Obj().getField("attr2").Bool());
+    }
+}
+
+TEST_F(LogV2JsonTruncationTest, JsonTruncationDisabled) {
+    auto lines = makeLineCapture(JSONFormatter());
+
+    for (auto& test : generateTests()) {
+        LOGV2_OPTIONS(20086, {LogTruncation::Disabled}, "message", "name"_attr = test.originalDoc);
+        auto logObj = fromjson(lines.back());
+        auto loggedAttr =
+            logObj.getField(constants::kAttributesFieldName).Obj().getField("name").Obj();
+
+        ASSERT_EQUALS(loggedAttr.woCompare(test.originalDoc), 0);
+        ASSERT_FALSE(logObj.hasField(constants::kTruncatedFieldName));
+        ASSERT_FALSE(logObj.hasField(constants::kTruncatedSizeFieldName));
+    }
 }
 
 TEST_F(LogV2Test, StringTruncation) {

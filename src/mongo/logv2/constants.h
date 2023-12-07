@@ -48,6 +48,7 @@ constexpr StringData kIdFieldName = "id"_sd;
 constexpr StringData kMessageFieldName = "msg"_sd;
 constexpr StringData kAttributesFieldName = "attr"_sd;
 constexpr StringData kTruncatedFieldName = "truncated"_sd;
+constexpr StringData kOmittedFieldName = "omitted"_sd;
 constexpr StringData kTruncatedSizeFieldName = "size"_sd;
 constexpr StringData kTagsFieldName = "tags"_sd;
 constexpr StringData kTenantFieldName = "tenant"_sd;

@@ -292,8 +292,32 @@ BSONObj BSONObj::_jsonStringGenerator(const Generator& g,
         while (1) {
             truncation = e.jsonStringGenerator(
                 g, writeSeparator, !isArray, pretty ? (pretty + 1) : 0, buffer, writeLimit);
+
+            if (!truncation.isEmpty()) {
+                g.writePadding(buffer);
+
+                BSONObjBuilder bob;
+                int omitted = 0;
+
+                bob.append("truncated", truncation);
+                if (!e.isABSONObj()) {
+                    // element is a leaf and will be omitted
+                    omitted++;
+                }
+                // subsequent elements are omitted
+                while (!(e = i.next()).eoo())
+                    ++omitted;
+
+                if (omitted) {
+                    bob.append("omitted", omitted);
+                }
+                truncation = bob.obj();
+                break;
+            }
+
             e = i.next();
-            if (!truncation.isEmpty() || e.eoo()) {
+
+            if (e.eoo()) {
                 g.writePadding(buffer);
                 break;
             }
