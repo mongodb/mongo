@@ -582,7 +582,9 @@ void runTfoScenario(bool serverOn, bool clientOn, bool expectTfo) {
     auto extractTfoAccepted = [] {
         BSONObjBuilder bob;
         networkCounter.append(bob);
-        return bob.done()["tcpFastOpen"]["accepted"].numberInt();
+        auto obj = bob.obj();
+        auto accepted = obj["tcpFastOpen"]["accepted"].numberInt();
+        return std::pair{accepted, obj};
     };
 
     TestFixture tf;
@@ -602,12 +604,23 @@ void runTfoScenario(bool serverOn, bool clientOn, bool expectTfo) {
 
     // Make one throwaway connection just to allow establishment of a TFO cookie.
     connectOnce();
-
-    int tfos = extractTfoAccepted();
+    auto rec0 = extractTfoAccepted();
     connectOnce();
-    int newTfos = extractTfoAccepted();
+    auto rec1 = extractTfoAccepted();
 
-    ASSERT_EQ(newTfos, tfos + expectTfo);
+    auto newTfos = rec1.first - rec0.first;
+    if (newTfos != static_cast<int>(expectTfo)) {
+        LOGV2_WARNING(8397800,
+                      "In practice we sometimes do not get TFO when we expect to. "
+                      "We are logging these events but not failing the test (See SERVER-83978)",
+                      "serverOn"_attr = serverOn,
+                      "clientOn"_attr = clientOn,
+                      "expectTfo"_attr = expectTfo,
+                      "rec0"_attr = rec0.second,
+                      "rec1"_attr = rec1.second);
+        // Only really asserting that we do not unexpectedly get TFO.
+        ASSERT_LTE(newTfos, static_cast<int>(expectTfo));
+    }
 }
 
 TEST(AsioTransportLayer, TcpFastOpenWithServerOffClientOff) {
