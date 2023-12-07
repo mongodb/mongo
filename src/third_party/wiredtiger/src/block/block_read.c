@@ -41,7 +41,6 @@ __wt_bm_read(
 #endif
 
     /* Read the block. */
-    __wt_capacity_throttle(session, size, WT_THROTTLE_READ);
     WT_ERR(__wt_block_read_off(session, block, buf, objectid, offset, size, checksum));
 
     /* Optionally discard blocks from the system's buffer cache. */
@@ -218,8 +217,10 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
                   ENOSPC);
             }
         }
-        if (failures > 0 || !chunkcache_hit)
+        if (!chunkcache_hit || failures > 0) {
+            __wt_capacity_throttle(session, size, WT_THROTTLE_READ);
             WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
+        }
 
         /*
          * We incrementally read through the structure before doing a checksum, do little- to

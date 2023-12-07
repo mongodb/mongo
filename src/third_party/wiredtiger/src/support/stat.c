@@ -1524,6 +1524,7 @@ static const char *const __stats_connection_desc[] = {
   "capacity: background fsync time (msecs)",
   "capacity: bytes read",
   "capacity: bytes written for checkpoint",
+  "capacity: bytes written for chunk cache",
   "capacity: bytes written for eviction",
   "capacity: bytes written for log",
   "capacity: bytes written total",
@@ -1533,6 +1534,7 @@ static const char *const __stats_connection_desc[] = {
   "capacity: time waiting during eviction (usecs)",
   "capacity: time waiting during logging (usecs)",
   "capacity: time waiting during read (usecs)",
+  "capacity: time waiting for chunk cache IO bandwidth (usecs)",
   "checkpoint: checkpoint has acquired a snapshot for its transaction",
   "checkpoint: checkpoints skipped because database was clean",
   "checkpoint: fsync calls after allocating the transaction ID",
@@ -2225,6 +2227,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing fsync_all_time */
     stats->capacity_bytes_read = 0;
     stats->capacity_bytes_ckpt = 0;
+    stats->capacity_bytes_chunkcache = 0;
     stats->capacity_bytes_evict = 0;
     stats->capacity_bytes_log = 0;
     stats->capacity_bytes_written = 0;
@@ -2234,6 +2237,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->capacity_time_evict = 0;
     stats->capacity_time_log = 0;
     stats->capacity_time_read = 0;
+    stats->capacity_time_chunkcache = 0;
     stats->checkpoint_snapshot_acquired = 0;
     stats->checkpoint_skipped = 0;
     stats->checkpoint_fsync_post = 0;
@@ -2937,6 +2941,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->fsync_all_time += WT_STAT_READ(from, fsync_all_time);
     to->capacity_bytes_read += WT_STAT_READ(from, capacity_bytes_read);
     to->capacity_bytes_ckpt += WT_STAT_READ(from, capacity_bytes_ckpt);
+    to->capacity_bytes_chunkcache += WT_STAT_READ(from, capacity_bytes_chunkcache);
     to->capacity_bytes_evict += WT_STAT_READ(from, capacity_bytes_evict);
     to->capacity_bytes_log += WT_STAT_READ(from, capacity_bytes_log);
     to->capacity_bytes_written += WT_STAT_READ(from, capacity_bytes_written);
@@ -2946,6 +2951,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->capacity_time_evict += WT_STAT_READ(from, capacity_time_evict);
     to->capacity_time_log += WT_STAT_READ(from, capacity_time_log);
     to->capacity_time_read += WT_STAT_READ(from, capacity_time_read);
+    to->capacity_time_chunkcache += WT_STAT_READ(from, capacity_time_chunkcache);
     to->checkpoint_snapshot_acquired += WT_STAT_READ(from, checkpoint_snapshot_acquired);
     to->checkpoint_skipped += WT_STAT_READ(from, checkpoint_skipped);
     to->checkpoint_fsync_post += WT_STAT_READ(from, checkpoint_fsync_post);
