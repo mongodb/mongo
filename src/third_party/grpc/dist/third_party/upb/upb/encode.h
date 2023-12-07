@@ -25,47 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
- * upb_Encode: parsing into a upb_Message using a upb_MiniTable.
- */
+// This header is deprecated, use upb/wire/encode.h instead
+// IWYU pragma: private, include "upb/wire/encode.h"
 
 #ifndef UPB_ENCODE_H_
 #define UPB_ENCODE_H_
 
-#include "upb/msg.h"
-
-/* Must be last. */
-#include "upb/port_def.inc"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-enum {
-  /* If set, the results of serializing will be deterministic across all
-   * instances of this binary. There are no guarantees across different
-   * binary builds.
-   *
-   * If your proto contains maps, the encoder will need to malloc()/free()
-   * memory during encode. */
-  kUpb_Encode_Deterministic = 1,
-
-  /* When set, unknown fields are not printed. */
-  kUpb_Encode_SkipUnknown = 2,
-
-  /* When set, the encode will fail if any required fields are missing. */
-  kUpb_Encode_CheckRequired = 4,
-};
-
-#define UPB_ENCODE_MAXDEPTH(depth) ((depth) << 16)
-
-char* upb_Encode(const void* msg, const upb_MiniTable* l, int options,
-                 upb_Arena* arena, size_t* size);
-
-#include "upb/port_undef.inc"
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
+#include "upb/wire/encode.h"
 
 #endif /* UPB_ENCODE_H_ */

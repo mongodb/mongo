@@ -12,10 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_HPACK_ENCODER_TABLE_H
-#define GRPC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_HPACK_ENCODER_TABLE_H
+#ifndef GRPC_SRC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_HPACK_ENCODER_TABLE_H
+#define GRPC_SRC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_HPACK_ENCODER_TABLE_H
 
 #include <grpc/support/port_platform.h>
+
+#include <stddef.h>
+#include <stdint.h>
+
+#include <limits>
 
 #include "absl/container/inlined_vector.h"
 
@@ -27,9 +32,13 @@ namespace grpc_core {
 // sizes.
 class HPackEncoderTable {
  public:
+  using EntrySize = uint16_t;
+
   HPackEncoderTable() : elem_size_(hpack_constants::kInitialTableEntries) {}
 
-  static constexpr size_t MaxEntrySize() { return 65535; }
+  static constexpr size_t MaxEntrySize() {
+    return std::numeric_limits<EntrySize>::max();
+  }
 
   // Reserve space in table for the new element, evict entries if needed.
   // Return the new index of the element. Return 0 to indicate not adding to
@@ -41,6 +50,8 @@ class HPackEncoderTable {
   uint32_t max_size() const { return max_table_size_; }
   // Get the current table size
   uint32_t test_only_table_size() const { return table_size_; }
+  // Get the number of entries in the table
+  uint32_t test_only_table_elems() const { return table_elems_; }
 
   // Convert an element index into a dynamic index
   uint32_t DynamicIndex(uint32_t index) const {
@@ -62,10 +73,10 @@ class HPackEncoderTable {
   uint32_t table_elems_ = 0;
   uint32_t table_size_ = 0;
   // The size of each element in the HPACK table.
-  absl::InlinedVector<uint16_t, hpack_constants::kInitialTableEntries>
+  absl::InlinedVector<EntrySize, hpack_constants::kInitialTableEntries>
       elem_size_;
 };
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_HPACK_ENCODER_TABLE_H
+#endif  // GRPC_SRC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_HPACK_ENCODER_TABLE_H

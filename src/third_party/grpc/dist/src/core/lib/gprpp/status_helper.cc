@@ -28,16 +28,20 @@
 #include "absl/strings/cord.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
-#include "absl/strings/str_format.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/time/clock.h"
 #include "google/protobuf/any.upb.h"
 #include "google/rpc/status.upb.h"
+#include "upb/base/string_view.h"
+#include "upb/mem/arena.h"
 #include "upb/upb.hpp"
 
 #include <grpc/support/log.h>
 
-#include "src/core/lib/gprpp/time_util.h"
+#include "src/core/lib/slice/percent_encoding.h"
+#include "src/core/lib/slice/slice.h"
 
 namespace grpc_core {
 
@@ -137,8 +141,9 @@ void EncodeUInt32ToBytes(uint32_t v, char* buf) {
 
 uint32_t DecodeUInt32FromBytes(const char* buf) {
   const unsigned char* ubuf = reinterpret_cast<const unsigned char*>(buf);
-  return ubuf[0] | (uint32_t(ubuf[1]) << 8) | (uint32_t(ubuf[2]) << 16) |
-         (uint32_t(ubuf[3]) << 24);
+  return ubuf[0] | (static_cast<uint32_t>(ubuf[1]) << 8) |
+         (static_cast<uint32_t>(ubuf[2]) << 16) |
+         (static_cast<uint32_t>(ubuf[3]) << 24);
 }
 
 std::vector<absl::Status> ParseChildren(absl::Cord children) {
@@ -349,10 +354,22 @@ namespace internal {
 
 google_rpc_Status* StatusToProto(const absl::Status& status, upb_Arena* arena) {
   google_rpc_Status* msg = google_rpc_Status_new(arena);
-  google_rpc_Status_set_code(msg, int32_t(status.code()));
+  google_rpc_Status_set_code(msg, static_cast<int32_t>(status.code()));
+  // Protobuf string field requires to be utf-8 encoding but C++ string doesn't
+  // this requirement so it can be a non utf-8 string. So it should be converted
+  // to a percent-encoded string to keep it as a utf-8 string.
+  Slice message_percent_slice =
+      PercentEncodeSlice(Slice::FromExternalString(status.message()),
+                         PercentEncodingType::Compatible);
+  char* message_percent = reinterpret_cast<char*>(
+      upb_Arena_Malloc(arena, message_percent_slice.length()));
+  if (message_percent_slice.length() > 0) {
+    memcpy(message_percent, message_percent_slice.data(),
+           message_percent_slice.length());
+  }
   google_rpc_Status_set_message(
-      msg, upb_StringView_FromDataAndSize(status.message().data(),
-                                          status.message().size()));
+      msg, upb_StringView_FromDataAndSize(message_percent,
+                                          message_percent_slice.length()));
   status.ForEachPayload([&](absl::string_view type_url,
                             const absl::Cord& payload) {
     google_protobuf_Any* any = google_rpc_Status_add_details(msg, arena);
@@ -382,9 +399,15 @@ google_rpc_Status* StatusToProto(const absl::Status& status, upb_Arena* arena) {
 
 absl::Status StatusFromProto(google_rpc_Status* msg) {
   int32_t code = google_rpc_Status_code(msg);
-  upb_StringView message = google_rpc_Status_message(msg);
-  absl::Status status(static_cast<absl::StatusCode>(code),
-                      absl::string_view(message.data, message.size));
+  upb_StringView message_percent_upb = google_rpc_Status_message(msg);
+  Slice message_percent_slice = Slice::FromExternalString(
+      absl::string_view(message_percent_upb.data, message_percent_upb.size));
+  Slice message_slice =
+      PermissivePercentDecodeSlice(std::move(message_percent_slice));
+  absl::Status status(
+      static_cast<absl::StatusCode>(code),
+      absl::string_view(reinterpret_cast<const char*>(message_slice.data()),
+                        message_slice.size()));
   size_t detail_len;
   const google_protobuf_Any* const* details =
       google_rpc_Status_details(msg, &detail_len);

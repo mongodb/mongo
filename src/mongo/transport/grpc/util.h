@@ -74,7 +74,18 @@ static constexpr StringData kWireVersionKey = "mongodb-wireversion"_sd;
 /**
  * Converts a Mongo URI into a gRPC formatted string.
  */
-std::string formatHostAndPortForGRPC(const HostAndPort& address);
+std::string toGRPCFormattedURI(const HostAndPort& address);
+
+// See: https://grpc.github.io/grpc/cpp/md_doc_naming.html
+inline bool isUnixSchemeGRPCFormattedURI(StringData uri) {
+    return uri.startsWith("unix:");
+}
+
+/**
+ * Parses a gRPC-formatted URI to a HostAndPort, throwing an exception on failure.
+ * See: https://grpc.github.io/grpc/cpp/md_doc_naming.html
+ */
+HostAndPort parseGRPCFormattedURI(StringData uri);
 
 /**
  * Converts a gRPC status code into its corresponding MongoDB error code.

@@ -1,34 +1,48 @@
-/*
- *
- * Copyright 2016 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2016 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
-#ifndef GRPCXX_CHANNEL_FILTER_H
-#define GRPCXX_CHANNEL_FILTER_H
+#ifndef GRPC_SRC_CPP_COMMON_CHANNEL_FILTER_H
+#define GRPC_SRC_CPP_COMMON_CHANNEL_FILTER_H
+
+#include <stddef.h>
 
 #include <functional>
-#include <vector>
+#include <new>
+#include <string>
+#include <utility>
+
+#include "absl/status/status.h"
+#include "absl/types/optional.h"
 
 #include <grpc/grpc.h>
-#include <grpc/support/alloc.h>
-#include <grpcpp/impl/codegen/config.h>
+#include <grpcpp/support/config.h>
 
+#include "src/core/lib/channel/channel_args.h"
+#include "src/core/lib/channel/channel_fwd.h"
 #include "src/core/lib/channel/channel_stack.h"
-#include "src/core/lib/surface/channel_init.h"
+#include "src/core/lib/channel/context.h"
+#include "src/core/lib/iomgr/closure.h"
+#include "src/core/lib/iomgr/error.h"
+#include "src/core/lib/iomgr/polling_entity.h"
+#include "src/core/lib/slice/slice_buffer.h"
+#include "src/core/lib/surface/channel_stack_type.h"
 #include "src/core/lib/transport/metadata_batch.h"
+#include "src/core/lib/transport/transport.h"
 
 /// An interface to define filters.
 ///
@@ -72,7 +86,7 @@ class TransportOp {
   grpc_error_handle disconnect_with_error() const {
     return op_->disconnect_with_error;
   }
-  bool send_goaway() const { return op_->goaway_error != GRPC_ERROR_NONE; }
+  bool send_goaway() const { return !op_->goaway_error.ok(); }
 
   // TODO(roth): Add methods for additional fields as needed.
 
@@ -123,12 +137,6 @@ class TransportStreamOpBatch {
     return op_->recv_trailing_metadata ? &recv_trailing_metadata_ : nullptr;
   }
 
-  uint32_t* send_initial_metadata_flags() const {
-    return op_->send_initial_metadata ? &op_->payload->send_initial_metadata
-                                             .send_initial_metadata_flags
-                                      : nullptr;
-  }
-
   grpc_closure* recv_initial_metadata_ready() const {
     return op_->recv_initial_metadata
                ? op_->payload->recv_initial_metadata.recv_initial_metadata_ready
@@ -138,22 +146,21 @@ class TransportStreamOpBatch {
     op_->payload->recv_initial_metadata.recv_initial_metadata_ready = closure;
   }
 
-  grpc_core::OrphanablePtr<grpc_core::ByteStream>* send_message() const {
-    return op_->send_message ? &op_->payload->send_message.send_message
+  grpc_core::SliceBuffer* send_message() const {
+    return op_->send_message ? op_->payload->send_message.send_message
                              : nullptr;
   }
-  void set_send_message(
-      grpc_core::OrphanablePtr<grpc_core::ByteStream> send_message) {
+
+  void set_send_message(grpc_core::SliceBuffer* send_message) {
     op_->send_message = true;
-    op_->payload->send_message.send_message = std::move(send_message);
+    op_->payload->send_message.send_message = send_message;
   }
 
-  grpc_core::OrphanablePtr<grpc_core::ByteStream>* recv_message() const {
+  absl::optional<grpc_core::SliceBuffer>* recv_message() const {
     return op_->recv_message ? op_->payload->recv_message.recv_message
                              : nullptr;
   }
-  void set_recv_message(
-      grpc_core::OrphanablePtr<grpc_core::ByteStream>* recv_message) {
+  void set_recv_message(absl::optional<grpc_core::SliceBuffer>* recv_message) {
     op_->recv_message = true;
     op_->payload->recv_message.recv_message = recv_message;
   }
@@ -161,18 +168,6 @@ class TransportStreamOpBatch {
   census_context* get_census_context() const {
     return static_cast<census_context*>(
         op_->payload->context[GRPC_CONTEXT_TRACING].value);
-  }
-
-  const gpr_atm* get_peer_string() const {
-    if (op_->send_initial_metadata &&
-        op_->payload->send_initial_metadata.peer_string != nullptr) {
-      return op_->payload->send_initial_metadata.peer_string;
-    } else if (op_->recv_initial_metadata &&
-               op_->payload->recv_initial_metadata.peer_string != nullptr) {
-      return op_->payload->recv_initial_metadata.peer_string;
-    } else {
-      return nullptr;
-    }
   }
 
  private:
@@ -194,7 +189,7 @@ class ChannelData {
   /// Initializes the channel data.
   virtual grpc_error_handle Init(grpc_channel_element* /*elem*/,
                                  grpc_channel_element_args* /*args*/) {
-    return GRPC_ERROR_NONE;
+    return absl::OkStatus();
   }
 
   // Called before destruction.
@@ -217,7 +212,7 @@ class CallData {
   /// Initializes the call data.
   virtual grpc_error_handle Init(grpc_call_element* /*elem*/,
                                  const grpc_call_element_args* /*args*/) {
-    return GRPC_ERROR_NONE;
+    return absl::OkStatus();
   }
 
   // Called before destruction.
@@ -306,7 +301,7 @@ class ChannelFilter final {
 
 void RegisterChannelFilter(
     grpc_channel_stack_type stack_type, int priority,
-    std::function<bool(const grpc_channel_args&)> include_filter,
+    std::function<bool(const grpc_core::ChannelArgs&)> include_filter,
     const grpc_channel_filter* filter);
 
 }  // namespace internal
@@ -324,7 +319,7 @@ void RegisterChannelFilter(
 template <typename ChannelDataType, typename CallDataType>
 void RegisterChannelFilter(
     const char* name, grpc_channel_stack_type stack_type, int priority,
-    std::function<bool(const grpc_channel_args&)> include_filter) {
+    std::function<bool(const grpc_core::ChannelArgs&)> include_filter) {
   using FilterType = internal::ChannelFilter<ChannelDataType, CallDataType>;
   static const grpc_channel_filter filter = {
       FilterType::StartTransportStreamOpBatch,
@@ -336,6 +331,7 @@ void RegisterChannelFilter(
       FilterType::DestroyCallElement,
       FilterType::channel_data_size,
       FilterType::InitChannelElement,
+      grpc_channel_stack_no_post_init,
       FilterType::DestroyChannelElement,
       FilterType::GetChannelInfo,
       name};
@@ -345,4 +341,4 @@ void RegisterChannelFilter(
 
 }  // namespace grpc
 
-#endif  // GRPCXX_CHANNEL_FILTER_H
+#endif  // GRPC_SRC_CPP_COMMON_CHANNEL_FILTER_H

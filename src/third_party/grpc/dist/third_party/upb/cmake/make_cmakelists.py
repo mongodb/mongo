@@ -45,6 +45,19 @@ def StripFirstChar(deps):
 def IsSourceFile(name):
   return name.endswith(".c") or name.endswith(".cc")
 
+
+ADD_LIBRARY_FORMAT = """
+add_library(%(name)s %(type)s
+    %(sources)s
+)
+target_include_directories(%(name)s %(keyword)s
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../cmake>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINRARY_DIR}>
+)
+"""
+
+
 class BuildFileFunctions(object):
   def __init__(self, converter):
     self.converter = converter
@@ -60,13 +73,15 @@ class BuildFileFunctions(object):
 
   def load(self, *args):
     pass
-
+  
   def cc_library(self, **kwargs):
     if kwargs["name"].endswith("amalgamation"):
       return
     if kwargs["name"] == "upbc_generator":
       return
     if kwargs["name"] == "lupb":
+      return
+    if "testonly" in kwargs:
       return
     files = kwargs.get("srcs", []) + kwargs.get("hdrs", [])
     found_files = []
@@ -81,18 +96,23 @@ class BuildFileFunctions(object):
 
     if list(filter(IsSourceFile, files)):
       # Has sources, make this a normal library.
-      self.converter.toplevel += "add_library(%s\n  %s)\n" % (
-          kwargs["name"],
-          "\n  ".join(found_files)
-      )
+      self.converter.toplevel += ADD_LIBRARY_FORMAT % {
+          "name": kwargs["name"],
+          "type": "",
+          "keyword": "PUBLIC",
+          "sources": "\n  ".join(found_files),
+      }
       self._add_deps(kwargs)
     else:
       # Header-only library, have to do a couple things differently.
       # For some info, see:
       #  http://mariobadr.com/creating-a-header-only-library-with-cmake.html
-      self.converter.toplevel += "add_library(%s INTERFACE)\n" % (
-          kwargs["name"]
-      )
+      self.converter.toplevel += ADD_LIBRARY_FORMAT % {
+          "name": kwargs["name"],
+          "type": "INTERFACE",
+          "keyword": "INTERFACE",
+          "sources": "",
+      }
       self._add_deps(kwargs, " INTERFACE")
 
   def cc_binary(self, **kwargs):
@@ -126,6 +146,9 @@ class BuildFileFunctions(object):
   def cc_fuzz_test(self, **kwargs):
     pass
 
+  def pkg_files(self, **kwargs):
+    pass
+
   def py_library(self, **kwargs):
     pass
 
@@ -150,7 +173,7 @@ class BuildFileFunctions(object):
   def cc_proto_library(self, **kwargs):
     pass
 
-  def generated_file_staleness_test(self, **kwargs):
+  def staleness_test(self, **kwargs):
     pass
 
   def upb_amalgamation(self, **kwargs):
@@ -180,7 +203,7 @@ class BuildFileFunctions(object):
   def select(self, arg_dict):
     return []
 
-  def glob(self, *args):
+  def glob(self, *args, **kwargs):
     return []
 
   def licenses(self, *args):
@@ -192,17 +215,37 @@ class BuildFileFunctions(object):
   def map_dep(self, arg):
     return arg
 
+  def package_group(self, **kwargs):
+    pass
+
+  def bool_flag(self, **kwargs):
+    pass
+
+  def bootstrap_upb_proto_library(self, **kwargs):
+    pass
+
+  def bootstrap_cc_library(self, **kwargs):
+    pass
+
+  def alias(self, **kwargs):
+    pass
+
 
 class WorkspaceFileFunctions(object):
   def __init__(self, converter):
     self.converter = converter
 
-  def load(self, *args):
+  def load(self, *args, **kwargs):
     pass
 
   def workspace(self, **kwargs):
     self.converter.prelude += "project(%s)\n" % (kwargs["name"])
     self.converter.prelude += "set(CMAKE_C_STANDARD 99)\n"
+
+  def maybe(self, rule, **kwargs):
+    if kwargs["name"] == "utf8_range":
+      self.converter.utf8_range_commit = kwargs["commit"]
+    pass
 
   def http_archive(self, **kwargs):
     pass
@@ -216,10 +259,13 @@ class WorkspaceFileFunctions(object):
   def bazel_version_repository(self, **kwargs):
     pass
 
-  def upb_deps(self):
+  def protobuf_deps(self):
     pass
 
-  def protobuf_deps(self):
+  def utf8_range_deps(self):
+    pass
+
+  def pip_parse(self, **kwargs):
     pass
 
   def rules_fuzzing_dependencies(self):
@@ -228,10 +274,31 @@ class WorkspaceFileFunctions(object):
   def rules_fuzzing_init(self):
     pass
 
+  def rules_pkg_dependencies(self):
+    pass
+
   def system_python(self, **kwargs):
     pass
 
+  def register_system_python(self, **kwargs):
+    pass
+
   def register_toolchains(self, toolchain):
+    pass
+
+  def python_source_archive(self, **kwargs):
+    pass
+
+  def python_nuget_package(self, **kwargs):
+    pass
+
+  def install_deps(self):
+    pass
+
+  def fuzzing_py_install_deps(self):
+    pass
+
+  def googletest_deps(self):
     pass
 
 
@@ -240,26 +307,19 @@ class Converter(object):
     self.prelude = ""
     self.toplevel = ""
     self.if_lua = ""
+    self.utf8_range_commit = ""
 
   def convert(self):
     return self.template % {
         "prelude": converter.prelude,
         "toplevel": converter.toplevel,
+        "utf8_range_commit": converter.utf8_range_commit,
     }
 
   template = textwrap.dedent("""\
     # This file was generated from BUILD using tools/make_cmakelists.py.
 
-    cmake_minimum_required(VERSION 3.1)
-
-    if(${CMAKE_VERSION} VERSION_LESS 3.12)
-        cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
-    else()
-        cmake_policy(VERSION 3.12)
-    endif()
-
-    cmake_minimum_required (VERSION 3.0)
-    cmake_policy(SET CMP0048 NEW)
+    cmake_minimum_required(VERSION 3.10...3.24)
 
     %(prelude)s
 
@@ -297,9 +357,24 @@ class Converter(object):
       set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
     endif()
 
-    include_directories(..)
-    include_directories(../cmake)
-    include_directories(${CMAKE_CURRENT_BINARY_DIR})
+    if(NOT TARGET utf8_range)
+      if(EXISTS ../external/utf8_range)
+        # utf8_range is already installed
+        include_directories(../external/utf8_range)
+      else()
+        include(FetchContent)
+        FetchContent_Declare(
+          utf8_range
+          GIT_REPOSITORY "https://github.com/protocolbuffers/utf8_range.git"
+          GIT_TAG "%(utf8_range_commit)s"
+        )
+        FetchContent_GetProperties(utf8_range)
+        if(NOT utf8_range_POPULATED)
+          FetchContent_Populate(utf8_range)
+          include_directories(${utf8_range_SOURCE_DIR})
+        endif()
+      endif()
+    endif()
 
     if(APPLE)
       set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined dynamic_lookup -flat_namespace")
@@ -327,7 +402,9 @@ def GetDict(obj):
 
 globs = GetDict(converter)
 
-exec(open("WORKSPACE").read(), GetDict(WorkspaceFileFunctions(converter)))
+workspace_dict = GetDict(WorkspaceFileFunctions(converter))
+exec(open("bazel/workspace_deps.bzl").read(), workspace_dict)
+exec(open("WORKSPACE").read(), workspace_dict)
 exec(open("BUILD").read(), GetDict(BuildFileFunctions(converter)))
 
 with open(sys.argv[1], "w") as f:

@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //         atenasio@google.com (Chris Atenasio) (ZigZag transform)
@@ -39,23 +16,23 @@
 #ifndef GOOGLE_PROTOBUF_WIRE_FORMAT_H__
 #define GOOGLE_PROTOBUF_WIRE_FORMAT_H__
 
-#include <string>
-
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/parse_context.h>
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/generated_message_util.h>
-#include <google/protobuf/message.h>
-#include <google/protobuf/metadata_lite.h>
-#include <google/protobuf/wire_format_lite.h>
-#include <google/protobuf/stubs/casts.h>
+#include "google/protobuf/stubs/common.h"
+#include "absl/base/casts.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/generated_message_util.h"
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/message.h"
+#include "google/protobuf/metadata_lite.h"
+#include "google/protobuf/parse_context.h"
+#include "google/protobuf/port.h"
+#include "google/protobuf/wire_format_lite.h"
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
 #endif
 
-#include <google/protobuf/port_def.inc>
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
@@ -79,6 +56,8 @@ namespace internal {
 // This class is really a namespace that contains only static methods
 class PROTOBUF_EXPORT WireFormat {
  public:
+  WireFormat() = delete;
+
   // Given a field return its WireType
   static inline WireFormatLite::WireType WireTypeForField(
       const FieldDescriptor* field);
@@ -127,7 +106,7 @@ class PROTOBUF_EXPORT WireFormat {
     int expected_endpoint = output->ByteCount() + size;
     output->SetCur(
         _InternalSerialize(message, output->Cur(), output->EpsCopy()));
-    GOOGLE_CHECK_EQ(output->ByteCount(), expected_endpoint)
+    ABSL_CHECK_EQ(output->ByteCount(), expected_endpoint)
         << ": Protocol message serialized to a size different from what was "
            "originally expected.  Perhaps it was modified by another thread "
            "during serialization?";
@@ -285,6 +264,7 @@ class PROTOBUF_EXPORT WireFormat {
 
  private:
   struct MessageSetParser;
+  friend class TcParser;
   // Skip a MessageSet field.
   static bool SkipMessageSetField(io::CodedInputStream* input,
                                   uint32_t field_number,
@@ -301,8 +281,6 @@ class PROTOBUF_EXPORT WireFormat {
                                                  uint64_t tag,
                                                  const Reflection* reflection,
                                                  const FieldDescriptor* field);
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(WireFormat);
 };
 
 // Subclass of FieldSkipper which saves skipped fields to an UnknownFieldSet.
@@ -337,7 +315,7 @@ inline WireFormatLite::WireType WireFormat::WireTypeForFieldType(
   // Some compilers don't like enum -> enum casts, so we implicit_cast to
   // int first.
   return WireFormatLite::WireTypeForFieldType(
-      static_cast<WireFormatLite::FieldType>(implicit_cast<int>(type)));
+      static_cast<WireFormatLite::FieldType>(absl::implicit_cast<int>(type)));
 }
 
 inline uint32_t WireFormat::MakeTag(const FieldDescriptor* field) {
@@ -350,14 +328,15 @@ inline size_t WireFormat::TagSize(int field_number,
   // int first.
   return WireFormatLite::TagSize(
       field_number,
-      static_cast<WireFormatLite::FieldType>(implicit_cast<int>(type)));
+      static_cast<WireFormatLite::FieldType>(absl::implicit_cast<int>(type)));
 }
 
 inline void WireFormat::VerifyUTF8String(const char* data, int size,
                                          WireFormat::Operation op) {
 #ifdef GOOGLE_PROTOBUF_UTF8_VALIDATION_ENABLED
-  WireFormatLite::VerifyUtf8String(
-      data, size, static_cast<WireFormatLite::Operation>(op), nullptr);
+  WireFormatLite::VerifyUtf8String(data, size,
+                                   static_cast<WireFormatLite::Operation>(op),
+                                   /* field_name = */ "");
 #else
   // Avoid the compiler warning about unused variables.
   (void)data;
@@ -409,6 +388,6 @@ uint8_t* SerializeMapKeyWithCachedSizes(const FieldDescriptor* field,
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_WIRE_FORMAT_H__

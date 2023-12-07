@@ -1,9 +1,9 @@
 Pod::Spec.new do |s|
   s.name     = 'Protobuf-C++'
-  s.version  = '3.19.5'
+  s.version  = '4.25.0'
   s.summary  = 'Protocol Buffers v3 runtime library for C++.'
   s.homepage = 'https://github.com/google/protobuf'
-  s.license  = '3-Clause BSD License'
+  s.license  = 'BSD-3-Clause'
   s.authors  = { 'The Protocol Buffers contributors' => 'protobuf@googlegroups.com' }
   s.cocoapods_version = '>= 1.0'
 
@@ -13,8 +13,7 @@ Pod::Spec.new do |s|
   s.source_files = 'src/google/protobuf/*.{h,cc,inc}',
                    'src/google/protobuf/stubs/*.{h,cc}',
                    'src/google/protobuf/io/*.{h,cc}',
-                   'src/google/protobuf/util/*.{h,cc}',
-                   'src/google/protobuf/util/internal/*.{h,cc}'
+                   'src/google/protobuf/util/*.{h,cc}'
 
   # Excluding all the tests in the directories above
   s.exclude_files = 'src/google/**/*_test.{h,cc,inc}',
@@ -26,15 +25,16 @@ Pod::Spec.new do |s|
 
   s.header_mappings_dir = 'src'
 
-  s.ios.deployment_target = '7.0'
-  s.osx.deployment_target = '10.9'
-  s.tvos.deployment_target = '9.0'
-  s.watchos.deployment_target = '2.0'
+  s.ios.deployment_target = '12.0'
+  s.osx.deployment_target = '10.13'
+  s.tvos.deployment_target = '12.0'
+  s.watchos.deployment_target = '6.0'
 
   s.pod_target_xcconfig = {
     # Do not let src/google/protobuf/stubs/time.h override system API
     'USE_HEADERMAP' => 'NO',
     'ALWAYS_SEARCH_USER_PATHS' => 'NO',
+    'HEADER_SEARCH_PATHS' => '"$(PODS_TARGET_SRCROOT)/src"'
   }
 
 end

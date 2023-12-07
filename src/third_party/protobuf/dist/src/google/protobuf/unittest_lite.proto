@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //
@@ -47,6 +24,7 @@ message TestAllTypesLite {
   message NestedMessage {
     optional int32 bb = 1;
     optional int64 cc = 2;
+    repeated int32 dd = 3 [packed = true];
   }
 
   message NestedMessage2 {
@@ -97,6 +75,8 @@ message TestAllTypesLite {
       optional_public_import_message = 26;
 
   optional NestedMessage optional_lazy_message = 27 [lazy = true];
+  optional NestedMessage optional_unverified_lazy_message = 28
+      [unverified_lazy = true];
 
   // Repeated
   repeated int32 repeated_int32 = 31;
@@ -240,13 +220,18 @@ extend TestAllExtensionsLite {
 
   optional string optional_string_piece_extension_lite = 24
       [ctype = STRING_PIECE];
-  optional string optional_cord_extension_lite = 25 [ctype = CORD];
+  // TODO: ctype=CORD is not supported for extension. Add
+  // ctype=CORD option back after it is supported.
+  optional string optional_cord_extension_lite = 25;
 
   optional protobuf_unittest_import.PublicImportMessageLite
       optional_public_import_message_extension_lite = 26;
 
   optional TestAllTypesLite.NestedMessage optional_lazy_message_extension_lite =
       27 [lazy = true];
+  optional TestAllTypesLite.NestedMessage
+      optional_unverified_lazy_message_extension_lite = 28
+      [unverified_lazy = true];
 
   // Repeated
   repeated int32 repeated_int32_extension_lite = 31;
@@ -282,7 +267,9 @@ extend TestAllExtensionsLite {
 
   repeated string repeated_string_piece_extension_lite = 54
       [ctype = STRING_PIECE];
-  repeated string repeated_cord_extension_lite = 55 [ctype = CORD];
+  // TODO: ctype=CORD is not supported for extension. Add
+  // ctype=CORD option back after it is supported.
+  repeated string repeated_cord_extension_lite = 55;
 
   repeated TestAllTypesLite.NestedMessage repeated_lazy_message_extension_lite =
       57 [lazy = true];
@@ -313,8 +300,9 @@ extend TestAllExtensionsLite {
 
   optional string default_string_piece_extension_lite = 84
       [ctype = STRING_PIECE, default = "abc"];
-  optional string default_cord_extension_lite = 85
-      [ctype = CORD, default = "123"];
+  // TODO: ctype=CORD is not supported for extension. Add
+  // ctype=CORD option back after it is supported.
+  optional string default_cord_extension_lite = 85 [default = "123"];
 
   // For oneof test
   optional uint32 oneof_uint32_extension_lite = 111;
@@ -391,6 +379,12 @@ message TestParsingMergeLite {
   }
 }
 
+// Test that the correct exception is thrown by parseFrom in a corner case
+// involving merging, extensions, and required fields.
+message TestMergeExceptionLite {
+  optional TestAllExtensionsLite all_extensions = 1;
+}
+
 // TestEmptyMessageLite is used to test unknown fields support in lite mode.
 message TestEmptyMessageLite {}
 
@@ -400,7 +394,9 @@ message TestEmptyMessageWithExtensionsLite {
   extensions 1 to max;
 }
 
-enum V1EnumLite { V1_FIRST = 1; }
+enum V1EnumLite {
+  V1_FIRST = 1;
+}
 
 enum V2EnumLite {
   V2_FIRST = 1;
@@ -441,7 +437,11 @@ message TestHugeFieldNumbersLite {
     bytes oneof_bytes = 536870014;
   }
 
-  extensions 536860000 to 536869999;
+  extensions 536860000 to 536869999 [declaration = {
+    number: 536860000
+    full_name: ".protobuf_unittest.test_all_types_lite"
+    type: ".protobuf_unittest.TestAllTypesLite"
+  }];
 }
 
 extend TestHugeFieldNumbersLite {
@@ -461,6 +461,12 @@ message TestOneofParsingLite {
         [ctype = STRING_PIECE, default = "default StringPiece"];
     V2EnumLite oneof_enum = 9;
   }
+}
+
+message TestMessageSetLite {
+  option message_set_wire_format = true;
+
+  extensions 100 to max;
 }
 
 // The following four messages are set up to test for wire compatibility between

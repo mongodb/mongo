@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_LIB_PROMISE_CONTEXT_H
-#define GRPC_CORE_LIB_PROMISE_CONTEXT_H
+#ifndef GRPC_SRC_CORE_LIB_PROMISE_CONTEXT_H
+#define GRPC_SRC_CORE_LIB_PROMISE_CONTEXT_H
 
 #include <grpc/support/port_platform.h>
 
 #include <type_traits>
 #include <utility>
 
-#include "src/core/lib/gpr/tls.h"
+#include <grpc/support/log.h>
 
 namespace grpc_core {
 
@@ -29,7 +29,7 @@ namespace grpc_core {
 // not contain any members, only exist.
 // The reason for avoiding this is that context types each use a thread local.
 template <typename T>
-struct ContextType;
+struct ContextType;  // IWYU pragma: keep
 
 namespace promise_detail {
 
@@ -45,12 +45,11 @@ class Context : public ContextType<T> {
 
  private:
   T* const old_;
-  static GPR_THREAD_LOCAL(T*) current_;
+  static thread_local T* current_;
 };
 
 template <typename T>
-GPR_THREAD_LOCAL(T*)
-Context<T>::current_;
+thread_local T* Context<T>::current_;
 
 template <typename T, typename F>
 class WithContext {
@@ -69,18 +68,26 @@ class WithContext {
 
 }  // namespace promise_detail
 
-// Retrieve the current value of a context.
+// Return true if a context of type T is currently active.
+template <typename T>
+bool HasContext() {
+  return promise_detail::Context<T>::get() != nullptr;
+}
+
+// Retrieve the current value of a context, or abort if the value is unset.
 template <typename T>
 T* GetContext() {
-  return promise_detail::Context<T>::get();
+  auto* p = promise_detail::Context<T>::get();
+  GPR_ASSERT(p != nullptr);
+  return p;
 }
 
 // Given a promise and a context, return a promise that has that context set.
 template <typename T, typename F>
 promise_detail::WithContext<T, F> WithContext(F f, T* context) {
-  return promise_detail::WithContext<T, F>(f, context);
+  return promise_detail::WithContext<T, F>(std::move(f), context);
 }
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_LIB_PROMISE_CONTEXT_H
+#endif  // GRPC_SRC_CORE_LIB_PROMISE_CONTEXT_H

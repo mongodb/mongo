@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_LIB_CHANNEL_CHANNEL_ARGS_PRECONDITIONING_H
-#define GRPC_CORE_LIB_CHANNEL_CHANNEL_ARGS_PRECONDITIONING_H
+#ifndef GRPC_SRC_CORE_LIB_CHANNEL_CHANNEL_ARGS_PRECONDITIONING_H
+#define GRPC_SRC_CORE_LIB_CHANNEL_CHANNEL_ARGS_PRECONDITIONING_H
 
 #include <grpc/support/port_platform.h>
 
 #include <functional>
 #include <vector>
+
+#include <grpc/grpc.h>
 
 #include "src/core/lib/channel/channel_args.h"
 
@@ -49,8 +51,7 @@ class ChannelArgsPreconditioning {
   // Take channel args and precondition them.
   // Does not take ownership of the channel args passed in.
   // Returns a new channel args object that is owned by the caller.
-  const grpc_channel_args* PreconditionChannelArgs(
-      const grpc_channel_args* args) const;
+  ChannelArgs PreconditionChannelArgs(const grpc_channel_args* args) const;
 
  private:
   std::vector<Stage> stages_;
@@ -58,4 +59,4 @@ class ChannelArgsPreconditioning {
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_LIB_CHANNEL_CHANNEL_ARGS_PRECONDITIONING_H
+#endif  // GRPC_SRC_CORE_LIB_CHANNEL_CHANNEL_ARGS_PRECONDITIONING_H

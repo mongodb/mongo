@@ -12,55 +12,68 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_LIB_PROMISE_SLEEP_H
-#define GRPC_CORE_LIB_PROMISE_SLEEP_H
+#ifndef GRPC_SRC_CORE_LIB_PROMISE_SLEEP_H
+#define GRPC_SRC_CORE_LIB_PROMISE_SLEEP_H
 
 #include <grpc/support/port_platform.h>
 
-#include "src/core/lib/iomgr/timer.h"
+#include <atomic>
+#include <utility>
+
+#include "absl/status/status.h"
+
+#include <grpc/event_engine/event_engine.h>
+
+#include "src/core/lib/gprpp/time.h"
 #include "src/core/lib/promise/activity.h"
 #include "src/core/lib/promise/poll.h"
 
 namespace grpc_core {
 
 // Promise that sleeps until a deadline and then finishes.
-class Sleep {
+class Sleep final {
  public:
   explicit Sleep(Timestamp deadline);
   ~Sleep();
 
   Sleep(const Sleep&) = delete;
   Sleep& operator=(const Sleep&) = delete;
-  Sleep(Sleep&& other) noexcept : state_(other.state_) {
-    other.state_ = nullptr;
-  }
+  Sleep(Sleep&& other) noexcept
+      : deadline_(other.deadline_),
+        closure_(std::exchange(other.closure_, nullptr)) {}
   Sleep& operator=(Sleep&& other) noexcept {
-    std::swap(state_, other.state_);
+    deadline_ = other.deadline_;
+    std::swap(closure_, other.closure_);
     return *this;
-  }
+  };
 
   Poll<absl::Status> operator()();
 
  private:
-  static void OnTimer(void* arg, grpc_error_handle error);
+  class ActiveClosure final
+      : public grpc_event_engine::experimental::EventEngine::Closure {
+   public:
+    explicit ActiveClosure(Timestamp deadline);
 
-  enum class Stage { kInitial, kStarted, kDone };
-  struct State {
-    explicit State(Timestamp deadline) : deadline(deadline) {}
-    RefCount refs{2};
-    const Timestamp deadline;
-    grpc_timer timer;
-    grpc_closure on_timer;
-    Mutex mu;
-    Stage stage ABSL_GUARDED_BY(mu) = Stage::kInitial;
-    Waker waker ABSL_GUARDED_BY(mu);
-    void Unref() {
-      if (refs.Unref()) delete this;
-    }
+    void Run() override;
+    // After calling Cancel, it's no longer safe to access this object.
+    void Cancel();
+
+    bool HasRun() const;
+
+   private:
+    bool Unref();
+
+    Waker waker_;
+    // One ref dropped by Run(), the other by Cancel().
+    std::atomic<int> refs_{2};
+    grpc_event_engine::experimental::EventEngine::TaskHandle timer_handle_;
   };
-  State* state_;
+
+  Timestamp deadline_;
+  ActiveClosure* closure_{nullptr};
 };
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_LIB_PROMISE_SLEEP_H
+#endif  // GRPC_SRC_CORE_LIB_PROMISE_SLEEP_H

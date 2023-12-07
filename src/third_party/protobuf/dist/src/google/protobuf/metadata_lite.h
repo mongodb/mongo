@@ -1,42 +1,20 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #ifndef GOOGLE_PROTOBUF_METADATA_LITE_H__
 #define GOOGLE_PROTOBUF_METADATA_LITE_H__
 
 #include <string>
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/arena.h>
-#include <google/protobuf/port.h>
 
-#include <google/protobuf/port_def.inc>
+#include "google/protobuf/arena.h"
+#include "google/protobuf/port.h"
+
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
@@ -44,6 +22,9 @@
 
 namespace google {
 namespace protobuf {
+
+class UnknownFieldSet;
+
 namespace internal {
 
 // This is the representation for messages that support arena allocation. It
@@ -59,32 +40,26 @@ namespace internal {
 // It uses bit 0 == 0 to indicate an arena pointer and bit 0 == 1 to indicate a
 // UFS+Arena-container pointer. Besides it uses bit 1 == 0 to indicate arena
 // allocation and bit 1 == 1 to indicate heap allocation.
-class InternalMetadata {
+class PROTOBUF_EXPORT InternalMetadata {
  public:
   constexpr InternalMetadata() : ptr_(0) {}
-  explicit InternalMetadata(Arena* arena, bool is_message_owned = false)
-      : ptr_(is_message_owned
-                 ? reinterpret_cast<intptr_t>(arena) | kMessageOwnedArenaTagMask
-                 : reinterpret_cast<intptr_t>(arena)) {
-    GOOGLE_DCHECK(!is_message_owned || arena != nullptr);
+  explicit InternalMetadata(Arena* arena) {
+    ptr_ = reinterpret_cast<intptr_t>(arena);
   }
 
-  ~InternalMetadata() {
-    if (HasMessageOwnedArenaTag()) {
-      delete arena();
-    }
-  }
-
+  // Delete will delete the unknown fields only if they weren't allocated on an
+  // arena.  Then it updates the flags so that if you call
+  // have_unknown_fields(), it will return false.
+  //
+  // It is designed to be used as part of a Message class's destructor call, so
+  // that when control eventually gets to ~InternalMetadata(), we don't need to
+  // check for have_unknown_fields() again.
   template <typename T>
   void Delete() {
     // Note that Delete<> should be called not more than once.
     if (have_unknown_fields()) {
       DeleteOutOfLineHelper<T>();
     }
-  }
-
-  PROTOBUF_NDEBUG_INLINE Arena* owning_arena() const {
-    return HasMessageOwnedArenaTag() ? nullptr : arena();
   }
 
   PROTOBUF_NDEBUG_INLINE Arena* arena() const {
@@ -135,7 +110,8 @@ class InternalMetadata {
     }
   }
 
-  PROTOBUF_NDEBUG_INLINE void InternalSwap(InternalMetadata* other) {
+  PROTOBUF_NDEBUG_INLINE void InternalSwap(
+      InternalMetadata* PROTOBUF_RESTRICT other) {
     std::swap(ptr_, other->ptr_);
   }
 
@@ -158,17 +134,12 @@ class InternalMetadata {
 
   // Tagged pointer implementation.
   static constexpr intptr_t kUnknownFieldsTagMask = 1;
-  static constexpr intptr_t kMessageOwnedArenaTagMask = 2;
-  static constexpr intptr_t kPtrTagMask =
-      kUnknownFieldsTagMask | kMessageOwnedArenaTagMask;
+  static constexpr intptr_t kPtrTagMask = kUnknownFieldsTagMask;
   static constexpr intptr_t kPtrValueMask = ~kPtrTagMask;
 
   // Accessors for pointer tag and pointer value.
   PROTOBUF_ALWAYS_INLINE bool HasUnknownFieldsTag() const {
     return ptr_ & kUnknownFieldsTagMask;
-  }
-  PROTOBUF_ALWAYS_INLINE bool HasMessageOwnedArenaTag() const {
-    return ptr_ & kMessageOwnedArenaTagMask;
   }
 
   template <typename U>
@@ -188,20 +159,20 @@ class InternalMetadata {
 
   template <typename T>
   PROTOBUF_NOINLINE void DeleteOutOfLineHelper() {
-    if (arena() == nullptr) {
-      delete PtrValue<Container<T>>();
-    }
+    delete PtrValue<Container<T>>();
+    // TODO:  This store is load-bearing.  Since we are destructing
+    // the message at this point, see if we can eliminate it.
+    ptr_ = 0;
   }
 
   template <typename T>
   PROTOBUF_NOINLINE T* mutable_unknown_fields_slow() {
     Arena* my_arena = arena();
     Container<T>* container = Arena::Create<Container<T>>(my_arena);
-    intptr_t message_owned_arena_tag = ptr_ & kMessageOwnedArenaTagMask;
     // Two-step assignment works around a bug in clang's static analyzer:
     // https://bugs.llvm.org/show_bug.cgi?id=34198.
     ptr_ = reinterpret_cast<intptr_t>(container);
-    ptr_ |= kUnknownFieldsTagMask | message_owned_arena_tag;
+    ptr_ |= kUnknownFieldsTagMask;
     container->arena = my_arena;
     return &(container->unknown_fields);
   }
@@ -222,6 +193,9 @@ class InternalMetadata {
   PROTOBUF_NOINLINE void DoSwap(T* other) {
     mutable_unknown_fields<T>()->Swap(other);
   }
+
+  // Private helper with debug checks for ~InternalMetadata()
+  void CheckedDestruct();
 };
 
 // String Template specializations.
@@ -233,6 +207,19 @@ PROTOBUF_EXPORT void InternalMetadata::DoMergeFrom<std::string>(
     const std::string& other);
 template <>
 PROTOBUF_EXPORT void InternalMetadata::DoSwap<std::string>(std::string* other);
+
+// Instantiated once in message.cc (where the definition of UnknownFieldSet is
+// known) to prevent much duplication across translation units of a large build.
+extern template PROTOBUF_EXPORT void
+InternalMetadata::DoClear<UnknownFieldSet>();
+extern template PROTOBUF_EXPORT void
+InternalMetadata::DoMergeFrom<UnknownFieldSet>(const UnknownFieldSet& other);
+extern template PROTOBUF_EXPORT void
+InternalMetadata::DoSwap<UnknownFieldSet>(UnknownFieldSet* other);
+extern template PROTOBUF_EXPORT void
+InternalMetadata::DeleteOutOfLineHelper<UnknownFieldSet>();
+extern template PROTOBUF_EXPORT UnknownFieldSet*
+InternalMetadata::mutable_unknown_fields_slow<UnknownFieldSet>();
 
 // This helper RAII class is needed to efficiently parse unknown fields. We
 // should only call mutable_unknown_fields if there are actual unknown fields.
@@ -265,6 +252,6 @@ class PROTOBUF_EXPORT LiteUnknownFieldSetter {
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_METADATA_LITE_H__

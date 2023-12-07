@@ -14,7 +14,7 @@
 #ifndef GRPC_EVENT_ENGINE_MEMORY_ALLOCATOR_H
 #define GRPC_EVENT_ENGINE_MEMORY_ALLOCATOR_H
 
-#include <grpc/impl/codegen/port_platform.h>
+#include <grpc/support/port_platform.h>
 
 #include <stdlib.h>  // for abort()
 
@@ -26,23 +26,8 @@
 #include <grpc/event_engine/internal/memory_allocator_impl.h>
 #include <grpc/slice.h>
 
-// forward-declaring an internal struct, not used publicly.
-struct grpc_slice_buffer;
-
 namespace grpc_event_engine {
 namespace experimental {
-
-// TODO(nnoble): needs implementation
-class SliceBuffer {
- public:
-  SliceBuffer() { abort(); }
-  explicit SliceBuffer(grpc_slice_buffer*) { abort(); }
-
-  grpc_slice_buffer* RawSliceBuffer() { return slice_buffer_; }
-
- private:
-  grpc_slice_buffer* slice_buffer_;
-};
 
 // Tracks memory allocated by one system.
 // Is effectively a thin wrapper/smart pointer for a MemoryAllocatorImpl,
@@ -71,8 +56,8 @@ class MemoryAllocator {
   /// The object will not be usable after this call unless it's a valid
   /// allocator is moved into it.
   void Reset() {
-    if (allocator_ != nullptr) allocator_->Shutdown();
-    allocator_.reset();
+    auto a = std::move(allocator_);
+    if (a != nullptr) a->Shutdown();
   }
 
   /// Reserve bytes from the quota.

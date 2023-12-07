@@ -35,25 +35,14 @@
 
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/server_context.h"
+#include "mongo/transport/grpc/util.h"
 
 namespace mongo::transport::grpc {
 
 class GRPCServerContext : public ServerContext {
 public:
-    /**
-     * Parses a gRPC-formatted URI to a HostAndPort, throwing an exception on failure.
-     * See: https://grpc.github.io/grpc/cpp/md_doc_naming.html
-     */
-    static HostAndPort parseURI(const std::string& uri) {
-        StringData sd{uri};
-        if (auto firstColon = sd.find(':'); firstColon != std::string::npos) {
-            sd = sd.substr(firstColon + 1);
-        }
-        return HostAndPort::parseThrowing(sd);
-    }
-
     explicit GRPCServerContext(::grpc::ServerContext* ctx)
-        : _ctx{ctx}, _remote{parseURI(_ctx->peer())} {
+        : _ctx{ctx}, _remote{util::parseGRPCFormattedURI(_ctx->peer())} {
         for (auto& kvp : _ctx->client_metadata()) {
             _clientMetadata.insert({StringData{kvp.first.data(), kvp.first.length()},
                                     StringData{kvp.second.data(), kvp.second.length()}});

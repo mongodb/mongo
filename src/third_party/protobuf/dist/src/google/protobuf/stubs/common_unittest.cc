@@ -1,51 +1,29 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 
-#include <vector>
-#include <google/protobuf/stubs/callback.h>
-#include <google/protobuf/stubs/casts.h>
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/stubs/strutil.h>
-#include <google/protobuf/stubs/substitute.h>
+#include "google/protobuf/stubs/common.h"
 
-#include <google/protobuf/testing/googletest.h>
 #include <gtest/gtest.h>
+
+#include <vector>
+
+#include "absl/log/absl_log.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/substitute.h"
+#include "google/protobuf/stubs/callback.h"
+#include "google/protobuf/testing/googletest.h"
 
 namespace google {
 namespace protobuf {
 namespace {
 
-// TODO(kenton):  More tests.
+// TODO:  More tests.
 
 #ifdef PACKAGE_VERSION  // only defined when using automake, not MSVC
 
@@ -56,7 +34,7 @@ TEST(VersionTest, VersionMatchesConfig) {
   std::string version = PACKAGE_VERSION;
   int pos = 0;
   while (pos < version.size() &&
-         (ascii_isdigit(version[pos]) || version[pos] == '.')) {
+         (absl::ascii_isdigit(version[pos]) || version[pos] == '.')) {
     ++pos;
   }
   version.erase(pos);
@@ -75,90 +53,6 @@ TEST(CommonTest, IntMinMaxConstants) {
   EXPECT_EQ(static_cast<uint64>(kint64min), static_cast<uint64>(kint64max) + 1);
   EXPECT_EQ(0, kuint32max + 1);
   EXPECT_EQ(0, kuint64max + 1);
-}
-
-std::vector<std::string> captured_messages_;
-
-void CaptureLog(LogLevel level, const char* filename, int line,
-                const std::string& message) {
-  captured_messages_.push_back(
-    strings::Substitute("$0 $1:$2: $3",
-      implicit_cast<int>(level), filename, line, message));
-}
-
-TEST(LoggingTest, DefaultLogging) {
-  CaptureTestStderr();
-  int line = __LINE__;
-  GOOGLE_LOG(INFO   ) << "A message.";
-  GOOGLE_LOG(WARNING) << "A warning.";
-  GOOGLE_LOG(ERROR  ) << "An error.";
-
-  std::string text = GetCapturedTestStderr();
-  EXPECT_EQ(
-    "[libprotobuf INFO " __FILE__ ":" + SimpleItoa(line + 1) + "] A message.\n"
-    "[libprotobuf WARNING " __FILE__ ":" + SimpleItoa(line + 2) + "] A warning.\n"
-    "[libprotobuf ERROR " __FILE__ ":" + SimpleItoa(line + 3) + "] An error.\n",
-    text);
-}
-
-TEST(LoggingTest, NullLogging) {
-  LogHandler* old_handler = SetLogHandler(nullptr);
-
-  CaptureTestStderr();
-  GOOGLE_LOG(INFO   ) << "A message.";
-  GOOGLE_LOG(WARNING) << "A warning.";
-  GOOGLE_LOG(ERROR  ) << "An error.";
-
-  EXPECT_TRUE(SetLogHandler(old_handler) == nullptr);
-
-  std::string text = GetCapturedTestStderr();
-  EXPECT_EQ("", text);
-}
-
-TEST(LoggingTest, CaptureLogging) {
-  captured_messages_.clear();
-
-  LogHandler* old_handler = SetLogHandler(&CaptureLog);
-
-  int start_line = __LINE__;
-  GOOGLE_LOG(ERROR) << "An error.";
-  GOOGLE_LOG(WARNING) << "A warning.";
-
-  EXPECT_TRUE(SetLogHandler(old_handler) == &CaptureLog);
-
-  ASSERT_EQ(2, captured_messages_.size());
-  EXPECT_EQ(
-    "2 " __FILE__ ":" + SimpleItoa(start_line + 1) + ": An error.",
-    captured_messages_[0]);
-  EXPECT_EQ(
-    "1 " __FILE__ ":" + SimpleItoa(start_line + 2) + ": A warning.",
-    captured_messages_[1]);
-}
-
-TEST(LoggingTest, SilenceLogging) {
-  captured_messages_.clear();
-
-  LogHandler* old_handler = SetLogHandler(&CaptureLog);
-
-  int line1 = __LINE__; GOOGLE_LOG(INFO) << "Visible1";
-  LogSilencer* silencer1 = new LogSilencer;
-  GOOGLE_LOG(INFO) << "Not visible.";
-  LogSilencer* silencer2 = new LogSilencer;
-  GOOGLE_LOG(INFO) << "Not visible.";
-  delete silencer1;
-  GOOGLE_LOG(INFO) << "Not visible.";
-  delete silencer2;
-  int line2 = __LINE__; GOOGLE_LOG(INFO) << "Visible2";
-
-  EXPECT_TRUE(SetLogHandler(old_handler) == &CaptureLog);
-
-  ASSERT_EQ(2, captured_messages_.size());
-  EXPECT_EQ(
-    "0 " __FILE__ ":" + SimpleItoa(line1) + ": Visible1",
-    captured_messages_[0]);
-  EXPECT_EQ(
-    "0 " __FILE__ ":" + SimpleItoa(line2) + ": Visible2",
-    captured_messages_[1]);
 }
 
 class ClosureTest : public testing::Test {

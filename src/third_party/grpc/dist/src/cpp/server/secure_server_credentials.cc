@@ -1,30 +1,37 @@
-/*
- *
- * Copyright 2015 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include "src/cpp/server/secure_server_credentials.h"
 
-#include <functional>
+#include <algorithm>
 #include <map>
 #include <memory>
+#include <utility>
+#include <vector>
 
-#include <grpcpp/impl/codegen/slice.h>
-#include <grpcpp/impl/grpc_library.h>
+#include <grpc/grpc_security_constants.h>
+#include <grpc/slice.h>
+#include <grpc/status.h>
 #include <grpcpp/security/auth_metadata_processor.h>
+#include <grpcpp/security/tls_credentials_options.h>
+#include <grpcpp/support/slice.h>
+#include <grpcpp/support/status.h>
+#include <grpcpp/support/string_ref.h>
 
 #include "src/cpp/common/secure_auth_context.h"
 

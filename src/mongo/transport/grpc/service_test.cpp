@@ -686,27 +686,52 @@ TEST(GRPCInteropTest, SerializationRoundTrip) {
 
 TEST(GRPCInteropTest, URIParsing) {
     {
-        HostAndPort hp = GRPCServerContext::parseURI("ipv4:127.0.0.1");
+        HostAndPort hp = grpc::util::parseGRPCFormattedURI("127.0.0.1");
         ASSERT_TRUE(hp.isLocalHost());
     }
     {
-        HostAndPort hp = GRPCServerContext::parseURI("ipv4:192.168.0.1:123");
+        HostAndPort hp = grpc::util::parseGRPCFormattedURI("ipv4:127.0.0.1");
+        ASSERT_TRUE(hp.isLocalHost());
+    }
+    {
+        HostAndPort hp = grpc::util::parseGRPCFormattedURI("ipv4:192.168.0.1:123");
         ASSERT_EQ(hp.host(), "192.168.0.1");
         ASSERT_EQ(hp.port(), 123);
     }
     {
-        HostAndPort hp = GRPCServerContext::parseURI("ipv6:[::1]");
+        HostAndPort hp = grpc::util::parseGRPCFormattedURI("[::1]");
+        ASSERT_TRUE(hp.isLocalHost());
+    }
+    {
+        HostAndPort hp = grpc::util::parseGRPCFormattedURI("ipv6:[::1]");
+        ASSERT_TRUE(hp.isLocalHost());
+    }
+    {
+        HostAndPort hp = grpc::util::parseGRPCFormattedURI("ipv6:%5B%3A%3A1%5D");
         ASSERT_TRUE(hp.isLocalHost());
     }
     {
         HostAndPort hp =
-            GRPCServerContext::parseURI("ipv6:[2001:db8:3333:4444:5555:6666:7777:8888]:123");
+            grpc::util::parseGRPCFormattedURI("ipv6:[2001:db8:3333:4444:5555:6666:7777:8888]:123");
         ASSERT_EQ(hp.host(), "2001:db8:3333:4444:5555:6666:7777:8888");
         ASSERT_EQ(hp.port(), 123);
     }
+
     {
-        HostAndPort hp = GRPCServerContext::parseURI("unix://path/to/socket.sock");
-        ASSERT_EQ(hp.host(), "//path/to/socket.sock");
+        HostAndPort hp = grpc::util::parseGRPCFormattedURI(
+            "ipv6:%5B2001%3Adb8%3A3333%3A4444%3A5555%3A6666%3A7777%3A8888%5D%3A123");
+        ASSERT_EQ(hp.host(), "2001:db8:3333:4444:5555:6666:7777:8888");
+        ASSERT_EQ(hp.port(), 123);
+    }
+
+    {
+        HostAndPort hp = grpc::util::parseGRPCFormattedURI("unix:///path/to/socket.sock");
+        ASSERT_EQ(hp.host(), "///path/to/socket.sock");
+    }
+
+    {
+        HostAndPort hp = grpc::util::parseGRPCFormattedURI("unix:%2F%2F%2Fpath%2Fto%2Fsocket.sock");
+        ASSERT_EQ(hp.host(), "///path/to/socket.sock");
     }
 }
 

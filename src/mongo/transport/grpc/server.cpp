@@ -215,9 +215,13 @@ void Server::start() {
 
     std::vector<int> boundPorts(_options.addresses.size());
     for (size_t i = 0; i < _options.addresses.size(); i++) {
-        builder.AddListeningPort(util::formatHostAndPortForGRPC(_options.addresses[i]),
-                                 _makeServerCredentialsWithFetcher(),
-                                 &boundPorts[i]);
+        auto grpcAddr = util::toGRPCFormattedURI(_options.addresses[i]);
+
+        if (util::isUnixSchemeGRPCFormattedURI(grpcAddr)) {
+            builder.AddListeningPort(grpcAddr, ::grpc::InsecureServerCredentials());
+        } else {
+            builder.AddListeningPort(grpcAddr, _makeServerCredentialsWithFetcher(), &boundPorts[i]);
+        }
     }
     for (auto& service : _services) {
         builder.RegisterService(service.get());

@@ -12,17 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_LIB_SECURITY_AUTHORIZATION_GRPC_AUTHORIZATION_POLICY_PROVIDER_H
-#define GRPC_CORE_LIB_SECURITY_AUTHORIZATION_GRPC_AUTHORIZATION_POLICY_PROVIDER_H
+#ifndef GRPC_SRC_CORE_LIB_SECURITY_AUTHORIZATION_GRPC_AUTHORIZATION_POLICY_PROVIDER_H
+#define GRPC_SRC_CORE_LIB_SECURITY_AUTHORIZATION_GRPC_AUTHORIZATION_POLICY_PROVIDER_H
 
 #include <grpc/support/port_platform.h>
 
+#include <functional>
 #include <memory>
+#include <string>
 
+#include "absl/base/thread_annotations.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 
+#include <grpc/grpc_security.h>
+#include <grpc/support/sync.h>
+
+#include "src/core/lib/gprpp/ref_counted_ptr.h"
 #include "src/core/lib/gprpp/sync.h"
 #include "src/core/lib/gprpp/thd.h"
+#include "src/core/lib/security/authorization/authorization_engine.h"
 #include "src/core/lib/security/authorization/authorization_policy_provider.h"
 #include "src/core/lib/security/authorization/rbac_translator.h"
 
@@ -74,6 +84,9 @@ class FileWatcherAuthorizationPolicyProvider
                                          unsigned int refresh_interval_sec,
                                          absl::Status* status);
 
+  void SetCallbackForTesting(
+      std::function<void(bool contents_changed, absl::Status Status)> cb);
+
   void Orphan() override;
 
   AuthorizationEngines engines() override {
@@ -93,6 +106,9 @@ class FileWatcherAuthorizationPolicyProvider
   gpr_event shutdown_event_;
 
   Mutex mu_;
+  // Callback is executed on every reload. This is useful for testing purpose.
+  std::function<void(bool contents_changed, absl::Status status)> cb_
+      ABSL_GUARDED_BY(mu_) = nullptr;
   // Engines created using authz_policy_.
   RefCountedPtr<AuthorizationEngine> allow_engine_ ABSL_GUARDED_BY(mu_);
   RefCountedPtr<AuthorizationEngine> deny_engine_ ABSL_GUARDED_BY(mu_);
@@ -100,4 +116,4 @@ class FileWatcherAuthorizationPolicyProvider
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_LIB_SECURITY_AUTHORIZATION_GRPC_AUTHORIZATION_POLICY_PROVIDER_H
+#endif  // GRPC_SRC_CORE_LIB_SECURITY_AUTHORIZATION_GRPC_AUTHORIZATION_POLICY_PROVIDER_H

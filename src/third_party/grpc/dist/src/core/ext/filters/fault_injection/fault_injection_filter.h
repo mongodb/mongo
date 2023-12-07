@@ -14,19 +14,25 @@
 // limitations under the License.
 //
 
-#ifndef GRPC_CORE_EXT_FILTERS_FAULT_INJECTION_FAULT_INJECTION_FILTER_H
-#define GRPC_CORE_EXT_FILTERS_FAULT_INJECTION_FAULT_INJECTION_FILTER_H
+#ifndef GRPC_SRC_CORE_EXT_FILTERS_FAULT_INJECTION_FAULT_INJECTION_FILTER_H
+#define GRPC_SRC_CORE_EXT_FILTERS_FAULT_INJECTION_FAULT_INJECTION_FILTER_H
 
 #include <grpc/support/port_platform.h>
 
-#include "src/core/ext/filters/fault_injection/service_config_parser.h"
-#include "src/core/lib/channel/channel_stack.h"
-#include "src/core/lib/channel/promise_based_filter.h"
-#include "src/core/lib/transport/transport.h"
+#include <stddef.h>
 
-// Channel arg key for enabling parsing fault injection via method config.
-#define GRPC_ARG_PARSE_FAULT_INJECTION_METHOD_CONFIG \
-  "grpc.parse_fault_injection_method_config"
+#include <memory>
+
+#include "absl/base/thread_annotations.h"
+#include "absl/random/random.h"
+#include "absl/status/statusor.h"
+
+#include "src/core/lib/channel/channel_args.h"
+#include "src/core/lib/channel/channel_fwd.h"
+#include "src/core/lib/channel/promise_based_filter.h"
+#include "src/core/lib/gprpp/sync.h"
+#include "src/core/lib/promise/arena_promise.h"
+#include "src/core/lib/transport/transport.h"
 
 namespace grpc_core {
 
@@ -39,7 +45,7 @@ class FaultInjectionFilter : public ChannelFilter {
   static const grpc_channel_filter kFilter;
 
   static absl::StatusOr<FaultInjectionFilter> Create(
-      ChannelArgs args, ChannelFilter::Args filter_args);
+      const ChannelArgs& args, ChannelFilter::Args filter_args);
 
   // Construct a promise for one call.
   ArenaPromise<ServerMetadataHandle> MakeCallPromise(
@@ -53,10 +59,13 @@ class FaultInjectionFilter : public ChannelFilter {
       const ClientMetadataHandle& initial_metadata);
 
   // The relative index of instances of the same filter.
-  int index_;
+  size_t index_;
   const size_t service_config_parser_index_;
+  std::unique_ptr<Mutex> mu_;
+  absl::InsecureBitGen abort_rand_generator_ ABSL_GUARDED_BY(mu_);
+  absl::InsecureBitGen delay_rand_generator_ ABSL_GUARDED_BY(mu_);
 };
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_EXT_FILTERS_FAULT_INJECTION_FAULT_INJECTION_FILTER_H
+#endif  // GRPC_SRC_CORE_EXT_FILTERS_FAULT_INJECTION_FAULT_INJECTION_FILTER_H

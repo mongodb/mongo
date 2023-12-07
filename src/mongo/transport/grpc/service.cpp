@@ -193,9 +193,13 @@ auto makeRpcServiceMethod(CommandService* service, const char* name, HandlerType
                 CommandService* service,
                 ::grpc::ServerContext* nativeServerCtx,
                 ::grpc::ServerReaderWriter<ConstSharedBuffer, SharedBuffer>* nativeServerStream) {
-                GRPCServerContext ctx{nativeServerCtx};
-                GRPCServerStream stream{nativeServerStream};
-                return handler(service, ctx, stream);
+                try {
+                    GRPCServerContext ctx{nativeServerCtx};
+                    GRPCServerStream stream{nativeServerStream};
+                    return handler(service, ctx, stream);
+                } catch (const DBException& e) {
+                    return util::convertStatus(e.toStatus());
+                }
             },
             service));
 }

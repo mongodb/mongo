@@ -1,46 +1,24 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
+#include "google/protobuf/compiler/csharp/csharp_primitive_field.h"
 
 #include <sstream>
+#include <string>
+#include <utility>
 
-#include <google/protobuf/compiler/code_generator.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/io/printer.h>
-#include <google/protobuf/io/zero_copy_stream.h>
-#include <google/protobuf/stubs/strutil.h>
-
-#include <google/protobuf/compiler/csharp/csharp_doc_comment.h>
-#include <google/protobuf/compiler/csharp/csharp_helpers.h>
-#include <google/protobuf/compiler/csharp/csharp_options.h>
-#include <google/protobuf/compiler/csharp/csharp_primitive_field.h>
+#include "google/protobuf/compiler/code_generator.h"
+#include "absl/strings/str_cat.h"
+#include "google/protobuf/compiler/csharp/csharp_doc_comment.h"
+#include "google/protobuf/compiler/csharp/csharp_helpers.h"
+#include "google/protobuf/compiler/csharp/csharp_options.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/descriptor.pb.h"
+#include "google/protobuf/io/printer.h"
 
 namespace google {
 namespace protobuf {
@@ -50,12 +28,15 @@ namespace csharp {
 PrimitiveFieldGenerator::PrimitiveFieldGenerator(
     const FieldDescriptor* descriptor, int presenceIndex, const Options *options)
     : FieldGeneratorBase(descriptor, presenceIndex, options) {
-  // TODO(jonskeet): Make this cleaner...
+  // TODO: Make this cleaner...
   is_value_type = descriptor->type() != FieldDescriptor::TYPE_STRING
       && descriptor->type() != FieldDescriptor::TYPE_BYTES;
   if (!is_value_type && !SupportsPresenceApi(descriptor_)) {
-    variables_["has_property_check"] = variables_["property_name"] + ".Length != 0";
-    variables_["other_has_property_check"] = "other." + variables_["property_name"] + ".Length != 0";
+    std::string property_name = variables_["property_name"];
+    variables_["has_property_check"] =
+        absl::StrCat(property_name, ".Length != 0");
+    variables_["other_has_property_check"] =
+        absl::StrCat("other.", property_name, ".Length != 0");
   }
 }
 
@@ -63,28 +44,28 @@ PrimitiveFieldGenerator::~PrimitiveFieldGenerator() {
 }
 
 void PrimitiveFieldGenerator::GenerateMembers(io::Printer* printer) {
-  
   // Note: in multiple places, this code assumes that all fields
   // that support presence are either nullable, or use a presence field bit.
   // Fields which are oneof members are not generated here; they're generated in PrimitiveOneofFieldGenerator below.
   // Extensions are not generated here either.
 
-
-  // Proto2 allows different default values to be specified. These are retained
-  // via static fields. They don't particularly need to be, but we don't need
-  // to change that. In Proto3 the default value we don't generate these
-  // fields, just using the literal instead.
-  if (IsProto2(descriptor_->file())) {
+  // Explicit presence allows different default values to be specified. These
+  // are retained via static fields. They don't particularly need to be, but we
+  // don't need to change that. Under implicit presence we don't use static
+  // fields for default values and just use the literals instead.
+  if (descriptor_->has_presence()) {
     // Note: "private readonly static" isn't as idiomatic as
     // "private static readonly", but changing this now would create a lot of
     // churn in generated code with near-to-zero benefit.
     printer->Print(
       variables_,
       "private readonly static $type_name$ $property_name$DefaultValue = $default_value$;\n\n");
+    std::string property_name = variables_["property_name"];
     variables_["default_value_access"] =
-      variables_["property_name"] + "DefaultValue";
+        absl::StrCat(property_name, "DefaultValue");
   } else {
-    variables_["default_value_access"] = variables_["default_value"];
+    std::string default_value = variables_["default_value"];
+    variables_["default_value_access"] = std::move(default_value);
   }
 
   // Declare the field itself.
@@ -215,7 +196,7 @@ void PrimitiveFieldGenerator::GenerateSerializedSizeCode(io::Printer* printer) {
   } else {
     printer->Print(
       "size += $tag_size$ + $fixed_size$;\n",
-      "fixed_size", StrCat(fixedSize),
+      "fixed_size", absl::StrCat(fixedSize),
       "tag_size", variables_["tag_size"]);
   }
   printer->Outdent();
@@ -296,7 +277,7 @@ void PrimitiveOneofFieldGenerator::GenerateMembers(io::Printer* printer) {
   }
   printer->Print(
     variables_,
-    "    $oneof_name$Case_ = $oneof_property_name$OneofCase.$property_name$;\n"
+    "    $oneof_name$Case_ = $oneof_property_name$OneofCase.$oneof_case_name$;\n"
     "  }\n"
     "}\n");
   if (SupportsPresenceApi(descriptor_)) {
@@ -307,7 +288,7 @@ void PrimitiveOneofFieldGenerator::GenerateMembers(io::Printer* printer) {
     printer->Print(
       variables_,
       "$access_level$ bool Has$property_name$ {\n"
-      "  get { return $oneof_name$Case_ == $oneof_property_name$OneofCase.$property_name$; }\n"
+      "  get { return $oneof_name$Case_ == $oneof_property_name$OneofCase.$oneof_case_name$; }\n"
       "}\n");
     printer->Print(
       variables_,

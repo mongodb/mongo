@@ -1,50 +1,29 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
-#include <google/protobuf/reflection_ops.h>
+#include "google/protobuf/reflection_ops.h"
 
 #include <string>
 #include <vector>
 
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/map_field.h>
-#include <google/protobuf/map_field_inl.h>
-#include <google/protobuf/unknown_field_set.h>
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
+#include "absl/strings/str_cat.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/descriptor.pb.h"
+#include "google/protobuf/map_field.h"
+#include "google/protobuf/map_field_inl.h"
+#include "google/protobuf/unknown_field_set.h"
 
-#include <google/protobuf/port_def.inc>
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
@@ -56,7 +35,8 @@ static const Reflection* GetReflectionOrDie(const Message& m) {
     const Descriptor* d = m.GetDescriptor();
     const std::string& mtype = d ? d->name() : "unknown";
     // RawMessage is one known type for which GetReflection() returns nullptr.
-    GOOGLE_LOG(FATAL) << "Message does not support reflection (type " << mtype << ").";
+    ABSL_LOG(FATAL) << "Message does not support reflection (type " << mtype
+                    << ").";
   }
   return r;
 }
@@ -68,10 +48,10 @@ void ReflectionOps::Copy(const Message& from, Message* to) {
 }
 
 void ReflectionOps::Merge(const Message& from, Message* to) {
-  GOOGLE_CHECK_NE(&from, to);
+  ABSL_CHECK_NE(&from, to);
 
   const Descriptor* descriptor = from.GetDescriptor();
-  GOOGLE_CHECK_EQ(to->GetDescriptor(), descriptor)
+  ABSL_CHECK_EQ(to->GetDescriptor(), descriptor)
       << "Tried to merge messages of different types "
       << "(merge " << descriptor->full_name() << " to "
       << to->GetDescriptor()->full_name() << ")";
@@ -84,7 +64,7 @@ void ReflectionOps::Merge(const Message& from, Message* to) {
                           google::protobuf::MessageFactory::generated_factory());
 
   std::vector<const FieldDescriptor*> fields;
-  from_reflection->ListFieldsOmitStripped(from, &fields);
+  from_reflection->ListFields(from, &fields);
   for (const FieldDescriptor* field : fields) {
     if (field->is_repeated()) {
       // Use map reflection if both are in map status and have the
@@ -169,20 +149,24 @@ void ReflectionOps::Merge(const Message& from, Message* to) {
     }
   }
 
-  to_reflection->MutableUnknownFields(to)->MergeFrom(
-      from_reflection->GetUnknownFields(from));
+  if (!from_reflection->GetUnknownFields(from).empty()) {
+    to_reflection->MutableUnknownFields(to)->MergeFrom(
+        from_reflection->GetUnknownFields(from));
+  }
 }
 
 void ReflectionOps::Clear(Message* message) {
   const Reflection* reflection = GetReflectionOrDie(*message);
 
   std::vector<const FieldDescriptor*> fields;
-  reflection->ListFieldsOmitStripped(*message, &fields);
+  reflection->ListFields(*message, &fields);
   for (const FieldDescriptor* field : fields) {
     reflection->ClearField(message, field);
   }
 
-  reflection->MutableUnknownFields(message)->Clear();
+  if (reflection->GetInternalMetadata(*message).have_unknown_fields()) {
+    reflection->MutableUnknownFields(message)->Clear();
+  }
 }
 
 bool ReflectionOps::IsInitialized(const Message& message, bool check_fields,
@@ -192,7 +176,7 @@ bool ReflectionOps::IsInitialized(const Message& message, bool check_fields,
   if (const int field_count = descriptor->field_count()) {
     const FieldDescriptor* begin = descriptor->field(0);
     const FieldDescriptor* end = begin + field_count;
-    GOOGLE_DCHECK_EQ(descriptor->field(field_count - 1), end - 1);
+    ABSL_DCHECK_EQ(descriptor->field(field_count - 1), end - 1);
 
     if (check_fields) {
       // Check required fields of this message.
@@ -240,9 +224,20 @@ bool ReflectionOps::IsInitialized(const Message& message, bool check_fields,
       }
     }
   }
-  if (check_descendants && reflection->HasExtensionSet(message) &&
-      !reflection->GetExtensionSet(message).IsInitialized()) {
-    return false;
+  if (check_descendants && reflection->HasExtensionSet(message)) {
+    // Note that "extendee" is only referenced if the extension is lazily parsed
+    // (e.g. LazyMessageExtensionImpl), which requires a verification function
+    // to be generated.
+    //
+    // Dynamic messages would get null prototype from the generated message
+    // factory but their verification functions are not generated. Therefore, it
+    // it will always be eagerly parsed and "extendee" here will not be
+    // referenced.
+    const Message* extendee =
+        MessageFactory::generated_factory()->GetPrototype(descriptor);
+    if (!reflection->GetExtensionSet(message).IsInitialized(extendee)) {
+      return false;
+    }
   }
   return true;
 }
@@ -267,7 +262,7 @@ bool ReflectionOps::IsInitialized(const Message& message) {
   std::vector<const FieldDescriptor*> fields;
   // Should be safe to skip stripped fields because required fields are not
   // stripped.
-  reflection->ListFieldsOmitStripped(message, &fields);
+  reflection->ListFields(message, &fields);
   for (const FieldDescriptor* field : fields) {
     if (field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
 
@@ -369,7 +364,7 @@ static std::string SubMessagePrefix(const std::string& prefix,
   }
   if (index != -1) {
     result.append("[");
-    result.append(StrCat(index));
+    result.append(absl::StrCat(index));
     result.append("]");
   }
   result.append(".");
@@ -396,7 +391,7 @@ void ReflectionOps::FindInitializationErrors(const Message& message,
 
   // Check sub-messages.
   std::vector<const FieldDescriptor*> fields;
-  reflection->ListFieldsOmitStripped(message, &fields);
+  reflection->ListFields(message, &fields);
   for (const FieldDescriptor* field : fields) {
     if (field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
 
@@ -420,16 +415,14 @@ void ReflectionOps::FindInitializationErrors(const Message& message,
 
 void GenericSwap(Message* lhs, Message* rhs) {
 #ifndef PROTOBUF_FORCE_COPY_IN_SWAP
-  GOOGLE_DCHECK(Arena::InternalHelper<Message>::GetOwningArena(lhs) !=
-         Arena::InternalHelper<Message>::GetOwningArena(rhs));
-  GOOGLE_DCHECK(Arena::InternalHelper<Message>::GetOwningArena(lhs) != nullptr ||
-         Arena::InternalHelper<Message>::GetOwningArena(rhs) != nullptr);
+  ABSL_DCHECK(lhs->GetArena() != rhs->GetArena());
+  ABSL_DCHECK(lhs->GetArena() != nullptr || rhs->GetArena() != nullptr);
 #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
   // At least one of these must have an arena, so make `rhs` point to it.
-  Arena* arena = Arena::InternalHelper<Message>::GetOwningArena(rhs);
+  Arena* arena = rhs->GetArena();
   if (arena == nullptr) {
     std::swap(lhs, rhs);
-    arena = Arena::InternalHelper<Message>::GetOwningArena(rhs);
+    arena = rhs->GetArena();
   }
 
   // Improve efficiency by placing the temporary on an arena so that messages
@@ -451,4 +444,4 @@ void GenericSwap(Message* lhs, Message* rhs) {
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"

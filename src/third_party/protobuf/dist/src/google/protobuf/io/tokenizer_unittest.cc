@@ -1,50 +1,26 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include <google/protobuf/io/tokenizer.h>
+#include "google/protobuf/io/tokenizer.h"
 
 #include <limits.h>
 #include <math.h>
 
 #include <vector>
 
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/stubs/strutil.h>
-#include <google/protobuf/stubs/substitute.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/testing/googletest.h>
+#include "google/protobuf/stubs/common.h"
+#include "absl/strings/escaping.h"
+#include "absl/strings/substitute.h"
+#include "google/protobuf/io/zero_copy_stream_impl.h"
+#include "google/protobuf/testing/googletest.h"
 #include <gtest/gtest.h>
 
 namespace google {
@@ -55,7 +31,7 @@ namespace {
 // ===================================================================
 // Data-Driven Test Infrastructure
 
-// TODO(kenton):  This is copied from coded_stream_unittest.  This is
+// TODO:  This is copied from coded_stream_unittest.  This is
 //   temporary until these features are integrated into gTest itself.
 
 // TEST_1D and TEST_2D are macros I'd eventually like to see added to
@@ -63,7 +39,7 @@ namespace {
 // run multiple times, once for each item in some input array.  TEST_1D
 // tests all cases in a single input array.  TEST_2D tests all
 // combinations of cases from two arrays.  The arrays must be statically
-// defined such that the GOOGLE_ARRAYSIZE() macro works on them.  Example:
+// defined such that the ABSL_ARRAYSIZE() macro works on them.  Example:
 //
 // int kCases[] = {1, 2, 3, 4}
 // TEST_1D(MyFixture, MyTest, kCases) {
@@ -83,7 +59,7 @@ namespace {
   };                                                              \
                                                                   \
   TEST_F(FIXTURE##_##NAME##_DD, NAME) {                           \
-    for (int i = 0; i < GOOGLE_ARRAYSIZE(CASES); i++) {                  \
+    for (int i = 0; i < ABSL_ARRAYSIZE(CASES); i++) {             \
       SCOPED_TRACE(testing::Message()                             \
                    << #CASES " case #" << i << ": " << CASES[i]); \
       DoSingleCase(CASES[i]);                                     \
@@ -102,8 +78,8 @@ namespace {
   };                                                                        \
                                                                             \
   TEST_F(FIXTURE##_##NAME##_DD, NAME) {                                     \
-    for (int i = 0; i < GOOGLE_ARRAYSIZE(CASES1); i++) {                           \
-      for (int j = 0; j < GOOGLE_ARRAYSIZE(CASES2); j++) {                         \
+    for (int i = 0; i < ABSL_ARRAYSIZE(CASES1); i++) {                      \
+      for (int j = 0; j < ABSL_ARRAYSIZE(CASES2); j++) {                    \
         SCOPED_TRACE(testing::Message()                                     \
                      << #CASES1 " case #" << i << ": " << CASES1[i] << ", " \
                      << #CASES2 " case #" << j << ": " << CASES2[j]);       \
@@ -162,8 +138,8 @@ class TestErrorCollector : public ErrorCollector {
   std::string text_;
 
   // implements ErrorCollector ---------------------------------------
-  void AddError(int line, int column, const std::string& message) {
-    strings::SubstituteAndAppend(&text_, "$0:$1: $2\n", line, column, message);
+  void RecordError(int line, int column, absl::string_view message) override {
+    absl::SubstituteAndAppend(&text_, "$0:$1: $2\n", line, column, message);
   }
 };
 
@@ -178,9 +154,10 @@ const int kBlockSizes[] = {1, 2, 3, 5, 7, 13, 32, 1024};
 class TokenizerTest : public testing::Test {
  protected:
   // For easy testing.
-  uint64 ParseInteger(const std::string& text) {
-    uint64 result;
-    EXPECT_TRUE(Tokenizer::ParseInteger(text, kuint64max, &result));
+  uint64_t ParseInteger(const std::string& text) {
+    uint64_t result;
+    EXPECT_TRUE(Tokenizer::ParseInteger(text, kuint64max, &result))
+        << "'" << text << "'";
     return result;
   }
 };
@@ -200,7 +177,7 @@ struct SimpleTokenCase {
 
 inline std::ostream& operator<<(std::ostream& out,
                                 const SimpleTokenCase& test_case) {
-  return out << CEscape(test_case.input);
+  return out << absl::CEscape(test_case.input);
 }
 
 SimpleTokenCase kSimpleTokenCases[] = {
@@ -369,7 +346,7 @@ struct MultiTokenCase {
 
 inline std::ostream& operator<<(std::ostream& out,
                                 const MultiTokenCase& test_case) {
-  return out << CEscape(test_case.input);
+  return out << absl::CEscape(test_case.input);
 }
 
 MultiTokenCase kMultiTokenCases[] = {
@@ -613,7 +590,7 @@ TEST_1D(TokenizerTest, ShCommentStyle, kBlockSizes) {
   tokenizer.set_comment_style(Tokenizer::SH_COMMENT_STYLE);
 
   // Advance through tokens and check that they are parsed as expected.
-  for (int i = 0; i < GOOGLE_ARRAYSIZE(kTokens); i++) {
+  for (int i = 0; i < ABSL_ARRAYSIZE(kTokens); i++) {
     EXPECT_TRUE(tokenizer.Next());
     EXPECT_EQ(tokenizer.current().text, kTokens[i]);
   }
@@ -640,9 +617,10 @@ struct DocCommentCase {
 
 inline std::ostream& operator<<(std::ostream& out,
                                 const DocCommentCase& test_case) {
-  return out << CEscape(test_case.input);
+  return out << absl::CEscape(test_case.input);
 }
 
+// clang-format off
 DocCommentCase kDocCommentCases[] = {
     {"prev next",
 
@@ -650,10 +628,22 @@ DocCommentCase kDocCommentCases[] = {
      {},
      ""},
 
-    {"prev /* ignored */ next",
+    {"prev // no next token\n",
+
+     " no next token\n",
+     {},
+     ""},
+
+    {"prev // no next token and no trailing newline",
+
+     " no next token and no trailing newline",
+     {},
+     ""},
+
+    {"prev /* detached */ next",
 
      "",
-     {},
+     {" detached "},
      ""},
 
     {"prev // trailing comment\n"
@@ -662,6 +652,13 @@ DocCommentCase kDocCommentCases[] = {
      " trailing comment\n",
      {},
      ""},
+
+    {"prev\n"
+     "/* leading comment */ next",
+
+     "",
+     {},
+     " leading comment "},
 
     {"prev\n"
      "// leading comment\n"
@@ -762,7 +759,59 @@ DocCommentCase kDocCommentCases[] = {
      "",
      {},
      " leading comment\n"},
+
+    {"prev /* many comments*/ /* all inline */ /* will be handled */ next",
+
+     " many comments",
+     {" all inline "},
+     " will be handled "},
+
+    {R"pb(
+     prev /* a single block comment
+         that spans multiple lines
+         is detached if it ends
+         on the same line as next */ next
+     )pb",
+
+     "",
+     {" a single block comment\n"
+      "that spans multiple lines\n"
+      "is detached if it ends\n"
+      "on the same line as next "},
+     ""},
+
+    {R"pb(
+       prev /* trailing */ /* leading */ next
+     )pb",
+
+     " trailing ",
+     {},
+     " leading "},
+
+    {R"pb(
+     prev /* multi-line
+          trailing */ /* an oddly
+                      placed detached */ /* an oddly
+                                         placed leading */ next
+     )pb",
+
+     " multi-line\ntrailing ",
+     {" an oddly\nplaced detached "},
+     " an oddly\nplaced leading "},
+
+    {R"pb(
+       prev  // trailing with newline
+       // detached
+       /* another detached */
+       // leading but no next token to attach it to
+     )pb",
+
+     " trailing with newline\n",
+     {" detached\n", " another detached ",
+      " leading but no next token to attach it to\n"},
+     ""},
 };
+// clang-format on
 
 TEST_2D(TokenizerTest, DocComments, kDocCommentCases, kBlockSizes) {
   // Set up the tokenizer.
@@ -776,8 +825,8 @@ TEST_2D(TokenizerTest, DocComments, kDocCommentCases, kBlockSizes) {
                          kDocCommentCases_case.input.size(), kBlockSizes_case);
   Tokenizer tokenizer2(&input2, &error_collector);
 
-  tokenizer.Next();
-  tokenizer2.Next();
+  EXPECT_TRUE(tokenizer.Next());
+  EXPECT_TRUE(tokenizer2.Next());
 
   EXPECT_EQ("prev", tokenizer.current().text);
   EXPECT_EQ("prev", tokenizer2.current().text);
@@ -785,17 +834,19 @@ TEST_2D(TokenizerTest, DocComments, kDocCommentCases, kBlockSizes) {
   std::string prev_trailing_comments;
   std::vector<std::string> detached_comments;
   std::string next_leading_comments;
-  tokenizer.NextWithComments(&prev_trailing_comments, &detached_comments,
-                             &next_leading_comments);
-  tokenizer2.NextWithComments(NULL, NULL, NULL);
-  EXPECT_EQ("next", tokenizer.current().text);
-  EXPECT_EQ("next", tokenizer2.current().text);
+  bool has_next = tokenizer.NextWithComments(
+      &prev_trailing_comments, &detached_comments, &next_leading_comments);
+  EXPECT_EQ(has_next, tokenizer2.NextWithComments(nullptr, nullptr, nullptr));
+  if (has_next) {
+    EXPECT_EQ("next", tokenizer.current().text);
+    EXPECT_EQ("next", tokenizer2.current().text);
+  }
 
   EXPECT_EQ(kDocCommentCases_case.prev_trailing_comments,
             prev_trailing_comments);
 
   for (int i = 0; i < detached_comments.size(); i++) {
-    ASSERT_LT(i, GOOGLE_ARRAYSIZE(kDocCommentCases));
+    ASSERT_LT(i, ABSL_ARRAYSIZE(kDocCommentCases));
     ASSERT_TRUE(kDocCommentCases_case.detached_comments[i] != NULL);
     EXPECT_EQ(kDocCommentCases_case.detached_comments[i], detached_comments[i]);
   }
@@ -809,8 +860,8 @@ TEST_2D(TokenizerTest, DocComments, kDocCommentCases, kBlockSizes) {
 
 // -------------------------------------------------------------------
 
-// Test parse helpers.  It's not really worth setting up a full data-driven
-// test here.
+// Test parse helpers.
+// TODO: Add a fuzz test for this.
 TEST_F(TokenizerTest, ParseInteger) {
   EXPECT_EQ(0, ParseInteger("0"));
   EXPECT_EQ(123, ParseInteger("123"));
@@ -823,7 +874,7 @@ TEST_F(TokenizerTest, ParseInteger) {
   // Test invalid integers that may still be tokenized as integers.
   EXPECT_EQ(0, ParseInteger("0x"));
 
-  uint64 i;
+  uint64_t i;
 
   // Test invalid integers that will never be tokenized as integers.
   EXPECT_FALSE(Tokenizer::ParseInteger("zxy", kuint64max, &i));
@@ -840,6 +891,107 @@ TEST_F(TokenizerTest, ParseInteger) {
   EXPECT_FALSE(Tokenizer::ParseInteger("12346", 12345, &i));
   EXPECT_TRUE(Tokenizer::ParseInteger("0xFFFFFFFFFFFFFFFF", kuint64max, &i));
   EXPECT_FALSE(Tokenizer::ParseInteger("0x10000000000000000", kuint64max, &i));
+
+  // Test near the limits of signed parsing (values in kint64max +/- 1600)
+  for (int64_t offset = -1600; offset <= 1600; ++offset) {
+    // We make sure to perform an unsigned addition so that we avoid signed
+    // overflow, which would be undefined behavior.
+    uint64_t i = 0x7FFFFFFFFFFFFFFFu + static_cast<uint64_t>(offset);
+    char decimal[32];
+    snprintf(decimal, 32, "%llu", static_cast<unsigned long long>(i));
+    if (offset > 0) {
+      uint64_t parsed = -1;
+      EXPECT_FALSE(Tokenizer::ParseInteger(decimal, kint64max, &parsed))
+          << decimal << "=>" << parsed;
+    } else {
+      uint64_t parsed = -1;
+      EXPECT_TRUE(Tokenizer::ParseInteger(decimal, kint64max, &parsed))
+          << decimal << "=>" << parsed;
+      EXPECT_EQ(parsed, i);
+    }
+    char octal[32];
+    snprintf(octal, 32, "0%llo", static_cast<unsigned long long>(i));
+    if (offset > 0) {
+      uint64_t parsed = -1;
+      EXPECT_FALSE(Tokenizer::ParseInteger(octal, kint64max, &parsed))
+          << octal << "=>" << parsed;
+    } else {
+      uint64_t parsed = -1;
+      EXPECT_TRUE(Tokenizer::ParseInteger(octal, kint64max, &parsed))
+          << octal << "=>" << parsed;
+      EXPECT_EQ(parsed, i);
+    }
+    char hex[32];
+    snprintf(hex, 32, "0x%llx", static_cast<unsigned long long>(i));
+    if (offset > 0) {
+      uint64_t parsed = -1;
+      EXPECT_FALSE(Tokenizer::ParseInteger(hex, kint64max, &parsed))
+          << hex << "=>" << parsed;
+    } else {
+      uint64_t parsed = -1;
+      EXPECT_TRUE(Tokenizer::ParseInteger(hex, kint64max, &parsed)) << hex;
+      EXPECT_EQ(parsed, i);
+    }
+    // EXPECT_NE(offset, -237);
+  }
+
+  // Test near the limits of unsigned parsing (values in kuint64max +/- 1600)
+  // By definition, values greater than kuint64max cannot be held in a uint64_t
+  // variable, so printing them is a little tricky; fortunately all but the
+  // last four digits are known, so we can hard-code them in the printf string,
+  // and we only need to format the last 4.
+  for (int64_t offset = -1600; offset <= 1600; ++offset) {
+    {
+      uint64_t i = 18446744073709551615u + offset;
+      char decimal[32];
+      snprintf(decimal, 32, "1844674407370955%04llu",
+               static_cast<unsigned long long>(1615 + offset));
+      if (offset > 0) {
+        uint64_t parsed = -1;
+        EXPECT_FALSE(Tokenizer::ParseInteger(decimal, kuint64max, &parsed))
+            << decimal << "=>" << parsed;
+      } else {
+        uint64_t parsed = -1;
+        EXPECT_TRUE(Tokenizer::ParseInteger(decimal, kuint64max, &parsed))
+            << decimal;
+        EXPECT_EQ(parsed, i);
+      }
+    }
+    {
+      uint64_t i = 01777777777777777777777u + offset;
+      if (offset > 0) {
+        char octal[32];
+        snprintf(octal, 32, "0200000000000000000%04llo",
+                 static_cast<unsigned long long>(offset - 1));
+        uint64_t parsed = -1;
+        EXPECT_FALSE(Tokenizer::ParseInteger(octal, kuint64max, &parsed))
+            << octal << "=>" << parsed;
+      } else {
+        char octal[32];
+        snprintf(octal, 32, "0%llo", static_cast<unsigned long long>(i));
+        uint64_t parsed = -1;
+        EXPECT_TRUE(Tokenizer::ParseInteger(octal, kuint64max, &parsed))
+            << octal;
+        EXPECT_EQ(parsed, i);
+      }
+    }
+    {
+      uint64_t ui = 0xffffffffffffffffu + offset;
+      char hex[32];
+      if (offset > 0) {
+        snprintf(hex, 32, "0x1000000000000%04llx",
+                 static_cast<unsigned long long>(offset - 1));
+        uint64_t parsed = -1;
+        EXPECT_FALSE(Tokenizer::ParseInteger(hex, kuint64max, &parsed))
+            << hex << "=>" << parsed;
+      } else {
+        snprintf(hex, 32, "0x%llx", static_cast<unsigned long long>(ui));
+        uint64_t parsed = -1;
+        EXPECT_TRUE(Tokenizer::ParseInteger(hex, kuint64max, &parsed)) << hex;
+        EXPECT_EQ(parsed, ui);
+      }
+    }
+  }
 }
 
 TEST_F(TokenizerTest, ParseFloat) {
@@ -873,7 +1025,7 @@ TEST_F(TokenizerTest, ParseFloat) {
   EXPECT_EQ(0.0, Tokenizer::ParseFloat("1e-9999999999999999999999999999"));
   EXPECT_EQ(HUGE_VAL, Tokenizer::ParseFloat("1e+9999999999999999999999999999"));
 
-#ifdef PROTOBUF_HAS_DEATH_TEST  // death tests do not work on Windows yet
+#if GTEST_HAS_DEATH_TEST  // death tests do not work on Windows yet
   // Test invalid integers that will never be tokenized as integers.
   EXPECT_DEBUG_DEATH(
       Tokenizer::ParseFloat("zxy"),
@@ -884,7 +1036,7 @@ TEST_F(TokenizerTest, ParseFloat) {
   EXPECT_DEBUG_DEATH(
       Tokenizer::ParseFloat("-1.0"),
       "passed text that could not have been tokenized as a float");
-#endif  // PROTOBUF_HAS_DEATH_TEST
+#endif  // GTEST_HAS_DEATH_TEST
 }
 
 TEST_F(TokenizerTest, ParseString) {
@@ -896,6 +1048,8 @@ TEST_F(TokenizerTest, ParseString) {
   Tokenizer::ParseString("'\\1x\\1\\123\\739\\52\\334n\\3'", &output);
   EXPECT_EQ("\1x\1\123\739\52\334n\3", output);
   Tokenizer::ParseString("'\\x20\\x4'", &output);
+  EXPECT_EQ("\x20\x4", output);
+  Tokenizer::ParseString("'\\X20\\X4'", &output);
   EXPECT_EQ("\x20\x4", output);
 
   // Test invalid strings that may still be tokenized as strings.
@@ -926,11 +1080,11 @@ TEST_F(TokenizerTest, ParseString) {
   EXPECT_EQ("\\U00110000\\U00200000\\Uffffffff", output);
 
   // Test invalid strings that will never be tokenized as strings.
-#ifdef PROTOBUF_HAS_DEATH_TEST  // death tests do not work on Windows yet
+#if GTEST_HAS_DEATH_TEST  // death tests do not work on Windows yet
   EXPECT_DEBUG_DEATH(
       Tokenizer::ParseString("", &output),
       "passed text that could not have been tokenized as a string");
-#endif  // PROTOBUF_HAS_DEATH_TEST
+#endif  // GTEST_HAS_DEATH_TEST
 }
 
 TEST_F(TokenizerTest, ParseStringAppend) {
@@ -956,16 +1110,17 @@ struct ErrorCase {
 };
 
 inline std::ostream& operator<<(std::ostream& out, const ErrorCase& test_case) {
-  return out << CEscape(test_case.input);
+  return out << absl::CEscape(test_case.input);
 }
 
 ErrorCase kErrorCases[] = {
     // String errors.
     {"'\\l' foo", true, "0:2: Invalid escape sequence in string literal.\n"},
-    {"'\\X' foo", true, "0:2: Invalid escape sequence in string literal.\n"},
+    {"'\\X' foo", true, "0:3: Expected hex digits for escape sequence.\n"},
     {"'\\x' foo", true, "0:3: Expected hex digits for escape sequence.\n"},
     {"'foo", false, "0:4: Unexpected end of string.\n"},
-    {"'bar\nfoo", true, "0:4: String literals cannot cross line boundaries.\n"},
+    {"'bar\nfoo", true,
+     "0:4: Multiline strings are not allowed. Did you miss a \"?.\n"},
     {"'\\u01' foo", true,
      "0:5: Expected four hex digits for \\u escape sequence.\n"},
     {"'\\u01' foo", true,

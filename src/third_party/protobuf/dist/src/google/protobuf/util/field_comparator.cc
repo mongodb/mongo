@@ -1,49 +1,57 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: ksroka@google.com (Krzysztof Sroka)
 
-#include <google/protobuf/util/field_comparator.h>
+#include "google/protobuf/util/field_comparator.h"
 
+#include <algorithm>
+#include <cfloat>
+#include <cmath>
 #include <limits>
 #include <string>
 
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/message.h>
-#include <google/protobuf/util/message_differencer.h>
-#include <google/protobuf/stubs/map_util.h>
-#include <google/protobuf/stubs/mathutil.h>
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/message.h"
+#include "google/protobuf/util/message_differencer.h"
+
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
 namespace util {
+namespace {
+template <typename T>
+struct Epsilon {};
+template <>
+struct Epsilon<float> {
+  constexpr static auto value = 32 * FLT_EPSILON;
+};
+template <>
+struct Epsilon<double> {
+  constexpr static auto value = 32 * DBL_EPSILON;
+};
+
+template <typename T>
+bool WithinFractionOrMargin(const T x, const T y, const T fraction,
+                            const T margin) {
+  ABSL_DCHECK(fraction >= T(0) && fraction < T(1) && margin >= T(0));
+
+  if (!std::isfinite(x) || !std::isfinite(y)) {
+    return false;
+  }
+  const T relative_margin = fraction * std::max(std::fabs(x), std::fabs(y));
+  return std::fabs(x - y) <= std::max(margin, relative_margin);
+}
+
+}  // namespace
 
 FieldComparator::FieldComparator() {}
 FieldComparator::~FieldComparator() {}
@@ -121,8 +129,8 @@ FieldComparator::ComparisonResult SimpleFieldComparator::SimpleCompare(
       return RECURSE;
 
     default:
-      GOOGLE_LOG(FATAL) << "No comparison code for field " << field->full_name()
-                 << " of CppType = " << field->cpp_type();
+      ABSL_LOG(FATAL) << "No comparison code for field " << field->full_name()
+                      << " of CppType = " << field->cpp_type();
       return DIFFERENT;
   }
 }
@@ -130,7 +138,7 @@ FieldComparator::ComparisonResult SimpleFieldComparator::SimpleCompare(
 bool SimpleFieldComparator::CompareWithDifferencer(
     MessageDifferencer* differencer, const Message& message1,
     const Message& message2, const util::FieldContext* field_context) {
-  return differencer->Compare(message1, message2,
+  return differencer->Compare(message1, message2, false,
                               field_context->parent_fields());
 }
 
@@ -143,8 +151,8 @@ void SimpleFieldComparator::SetDefaultFractionAndMargin(double fraction,
 void SimpleFieldComparator::SetFractionAndMargin(const FieldDescriptor* field,
                                                  double fraction,
                                                  double margin) {
-  GOOGLE_CHECK(FieldDescriptor::CPPTYPE_FLOAT == field->cpp_type() ||
-        FieldDescriptor::CPPTYPE_DOUBLE == field->cpp_type())
+  ABSL_CHECK(FieldDescriptor::CPPTYPE_FLOAT == field->cpp_type() ||
+             FieldDescriptor::CPPTYPE_DOUBLE == field->cpp_type())
       << "Field has to be float or double type. Field name is: "
       << field->full_name();
   map_tolerance_[field] = Tolerance(fraction, margin);
@@ -183,19 +191,28 @@ bool SimpleFieldComparator::CompareDoubleOrFloat(const FieldDescriptor& field,
       return true;
     }
     // float_comparison_ == APPROXIMATE covers two use cases.
-    Tolerance* tolerance = FindOrNull(map_tolerance_, &field);
-    if (tolerance == NULL && has_default_tolerance_) {
-      tolerance = &default_tolerance_;
+    Tolerance* tolerance = nullptr;
+    if (has_default_tolerance_) tolerance = &default_tolerance_;
+
+    auto it = map_tolerance_.find(&field);
+    if (it != map_tolerance_.end()) {
+      tolerance = &it->second;
     }
-    if (tolerance == NULL) {
-      return MathUtil::AlmostEquals(value_1, value_2);
-    } else {
+
+    if (tolerance != nullptr) {
       // Use user-provided fraction and margin. Since they are stored as
       // doubles, we explicitly cast them to types of values provided. This
       // is very likely to fail if provided values are not numeric.
-      return MathUtil::WithinFractionOrMargin(
-          value_1, value_2, static_cast<T>(tolerance->fraction),
-          static_cast<T>(tolerance->margin));
+      return WithinFractionOrMargin(value_1, value_2,
+                                    static_cast<T>(tolerance->fraction),
+                                    static_cast<T>(tolerance->margin));
+    } else {
+      if (std::fabs(value_1) <= Epsilon<T>::value &&
+          std::fabs(value_2) <= Epsilon<T>::value) {
+        return true;
+      }
+      return WithinFractionOrMargin(value_1, value_2, Epsilon<T>::value,
+                                    Epsilon<T>::value);
     }
   }
 }
@@ -208,3 +225,5 @@ FieldComparator::ComparisonResult SimpleFieldComparator::ResultFromBoolean(
 }  // namespace util
 }  // namespace protobuf
 }  // namespace google
+
+#include "google/protobuf/port_undef.inc"

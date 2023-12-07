@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //         atenasio@google.com (Chris Atenasio) (ZigZag transform)
@@ -40,18 +17,19 @@
 #ifndef GOOGLE_PROTOBUF_WIRE_FORMAT_LITE_H__
 #define GOOGLE_PROTOBUF_WIRE_FORMAT_LITE_H__
 
+#include <limits>
 #include <string>
 
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/arenastring.h>
-#include <google/protobuf/message_lite.h>
-#include <google/protobuf/port.h>
-#include <google/protobuf/repeated_field.h>
-#include <google/protobuf/stubs/casts.h>
+#include "google/protobuf/stubs/common.h"
+#include "absl/base/casts.h"
+#include "absl/log/absl_check.h"
+#include "absl/strings/string_view.h"
+#include "google/protobuf/arenastring.h"
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/message_lite.h"
+#include "google/protobuf/port.h"
+#include "google/protobuf/repeated_field.h"
 
-// Do UTF-8 validation on string type in Debug build only
 #ifndef NDEBUG
 #define GOOGLE_PROTOBUF_UTF8_VALIDATION_ENABLED
 #endif
@@ -67,7 +45,8 @@
 #undef TYPE_BOOL
 
 
-#include <google/protobuf/port_def.inc>
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
@@ -84,6 +63,7 @@ namespace internal {
 // This class is really a namespace that contains only static methods.
 class PROTOBUF_EXPORT WireFormatLite {
  public:
+  WireFormatLite() = delete;
   // -----------------------------------------------------------------
   // Helper constants and functions related to the format.  These are
   // mostly meant for internal and generated code to use.
@@ -99,7 +79,11 @@ class PROTOBUF_EXPORT WireFormatLite {
   // identifies the encoding of this data, it is possible to skip
   // unrecognized fields for forwards compatibility.
 
-  enum WireType {
+  enum WireType
+#ifndef SWIG
+      : int
+#endif  // !SWIG
+  {
     WIRETYPE_VARINT = 0,
     WIRETYPE_FIXED64 = 1,
     WIRETYPE_LENGTH_DELIMITED = 2,
@@ -321,6 +305,9 @@ class PROTOBUF_EXPORT WireFormatLite {
   static bool ReadBytes(io::CodedInputStream* input, std::string* value);
   static bool ReadBytes(io::CodedInputStream* input, std::string** p);
 
+  static inline bool ReadBytes(io::CodedInputStream* input, absl::Cord* value);
+  static inline bool ReadBytes(io::CodedInputStream* input, absl::Cord** p);
+
   enum Operation {
     PARSE = 0,
     SERIALIZE = 1,
@@ -535,6 +522,29 @@ class PROTOBUF_EXPORT WireFormatLite {
       const RepeatedField<int>& value, uint8_t* output);
 
   // Write fields, including tags.
+  template <int field_number>
+  PROTOBUF_NOINLINE static uint8_t* WriteInt32ToArrayWithField(
+      ::google::protobuf::io::EpsCopyOutputStream* stream, int32_t value,
+      uint8_t* target) {
+    target = stream->EnsureSpace(target);
+    return WriteInt32ToArray(field_number, value, target);
+  }
+
+  template <int field_number>
+  PROTOBUF_NOINLINE static uint8_t* WriteInt64ToArrayWithField(
+      ::google::protobuf::io::EpsCopyOutputStream* stream, int64_t value,
+      uint8_t* target) {
+    target = stream->EnsureSpace(target);
+    return WriteInt64ToArray(field_number, value, target);
+  }
+
+  template <int field_number>
+  PROTOBUF_NOINLINE static uint8_t* WriteEnumToArrayWithField(
+      ::google::protobuf::io::EpsCopyOutputStream* stream, int value, uint8_t* target) {
+    target = stream->EnsureSpace(target);
+    return WriteEnumToArray(field_number, value, target);
+  }
+
   PROTOBUF_NDEBUG_INLINE static uint8_t* WriteInt32ToArray(int field_number,
                                                            int32_t value,
                                                            uint8_t* target);
@@ -622,18 +632,15 @@ class PROTOBUF_EXPORT WireFormatLite {
   // of serialization, the "ToArray" variants may be invoked.  But they don't
   // have a CodedOutputStream available, so they get an additional parameter
   // telling them whether to serialize deterministically.
-  template <typename MessageType>
-  PROTOBUF_NDEBUG_INLINE static uint8_t* InternalWriteGroup(
-      int field_number, const MessageType& value, uint8_t* target,
-      io::EpsCopyOutputStream* stream);
-  template <typename MessageType>
-  PROTOBUF_NDEBUG_INLINE static uint8_t* InternalWriteMessage(
-      int field_number, const MessageType& value, uint8_t* target,
-      io::EpsCopyOutputStream* stream);
+  static uint8_t* InternalWriteGroup(int field_number, const MessageLite& value,
+                                     uint8_t* target,
+                                     io::EpsCopyOutputStream* stream);
+  static uint8_t* InternalWriteMessage(int field_number,
+                                       const MessageLite& value,
+                                       int cached_size, uint8_t* target,
+                                       io::EpsCopyOutputStream* stream);
 
-  // Like above, but de-virtualize the call to SerializeWithCachedSizes().  The
-  // pointer must point at an instance of MessageType, *not* a subclass (or
-  // the subclass must not override SerializeWithCachedSizes()).
+  // Like above, but de-virtualize the call to SerializeWithCachedSizes().
   template <typename MessageType>
   PROTOBUF_NDEBUG_INLINE static uint8_t* InternalWriteGroupNoVirtualToArray(
       int field_number, const MessageType& value, uint8_t* target);
@@ -662,7 +669,8 @@ class PROTOBUF_EXPORT WireFormatLite {
                                     static_cast<uint32_t>(field_number) << 3) +
                                 io::CodedOutputStream::VarintSize32(size)),
         io::CodedOutputStream::IsDefaultSerializationDeterministic());
-    return InternalWriteMessage(field_number, value, target, &stream);
+    return InternalWriteMessage(field_number, value, value.GetCachedSize(),
+                                target, &stream);
   }
 
   // Compute the byte size of a field.  The XxSize() functions do NOT include
@@ -702,7 +710,11 @@ class PROTOBUF_EXPORT WireFormatLite {
   static constexpr size_t kBoolSize = 1;
 
   static inline size_t StringSize(const std::string& value);
+  static inline size_t StringSize(const absl::Cord& value);
   static inline size_t BytesSize(const std::string& value);
+  static inline size_t BytesSize(const absl::Cord& value);
+  static inline size_t StringSize(absl::string_view value);
+  static inline size_t BytesSize(absl::string_view value);
 
   template <typename MessageType>
   static inline size_t GroupSize(const MessageType& value);
@@ -739,8 +751,6 @@ class PROTOBUF_EXPORT WireFormatLite {
   static const WireFormatLite::WireType kWireTypeForFieldType[];
   static void WriteSubMessageMaybeToArray(int size, const MessageLite& value,
                                           io::CodedOutputStream* output);
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(WireFormatLite);
 };
 
 // A class which deals with unknown values.  The default implementation just
@@ -815,19 +825,19 @@ inline size_t WireFormatLite::TagSize(int field_number,
 }
 
 inline uint32_t WireFormatLite::EncodeFloat(float value) {
-  return bit_cast<uint32_t>(value);
+  return absl::bit_cast<uint32_t>(value);
 }
 
 inline float WireFormatLite::DecodeFloat(uint32_t value) {
-  return bit_cast<float>(value);
+  return absl::bit_cast<float>(value);
 }
 
 inline uint64_t WireFormatLite::EncodeDouble(double value) {
-  return bit_cast<uint64_t>(value);
+  return absl::bit_cast<uint64_t>(value);
 }
 
 inline double WireFormatLite::DecodeDouble(uint64_t value) {
-  return bit_cast<double>(value);
+  return absl::bit_cast<double>(value);
 }
 
 // ZigZag Transform:  Encodes signed integers so that they can be
@@ -1079,7 +1089,7 @@ template <typename CType, enum WireFormatLite::FieldType DeclaredType>
 inline bool WireFormatLite::ReadRepeatedFixedSizePrimitive(
     int tag_size, uint32_t tag, io::CodedInputStream* input,
     RepeatedField<CType>* values) {
-  GOOGLE_DCHECK_EQ(UInt32Size(tag), static_cast<size_t>(tag_size));
+  ABSL_DCHECK_EQ(UInt32Size(tag), static_cast<size_t>(tag_size));
   CType value;
   if (!ReadPrimitive<CType, DeclaredType>(input, &value)) return false;
   values->Add(value);
@@ -1250,6 +1260,17 @@ template <typename CType, enum WireFormatLite::FieldType DeclaredType>
 bool WireFormatLite::ReadPackedPrimitiveNoInline(io::CodedInputStream* input,
                                                  RepeatedField<CType>* values) {
   return ReadPackedPrimitive<CType, DeclaredType>(input, values);
+}
+
+inline bool WireFormatLite::ReadBytes(io::CodedInputStream* input,
+                                      absl::Cord* value) {
+  int length;
+  return input->ReadVarintSizeAsInt(&length) && input->ReadCord(value, length);
+}
+
+inline bool WireFormatLite::ReadBytes(io::CodedInputStream* input,
+                                      absl::Cord** p) {
+  return ReadBytes(input, *p);
 }
 
 
@@ -1440,7 +1461,7 @@ inline uint8_t* WireFormatLite::WritePrimitiveNoTagToArray(
     const RepeatedField<T>& value, uint8_t* (*Writer)(T, uint8_t*),
     uint8_t* target) {
   const int n = value.size();
-  GOOGLE_DCHECK_GT(n, 0);
+  ABSL_DCHECK_GT(n, 0);
 
   const T* ii = value.data();
   int i = 0;
@@ -1459,7 +1480,7 @@ inline uint8_t* WireFormatLite::WriteFixedNoTagToArray(
   (void)Writer;
 
   const int n = value.size();
-  GOOGLE_DCHECK_GT(n, 0);
+  ABSL_DCHECK_GT(n, 0);
 
   const T* ii = value.data();
   const int bytes = n * static_cast<int>(sizeof(ii[0]));
@@ -1705,25 +1726,6 @@ inline uint8_t* WireFormatLite::WriteBytesToArray(int field_number,
 }
 
 
-template <typename MessageType>
-inline uint8_t* WireFormatLite::InternalWriteGroup(
-    int field_number, const MessageType& value, uint8_t* target,
-    io::EpsCopyOutputStream* stream) {
-  target = WriteTagToArray(field_number, WIRETYPE_START_GROUP, target);
-  target = value._InternalSerialize(target, stream);
-  target = stream->EnsureSpace(target);
-  return WriteTagToArray(field_number, WIRETYPE_END_GROUP, target);
-}
-template <typename MessageType>
-inline uint8_t* WireFormatLite::InternalWriteMessage(
-    int field_number, const MessageType& value, uint8_t* target,
-    io::EpsCopyOutputStream* stream) {
-  target = WriteTagToArray(field_number, WIRETYPE_LENGTH_DELIMITED, target);
-  target = io::CodedOutputStream::WriteVarint32ToArrayOutOfLine(
-      static_cast<uint32_t>(value.GetCachedSize()), target);
-  return value._InternalSerialize(target, stream);
-}
-
 // See comment on ReadGroupNoVirtual to understand the need for this template
 // parameter name.
 template <typename MessageType_WorkAroundCppLookupDefect>
@@ -1802,6 +1804,23 @@ inline size_t WireFormatLite::BytesSize(const std::string& value) {
   return LengthDelimitedSize(value.size());
 }
 
+inline size_t WireFormatLite::BytesSize(const absl::Cord& value) {
+  return LengthDelimitedSize(value.size());
+}
+
+inline size_t WireFormatLite::StringSize(const absl::Cord& value) {
+  return LengthDelimitedSize(value.size());
+}
+
+inline size_t WireFormatLite::StringSize(const absl::string_view value) {
+  // WARNING:  In wire_format.cc, both strings and bytes are handled by
+  //   StringSize() to avoid code duplication.  If the implementations become
+  //   different, you will need to update that usage.
+  return LengthDelimitedSize(value.size());
+}
+inline size_t WireFormatLite::BytesSize(const absl::string_view value) {
+  return LengthDelimitedSize(value.size());
+}
 
 template <typename MessageType>
 inline size_t WireFormatLite::GroupSize(const MessageType& value) {
@@ -1857,7 +1876,8 @@ bool ParseMessageSetItemImpl(io::CodedInputStream* input, MS ms) {
     switch (tag) {
       case WireFormatLite::kMessageSetTypeIdTag: {
         uint32_t type_id;
-        if (!input->ReadVarint32(&type_id)) return false;
+        // We should fail parsing if type id is 0.
+        if (!input->ReadVarint32(&type_id) || type_id == 0) return false;
         if (state == State::kNoTag) {
           last_type_id = type_id;
           state = State::kHasType;
@@ -1919,6 +1939,6 @@ bool ParseMessageSetItemImpl(io::CodedInputStream* input, MS ms) {
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_WIRE_FORMAT_LITE_H__

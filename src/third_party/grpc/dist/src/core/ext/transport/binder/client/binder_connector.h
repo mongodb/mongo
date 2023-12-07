@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_EXT_TRANSPORT_BINDER_CLIENT_BINDER_CONNECTOR_H
-#define GRPC_CORE_EXT_TRANSPORT_BINDER_CLIENT_BINDER_CONNECTOR_H
+#ifndef GRPC_SRC_CORE_EXT_TRANSPORT_BINDER_CLIENT_BINDER_CONNECTOR_H
+#define GRPC_SRC_CORE_EXT_TRANSPORT_BINDER_CLIENT_BINDER_CONNECTOR_H
 
 #include <grpc/support/port_platform.h>
 
@@ -23,7 +23,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 
-#include <grpc/impl/codegen/grpc_types.h>
+#include <grpc/impl/grpc_types.h>
 #include <grpcpp/channel.h>
 #include <grpcpp/support/channel_arguments.h>
 
@@ -35,10 +35,9 @@ namespace grpc_core {
 class BinderClientChannelFactory : public ClientChannelFactory {
  public:
   RefCountedPtr<Subchannel> CreateSubchannel(
-      const grpc_resolved_address& address,
-      const grpc_channel_args* args) override;
+      const grpc_resolved_address& address, const ChannelArgs& args) override;
 };
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_EXT_TRANSPORT_BINDER_CLIENT_BINDER_CONNECTOR_H
+#endif  // GRPC_SRC_CORE_EXT_TRANSPORT_BINDER_CLIENT_BINDER_CONNECTOR_H

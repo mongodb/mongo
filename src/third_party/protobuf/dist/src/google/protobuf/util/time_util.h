@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Defines utilities for the Timestamp and Duration well known types.
 
@@ -40,8 +17,8 @@
 #ifdef _MSC_VER
 #ifdef _XBOX_ONE
 struct timeval {
-  int64 tv_sec;  /* seconds */
-  int64 tv_usec; /* and microseconds */
+  int64_t tv_sec;  /* seconds */
+  int64_t tv_usec; /* and microseconds */
 };
 #else
 #include <winsock2.h>
@@ -50,10 +27,11 @@ struct timeval {
 #include <sys/time.h>
 #endif
 
-#include <google/protobuf/duration.pb.h>
-#include <google/protobuf/timestamp.pb.h>
+#include "google/protobuf/duration.pb.h"
+#include "google/protobuf/timestamp.pb.h"
 
-#include <google/protobuf/port_def.inc>
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
@@ -68,11 +46,31 @@ class PROTOBUF_EXPORT TimeUtil {
   // The min/max Timestamp/Duration values we support.
   //
   // For "0001-01-01T00:00:00Z".
-  static const int64_t kTimestampMinSeconds = -62135596800LL;
+  static constexpr int64_t kTimestampMinSeconds = -62135596800LL;
   // For "9999-12-31T23:59:59.999999999Z".
-  static const int64_t kTimestampMaxSeconds = 253402300799LL;
-  static const int64_t kDurationMinSeconds = -315576000000LL;
-  static const int64_t kDurationMaxSeconds = 315576000000LL;
+  static constexpr int64_t kTimestampMaxSeconds = 253402300799LL;
+  static constexpr int32_t kTimestampMinNanoseconds = 0;
+  static constexpr int32_t kTimestampMaxNanoseconds = 999999999;
+  static constexpr int64_t kDurationMinSeconds = -315576000000LL;
+  static constexpr int64_t kDurationMaxSeconds = 315576000000LL;
+  static constexpr int32_t kDurationMinNanoseconds = -999999999;
+  static constexpr int32_t kDurationMaxNanoseconds = 999999999;
+
+  static bool IsTimestampValid(const Timestamp& timestamp) {
+    return timestamp.seconds() <= kTimestampMaxSeconds &&
+           timestamp.seconds() >= kTimestampMinSeconds &&
+           timestamp.nanos() <= kTimestampMaxNanoseconds &&
+           timestamp.nanos() >= kTimestampMinNanoseconds;
+  }
+
+  static bool IsDurationValid(const Duration& duration) {
+    return duration.seconds() <= kDurationMaxSeconds &&
+           duration.seconds() >= kDurationMinSeconds &&
+           duration.nanos() <= kDurationMaxNanoseconds &&
+           duration.nanos() >= kDurationMinNanoseconds &&
+           !(duration.seconds() >= 1 && duration.nanos() < 0) &&
+           !(duration.seconds() <= -1 && duration.nanos() > 0);
+  }
 
   // Converts Timestamp to/from RFC 3339 date string format.
   // Generated output will always be Z-normalized and uses 3, 6 or 9
@@ -90,7 +88,7 @@ class PROTOBUF_EXPORT TimeUtil {
   // Example of accepted format:
   //   "1972-01-01T10:00:20.021-05:00"
   static std::string ToString(const Timestamp& timestamp);
-  static bool FromString(const std::string& value, Timestamp* timestamp);
+  static bool FromString(absl::string_view value, Timestamp* timestamp);
 
   // Converts Duration to/from string format. The string format will contains
   // 3, 6, or 9 fractional digits depending on the precision required to
@@ -99,11 +97,8 @@ class PROTOBUF_EXPORT TimeUtil {
   // The range that can be represented by Duration is from -315,576,000,000
   // to +315,576,000,000 inclusive (in seconds).
   static std::string ToString(const Duration& duration);
-  static bool FromString(const std::string& value, Duration* timestamp);
+  static bool FromString(absl::string_view value, Duration* duration);
 
-#ifdef GetCurrentTime
-#undef GetCurrentTime  // Visual Studio has macro GetCurrentTime
-#endif
   // Gets the current UTC time.
   static Timestamp GetCurrentTime();
   // Returns the Time representing "1970-01-01 00:00:00".
@@ -252,7 +247,7 @@ inline Duration operator%(const Duration& d1, const Duration& d2) {
 }
 
 inline std::ostream& operator<<(std::ostream& out, const Duration& d) {
-  out << ::PROTOBUF_NAMESPACE_ID::util::TimeUtil::ToString(d);
+  out << google::protobuf::util::TimeUtil::ToString(d);
   return out;
 }
 
@@ -301,13 +296,13 @@ inline Timestamp operator-(const Timestamp& t, const Duration& d) {
 PROTOBUF_EXPORT Duration operator-(const Timestamp& t1, const Timestamp& t2);
 
 inline std::ostream& operator<<(std::ostream& out, const Timestamp& t) {
-  out << ::PROTOBUF_NAMESPACE_ID::util::TimeUtil::ToString(t);
+  out << google::protobuf::util::TimeUtil::ToString(t);
   return out;
 }
 
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_UTIL_TIME_UTIL_H__

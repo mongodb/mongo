@@ -1,51 +1,50 @@
-/*
- *
- * Copyright 2015-2016 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2015-2016 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <grpc/support/port_platform.h>
 
 #include "src/core/lib/security/credentials/composite/composite_credentials.h"
 
 #include <cstring>
-#include <new>
+#include <memory>
 #include <vector>
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 
-#include <grpc/support/alloc.h>
 #include <grpc/support/log.h>
-#include <grpc/support/string_util.h>
 
+#include "src/core/lib/debug/trace.h"
 #include "src/core/lib/gprpp/ref_counted_ptr.h"
-#include "src/core/lib/iomgr/polling_entity.h"
 #include "src/core/lib/promise/try_seq.h"
 #include "src/core/lib/surface/api_trace.h"
-#include "src/core/lib/transport/transport.h"
 
 //
 // grpc_composite_channel_credentials
 //
 
-const char* grpc_composite_channel_credentials::type() const {
-  return "Composite";
+grpc_core::UniqueTypeName grpc_composite_channel_credentials::Type() {
+  static grpc_core::UniqueTypeName::Factory kFactory("Composite");
+  return kFactory.Create();
 }
 
-/* -- Composite call credentials. -- */
+// -- Composite call credentials. --
 
 grpc_core::ArenaPromise<absl::StatusOr<grpc_core::ClientMetadataHandle>>
 grpc_composite_call_credentials::GetRequestMetadata(
@@ -60,7 +59,10 @@ grpc_composite_call_credentials::GetRequestMetadata(
       });
 }
 
-const char* grpc_composite_call_credentials::Type() { return "Composite"; }
+grpc_core::UniqueTypeName grpc_composite_call_credentials::Type() {
+  static grpc_core::UniqueTypeName::Factory kFactory("Composite");
+  return kFactory.Create();
+}
 
 std::string grpc_composite_call_credentials::debug_string() {
   std::vector<std::string> outputs;
@@ -137,23 +139,21 @@ grpc_call_credentials* grpc_composite_call_credentials_create(
       .release();
 }
 
-/* -- Composite channel credentials. -- */
+// -- Composite channel credentials. --
 
 grpc_core::RefCountedPtr<grpc_channel_security_connector>
 grpc_composite_channel_credentials::create_security_connector(
     grpc_core::RefCountedPtr<grpc_call_credentials> call_creds,
-    const char* target, const grpc_channel_args* args,
-    grpc_channel_args** new_args) {
+    const char* target, grpc_core::ChannelArgs* args) {
   GPR_ASSERT(inner_creds_ != nullptr && call_creds_ != nullptr);
-  /* If we are passed a call_creds, create a call composite to pass it
-     downstream. */
+  // If we are passed a call_creds, create a call composite to pass it
+  // downstream.
   if (call_creds != nullptr) {
     return inner_creds_->create_security_connector(
         composite_call_credentials_create(call_creds_, std::move(call_creds)),
-        target, args, new_args);
+        target, args);
   } else {
-    return inner_creds_->create_security_connector(call_creds_, target, args,
-                                                   new_args);
+    return inner_creds_->create_security_connector(call_creds_, target, args);
   }
 }
 

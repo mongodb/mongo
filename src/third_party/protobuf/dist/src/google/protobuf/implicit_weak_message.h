@@ -1,48 +1,26 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #ifndef GOOGLE_PROTOBUF_IMPLICIT_WEAK_MESSAGE_H__
 #define GOOGLE_PROTOBUF_IMPLICIT_WEAK_MESSAGE_H__
 
 #include <string>
 
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/arena.h>
-#include <google/protobuf/message_lite.h>
-#include <google/protobuf/repeated_field.h>
+#include "google/protobuf/arena.h"
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/message_lite.h"
+#include "google/protobuf/repeated_field.h"
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
 #endif
 
-#include <google/protobuf/port_def.inc>
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 // This file is logically internal-only and should only be used by protobuf
 // generated code.
@@ -56,8 +34,25 @@ namespace internal {
 // message type does not get linked into the binary.
 class PROTOBUF_EXPORT ImplicitWeakMessage : public MessageLite {
  public:
-  ImplicitWeakMessage() {}
-  explicit ImplicitWeakMessage(Arena* arena) : MessageLite(arena) {}
+  ImplicitWeakMessage() : ImplicitWeakMessage(nullptr) {}
+  explicit constexpr ImplicitWeakMessage(ConstantInitialized)
+      : data_(nullptr) {}
+  ImplicitWeakMessage(const ImplicitWeakMessage&) = delete;
+  ImplicitWeakMessage& operator=(const ImplicitWeakMessage&) = delete;
+
+  // Arena enabled constructors: for internal use only.
+  ImplicitWeakMessage(internal::InternalVisibility, Arena* arena)
+      : ImplicitWeakMessage(arena) {}
+
+  // TODO: make this constructor private
+  explicit ImplicitWeakMessage(Arena* arena)
+      : MessageLite(arena), data_(new std::string) {}
+
+  ~ImplicitWeakMessage() override {
+    // data_ will be null in the default instance, but we can safely call delete
+    // here because the default instance will never be destroyed.
+    delete data_;
+  }
 
   static const ImplicitWeakMessage* default_instance();
 
@@ -67,32 +62,44 @@ class PROTOBUF_EXPORT ImplicitWeakMessage : public MessageLite {
     return Arena::CreateMessage<ImplicitWeakMessage>(arena);
   }
 
-  void Clear() override { data_.clear(); }
+  void Clear() override { data_->clear(); }
 
   bool IsInitialized() const override { return true; }
 
   void CheckTypeAndMergeFrom(const MessageLite& other) override {
-    data_.append(static_cast<const ImplicitWeakMessage&>(other).data_);
+    const std::string* other_data =
+        static_cast<const ImplicitWeakMessage&>(other).data_;
+    if (other_data != nullptr) {
+      data_->append(*other_data);
+    }
   }
 
   const char* _InternalParse(const char* ptr, ParseContext* ctx) final;
 
-  size_t ByteSizeLong() const override { return data_.size(); }
+  size_t ByteSizeLong() const override {
+    return data_ == nullptr ? 0 : data_->size();
+  }
 
   uint8_t* _InternalSerialize(uint8_t* target,
                               io::EpsCopyOutputStream* stream) const final {
-    return stream->WriteRaw(data_.data(), static_cast<int>(data_.size()),
+    if (data_ == nullptr) {
+      return target;
+    }
+    return stream->WriteRaw(data_->data(), static_cast<int>(data_->size()),
                             target);
   }
-
-  int GetCachedSize() const override { return static_cast<int>(data_.size()); }
 
   typedef void InternalArenaConstructable_;
 
  private:
-  std::string data_;
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ImplicitWeakMessage);
+  // This std::string is allocated on the heap, but we use a raw pointer so that
+  // the default instance can be constant-initialized. In the const methods, we
+  // have to handle the possibility of data_ being null.
+  std::string* data_;
 };
+
+struct ImplicitWeakMessageDefaultType;
+extern ImplicitWeakMessageDefaultType implicit_weak_message_default_instance;
 
 // A type handler for use with implicit weak repeated message fields.
 template <typename ImplicitWeakType>
@@ -124,9 +131,25 @@ class ImplicitWeakTypeHandler {
 
 template <typename T>
 struct WeakRepeatedPtrField {
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+
   using TypeHandler = internal::ImplicitWeakTypeHandler<T>;
+
   constexpr WeakRepeatedPtrField() : weak() {}
+  WeakRepeatedPtrField(const WeakRepeatedPtrField& rhs)
+      : WeakRepeatedPtrField(nullptr, rhs) {}
+
+  // Arena enabled constructors: for internal use only.
+  WeakRepeatedPtrField(internal::InternalVisibility, Arena* arena)
+      : WeakRepeatedPtrField(arena) {}
+  WeakRepeatedPtrField(internal::InternalVisibility, Arena* arena,
+                       const WeakRepeatedPtrField& rhs)
+      : WeakRepeatedPtrField(arena, rhs) {}
+
+  // TODO: make this constructor private
   explicit WeakRepeatedPtrField(Arena* arena) : weak(arena) {}
+
   ~WeakRepeatedPtrField() { weak.template Destroy<TypeHandler>(); }
 
   typedef internal::RepeatedPtrIterator<MessageLite> iterator;
@@ -137,6 +160,7 @@ struct WeakRepeatedPtrField {
                                                 const void* const>
       const_pointer_iterator;
 
+  bool empty() const { return base().empty(); }
   iterator begin() { return iterator(base().raw_data()); }
   const_iterator begin() const { return iterator(base().raw_data()); }
   const_iterator cbegin() const { return begin(); }
@@ -147,13 +171,13 @@ struct WeakRepeatedPtrField {
     return pointer_iterator(base().raw_mutable_data());
   }
   const_pointer_iterator pointer_begin() const {
-    return const_pointer_iterator(base().raw_mutable_data());
+    return const_pointer_iterator(base().raw_data());
   }
   pointer_iterator pointer_end() {
     return pointer_iterator(base().raw_mutable_data() + base().size());
   }
   const_pointer_iterator pointer_end() const {
-    return const_pointer_iterator(base().raw_mutable_data() + base().size());
+    return const_pointer_iterator(base().raw_data() + base().size());
   }
 
   MessageLite* AddWeak(const MessageLite* prototype) {
@@ -162,9 +186,10 @@ struct WeakRepeatedPtrField {
   T* Add() { return weak.Add(); }
   void Clear() { base().template Clear<TypeHandler>(); }
   void MergeFrom(const WeakRepeatedPtrField& other) {
-    base().template MergeFrom<TypeHandler>(other.base());
+    if (other.empty()) return;
+    base().template MergeFrom<MessageLite>(other.base());
   }
-  void InternalSwap(WeakRepeatedPtrField* other) {
+  void InternalSwap(WeakRepeatedPtrField* PROTOBUF_RESTRICT other) {
     base().InternalSwap(&other->base());
   }
 
@@ -176,11 +201,17 @@ struct WeakRepeatedPtrField {
   union {
     RepeatedPtrField<T> weak;
   };
+
+ private:
+  WeakRepeatedPtrField(Arena* arena, const WeakRepeatedPtrField& rhs)
+      : WeakRepeatedPtrField(arena) {
+    MergeFrom(rhs);
+  }
 };
 
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_IMPLICIT_WEAK_MESSAGE_H__

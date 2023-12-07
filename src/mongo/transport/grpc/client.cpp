@@ -271,14 +271,17 @@ public:
             [](auto) { return true; },
             [&](const HostAndPort& remote, bool useSSL) {
                 invariant(useSSL, "SSL is required when using gRPC");
+                auto uri = util::toGRPCFormattedURI(remote);
+                auto credentials = util::isUnixSchemeGRPCFormattedURI(uri)
+                    ? ::grpc::InsecureChannelCredentials()
+                    : ::grpc::SslCredentials(_sslOps);
+
                 ::grpc::ChannelArguments channel_args;
                 channel_args.SetMaxReceiveMessageSize(MaxMessageSizeBytes);
                 channel_args.SetMaxSendMessageSize(MaxMessageSizeBytes);
                 channel_args.SetCompressionAlgorithm(
                     ::grpc_compression_algorithm::GRPC_COMPRESS_NONE);
-                return ::grpc::CreateCustomChannel(util::formatHostAndPortForGRPC(remote),
-                                                   ::grpc::SslCredentials(_sslOps),
-                                                   channel_args);
+                return ::grpc::CreateCustomChannel(uri, credentials, channel_args);
             },
             [](std::shared_ptr<::grpc::Channel>& channel, Milliseconds connectTimeout) {
                 iassert(ErrorCodes::NetworkTimeout,

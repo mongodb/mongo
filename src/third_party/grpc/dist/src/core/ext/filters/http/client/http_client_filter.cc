@@ -1,42 +1,55 @@
-/*
- * Copyright 2015 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <grpc/support/port_platform.h>
 
 #include "src/core/ext/filters/http/client/http_client_filter.h"
 
-#include <stdint.h>
-#include <string.h>
-
+#include <algorithm>
+#include <functional>
+#include <initializer_list>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
-#include <grpc/support/alloc.h>
-#include <grpc/support/log.h>
+#include <grpc/grpc.h>
+#include <grpc/impl/channel_arg_names.h>
+#include <grpc/status.h>
 
 #include "src/core/lib/channel/channel_args.h"
-#include "src/core/lib/promise/call_push_pull.h"
-#include "src/core/lib/promise/seq.h"
+#include "src/core/lib/channel/channel_stack.h"
+#include "src/core/lib/promise/context.h"
+#include "src/core/lib/promise/latch.h"
+#include "src/core/lib/promise/map.h"
+#include "src/core/lib/promise/pipe.h"
+#include "src/core/lib/promise/poll.h"
+#include "src/core/lib/promise/race.h"
+#include "src/core/lib/resource_quota/arena.h"
 #include "src/core/lib/slice/percent_encoding.h"
 #include "src/core/lib/transport/status_conversion.h"
+#include "src/core/lib/transport/transport_fwd.h"
 #include "src/core/lib/transport/transport_impl.h"
 
 namespace grpc_core {
@@ -48,10 +61,10 @@ const grpc_channel_filter HttpClientFilter::kFilter =
 namespace {
 absl::Status CheckServerMetadata(ServerMetadata* b) {
   if (auto* status = b->get_pointer(HttpStatusMetadata())) {
-    /* If both gRPC status and HTTP status are provided in the response, we
-     * should prefer the gRPC status code, as mentioned in
-     * https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
-     */
+    // If both gRPC status and HTTP status are provided in the response, we
+    // should prefer the gRPC status code, as mentioned in
+    // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
+    //
     const grpc_status_code* grpc_status = b->get_pointer(GrpcStatusMetadata());
     if (grpc_status != nullptr || *status == 200) {
       b->Remove(HttpStatusMetadata());
@@ -97,45 +110,55 @@ Slice UserAgentFromArgs(const ChannelArgs& args, const char* transport_name) {
 ArenaPromise<ServerMetadataHandle> HttpClientFilter::MakeCallPromise(
     CallArgs call_args, NextPromiseFactory next_promise_factory) {
   auto& md = call_args.client_initial_metadata;
-  md->Set(HttpMethodMetadata(), HttpMethodMetadata::kPost);
+  if (test_only_use_put_requests_) {
+    md->Set(HttpMethodMetadata(), HttpMethodMetadata::kPut);
+  } else {
+    md->Set(HttpMethodMetadata(), HttpMethodMetadata::kPost);
+  }
   md->Set(HttpSchemeMetadata(), scheme_);
   md->Set(TeMetadata(), TeMetadata::kTrailers);
   md->Set(ContentTypeMetadata(), ContentTypeMetadata::kApplicationGrpc);
   md->Set(UserAgentMetadata(), user_agent_.Ref());
 
-  auto* read_latch = GetContext<Arena>()->New<Latch<ServerMetadata*>>();
-  auto* write_latch =
-      absl::exchange(call_args.server_initial_metadata, read_latch);
+  auto* initial_metadata_err =
+      GetContext<Arena>()->New<Latch<ServerMetadataHandle>>();
 
-  return CallPushPull(
-      Seq(next_promise_factory(std::move(call_args)),
-          [](ServerMetadataHandle md) -> ServerMetadataHandle {
-            auto r = CheckServerMetadata(md.get());
-            if (!r.ok()) return ServerMetadataHandle(r);
-            return md;
-          }),
-      []() { return absl::OkStatus(); },
-      Seq(read_latch->Wait(),
-          [write_latch](ServerMetadata** md) -> absl::Status {
-            auto r =
-                *md == nullptr ? absl::OkStatus() : CheckServerMetadata(*md);
-            write_latch->Set(*md);
-            return r;
-          }));
+  call_args.server_initial_metadata->InterceptAndMap(
+      [initial_metadata_err](
+          ServerMetadataHandle md) -> absl::optional<ServerMetadataHandle> {
+        auto r = CheckServerMetadata(md.get());
+        if (!r.ok()) {
+          initial_metadata_err->Set(ServerMetadataFromStatus(r));
+          return absl::nullopt;
+        }
+        return std::move(md);
+      });
+
+  return Race(initial_metadata_err->Wait(),
+              Map(next_promise_factory(std::move(call_args)),
+                  [](ServerMetadataHandle md) -> ServerMetadataHandle {
+                    auto r = CheckServerMetadata(md.get());
+                    if (!r.ok()) return ServerMetadataFromStatus(r);
+                    return md;
+                  }));
 }
 
 HttpClientFilter::HttpClientFilter(HttpSchemeMetadata::ValueType scheme,
-                                   Slice user_agent)
-    : scheme_(scheme), user_agent_(std::move(user_agent)) {}
+                                   Slice user_agent,
+                                   bool test_only_use_put_requests)
+    : scheme_(scheme),
+      user_agent_(std::move(user_agent)),
+      test_only_use_put_requests_(test_only_use_put_requests) {}
 
-absl::StatusOr<HttpClientFilter> HttpClientFilter::Create(ChannelArgs args,
-                                                          ChannelFilter::Args) {
+absl::StatusOr<HttpClientFilter> HttpClientFilter::Create(
+    const ChannelArgs& args, ChannelFilter::Args) {
   auto* transport = args.GetObject<grpc_transport>();
   if (transport == nullptr) {
     return absl::InvalidArgumentError("HttpClientFilter needs a transport");
   }
-  return HttpClientFilter(SchemeFromArgs(args),
-                          UserAgentFromArgs(args, transport->vtable->name));
+  return HttpClientFilter(
+      SchemeFromArgs(args), UserAgentFromArgs(args, transport->vtable->name),
+      args.GetInt(GRPC_ARG_TEST_ONLY_USE_PUT_REQUESTS).value_or(false));
 }
 
 }  // namespace grpc_core

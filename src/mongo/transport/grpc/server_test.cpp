@@ -251,10 +251,11 @@ TEST_F(ServerTest, DisableCertificateValidation) {
 }
 
 TEST_F(ServerTest, MultipleAddresses) {
-    std::vector<HostAndPort> addresses{HostAndPort("localhost", test::kLetKernelChoosePort),
-                                       HostAndPort("127.0.0.1", test::kLetKernelChoosePort),
-                                       HostAndPort("::1", test::kLetKernelChoosePort),
-                                       HostAndPort(makeUnixSockPath(test::kLetKernelChoosePort))};
+    std::vector<HostAndPort> addresses{
+        HostAndPort("localhost", test::kLetKernelChoosePort),
+        HostAndPort("127.0.0.1", test::kLetKernelChoosePort),
+        HostAndPort("::1", test::kLetKernelChoosePort),
+        HostAndPort(makeUnixSockPath(test::kLetKernelChoosePort, "grpc-multiple-addresses-test"))};
 
     Server::Options options = CommandServiceTestFixtures::makeServerOptions();
     options.addresses = addresses;
@@ -266,8 +267,8 @@ TEST_F(ServerTest, MultipleAddresses) {
             ASSERT_EQ(boundAddresses.size(), addresses.size())
                 << "not all provided addresses were bound to";
             for (auto& address : boundAddresses) {
-                auto stub =
-                    CommandServiceTestFixtures::makeStub(util::formatHostAndPortForGRPC(address));
+                auto uri = util::toGRPCFormattedURI(address);
+                auto stub = CommandServiceTestFixtures::makeStub(uri);
                 ASSERT_EQ(stub.connect().error_code(), ::grpc::StatusCode::OK)
                     << "failed to connect to " << address;
             }

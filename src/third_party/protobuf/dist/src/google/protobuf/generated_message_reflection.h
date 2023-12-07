@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
@@ -39,17 +16,18 @@
 #define GOOGLE_PROTOBUF_GENERATED_MESSAGE_REFLECTION_H__
 
 #include <string>
-#include <vector>
-#include <google/protobuf/stubs/casts.h>
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/generated_enum_reflection.h>
-#include <google/protobuf/stubs/once.h>
-#include <google/protobuf/port.h>
-#include <google/protobuf/unknown_field_set.h>
 
+#include "google/protobuf/stubs/common.h"
+#include "absl/base/call_once.h"
+#include "absl/base/casts.h"
+#include "absl/strings/string_view.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/generated_enum_reflection.h"
+#include "google/protobuf/port.h"
+#include "google/protobuf/unknown_field_set.h"
 
-#include <google/protobuf/port_def.inc>
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
@@ -72,6 +50,16 @@ class DefaultEmptyOneof;
 // Defined in other files.
 class ExtensionSet;  // extension_set.h
 class WeakFieldMap;  // weak_field_map.h
+
+// Tag used on offsets for fields that don't have a real offset.
+// For example, weak message fields go into the WeakFieldMap and not in an
+// actual field.
+constexpr uint32_t kInvalidFieldOffsetTag = 0x40000000u;
+
+// Mask used on offsets for split fields.
+constexpr uint32_t kSplitFieldOffsetMask = 0x80000000u;
+constexpr uint32_t kLazyMask = 0x1u;
+constexpr uint32_t kInlinedMask = 0x1u;
 
 // This struct describes the internal layout of the message, hence this is
 // used to act on the message reflectively.
@@ -122,14 +110,13 @@ struct ReflectionSchema {
   uint32_t GetObjectSize() const { return static_cast<uint32_t>(object_size_); }
 
   bool InRealOneof(const FieldDescriptor* field) const {
-    return field->containing_oneof() &&
-           !field->containing_oneof()->is_synthetic();
+    return field->real_containing_oneof();
   }
 
   // Offset of a non-oneof field.  Getting a field offset is slightly more
   // efficient when we know statically that it is not a oneof field.
   uint32_t GetFieldOffsetNonOneof(const FieldDescriptor* field) const {
-    GOOGLE_DCHECK(!InRealOneof(field));
+    ABSL_DCHECK(!InRealOneof(field));
     return OffsetValue(offsets_[field->index()], field->type());
   }
 
@@ -137,8 +124,8 @@ struct ReflectionSchema {
   uint32_t GetFieldOffset(const FieldDescriptor* field) const {
     if (InRealOneof(field)) {
       size_t offset =
-          static_cast<size_t>(field->containing_type()->field_count() +
-                              field->containing_oneof()->index());
+          static_cast<size_t>(field->containing_type()->field_count()) +
+          field->containing_oneof()->index();
       return OffsetValue(offsets_[offset], field->type());
     } else {
       return GetFieldOffsetNonOneof(field);
@@ -161,13 +148,13 @@ struct ReflectionSchema {
   // Bit index within the bit array of hasbits.  Bit order is low-to-high.
   uint32_t HasBitIndex(const FieldDescriptor* field) const {
     if (has_bits_offset_ == -1) return static_cast<uint32_t>(-1);
-    GOOGLE_DCHECK(HasHasbits());
+    ABSL_DCHECK(HasHasbits());
     return has_bit_indices_[field->index()];
   }
 
   // Byte offset of the hasbits array.
   uint32_t HasBitsOffset() const {
-    GOOGLE_DCHECK(HasHasbits());
+    ABSL_DCHECK(HasHasbits());
     return static_cast<uint32_t>(has_bits_offset_);
   }
 
@@ -176,13 +163,13 @@ struct ReflectionSchema {
   // Bit index within the bit array of _inlined_string_donated_.  Bit order is
   // low-to-high.
   uint32_t InlinedStringIndex(const FieldDescriptor* field) const {
-    GOOGLE_DCHECK(HasInlinedString());
+    ABSL_DCHECK(HasInlinedString());
     return inlined_string_indices_[field->index()];
   }
 
   // Byte offset of the _inlined_string_donated_ array.
   uint32_t InlinedStringDonatedOffset() const {
-    GOOGLE_DCHECK(HasInlinedString());
+    ABSL_DCHECK(HasInlinedString());
     return static_cast<uint32_t>(inlined_string_donated_offset_);
   }
 
@@ -199,7 +186,7 @@ struct ReflectionSchema {
 
   // The offset of the ExtensionSet in this message.
   uint32_t GetExtensionSetOffset() const {
-    GOOGLE_DCHECK(HasExtensionSet());
+    ABSL_DCHECK(HasExtensionSet());
     return static_cast<uint32_t>(extensions_offset_);
   }
 
@@ -220,26 +207,27 @@ struct ReflectionSchema {
 
   // Returns true if the field is implicitly backed by LazyField.
   bool IsEagerlyVerifiedLazyField(const FieldDescriptor* field) const {
-    GOOGLE_DCHECK_EQ(field->type(), FieldDescriptor::TYPE_MESSAGE);
+    ABSL_DCHECK_EQ(field->type(), FieldDescriptor::TYPE_MESSAGE);
     (void)field;
     return false;
   }
 
-  // Returns true if the field's accessor is called by any external code (aka,
-  // non proto library code).
-  bool IsFieldUsed(const FieldDescriptor* field) const {
-    (void)field;
-    return true;
+  bool IsSplit() const { return split_offset_ != -1; }
+
+  bool IsSplit(const FieldDescriptor* field) const {
+    return split_offset_ != -1 &&
+           (offsets_[field->index()] & kSplitFieldOffsetMask) != 0;
   }
 
-  bool IsFieldStripped(const FieldDescriptor* field) const {
-    (void)field;
-    return false;
+  // Byte offset of _split_.
+  uint32_t SplitOffset() const {
+    ABSL_DCHECK(IsSplit());
+    return static_cast<uint32_t>(split_offset_);
   }
 
-  bool IsMessageStripped(const Descriptor* descriptor) const {
-    (void)descriptor;
-    return false;
+  uint32_t SizeofSplit() const {
+    ABSL_DCHECK(IsSplit());
+    return static_cast<uint32_t>(sizeof_split_);
   }
 
 
@@ -262,6 +250,8 @@ struct ReflectionSchema {
   int weak_field_map_offset_;
   const uint32_t* inlined_string_indices_;
   int inlined_string_donated_offset_;
+  int split_offset_;
+  int sizeof_split_;
 
   // We tag offset values to provide additional data about fields (such as
   // "unused" or "lazy" or "inlined").
@@ -269,15 +259,15 @@ struct ReflectionSchema {
     if (type == FieldDescriptor::TYPE_MESSAGE ||
         type == FieldDescriptor::TYPE_STRING ||
         type == FieldDescriptor::TYPE_BYTES) {
-      return v & 0x7FFFFFFEu;
+      return v & (~kSplitFieldOffsetMask) & (~kInlinedMask) & (~kLazyMask);
     }
-    return v & 0x7FFFFFFFu;
+    return v & (~kSplitFieldOffsetMask);
   }
 
   static bool Inlined(uint32_t v, FieldDescriptor::Type type) {
     if (type == FieldDescriptor::TYPE_STRING ||
         type == FieldDescriptor::TYPE_BYTES) {
-      return (v & 1u) != 0u;
+      return (v & kInlinedMask) != 0u;
     } else {
       // Non string/byte fields are not inlined.
       return false;
@@ -307,7 +297,7 @@ struct PROTOBUF_EXPORT DescriptorTable {
   int size;  // of serialized descriptor
   const char* descriptor;
   const char* filename;
-  once_flag* once;
+  absl::once_flag* once;
   const DescriptorTable* const* deps;
   int num_deps;
   int num_messages;
@@ -320,27 +310,19 @@ struct PROTOBUF_EXPORT DescriptorTable {
   const ServiceDescriptor** file_level_service_descriptors;
 };
 
-enum {
-  // Tag used on offsets for fields that don't have a real offset.
-  // For example, weak message fields go into the WeakFieldMap and not in an
-  // actual field.
-  kInvalidFieldOffsetTag = 0x40000000u,
-};
-
 // AssignDescriptors() pulls the compiled FileDescriptor from the DescriptorPool
 // and uses it to populate all of the global variables which store pointers to
 // the descriptor objects.  It also constructs the reflection objects.  It is
 // called the first time anyone calls descriptor() or GetReflection() on one of
 // the types defined in the file.  AssignDescriptors() is thread-safe.
-void PROTOBUF_EXPORT AssignDescriptors(const DescriptorTable* table,
-                                       bool eager = false);
+void PROTOBUF_EXPORT AssignDescriptors(const DescriptorTable* table);
 
 // Overload used to implement GetMetadataStatic in the generated code.
-// See comments in compiler/cpp/internal/file.cc as to why.
+// See comments in compiler/cpp/file.cc as to why.
 // It takes a `Metadata` and returns it to allow for tail calls and reduce
 // binary size.
 Metadata PROTOBUF_EXPORT AssignDescriptors(const DescriptorTable* (*table)(),
-                                           internal::once_flag* once,
+                                           absl::once_flag* once,
                                            const Metadata& metadata);
 
 // These cannot be in lite so we put them in the reflection.
@@ -349,14 +331,49 @@ PROTOBUF_EXPORT void UnknownFieldSetSerializer(const uint8_t* base,
                                                uint32_t has_offset,
                                                io::CodedOutputStream* output);
 
+PROTOBUF_EXPORT void InitializeFileDescriptorDefaultInstances();
+
 struct PROTOBUF_EXPORT AddDescriptorsRunner {
   explicit AddDescriptorsRunner(const DescriptorTable* table);
 };
+
+struct DenseEnumCacheInfo {
+  std::atomic<const std::string**> cache;
+  int min_val;
+  int max_val;
+  const EnumDescriptor* (*descriptor_fn)();
+};
+PROTOBUF_EXPORT const std::string& NameOfDenseEnumSlow(int v,
+                                                       DenseEnumCacheInfo*);
+
+// Similar to the routine NameOfEnum, this routine returns the name of an enum.
+// Unlike that routine, it allocates, on-demand, a block of pointers to the
+// std::string objects allocated by reflection to store the enum names. This
+// way, as long as the enum values are fairly dense, looking them up can be
+// very fast. This assumes all the enums fall in the range [min_val .. max_val].
+template <const EnumDescriptor* (*descriptor_fn)(), int min_val, int max_val>
+const std::string& NameOfDenseEnum(int v) {
+  static_assert(max_val - min_val >= 0, "Too many enums between min and max.");
+  static DenseEnumCacheInfo deci = {/* atomic ptr */ {}, min_val, max_val,
+                                    descriptor_fn};
+  const std::string** cache = deci.cache.load(std::memory_order_acquire );
+  if (PROTOBUF_PREDICT_TRUE(cache != nullptr)) {
+    if (PROTOBUF_PREDICT_TRUE(v >= min_val && v <= max_val)) {
+      return *cache[v - min_val];
+    }
+  }
+  return NameOfDenseEnumSlow(v, &deci);
+}
+
+// Returns whether this type of field is stored in the split struct as a raw
+// pointer.
+PROTOBUF_EXPORT bool SplitFieldHasExtraIndirection(
+    const FieldDescriptor* field);
 
 }  // namespace internal
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_GENERATED_MESSAGE_REFLECTION_H__

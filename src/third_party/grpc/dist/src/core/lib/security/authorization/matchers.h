@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_LIB_SECURITY_AUTHORIZATION_MATCHERS_H
-#define GRPC_CORE_LIB_SECURITY_AUTHORIZATION_MATCHERS_H
+#ifndef GRPC_SRC_CORE_LIB_SECURITY_AUTHORIZATION_MATCHERS_H
+#define GRPC_SRC_CORE_LIB_SECURITY_AUTHORIZATION_MATCHERS_H
 
 #include <grpc/support/port_platform.h>
 
-#include <memory>
+#include <stdint.h>
 
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "absl/types/optional.h"
+
+#include "src/core/lib/iomgr/resolved_address.h"
 #include "src/core/lib/matchers/matchers.h"
 #include "src/core/lib/security/authorization/evaluate_args.h"
 #include "src/core/lib/security/authorization/rbac_policy.h"
@@ -208,4 +215,4 @@ class PolicyAuthorizationMatcher : public AuthorizationMatcher {
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_LIB_SECURITY_AUTHORIZATION_MATCHERS_H
+#endif  // GRPC_SRC_CORE_LIB_SECURITY_AUTHORIZATION_MATCHERS_H

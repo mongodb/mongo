@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
@@ -37,15 +14,17 @@
 #ifndef GOOGLE_PROTOBUF_COMPILER_IMPORTER_H__
 #define GOOGLE_PROTOBUF_COMPILER_IMPORTER_H__
 
-#include <set>
 #include <string>
 #include <utility>
 #include <vector>
-#include <google/protobuf/compiler/parser.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/descriptor_database.h>
 
-#include <google/protobuf/port_def.inc>
+#include "absl/strings/string_view.h"
+#include "google/protobuf/compiler/parser.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/descriptor_database.h"
+
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
@@ -62,7 +41,7 @@ class MultiFileErrorCollector;
 class SourceTree;
 class DiskSourceTree;
 
-// TODO(kenton):  Move all SourceTree stuff to a separate file?
+// TODO:  Move all SourceTree stuff to a separate file?
 
 // An implementation of DescriptorDatabase which loads files from a SourceTree
 // and parses them.
@@ -85,7 +64,7 @@ class PROTOBUF_EXPORT SourceTreeDescriptorDatabase : public DescriptorDatabase {
   // the specified source_tree.
   SourceTreeDescriptorDatabase(SourceTree* source_tree,
                                DescriptorDatabase* fallback_database);
-  ~SourceTreeDescriptorDatabase();
+  ~SourceTreeDescriptorDatabase() override;
 
   // Instructs the SourceTreeDescriptorDatabase to report any parse errors
   // to the given MultiFileErrorCollector.  This should be called before
@@ -124,17 +103,17 @@ class PROTOBUF_EXPORT SourceTreeDescriptorDatabase : public DescriptorDatabase {
       : public DescriptorPool::ErrorCollector {
    public:
     ValidationErrorCollector(SourceTreeDescriptorDatabase* owner);
-    ~ValidationErrorCollector();
+    ~ValidationErrorCollector() override;
 
     // implements ErrorCollector ---------------------------------------
-    void AddError(const std::string& filename, const std::string& element_name,
-                  const Message* descriptor, ErrorLocation location,
-                  const std::string& message) override;
+    void RecordError(absl::string_view filename, absl::string_view element_name,
+                     const Message* descriptor, ErrorLocation location,
+                     absl::string_view message) override;
 
-    void AddWarning(const std::string& filename,
-                    const std::string& element_name, const Message* descriptor,
-                    ErrorLocation location,
-                    const std::string& message) override;
+    void RecordWarning(absl::string_view filename,
+                       absl::string_view element_name,
+                       const Message* descriptor, ErrorLocation location,
+                       absl::string_view message) override;
 
    private:
     SourceTreeDescriptorDatabase* owner_;
@@ -153,10 +132,12 @@ class PROTOBUF_EXPORT SourceTreeDescriptorDatabase : public DescriptorDatabase {
 // This is really just a thin wrapper around SourceTreeDescriptorDatabase.
 // You may find that SourceTreeDescriptorDatabase is more flexible.
 //
-// TODO(kenton):  I feel like this class is not well-named.
+// TODO:  I feel like this class is not well-named.
 class PROTOBUF_EXPORT Importer {
  public:
   Importer(SourceTree* source_tree, MultiFileErrorCollector* error_collector);
+  Importer(const Importer&) = delete;
+  Importer& operator=(const Importer&) = delete;
   ~Importer();
 
   // Import the given file and build a FileDescriptor representing it.  If
@@ -186,27 +167,44 @@ class PROTOBUF_EXPORT Importer {
  private:
   SourceTreeDescriptorDatabase database_;
   DescriptorPool pool_;
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(Importer);
 };
 
 // If the importer encounters problems while trying to import the proto files,
 // it reports them to a MultiFileErrorCollector.
 class PROTOBUF_EXPORT MultiFileErrorCollector {
  public:
-  inline MultiFileErrorCollector() {}
+  MultiFileErrorCollector() {}
+  MultiFileErrorCollector(const MultiFileErrorCollector&) = delete;
+  MultiFileErrorCollector& operator=(const MultiFileErrorCollector&) = delete;
   virtual ~MultiFileErrorCollector();
 
   // Line and column numbers are zero-based.  A line number of -1 indicates
   // an error with the entire file (e.g. "not found").
-  virtual void AddError(const std::string& filename, int line, int column,
-                        const std::string& message) = 0;
-
-  virtual void AddWarning(const std::string& /* filename */, int /* line */,
-                          int /* column */, const std::string& /* message */) {}
+  virtual void RecordError(absl::string_view filename, int line, int column,
+                           absl::string_view message) {
+    PROTOBUF_IGNORE_DEPRECATION_START
+    AddError(std::string(filename), line, column, std::string(message));
+    PROTOBUF_IGNORE_DEPRECATION_STOP
+  }
+  virtual void RecordWarning(absl::string_view filename, int line, int column,
+                             absl::string_view message) {
+    PROTOBUF_IGNORE_DEPRECATION_START
+    AddWarning(std::string(filename), line, column, std::string(message));
+    PROTOBUF_IGNORE_DEPRECATION_STOP
+  }
 
  private:
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(MultiFileErrorCollector);
+  // These should never be called directly, but if a legacy class overrides
+  // them they'll get routed to by the Record* methods.
+  ABSL_DEPRECATED("Use RecordError")
+  virtual void AddError(const std::string& filename, int line, int column,
+                        const std::string& message) {
+    ABSL_LOG(FATAL) << "AddError or RecordError must be implemented.";
+  }
+
+  ABSL_DEPRECATED("Use RecordWarning")
+  virtual void AddWarning(const std::string& filename, int line, int column,
+                          const std::string& message) {}
 };
 
 // Abstract interface which represents a directory tree containing proto files.
@@ -215,24 +213,23 @@ class PROTOBUF_EXPORT MultiFileErrorCollector {
 // below.
 class PROTOBUF_EXPORT SourceTree {
  public:
-  inline SourceTree() {}
+  SourceTree() {}
+  SourceTree(const SourceTree&) = delete;
+  SourceTree& operator=(const SourceTree&) = delete;
   virtual ~SourceTree();
 
   // Open the given file and return a stream that reads it, or NULL if not
   // found.  The caller takes ownership of the returned object.  The filename
   // must be a path relative to the root of the source tree and must not
   // contain "." or ".." components.
-  virtual io::ZeroCopyInputStream* Open(const std::string& filename) = 0;
+  virtual io::ZeroCopyInputStream* Open(absl::string_view filename) = 0;
 
   // If Open() returns NULL, calling this method immediately will return an
   // description of the error.
   // Subclasses should implement this method and return a meaningful value for
   // better error reporting.
-  // TODO(xiaofeng): change this to a pure virtual function.
+  // TODO: change this to a pure virtual function.
   virtual std::string GetLastErrorMessage();
-
- private:
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(SourceTree);
 };
 
 // An implementation of SourceTree which loads files from locations on disk.
@@ -241,7 +238,9 @@ class PROTOBUF_EXPORT SourceTree {
 class PROTOBUF_EXPORT DiskSourceTree : public SourceTree {
  public:
   DiskSourceTree();
-  ~DiskSourceTree();
+  DiskSourceTree(const DiskSourceTree&) = delete;
+  DiskSourceTree& operator=(const DiskSourceTree&) = delete;
+  ~DiskSourceTree() override;
 
   // Map a path on disk to a location in the SourceTree.  The path may be
   // either a file or a directory.  If it is a directory, the entire tree
@@ -259,7 +258,7 @@ class PROTOBUF_EXPORT DiskSourceTree : public SourceTree {
   //
   // disk_path may be an absolute path or relative to the current directory,
   // just like a path you'd pass to open().
-  void MapPath(const std::string& virtual_path, const std::string& disk_path);
+  void MapPath(absl::string_view virtual_path, absl::string_view disk_path);
 
   // Return type for DiskFileToVirtualFile().
   enum DiskFileToVirtualFileResult {
@@ -290,17 +289,17 @@ class PROTOBUF_EXPORT DiskSourceTree : public SourceTree {
   // * NO_MAPPING: Indicates that no mapping was found which contains this
   //   file.
   DiskFileToVirtualFileResult DiskFileToVirtualFile(
-      const std::string& disk_file, std::string* virtual_file,
+      absl::string_view disk_file, std::string* virtual_file,
       std::string* shadowing_disk_file);
 
   // Given a virtual path, find the path to the file on disk.
   // Return true and update disk_file with the on-disk path if the file exists.
   // Return false and leave disk_file untouched if the file doesn't exist.
-  bool VirtualFileToDiskFile(const std::string& virtual_file,
+  bool VirtualFileToDiskFile(absl::string_view virtual_file,
                              std::string* disk_file);
 
   // implements SourceTree -------------------------------------------
-  io::ZeroCopyInputStream* Open(const std::string& filename) override;
+  io::ZeroCopyInputStream* Open(absl::string_view filename) override;
 
   std::string GetLastErrorMessage() override;
 
@@ -309,28 +308,26 @@ class PROTOBUF_EXPORT DiskSourceTree : public SourceTree {
     std::string virtual_path;
     std::string disk_path;
 
-    inline Mapping(const std::string& virtual_path_param,
-                   const std::string& disk_path_param)
-        : virtual_path(virtual_path_param), disk_path(disk_path_param) {}
+    inline Mapping(std::string virtual_path_param, std::string disk_path_param)
+        : virtual_path(std::move(virtual_path_param)),
+          disk_path(std::move(disk_path_param)) {}
   };
   std::vector<Mapping> mappings_;
   std::string last_error_message_;
 
   // Like Open(), but returns the on-disk path in disk_file if disk_file is
   // non-NULL and the file could be successfully opened.
-  io::ZeroCopyInputStream* OpenVirtualFile(const std::string& virtual_file,
+  io::ZeroCopyInputStream* OpenVirtualFile(absl::string_view virtual_file,
                                            std::string* disk_file);
 
   // Like Open() but given the actual on-disk path.
-  io::ZeroCopyInputStream* OpenDiskFile(const std::string& filename);
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(DiskSourceTree);
+  io::ZeroCopyInputStream* OpenDiskFile(absl::string_view filename);
 };
 
 }  // namespace compiler
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_COMPILER_IMPORTER_H__

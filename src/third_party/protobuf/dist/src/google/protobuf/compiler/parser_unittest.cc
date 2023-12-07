@@ -1,57 +1,43 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include <google/protobuf/compiler/parser.h>
+#include "google/protobuf/compiler/parser.h"
 
 #include <algorithm>
-#include <map>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
-#include <google/protobuf/test_util2.h>
-#include <google/protobuf/unittest.pb.h>
-#include <google/protobuf/any.pb.h>
-#include <google/protobuf/unittest_custom_options.pb.h>
-#include <google/protobuf/io/tokenizer.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/text_format.h>
-#include <google/protobuf/wire_format.h>
-#include <google/protobuf/testing/googletest.h>
+#include "google/protobuf/any.pb.h"
+#include "google/protobuf/descriptor.pb.h"
+#include "google/protobuf/testing/googletest.h"
 #include <gtest/gtest.h>
-#include <google/protobuf/stubs/substitute.h>
-#include <google/protobuf/stubs/map_util.h>
+#include "absl/container/flat_hash_map.h"
+#include "absl/log/absl_check.h"
+#include "absl/memory/memory.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/substitute.h"
+#include "google/protobuf/compiler/retention.h"
+#include "google/protobuf/test_util2.h"
+#include "google/protobuf/text_format.h"
+#include "google/protobuf/unittest.pb.h"
+#include "google/protobuf/unittest_custom_options.pb.h"
+#include "google/protobuf/unittest_import.pb.h"
+#include "google/protobuf/unittest_import_public.pb.h"
+#include "google/protobuf/wire_format.h"
+
+
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
@@ -68,12 +54,12 @@ class MockErrorCollector : public io::ErrorCollector {
   std::string text_;
 
   // implements ErrorCollector ---------------------------------------
-  void AddWarning(int line, int column, const std::string& message) override {
-    strings::SubstituteAndAppend(&warning_, "$0:$1: $2\n", line, column, message);
+  void RecordWarning(int line, int column, absl::string_view message) override {
+    absl::SubstituteAndAppend(&warning_, "$0:$1: $2\n", line, column, message);
   }
 
-  void AddError(int line, int column, const std::string& message) override {
-    strings::SubstituteAndAppend(&text_, "$0:$1: $2\n", line, column, message);
+  void RecordError(int line, int column, absl::string_view message) override {
+    absl::SubstituteAndAppend(&text_, "$0:$1: $2\n", line, column, message);
   }
 };
 
@@ -83,19 +69,19 @@ class MockValidationErrorCollector : public DescriptorPool::ErrorCollector {
                                io::ErrorCollector* wrapped_collector)
       : source_locations_(source_locations),
         wrapped_collector_(wrapped_collector) {}
-  ~MockValidationErrorCollector() {}
+  ~MockValidationErrorCollector() override = default;
 
   // implements ErrorCollector ---------------------------------------
-  void AddError(const std::string& filename, const std::string& element_name,
-                const Message* descriptor, ErrorLocation location,
-                const std::string& message) override {
+  void RecordError(absl::string_view filename, absl::string_view element_name,
+                   const Message* descriptor, ErrorLocation location,
+                   absl::string_view message) override {
     int line, column;
     if (location == DescriptorPool::ErrorCollector::IMPORT) {
       source_locations_.FindImport(descriptor, element_name, &line, &column);
     } else {
       source_locations_.Find(descriptor, location, &line, &column);
     }
-    wrapped_collector_->AddError(line, column, message);
+    wrapped_collector_->RecordError(line, column, message);
   }
 
  private:
@@ -108,10 +94,12 @@ class ParserTest : public testing::Test {
   ParserTest() : require_syntax_identifier_(false) {}
 
   // Set up the parser to parse the given text.
-  void SetupParser(const char* text) {
-    raw_input_.reset(new io::ArrayInputStream(text, strlen(text)));
-    input_.reset(new io::Tokenizer(raw_input_.get(), &error_collector_));
-    parser_.reset(new Parser());
+  void SetupParser(absl::string_view text) {
+    raw_input_ =
+        absl::make_unique<io::ArrayInputStream>(text.data(), text.size());
+    input_ =
+        absl::make_unique<io::Tokenizer>(raw_input_.get(), &error_collector_);
+    parser_ = absl::make_unique<Parser>();
     parser_->RecordErrorsTo(&error_collector_);
     parser_->SetRequireSyntaxIdentifier(require_syntax_identifier_);
   }
@@ -123,7 +111,7 @@ class ParserTest : public testing::Test {
     SetupParser(input);
     FileDescriptorProto actual, expected;
 
-    parser_->Parse(input_.get(), &actual);
+    EXPECT_TRUE(parser_->Parse(input_.get(), &actual));
     EXPECT_EQ(io::Tokenizer::TYPE_END, input_->current().type);
     ASSERT_EQ("", error_collector_.text_);
 
@@ -137,7 +125,7 @@ class ParserTest : public testing::Test {
     ASSERT_TRUE(TextFormat::ParseFromString(output, &expected));
 
     // Compare by comparing debug strings.
-    // TODO(kenton):  Use differencer, once it is available.
+    // TODO:  Use differencer, once it is available.
     EXPECT_EQ(expected.DebugString(), actual.DebugString());
   }
 
@@ -147,12 +135,25 @@ class ParserTest : public testing::Test {
     EXPECT_EQ(io::Tokenizer::TYPE_END, input_->current().type);
   }
 
-  // Same as above but does not expect that the parser parses the complete
-  // input.
-  void ExpectHasEarlyExitErrors(const char* text, const char* expected_errors) {
+  // Parse the text and expect that the given warnings are reported.
+  void ExpectHasWarnings(const char* text, const char* expected_warnings) {
     SetupParser(text);
     FileDescriptorProto file;
-    parser_->Parse(input_.get(), &file);
+    ASSERT_TRUE(parser_->Parse(input_.get(), &file));
+    EXPECT_EQ(io::Tokenizer::TYPE_END, input_->current().type);
+    ASSERT_EQ("", error_collector_.text_);
+    EXPECT_EQ(expected_warnings, error_collector_.warning_);
+  }
+
+  // Same as above but does not expect that the parser parses the complete
+  // input.
+  void ExpectHasEarlyExitErrors(absl::string_view text,
+                                absl::string_view expected_errors) {
+    SetupParser(text);
+    SourceLocationTable source_locations;
+    parser_->RecordSourceLocationsTo(&source_locations);
+    FileDescriptorProto file;
+    EXPECT_FALSE(parser_->Parse(input_.get(), &file));
     EXPECT_EQ(expected_errors, error_collector_.text_);
   }
 
@@ -173,7 +174,7 @@ class ParserTest : public testing::Test {
     MockValidationErrorCollector validation_error_collector(source_locations,
                                                             &error_collector_);
     EXPECT_TRUE(pool_.BuildFileCollectingErrors(
-                    file, &validation_error_collector) == NULL);
+                    file, &validation_error_collector) == nullptr);
     EXPECT_EQ(expected_errors, error_collector_.text_);
   }
 
@@ -194,7 +195,7 @@ TEST_F(ParserTest, StopAfterSyntaxIdentifier) {
       "syntax = \"foobar\";\n"
       "this line will not be parsed\n");
   parser_->SetStopAfterSyntaxIdentifier(true);
-  EXPECT_TRUE(parser_->Parse(input_.get(), NULL));
+  EXPECT_TRUE(parser_->Parse(input_.get(), nullptr));
   EXPECT_EQ("", error_collector_.text_);
   EXPECT_EQ("foobar", parser_->GetSyntaxIdentifier());
 }
@@ -204,7 +205,7 @@ TEST_F(ParserTest, StopAfterOmittedSyntaxIdentifier) {
       "// blah\n"
       "this line will not be parsed\n");
   parser_->SetStopAfterSyntaxIdentifier(true);
-  EXPECT_TRUE(parser_->Parse(input_.get(), NULL));
+  EXPECT_TRUE(parser_->Parse(input_.get(), nullptr));
   EXPECT_EQ("", error_collector_.text_);
   EXPECT_EQ("", parser_->GetSyntaxIdentifier());
 }
@@ -214,7 +215,7 @@ TEST_F(ParserTest, StopAfterSyntaxIdentifierWithErrors) {
       "// blah\n"
       "syntax = error;\n");
   parser_->SetStopAfterSyntaxIdentifier(true);
-  EXPECT_FALSE(parser_->Parse(input_.get(), NULL));
+  EXPECT_FALSE(parser_->Parse(input_.get(), nullptr));
   EXPECT_EQ("1:9: Expected syntax identifier.\n", error_collector_.text_);
 }
 
@@ -262,6 +263,16 @@ TEST_F(ParserTest, WarnIfFieldNameContainsNumberImmediatelyFollowUnderscore) {
   EXPECT_TRUE(error_collector_.warning_.find(
                   "Number should not come right after an underscore. Found: "
                   "song_name_1.") != std::string::npos);
+}
+
+TEST_F(ParserTest, RegressionNestedOpenBraceDoNotStackOverflow) {
+  std::string input("edition=\"a\000;", 12);
+  input += std::string(100000, '{');
+  ExpectHasEarlyExitErrors(
+      input,
+      "0:10: Unexpected end of string.\n"
+      "0:10: Invalid control characters encountered in text.\n"
+      "0:8: Unknown edition \"a\".\n");
 }
 
 // ===================================================================
@@ -591,6 +602,56 @@ TEST_F(ParseMessageTest, FieldOptions) {
       "}");
 }
 
+TEST_F(ParseMessageTest, FieldOptionsSupportLargeDecimalLiteral) {
+  // decimal integer literal > uint64 max
+  ExpectParsesTo(
+      "import \"google/protobuf/descriptor.proto\";\n"
+      "extend google.protobuf.FieldOptions {\n"
+      "  optional double f = 10101;\n"
+      "}\n"
+      "message TestMessage {\n"
+      "  optional double a = 1 [default = 18446744073709551616];\n"
+      "  optional double b = 2 [default = -18446744073709551616];\n"
+      "  optional double c = 3 [(f) = 18446744073709551616];\n"
+      "  optional double d = 4 [(f) = -18446744073709551616];\n"
+      "}\n",
+
+      "dependency: \"google/protobuf/descriptor.proto\""
+      "extension {"
+      "  name: \"f\" label: LABEL_OPTIONAL type: TYPE_DOUBLE number: 10101"
+      "  extendee: \"google.protobuf.FieldOptions\""
+      "}"
+      "message_type {"
+      "  name: \"TestMessage\""
+      "  field {"
+      "    name: \"a\" label: LABEL_OPTIONAL type: TYPE_DOUBLE number: 1"
+      "    default_value: \"1.8446744073709552e+19\""
+      "  }"
+      "  field {"
+      "    name: \"b\" label: LABEL_OPTIONAL type: TYPE_DOUBLE number: 2"
+      "    default_value: \"-1.8446744073709552e+19\""
+      "  }"
+      "  field {"
+      "    name: \"c\" label: LABEL_OPTIONAL type: TYPE_DOUBLE number: 3"
+      "    options{"
+      "      uninterpreted_option{"
+      "        name{ name_part: \"f\" is_extension: true }"
+      "        double_value: 1.8446744073709552e+19"
+      "      }"
+      "    }"
+      "  }"
+      "  field {"
+      "    name: \"d\" label: LABEL_OPTIONAL type: TYPE_DOUBLE number: 4"
+      "    options{"
+      "      uninterpreted_option{"
+      "        name{ name_part: \"f\" is_extension: true }"
+      "        double_value: -1.8446744073709552e+19"
+      "      }"
+      "    }"
+      "  }"
+      "}");
+}
+
 TEST_F(ParseMessageTest, Oneof) {
   ExpectParsesTo(
       "message TestMessage {\n"
@@ -799,6 +860,22 @@ TEST_F(ParseMessageTest, ReservedNames) {
       "}");
 }
 
+TEST_F(ParseMessageTest, ReservedIdentifiers) {
+  ExpectParsesTo(
+      "edition = \"2023\";\n"
+      "message TestMessage {\n"
+      "  reserved foo, bar;\n"
+      "}\n",
+
+      "syntax: \"editions\" "
+      "edition: EDITION_2023 "
+      "message_type {"
+      "  name: \"TestMessage\""
+      "  reserved_name: \"foo\""
+      "  reserved_name: \"bar\""
+      "}");
+}
+
 TEST_F(ParseMessageTest, ExtensionRange) {
   ExpectParsesTo(
       "message TestMessage {\n"
@@ -851,6 +928,35 @@ TEST_F(ParseMessageTest, CompoundExtensionRange) {
       "  extension_range { start:100 end:536870912 }"
       "  extension_range { start:3   end:4         }"
       "}");
+}
+
+TEST_F(ParseMessageTest, MaxIntExtensionDoesNotOverflow) {
+  ExpectHasErrors(
+      R"(
+        syntax = "proto2";
+        message TestMessage {
+          extensions 2147483647;
+        }
+      )",
+      "3:31: Field number out of bounds.\n");
+  error_collector_.text_.clear();
+  ExpectHasErrors(
+      R"(
+        syntax = "proto2";
+        message TestMessage {
+          extensions 1 to 2147483647;
+        }
+      )",
+      "3:36: Field number out of bounds.\n");
+  error_collector_.text_.clear();
+  ExpectHasErrors(
+      R"(
+        syntax = "proto2";
+        message TestMessage {
+          extensions 2147483647 to 2147483647;
+        }
+      )",
+      "3:32: Field number out of bounds.\n");
 }
 
 TEST_F(ParseMessageTest, CompoundExtensionRangeWithOptions) {
@@ -1046,6 +1152,19 @@ TEST_F(ParseMessageTest, ExplicitOptionalLabelProto3) {
       "}");
 }
 
+TEST_F(ParseMessageTest, CanHandleErrorOnFirstToken) {
+  require_syntax_identifier_ = false;
+  ExpectHasEarlyExitErrors(
+      "/", "0:0: Expected top-level statement (e.g. \"message\").\n");
+
+  require_syntax_identifier_ = true;
+  ExpectHasEarlyExitErrors(
+      "/",
+      "0:0: Expected top-level statement (e.g. \"message\").\n"
+      "0:0: File must begin with a syntax statement, e.g. 'syntax = "
+      "\"proto2\";'.\n");
+}
+
 // ===================================================================
 
 typedef ParserTest ParseEnumTest;
@@ -1149,6 +1268,24 @@ TEST_F(ParseEnumTest, ReservedNames) {
       "  reserved \"foo\", \"bar\";\n"
       "}\n",
 
+      "enum_type {"
+      "  name: \"TestEnum\""
+      "  value { name:\"FOO\" number:0 }"
+      "  reserved_name: \"foo\""
+      "  reserved_name: \"bar\""
+      "}");
+}
+
+TEST_F(ParseEnumTest, ReservedIdentifiers) {
+  ExpectParsesTo(
+      "edition = \"2023\";\n"
+      "enum TestEnum {\n"
+      "  FOO = 0;\n"
+      "  reserved foo, bar;\n"
+      "}\n",
+
+      "syntax: \"editions\" "
+      "edition: EDITION_2023 "
       "enum_type {"
       "  name: \"TestEnum\""
       "  value { name:\"FOO\" number:0 }"
@@ -1430,6 +1567,44 @@ TEST_F(ParseErrorTest, DuplicateJsonName) {
       "1:41: Already set option \"json_name\".\n");
 }
 
+TEST_F(ParseErrorTest, MsgReservedIdentifierOnlyInEditions) {
+  ExpectHasErrors(
+      "message TestMessage {\n"
+      "  reserved foo, bar;\n"
+      "}\n",
+      "1:11: Reserved names must be string literals. (Only editions supports "
+      "identifiers.)\n");
+}
+TEST_F(ParseErrorTest, MsgReservedNameStringNotInEditions) {
+  ExpectHasErrors(
+      "edition = \"2023\";\n"
+      "message TestMessage {\n"
+      "  reserved \"foo\", \"bar\";\n"
+      "}\n",
+      "2:11: Reserved names must be identifiers in editions, not string "
+      "literals.\n");
+}
+
+TEST_F(ParseErrorTest, EnumReservedIdentifierOnlyInEditions) {
+  ExpectHasErrors(
+      "enum TestEnum {\n"
+      "  FOO = 0;\n"
+      "  reserved foo, bar;\n"
+      "}\n",
+      "2:11: Reserved names must be string literals. (Only editions supports "
+      "identifiers.)\n");
+}
+TEST_F(ParseErrorTest, EnumReservedNameStringNotInEditions) {
+  ExpectHasErrors(
+      "edition = \"2023\";\n"
+      "enum TestEnum {\n"
+      "  FOO = 0;\n"
+      "  reserved \"foo\", \"bar\";\n"
+      "}\n",
+      "3:11: Reserved names must be identifiers in editions, not string "
+      "literals.\n");
+}
+
 TEST_F(ParseErrorTest, EnumValueOutOfRange) {
   ExpectHasErrors(
       "enum TestEnum {\n"
@@ -1629,13 +1804,16 @@ TEST_F(ParseErrorTest, EnumValueMissingNumber) {
       "1:5: Missing numeric value for enum constant.\n");
 }
 
+// NB: with editions, this would be accepted and would reserve a value name of
+// "max"
 TEST_F(ParseErrorTest, EnumReservedStandaloneMaxNotAllowed) {
   ExpectHasErrors(
       "enum TestEnum {\n"
       "  FOO = 1;\n"
       "  reserved max;\n"
       "}\n",
-      "2:11: Expected enum value or number range.\n");
+      "2:11: Reserved names must be string literals. (Only editions supports "
+      "identifiers.)\n");
 }
 
 TEST_F(ParseErrorTest, EnumReservedMixNameAndNumber) {
@@ -1645,6 +1823,15 @@ TEST_F(ParseErrorTest, EnumReservedMixNameAndNumber) {
       "  reserved 10, \"foo\";\n"
       "}\n",
       "2:15: Expected enum number range.\n");
+}
+TEST_F(ParseErrorTest, EnumReservedMixNameAndNumberEditions) {
+  ExpectHasErrors(
+      "edition = \"2023\";\n"
+      "enum TestEnum {\n"
+      "  FOO = 1;\n"
+      "  reserved 10, foo;\n"
+      "}\n",
+      "3:15: Expected enum number range.\n");
 }
 
 TEST_F(ParseErrorTest, EnumReservedPositiveNumberOutOfRange) {
@@ -1671,18 +1858,33 @@ TEST_F(ParseErrorTest, EnumReservedMissingQuotes) {
       "  FOO = 1;\n"
       "  reserved foo;\n"
       "}\n",
-      "2:11: Expected enum value or number range.\n");
+      "2:11: Reserved names must be string literals. (Only editions supports "
+      "identifiers.)\n");
+}
+
+TEST_F(ParseErrorTest, EnumReservedInvalidIdentifier) {
+  ExpectHasWarnings(
+      R"schema(
+        enum TestEnum {
+          FOO = 1;
+          reserved "foo bar";
+        }
+      )schema",
+      "3:19: Reserved name \"foo bar\" is not a valid identifier.\n");
 }
 
 // -------------------------------------------------------------------
 // Reserved field number errors
 
+// NB: with editions, this would be accepted and would reserve a field name of
+// "max"
 TEST_F(ParseErrorTest, ReservedStandaloneMaxNotAllowed) {
   ExpectHasErrors(
       "message Foo {\n"
       "  reserved max;\n"
       "}\n",
-      "1:11: Expected field name or number range.\n");
+      "1:11: Reserved names must be string literals. (Only editions supports "
+      "identifiers.)\n");
 }
 
 TEST_F(ParseErrorTest, ReservedMixNameAndNumber) {
@@ -1692,13 +1894,32 @@ TEST_F(ParseErrorTest, ReservedMixNameAndNumber) {
       "}\n",
       "1:15: Expected field number range.\n");
 }
+TEST_F(ParseErrorTest, ReservedMixNameAndNumberEditions) {
+  ExpectHasErrors(
+      "edition = \"2023\";\n"
+      "message Foo {\n"
+      "  reserved 10, foo;\n"
+      "}\n",
+      "2:15: Expected field number range.\n");
+}
 
 TEST_F(ParseErrorTest, ReservedMissingQuotes) {
   ExpectHasErrors(
       "message Foo {\n"
       "  reserved foo;\n"
       "}\n",
-      "1:11: Expected field name or number range.\n");
+      "1:11: Reserved names must be string literals. (Only editions supports "
+      "identifiers.)\n");
+}
+
+TEST_F(ParseErrorTest, ReservedInvalidIdentifier) {
+  ExpectHasWarnings(
+      R"schema(
+        message Foo {
+          reserved "foo bar";
+        }
+      )schema",
+      "2:19: Reserved name \"foo bar\" is not a valid identifier.\n");
 }
 
 TEST_F(ParseErrorTest, ReservedNegativeNumber) {
@@ -1792,7 +2013,7 @@ TEST_F(ParserValidationErrorTest, PackageNameError) {
   FileDescriptorProto other_file;
   other_file.set_name("bar.proto");
   other_file.add_message_type()->set_name("foo");
-  EXPECT_TRUE(pool_.BuildFile(other_file) != NULL);
+  EXPECT_TRUE(pool_.BuildFile(other_file) != nullptr);
 
   // Now try to define it as a package.
   ExpectHasValidationErrors(
@@ -1861,7 +2082,8 @@ TEST_F(ParserValidationErrorTest, FieldNumberError) {
       "message Foo {\n"
       "  optional int32 bar = 0;\n"
       "}\n",
-      "1:23: Field numbers must be positive integers.\n");
+      "1:23: Field numbers must be positive integers.\n"
+      "1:23: Suggested field numbers for Foo: 1\n");
 }
 
 TEST_F(ParserValidationErrorTest, FieldExtendeeError) {
@@ -1887,6 +2109,22 @@ TEST_F(ParserValidationErrorTest, FieldDefaultValueError) {
       "  optional Baz bar = 1 [default=NO_SUCH_VALUE];\n"
       "}\n",
       "2:32: Enum type \"Baz\" has no value named \"NO_SUCH_VALUE\".\n");
+}
+
+TEST_F(ParserValidationErrorTest, FieldDefaultIntegerOutOfRange) {
+  ExpectHasErrors(
+      "message Foo {\n"
+      "  optional double bar = 1 [default = 0x10000000000000000];\n"
+      "}\n",
+      "1:37: Integer out of range.\n");
+}
+
+TEST_F(ParserValidationErrorTest, FieldOptionOutOfRange) {
+  ExpectHasErrors(
+      "message Foo {\n"
+      "  optional double bar = 1 [foo = 0x10000000000000000];\n"
+      "}\n",
+      "1:33: Integer out of range.\n");
 }
 
 TEST_F(ParserValidationErrorTest, FileOptionNameError) {
@@ -1926,7 +2164,24 @@ TEST_F(ParserValidationErrorTest, ExtensionRangeNumberError) {
       "message Foo {\n"
       "  extensions 0;\n"
       "}\n",
-      "1:13: Extension numbers must be positive integers.\n");
+      "1:13: Extension numbers must be positive integers.\n"
+      "1:13: Suggested field numbers for Foo: 1\n");
+}
+
+TEST_F(ParserValidationErrorTest, ExtensionRangeNumberOrderError) {
+  ExpectHasValidationErrors(
+      "message Foo {\n"
+      "  extensions 2 to 1;\n"
+      "}\n",
+      "1:13: Extension range end number must be greater than start number.\n");
+}
+
+TEST_F(ParserValidationErrorTest, ReservedRangeError) {
+  ExpectHasValidationErrors(
+      "message Foo {\n"
+      "  reserved 2 to 1;\n"
+      "}\n",
+      "1:11: Reserved range end number must be greater than start number.\n");
 }
 
 TEST_F(ParserValidationErrorTest, Proto3ExtensionError) {
@@ -1971,11 +2226,124 @@ TEST_F(ParserValidationErrorTest, Proto3JsonConflictError) {
   ExpectHasValidationErrors(
       "syntax = 'proto3';\n"
       "message TestMessage {\n"
-      "  uint32 foo = 1;\n"
+      "  uint32 _foo = 1;\n"
       "  uint32 Foo = 2;\n"
       "}\n",
-      "3:9: The JSON camel-case name of field \"Foo\" conflicts with field "
-      "\"foo\". This is not allowed in proto3.\n");
+      "3:9: The default JSON name of field \"Foo\" (\"Foo\") conflicts "
+      "with the default JSON name of field \"_foo\".\n");
+}
+
+TEST_F(ParserValidationErrorTest, Proto2JsonConflictError) {
+  ExpectParsesTo(
+      "syntax = 'proto2';\n"
+      "message TestMessage {\n"
+      "  optional uint32 _foo = 1;\n"
+      "  optional uint32 Foo = 2;\n"
+      "}\n",
+      "syntax: 'proto2'\n"
+      "message_type {\n"
+      "  name: 'TestMessage'\n"
+      "  field {\n"
+      "    label: LABEL_OPTIONAL type: TYPE_UINT32 name: '_foo' number: 1\n"
+      "  }\n"
+      "  field {\n"
+      "    label: LABEL_OPTIONAL type: TYPE_UINT32 name: 'Foo' number: 2\n"
+      "  }\n"
+      "}\n");
+}
+
+TEST_F(ParserValidationErrorTest, Proto3CustomJsonConflictWithDefaultError) {
+  ExpectHasValidationErrors(
+      "syntax = 'proto3';\n"
+      "message TestMessage {\n"
+      "  uint32 foo = 1 [json_name='bar'];\n"
+      "  uint32 bar = 2;\n"
+      "}\n",
+      "3:9: The default JSON name of field \"bar\" (\"bar\") conflicts "
+      "with the custom JSON name of field \"foo\".\n");
+}
+
+TEST_F(ParserValidationErrorTest, Proto2CustomJsonConflictWithDefaultError) {
+  ExpectParsesTo(
+      "syntax = 'proto2';\n"
+      "message TestMessage {\n"
+      "  optional uint32 foo = 1 [json_name='bar'];\n"
+      "  optional uint32 bar = 2;\n"
+      "}\n",
+      "syntax: 'proto2'\n"
+      "message_type {\n"
+      "  name: 'TestMessage'\n"
+      "  field {\n"
+      "    label: LABEL_OPTIONAL type: TYPE_UINT32 name: 'foo' number: 1 "
+      "json_name: 'bar'\n"
+      "  }\n"
+      "  field {\n"
+      "    label: LABEL_OPTIONAL type: TYPE_UINT32 name: 'bar' number: 2\n"
+      "  }\n"
+      "}\n");
+}
+
+TEST_F(ParserValidationErrorTest, Proto3CustomJsonConflictError) {
+  ExpectHasValidationErrors(
+      "syntax = 'proto3';\n"
+      "message TestMessage {\n"
+      "  uint32 foo = 1 [json_name='baz'];\n"
+      "  uint32 bar = 2 [json_name='baz'];\n"
+      "}\n",
+      "3:9: The custom JSON name of field \"bar\" (\"baz\") conflicts "
+      "with the custom JSON name of field \"foo\".\n");
+}
+
+TEST_F(ParserValidationErrorTest, Proto2CustomJsonConflictError) {
+  ExpectHasValidationErrors(
+      "syntax = 'proto2';\n"
+      "message TestMessage {\n"
+      "  optional uint32 foo = 1 [json_name='baz'];\n"
+      "  optional uint32 bar = 2 [json_name='baz'];\n"
+      "}\n",
+      "3:18: The custom JSON name of field \"bar\" (\"baz\") conflicts "
+      "with the custom JSON name of field \"foo\".\n");
+}
+
+TEST_F(ParserValidationErrorTest, Proto3JsonConflictLegacy) {
+  ExpectHasValidationErrors(
+      "syntax = 'proto3';\n"
+      "message TestMessage {\n"
+      "  option deprecated_legacy_json_field_conflicts = true;\n"
+      "  uint32 fooBar = 1;\n"
+      "  uint32 foo_bar = 2;\n"
+      "}\n",
+      "4:9: The default JSON name of field \"foo_bar\" (\"fooBar\") conflicts "
+      "with the default JSON name of field \"fooBar\".\n");
+}
+
+TEST_F(ParserValidationErrorTest, Proto2JsonConflictLegacy) {
+  ExpectParsesTo(
+      "syntax = 'proto2';\n"
+      "message TestMessage {\n"
+      "  option deprecated_legacy_json_field_conflicts = true;\n"
+      "  optional uint32 fooBar = 1;\n"
+      "  optional uint32 foo_bar = 2;\n"
+      "}\n",
+      "syntax: 'proto2'\n"
+      "message_type {\n"
+      "  name: 'TestMessage'\n"
+      "  field {\n"
+      "    label: LABEL_OPTIONAL type: TYPE_UINT32 name: 'fooBar' number: 1\n"
+      "  }\n"
+      "  field {\n"
+      "    label: LABEL_OPTIONAL type: TYPE_UINT32 name: 'foo_bar' number: 2\n"
+      "  }\n"
+      "  options {\n"
+      "    uninterpreted_option {\n"
+      "      name {\n"
+      "        name_part: 'deprecated_legacy_json_field_conflicts'\n"
+      "        is_extension: false\n"
+      "      }\n"
+      "      identifier_value: 'true'\n"
+      "    }\n"
+      "  }\n"
+      "}\n");
 }
 
 TEST_F(ParserValidationErrorTest, EnumNameError) {
@@ -1989,7 +2357,7 @@ TEST_F(ParserValidationErrorTest, Proto3EnumError) {
   ExpectHasValidationErrors(
       "syntax = 'proto3';\n"
       "enum Foo {A = 1;}\n",
-      "1:14: The first enum value must be zero in proto3.\n");
+      "1:14: The first enum value must be zero for open enums.\n");
 }
 
 TEST_F(ParserValidationErrorTest, EnumValueNameError) {
@@ -2009,11 +2377,20 @@ TEST_F(ParserValidationErrorTest, EnumValueAliasError) {
       "}\n",
       "2:8: \"BAZ\" uses the same enum value as \"BAR\". If this is "
       "intended, set 'option allow_alias = true;' to the enum "
-      "definition.\n");
+      "definition. The next available enum value is 2.\n");
+}
+
+TEST_F(ParserValidationErrorTest, EnumReservedRangeError) {
+  ExpectHasValidationErrors(
+      "enum Foo {\n"
+      "  BAR = 1;\n"
+      "  reserved 2 to 1;\n"
+      "}\n",
+      "2:11: Reserved range end number must be greater than start number.\n");
 }
 
 TEST_F(ParserValidationErrorTest, ExplicitlyMapEntryError) {
-  ExpectHasValidationErrors(
+  ExpectHasErrors(
       "message Foo {\n"
       "  message ValueEntry {\n"
       "    option map_entry = true;\n"
@@ -2021,9 +2398,8 @@ TEST_F(ParserValidationErrorTest, ExplicitlyMapEntryError) {
       "    optional int32 value = 2;\n"
       "    extensions 99 to 999;\n"
       "  }\n"
-      "  repeated ValueEntry value = 1;\n"
       "}",
-      "7:11: map_entry should not be set explicitly. Use "
+      "2:11: map_entry should not be set explicitly. Use "
       "map<KeyType, ValueType> instead.\n");
 }
 
@@ -2071,7 +2447,7 @@ TEST_F(ParserValidationErrorTest, ResolvedUndefinedError) {
   other_file.set_name("base.proto");
   other_file.set_package("base");
   other_file.add_message_type()->set_name("bar");
-  EXPECT_TRUE(pool_.BuildFile(other_file) != NULL);
+  EXPECT_TRUE(pool_.BuildFile(other_file) != nullptr);
 
   // Define "foo.base" and try "base.bar".
   // "base.bar" is resolved to "foo.base.bar" which is not defined.
@@ -2092,11 +2468,11 @@ TEST_F(ParserValidationErrorTest, ResovledUndefinedOptionError) {
   // Build descriptor message in test pool
   FileDescriptorProto descriptor_proto;
   DescriptorProto::descriptor()->file()->CopyTo(&descriptor_proto);
-  ASSERT_TRUE(pool_.BuildFile(descriptor_proto) != NULL);
+  ASSERT_TRUE(pool_.BuildFile(descriptor_proto) != nullptr);
 
   // base2.proto:
   //   package baz
-  //   import net/proto2/proto/descriptor.proto
+  //   import google/protobuf/descriptor.proto
   //   message Bar { optional int32 foo = 1; }
   //   extend FileOptions { optional Bar bar = 7672757; }
   FileDescriptorProto other_file;
@@ -2121,7 +2497,7 @@ TEST_F(ParserValidationErrorTest, ResovledUndefinedOptionError) {
   extension->set_type_name("Bar");
   extension->set_extendee("google.protobuf.FileOptions");
 
-  EXPECT_TRUE(pool_.BuildFile(other_file) != NULL);
+  EXPECT_TRUE(pool_.BuildFile(other_file) != nullptr);
 
   // qux.proto:
   //   package qux.baz
@@ -2201,11 +2577,29 @@ void StripFieldTypeName(FileDescriptorProto* file_proto) {
   }
 }
 
+void StripEmptyOptions(DescriptorProto& proto) {
+  for (auto& ext : *proto.mutable_extension_range()) {
+    if (ext.has_options() && ext.options().DebugString().empty()) {
+      ext.clear_options();
+    }
+  }
+}
+
+void StripEmptyOptions(FileDescriptorProto& file_proto) {
+  if (file_proto.message_type_size() == 0) {
+    return;
+  }
+  for (auto& msg : *file_proto.mutable_message_type()) {
+    StripEmptyOptions(msg);
+  }
+}
+
 TEST_F(ParseDescriptorDebugTest, TestAllDescriptorTypes) {
   const FileDescriptor* original_file =
       protobuf_unittest::TestAllTypes::descriptor()->file();
   FileDescriptorProto expected;
   original_file->CopyTo(&expected);
+  StripEmptyOptions(expected);
 
   // Get the DebugString of the unittest.proto FileDecriptor, which includes
   // all other descriptor types
@@ -2221,24 +2615,23 @@ TEST_F(ParseDescriptorDebugTest, TestAllDescriptorTypes) {
   // We now have a FileDescriptorProto, but to compare with the expected we
   // need to link to a FileDecriptor, then output back to a proto. We'll
   // also need to give it the same name as the original.
-  parsed.set_name(
-      TestUtil::MaybeTranslatePath("net/proto2/internal/unittest.proto"));
+  parsed.set_name("google/protobuf/unittest.proto");
   // We need the imported dependency before we can build our parsed proto
   const FileDescriptor* public_import =
       protobuf_unittest_import::PublicImportMessage::descriptor()->file();
   FileDescriptorProto public_import_proto;
   public_import->CopyTo(&public_import_proto);
-  ASSERT_TRUE(pool_.BuildFile(public_import_proto) != NULL);
+  ASSERT_TRUE(pool_.BuildFile(public_import_proto) != nullptr);
   const FileDescriptor* import =
       protobuf_unittest_import::ImportMessage::descriptor()->file();
   FileDescriptorProto import_proto;
   import->CopyTo(&import_proto);
-  ASSERT_TRUE(pool_.BuildFile(import_proto) != NULL);
+  ASSERT_TRUE(pool_.BuildFile(import_proto) != nullptr);
   const FileDescriptor* actual = pool_.BuildFile(parsed);
   parsed.Clear();
-  ASSERT_TRUE(actual != NULL) << "Failed to validate:\n" << debug_string;
+  ASSERT_TRUE(actual != nullptr) << "Failed to validate:\n" << debug_string;
   actual->CopyTo(&parsed);
-  ASSERT_TRUE(actual != NULL);
+  ASSERT_TRUE(actual != nullptr);
 
   // The messages might be in different orders, making them hard to compare.
   // So, sort the messages in the descriptor protos (including nested messages,
@@ -2276,14 +2669,14 @@ TEST_F(ParseDescriptorDebugTest, TestCustomOptions) {
   const FileDescriptor* import = FileDescriptorProto::descriptor()->file();
   FileDescriptorProto import_proto;
   import->CopyTo(&import_proto);
-  ASSERT_TRUE(pool_.BuildFile(import_proto) != NULL);
+  ASSERT_TRUE(pool_.BuildFile(import_proto) != nullptr);
 
   FileDescriptorProto any_import;
   google::protobuf::Any::descriptor()->file()->CopyTo(&any_import);
   ASSERT_TRUE(pool_.BuildFile(any_import) != nullptr);
 
   const FileDescriptor* actual = pool_.BuildFile(parsed);
-  ASSERT_TRUE(actual != NULL);
+  ASSERT_TRUE(actual != nullptr) << error_collector_.text_;
   parsed.Clear();
   actual->CopyTo(&parsed);
 
@@ -2365,7 +2758,7 @@ TEST_F(ParseDescriptorDebugTest, TestCommentsInDebugString) {
   MockValidationErrorCollector collector(source_locations, &error_collector_);
   const FileDescriptor* descriptor =
       pool_.BuildFileCollectingErrors(parsed_desc, &collector);
-  ASSERT_TRUE(descriptor != NULL);
+  ASSERT_TRUE(descriptor != nullptr);
 
   // Ensure that each of the comments appears somewhere in the DebugString().
   // We don't test the exact comment placement or formatting, because we do not
@@ -2399,7 +2792,7 @@ TEST_F(ParseDescriptorDebugTest, TestCommentsInDebugString) {
     const std::string debug_string =
         descriptor->DebugStringWithOptions(debug_string_options);
 
-    for (int i = 0; i < GOOGLE_ARRAYSIZE(expected_comments); ++i) {
+    for (int i = 0; i < ABSL_ARRAYSIZE(expected_comments); ++i) {
       std::string::size_type found_pos =
           debug_string.find(expected_comments[i]);
       EXPECT_TRUE(found_pos != std::string::npos)
@@ -2429,7 +2822,7 @@ TEST_F(ParseDescriptorDebugTest, TestMaps) {
   EXPECT_TRUE(parser_->Parse(input_.get(), &original));
   original.set_name("foo.proto");
   const FileDescriptor* file = pool_.BuildFile(original);
-  ASSERT_TRUE(file != NULL);
+  ASSERT_TRUE(file != nullptr);
 
   // Make sure the debug string uses map syntax and does not have the auto
   // generated entry.
@@ -2466,13 +2859,15 @@ TEST_F(ParseDescriptorDebugTest, TestMaps) {
 //   *output_field to the descriptor of the field, and *output_index to -1.
 // Returns true if the path was valid, false otherwise.  A gTest failure is
 // recorded before returning false.
-bool FollowPath(const Message& root, const int* path_begin, const int* path_end,
+bool FollowPath(const Message& root,
+                RepeatedField<int>::const_iterator path_begin,
+                RepeatedField<int>::const_iterator path_end,
                 const Message** output_message,
                 const FieldDescriptor** output_field, int* output_index) {
   if (path_begin == path_end) {
     // Path refers to this whole message.
     *output_message = &root;
-    *output_field = NULL;
+    *output_field = nullptr;
     *output_index = -1;
     return true;
   }
@@ -2482,7 +2877,7 @@ bool FollowPath(const Message& root, const int* path_begin, const int* path_end,
 
   const FieldDescriptor* field = descriptor->FindFieldByNumber(*path_begin);
 
-  if (field == NULL) {
+  if (field == nullptr) {
     ADD_FAILURE() << descriptor->name()
                   << " has no field number: " << *path_begin;
     return false;
@@ -2573,24 +2968,26 @@ class SourceInfoTest : public ParserTest {
     const SourceCodeInfo& source_info = file_.source_code_info();
     for (int i = 0; i < source_info.location_size(); i++) {
       const SourceCodeInfo::Location& location = source_info.location(i);
-      const Message* descriptor_proto = NULL;
-      const FieldDescriptor* field = NULL;
+      const Message* descriptor_proto = nullptr;
+      const FieldDescriptor* field = nullptr;
       int index = 0;
       if (!FollowPath(file_, location.path().begin(), location.path().end(),
                       &descriptor_proto, &field, &index)) {
         return false;
       }
 
-      spans_.insert(
-          std::make_pair(SpanKey(*descriptor_proto, field, index), &location));
+      spans_[SpanKey(*descriptor_proto, field, index)].push_back(&location);
     }
 
     return true;
   }
 
   void TearDown() override {
-    EXPECT_TRUE(spans_.empty()) << "Forgot to call HasSpan() for:\n"
-                                << spans_.begin()->second->DebugString();
+    for (auto& kv : spans_) {
+      EXPECT_TRUE(kv.second.empty())
+          << "Forgot to call HasSpan() for "
+          << (*kv.second.begin())->DebugString() << " spans.";
+    }
   }
 
   // -----------------------------------------------------------------
@@ -2601,8 +2998,8 @@ class SourceInfoTest : public ParserTest {
 
   bool HasSpan(char start_marker, char end_marker,
                const Message& descriptor_proto) {
-    return HasSpanWithComment(start_marker, end_marker, descriptor_proto, NULL,
-                              -1, NULL, NULL, NULL);
+    return HasSpanWithComment(start_marker, end_marker, descriptor_proto,
+                              nullptr, -1, nullptr, nullptr, nullptr);
   }
 
   bool HasSpanWithComment(char start_marker, char end_marker,
@@ -2610,8 +3007,8 @@ class SourceInfoTest : public ParserTest {
                           const char* expected_leading_comments,
                           const char* expected_trailing_comments,
                           const char* expected_leading_detached_comments) {
-    return HasSpanWithComment(start_marker, end_marker, descriptor_proto, NULL,
-                              -1, expected_leading_comments,
+    return HasSpanWithComment(start_marker, end_marker, descriptor_proto,
+                              nullptr, -1, expected_leading_comments,
                               expected_trailing_comments,
                               expected_leading_detached_comments);
   }
@@ -2625,7 +3022,7 @@ class SourceInfoTest : public ParserTest {
                const Message& descriptor_proto, const std::string& field_name,
                int index) {
     return HasSpan(start_marker, end_marker, descriptor_proto, field_name,
-                   index, NULL, NULL, NULL);
+                   index, nullptr, nullptr, nullptr);
   }
 
   bool HasSpan(char start_marker, char end_marker,
@@ -2635,7 +3032,7 @@ class SourceInfoTest : public ParserTest {
                const char* expected_leading_detached_comments) {
     const FieldDescriptor* field =
         descriptor_proto.GetDescriptor()->FindFieldByName(field_name);
-    if (field == NULL) {
+    if (field == nullptr) {
       ADD_FAILURE() << descriptor_proto.GetDescriptor()->name()
                     << " has no such field: " << field_name;
       return false;
@@ -2648,8 +3045,8 @@ class SourceInfoTest : public ParserTest {
   }
 
   bool HasSpan(const Message& descriptor_proto) {
-    return HasSpanWithComment('\0', '\0', descriptor_proto, NULL, -1, NULL,
-                              NULL, NULL);
+    return HasSpanWithComment('\0', '\0', descriptor_proto, nullptr, -1,
+                              nullptr, nullptr, nullptr);
   }
 
   bool HasSpan(const Message& descriptor_proto, const std::string& field_name) {
@@ -2662,59 +3059,52 @@ class SourceInfoTest : public ParserTest {
                           const char* expected_leading_comments,
                           const char* expected_trailing_comments,
                           const char* expected_leading_detached_comments) {
-    std::pair<SpanMap::iterator, SpanMap::iterator> range =
-        spans_.equal_range(SpanKey(descriptor_proto, field, index));
-
+    SpanKey key(descriptor_proto, field, index);
     if (start_marker == '\0') {
-      if (range.first == range.second) {
-        return false;
-      } else {
-        spans_.erase(range.first);
+      auto old = spans_.extract(key);
+      // Return true if we actually removed something.
+      return !(old.empty() || old.mapped().empty());
+    }
+
+    std::vector<const SourceCodeInfo::Location*>& range = spans_[key];
+    std::pair<int, int> start_pos = markers_.at(start_marker);
+    std::pair<int, int> end_pos = markers_.at(end_marker);
+
+    RepeatedField<int> expected_span;
+    expected_span.Add(start_pos.first);
+    expected_span.Add(start_pos.second);
+    if (end_pos.first != start_pos.first) {
+      expected_span.Add(end_pos.first);
+    }
+    expected_span.Add(end_pos.second);
+
+    for (auto iter = range.begin(); iter != range.end(); ++iter) {
+      const SourceCodeInfo::Location* location = *iter;
+      if (CompareSpans(expected_span, location->span())) {
+        if (expected_leading_comments == nullptr) {
+          EXPECT_FALSE(location->has_leading_comments());
+        } else {
+          EXPECT_TRUE(location->has_leading_comments());
+          EXPECT_EQ(expected_leading_comments, location->leading_comments());
+        }
+        if (expected_trailing_comments == nullptr) {
+          EXPECT_FALSE(location->has_trailing_comments());
+        } else {
+          EXPECT_TRUE(location->has_trailing_comments());
+          EXPECT_EQ(expected_trailing_comments, location->trailing_comments());
+        }
+        if (expected_leading_detached_comments == nullptr) {
+          EXPECT_EQ(0, location->leading_detached_comments_size());
+        } else {
+          EXPECT_EQ(expected_leading_detached_comments,
+                    absl::StrJoin(location->leading_detached_comments(), "\n"));
+        }
+        range.erase(iter);
         return true;
       }
-    } else {
-      std::pair<int, int> start_pos = FindOrDie(markers_, start_marker);
-      std::pair<int, int> end_pos = FindOrDie(markers_, end_marker);
-
-      RepeatedField<int> expected_span;
-      expected_span.Add(start_pos.first);
-      expected_span.Add(start_pos.second);
-      if (end_pos.first != start_pos.first) {
-        expected_span.Add(end_pos.first);
-      }
-      expected_span.Add(end_pos.second);
-
-      for (SpanMap::iterator iter = range.first; iter != range.second; ++iter) {
-        if (CompareSpans(expected_span, iter->second->span())) {
-          if (expected_leading_comments == NULL) {
-            EXPECT_FALSE(iter->second->has_leading_comments());
-          } else {
-            EXPECT_TRUE(iter->second->has_leading_comments());
-            EXPECT_EQ(expected_leading_comments,
-                      iter->second->leading_comments());
-          }
-          if (expected_trailing_comments == NULL) {
-            EXPECT_FALSE(iter->second->has_trailing_comments());
-          } else {
-            EXPECT_TRUE(iter->second->has_trailing_comments());
-            EXPECT_EQ(expected_trailing_comments,
-                      iter->second->trailing_comments());
-          }
-          if (expected_leading_detached_comments == NULL) {
-            EXPECT_EQ(0, iter->second->leading_detached_comments_size());
-          } else {
-            EXPECT_EQ(
-                expected_leading_detached_comments,
-                Join(iter->second->leading_detached_comments(), "\n"));
-          }
-
-          spans_.erase(iter);
-          return true;
-        }
-      }
-
-      return false;
     }
+
+    return false;
   }
 
  private:
@@ -2723,25 +3113,29 @@ class SourceInfoTest : public ParserTest {
     const FieldDescriptor* field;
     int index;
 
-    inline SpanKey() {}
+    inline SpanKey() = default;
     inline SpanKey(const Message& descriptor_proto_param,
                    const FieldDescriptor* field_param, int index_param)
         : descriptor_proto(&descriptor_proto_param),
           field(field_param),
           index(index_param) {}
 
-    inline bool operator<(const SpanKey& other) const {
-      if (descriptor_proto < other.descriptor_proto) return true;
-      if (descriptor_proto > other.descriptor_proto) return false;
-      if (field < other.field) return true;
-      if (field > other.field) return false;
-      return index < other.index;
+    template <typename H>
+    friend H AbslHashValue(H h, const SpanKey& key) {
+      return H::combine(std::move(h), key.descriptor_proto, key.field,
+                        key.index);
+    }
+
+    friend bool operator==(const SpanKey& lhs, const SpanKey& rhs) {
+      return lhs.descriptor_proto == rhs.descriptor_proto &&  //
+             lhs.field == rhs.field &&                        //
+             lhs.index == rhs.index;
     }
   };
 
-  typedef std::multimap<SpanKey, const SourceCodeInfo::Location*> SpanMap;
-  SpanMap spans_;
-  std::map<char, std::pair<int, int> > markers_;
+  absl::flat_hash_map<SpanKey, std::vector<const SourceCodeInfo::Location*>>
+      spans_;
+  absl::flat_hash_map<char, std::pair<int, int>> markers_;
   std::string text_without_markers_;
 
   void ExtractMarkers(const char* text) {
@@ -2752,14 +3146,14 @@ class SourceInfoTest : public ParserTest {
     while (*text != '\0') {
       if (*text == '$') {
         ++text;
-        GOOGLE_CHECK_NE('\0', *text);
+        ABSL_CHECK_NE('\0', *text);
         if (*text == '$') {
           text_without_markers_ += '$';
           ++column;
         } else {
           markers_[*text] = std::make_pair(line, column);
           ++text;
-          GOOGLE_CHECK_EQ('$', *text);
+          ABSL_CHECK_EQ('$', *text);
         }
       } else if (*text == '\n') {
         ++line;
@@ -3496,7 +3890,7 @@ TEST_F(SourceInfoTest, DocComments) {
   const FieldDescriptorProto& bar = foo.field(0);
 
   EXPECT_TRUE(HasSpanWithComment('a', 'd', foo, " Foo leading\n line 2\n",
-                                 " Foo trailing\n line 2\n", NULL));
+                                 " Foo trailing\n line 2\n", nullptr));
   EXPECT_TRUE(HasSpanWithComment('b', 'c', bar, " bar leading\n",
                                  " bar trailing\n", " detached\n"));
 
@@ -3572,7 +3966,7 @@ TEST_F(SourceInfoTest, DocComments3) {
   const FieldDescriptorProto& bar = foo.field(0);
 
   EXPECT_TRUE(HasSpanWithComment('b', 'c', bar, " bar leading\n",
-                                 " bar trailing\n", NULL));
+                                 " bar trailing\n", nullptr));
 
   // Ignore these.
   EXPECT_TRUE(HasSpan(file_));
@@ -3655,7 +4049,7 @@ TEST_F(SourceInfoTest, DocCommentsOneof) {
   const FieldDescriptorProto& bar_int = foo.field(0);
 
   EXPECT_TRUE(HasSpanWithComment('a', 'f', foo, " Foo leading\n",
-                                 " Foo trailing\n", NULL));
+                                 " Foo trailing\n", nullptr));
   EXPECT_TRUE(HasSpanWithComment('b', 'e', bar, " bar leading\n line 2 ",
                                  " bar trailing\n line 2 ",
                                  " detached before oneof\n"));
@@ -3674,8 +4068,288 @@ TEST_F(SourceInfoTest, DocCommentsOneof) {
 
 // ===================================================================
 
+typedef ParserTest ParseEditionsTest;
+
+TEST_F(ParseEditionsTest, Editions) {
+  ExpectParsesTo(
+      R"schema(
+        edition = "2023";
+        message A {
+          int32 b = 1;
+        })schema",
+      "message_type \t {"
+      "  name: \"A\""
+      "  field {"
+      "    name: \"b\""
+      "    number: 1"
+      "    label: LABEL_OPTIONAL"
+      "    type: TYPE_INT32"
+      "  }"
+      "}"
+      "syntax: \"editions\""
+      "edition: EDITION_2023\n");
+}
+
+TEST_F(ParseEditionsTest, TestEdition) {
+  ExpectParsesTo(
+      R"schema(
+        edition = "99998_TEST_ONLY";
+      )schema",
+      "syntax: \"editions\""
+      "edition: EDITION_99998_TEST_ONLY\n");
+}
+
+TEST_F(ParseEditionsTest, ExtensionsParse) {
+  ExpectParsesTo(
+      R"schema(
+        edition = '2023';
+        message Foo {
+          extensions 100 to 199;
+        }
+        extend Foo { string foo = 101; })schema",
+      "message_type \t {"
+      "  name: \"Foo\""
+      "  extension_range {"
+      "    start: 100"
+      "    end: 200"
+      "  }"
+      "}"
+      "extension {"
+      "  name: \"foo\""
+      "  extendee: \"Foo\""
+      "  number: 101"
+      "  label: LABEL_OPTIONAL"
+      "  type: TYPE_STRING"
+      "}"
+      "syntax: \"editions\""
+      "edition: EDITION_2023\n");
+}
+
+TEST_F(ParseEditionsTest, MapFeatures) {
+  ExpectParsesTo(
+      R"schema(
+        edition = '2023';
+        message Foo {
+          map<string, int> map_field = 1 [
+            features.my_feature = SOMETHING
+          ];
+        })schema",
+      R"pb(message_type {
+             name: "Foo"
+             field {
+               name: "map_field"
+               number: 1
+               label: LABEL_REPEATED
+               type_name: "MapFieldEntry"
+               options {
+                 uninterpreted_option {
+                   name { name_part: "features" is_extension: false }
+                   name { name_part: "my_feature" is_extension: false }
+                   identifier_value: "SOMETHING"
+                 }
+               }
+             }
+             nested_type {
+               name: "MapFieldEntry"
+               field {
+                 name: "key"
+                 number: 1
+                 label: LABEL_OPTIONAL
+                 type: TYPE_STRING
+                 options {
+                   uninterpreted_option {
+                     name { name_part: "features" is_extension: false }
+                     name { name_part: "my_feature" is_extension: false }
+                     identifier_value: "SOMETHING"
+                   }
+                 }
+               }
+               field {
+                 name: "value"
+                 number: 2
+                 label: LABEL_OPTIONAL
+                 type_name: "int"
+                 options {
+                   uninterpreted_option {
+                     name { name_part: "features" is_extension: false }
+                     name { name_part: "my_feature" is_extension: false }
+                     identifier_value: "SOMETHING"
+                   }
+                 }
+               }
+               options { map_entry: true }
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_2023)pb");
+}
+
+TEST_F(ParseEditionsTest, EmptyEdition) {
+  ExpectHasEarlyExitErrors(
+      R"schema(
+        edition = "";
+        message A {
+          optional int32 b = 1;
+        })schema",
+      "1:18: Unknown edition \"\".\n");
+}
+
+TEST_F(ParseEditionsTest, InvalidEdition) {
+  ExpectHasEarlyExitErrors(
+      R"schema(
+        edition = "2023_INVALID";
+        message A {
+          optional int32 b = 1;
+        })schema",
+      "1:18: Unknown edition \"2023_INVALID\".\n");
+}
+
+TEST_F(ParseEditionsTest, UnknownEdition) {
+  ExpectHasEarlyExitErrors(
+      R"schema(
+        edition = "UNKNOWN";
+        message A {
+          optional int32 b = 1;
+        })schema",
+      "1:18: Unknown edition \"UNKNOWN\".\n");
+}
+
+TEST_F(ParseEditionsTest, LegacyProto2Edition) {
+  ExpectHasEarlyExitErrors(
+      R"schema(
+        edition = "PROTO2";
+        message A {
+          optional int32 b = 1;
+        })schema",
+      "1:18: Unknown edition \"PROTO2\".\n");
+}
+
+TEST_F(ParseEditionsTest, LegacyProto3Edition) {
+  ExpectHasEarlyExitErrors(
+      R"schema(
+        edition = "PROTO3";
+        message A {
+          optional int32 b = 1;
+        })schema",
+      "1:18: Unknown edition \"PROTO3\".\n");
+}
+
+TEST_F(ParseEditionsTest, SyntaxEditions) {
+  ExpectHasEarlyExitErrors(
+      R"schema(
+        syntax = "editions";
+        message A {
+          optional int32 b = 1;
+        })schema",
+      "1:17: Unrecognized syntax identifier \"editions\".  This parser only "
+      "recognizes \"proto2\" and \"proto3\".\n");
+}
+
+TEST_F(ParseEditionsTest, MixedSyntaxAndEdition) {
+  ExpectHasErrors(
+      R"schema(
+        syntax = "proto2";
+        edition = "2023";
+        message A {
+          optional int32 b = 1;
+        })schema",
+      "2:8: Expected top-level statement (e.g. \"message\").\n");
+}
+
+TEST_F(ParseEditionsTest, MixedEditionAndSyntax) {
+  ExpectHasErrors(
+      R"schema(
+        edition = "2023";
+        syntax = "proto2";
+        message A {
+          int32 b = 1;
+        })schema",
+      "2:8: Expected top-level statement (e.g. \"message\").\n");
+}
+
+TEST_F(ParseEditionsTest, OptionalKeywordBanned) {
+  ExpectHasErrors(
+      R"schema(
+        edition = "2023";
+        message A {
+          optional int32 b = 1;
+        })schema",
+      "3:10: Label \"optional\" is not supported in editions. By default, all "
+      "singular fields have presence unless features.field_presence is set.\n");
+}
+
+TEST_F(ParseEditionsTest, RequiredKeywordBanned) {
+  ExpectHasErrors(
+      R"schema(
+        edition = "2023";
+        message A {
+          required int32 b = 1;
+        })schema",
+      "3:10: Label \"required\" is not supported in editions, use "
+      "features.field_presence = LEGACY_REQUIRED.\n");
+}
+
+TEST_F(ParseEditionsTest, GroupsBanned) {
+  ExpectHasErrors(
+      R"schema(
+        edition = "2023";
+        message TestMessage {
+          group TestGroup = 1 {};
+        })schema",
+      "3:10: Group syntax is no longer supported in editions. To get group "
+      "behavior you can specify features.message_encoding = DELIMITED on a "
+      "message field.\n");
+}
+
+TEST_F(ParseEditionsTest, ValidationError) {
+  ExpectHasValidationErrors(
+      R"schema(
+        edition = "2023";
+        option features.field_presence = IMPLICIT;
+        option java_package = "blah";
+        message TestMessage {
+          string foo = 1 [default = "hello"];
+        })schema",
+      "5:17: Implicit presence fields can't specify defaults.\n");
+}
+
+TEST_F(ParseEditionsTest, InvalidMerge) {
+  ExpectHasValidationErrors(
+      R"schema(
+        edition = "2023";
+        option features.field_presence = IMPLICIT;
+        option java_package = "blah";
+        message TestMessage {
+          string foo = 1 [
+            default = "hello",
+            features.field_presence = FIELD_PRESENCE_UNKNOWN,
+            features.enum_type = ENUM_TYPE_UNKNOWN
+          ];
+        })schema",
+      "5:17: Feature field `field_presence` must resolve to a known value, "
+      "found FIELD_PRESENCE_UNKNOWN\n");
+}
+
+TEST_F(ParseEditionsTest, FeaturesWithoutEditions) {
+  ExpectHasValidationErrors(
+      R"schema(
+        syntax = "proto3";
+        option features.field_presence = IMPLICIT;
+        message TestMessage {
+          string foo = 1 [
+            default = "hello",
+            features.field_presence = EXPLICIT
+          ];
+        })schema",
+      "1:8: Features are only valid under editions.\n"
+      "4:17: Features are only valid under editions.\n");
+}
+
+
 }  // anonymous namespace
 
 }  // namespace compiler
 }  // namespace protobuf
 }  // namespace google
+
+#include "google/protobuf/port_undef.inc"

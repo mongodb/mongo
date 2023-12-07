@@ -1,43 +1,24 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #ifndef GOOGLE_PROTOBUF_COMPILER_CSHARP_FIELD_BASE_H__
 #define GOOGLE_PROTOBUF_COMPILER_CSHARP_FIELD_BASE_H__
 
 #include <string>
-#include <google/protobuf/stubs/strutil.h>
 
-#include <google/protobuf/compiler/code_generator.h>
-#include <google/protobuf/compiler/csharp/csharp_source_generator_base.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/io/printer.h>
+#include "google/protobuf/compiler/code_generator.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/escaping.h"
+#include "absl/strings/str_replace.h"
+#include "absl/strings/str_split.h"
+#include "google/protobuf/compiler/csharp/csharp_source_generator_base.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/io/printer.h"
 
 namespace google {
 namespace protobuf {
@@ -74,7 +55,7 @@ class FieldGeneratorBase : public SourceGeneratorBase {
  protected:
   const FieldDescriptor* descriptor_;
   const int presenceIndex_;
-  std::map<std::string, std::string> variables_;
+  absl::flat_hash_map<absl::string_view, std::string> variables_;
 
   void AddDeprecatedFlag(io::Printer* printer);
   void AddNullCheck(io::Printer* printer);
@@ -82,9 +63,10 @@ class FieldGeneratorBase : public SourceGeneratorBase {
 
   void AddPublicMemberAttributes(io::Printer* printer);
   void SetCommonOneofFieldVariables(
-      std::map<std::string, std::string>* variables);
+      absl::flat_hash_map<absl::string_view, std::string>* variables);
 
   std::string oneof_property_name();
+  std::string oneof_case_name(); 
   std::string oneof_name();
   std::string property_name();
   std::string name();
@@ -97,7 +79,8 @@ class FieldGeneratorBase : public SourceGeneratorBase {
   std::string capitalized_type_name();
 
  private:
-  void SetCommonFieldVariables(std::map<std::string, std::string>* variables);
+  void SetCommonFieldVariables(
+      absl::flat_hash_map<absl::string_view, std::string>* variables);
   std::string GetStringDefaultValueInternal(const FieldDescriptor* descriptor);
   std::string GetBytesDefaultValueInternal(const FieldDescriptor* descriptor);
 };

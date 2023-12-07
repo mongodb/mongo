@@ -31,6 +31,7 @@
 
 #include "mongo/transport/grpc/util.h"
 
+#include "mongo/client/mongo_uri.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_util.h"
@@ -41,6 +42,7 @@ using namespace fmt::literals;
 namespace mongo::transport::grpc::util {
 namespace constants {
 const std::string kClusterMaxWireVersionKey = "mongodb-maxwireversion";
+constexpr StringData kUriSchemes[] = {"dns:"_sd, "ipv4:"_sd, "ipv6:"_sd, "unix:"_sd};
 }  // namespace constants
 
 ::grpc::SslServerCredentialsOptions::PemKeyCertPair parsePEMKeyFile(StringData filePath) {
@@ -54,12 +56,30 @@ const std::string kClusterMaxWireVersionKey = "mongodb-maxwireversion";
     return certPair;
 }
 
-std::string formatHostAndPortForGRPC(const HostAndPort& address) {
+std::string toGRPCFormattedURI(const HostAndPort& address) {
     if (isUnixDomainSocket(address.host())) {
         return fmt::format("unix://{}", address.host());
     } else {
         return address.toString();
     }
+}
+
+HostAndPort parseGRPCFormattedURI(StringData uri) {
+    // See: https://github.com/grpc/grpc/issues/35006
+    if (uri == "unix:") {
+        return HostAndPort("", 0);
+    }
+
+    // gRPC URIs can be prefixed with a scheme (e.g. "unix:///blah.sock"). If this URI contains a
+    // scheme, find the end of it and begin parsing from that point onward.
+    for (auto scheme : constants::kUriSchemes) {
+        if (uri.starts_with(scheme)) {
+            uri.remove_prefix(scheme.size());
+            break;
+        }
+    }
+
+    return HostAndPort::parseThrowing(uassertStatusOK(uriDecode(uri)));
 }
 
 ErrorCodes::Error statusToErrorCode(::grpc::StatusCode statusCode) {

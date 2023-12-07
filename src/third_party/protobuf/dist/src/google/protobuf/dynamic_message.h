@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
@@ -40,20 +17,21 @@
 
 #include <algorithm>
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/message.h>
-#include <google/protobuf/stubs/mutex.h>
-#include <google/protobuf/reflection.h>
-#include <google/protobuf/repeated_field.h>
+#include "absl/container/flat_hash_map.h"
+#include "absl/synchronization/mutex.h"
+#include "google/protobuf/message.h"
+#include "google/protobuf/port.h"
+#include "google/protobuf/reflection.h"
+#include "google/protobuf/repeated_field.h"
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
 #endif
 
-#include <google/protobuf/port_def.inc>
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
@@ -79,6 +57,9 @@ class DescriptorPool;  // descriptor.h
 // encapsulates this "cache".  All DynamicMessages of the same type created
 // from the same factory will share the same support data.  Any Descriptors
 // used with a particular factory must outlive the factory.
+//
+// The thread safety for this class is subtle, see comments around GetPrototype
+// for details
 class PROTOBUF_EXPORT DynamicMessageFactory : public MessageFactory {
  public:
   // Construct a DynamicMessageFactory that will search for extensions in
@@ -92,9 +73,14 @@ class PROTOBUF_EXPORT DynamicMessageFactory : public MessageFactory {
   //   parser to look for extensions in an alternate pool.  However, note that
   //   this is almost never what you want to do.  Almost all users should use
   //   the zero-arg constructor.
-  DynamicMessageFactory(const DescriptorPool* pool);
+#ifndef PROTOBUF_FUTURE_BREAKING_CHANGES
+  explicit
+#endif
+      DynamicMessageFactory(const DescriptorPool* pool);
+  DynamicMessageFactory(const DynamicMessageFactory&) = delete;
+  DynamicMessageFactory& operator=(const DynamicMessageFactory&) = delete;
 
-  ~DynamicMessageFactory();
+  ~DynamicMessageFactory() override;
 
   // Call this to tell the DynamicMessageFactory that if it is given a
   // Descriptor d for which:
@@ -130,13 +116,11 @@ class PROTOBUF_EXPORT DynamicMessageFactory : public MessageFactory {
   bool delegate_to_generated_factory_;
 
   struct TypeInfo;
-  std::unordered_map<const Descriptor*, const TypeInfo*> prototypes_;
-  mutable internal::WrappedMutex prototypes_mutex_;
+  absl::flat_hash_map<const Descriptor*, const TypeInfo*> prototypes_;
+  mutable absl::Mutex prototypes_mutex_;
 
   friend class DynamicMessage;
   const Message* GetPrototypeNoLock(const Descriptor* type);
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(DynamicMessageFactory);
 };
 
 // Helper for computing a sorted list of map entries via reflection.
@@ -158,9 +142,9 @@ class PROTOBUF_EXPORT DynamicMapSorter {
 #ifndef NDEBUG
     for (size_t j = 1; j < static_cast<size_t>(map_size); j++) {
       if (!comparator(result[j - 1], result[j])) {
-        GOOGLE_LOG(ERROR) << (comparator(result[j], result[j - 1])
-                           ? "internal error in map key sorting"
-                           : "map keys are not unique");
+        ABSL_LOG(ERROR) << (comparator(result[j], result[j - 1])
+                                ? "internal error in map key sorting"
+                                : "map keys are not unique");
       }
     }
 #endif
@@ -207,7 +191,7 @@ class PROTOBUF_EXPORT DynamicMapSorter {
           return first < second;
         }
         default:
-          GOOGLE_LOG(DFATAL) << "Invalid key for map field.";
+          ABSL_DLOG(FATAL) << "Invalid key for map field.";
           return true;
       }
     }
@@ -220,6 +204,6 @@ class PROTOBUF_EXPORT DynamicMapSorter {
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_DYNAMIC_MESSAGE_H__

@@ -1,39 +1,17 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #ifndef GOOGLE_PROTOBUF_REFLECTION_INTERNAL_H__
 #define GOOGLE_PROTOBUF_REFLECTION_INTERNAL_H__
 
-#include <google/protobuf/map_field.h>
-#include <google/protobuf/reflection.h>
-#include <google/protobuf/repeated_field.h>
+#include "absl/strings/cord.h"
+#include "google/protobuf/map_field.h"
+#include "google/protobuf/reflection.h"
+#include "google/protobuf/repeated_field.h"
 
 namespace google {
 namespace protobuf {
@@ -109,6 +87,9 @@ class RepeatedFieldWrapper : public RandomAccessRepeatedFieldAccessor {
   void RemoveLast(Field* data) const override {
     MutableRepeatedField(data)->RemoveLast();
   }
+  void Reserve(Field* data, int size) const override {
+    MutableRepeatedField(data)->Reserve(size);
+  }
   void SwapElements(Field* data, int index1, int index2) const override {
     MutableRepeatedField(data)->SwapElements(index1, index2);
   }
@@ -164,6 +145,9 @@ class RepeatedPtrFieldWrapper : public RandomAccessRepeatedFieldAccessor {
   }
   void RemoveLast(Field* data) const override {
     MutableRepeatedField(data)->RemoveLast();
+  }
+  void Reserve(Field* data, int size) const override {
+    MutableRepeatedField(data)->Reserve(size);
   }
   void SwapElements(Field* data, int index1, int index2) const override {
     MutableRepeatedField(data)->SwapElements(index1, index2);
@@ -228,12 +212,15 @@ class MapFieldAccessor final : public RandomAccessRepeatedFieldAccessor {
   void RemoveLast(Field* data) const override {
     MutableRepeatedField(data)->RemoveLast();
   }
+  void Reserve(Field* data, int size) const override {
+    MutableRepeatedField(data)->Reserve(size);
+  }
   void SwapElements(Field* data, int index1, int index2) const override {
     MutableRepeatedField(data)->SwapElements(index1, index2);
   }
   void Swap(Field* data, const internal::RepeatedFieldAccessor* other_mutator,
             Field* other_data) const override {
-    GOOGLE_CHECK(this == other_mutator);
+    ABSL_CHECK(this == other_mutator);
     MutableRepeatedField(data)->Swap(MutableRepeatedField(other_data));
   }
 
@@ -277,7 +264,7 @@ class RepeatedFieldPrimitiveAccessor final : public RepeatedFieldWrapper<T> {
     // Currently RepeatedFieldPrimitiveAccessor is the only implementation of
     // RepeatedFieldAccessor for primitive types. As we are using singletons
     // for these accessors, here "other_mutator" must be "this".
-    GOOGLE_CHECK(this == other_mutator);
+    ABSL_CHECK(this == other_mutator);
     MutableRepeatedField(data)->Swap(MutableRepeatedField(other_data));
   }
 
@@ -341,7 +328,7 @@ class RepeatedPtrFieldMessageAccessor final
   RepeatedPtrFieldMessageAccessor() {}
   void Swap(Field* data, const internal::RepeatedFieldAccessor* other_mutator,
             Field* other_data) const override {
-    GOOGLE_CHECK(this == other_mutator);
+    ABSL_CHECK(this == other_mutator);
     MutableRepeatedField(data)->Swap(MutableRepeatedField(other_data));
   }
 

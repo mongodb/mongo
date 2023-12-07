@@ -139,7 +139,7 @@ public:
             uassertStatusOK(tl->setup());
             uassertStatusOK(tl->start());
             ON_BLOCK_EXIT([&] { tl->shutdown(); });
-            cb(*tl);
+            ASSERT_DOES_NOT_THROW(cb(*tl));
         });
     }
 
@@ -340,8 +340,9 @@ TEST_F(GRPCTransportLayerTest, ConnectAndListen) {
                 auto addrs = tl.getListeningAddresses();
                 std::vector<stdx::thread> threads;
                 for (size_t i = 0; i < addrs.size() * 5; i++) {
-                    threads.push_back(monitor.spawn(
-                        [&, i] { assertConnectSucceeds(tl, addrs[i % addrs.size()]); }));
+                    threads.push_back(monitor.spawn([&, i] {
+                        ASSERT_DOES_NOT_THROW(assertConnectSucceeds(tl, addrs[i % addrs.size()]));
+                    }));
                 }
 
                 for (auto& thread : threads) {
