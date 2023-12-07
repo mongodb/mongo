@@ -44,7 +44,7 @@ namespace mongo {
  * then stored in the heap.
  */
 template <typename BT, size_t InlinedCapacity>
-requires std::integral<BT> &&(InlinedCapacity > static_cast<size_t>(0)) class InlinedStorage {
+class InlinedStorage {
 public:
     using BlockType = BT;
     static constexpr size_t kBlockSize = sizeof(BlockType) * CHAR_BIT;

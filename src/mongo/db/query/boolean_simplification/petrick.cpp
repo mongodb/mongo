@@ -30,12 +30,12 @@
 #include "mongo/db/query/boolean_simplification/petrick.h"
 
 #include <algorithm>
-#include <boost/dynamic_bitset/dynamic_bitset.hpp>
-#include <boost/move/utility_core.hpp>
 #include <cstddef>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <memory>
 #include <utility>
+
+#include "mongo/util/dynamic_bitset.h"
 
 namespace mongo::boolean_simplification {
 namespace {
@@ -50,7 +50,7 @@ public:
         _implicant.set(implicantIndex);
     }
 
-    explicit PrimeImplicant(boost::dynamic_bitset<size_t> bitset) : _implicant(std::move(bitset)) {}
+    explicit PrimeImplicant(DynamicBitset<size_t, 1> bitset) : _implicant(std::move(bitset)) {}
 
     /**
      * Returns true if 'this' is a non-strict subset of 'other'.
@@ -61,8 +61,8 @@ public:
 
     PrimeImplicantIndices getListOfSetBits() const {
         PrimeImplicantIndices result{};
-        for (uint32_t i = _implicant.find_first(); i < _implicant.size();
-             i = _implicant.find_next(i)) {
+        for (uint32_t i = _implicant.findFirst(); i < _implicant.size();
+             i = _implicant.findNext(i)) {
             result.emplace_back(i);
         }
         return result;
@@ -84,7 +84,7 @@ public:
     friend PrimeImplicant operator|(const PrimeImplicant& lhs, const PrimeImplicant& rhs);
 
 private:
-    boost::dynamic_bitset<size_t> _implicant;
+    DynamicBitset<size_t, 1> _implicant;
 };
 
 PrimeImplicant operator|(const PrimeImplicant& lhs, const PrimeImplicant& rhs) {

@@ -51,7 +51,7 @@ T maskbit(size_t bitIndex) {
  * sizeof(T).
  */
 template <typename T, size_t NumberOfBlocks>
-requires std::integral<T> &&(NumberOfBlocks > static_cast<size_t>(0)) class DynamicBitset {
+class DynamicBitset {
 public:
     using Storage = InlinedStorage<T, NumberOfBlocks>;
     using BlockType = T;
@@ -293,6 +293,22 @@ public:
         }
 
         return true;
+    }
+
+    /**
+     * Return true if this bitset has common set bits with 'other'.
+     */
+    MONGO_COMPILER_ALWAYS_INLINE bool intersects(const DynamicBitset& other) const {
+        assertSize(other);
+        const auto* data = _storage.data();
+        const auto* otherData = other._storage.data();
+        for (size_t i = 0; i < _storage.size(); ++i) {
+            if (data[i] & otherData[i]) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -176,6 +176,15 @@ TEST(DynamicBitsetTests, IsSubsetOf) {
     ASSERT_FALSE(Bitset("0011100000").isSubsetOf(Bitset("1010101010")));
 }
 
+TEST(DynamicBitsetTests, Intersects) {
+    ASSERT_FALSE(Bitset("0000000000").intersects(Bitset("0000000000")));
+    ASSERT_TRUE(Bitset("0000000001").intersects(Bitset("0000000001")));
+    ASSERT_FALSE(Bitset("0000000000").intersects(Bitset("1111111111")));
+    ASSERT_TRUE(Bitset("0000000001").intersects(Bitset("1111111111")));
+    ASSERT_TRUE(Bitset("1000000000").intersects(Bitset("1111111111")));
+    ASSERT_FALSE(Bitset("1000000000").intersects(Bitset("0111111111")));
+}
+
 TEST(DynamicBitsetTests, isEqualToMasked) {
     ASSERT_TRUE(Bitset("0000000000").isEqualToMasked(Bitset("0011100000"), Bitset("0000000000")));
     ASSERT_TRUE(Bitset("0010000000").isEqualToMasked(Bitset("0011100000"), Bitset("0010000000")));
