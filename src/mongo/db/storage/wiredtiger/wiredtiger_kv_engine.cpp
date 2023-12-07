@@ -632,6 +632,8 @@ void WiredTigerKVEngine::notifyStartupComplete(OperationContext* opCtx) {
     StorageEngine::AutoCompactOptions options{/*enable=*/true,
                                               /*freeSpaceTargetMB=*/boost::none,
                                               /*excludedIdents*/ std::vector<StringData>()};
+
+    Lock::GlobalLock lk(opCtx, MODE_IX);
     auto status = autoCompact(opCtx, options);
     uassert(8373401, "Failed to execute autoCompact.", status.isOK());
 }
