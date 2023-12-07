@@ -1639,15 +1639,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const auto ln = static_cast<const LimitNode*>(root);
     boost::optional<long long> skip;
 
+    auto childReqs = reqs.copyForChild();
+    childReqs.setHasLimit(true);
+
     auto [stage, outputs] = [&]() {
         if (ln->children[0]->getType() == StageType::STAGE_SKIP) {
             // If we have both limit and skip stages and the skip stage is beneath the limit, then
             // we can combine these two stages into one.
             const auto sn = static_cast<const SkipNode*>(ln->children[0].get());
             skip = sn->skip;
-            return build(sn->children[0].get(), reqs);
+            return build(sn->children[0].get(), childReqs);
         } else {
-            return build(ln->children[0].get(), reqs);
+            return build(ln->children[0].get(), childReqs);
         }
     }();
 
@@ -1848,6 +1851,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     auto forwardingReqs = reqs.copyForChild();
+    if (reqs.getHasLimit()) {
+        // When sort is followed by a limit the overhead of tracking the kField slots during sorting
+        // is greater compared to the overhead of retrieving the necessary kFields from the BSON
+        // object (kResult) after the sorting is done.
+        forwardingReqs.clearAllFields().clearMRInfo().setResult();
+    }
 
     if (hasPartsWithCommonPrefix) {
         forwardingReqs.clearMRInfo().setResult();
@@ -2044,6 +2053,28 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                    sn->maxMemoryUsageBytes,
                                    _cq.getExpCtx()->allowDiskUse,
                                    root->nodeId());
+
+    if (reqs.getHasLimit()) {
+        // Project the fields that the parent requested using kResult
+        auto kResultSlot = outputs.getIfExists(kResult);
+        tassert(8312200, "kResult slot should be set", kResultSlot);
+        auto fields = reqs.getFields();
+        // Clear from outputs everything that is not found in forwardingReqs and project from
+        // kResult every required field not already in outputs.
+        outputs.clearNonRequiredSlotsAndInfos(forwardingReqs);
+        auto [outStage, outSlots] = projectFieldsToSlots(std::move(stage),
+                                                         fields,
+                                                         kResultSlot->slotId,
+                                                         root->nodeId(),
+                                                         &_slotIdGenerator,
+                                                         _state,
+                                                         &outputs);
+        stage = std::move(outStage);
+
+        for (size_t i = 0; i < fields.size(); ++i) {
+            outputs.set(std::make_pair(PlanStageSlots::kField, std::move(fields[i])), outSlots[i]);
+        }
+    }
 
     return {std::move(stage), std::move(outputs)};
 }

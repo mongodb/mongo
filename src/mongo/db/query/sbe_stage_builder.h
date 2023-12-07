@@ -538,7 +538,8 @@ public:
           _makeResultInfoReq(cloneInfoReq(other._makeResultInfoReq)),
           _isBuildingUnionForTailableCollScan(other._isBuildingUnionForTailableCollScan),
           _isTailableCollScanResumeBranch(other._isTailableCollScanResumeBranch),
-          _targetNamespace(other._targetNamespace) {}
+          _targetNamespace(other._targetNamespace),
+          _hasLimit(other._hasLimit) {}
 
     PlanStageReqs(PlanStageReqs&& other) = default;
 
@@ -549,6 +550,7 @@ public:
             _isBuildingUnionForTailableCollScan = other._isBuildingUnionForTailableCollScan;
             _isTailableCollScanResumeBranch = other._isTailableCollScanResumeBranch;
             _targetNamespace = other._targetNamespace;
+            _hasLimit = other._hasLimit;
         }
         return *this;
     }
@@ -786,6 +788,15 @@ public:
         return _targetNamespace;
     }
 
+    bool getHasLimit() const {
+        return _hasLimit;
+    }
+
+    PlanStageReqs& setHasLimit(bool b) {
+        _hasLimit = b;
+        return *this;
+    }
+
 private:
     friend class PlanStageSlots;
 
@@ -814,6 +825,10 @@ private:
     // namespace different from its parent node can set this value to notify any child nodes of
     // the correct namespace.
     NamespaceString _targetNamespace;
+
+    // When the pipeline has a limit stage this will be set to true. The flag is used by the sort
+    // stage to improve the performance of queries that have both sort and limit.
+    bool _hasLimit{false};
 };  // class PlanStageReqs
 
 struct BuildProjectionPlan {
