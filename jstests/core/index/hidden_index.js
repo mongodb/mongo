@@ -118,6 +118,20 @@ function validateHiddenIndexBehaviour(
     assert(idxSpec.hidden);
     explain = assert.commandWorked(coll.find(query, projection).explain());
     assert.eq(numOfUsedIndexes(explain), 0);
+
+    if (wildcard)
+        assert.commandFailedWithCode(coll.createIndex({"a.$**": index_type}, {hidden: false}),
+                                     ErrorCodes.IndexOptionsConflict);
+    else if (index_type === 'columnstore')
+        assert.commandFailedWithCode(coll.createIndex({"$**": index_type}, {hidden: false}),
+                                     ErrorCodes.IndexOptionsConflict);
+    else
+        assert.commandFailedWithCode(coll.createIndex({"a": index_type}, {hidden: false}),
+                                     ErrorCodes.IndexOptionsConflict);
+
+    idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), index_name);
+    assert(idxSpec.hidden);
+
     assert.commandWorked(coll.dropIndexes());
 }
 

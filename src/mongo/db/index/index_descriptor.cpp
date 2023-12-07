@@ -105,7 +105,6 @@ std::map<StringData, BSONElement> populateOptionsMapForEqualityCheck(const BSONO
         IndexDescriptor::k2dsphereVersionFieldName,        // same as index version
         IndexDescriptor::kBackgroundFieldName,             // this is a creation time option only
         IndexDescriptor::kDropDuplicatesFieldName,         // this is now ignored
-        IndexDescriptor::kHiddenFieldName,                 // not considered for equivalence
         IndexDescriptor::kCollationFieldName,              // checked specially
         IndexDescriptor::kPartialFilterExprFieldName,      // checked specially
         IndexDescriptor::kUniqueFieldName,                 // checked specially
