@@ -35,8 +35,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [7] filter {(((getField(s3, "a") <=> 10024) == 0ll) ?: false)} 
 [6] nlj inner [s3] [s2] {(((s2 <=> s5) == 0ll) ?: false)} 
     left 
-        [3] project [s3 = getField(s1, "zipcode")] 
-        [1] project [s2 = getField(s1, "city")] 
+        [1] project [s2 = getField(s1, "city"), s3 = getField(s1, "zipcode")] 
         [0] scan s1 none none none none none none none lowPriority [] @"<collUUID>" true false 
     right 
         [5] project [s5 = getField(s4, "id")] 
@@ -78,8 +77,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 [7] filter {(((getField(s3, "a") <=> 10024) == 0ll) ?: false)} 
 [6] nlj left [s3] [s2] {(((s2 <=> s5) == 0ll) ?: false)} 
     left 
-        [3] project [s3 = getField(s1, "zipcode")] 
-        [1] project [s2 = getField(s1, "city")] 
+        [1] project [s2 = getField(s1, "city"), s3 = getField(s1, "zipcode")] 
         [0] scan s1 none none none none none none none lowPriority [] @"<collUUID>" true false 
     right 
         [5] project [s5 = getField(s4, "id")] 

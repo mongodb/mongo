@@ -28,9 +28,7 @@ PhysicalScan [{'<root>': scan0}, collName]
 -- OUTPUT:
 [5] filter {(((getField(s3, "a") <=> 23) == 0ll) ?: false)} 
 [0] sort [s2] [asc] [s3, s4] 
-[4] project [s4 = getField(s1, "c")] 
-[3] project [s3 = getField(s1, "b")] 
-[2] project [s2 = getField(s1, "a")] 
+[2] project [s2 = getField(s1, "a"), s3 = getField(s1, "b"), s4 = getField(s1, "c")] 
 [1] scan s1 none none none none none none none lowPriority [] @"<collUUID>" true false 
 
 ==== VARIATION: Lower collation node with two fields ====
@@ -61,7 +59,5 @@ PhysicalScan [{'<root>': scan0}, collName]
 -- OUTPUT:
 [5] filter {(((getField(s4, "a") <=> 35) == 0ll) ?: false)} 
 [0] sort [s2, s3] [asc, desc] [s4] 
-[4] project [s4 = getField(s1, "c")] 
-[3] project [s3 = getField(s1, "b")] 
-[2] project [s2 = getField(s1, "a")] 
+[2] project [s2 = getField(s1, "a"), s3 = getField(s1, "b"), s4 = getField(s1, "c")] 
 [1] scan s1 none none none none none none none lowPriority [] @"<collUUID>" true false 
