@@ -437,8 +437,6 @@ public:
 
     virtual void incrementNumCatchUpOpsIfCatchingUp(long numOps) override;
 
-    void signalDropPendingCollectionsRemovedFromStorage() final;
-
     virtual boost::optional<Timestamp> getRecoveryTimestamp() override;
 
     virtual bool setContainsArbiter() const override;
@@ -1854,6 +1852,9 @@ private:
     // The non-null OpTime used for committed reads, if there is one.
     // When engaged, this must be <= _lastCommittedOpTime.
     boost::optional<OpTime> _currentCommittedSnapshot;  // (M)
+
+    // Captured committedSnapshotOptime after reconfig
+    boost::optional<OpTime> _committedSnapshotAfterReconfig;  // (M)
 
     // Used to signal threads that are waiting for a new value of _currentCommittedSnapshot.
     stdx::condition_variable _currentCommittedSnapshotCond;  // (M)

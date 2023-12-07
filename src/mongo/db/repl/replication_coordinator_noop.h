@@ -337,8 +337,6 @@ public:
 
     void incrementNumCatchUpOpsIfCatchingUp(long numOps) final;
 
-    void signalDropPendingCollectionsRemovedFromStorage() final;
-
     boost::optional<Timestamp> getRecoveryTimestamp() final;
 
     bool setContainsArbiter() const final;

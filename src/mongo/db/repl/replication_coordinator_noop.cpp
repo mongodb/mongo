@@ -543,10 +543,6 @@ Status ReplicationCoordinatorNoOp::stepUpIfEligible(bool skipDryRun) {
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::signalDropPendingCollectionsRemovedFromStorage() {
-    MONGO_UNREACHABLE;
-}
-
 boost::optional<Timestamp> ReplicationCoordinatorNoOp::getRecoveryTimestamp() {
     MONGO_UNREACHABLE;
 }

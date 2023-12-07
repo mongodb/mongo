@@ -2055,28 +2055,38 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
                 return false;
             }
 
+            // The following is an optimization when we are checking for opTime, but not config.
+            // For majority write concern, in addition to waiting for the committed snapshot to
+            // advance past the write, it also waits for a majority of nodes to have their
+            // lasDurable (j: true) or lastApplied (j: false) to advance past the write.
+            // Waiting for the committed snapshot is sufficient in most cases and so the additional
+            // wait is usually a no-op and only needed
+            // when writeConcernMajorityJournalDefault is false and j: true.
+            // When writeConcernMajorityShouldJournal is true,
+            // waiting for committedSnapshot is enough regardless of the j value.
+            // When writeConcernMajorityShouldJournal is false,
+            // committedSnapshot also cover j: false. Otherwise, fall through.
+
+            if (writeConcern.checkCondition == WriteConcernOptions::CheckCondition::OpTime &&
+                (getWriteConcernMajorityShouldJournal_inlock() || !useDurableOpTime)) {
+                if (kDebugBuild) {
+                    // At this stage all the tagged nodes should have reached the opTime, except
+                    // after the reconfig(see SERVER-47205). If the OpTime is greater than
+                    // _committedSnapshotAfterReconfig, check for that.
+                    if (!_committedSnapshotAfterReconfig ||
+                        (_committedSnapshotAfterReconfig < opTime)) {
+                        auto tagPattern = uassertStatusOK(_rsConfig.findCustomWriteMode(
+                            ReplSetConfig::kMajorityWriteConcernModeName));
+                        dassert(_topCoord->haveTaggedNodesReachedOpTime(
+                            opTime, tagPattern, useDurableOpTime));
+                    }
+                }
+                return true;
+            }
             // Fallthrough to wait for "majority" write concern.
         }
 
-        // Wait for all drop pending collections with drop optime before and at 'opTime' to be
-        // removed from storage.
-        if (auto dropOpTime = _externalState->getEarliestDropPendingOpTime()) {
-            if (*dropOpTime <= opTime) {
-                LOGV2_DEBUG(
-                    21338,
-                    1,
-                    "Unable to satisfy the requested majority write concern at 'committed' optime. "
-                    "There are still drop pending collections that have to be removed from storage "
-                    "before we can satisfy the write concern",
-                    "opTime"_attr = opTime,
-                    "earliestDropOpTime"_attr = *dropOpTime,
-                    "writeConcern"_attr = writeConcern.toBSON());
-                return false;
-            }
-        }
-
         // Continue and wait for replication to the majority (of voters).
-        // *** Needed for J:True, writeConcernMajorityShouldJournal:False (appliedOpTime snapshot).
         patternName = ReplSetConfig::kMajorityWriteConcernModeName;
     } else {
         patternName = wMode;
@@ -4153,6 +4163,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
         }
     }
 
+    _committedSnapshotAfterReconfig = _getCurrentCommittedSnapshotOpTime_inlock();
     lk.unlock();
     ReplicaSetAwareServiceRegistry::get(_service).onSetCurrentConfig(opCtx);
     _performPostMemberStateUpdateAction(action);
@@ -4949,11 +4960,6 @@ void ReplicationCoordinatorImpl::incrementNumCatchUpOpsIfCatchingUp(long numOps)
     if (_catchupState) {
         _catchupState->incrementNumCatchUpOps_inlock(numOps);
     }
-}
-
-void ReplicationCoordinatorImpl::signalDropPendingCollectionsRemovedFromStorage() {
-    stdx::lock_guard<Latch> lock(_mutex);
-    _wakeReadyWaiters(lock, _externalState->getEarliestDropPendingOpTime());
 }
 
 boost::optional<Timestamp> ReplicationCoordinatorImpl::getRecoveryTimestamp() {

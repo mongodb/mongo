@@ -747,8 +747,6 @@ void ReplicationCoordinatorMock::incrementNumCatchUpOpsIfCatchingUp(long numOps)
     return;
 }
 
-void ReplicationCoordinatorMock::signalDropPendingCollectionsRemovedFromStorage() {}
-
 boost::optional<Timestamp> ReplicationCoordinatorMock::getRecoveryTimestamp() {
     if (_storage) {
         return _storage->getRecoveryTimestamp(getServiceContext());

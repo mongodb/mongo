@@ -349,8 +349,6 @@ public:
 
     void incrementNumCatchUpOpsIfCatchingUp(long numOps) override;
 
-    void signalDropPendingCollectionsRemovedFromStorage() final;
-
     boost::optional<Timestamp> getRecoveryTimestamp() override;
 
     bool setContainsArbiter() const override;

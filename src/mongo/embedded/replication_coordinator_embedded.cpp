@@ -575,10 +575,6 @@ Status ReplicationCoordinatorEmbedded::stepUpIfEligible(bool skipDryRun) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::signalDropPendingCollectionsRemovedFromStorage() {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 boost::optional<Timestamp> ReplicationCoordinatorEmbedded::getRecoveryTimestamp() {
     UASSERT_NOT_IMPLEMENTED;
 }

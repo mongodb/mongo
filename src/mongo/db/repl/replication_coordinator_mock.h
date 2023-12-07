@@ -420,8 +420,6 @@ public:
 
     virtual void incrementNumCatchUpOpsIfCatchingUp(long numOps) override;
 
-    void signalDropPendingCollectionsRemovedFromStorage() final;
-
     virtual boost::optional<Timestamp> getRecoveryTimestamp() override;
 
     virtual bool setContainsArbiter() const override;
