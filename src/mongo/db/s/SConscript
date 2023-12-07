@@ -31,7 +31,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/shard_role',
-        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/s/common_s',
     ],
 )

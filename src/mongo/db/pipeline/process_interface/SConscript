@@ -81,7 +81,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/s/sharding_api',
     ],
 )
