@@ -18,7 +18,7 @@ include:
 ### Uncomment when using this file for a LTS release branch. ###
 # - filename: etc/evergreen_yml_components/variants/in_memory.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
-# - filename: etc/evergreen_yml_components/variants/sanitizer.yml
+# - filename: etc/evergreen_yml_components/variants/sanitizer/test_dev_release.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 # - filename: etc/evergreen_yml_components/variants/ninja.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###

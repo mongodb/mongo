@@ -1,6 +1,13 @@
 # Build variants for testing the classic engine.
 
 variables:
+# THIS HAS COPIES IN:
+# - etc/evergreen.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/config_shard.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/classic_engine.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
   - name: archive_dist_test_debug
@@ -13,37 +20,52 @@ variables:
   - name: generate_buildid_to_debug_symbols_mapping
     variant: linux-x86-dynamic-compile
 
+# THIS HAS COPIES IN:
+# - etc/evergreen.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/config_shard.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/classic_engine.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel80-medium
+  core_analyzer_distro_name: rhel80-large
   num_scons_link_jobs_available: 0.99
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
+# THIS HAS COPIES IN:
+# - etc/evergreen.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/config_shard.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/classic_engine.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &enterprise-rhel-80-64-bit-dynamic-expansions
-    <<: *linux_x86_generic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    has_packages: false
-    jstestfuzz_num_generated_files: 40
-    jstestfuzz_concurrent_num_files: 10
-    target_resmoke_time: 10
-    max_sub_suites: 5
-    idle_timeout_factor: 1.5
-    exec_timeout_factor: 1.5
-    large_distro_name: rhel80-medium
-    core_analyzer_distro_name: rhel80-large
-    burn_in_tag_buildvariants: >-
-      enterprise-rhel-80-64-bit-inmem
-      enterprise-rhel-80-64-bit-multiversion
-    burn_in_tag_compile_task_dependency: archive_dist_test_debug
+  <<: *linux_x86_generic_expansions
+  scons_cache_scope: shared
+  scons_cache_mode: all
+  has_packages: false
+  jstestfuzz_num_generated_files: 40
+  jstestfuzz_concurrent_num_files: 10
+  target_resmoke_time: 10
+  max_sub_suites: 5
+  idle_timeout_factor: 1.5
+  exec_timeout_factor: 1.5
+  large_distro_name: rhel80-medium
 
 # If you add anything to san_options, make sure the appropriate changes are
 # also made to SConstruct.
-# and also to the san_options in compile_static_analysis.yml
-- aubsan_options: &aubsan_options
-  >-
+# THIS HAS COPIES IN:
+# - etc/evergreen.yml
+# - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev_release.yml
+# - etc/evergreen_yml_components/variants/classic_engine.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- aubsan_options: &aubsan_options >-
     UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
     LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
     ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
@@ -68,10 +90,6 @@ buildvariants:
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: >-
-      enterprise-rhel-80-64-bit-inmem
-      enterprise-rhel-80-64-bit-multiversion
-    burn_in_tag_compile_task_dependency: archive_dist_test_debug
   depends_on:
   - name: archive_dist_test_debug
     variant: *linux_x86_dynamic_compile_variant_name

@@ -6,6 +6,8 @@ variables:
 # - etc/evergreen.yml
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # - etc/evergreen_yml_components/variants/config_shard.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
@@ -23,6 +25,8 @@ variables:
 # - etc/evergreen.yml
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # - etc/evergreen_yml_components/variants/config_shard.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
@@ -37,6 +41,8 @@ variables:
 # - etc/evergreen.yml
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # - etc/evergreen_yml_components/variants/config_shard.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &enterprise-rhel-80-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions

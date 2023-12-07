@@ -2,7 +2,7 @@
 
 variables:
 # THIS HAS COPIES IN
-# - etc/evergreen_yml_components/variants/compile_static_analysis.yml
+# - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
 # - etc/evergreen_yml_components/variants/rhel/build_dev.yml
 # - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
@@ -17,7 +17,7 @@ variables:
   - name: generate_buildid_to_debug_symbols_mapping
 
 # THIS HAS COPIES IN
-# - etc/evergreen_yml_components/variants/compile_static_analysis.yml
+# - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
 # - etc/evergreen_yml_components/variants/rhel/build_dev.yml
 # - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
@@ -27,7 +27,7 @@ variables:
   has_packages: false
 
 # THIS HAS COPIES IN
-# - etc/evergreen_yml_components/variants/compile_static_analysis.yml
+# - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
 # - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_debug_compile_expansions
