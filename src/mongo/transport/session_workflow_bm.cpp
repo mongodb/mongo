@@ -86,7 +86,7 @@ constexpr bool enableInstrumentation = false;
 /** Benchmarks can't do this with command line flags like unit tests can. */
 void initializeInstrumentation() {
     constexpr auto kLogLevel =
-        enableInstrumentation ? logv2::LogSeverity::Debug(4) : logv2::LogSeverity::Error();
+        enableInstrumentation ? logv2::LogSeverity::Debug(4) : logv2::LogSeverity::Warning();
     std::array components = {
         std::pair{logv2::LogComponent::kExecutor, kLogLevel},
         std::pair{logv2::LogComponent::kNetwork, kLogLevel},
@@ -243,6 +243,7 @@ public:
         LOGV2_DEBUG(7015136, 3, "About to start sep");
         invariant(svcCtx->getTransportLayerManager()->setup());
         invariant(svcCtx->getTransportLayerManager()->start());
+        ServiceExecutor::startupAll(svcCtx);
     }
 
     AsioSessionManager* sessionManager() const {
@@ -256,6 +257,7 @@ public:
             return;
         LOGV2_DEBUG(7015138, 3, "TearDown (last)");
         getGlobalServiceContext()->getTransportLayerManager()->shutdown();
+        ServiceExecutor::shutdownAll(getGlobalServiceContext(), Seconds(1));
         setGlobalServiceContext({});
         _savedDefaultReserved.reset();
     }
@@ -269,8 +271,9 @@ public:
                 return _transportLayer;
             };
             Future<void> ended = session->observeEnd();
-            sessionManager()->startSession(std::move(session));
+            sessionManager()->startSession(session);
             ended.get();
+            invariant(session->rounds() == 0);
         }
         LOGV2_DEBUG(7015140, 3, "run: all iterations finished");
         invariant(sessionManager()->waitForNoSessions(Seconds{1}));
