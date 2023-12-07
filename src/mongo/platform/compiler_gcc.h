@@ -104,6 +104,8 @@
 
 #define MONGO_COMPILER_NO_UNIQUE_ADDRESS [[no_unique_address]]
 
+#define MONGO_COMPILER_USED [[gnu::used]]
+
 #if defined(__clang__)
 #define MONGO_GSL_POINTER [[gsl::Pointer]]
 #else

@@ -79,4 +79,6 @@
 
 #define MONGO_COMPILER_NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
 
+#define MONGO_COMPILER_USED
+
 #define MONGO_GSL_POINTER

@@ -189,6 +189,13 @@
  *    since the MSVC compiler ignores attributes it does not recognize.
  *
  *
+ * MONGO_USED
+ *
+ *    Tells the compiler that the value is not to be optimized out, even if the compiler believes it
+ *    is unused. This ensure that the symbol and value are always compiled into the binary and can
+ *    be used for debugging and other uses. Equivalent to adding [[gnu::used]] to the declaration.
+ *
+ *
  * MONGO_GSL_POINTER
  *
  *    Hints to the compiler that this type is a gsl::Pointer type,
