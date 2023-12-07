@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bson_validate_old.h"
 #include "mongo/logv2/log.h"
@@ -58,6 +59,8 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     // This will effectively cause the fuzer to find differences between both implementations
     // (as they'd lead to crashes), while using edge cases leading to interesting control flow
     // paths in both implementations.
-    invariant(oldRet.isOK() == ret.isOK());
+    //
+    // Ignore changes due to column validation failing additional entries
+    invariant(oldRet.isOK() == ret.isOK() || ret.code() == ErrorCodes::NonConformantBSON);
     return 0;
 }
