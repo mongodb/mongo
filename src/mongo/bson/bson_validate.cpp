@@ -442,34 +442,38 @@ public:
         uassert(InvalidBSON,
                 "BSON literal is not followed by fieldname",
                 _maxLength > 1);  // must at least have a 0-terminator after control
-        size_t fieldNameSize = strnlen(_data + 1 /* skip type */, _maxLength - 1);
-        uassert(InvalidBSON,
-                "BSON literal fieldname exceeds buffer size",
-                fieldNameSize < _maxLength - 1);
-        fieldNameSize++;  // add the 0-terminator
-
-        int size = BSONElement::computeSize(*_data, _data, fieldNameSize, _maxLength);
-        uassert(InvalidBSON,
-                "BSON literal content exceeds buffer size",
-                size != -1 && (size_t)size <= _maxLength);
-        _currFrame->end = _data + size;
+        size_t fieldNameSize = strnlen(_data + 1 /* skip type */, _maxLength - 1) + 1;
 
         // Handle one element without using iterative loop, and without expecting
         // multiple instances or an EOO.  Only resume with the iterative loop if
         // the frame stack has been incremented, meaning we have nested objects
+
+        // Save pointer to currFrame->end so we can fill it in once we know the size
+        const char** preEnd = &(_currFrame->end);
         const char* ptr =
             _validateElem(Cursor{_data + 1 + fieldNameSize, _data + _maxLength}, *_data);
         _validator.checkNonConformantElem(_data, 1 + fieldNameSize, *_data);
 
         if (_currFrame != _frames.begin()) {
+            // We know that type was kObject or kArray, so size is fieldname, type,
+            // and a stored int
+            int size = 1 + fieldNameSize +
+                ConstDataView(_data + fieldNameSize + 1).read<LittleEndian<int32_t>>();
+            uassert(InvalidBSON,
+                    "BSON literal content exceeds buffer size",
+                    (size_t)size <= _maxLength);
+            *preEnd = _data + size;
             const char* internalEnd = _currFrame->end;
             _popFrame();
             uassert(InvalidBSON,
                     "BSON literal nested content does not end at external end",
                     _currFrame->end == internalEnd);
             _validateIterative(Cursor{ptr, _data + size});
+            return size;
+        } else {
+            *preEnd = ptr;
+            return ptr - _data;
         }
-        return size;
     }
 
 private:
