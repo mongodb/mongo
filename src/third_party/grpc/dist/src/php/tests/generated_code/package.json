@@ -1,8 +1,0 @@
-{
-  "name": "grpc-examples",
-  "version": "0.1.0",
-  "dependencies": {
-    "@grpc/proto-loader": "^0.1.0",
-    "grpc": "^1.39.0"
-  }
-}

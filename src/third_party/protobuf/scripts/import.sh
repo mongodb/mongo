@@ -28,6 +28,17 @@ rm -rf kokoro
 rm -rf m4
 rm -rf protoc-artifacts
 rm -rf util
+rm -rf ci
+rm -rf csharp
+rm -rf java
+rm -rf js
+rm -rf lua
+rm -rf objectivec
+rm -rf php
+rm -rf python
+rm -rf ruby
+rm -rf rust
+
 find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;
 find . -type d -name "Google.Protobuf.Test" -exec rm -rf {} \;
 popd

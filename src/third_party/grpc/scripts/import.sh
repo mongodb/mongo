@@ -33,6 +33,13 @@ rm -rf examples/objective-c
 rm -rf examples/php
 rm -rf examples/python
 rm -rf examples/ruby
+rm -rf src/android
+rm -rf src/csharp
+rm -rf src/objective-c
+rm -rf src/php
+rm -rf src/python
+rm -rf src/ruby
+
 find . -type f -name "*.BUILD" -exec rm -rf {} \;
 find . -type f -name "*.podspec" -exec rm -rf {} \;
 find . -type f -name "*.gemspec" -exec rm -rf {} \;
