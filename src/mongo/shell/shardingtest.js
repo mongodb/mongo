@@ -1884,6 +1884,21 @@ var ShardingTest = function ShardingTest(params) {
         // empty config database.
         this.configRS.awaitLastOpCommitted();
 
+        if (useAutoBootstrapProcedure) {
+            // This is needed because auto-bootstrapping will initially create a config.shards entry
+            // for the config shard where the host field does not contain all the nodes in the
+            // replica set.
+            assert.soonNoExcept(() => {
+                function getConfigShardDoc() {
+                    return csrsPrimary.getDB("config").shards.findOne({_id: "config"})
+                }
+                const configShardDoc = this.keyFile
+                    ? authutil.asCluster(csrsPrimary, this.keyFile, getConfigShardDoc)
+                    : getConfigShardDoc();
+                return configShardDoc.host == this.configRS.getURL();
+            });
+        }
+
         if (jsTestOptions().keyFile) {
             jsTest.authenticateNodes(this._mongos);
         }
