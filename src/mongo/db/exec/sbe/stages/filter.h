@@ -71,6 +71,7 @@ public:
           _filter(std::move(filter)) {
         static_assert(!IsEof || !IsConst);
         _children.emplace_back(std::move(input));
+        tassert(8400101, "Filter must be passed a filter", _filter);
     }
 
     std::unique_ptr<PlanStage> clone() const final {

@@ -92,4 +92,15 @@ TimeseriesTest.run((insert) => {
               [{_id: 1}]);
 
     testMatch({"time": {"obj": new Date(datePrefix + 100)}}, []);
+
+    // Special test case which can result in an empty event filter being compiled (SERVER-84001).
+    {
+        const pipe = [
+            {$match: {"topLevelScalarField": {$not: {$in: []}}}},
+            {$match: {"measurement": "cpu"}},
+            {$project: {_id: 1}}
+        ];
+        const res = coll.aggregate(pipe).toArray()
+        assert.eq(res.length, 3);
+    }
 });

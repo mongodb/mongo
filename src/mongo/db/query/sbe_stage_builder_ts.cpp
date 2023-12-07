@@ -430,9 +430,11 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     if (eventFilter) {
         auto eventFilterSbExpr =
             generateFilter(_state, eventFilter, boost::none /* rootSlot */, &outputs);
-        stage = sbe::makeS<sbe::FilterStage<false>>(
-            std::move(stage), eventFilterSbExpr.extractExpr(_state).expr, unpackNode->nodeId());
-        printPlan(*stage);
+        if (!eventFilterSbExpr.isNull()) {
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), eventFilterSbExpr.extractExpr(_state).expr, unpackNode->nodeId());
+            printPlan(*stage);
+        }
     }
 
     // If the parent wants us to materialize kResult, create an object with all published fields.
