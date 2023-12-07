@@ -539,7 +539,7 @@ boost::optional<ExecParams> tryGetSBEExecutorViaFastPath(
     }
 
     sbePlan->attachToOperationContext(opCtx);
-    if (expCtx->mayDbProfile) {
+    if (expCtx->explain || expCtx->mayDbProfile) {
         sbePlan->markShouldCollectTimingInfo();
     }
 

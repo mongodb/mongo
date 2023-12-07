@@ -30,25 +30,15 @@ function verifyStages(execStages, microAndNanosExpected) {
 
 // Test explain on find command.
 let explainResult = coll.find({x: {$gt: 500}}).explain("executionStats");
-// TODO SERVER-83762: this switch-case for different optimizers, can be removed once the CQF explain
-// output contains "executionTimeMillisEstimate".
-switch (getOptimizer(explainResult)) {
-    case "classic": {
-        let executionStages = explainResult.executionStats.executionStages;
-        assert(executionStages.hasOwnProperty("executionTimeMillisEstimate"), executionStages);
-        verifyStages(executionStages, false);
-        break;
-    }
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+let executionStages = explainResult.executionStats.executionStages;
+assert(executionStages.hasOwnProperty("executionTimeMillisEstimate"), executionStages);
+verifyStages(executionStages, false);
 
 // Test explain on aggregate command.
 const pipeline = [{$match: {x: {$gt: 500}}}, {$addFields: {xx: {$add: ["$x", "$y"]}}}];
 // Run an explain command when the "executionTimeMicros"/"executionTimeNanos" should be omitted.
 explainResult = coll.explain("executionStats").aggregate(pipeline);
-let executionStages = explainResult.hasOwnProperty("stages")
+executionStages = explainResult.hasOwnProperty("stages")
     ? explainResult.stages
     : [explainResult.executionStats.executionStages];
 assert.neq(executionStages.length, 0, executionStages);
@@ -75,18 +65,8 @@ coll = db.explain_execution_time_in_microseconds;
 explainResult = coll.find({x: {$gt: 500}}).explain("executionStats");
 let isSBE = explainResult.explainVersion === "2";
 executionStages = explainResult.executionStats.executionStages;
-// TODO SERVER-83762: this switch-case for different optimizers, can be removed once the CQF explain
-// output contains "executionTimeMillisEstimate".
-switch (getOptimizer(explainResult)) {
-    case "classic": {
-        assert(executionStages.hasOwnProperty("executionTimeMillisEstimate"), executionStages);
-        verifyStages(executionStages, isSBE);
-        break;
-    }
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert(executionStages.hasOwnProperty("executionTimeMillisEstimate"), executionStages);
+verifyStages(executionStages, isSBE);
 
 explainResult = coll.explain("executionStats").aggregate(pipeline);
 executionStages = explainResult.hasOwnProperty("stages")

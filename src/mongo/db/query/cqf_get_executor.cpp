@@ -443,7 +443,7 @@ static ExecParams createExecutor(
                                       std::move(staticData));
 
     sbePlan->attachToOperationContext(opCtx);
-    if (expCtx->mayDbProfile) {
+    if (expCtx->explain || expCtx->mayDbProfile) {
         sbePlan->markShouldCollectTimingInfo();
     }
 
