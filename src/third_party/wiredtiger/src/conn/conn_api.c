@@ -1221,7 +1221,6 @@ err:
      * writes and we're about to do a final checkpoint separately from the checkpoint server.
      */
     WT_TRET(__wt_background_compact_server_destroy(session));
-    WT_TRET(__wt_capacity_server_destroy(session));
     WT_TRET(__wt_checkpoint_server_destroy(session));
 
     /* Perform a final checkpoint and shut down the global transaction state. */

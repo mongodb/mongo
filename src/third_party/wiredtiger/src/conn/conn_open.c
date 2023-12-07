@@ -91,7 +91,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
      * down before the eviction server, and shut all servers down before closing open data handles.
      */
     WT_TRET(__wt_background_compact_server_destroy(session));
-    WT_TRET(__wt_capacity_server_destroy(session));
     WT_TRET(__wt_checkpoint_server_destroy(session));
     WT_TRET(__wt_statlog_destroy(session, true));
     WT_TRET(__wt_tiered_storage_destroy(session, false));
@@ -102,6 +101,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
     /* The eviction server is shut down last. */
     WT_TRET(__wt_evict_destroy(session));
+    /* The capacity server can only be shut down after all I/O is complete. */
+    WT_TRET(__wt_capacity_server_destroy(session));
 
     /* There should be no more file opens after this point. */
     F_SET(conn, WT_CONN_CLOSING_NO_MORE_OPENS);
