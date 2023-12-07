@@ -5,7 +5,7 @@ RUN mkdir -p bin/test/format
 RUN mkdir -p /data/RUNDIR
 COPY cmake_build/test/format/t bin/test/format/
 COPY tools/voidstar/lib/libvoidstar.so tools/voidstar/lib/
-COPY cmake_build/libwiredtiger.so.11.2.0 bin/
+COPY cmake_build/libwiredtiger.so.[0-9][0-9].[0-9].[0-9] bin/
 COPY cmake_build/wt bin/
 RUN mkdir -p bin/ext/encryptors/rotn
 COPY cmake_build/ext/encryptors/rotn/libwiredtiger_rotn.so bin/ext/encryptors/rotn
