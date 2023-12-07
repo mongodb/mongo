@@ -571,16 +571,6 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     invariant(begin != end);
 
     auto nss = oplogEntryTemplate->getNss();
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->isOplogDisabledFor(opCtx, nss)) {
-        invariant(!begin->stmtIds.empty());
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "retryable writes is not supported for unreplicated ns: "
-                              << nss.toStringForErrorMsg(),
-                begin->stmtIds.front() == kUninitializedStmtId);
-        return {};
-    }
-
     // The number of entries in 'fromMigrate' should be consistent with the number of insert
     // operations in [begin, end). Also, 'fromMigrate' is a sharding concept, so there is no
     // need to check 'fromMigrate' for inserts that are not replicated. See SERVER-75829.
@@ -677,6 +667,27 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     return opTimes;
 }
 
+bool _skipOplogOps(const bool isOplogDisabled,
+                   const bool inBatchedWrite,
+                   const bool inMultiDocumentTransaction,
+                   const NamespaceString& nss,
+                   const std::vector<StmtId>& stmtIds) {
+    // Return early, possibly uassert for retryable writes if isOplogDisabledFor is true
+    if (isOplogDisabled) {
+        if (!inBatchedWrite && !inMultiDocumentTransaction) {
+            invariant(!stmtIds.empty());
+            invariant(stmtIds.front() != kUninitializedStmtId || stmtIds.size() == 1);
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "retryable writes is not supported for unreplicated ns: "
+                                  << nss.toStringForErrorMsg(),
+                    stmtIds.front() == kUninitializedStmtId);
+        }
+        return true;
+    } else {
+        return false;
+    }
+}
+
 }  // namespace
 
 void OpObserverImpl::onInserts(OperationContext* opCtx,
@@ -686,20 +697,26 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                std::vector<bool> fromMigrate,
                                bool defaultFromMigrate,
                                OpStateAccumulator* opAccumulator) {
+    const auto& nss = coll->ns();
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const bool isOplogDisabled = replCoord->isOplogDisabledFor(opCtx, nss);
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
-        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
+        txnParticipant && !isOplogDisabled && txnParticipant.transactionIsOpen();
+    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
+    const bool inBatchedWrite = batchedWriteContext.writesAreBatched();
 
-    const auto& nss = coll->ns();
+    if (_skipOplogOps(
+            isOplogDisabled, inBatchedWrite, inMultiDocumentTransaction, nss, first->stmtIds)) {
+        return;
+    }
+
     const auto& uuid = coll->uuid();
 
     std::vector<repl::OpTime> opTimeList;
     repl::OpTime lastOpTime;
 
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
-
-    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
-    const bool inBatchedWrite = batchedWriteContext.writesAreBatched();
 
     if (inBatchedWrite) {
         invariant(!defaultFromMigrate);
@@ -851,18 +868,27 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
     }
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const auto& nss = args.coll->ns();
+    const bool isOplogDisabled = replCoord->isOplogDisabledFor(opCtx, nss);
     const bool inMultiDocumentTransaction =
-        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
-
-    auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, args.coll->ns());
-
-    OpTimeBundle opTime;
+        txnParticipant && !isOplogDisabled && txnParticipant.transactionIsOpen();
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
     const bool inBatchedWrite = batchedWriteContext.writesAreBatched();
 
+    if (_skipOplogOps(isOplogDisabled,
+                      inBatchedWrite,
+                      inMultiDocumentTransaction,
+                      nss,
+                      args.updateArgs->stmtIds)) {
+        return;
+    }
+
+    auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
+    OpTimeBundle opTime;
     if (inBatchedWrite) {
         auto operation = MutableOplogEntry::makeUpdateOperation(
-            args.coll->ns(), args.coll->uuid(), args.updateArgs->update, args.updateArgs->criteria);
+            nss, args.coll->uuid(), args.updateArgs->update, args.updateArgs->criteria);
         operation.setDestinedRecipient(
             shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
@@ -881,7 +907,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
                 << "Attempted a retryable write within a non-retryable multi-document transaction");
 
         auto operation = MutableOplogEntry::makeUpdateOperation(
-            args.coll->ns(), args.coll->uuid(), args.updateArgs->update, args.updateArgs->criteria);
+            nss, args.coll->uuid(), args.updateArgs->update, args.updateArgs->criteria);
 
         if (inRetryableInternalTransaction) {
             operation.setInitializedStatementIds(args.updateArgs->stmtIds);
@@ -900,7 +926,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
                 CollectionUpdateArgs::StoreDocOption::PostImage) {
                 invariant(!args.updateArgs->updatedDoc.isEmpty(),
                           str::stream()
-                              << "Update document must be present for pre-image recording");
+                              << "Update document must be present for post-image recording");
                 operation.setPostImage(args.updateArgs->updatedDoc.getOwned());
                 if (args.retryableFindAndModifyLocation ==
                     RetryableFindAndModifyLocation::kSideCollection) {
@@ -987,10 +1013,12 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    BSONObj const& doc,
                                    OplogDeleteEntryArgs* args,
                                    OpStateAccumulator* opAccumulator) {
+    const auto& nss = coll->ns();
     documentKeyDecoration(args).emplace(getDocumentKey(coll, doc));
 
-    {
-        ShardingWriteRouter shardingWriteRouter(opCtx, coll->ns());
+    // no need to create ShardingWriteRouter if isOplogDisabledFor is true
+    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
+        ShardingWriteRouter shardingWriteRouter(opCtx, nss);
         destinedRecipientDecoration(args) = shardingWriteRouter.getReshardingDestinedRecipient(doc);
     }
 }
@@ -1006,13 +1034,17 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     auto optDocKey = documentKeyDecoration(args);
     invariant(optDocKey, nss.toStringForErrorMsg());
     auto& documentKey = optDocKey.value();
-
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const bool isOplogDisabled = replCoord->isOplogDisabledFor(opCtx, nss);
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
-        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
-
+        txnParticipant && !isOplogDisabled && txnParticipant.transactionIsOpen();
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
     const bool inBatchedWrite = batchedWriteContext.writesAreBatched();
+
+    if (_skipOplogOps(isOplogDisabled, inBatchedWrite, inMultiDocumentTransaction, nss, {stmtId})) {
+        return;
+    }
 
     OpTimeBundle opTime;
     if (inBatchedWrite) {
