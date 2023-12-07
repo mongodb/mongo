@@ -12,9 +12,10 @@
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
- *   # The SBE plan cache was first enabled in 6.3, but SERVER-79867, now tested here as well, was
- *   # first fixed in 7.1.
- *   requires_fcv_71,
+ *   # This test checks a new field "solutionHash" in $planCacheStats, not available in previous
+ *   # versions.
+ *   requires_fcv_72,
+ *   multiversion_incompatible,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
@@ -44,6 +45,7 @@ if (isSbeEnabled) {
     assert(stats.hasOwnProperty("cachedPlan"), stats);
     assert(stats.cachedPlan.hasOwnProperty("slots"), stats);
     assert(stats.cachedPlan.hasOwnProperty("stages"), stats);
+    assert(stats.hasOwnProperty("solutionHash"), stats);
     coll.getPlanCache().clear();
 }
 
@@ -58,6 +60,7 @@ const allStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
 assert.eq(allStats.length, 1, allStats);
 const stats = allStats[0];
 assert(stats.hasOwnProperty("cachedPlan"), stats);
+assert(stats.hasOwnProperty("solutionHash"), stats);
 
 if (isSbeEnabled) {
     assert(stats.cachedPlan.hasOwnProperty("slots"), stats);

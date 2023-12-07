@@ -114,6 +114,7 @@ std::unique_ptr<SolutionCacheData> SolutionCacheData::clone() const {
     other->solnType = this->solnType;
     other->wholeIXSolnDir = this->wholeIXSolnDir;
     other->indexFilterApplied = this->indexFilterApplied;
+    other->solutionHash = this->solutionHash;
     return other;
 }
 

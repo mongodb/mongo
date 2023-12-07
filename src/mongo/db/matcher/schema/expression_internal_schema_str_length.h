@@ -80,7 +80,10 @@ public:
 
     bool equivalent(const MatchExpression* other) const final;
 
-protected:
+    StringData getName() const {
+        return _name;
+    }
+
     long long strLen() const {
         return _strLen;
     }

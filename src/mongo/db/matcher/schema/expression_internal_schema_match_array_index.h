@@ -125,6 +125,10 @@ public:
         return _index;
     }
 
+    const ExpressionWithPlaceholder* getExpression() const {
+        return _expression.get();
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final;
 

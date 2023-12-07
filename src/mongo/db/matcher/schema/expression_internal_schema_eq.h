@@ -97,6 +97,10 @@ public:
         visitor->visit(this);
     }
 
+    BSONElement getRhsElem() const {
+        return _rhsElem;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) {

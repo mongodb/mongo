@@ -243,6 +243,9 @@ struct SolutionCacheData {
 
     // True if index filter was applied.
     bool indexFilterApplied;
+
+    // Hash of the QuerySolution that led to this cache data.
+    size_t solutionHash;
 };
 
 using PlanCacheEntry = PlanCacheEntryBase<SolutionCacheData, plan_cache_debug_info::DebugInfo>;

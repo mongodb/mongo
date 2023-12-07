@@ -120,6 +120,10 @@ public:
         visitor->visit(this);
     }
 
+    BSONObj getRhsObj() const {
+        return _rhsObj;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) {

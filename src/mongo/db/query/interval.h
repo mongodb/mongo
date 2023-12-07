@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
@@ -234,6 +235,12 @@ inline bool operator==(const Interval& lhs, const Interval& rhs) {
 
 inline bool operator!=(const Interval& lhs, const Interval& rhs) {
     return !(lhs == rhs);
+}
+
+template <typename H>
+H AbslHashValue(H state, const Interval& c) {
+    return H::combine(
+        std::move(state), c.startInclusive, c.endInclusive, simpleHash(c._intervalData));
 }
 
 }  // namespace mongo

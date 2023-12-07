@@ -27,6 +27,10 @@
 //   simulate_atlas_proxy_incompatible,
 //   # Query settings are not supported in upgrade/downgrade scenario
 //   cannot_run_during_upgrade_downgrade,
+//   # This test checks a new field "solutionHash" in $planCacheStats, not available in previous
+//   # versions.
+//   requires_fcv_72,
+//   multiversion_incompatible,
 // ]
 
 import {
@@ -132,12 +136,18 @@ if (!isSbeEnabled) {
 // query shapes.
 assert.eq(0, coll.find({a: 123}).sort({b: -1, a: 1}).itcount(), 'unexpected document count');
 let entryNewShape = getPlansForCacheEntry({a: 123}, {b: -1, a: 1});
+// Assert on queryHash.
 assert.eq(entry.hasOwnProperty("queryHash"), true);
 assert.eq(entryNewShape.hasOwnProperty("queryHash"), true);
 assert.neq(entry["queryHash"], entryNewShape["queryHash"]);
+// Assert on planCacheKey.
 assert.eq(entry.hasOwnProperty("planCacheKey"), true);
 assert.eq(entryNewShape.hasOwnProperty("planCacheKey"), true);
 assert.neq(entry["planCacheKey"], entryNewShape["planCacheKey"]);
+// Assert on solutionHash.
+assert.eq(entry.hasOwnProperty("solutionHash"), true);
+assert.eq(entryNewShape.hasOwnProperty("solutionHash"), true);
+assert.neq(entry["solutionHash"], entryNewShape["solutionHash"]);
 
 // Generate more plans for test query by adding indexes (compound and sparse).  This will also
 // clear the plan cache.

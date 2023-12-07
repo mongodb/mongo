@@ -94,12 +94,15 @@ void updatePlanCache(OperationContext* opCtx,
                      const CanonicalQuery& query,
                      const QuerySolution& solution,
                      const sbe::PlanStage& root,
-                     stage_builder::PlanStageData& stageData) {
+                     stage_builder::PlanStageData stageData) {
     const CollectionPtr& collection = collections.getMainCollection();
     if (collection && !query.isUncacheableSbe() && shouldCacheQuery(query) &&
         solution.isEligibleForPlanCache()) {
         sbe::PlanCacheKey key = plan_cache_key_factory::make(query, collections);
-        auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), stageData);
+        // Store a copy of the root and corresponding data, as well as the hash of the QuerySolution
+        // that led to this cache entry.
+        auto plan = std::make_unique<sbe::CachedSbePlan>(
+            root.clone(), std::move(stageData), solution.hash());
         plan->indexFilterApplied = solution.indexFilterApplied;
 
         bool shouldOmitDiagnosticInformation =

@@ -333,7 +333,8 @@ private:
             std::make_unique<sbe::CoScanStage>(PlanNodeId{}),
             stage_builder::PlanStageData(
                 stage_builder::Environment(std::make_unique<sbe::RuntimeEnvironment>()),
-                std::make_unique<stage_builder::PlanStageStaticData>()));
+                std::make_unique<stage_builder::PlanStageStaticData>()),
+            0 /*hash*/);
         auto decision = createDecision(1U);
         auto querySolution = std::make_unique<QuerySolution>();
 

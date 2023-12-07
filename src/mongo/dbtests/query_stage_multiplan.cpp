@@ -128,6 +128,7 @@ static const NamespaceString nss =
 
 std::unique_ptr<QuerySolution> createQuerySolution() {
     auto soln = std::make_unique<QuerySolution>();
+    soln->setRoot(std::make_unique<CollectionScanNode>());
     soln->cacheData = std::make_unique<SolutionCacheData>();
     soln->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
     soln->cacheData->tree = std::make_unique<PlanCacheIndexTree>();

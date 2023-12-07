@@ -13,9 +13,12 @@
 //   assumes_standalone_mongod,
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
-//   requires_fcv_61,
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
+//   # This test checks a new field "solutionHash" in $planCacheStats, not available in previous
+//   # versions.
+//   requires_fcv_72,
+//   multiversion_incompatible,
 // ]
 import {getPlanCacheKeyFromExplain} from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
@@ -39,11 +42,12 @@ assert.commandWorked(coll.insert({a: 'foo', b: 5}));
 
 // We need two indexes that each query can use so that a plan cache entry is created.
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: 'en_US'}}));
-assert.commandWorked(coll.createIndex({a: 1, b: 1}, {collation: {locale: 'en_US'}}));
+assert.commandWorked(coll.createIndex({a: 1, b: 1}, {name: "ab1", collation: {locale: 'en_US'}}));
 
 // We need an index with a different collation, so that string comparisons affect the query
 // shape.
 assert.commandWorked(coll.createIndex({b: 1}, {collation: {locale: 'fr_CA'}}));
+assert.commandWorked(coll.createIndex({a: 1, b: 1}, {name: "ab2", collation: {locale: 'fr_CA'}}));
 
 // Run a query so that an entry is inserted into the cache.
 assert.commandWorked(
@@ -91,6 +95,11 @@ explainRes = coll.find({a: 'foo', b: 5}).collation({locale: 'fr_CA'}).explain();
 assert.eq(0,
           getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes, db)).length,
           dumpPlanCacheState());
+// Cache the query, then assert that different collations lead to different hashes.
+coll.find({a: 'foo', b: 5}).collation({locale: 'fr_CA'}).toArray();
+const cache = coll.getPlanCache().list();
+assert.eq(cache.length, 2);
+assert.neq(cache[0].solutionHash, cache[1].solutionHash);
 
 explainRes = coll.find({a: 'foo', b: 'bar'}).collation({locale: 'en_US'}).explain();
 // A query with different string locations should have no cached plans.

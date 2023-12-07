@@ -89,19 +89,21 @@ void QueryPlannerTest::clearState() {
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey) {
-    params.indices.push_back({keyPattern,
-                              IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                              IndexDescriptor::kLatestIndexVersion,
-                              multikey,
-                              {},
-                              {},
-                              false,  // sparse
-                              false,  // unique
-                              IndexEntry::Identifier{"hari_king_of_the_stove"},
-                              nullptr,  // filterExpr
-                              BSONObj(),
-                              nullptr,
-                              nullptr});
+    params.indices.push_back(
+        {keyPattern,
+         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+         IndexDescriptor::kLatestIndexVersion,
+         multikey,
+         {},
+         {},
+         false,  // sparse
+         false,  // unique
+         // Add the position to the name so we have a unique set of index names.
+         IndexEntry::Identifier{"hari_king_of_the_stove" + std::to_string(params.indices.size())},
+         nullptr,  // filterExpr
+         BSONObj(),
+         nullptr,
+         nullptr});
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey, bool sparse) {

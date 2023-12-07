@@ -83,7 +83,10 @@ public:
         return nullptr;
     }
 
-protected:
+    StringData getName() const {
+        return _name;
+    }
+
     long long numItems() const {
         return _numItems;
     }

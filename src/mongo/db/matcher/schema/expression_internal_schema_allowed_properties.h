@@ -200,6 +200,14 @@ public:
         return _patternProperties;
     }
 
+    StringData getNamePlaceholder() const {
+        return _namePlaceholder;
+    }
+
+    const ExpressionWithPlaceholder* getOtherwise() const {
+        return _otherwise.get();
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final;
 

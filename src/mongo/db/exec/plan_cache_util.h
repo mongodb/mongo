@@ -205,30 +205,8 @@ void updatePlanCacheFromCandidates(
         solution->isEligibleForPlanCache()) {
         const CollectionPtr& collection = collections.getMainCollection();
         auto rankingDecision = ranking.get();
-        auto cacheClassicPlan = [&]() {
-            auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
-                return buildDebugInfo(query, std::move(ranking));
-            };
-            PlanCacheCallbacksImpl<PlanCacheKey,
-                                   SolutionCacheData,
-                                   plan_cache_debug_info::DebugInfo>
-                callbacks{query, buildDebugInfoFn};
-            winningPlan.solution->cacheData->indexFilterApplied =
-                winningPlan.solution->indexFilterApplied;
-            auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
-            uassertStatusOK(CollectionQueryInfo::get(collection)
-                                .getPlanCache()
-                                ->set(plan_cache_key_factory::make<PlanCacheKey>(query, collection),
-                                      winningPlan.solution->cacheData->clone(),
-                                      *rankingDecision,
-                                      opCtx->getServiceContext()->getPreciseClockSource()->now(),
-                                      &callbacks,
-                                      isSensitive ? PlanSecurityLevel::kSensitive
-                                                  : PlanSecurityLevel::kNotSensitive,
-                                      boost::none /* worksGrowthCoefficient */));
-        };
 
-        if (winningPlan.solution->cacheData != nullptr) {
+        if (solution->cacheData != nullptr) {
             if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
                 tassert(6142201,
                         "The winning CandidatePlan should contain the original plan",
@@ -237,12 +215,12 @@ void updatePlanCacheFromCandidates(
                 // Clone the winning SBE plan and its auxiliary data.
                 auto cachedPlan = std::make_unique<sbe::CachedSbePlan>(
                     std::move(winningPlan.clonedPlan->first),
-                    std::move(winningPlan.clonedPlan->second.stageData));
-                cachedPlan->indexFilterApplied = winningPlan.solution->indexFilterApplied;
+                    std::move(winningPlan.clonedPlan->second.stageData),
+                    solution->hash());
+                cachedPlan->indexFilterApplied = solution->indexFilterApplied;
 
-                auto buildDebugInfoFn =
-                    [soln = winningPlan.solution.get()]() -> plan_cache_debug_info::DebugInfoSBE {
-                    return buildDebugInfo(soln);
+                auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfoSBE {
+                    return buildDebugInfo(solution);
                 };
                 PlanCacheCallbacksImpl<sbe::PlanCacheKey,
                                        sbe::CachedSbePlan,
@@ -260,10 +238,30 @@ void updatePlanCacheFromCandidates(
                     boost::none /* worksGrowthCoefficient */));
             } else {
                 static_assert(std::is_same_v<PlanStageType, PlanStage*>);
-                cacheClassicPlan();
+                auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
+                    return buildDebugInfo(query, std::move(ranking));
+                };
+                PlanCacheCallbacksImpl<PlanCacheKey,
+                                       SolutionCacheData,
+                                       plan_cache_debug_info::DebugInfo>
+                    callbacks{query, buildDebugInfoFn};
+                solution->cacheData->indexFilterApplied = solution->indexFilterApplied;
+                solution->cacheData->solutionHash = solution->hash();
+                auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
+                uassertStatusOK(
+                    CollectionQueryInfo::get(collection)
+                        .getPlanCache()
+                        ->set(plan_cache_key_factory::make<PlanCacheKey>(query, collection),
+                              solution->cacheData->clone(),
+                              *rankingDecision,
+                              opCtx->getServiceContext()->getPreciseClockSource()->now(),
+                              &callbacks,
+                              isSensitive ? PlanSecurityLevel::kSensitive
+                                          : PlanSecurityLevel::kNotSensitive,
+                              boost::none /* worksGrowthCoefficient */));
             }
         } else {
-            log_detail::logNotCachingNoData(winningPlan.solution->toString());
+            log_detail::logNotCachingNoData(solution->toString());
         }
     }
 }
@@ -280,6 +278,6 @@ void updatePlanCache(OperationContext* opCtx,
                      const CanonicalQuery& query,
                      const QuerySolution& solution,
                      const sbe::PlanStage& root,
-                     stage_builder::PlanStageData& stageData);
+                     stage_builder::PlanStageData stageData);
 }  // namespace plan_cache_util
 }  // namespace mongo

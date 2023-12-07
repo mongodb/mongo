@@ -331,6 +331,10 @@ public:
         visitor->visit(this);
     }
 
+    R2Annulus getAnnulus() const {
+        return _annulus;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) {

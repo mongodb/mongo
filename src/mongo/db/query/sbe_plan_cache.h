@@ -204,16 +204,19 @@ struct PlanCachePartitioner {
 
 /**
  * Represents the data cached in the SBE plan cache. This data holds an execution plan and necessary
- * auxiliary data for preparing and executing the PlanStage tree.
+ * auxiliary data for preparing and executing the PlanStage tree. In addition, holds the hash of the
+ * query solution that led to this plan.
  */
 struct CachedSbePlan {
-    CachedSbePlan(std::unique_ptr<sbe::PlanStage> root, stage_builder::PlanStageData data)
-        : root(std::move(root)), planStageData(std::move(data)) {
+    CachedSbePlan(std::unique_ptr<sbe::PlanStage> root,
+                  stage_builder::PlanStageData data,
+                  size_t hash)
+        : root(std::move(root)), planStageData(std::move(data)), solutionHash(hash) {
         tassert(5968206, "The RuntimeEnvironment should not be null", planStageData.env.runtimeEnv);
     }
 
     std::unique_ptr<CachedSbePlan> clone() const {
-        return std::make_unique<CachedSbePlan>(root->clone(), planStageData);
+        return std::make_unique<CachedSbePlan>(root->clone(), planStageData, solutionHash);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -223,6 +226,8 @@ struct CachedSbePlan {
     std::unique_ptr<sbe::PlanStage> root;
     stage_builder::PlanStageData planStageData;
     bool indexFilterApplied = false;
+    // Hash of the QuerySolution that led this cache entry.
+    size_t solutionHash;
 };
 
 using PlanCacheEntry = PlanCacheEntryBase<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;

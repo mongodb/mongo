@@ -301,6 +301,10 @@ public:
         visitor->visit(this);
     }
 
+    BinDataType getBinDataSubType() const {
+        return _binDataSubType;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) {

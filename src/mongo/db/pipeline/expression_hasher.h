@@ -210,633 +210,621 @@ public:
     explicit ExpressionHashVisitor(H hashState) : _hashState(std::move(hashState)) {}
 
     void visit(const ExpressionConstant* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kConst, expr->getValue());
+        combine(OpType::kConst, expr->getValue());
     }
 
     void visit(const ExpressionAbs* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAbs);
+        combine(OpType::kAbs);
     }
 
     void visit(const ExpressionAdd* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAdd);
+        combine(OpType::kAdd);
     }
 
     void visit(const ExpressionAllElementsTrue* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAllElementsTrue);
+        combine(OpType::kAllElementsTrue);
     }
 
     void visit(const ExpressionAnd* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAnd);
+        combine(OpType::kAnd);
     }
 
     void visit(const ExpressionAnyElementTrue* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAnyElementTrue);
+        combine(OpType::kAnyElementTrue);
     }
 
     void visit(const ExpressionTestApiVersion* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kTestApiVersion);
+        combine(OpType::kTestApiVersion);
     }
 
     void visit(const ExpressionArray* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kArray);
+        combine(OpType::kArray);
     }
 
     void visit(const ExpressionArrayElemAt* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kArrayElemAt);
+        combine(OpType::kArrayElemAt);
     }
 
     void visit(const ExpressionBitAnd* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kBitAnd);
+        combine(OpType::kBitAnd);
     }
 
     void visit(const ExpressionBitOr* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kBitOr);
+        combine(OpType::kBitOr);
     }
 
     void visit(const ExpressionBitXor* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kBitXor);
+        combine(OpType::kBitXor);
     }
 
     void visit(const ExpressionBitNot* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kBitNot);
+        combine(OpType::kBitNot);
     }
 
     void visit(const ExpressionFirst* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kFirst);
+        combine(OpType::kFirst);
     }
 
     void visit(const ExpressionLast* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kLast);
+        combine(OpType::kLast);
     }
 
     void visit(const ExpressionObjectToArray* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kObjectToArray);
+        combine(OpType::kObjectToArray);
     }
 
     void visit(const ExpressionArrayToObject* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kArrayToObject);
+        combine(OpType::kArrayToObject);
     }
 
     void visit(const ExpressionBsonSize* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kArrayToObject);
+        combine(OpType::kArrayToObject);
     }
 
     void visit(const ExpressionCeil* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kCeil);
+        combine(OpType::kCeil);
     }
 
     void visit(const ExpressionCoerceToBool* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kCoerceToBool);
+        combine(OpType::kCoerceToBool);
     }
 
     void visit(const ExpressionCompare* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kCompare, expr->getOp());
+        combine(OpType::kCompare, expr->getOp());
     }
 
     void visit(const ExpressionConcat* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kConcat);
+        combine(OpType::kConcat);
     }
 
     void visit(const ExpressionConcatArrays* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kConcatArrays);
+        combine(OpType::kConcatArrays);
     }
 
     void visit(const ExpressionCond* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kCond);
+        combine(OpType::kCond);
     }
 
     void visit(const ExpressionDateFromString* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kDateFromString);
+        combine(OpType::kDateFromString);
         if (expr->_parsedTimeZone) {
-            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+            combine(expr->_parsedTimeZone);
         }
     }
 
     void visit(const ExpressionDateFromParts* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kDateFromParts);
+        combine(OpType::kDateFromParts);
         if (expr->_parsedTimeZone) {
-            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+            combine(expr->_parsedTimeZone);
         }
     }
 
     void visit(const ExpressionDateDiff* expr) final {
-        _hashState = H::combine(
-            std::move(_hashState), OpType::kDateDiff, expr->_parsedStartOfWeek, expr->_parsedUnit);
+        combine(OpType::kDateDiff, expr->_parsedStartOfWeek, expr->_parsedUnit);
         if (expr->_parsedTimeZone) {
-            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+            combine(expr->_parsedTimeZone);
         }
     }
 
     void visit(const ExpressionDateToParts* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kDateToParts);
+        combine(OpType::kDateToParts);
         if (expr->_parsedTimeZone) {
-            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+            combine(expr->_parsedTimeZone);
         }
     }
 
     void visit(const ExpressionDateToString* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kDateToString);
+        combine(OpType::kDateToString);
         if (expr->_parsedTimeZone) {
-            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+            combine(expr->_parsedTimeZone);
         }
     }
 
     void visit(const ExpressionDateTrunc* expr) final {
-        _hashState = H::combine(std::move(_hashState),
-                                OpType::kDateTrunc,
-                                expr->_parsedStartOfWeek,
-                                expr->_parsedUnit,
-                                expr->_parsedBinSize);
+        combine(
+            OpType::kDateTrunc, expr->_parsedStartOfWeek, expr->_parsedUnit, expr->_parsedBinSize);
         if (expr->_parsedTimeZone) {
-            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+            combine(expr->_parsedTimeZone);
         }
     }
 
     void visit(const ExpressionDivide* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kDivide);
+        combine(OpType::kDivide);
     }
 
     void visit(const ExpressionExp* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kExp);
+        combine(OpType::kExp);
     }
 
     void visit(const ExpressionFieldPath* expr) final {
-        _hashState = H::combine(
-            std::move(_hashState), OpType::kExp, expr->getFieldPath(), expr->getVariableId());
+        combine(OpType::kExp, expr->getFieldPath(), expr->getVariableId());
     }
 
     void visit(const ExpressionFilter* expr) final {
-        _hashState = H::combine(
-            std::move(_hashState), OpType::kFilter, expr->_limit, expr->_varId, expr->_varName);
+        combine(OpType::kFilter, expr->_limit, expr->_varId, expr->_varName);
     }
     void visit(const ExpressionFloor* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kFloor);
+        combine(OpType::kFloor);
     }
 
     void visit(const ExpressionIfNull* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kIfNull);
+        combine(OpType::kIfNull);
     }
 
     void visit(const ExpressionIn* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kIn);
+        combine(OpType::kIn);
     }
 
     void visit(const ExpressionIndexOfArray* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kIndexOfArray);
+        combine(OpType::kIndexOfArray);
     }
 
     void visit(const ExpressionIndexOfBytes* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kIndexOfBytes);
+        combine(OpType::kIndexOfBytes);
     }
 
     void visit(const ExpressionIndexOfCP* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kIndexOfCP);
+        combine(OpType::kIndexOfCP);
     }
 
     void visit(const ExpressionIsNumber* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kIsNumber);
+        combine(OpType::kIsNumber);
     }
 
     void visit(const ExpressionLet* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kLet);
+        combine(OpType::kLet);
     }
 
     void visit(const ExpressionLn* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kLn);
+        combine(OpType::kLn);
     }
 
     void visit(const ExpressionLog* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kLog);
+        combine(OpType::kLog);
     }
 
     void visit(const ExpressionLog10* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kLog10);
+        combine(OpType::kLog10);
     }
 
     void visit(const ExpressionInternalFLEBetween* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kInternalFLEBetween);
+        combine(OpType::kInternalFLEBetween);
     }
 
     void visit(const ExpressionInternalFLEEqual* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kInternalFLEEqual);
+        combine(OpType::kInternalFLEEqual);
     }
 
     void visit(const ExpressionMap* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kMap, expr->_varId, expr->_varName);
+        combine(OpType::kMap, expr->_varId, expr->_varName);
     }
 
     void visit(const ExpressionMeta* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kMeta, expr->getMetaType());
+        combine(OpType::kMeta, expr->getMetaType());
     }
 
     void visit(const ExpressionMod* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kMod);
+        combine(OpType::kMod);
     }
 
     void visit(const ExpressionMultiply* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kMultiply);
+        combine(OpType::kMultiply);
     }
 
     void visit(const ExpressionNot* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kNot);
+        combine(OpType::kNot);
     }
 
     void visit(const ExpressionObject* expr) final {
         // Expressions are not hashed here, only their keys, since the expressions are duplicated in
         // _children field and will be hashed by the walker.
-        _hashState = H::combine(std::move(_hashState), OpType::kObject);
+        combine(OpType::kObject);
         for (const auto& childExpressionPair : expr->getChildExpressions()) {
-            _hashState = H::combine(std::move(_hashState), childExpressionPair.first);
+            combine(childExpressionPair.first);
         }
     }
 
     void visit(const ExpressionOr* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kOr);
+        combine(OpType::kOr);
     }
 
     void visit(const ExpressionPow* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kPow);
+        combine(OpType::kPow);
     }
 
     void visit(const ExpressionRange* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kRange);
+        combine(OpType::kRange);
     }
 
     void visit(const ExpressionReduce* expr) final {
-        _hashState =
-            H::combine(std::move(_hashState), OpType::kReduce, expr->_thisVar, expr->_valueVar);
+        combine(OpType::kReduce, expr->_thisVar, expr->_valueVar);
     }
 
     void visit(const ExpressionReplaceOne* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kReplaceOne);
+        combine(OpType::kReplaceOne);
     }
 
     void visit(const ExpressionReplaceAll* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kReplaceAll);
+        combine(OpType::kReplaceAll);
     }
 
     void visit(const ExpressionSetDifference* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSetDifference);
+        combine(OpType::kSetDifference);
     }
 
     void visit(const ExpressionSetEquals* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSetEquals);
+        combine(OpType::kSetEquals);
     }
 
     void visit(const ExpressionSetIntersection* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSetIntersection);
+        combine(OpType::kSetIntersection);
     }
 
     void visit(const ExpressionSetIsSubset* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSetIsSubset);
+        combine(OpType::kSetIsSubset);
     }
 
     void visit(const ExpressionSetUnion* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSetUnion);
+        combine(OpType::kSetUnion);
     }
 
     void visit(const ExpressionSize* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSize);
+        combine(OpType::kSize);
     }
 
     void visit(const ExpressionReverseArray* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kReverseArray);
+        combine(OpType::kReverseArray);
     }
 
     void visit(const ExpressionSortArray* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSortArray);
+        combine(OpType::kSortArray);
     }
 
     void visit(const ExpressionSlice* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSlice);
+        combine(OpType::kSlice);
     }
 
     void visit(const ExpressionIsArray* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kIsArray);
+        combine(OpType::kIsArray);
     }
 
     void visit(const ExpressionInternalFindAllValuesAtPath* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kInternalFindAllValuesAtPath);
+        combine(OpType::kInternalFindAllValuesAtPath);
     }
 
     void visit(const ExpressionRandom* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kRandom);
+        combine(OpType::kRandom);
     }
 
     void visit(const ExpressionRound* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kRound);
+        combine(OpType::kRound);
     }
 
     void visit(const ExpressionSplit* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSplit);
+        combine(OpType::kSplit);
     }
 
     void visit(const ExpressionSqrt* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSqrt);
+        combine(OpType::kSqrt);
     }
 
     void visit(const ExpressionStrcasecmp* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kStrcasecmp);
+        combine(OpType::kStrcasecmp);
     }
 
     void visit(const ExpressionSubstrBytes* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSubstrBytes);
+        combine(OpType::kSubstrBytes);
     }
 
     void visit(const ExpressionSubstrCP* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSubstrCP);
+        combine(OpType::kSubstrCP);
     }
 
     void visit(const ExpressionStrLenBytes* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kStrLenBytes);
+        combine(OpType::kStrLenBytes);
     }
 
     void visit(const ExpressionBinarySize* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kBinarySize);
+        combine(OpType::kBinarySize);
     }
 
     void visit(const ExpressionStrLenCP* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kStrLenCP);
+        combine(OpType::kStrLenCP);
     }
 
     void visit(const ExpressionSubtract* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSubtract);
+        combine(OpType::kSubtract);
     }
 
     void visit(const ExpressionSwitch* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSwitch);
+        combine(OpType::kSwitch);
     }
 
     void visit(const ExpressionToLower* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kToLower);
+        combine(OpType::kToLower);
     }
 
     void visit(const ExpressionToUpper* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kToUpper);
+        combine(OpType::kToUpper);
     }
 
     void visit(const ExpressionTrim* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kTrim);
+        combine(OpType::kTrim);
     }
 
     void visit(const ExpressionTrunc* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kTrunc);
+        combine(OpType::kTrunc);
     }
 
     void visit(const ExpressionType* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kType);
+        combine(OpType::kType);
     }
 
     void visit(const ExpressionZip* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kZip);
+        combine(OpType::kZip);
     }
 
     void visit(const ExpressionConvert* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kConvert);
+        combine(OpType::kConvert);
     }
 
     void visit(const ExpressionRegexFind* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kRegexFind);
+        combine(OpType::kRegexFind);
     }
 
     void visit(const ExpressionRegexFindAll* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kRegexFindAll);
+        combine(OpType::kRegexFindAll);
     }
 
     void visit(const ExpressionRegexMatch* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kRegexMatch);
+        combine(OpType::kRegexMatch);
     }
 
     void visit(const ExpressionCosine* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kCosine);
+        combine(OpType::kCosine);
     }
 
     void visit(const ExpressionSine* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSine);
+        combine(OpType::kSine);
     }
 
     void visit(const ExpressionTangent* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kTangent);
+        combine(OpType::kTangent);
     }
 
     void visit(const ExpressionArcCosine* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kArcCosine);
+        combine(OpType::kArcCosine);
     }
 
     void visit(const ExpressionArcSine* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kArcSine);
+        combine(OpType::kArcSine);
     }
 
     void visit(const ExpressionArcTangent* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kArcTangent);
+        combine(OpType::kArcTangent);
     }
 
     void visit(const ExpressionArcTangent2* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kArcTangent2);
+        combine(OpType::kArcTangent2);
     }
 
     void visit(const ExpressionHyperbolicArcTangent* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kHyperbolicArcTangent);
+        combine(OpType::kHyperbolicArcTangent);
     }
 
     void visit(const ExpressionHyperbolicArcCosine* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kHyperbolicArcCosine);
+        combine(OpType::kHyperbolicArcCosine);
     }
 
     void visit(const ExpressionHyperbolicArcSine* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kHyperbolicArcSine);
+        combine(OpType::kHyperbolicArcSine);
     }
 
     void visit(const ExpressionHyperbolicTangent* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kHyperbolicTangent);
+        combine(OpType::kHyperbolicTangent);
     }
 
     void visit(const ExpressionHyperbolicCosine* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kHyperbolicCosine);
+        combine(OpType::kHyperbolicCosine);
     }
 
     void visit(const ExpressionHyperbolicSine* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kHyperbolicSine);
+        combine(OpType::kHyperbolicSine);
     }
 
     void visit(const ExpressionDegreesToRadians* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kDegreesToRadians);
+        combine(OpType::kDegreesToRadians);
     }
 
     void visit(const ExpressionRadiansToDegrees* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kRadiansToDegrees);
+        combine(OpType::kRadiansToDegrees);
     }
 
     void visit(const ExpressionDayOfMonth* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kDayOfMonth);
+        combine(OpType::kDayOfMonth);
     }
 
     void visit(const ExpressionDayOfWeek* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kDayOfWeek);
+        combine(OpType::kDayOfWeek);
     }
 
     void visit(const ExpressionDayOfYear* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kDayOfYear);
+        combine(OpType::kDayOfYear);
     }
 
     void visit(const ExpressionHour* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kHour);
+        combine(OpType::kHour);
     }
 
     void visit(const ExpressionMillisecond* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kMillisecond);
+        combine(OpType::kMillisecond);
     }
 
     void visit(const ExpressionMinute* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kMinute);
+        combine(OpType::kMinute);
     }
 
     void visit(const ExpressionMonth* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kMonth);
+        combine(OpType::kMonth);
     }
 
     void visit(const ExpressionSecond* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSecond);
+        combine(OpType::kSecond);
     }
 
     void visit(const ExpressionWeek* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kWeek);
+        // constexpr static std::unordered_map<std::type_index, OpType> typeTo
+        combine(OpType::kWeek);
     }
 
     void visit(const ExpressionIsoWeekYear* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kIsoWeekYear);
+        combine(OpType::kIsoWeekYear);
     }
 
     void visit(const ExpressionIsoDayOfWeek* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kIsoDayOfWeek);
+        combine(OpType::kIsoDayOfWeek);
     }
 
     void visit(const ExpressionIsoWeek* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kIsoWeek);
+        combine(OpType::kIsoWeek);
     }
 
     void visit(const ExpressionYear* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kYear);
+        combine(OpType::kYear);
     }
 
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorAvg);
+        combine(OpType::kAccumulatorAvg);
     }
 
     void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorFirstN);
+        combine(OpType::kAccumulatorFirstN);
     }
 
     void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorLastN);
+        combine(OpType::kAccumulatorLastN);
     }
 
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorMax);
+        combine(OpType::kAccumulatorMax);
     }
 
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorMin);
+        combine(OpType::kAccumulatorMin);
     }
 
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorMaxN);
+        combine(OpType::kAccumulatorMaxN);
     }
 
     void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorMinN);
+        combine(OpType::kAccumulatorMinN);
     }
 
     void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorMedian, expr->_method);
+        combine(OpType::kAccumulatorMedian, expr->_method);
     }
 
     void visit(const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>* expr) final {
-        _hashState =
-            H::combine(std::move(_hashState), OpType::kAccumulatorPercentile, expr->_method);
+        combine(OpType::kAccumulatorPercentile, expr->_method);
     }
 
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorStdDevPop);
+        combine(OpType::kAccumulatorStdDevPop);
     }
 
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorStdDevSamp);
+        combine(OpType::kAccumulatorStdDevSamp);
     }
 
     void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorSum);
+        combine(OpType::kAccumulatorSum);
     }
 
     void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kAccumulatorMergeObjects);
+        combine(OpType::kAccumulatorMergeObjects);
     }
 
     void visit(const ExpressionTests::Testable* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kTestable);
+        combine(OpType::kTestable);
     }
 
     void visit(const ExpressionInternalJsEmit* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kInternalJsEmit);
+        combine(OpType::kInternalJsEmit);
     }
 
     void visit(const ExpressionFunction* expr) final {
         // _passedArgs are stored in _children field as well and will be hashed by the
         // expression_walker.
-        _hashState = H::combine(std::move(_hashState),
-                                OpType::kFunction,
-                                expr->_assignFirstArgToThis,
-                                expr->_funcSource,
-                                expr->_lang);
+        combine(OpType::kFunction, expr->_assignFirstArgToThis, expr->_funcSource, expr->_lang);
     }
 
     void visit(const ExpressionInternalFindSlice* expr) final {
-        _hashState = H::combine(
-            std::move(_hashState), OpType::kInternalFindSlice, expr->_skip, expr->_limit);
+        combine(OpType::kInternalFindSlice, expr->_skip, expr->_limit);
     }
 
     void visit(const ExpressionInternalFindPositional* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kInternalFindPositional);
+        combine(OpType::kInternalFindPositional);
     }
 
     void visit(const ExpressionInternalFindElemMatch* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kInternalFindElemMatch);
+        combine(OpType::kInternalFindElemMatch);
     }
 
     void visit(const ExpressionToHashedIndexKey* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kToHashedIndexKey);
+        combine(OpType::kToHashedIndexKey);
     }
 
     void visit(const ExpressionDateAdd* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kDateAdd);
+        combine(OpType::kDateAdd);
     }
 
     void visit(const ExpressionDateSubtract* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kDateSubtract);
+        combine(OpType::kDateSubtract);
     }
 
     void visit(const ExpressionGetField* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kGetField);
+        combine(OpType::kGetField);
     }
 
     void visit(const ExpressionSetField* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kSetField);
+        combine(OpType::kSetField);
     }
 
     void visit(const ExpressionTsSecond* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kTsSecond);
+        combine(OpType::kTsSecond);
     }
 
     void visit(const ExpressionTsIncrement* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kTsIncrement);
+        combine(OpType::kTsIncrement);
     }
 
     void visit(const ExpressionInternalOwningShard* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kInternalOwningShard);
+        combine(OpType::kInternalOwningShard);
     }
 
     void visit(const ExpressionInternalIndexKey* expr) final {
-        _hashState = H::combine(std::move(_hashState), OpType::kInternalIndexKey);
+        combine(OpType::kInternalIndexKey);
     }
 
     H moveHashState() {
@@ -844,6 +832,11 @@ public:
     }
 
 private:
+    template <typename... Ts>
+    void combine(const Ts&... values) {
+        _hashState = H::combine(std::move(_hashState), values...);
+    }
+
     H _hashState;
 };
 

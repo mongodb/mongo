@@ -36,6 +36,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <iosfwd>
 #include <iterator>
@@ -55,6 +56,7 @@
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_hasher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -76,6 +78,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/hash_utils.h"
 #include "mongo/util/id_generator.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -317,6 +320,23 @@ struct QuerySolutionNode {
         return _nodeId;
     }
 
+    template <typename H>
+    friend H AbslHashValue(H state, const QuerySolutionNode& c) {
+        c.hash(absl::HashState::Create(&state));
+        return state;
+    }
+
+    virtual void hash(absl::HashState state) const {
+        state = absl::HashState::combine(std::move(state), getType());
+        if (filter) {
+            state =
+                absl::HashState::combine(std::move(state), MatchExpressionHasher{}(filter.get()));
+        }
+        for (const auto& child : children) {
+            state = absl::HashState::combine(std::move(state), *child.get());
+        }
+    }
+
     std::vector<std::unique_ptr<QuerySolutionNode>> children;
 
     // If a stage has a non-NULL filter all values outputted from that stage must pass that
@@ -462,6 +482,10 @@ public:
      */
     std::vector<NamespaceStringOrUUID> getAllSecondaryNamespaces(const NamespaceString& mainNss);
 
+    size_t hash() const {
+        return absl::Hash<QuerySolutionNode>()(*_root);
+    }
+
     // There are two known scenarios in which a query solution might potentially block:
     //
     // Sort stage:
@@ -545,6 +569,15 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    void hash(absl::HashState state) const override {
+        // For a collscan plan, the QuerySolutionNode::filter attribute will have the values from
+        // the query rather than be parameterized. So including the filter in the hash would create
+        // inconsistent hashes.
+        state = absl::HashState::combine(std::move(state), getType());
+        state =
+            absl::HashState::combine_contiguous(std::move(state), children.data(), children.size());
+    }
 
     // Name of the namespace.
     NamespaceString nss;
@@ -894,6 +927,16 @@ struct IndexScanNode : public QuerySolutionNodeWithSortSet {
      */
     static std::set<StringData> getFieldsWithStringBounds(const IndexBounds& bounds,
                                                           const BSONObj& indexKeyPattern);
+
+    void hash(absl::HashState h) const override {
+        h = absl::HashState::combine(
+            std::move(h), index.identifier.catalogName, index.identifier.disambiguator);
+        if (iets.empty()) {
+            h = absl::HashState::combine(std::move(h), bounds);
+        }
+        h = absl::HashState::combine_contiguous(std::move(h), iets.data(), iets.size());
+        QuerySolutionNode::hash(std::move(h));
+    }
 
     IndexEntry index;
 

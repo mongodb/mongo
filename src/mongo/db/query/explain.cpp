@@ -538,6 +538,7 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
     out->append("indexFilterSet", entry.cachedPlan->indexFilterApplied);
 
     out->append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
+    out->append("solutionHash", static_cast<long long>(entry.cachedPlan->solutionHash));
 }
 
 void Explain::planCacheEntryToBSON(const sbe::PlanCacheEntry& entry, BSONObjBuilder* out) {
@@ -552,5 +553,6 @@ void Explain::planCacheEntryToBSON(const sbe::PlanCacheEntry& entry, BSONObjBuil
     out->append("indexFilterSet", entry.cachedPlan->indexFilterApplied);
     out->append("isPinned", entry.isPinned());
     out->append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
+    out->append("solutionHash", static_cast<long long>(entry.cachedPlan->solutionHash));
 }
 }  // namespace mongo

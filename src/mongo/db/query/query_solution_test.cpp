@@ -1325,6 +1325,29 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {
     assertNamespaceVectorsAreEqual(qs.getAllSecondaryNamespaces(mainNss), expectedNssVector);
 }
 
+TEST(QuerySolutionTest, AssertSameHashes) {
+    auto makeQs = []() {
+        auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+        const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+        const NamespaceString foreignColl =
+            NamespaceString::createNamespaceString_forTest("db.col");
+        auto root = std::make_unique<EqLookupNode>(std::move(scanNode),
+                                                   foreignColl,
+                                                   "local",
+                                                   "remote",
+                                                   "b",
+                                                   EqLookupNode::LookupStrategy::kNestedLoopJoin,
+                                                   boost::none /* idxEntry */,
+                                                   false /* shouldProduceBson */);
+
+
+        auto qs = std::make_unique<QuerySolution>();
+        qs->setRoot(std::move(root));
+        return qs;
+    };
+    ASSERT(makeQs()->hash() == makeQs()->hash());
+}
+
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
     auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
     const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");

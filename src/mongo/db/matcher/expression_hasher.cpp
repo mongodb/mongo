@@ -29,6 +29,7 @@
 
 #include "mongo/db/matcher/expression_hasher.h"
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/fts/fts_query_hash.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -46,8 +47,24 @@
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/db/matcher/expression_where_noop.h"
 #include "mongo/db/matcher/match_expression_walker.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/pipeline/expression_hasher.h"
 #include "mongo/db/query/tree_walker.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hash_utils.h"
 
@@ -76,6 +93,21 @@ H AbslHashValue(H h, const Collation& collation) {
                       collation.getNormalization(),
                       collation.getBackwards().value_or(false),
                       collation.getVersion());
+}
+
+template <typename H>
+H AbslHashValue(H h, const Decimal128& dec) {
+    return H::combine(std::move(h), dec.getValue().low64, dec.getValue().high64);
+}
+
+template <typename H>
+H AbslHashValue(H h, const ExpressionWithPlaceholder& dec) {
+    return H::combine(std::move(h), MatchExpressionHasher{}(dec.getFilter()), dec.getPlaceholder());
+}
+
+template <typename H>
+H AbslHashValue(H h, const BSONElement& el) {
+    return H::combine_contiguous(std::move(h), el.rawdata(), el.size());
 }
 
 /**
@@ -122,7 +154,7 @@ public:
         // regexes, and equalities fields.
 
         hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->hasNull());
+        combine(expr->hasNull());
         hashCombineCollator(expr->getCollator());
 
         // Hash the size of equalities's list and up to a maximum of 'maxNumberOfHashedElements'
@@ -132,9 +164,9 @@ public:
         const auto& equalities = expr->getEqualities();
         const size_t eqStep =
             std::max(static_cast<size_t>(1), equalities.size() / _maxNumberOfInElementsToHash);
-        _hashState = H::combine(std::move(_hashState), equalities.size());
+        combine(equalities.size());
         for (size_t i = 0; i < equalities.size(); i += eqStep) {
-            _hashState = H::combine(std::move(_hashState), eltCmp.hash(equalities[i]));
+            combine(eltCmp.hash(equalities[i]));
         }
 
         // Hash the size of regexes's list and up to a maximum of 'maxNumberOfHashedElements'
@@ -142,36 +174,35 @@ public:
         const auto& regexes = expr->getRegexes();
         const size_t regStep =
             std::max(static_cast<size_t>(1), regexes.size() / _maxNumberOfInElementsToHash);
-        _hashState = H::combine(std::move(_hashState), regexes.size());
+        combine(regexes.size());
         for (size_t i = 0; i < regexes.size(); i += regStep) {
-            _hashState = H::combine(std::move(_hashState),
-                                    calculateHash(*regexes[i].get(), _maxNumberOfInElementsToHash));
+            combine(calculateHash(*regexes[i].get(), _maxNumberOfInElementsToHash));
         }
     }
 
     void visit(const ModMatchExpression* expr) final {
         // `equivalent()` function does not use DivisorInputParamId and RemainderInputParamId.
         hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->getDivisor(), expr->getRemainder());
+        combine(expr->getDivisor(), expr->getRemainder());
     }
 
     void visit(const RegexMatchExpression* expr) final {
         // `equivalent()` function uses values of path, regex, and flags fields. `getString()`
         // function returns value of regex field.
         hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->getString(), expr->getFlags());
+        combine(expr->getString(), expr->getFlags());
     }
 
     void visit(const SizeMatchExpression* expr) final {
         // `getData()` returns value of size field.
         hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->getData());
+        combine(expr->getData());
     }
 
     void visit(const TypeMatchExpression* expr) final {
         // Only values of path, and typeSet fields are used by `equivalent()` function.
         hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->typeSet());
+        combine(expr->typeSet());
     }
 
     void visit(const WhereMatchExpression* expr) final {
@@ -199,24 +230,20 @@ public:
     void visit(const ExprMatchExpression* expr) final {
         hashCombineTypeAndPath(expr);
         hashCombineCollator(expr->getExpressionContext()->getCollator());
-        _hashState = H::combine(std::move(_hashState), *expr->getExpression());
+        combine(*expr->getExpression());
     }
     void visit(const GeoMatchExpression* expr) final {
         hashCombineTypeAndPath(expr);
-        _hashState =
-            H::combine(std::move(_hashState), SimpleBSONObjComparator{}.hash(expr->_rawObj));
+        combine(SimpleBSONObjComparator{}.hash(expr->_rawObj));
     }
     void visit(const GeoNearMatchExpression* expr) final {
         hashCombineTypeAndPath(expr);
-        _hashState =
-            H::combine(std::move(_hashState), SimpleBSONObjComparator{}.hash(expr->_rawObj));
+        combine(SimpleBSONObjComparator{}.hash(expr->_rawObj));
     }
     void visit(const InternalBucketGeoWithinMatchExpression* expr) final {
         hashCombineTypeAndPath(expr);
-        _hashState = H::combine(
-            std::move(_hashState),
-            SimpleBSONObjComparator{}.hash(expr->getGeoContainer().getGeoElement().Obj()),
-            expr->getField());
+        combine(SimpleBSONObjComparator{}.hash(expr->getGeoContainer().getGeoElement().Obj()),
+                expr->getField());
     }
     void visit(const InternalExprEqMatchExpression* expr) final {
         visitComparison(expr);
@@ -234,64 +261,85 @@ public:
         visitComparison(expr);
     }
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901800);
+        hashCombineTypeAndPath(expr);
+        combine(expr->startIndex(), *expr->getExpression());
     }
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901801);
+        hashCombineTypeAndPath(expr);
+        combine(expr->getNamePlaceholder(), *expr->getOtherwise());
+        for (const auto& prop : expr->getProperties()) {
+            combine(prop);
+        }
+        for (const auto& pat : expr->getPatternProperties()) {
+            combine(pat.first.rawRegex, *pat.second.get());
+        }
     }
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901802);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901803);
+        hashCombineTypeAndPath(expr);
+        combine(expr->typeSet());
     }
     void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901804);
+        hashCombineTypeAndPath(expr);
+        combine(expr->getBinDataSubType());
     }
     void visit(const InternalSchemaCondMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901805);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const InternalSchemaEqMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901806);
+        hashCombineTypeAndPath(expr);
+        combine(expr->getRhsElem());
     }
     void visit(const InternalSchemaFmodMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901807);
+        hashCombineTypeAndPath(expr);
+        combine(expr->getDivisor(), expr->getRemainder());
     }
     void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901808);
+        hashCombineTypeAndPath(expr);
+        combine(expr->arrayIndex(), *expr->getExpression());
     }
     void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901809);
+        hashCombineTypeAndPath(expr);
+        combine(expr->getName(), expr->numItems());
     }
     void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901810);
+        hashCombineTypeAndPath(expr);
+        combine(expr->getName(), expr->strLen());
     }
     void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901811);
+        hashCombineTypeAndPath(expr);
+        combine(expr->numProperties(), expr->getName());
     }
     void visit(const InternalSchemaMinItemsMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901812);
+        hashCombineTypeAndPath(expr);
+        combine(expr->getName(), expr->numItems());
     }
     void visit(const InternalSchemaMinLengthMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901813);
+        hashCombineTypeAndPath(expr);
+        combine(expr->getName(), expr->strLen());
     }
     void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901814);
+        hashCombineTypeAndPath(expr);
+        combine(expr->numProperties(), expr->getName());
     }
     void visit(const InternalSchemaObjectMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901815);
+        hashCombineTypeAndPath(expr);
+        combine(MatchExpressionHasher{}(expr->getChild(0)));
     }
     void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901816);
+        hashCombineTypeAndPath(expr);
+        combine(simpleHash(expr->getRhsObj()));
     }
     void visit(const InternalSchemaTypeExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901817);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901818);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const InternalSchemaXorMatchExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901819);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const NorMatchExpression* expr) final {
         hashCombineTypeAndPath(expr);
@@ -309,7 +357,9 @@ public:
         visitText(expr);
     }
     void visit(const TwoDPtInAnnulusExpression* expr) final {
-        MONGO_UNREACHABLE_TASSERT(7901820);
+        hashCombineTypeAndPath(expr);
+        auto annulus = expr->getAnnulus();
+        combine(annulus.getInner(), annulus.getOuter(), annulus.center().x, annulus.center().y);
     }
     void visit(const WhereNoOpMatchExpression* expr) final {
         visitWhere(expr);
@@ -324,12 +374,12 @@ public:
 
 private:
     void hashCombineTypeAndPath(const MatchExpression* expr) {
-        _hashState = H::combine(std::move(_hashState), expr->matchType(), expr->path());
+        combine(expr->matchType(), expr->path());
     }
 
     void hashCombineCollator(const CollatorInterface* ci) {
         if (ci) {
-            _hashState = H::combine(std::move(_hashState), ci->getSpec());
+            combine(ci->getSpec());
         }
     }
 
@@ -341,7 +391,7 @@ private:
         // `equivalent()` function compares sorted bitPositions.
         auto bitPositions = expr->getBitPositions();
         std::sort(bitPositions.begin(), bitPositions.end());
-        _hashState = H::combine(std::move(_hashState), bitPositions);
+        combine(bitPositions);
     }
 
     void visitComparison(const ComparisonMatchExpressionBase* expr) {
@@ -353,18 +403,23 @@ private:
         BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
                                      stringComparator);
         hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), eltCmp.hash(expr->getData()));
+        combine(eltCmp.hash(expr->getData()));
         hashCombineCollator(expr->getCollator());
     }
 
     void visitText(const TextMatchExpressionBase* expr) {
         hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->getFTSQuery());
+        combine(expr->getFTSQuery());
     }
 
     void visitWhere(const WhereMatchExpressionBase* expr) {
         hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->getCode());
+        combine(expr->getCode());
+    }
+
+    template <typename... Ts>
+    void combine(const Ts&... values) {
+        _hashState = H::combine(std::move(_hashState), values...);
     }
 
     H _hashState;

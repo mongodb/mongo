@@ -90,9 +90,12 @@ public:
         return MatchCategory::kOther;
     }
 
-protected:
     long long numProperties() const {
         return _numProperties;
+    }
+
+    StringData getName() const {
+        return _name;
     }
 
 private:
