@@ -1539,11 +1539,11 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
 }
 
 /*
- * __txn_modify_block --
+ * __wt_txn_modify_block --
  *     Check if the current transaction can modify an item.
  */
 static inline int
-__txn_modify_block(
+__wt_txn_modify_block(
   WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd, wt_timestamp_t *prev_tsp)
 {
     WT_DECL_ITEM(buf);
@@ -1631,8 +1631,12 @@ __txn_modify_block(
      */
     if (!rollback && prev_tsp != NULL) {
         if (upd != NULL) {
-            /* The durable timestamp must be greater than or equal to the commit timestamp. */
-            WT_ASSERT(session, upd->durable_ts >= upd->start_ts);
+            /*
+             * The durable timestamp must be greater than or equal to the commit timestamp unless it
+             * is an in-progress prepared update.
+             */
+            WT_ASSERT(session,
+              upd->durable_ts >= upd->start_ts || upd->prepare_state == WT_PREPARE_INPROGRESS);
             *prev_tsp = upd->durable_ts;
         } else if (tw_found)
             *prev_tsp = WT_TIME_WINDOW_HAS_STOP(&tw) ? tw.durable_stop_ts : tw.durable_start_ts;
@@ -1664,7 +1668,7 @@ __wt_txn_modify_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE 
      * operating on the metadata table.
      */
     if (txn->isolation == WT_ISO_SNAPSHOT && !WT_IS_METADATA(cbt->dhandle))
-        WT_RET(__txn_modify_block(session, cbt, upd, prev_tsp));
+        WT_RET(__wt_txn_modify_block(session, cbt, upd, prev_tsp));
 
     /*
      * Prepending a tombstone to another tombstone indicates remove of a non-existent key and that
