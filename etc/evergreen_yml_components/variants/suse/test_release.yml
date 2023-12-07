@@ -119,6 +119,8 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: .stitch
   - name: .crypt
+    distros:
+    - suse12-sp5-large
   - name: .timeseries_crud
     distros:
     - suse12-sp5-large
