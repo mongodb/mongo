@@ -42,9 +42,8 @@ class BitState {
 
   // The usual Search prototype.
   // Can only call Search once per BitState.
-  bool Search(const StringPiece& text, const StringPiece& context,
-              bool anchored, bool longest,
-              StringPiece* submatch, int nsubmatch);
+  bool Search(absl::string_view text, absl::string_view context, bool anchored,
+              bool longest, absl::string_view* submatch, int nsubmatch);
 
  private:
   inline bool ShouldVisit(int id, const char* p);
@@ -53,14 +52,14 @@ class BitState {
   bool TrySearch(int id, const char* p);
 
   // Search parameters
-  Prog* prog_;              // program being run
-  StringPiece text_;        // text being searched
-  StringPiece context_;     // greater context of text being searched
-  bool anchored_;           // whether search is anchored at text.begin()
-  bool longest_;            // whether search wants leftmost-longest match
-  bool endmatch_;           // whether match must end at text.end()
-  StringPiece* submatch_;   // submatches to fill in
-  int nsubmatch_;           //   # of submatches to fill in
+  Prog* prog_;                   // program being run
+  absl::string_view text_;       // text being searched
+  absl::string_view context_;    // greater context of text being searched
+  bool anchored_;                // whether search is anchored at text.begin()
+  bool longest_;                 // whether search wants leftmost-longest match
+  bool endmatch_;                // whether match must end at text.end()
+  absl::string_view* submatch_;  // submatches to fill in
+  int nsubmatch_;                //   # of submatches to fill in
 
   // Search state
   static constexpr int kVisitedBits = 64;
@@ -256,9 +255,9 @@ bool BitState::TrySearch(int id0, const char* p0) {
         if (submatch_[0].data() == NULL ||
             (longest_ && p > submatch_[0].data() + submatch_[0].size())) {
           for (int i = 0; i < nsubmatch_; i++)
-            submatch_[i] =
-                StringPiece(cap_[2 * i],
-                            static_cast<size_t>(cap_[2 * i + 1] - cap_[2 * i]));
+            submatch_[i] = absl::string_view(
+                cap_[2 * i],
+                static_cast<size_t>(cap_[2 * i + 1] - cap_[2 * i]));
         }
 
         // If going for first match, we're done.
@@ -285,17 +284,17 @@ bool BitState::TrySearch(int id0, const char* p0) {
 }
 
 // Search text (within context) for prog_.
-bool BitState::Search(const StringPiece& text, const StringPiece& context,
-                      bool anchored, bool longest,
-                      StringPiece* submatch, int nsubmatch) {
+bool BitState::Search(absl::string_view text, absl::string_view context,
+                      bool anchored, bool longest, absl::string_view* submatch,
+                      int nsubmatch) {
   // Search parameters.
   text_ = text;
   context_ = context;
   if (context_.data() == NULL)
     context_ = text;
-  if (prog_->anchor_start() && context_.begin() != text.begin())
+  if (prog_->anchor_start() && BeginPtr(context_) != BeginPtr(text))
     return false;
-  if (prog_->anchor_end() && context_.end() != text.end())
+  if (prog_->anchor_end() && EndPtr(context_) != EndPtr(text))
     return false;
   anchored_ = anchored || prog_->anchor_start();
   longest_ = longest || prog_->anchor_end();
@@ -303,7 +302,7 @@ bool BitState::Search(const StringPiece& text, const StringPiece& context,
   submatch_ = submatch;
   nsubmatch_ = nsubmatch;
   for (int i = 0; i < nsubmatch_; i++)
-    submatch_[i] = StringPiece();
+    submatch_[i] = absl::string_view();
 
   // Allocate scratch space.
   int nvisited = prog_->list_count() * static_cast<int>(text.size()+1);
@@ -353,16 +352,13 @@ bool BitState::Search(const StringPiece& text, const StringPiece& context,
 }
 
 // Bit-state search.
-bool Prog::SearchBitState(const StringPiece& text,
-                          const StringPiece& context,
-                          Anchor anchor,
-                          MatchKind kind,
-                          StringPiece* match,
-                          int nmatch) {
+bool Prog::SearchBitState(absl::string_view text, absl::string_view context,
+                          Anchor anchor, MatchKind kind,
+                          absl::string_view* match, int nmatch) {
   // If full match, we ask for an anchored longest match
   // and then check that match[0] == text.
   // So make sure match[0] exists.
-  StringPiece sp0;
+  absl::string_view sp0;
   if (kind == kFullMatch) {
     anchor = kAnchored;
     if (nmatch < 1) {
@@ -377,7 +373,7 @@ bool Prog::SearchBitState(const StringPiece& text,
   bool longest = kind != kFirstMatch;
   if (!b.Search(text, context, anchored, longest, match, nmatch))
     return false;
-  if (kind == kFullMatch && match[0].end() != text.end())
+  if (kind == kFullMatch && EndPtr(match[0]) != EndPtr(text))
     return false;
   return true;
 }

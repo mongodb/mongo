@@ -11,7 +11,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "util/util.h"
 #include "util/logging.h"
 
 namespace re2 {
@@ -81,36 +80,6 @@ class Bitmap256 {
 
   uint64_t words_[4];
 };
-
-int Bitmap256::FindNextSetBit(int c) const {
-  DCHECK_GE(c, 0);
-  DCHECK_LE(c, 255);
-
-  // Check the word that contains the bit. Mask out any lower bits.
-  int i = c / 64;
-  uint64_t word = words_[i] & (~uint64_t{0} << (c % 64));
-  if (word != 0)
-    return (i * 64) + FindLSBSet(word);
-
-  // Check any following words.
-  i++;
-  switch (i) {
-    case 1:
-      if (words_[1] != 0)
-        return (1 * 64) + FindLSBSet(words_[1]);
-      FALLTHROUGH_INTENDED;
-    case 2:
-      if (words_[2] != 0)
-        return (2 * 64) + FindLSBSet(words_[2]);
-      FALLTHROUGH_INTENDED;
-    case 3:
-      if (words_[3] != 0)
-        return (3 * 64) + FindLSBSet(words_[3]);
-      FALLTHROUGH_INTENDED;
-    default:
-      return -1;
-  }
-}
 
 }  // namespace re2
 

@@ -29,9 +29,11 @@
 #include <string>
 #include <vector>
 
-#include "util/test.h"
+#include "absl/base/macros.h"
+#include "absl/strings/escaping.h"
+#include "absl/strings/str_format.h"
+#include "gtest/gtest.h"
 #include "util/logging.h"
-#include "util/strutil.h"
 #include "util/utf.h"
 #include "re2/testing/regexp_generator.h"
 
@@ -47,7 +49,7 @@ const std::vector<std::string>& RegexpGenerator::EgrepOps() {
     "%s?",
     "%s\\C*",
   };
-  static std::vector<std::string> v(ops, ops + arraysize(ops));
+  static std::vector<std::string> v(ops, ops + ABSL_ARRAYSIZE(ops));
   return v;
 }
 
@@ -199,19 +201,21 @@ void RegexpGenerator::RunPostfix(const std::vector<std::string>& post) {
         regexps.push(post[i]);
         break;
       case 1: {
+        auto fmt = absl::ParsedFormat<'s'>::New(post[i]);
+        CHECK(fmt != nullptr);
         std::string a = regexps.top();
         regexps.pop();
-        regexps.push("(?:" + StringPrintf(post[i].c_str(), a.c_str()) + ")");
+        regexps.push("(?:" + absl::StrFormat(*fmt, a) + ")");
         break;
       }
       case 2: {
+        auto fmt = absl::ParsedFormat<'s', 's'>::New(post[i]);
+        CHECK(fmt != nullptr);
         std::string b = regexps.top();
         regexps.pop();
         std::string a = regexps.top();
         regexps.pop();
-        regexps.push("(?:" +
-                     StringPrintf(post[i].c_str(), a.c_str(), b.c_str()) +
-                     ")");
+        regexps.push("(?:" + absl::StrFormat(*fmt, a, b) + ")");
         break;
       }
     }
@@ -219,13 +223,13 @@ void RegexpGenerator::RunPostfix(const std::vector<std::string>& post) {
 
   if (regexps.size() != 1) {
     // Internal error - should never happen.
-    printf("Bad regexp program:\n");
+    absl::PrintF("Bad regexp program:\n");
     for (size_t i = 0; i < post.size(); i++) {
-      printf("  %s\n", CEscape(post[i]).c_str());
+      absl::PrintF("  %s\n", absl::CEscape(post[i]));
     }
-    printf("Stack after running program:\n");
+    absl::PrintF("Stack after running program:\n");
     while (!regexps.empty()) {
-      printf("  %s\n", CEscape(regexps.top()).c_str());
+      absl::PrintF("  %s\n", absl::CEscape(regexps.top()));
       regexps.pop();
     }
     LOG(FATAL) << "Bad regexp program.";
@@ -238,7 +242,7 @@ void RegexpGenerator::RunPostfix(const std::vector<std::string>& post) {
 }
 
 // Split s into an vector of strings, one for each UTF-8 character.
-std::vector<std::string> Explode(const StringPiece& s) {
+std::vector<std::string> Explode(absl::string_view s) {
   std::vector<std::string> v;
 
   for (const char *q = s.data(); q < s.data() + s.size(); ) {
@@ -253,7 +257,7 @@ std::vector<std::string> Explode(const StringPiece& s) {
 
 // Split string everywhere a substring is found, returning
 // vector of pieces.
-std::vector<std::string> Split(const StringPiece& sep, const StringPiece& s) {
+std::vector<std::string> Split(absl::string_view sep, absl::string_view s) {
   std::vector<std::string> v;
 
   if (sep.empty())
@@ -261,7 +265,7 @@ std::vector<std::string> Split(const StringPiece& sep, const StringPiece& s) {
 
   const char *p = s.data();
   for (const char *q = s.data(); q + sep.size() <= s.data() + s.size(); q++) {
-    if (StringPiece(q, sep.size()) == sep) {
+    if (absl::string_view(q, sep.size()) == sep) {
       v.push_back(std::string(p, q - p));
       p = q + sep.size();
       q = p - 1;  // -1 for ++ in loop

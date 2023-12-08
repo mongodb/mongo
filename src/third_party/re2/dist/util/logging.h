@@ -13,7 +13,7 @@
 #include <ostream>
 #include <sstream>
 
-#include "util/util.h"
+#include "absl/base/attributes.h"
 
 // Debug-only checking.
 #define DCHECK(condition) assert(condition)
@@ -93,7 +93,7 @@ class LogMessageFatal : public LogMessage {
  public:
   LogMessageFatal(const char* file, int line)
       : LogMessage(file, line) {}
-  ATTRIBUTE_NORETURN ~LogMessageFatal() {
+  ABSL_ATTRIBUTE_NORETURN ~LogMessageFatal() {
     Flush();
     abort();
   }

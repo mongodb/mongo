@@ -15,14 +15,13 @@
 #include <string>
 #include <utility>
 
-#include "util/util.h"
-#include "util/flags.h"
+#include "absl/flags/flag.h"
+#include "absl/strings/str_format.h"
 #include "util/logging.h"
 #include "util/pcre.h"
-#include "util/strutil.h"
 
 // Silence warnings about the wacky formatting in the operator() functions.
-#if !defined(__clang__) && defined(__GNUC__) && __GNUC__ >= 6
+#if !defined(__clang__) && defined(__GNUC__)
 #pragma GCC diagnostic ignored "-Wmisleading-indentation"
 #endif
 
@@ -33,10 +32,10 @@
 // not exceed main thread stacks.  Note that other threads
 // often have smaller stacks, and therefore tightening
 // regexp_stack_limit may frequently be necessary.
-DEFINE_FLAG(int, regexp_stack_limit, 256 << 10,
-            "default PCRE stack limit (bytes)");
-DEFINE_FLAG(int, regexp_match_limit, 1000000,
-            "default PCRE match limit (function calls)");
+ABSL_FLAG(int, regexp_stack_limit, 256 << 10,
+          "default PCRE stack limit (bytes)");
+ABSL_FLAG(int, regexp_match_limit, 1000000,
+          "default PCRE match limit (function calls)");
 
 #ifndef USEPCRE
 
@@ -191,24 +190,11 @@ pcre* PCRE::Compile(Anchor anchor) {
 
 /***** Convenience interfaces *****/
 
-bool PCRE::FullMatchFunctor::operator ()(const StringPiece& text,
-                                       const PCRE& re,
-                                       const Arg& a0,
-                                       const Arg& a1,
-                                       const Arg& a2,
-                                       const Arg& a3,
-                                       const Arg& a4,
-                                       const Arg& a5,
-                                       const Arg& a6,
-                                       const Arg& a7,
-                                       const Arg& a8,
-                                       const Arg& a9,
-                                       const Arg& a10,
-                                       const Arg& a11,
-                                       const Arg& a12,
-                                       const Arg& a13,
-                                       const Arg& a14,
-                                       const Arg& a15) const {
+bool PCRE::FullMatchFunctor::operator()(
+    absl::string_view text, const PCRE& re, const Arg& a0, const Arg& a1,
+    const Arg& a2, const Arg& a3, const Arg& a4, const Arg& a5, const Arg& a6,
+    const Arg& a7, const Arg& a8, const Arg& a9, const Arg& a10, const Arg& a11,
+    const Arg& a12, const Arg& a13, const Arg& a14, const Arg& a15) const {
   const Arg* args[kMaxArgs];
   int n = 0;
   if (&a0 == &no_more_args)  goto done; args[n++] = &a0;
@@ -234,24 +220,11 @@ done:
   return re.DoMatchImpl(text, ANCHOR_BOTH, &consumed, args, n, vec, kVecSize);
 }
 
-bool PCRE::PartialMatchFunctor::operator ()(const StringPiece& text,
-                                          const PCRE& re,
-                                          const Arg& a0,
-                                          const Arg& a1,
-                                          const Arg& a2,
-                                          const Arg& a3,
-                                          const Arg& a4,
-                                          const Arg& a5,
-                                          const Arg& a6,
-                                          const Arg& a7,
-                                          const Arg& a8,
-                                          const Arg& a9,
-                                          const Arg& a10,
-                                          const Arg& a11,
-                                          const Arg& a12,
-                                          const Arg& a13,
-                                          const Arg& a14,
-                                          const Arg& a15) const {
+bool PCRE::PartialMatchFunctor::operator()(
+    absl::string_view text, const PCRE& re, const Arg& a0, const Arg& a1,
+    const Arg& a2, const Arg& a3, const Arg& a4, const Arg& a5, const Arg& a6,
+    const Arg& a7, const Arg& a8, const Arg& a9, const Arg& a10, const Arg& a11,
+    const Arg& a12, const Arg& a13, const Arg& a14, const Arg& a15) const {
   const Arg* args[kMaxArgs];
   int n = 0;
   if (&a0 == &no_more_args)  goto done; args[n++] = &a0;
@@ -277,24 +250,11 @@ done:
   return re.DoMatchImpl(text, UNANCHORED, &consumed, args, n, vec, kVecSize);
 }
 
-bool PCRE::ConsumeFunctor::operator ()(StringPiece* input,
-                                     const PCRE& pattern,
-                                     const Arg& a0,
-                                     const Arg& a1,
-                                     const Arg& a2,
-                                     const Arg& a3,
-                                     const Arg& a4,
-                                     const Arg& a5,
-                                     const Arg& a6,
-                                     const Arg& a7,
-                                     const Arg& a8,
-                                     const Arg& a9,
-                                     const Arg& a10,
-                                     const Arg& a11,
-                                     const Arg& a12,
-                                     const Arg& a13,
-                                     const Arg& a14,
-                                     const Arg& a15) const {
+bool PCRE::ConsumeFunctor::operator()(
+    absl::string_view* input, const PCRE& pattern, const Arg& a0, const Arg& a1,
+    const Arg& a2, const Arg& a3, const Arg& a4, const Arg& a5, const Arg& a6,
+    const Arg& a7, const Arg& a8, const Arg& a9, const Arg& a10, const Arg& a11,
+    const Arg& a12, const Arg& a13, const Arg& a14, const Arg& a15) const {
   const Arg* args[kMaxArgs];
   int n = 0;
   if (&a0 == &no_more_args)  goto done; args[n++] = &a0;
@@ -326,24 +286,11 @@ done:
   }
 }
 
-bool PCRE::FindAndConsumeFunctor::operator ()(StringPiece* input,
-                                            const PCRE& pattern,
-                                            const Arg& a0,
-                                            const Arg& a1,
-                                            const Arg& a2,
-                                            const Arg& a3,
-                                            const Arg& a4,
-                                            const Arg& a5,
-                                            const Arg& a6,
-                                            const Arg& a7,
-                                            const Arg& a8,
-                                            const Arg& a9,
-                                            const Arg& a10,
-                                            const Arg& a11,
-                                            const Arg& a12,
-                                            const Arg& a13,
-                                            const Arg& a14,
-                                            const Arg& a15) const {
+bool PCRE::FindAndConsumeFunctor::operator()(
+    absl::string_view* input, const PCRE& pattern, const Arg& a0, const Arg& a1,
+    const Arg& a2, const Arg& a3, const Arg& a4, const Arg& a5, const Arg& a6,
+    const Arg& a7, const Arg& a8, const Arg& a9, const Arg& a10, const Arg& a11,
+    const Arg& a12, const Arg& a13, const Arg& a14, const Arg& a15) const {
   const Arg* args[kMaxArgs];
   int n = 0;
   if (&a0 == &no_more_args)  goto done; args[n++] = &a0;
@@ -375,9 +322,8 @@ done:
   }
 }
 
-bool PCRE::Replace(std::string *str,
-                 const PCRE& pattern,
-                 const StringPiece& rewrite) {
+bool PCRE::Replace(std::string* str, const PCRE& pattern,
+                   absl::string_view rewrite) {
   int vec[kVecSize] = {};
   int matches = pattern.TryMatch(*str, 0, UNANCHORED, true, vec, kVecSize);
   if (matches == 0)
@@ -393,9 +339,8 @@ bool PCRE::Replace(std::string *str,
   return true;
 }
 
-int PCRE::GlobalReplace(std::string *str,
-                      const PCRE& pattern,
-                      const StringPiece& rewrite) {
+int PCRE::GlobalReplace(std::string* str, const PCRE& pattern,
+                        absl::string_view rewrite) {
   int count = 0;
   int vec[kVecSize] = {};
   std::string out;
@@ -451,10 +396,8 @@ int PCRE::GlobalReplace(std::string *str,
   return count;
 }
 
-bool PCRE::Extract(const StringPiece &text,
-                 const PCRE& pattern,
-                 const StringPiece &rewrite,
-                 std::string *out) {
+bool PCRE::Extract(absl::string_view text, const PCRE& pattern,
+                   absl::string_view rewrite, std::string* out) {
   int vec[kVecSize] = {};
   int matches = pattern.TryMatch(text, 0, UNANCHORED, true, vec, kVecSize);
   if (matches == 0)
@@ -463,7 +406,7 @@ bool PCRE::Extract(const StringPiece &text,
   return pattern.Rewrite(out, rewrite, text, vec, matches);
 }
 
-std::string PCRE::QuoteMeta(const StringPiece& unquoted) {
+std::string PCRE::QuoteMeta(absl::string_view unquoted) {
   std::string result;
   result.reserve(unquoted.size() << 1);
 
@@ -508,12 +451,8 @@ void PCRE::ClearHitLimit() {
   hit_limit_ = 0;
 }
 
-int PCRE::TryMatch(const StringPiece& text,
-                   size_t startpos,
-                   Anchor anchor,
-                   bool empty_ok,
-                   int *vec,
-                   int vecsize) const {
+int PCRE::TryMatch(absl::string_view text, size_t startpos, Anchor anchor,
+                   bool empty_ok, int* vec, int vecsize) const {
   pcre* re = (anchor == ANCHOR_BOTH) ? re_full_ : re_partial_;
   if (re == NULL) {
     PCREPORT(ERROR) << "Matching against invalid re: " << *error_;
@@ -522,12 +461,12 @@ int PCRE::TryMatch(const StringPiece& text,
 
   int match_limit = match_limit_;
   if (match_limit <= 0) {
-    match_limit = GetFlag(FLAGS_regexp_match_limit);
+    match_limit = absl::GetFlag(FLAGS_regexp_match_limit);
   }
 
   int stack_limit = stack_limit_;
   if (stack_limit <= 0) {
-    stack_limit = GetFlag(FLAGS_regexp_stack_limit);
+    stack_limit = absl::GetFlag(FLAGS_regexp_stack_limit);
   }
 
   pcre_extra extra = { 0 };
@@ -604,12 +543,8 @@ int PCRE::TryMatch(const StringPiece& text,
   return rc;
 }
 
-bool PCRE::DoMatchImpl(const StringPiece& text,
-                       Anchor anchor,
-                       size_t* consumed,
-                       const Arg* const* args,
-                       int n,
-                       int* vec,
+bool PCRE::DoMatchImpl(absl::string_view text, Anchor anchor, size_t* consumed,
+                       const Arg* const* args, int n, int* vec,
                        int vecsize) const {
   assert((1 + n) * 3 <= vecsize);  // results + PCRE workspace
   if (NumberOfCapturingGroups() < n) {
@@ -654,11 +589,8 @@ bool PCRE::DoMatchImpl(const StringPiece& text,
   return true;
 }
 
-bool PCRE::DoMatch(const StringPiece& text,
-                   Anchor anchor,
-                   size_t* consumed,
-                   const Arg* const args[],
-                   int n) const {
+bool PCRE::DoMatch(absl::string_view text, Anchor anchor, size_t* consumed,
+                   const Arg* const args[], int n) const {
   assert(n >= 0);
   const int vecsize = (1 + n) * 3;  // results + PCRE workspace
                                     // (as for kVecSize)
@@ -668,8 +600,8 @@ bool PCRE::DoMatch(const StringPiece& text,
   return b;
 }
 
-bool PCRE::Rewrite(std::string *out, const StringPiece &rewrite,
-                 const StringPiece &text, int *vec, int veclen) const {
+bool PCRE::Rewrite(std::string* out, absl::string_view rewrite,
+                   absl::string_view text, int* vec, int veclen) const {
   int number_of_capturing_groups = NumberOfCapturingGroups();
   for (const char *s = rewrite.data(), *end = s + rewrite.size();
        s < end; s++) {
@@ -704,7 +636,7 @@ bool PCRE::Rewrite(std::string *out, const StringPiece &rewrite,
   return true;
 }
 
-bool PCRE::CheckRewriteString(const StringPiece& rewrite,
+bool PCRE::CheckRewriteString(absl::string_view rewrite,
                               std::string* error) const {
   int max_token = -1;
   for (const char *s = rewrite.data(), *end = s + rewrite.size();
@@ -733,7 +665,7 @@ bool PCRE::CheckRewriteString(const StringPiece& rewrite,
   }
 
   if (max_token > NumberOfCapturingGroups()) {
-    *error = StringPrintf(
+    *error = absl::StrFormat(
         "Rewrite schema requests %d matches, but the regexp only has %d "
         "parenthesized subexpressions.",
         max_token, NumberOfCapturingGroups());
@@ -741,7 +673,6 @@ bool PCRE::CheckRewriteString(const StringPiece& rewrite,
   }
   return true;
 }
-
 
 // Return the number of capturing subpatterns, or -1 if the
 // regexp wasn't valid on construction.
@@ -774,9 +705,9 @@ bool PCRE::Arg::parse_string(const char* str, size_t n, void* dest) {
   return true;
 }
 
-bool PCRE::Arg::parse_stringpiece(const char* str, size_t n, void* dest) {
+bool PCRE::Arg::parse_string_view(const char* str, size_t n, void* dest) {
   if (dest == NULL) return true;
-  *(reinterpret_cast<StringPiece*>(dest)) = StringPiece(str, n);
+  *(reinterpret_cast<absl::string_view*>(dest)) = absl::string_view(str, n);
   return true;
 }
 

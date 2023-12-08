@@ -10,9 +10,10 @@
 
 #include <stdint.h>
 #include <string.h>
-#include <unordered_map>
 #include <utility>
 
+#include "absl/base/macros.h"
+#include "absl/container/flat_hash_map.h"
 #include "util/logging.h"
 #include "util/utf.h"
 #include "re2/pod_array.h"
@@ -211,7 +212,7 @@ class Compiler : public Regexp::Walker<Frag> {
 
   int64_t max_mem_;    // Total memory budget.
 
-  std::unordered_map<uint64_t, int> rune_cache_;
+  absl::flat_hash_map<uint64_t, int> rune_cache_;
   Frag rune_range_;
 
   RE2::Anchor anchor_;  // anchor mode for RE2::Set
@@ -478,7 +479,7 @@ static uint64_t MakeRuneCacheKey(uint8_t lo, uint8_t hi, bool foldcase,
 int Compiler::CachedRuneByteSuffix(uint8_t lo, uint8_t hi, bool foldcase,
                                    int next) {
   uint64_t key = MakeRuneCacheKey(lo, hi, foldcase, next);
-  std::unordered_map<uint64_t, int>::const_iterator it = rune_cache_.find(key);
+  absl::flat_hash_map<uint64_t, int>::const_iterator it = rune_cache_.find(key);
   if (it != rune_cache_.end())
     return it->second;
   int id = UncachedRuneByteSuffix(lo, hi, foldcase, next);
@@ -789,8 +790,8 @@ void Compiler::AddRuneRangeUTF8(Rune lo, Rune hi, bool foldcase) {
 // Should not be called.
 Frag Compiler::Copy(Frag arg) {
   // We're using WalkExponential; there should be no copying.
-  LOG(DFATAL) << "Compiler::Copy called!";
   failed_ = true;
+  LOG(DFATAL) << "Compiler::Copy called!";
   return NoMatch();
 }
 
@@ -916,8 +917,8 @@ Frag Compiler::PostVisit(Regexp* re, Frag, Frag, Frag* child_frags,
       CharClass* cc = re->cc();
       if (cc->empty()) {
         // This can't happen.
-        LOG(DFATAL) << "No ranges in char class";
         failed_ = true;
+        LOG(DFATAL) << "No ranges in char class";
         return NoMatch();
       }
 
@@ -974,8 +975,8 @@ Frag Compiler::PostVisit(Regexp* re, Frag, Frag, Frag* child_frags,
     case kRegexpNoWordBoundary:
       return EmptyWidth(kEmptyNonWordBoundary);
   }
-  LOG(DFATAL) << "Missing case in Compiler: " << re->op();
   failed_ = true;
+  LOG(DFATAL) << "Missing case in Compiler: " << re->op();
   return NoMatch();
 }
 
@@ -1243,7 +1244,7 @@ Prog* Compiler::CompileSet(Regexp* re, RE2::Anchor anchor, int64_t max_mem) {
   // Make sure DFA has enough memory to operate,
   // since we're not going to fall back to the NFA.
   bool dfa_failed = false;
-  StringPiece sp = "hello, world";
+  absl::string_view sp = "hello, world";
   prog->SearchDFA(sp, sp, Prog::kAnchored, Prog::kManyMatch,
                   NULL, &dfa_failed, NULL);
   if (dfa_failed) {

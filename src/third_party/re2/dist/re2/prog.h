@@ -11,12 +11,12 @@
 
 #include <stdint.h>
 #include <functional>
-#include <mutex>
 #include <string>
 #include <vector>
 #include <type_traits>
 
-#include "util/util.h"
+#include "absl/base/call_once.h"
+#include "absl/strings/string_view.h"
 #include "util/logging.h"
 #include "re2/pod_array.h"
 #include "re2/re2.h"
@@ -207,6 +207,7 @@ class Prog {
   int list_count() { return list_count_; }
   int inst_count(InstOp op) { return inst_count_[op]; }
   uint16_t* list_heads() { return list_heads_.data(); }
+  size_t bit_state_text_max_size() { return bit_state_text_max_size_; }
   int64_t dfa_mem() { return dfa_mem_; }
   void set_dfa_mem(int64_t dfa_mem) { dfa_mem_ = dfa_mem; }
   bool anchor_start() { return anchor_start_; }
@@ -248,7 +249,7 @@ class Prog {
 
   // Returns the set of kEmpty flags that are in effect at
   // position p within context.
-  static uint32_t EmptyFlags(const StringPiece& context, const char* p);
+  static uint32_t EmptyFlags(absl::string_view context, const char* p);
 
   // Returns whether byte c is a word character: ASCII only.
   // Used by the implementation of \b and \B.
@@ -273,15 +274,15 @@ class Prog {
   // If a particular submatch is not matched during the regexp match,
   // it is set to NULL.
   //
-  // Matching text == StringPiece(NULL, 0) is treated as any other empty
+  // Matching text == absl::string_view() is treated as any other empty
   // string, but note that on return, it will not be possible to distinguish
   // submatches that matched that empty string from submatches that didn't
   // match anything.  Either way, match[i] == NULL.
 
   // Search using NFA: can find submatches but kind of slow.
-  bool SearchNFA(const StringPiece& text, const StringPiece& context,
-                 Anchor anchor, MatchKind kind,
-                 StringPiece* match, int nmatch);
+  bool SearchNFA(absl::string_view text, absl::string_view context,
+                 Anchor anchor, MatchKind kind, absl::string_view* match,
+                 int nmatch);
 
   // Search using DFA: much faster than NFA but only finds
   // end of match and can use a lot more memory.
@@ -289,8 +290,8 @@ class Prog {
   // If the DFA runs out of memory, sets *failed to true and returns false.
   // If matches != NULL and kind == kManyMatch and there is a match,
   // SearchDFA fills matches with the match IDs of the final matching state.
-  bool SearchDFA(const StringPiece& text, const StringPiece& context,
-                 Anchor anchor, MatchKind kind, StringPiece* match0,
+  bool SearchDFA(absl::string_view text, absl::string_view context,
+                 Anchor anchor, MatchKind kind, absl::string_view* match0,
                  bool* failed, SparseSet* matches);
 
   // The callback issued after building each DFA state with BuildEntireDFA().
@@ -320,16 +321,16 @@ class Prog {
   // but much faster than NFA (competitive with PCRE)
   // for those expressions.
   bool IsOnePass();
-  bool SearchOnePass(const StringPiece& text, const StringPiece& context,
-                     Anchor anchor, MatchKind kind,
-                     StringPiece* match, int nmatch);
+  bool SearchOnePass(absl::string_view text, absl::string_view context,
+                     Anchor anchor, MatchKind kind, absl::string_view* match,
+                     int nmatch);
 
   // Bit-state backtracking.  Fast on small cases but uses memory
   // proportional to the product of the list count and the text size.
   bool CanBitState() { return list_heads_.data() != NULL; }
-  bool SearchBitState(const StringPiece& text, const StringPiece& context,
-                      Anchor anchor, MatchKind kind,
-                      StringPiece* match, int nmatch);
+  bool SearchBitState(absl::string_view text, absl::string_view context,
+                      Anchor anchor, MatchKind kind, absl::string_view* match,
+                      int nmatch);
 
   static const int kMaxOnePassCapture = 5;  // $0 through $4
 
@@ -339,10 +340,9 @@ class Prog {
   // It is also recursive, so can't use in production (will overflow stacks).
   // The name "Unsafe" here is supposed to be a flag that
   // you should not be using this function.
-  bool UnsafeSearchBacktrack(const StringPiece& text,
-                             const StringPiece& context,
+  bool UnsafeSearchBacktrack(absl::string_view text, absl::string_view context,
                              Anchor anchor, MatchKind kind,
-                             StringPiece* match, int nmatch);
+                             absl::string_view* match, int nmatch);
 
   // Computes range for any strings matching regexp. The min and max can in
   // some cases be arbitrarily precise, so the caller gets to specify the
@@ -360,7 +360,6 @@ class Prog {
   // Returns true on success, false on error.
   bool PossibleMatchRange(std::string* min, std::string* max, int maxlen);
 
-  // EXPERIMENTAL! SUBJECT TO CHANGE!
   // Outputs the program fanout into the given sparse array.
   void Fanout(SparseArray<int>* fanout);
 
@@ -429,10 +428,11 @@ class Prog {
     };
   };
 
-  int list_count_;                 // count of lists (see above)
-  int inst_count_[kNumInst];       // count of instructions by opcode
-  PODArray<uint16_t> list_heads_;  // sparse array enumerating list heads
-                                   // not populated if size_ is overly large
+  int list_count_;                  // count of lists (see above)
+  int inst_count_[kNumInst];        // count of instructions by opcode
+  PODArray<uint16_t> list_heads_;   // sparse array enumerating list heads
+                                    // not populated if size_ is overly large
+  size_t bit_state_text_max_size_;  // upper bound (inclusive) on text.size()
 
   PODArray<Inst> inst_;              // pointer to instruction array
   PODArray<uint8_t> onepass_nodes_;  // data for OnePass nodes
@@ -443,12 +443,23 @@ class Prog {
 
   uint8_t bytemap_[256];    // map from input bytes to byte classes
 
-  std::once_flag dfa_first_once_;
-  std::once_flag dfa_longest_once_;
+  absl::once_flag dfa_first_once_;
+  absl::once_flag dfa_longest_once_;
 
   Prog(const Prog&) = delete;
   Prog& operator=(const Prog&) = delete;
 };
+
+// std::string_view in MSVC has iterators that aren't just pointers and
+// that don't allow comparisons between different objects - not even if
+// those objects are views into the same string! Thus, we provide these
+// conversion functions for convenience.
+static inline const char* BeginPtr(absl::string_view s) {
+  return s.data();
+}
+static inline const char* EndPtr(absl::string_view s) {
+  return s.data() + s.size();
+}
 
 }  // namespace re2
 

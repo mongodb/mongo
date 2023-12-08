@@ -14,8 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "util/util.h"
-#include "re2/stringpiece.h"
+#include "absl/strings/string_view.h"
 
 namespace re2 {
 
@@ -24,7 +23,7 @@ class StringGenerator {
   StringGenerator(int maxlen, const std::vector<std::string>& alphabet);
   ~StringGenerator() {}
 
-  const StringPiece& Next();
+  absl::string_view Next();
   bool HasNext() { return hasnext_; }
 
   // Resets generator to start sequence over.
@@ -45,11 +44,11 @@ class StringGenerator {
   std::vector<std::string> alphabet_;  // Alphabet, one string per letter.
 
   // Iteration state.
-  StringPiece sp_;           // Last StringPiece returned by Next().
-  std::string s_;            // String data in last StringPiece returned by Next().
+  absl::string_view sp_;     // Last string_view returned by Next().
+  std::string s_;            // String data in last string_view returned by Next().
   bool hasnext_;             // Whether Next() can be called again.
   std::vector<int> digits_;  // Alphabet indices for next string.
-  bool generate_null_;       // Whether to generate a NULL StringPiece next.
+  bool generate_null_;       // Whether to generate a NULL string_view next.
   bool random_;              // Whether generated strings are random.
   int nrandom_;              // Number of random strings left to generate.
   std::minstd_rand0 rng_;    // Random number generator.

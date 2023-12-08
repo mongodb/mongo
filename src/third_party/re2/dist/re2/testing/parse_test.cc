@@ -6,7 +6,8 @@
 
 #include <string>
 
-#include "util/test.h"
+#include "absl/base/macros.h"
+#include "gtest/gtest.h"
 #include "util/logging.h"
 #include "re2/regexp.h"
 
@@ -165,6 +166,8 @@ static Test tests[] = {
   // Test named captures
   { "(?P<name>a)", "cap{name:lit{a}}" },
   { "(?P<中文>a)", "cap{中文:lit{a}}" },
+  { "(?<name>a)", "cap{name:lit{a}}" },
+  { "(?<中文>a)", "cap{中文:lit{a}}" },
 
   // Case-folded literals
   { "[Aa]", "litfold{a}" },
@@ -262,7 +265,7 @@ void TestParse(const Test* tests, int ntests, Regexp::ParseFlags flags,
 
 // Test that regexps parse to expected structures.
 TEST(TestParse, SimpleRegexps) {
-  TestParse(tests, arraysize(tests), kTestFlags, "simple");
+  TestParse(tests, ABSL_ARRAYSIZE(tests), kTestFlags, "simple");
 }
 
 Test foldcase_tests[] = {
@@ -279,7 +282,7 @@ Test foldcase_tests[] = {
 
 // Test that parsing with FoldCase works.
 TEST(TestParse, FoldCase) {
-  TestParse(foldcase_tests, arraysize(foldcase_tests), Regexp::FoldCase, "foldcase");
+  TestParse(foldcase_tests, ABSL_ARRAYSIZE(foldcase_tests), Regexp::FoldCase, "foldcase");
 }
 
 Test literal_tests[] = {
@@ -288,7 +291,7 @@ Test literal_tests[] = {
 
 // Test that parsing with Literal works.
 TEST(TestParse, Literal) {
-  TestParse(literal_tests, arraysize(literal_tests), Regexp::Literal, "literal");
+  TestParse(literal_tests, ABSL_ARRAYSIZE(literal_tests), Regexp::Literal, "literal");
 }
 
 Test matchnl_tests[] = {
@@ -301,7 +304,7 @@ Test matchnl_tests[] = {
 // Test that parsing with MatchNL works.
 // (Also tested above during simple cases.)
 TEST(TestParse, MatchNL) {
-  TestParse(matchnl_tests, arraysize(matchnl_tests), Regexp::MatchNL, "with MatchNL");
+  TestParse(matchnl_tests, ABSL_ARRAYSIZE(matchnl_tests), Regexp::MatchNL, "with MatchNL");
 }
 
 Test nomatchnl_tests[] = {
@@ -313,7 +316,7 @@ Test nomatchnl_tests[] = {
 
 // Test that parsing without MatchNL works.
 TEST(TestParse, NoMatchNL) {
-  TestParse(nomatchnl_tests, arraysize(nomatchnl_tests), Regexp::NoParseFlags, "without MatchNL");
+  TestParse(nomatchnl_tests, ABSL_ARRAYSIZE(nomatchnl_tests), Regexp::NoParseFlags, "without MatchNL");
 }
 
 Test prefix_tests[] = {
@@ -357,7 +360,7 @@ Test prefix_tests[] = {
 
 // Test that prefix factoring works.
 TEST(TestParse, Prefix) {
-  TestParse(prefix_tests, arraysize(prefix_tests), Regexp::PerlX, "prefix");
+  TestParse(prefix_tests, ABSL_ARRAYSIZE(prefix_tests), Regexp::PerlX, "prefix");
 }
 
 Test nested_tests[] = {
@@ -373,7 +376,7 @@ Test nested_tests[] = {
 
 // Test that nested repetition works.
 TEST(TestParse, Nested) {
-  TestParse(nested_tests, arraysize(nested_tests), Regexp::PerlX, "nested");
+  TestParse(nested_tests, ABSL_ARRAYSIZE(nested_tests), Regexp::PerlX, "nested");
 }
 
 // Invalid regular expressions
@@ -395,6 +398,11 @@ const char* badtests[] = {
   "(?P<name",
   "(?P<x y>a)",
   "(?P<>a)",
+  "(?<name>a",
+  "(?<name>",
+  "(?<name",
+  "(?<x y>a)",
+  "(?<>a)",
   "[a-Z]",
   "(?i)[a-Z]",
   "a{100000}",
@@ -415,6 +423,7 @@ const char* only_perl[] = {
  "\\Q\\\\\\\\\\E",
  "(?:a)",
  "(?P<name>a)",
+ "(?<name>a)",
 };
 
 // Valid in POSIX, bad in Perl.
@@ -428,20 +437,20 @@ const char* only_posix[] = {
 
 // Test that parser rejects bad regexps.
 TEST(TestParse, InvalidRegexps) {
-  for (size_t i = 0; i < arraysize(badtests); i++) {
+  for (size_t i = 0; i < ABSL_ARRAYSIZE(badtests); i++) {
     ASSERT_TRUE(Regexp::Parse(badtests[i], Regexp::PerlX, NULL) == NULL)
       << " " << badtests[i];
     ASSERT_TRUE(Regexp::Parse(badtests[i], Regexp::NoParseFlags, NULL) == NULL)
       << " " << badtests[i];
   }
-  for (size_t i = 0; i < arraysize(only_posix); i++) {
+  for (size_t i = 0; i < ABSL_ARRAYSIZE(only_posix); i++) {
     ASSERT_TRUE(Regexp::Parse(only_posix[i], Regexp::PerlX, NULL) == NULL)
       << " " << only_posix[i];
     Regexp* re = Regexp::Parse(only_posix[i], Regexp::NoParseFlags, NULL);
     ASSERT_TRUE(re != NULL) << " " << only_posix[i];
     re->Decref();
   }
-  for (size_t i = 0; i < arraysize(only_perl); i++) {
+  for (size_t i = 0; i < ABSL_ARRAYSIZE(only_perl); i++) {
     ASSERT_TRUE(Regexp::Parse(only_perl[i], Regexp::NoParseFlags, NULL) == NULL)
       << " " << only_perl[i];
     Regexp* re = Regexp::Parse(only_perl[i], Regexp::PerlX, NULL);
@@ -452,7 +461,7 @@ TEST(TestParse, InvalidRegexps) {
 
 // Test that ToString produces original regexp or equivalent one.
 TEST(TestToString, EquivalentParse) {
-  for (size_t i = 0; i < arraysize(tests); i++) {
+  for (size_t i = 0; i < ABSL_ARRAYSIZE(tests); i++) {
     RegexpStatus status;
     Regexp::ParseFlags f = kTestFlags;
     if (tests[i].flags != 0) {
@@ -504,6 +513,16 @@ TEST(NamedCaptures, ErrorArgs) {
   EXPECT_TRUE(re == NULL);
   EXPECT_EQ(status.code(), kRegexpBadNamedCapture);
   EXPECT_EQ(status.error_arg(), "(?P<space bar>");
+
+  re = Regexp::Parse("test(?<name", Regexp::LikePerl, &status);
+  EXPECT_TRUE(re == NULL);
+  EXPECT_EQ(status.code(), kRegexpBadNamedCapture);
+  EXPECT_EQ(status.error_arg(), "(?<name");
+
+  re = Regexp::Parse("test(?<space bar>z)", Regexp::LikePerl, &status);
+  EXPECT_TRUE(re == NULL);
+  EXPECT_EQ(status.code(), kRegexpBadNamedCapture);
+  EXPECT_EQ(status.error_arg(), "(?<space bar>");
 }
 
 }  // namespace re2

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # coding=utf-8
 #
 # Copyright 2008 The RE2 Authors.  All Rights Reserved.

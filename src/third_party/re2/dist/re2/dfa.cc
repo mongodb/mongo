@@ -28,23 +28,25 @@
 #include <algorithm>
 #include <atomic>
 #include <deque>
-#include <mutex>
 #include <new>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "absl/base/call_once.h"
+#include "absl/base/macros.h"
+#include "absl/base/thread_annotations.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/strings/str_format.h"
+#include "absl/synchronization/mutex.h"
+#include "absl/types/span.h"
 #include "util/logging.h"
-#include "util/mix.h"
-#include "util/mutex.h"
 #include "util/strutil.h"
 #include "re2/pod_array.h"
 #include "re2/prog.h"
 #include "re2/re2.h"
 #include "re2/sparse_set.h"
-#include "re2/stringpiece.h"
 
 // Silence "zero-sized array in struct/union" warning for DFA::State::next_.
 #ifdef _MSC_VER
@@ -88,9 +90,9 @@ class DFA {
   //   returning the leftmost end of the match instead of the rightmost one.
   // If the DFA cannot complete the search (for example, if it is out of
   //   memory), it sets *failed and returns false.
-  bool Search(const StringPiece& text, const StringPiece& context,
-              bool anchored, bool want_earliest_match, bool run_forward,
-              bool* failed, const char** ep, SparseSet* matches);
+  bool Search(absl::string_view text, absl::string_view context, bool anchored,
+              bool want_earliest_match, bool run_forward, bool* failed,
+              const char** ep, SparseSet* matches);
 
   // Builds out all states for the entire DFA.
   // If cb is not empty, it receives one callback per state built.
@@ -114,21 +116,26 @@ class DFA {
   struct State {
     inline bool IsMatch() const { return (flag_ & kFlagMatch) != 0; }
 
+    template <typename H>
+    friend H AbslHashValue(H h, const State& a) {
+      const absl::Span<const int> ainst(a.inst_, a.ninst_);
+      return H::combine(std::move(h), a.flag_, ainst);
+    }
+
+    friend bool operator==(const State& a, const State& b) {
+      const absl::Span<const int> ainst(a.inst_, a.ninst_);
+      const absl::Span<const int> binst(b.inst_, b.ninst_);
+      return &a == &b || (a.flag_ == b.flag_ && ainst == binst);
+    }
+
     int* inst_;         // Instruction pointers in the state.
     int ninst_;         // # of inst_ pointers.
     uint32_t flag_;     // Empty string bitfield flags in effect on the way
                         // into this state, along with kFlagMatch if this
                         // is a matching state.
 
-// Work around the bug affecting flexible array members in GCC 6.x (for x >= 1).
-// (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=70932)
-#if !defined(__clang__) && defined(__GNUC__) && __GNUC__ == 6 && __GNUC_MINOR__ >= 1
-    std::atomic<State*> next_[0];   // Outgoing arrows from State,
-#else
     std::atomic<State*> next_[];    // Outgoing arrows from State,
-#endif
-
-                        // one per input byte class
+                                    // one per input byte class
   };
 
   enum {
@@ -143,11 +150,7 @@ class DFA {
   struct StateHash {
     size_t operator()(const State* a) const {
       DCHECK(a != NULL);
-      HashMix mix(a->flag_);
-      for (int i = 0; i < a->ninst_; i++)
-        mix.Mix(a->inst_[i]);
-      mix.Mix(0);
-      return mix.get();
+      return absl::Hash<State>()(*a);
     }
   };
 
@@ -155,24 +158,15 @@ class DFA {
     bool operator()(const State* a, const State* b) const {
       DCHECK(a != NULL);
       DCHECK(b != NULL);
-      if (a == b)
-        return true;
-      if (a->flag_ != b->flag_)
-        return false;
-      if (a->ninst_ != b->ninst_)
-        return false;
-      for (int i = 0; i < a->ninst_; i++)
-        if (a->inst_[i] != b->inst_[i])
-          return false;
-      return true;
+      return *a == *b;
     }
   };
 
-  typedef std::unordered_set<State*, StateHash, StateEqual> StateSet;
+  typedef absl::flat_hash_set<State*, StateHash, StateEqual> StateSet;
 
  private:
   // Make it easier to swap in a scalable reader-writer mutex.
-  using CacheMutex = Mutex;
+  using CacheMutex = absl::Mutex;
 
   enum {
     // Indices into start_ for unanchored searches.
@@ -238,7 +232,7 @@ class DFA {
 
   // Search parameters
   struct SearchParams {
-    SearchParams(const StringPiece& text, const StringPiece& context,
+    SearchParams(absl::string_view text, absl::string_view context,
                  RWLocker* cache_lock)
       : text(text),
         context(context),
@@ -252,8 +246,8 @@ class DFA {
         ep(NULL),
         matches(NULL) {}
 
-    StringPiece text;
-    StringPiece context;
+    absl::string_view text;
+    absl::string_view context;
     bool anchored;
     bool can_prefix_accel;
     bool want_earliest_match;
@@ -325,7 +319,7 @@ class DFA {
   Prog::MatchKind kind_;    // The kind of DFA.
   bool init_failed_;        // initialization failed (out of memory)
 
-  Mutex mutex_;  // mutex_ >= cache_mutex_.r
+  absl::Mutex mutex_;  // mutex_ >= cache_mutex_.r
 
   // Scratch areas, protected by mutex_.
   Workq* q0_;             // Two pre-allocated work queues.
@@ -428,7 +422,7 @@ DFA::DFA(Prog* prog, Prog::MatchKind kind, int64_t max_mem)
     q1_(NULL),
     mem_budget_(max_mem) {
   if (ExtraDebug)
-    fprintf(stderr, "\nkind %d\n%s\n", kind_, prog_->DumpUnanchored().c_str());
+    absl::FPrintF(stderr, "\nkind %d\n%s\n", kind_, prog_->DumpUnanchored());
   int nmark = 0;
   if (kind_ == Prog::kLongestMatch)
     nmark = prog_->size();
@@ -498,7 +492,7 @@ std::string DFA::DumpWorkq(Workq* q) {
       s += "|";
       sep = "";
     } else {
-      s += StringPrintf("%s%d", sep, *it);
+      s += absl::StrFormat("%s%d", sep, *it);
       sep = ",";
     }
   }
@@ -515,7 +509,7 @@ std::string DFA::DumpState(State* state) {
     return "*";
   std::string s;
   const char* sep = "";
-  s += StringPrintf("(%p)", state);
+  s += absl::StrFormat("(%p)", state);
   for (int i = 0; i < state->ninst_; i++) {
     if (state->inst_[i] == Mark) {
       s += "|";
@@ -524,11 +518,11 @@ std::string DFA::DumpState(State* state) {
       s += "||";
       sep = "";
     } else {
-      s += StringPrintf("%s%d", sep, state->inst_[i]);
+      s += absl::StrFormat("%s%d", sep, state->inst_[i]);
       sep = ",";
     }
   }
-  s += StringPrintf(" flag=%#x", state->flag_);
+  s += absl::StrFormat(" flag=%#x", state->flag_);
   return s;
 }
 
@@ -596,16 +590,35 @@ DFA::State* DFA::WorkqToCachedState(Workq* q, Workq* mq, uint32_t flag) {
   //mutex_.AssertHeld();
 
   // Construct array of instruction ids for the new state.
-  // Only ByteRange, EmptyWidth, and Match instructions are useful to keep:
-  // those are the only operators with any effect in
-  // RunWorkqOnEmptyString or RunWorkqOnByte.
+  // In some cases, kInstAltMatch may trigger an upgrade to FullMatchState.
+  // Otherwise, "compress" q down to list heads for storage; StateToWorkq()
+  // will "decompress" it for computation by exploring from each list head.
+  //
+  // Historically, only kInstByteRange, kInstEmptyWidth and kInstMatch were
+  // useful to keep, but it turned out that kInstAlt was necessary to keep:
+  //
+  // > [*] kInstAlt would seem useless to record in a state, since
+  // > we've already followed both its arrows and saved all the
+  // > interesting states we can reach from there.  The problem
+  // > is that one of the empty-width instructions might lead
+  // > back to the same kInstAlt (if an empty-width operator is starred),
+  // > producing a different evaluation order depending on whether
+  // > we keep the kInstAlt to begin with.  Sigh.
+  // > A specific case that this affects is /(^|a)+/ matching "a".
+  // > If we don't save the kInstAlt, we will match the whole "a" (0,1)
+  // > but in fact the correct leftmost-first match is the leading "" (0,0).
+  //
+  // Recall that flattening transformed the Prog from "tree" form to "list"
+  // form: in the former, kInstAlt existed explicitly... and abundantly; in
+  // the latter, it's implied between the instructions that compose a list.
+  // Thus, because the information wasn't lost, the bug doesn't remanifest.
   PODArray<int> inst(q->size());
   int n = 0;
   uint32_t needflags = 0;  // flags needed by kInstEmptyWidth instructions
   bool sawmatch = false;   // whether queue contains guaranteed kInstMatch
   bool sawmark = false;    // whether queue contains a Mark
   if (ExtraDebug)
-    fprintf(stderr, "WorkqToCachedState %s [%#x]", DumpWorkq(q).c_str(), flag);
+    absl::FPrintF(stderr, "WorkqToCachedState %s [%#x]", DumpWorkq(q), flag);
   for (Workq::iterator it = q->begin(); it != q->end(); ++it) {
     int id = *it;
     if (sawmatch && (kind_ == Prog::kFirstMatch || q->is_mark(id)))
@@ -630,10 +643,10 @@ DFA::State* DFA::WorkqToCachedState(Workq* q, Workq* mq, uint32_t flag) {
             (kind_ != Prog::kLongestMatch || !sawmark) &&
             (flag & kFlagMatch)) {
           if (ExtraDebug)
-            fprintf(stderr, " -> FullMatchState\n");
+            absl::FPrintF(stderr, " -> FullMatchState\n");
           return FullMatchState;
         }
-        FALLTHROUGH_INTENDED;
+        ABSL_FALLTHROUGH_INTENDED;
       default:
         // Record iff id is the head of its list, which must
         // be the case if id-1 is the last of *its* list. :)
@@ -676,7 +689,7 @@ DFA::State* DFA::WorkqToCachedState(Workq* q, Workq* mq, uint32_t flag) {
   // if the state is *not* a matching state.
   if (n == 0 && flag == 0) {
     if (ExtraDebug)
-      fprintf(stderr, " -> DeadState\n");
+      absl::FPrintF(stderr, " -> DeadState\n");
     return DeadState;
   }
 
@@ -740,25 +753,29 @@ DFA::State* DFA::CachedState(int* inst, int ninst, uint32_t flag) {
   StateSet::iterator it = state_cache_.find(&state);
   if (it != state_cache_.end()) {
     if (ExtraDebug)
-      fprintf(stderr, " -cached-> %s\n", DumpState(*it).c_str());
+      absl::FPrintF(stderr, " -cached-> %s\n", DumpState(*it));
     return *it;
   }
 
   // Must have enough memory for new state.
   // In addition to what we're going to allocate,
-  // the state cache hash table seems to incur about 40 bytes per
-  // State*, empirically.
-  const int kStateCacheOverhead = 40;
+  // the state cache hash table seems to incur about 18 bytes per
+  // State*. Worst case for non-small sets is it being half full, where each
+  // value present takes up 1 byte hash sample plus the pointer itself.
+  const int kStateCacheOverhead = 18;
   int nnext = prog_->bytemap_range() + 1;  // + 1 for kByteEndText slot
-  int mem = sizeof(State) + nnext*sizeof(std::atomic<State*>) +
-            ninst*sizeof(int);
-  if (mem_budget_ < mem + kStateCacheOverhead) {
+  int mem = sizeof(State) + nnext*sizeof(std::atomic<State*>);
+  int instmem = ninst*sizeof(int);
+  if (mem_budget_ < mem + instmem + kStateCacheOverhead) {
     mem_budget_ = -1;
     return NULL;
   }
-  mem_budget_ -= mem + kStateCacheOverhead;
+  mem_budget_ -= mem + instmem + kStateCacheOverhead;
 
   // Allocate new state along with room for next_ and inst_.
+  // inst_ is stored separately since it's colder; this also
+  // means that the States for a given DFA are the same size
+  // class, so the allocator can hopefully pack them better.
   char* space = std::allocator<char>().allocate(mem);
   State* s = new (space) State;
   (void) new (s->next_) std::atomic<State*>[nnext];
@@ -766,12 +783,13 @@ DFA::State* DFA::CachedState(int* inst, int ninst, uint32_t flag) {
   // (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64658)
   for (int i = 0; i < nnext; i++)
     (void) new (s->next_ + i) std::atomic<State*>(NULL);
-  s->inst_ = new (s->next_ + nnext) int[ninst];
-  memmove(s->inst_, inst, ninst*sizeof s->inst_[0]);
+  s->inst_ = std::allocator<int>().allocate(ninst);
+  (void) new (s->inst_) int[ninst];
+  memmove(s->inst_, inst, instmem);
   s->ninst_ = ninst;
   s->flag_ = flag;
   if (ExtraDebug)
-    fprintf(stderr, " -> %s\n", DumpState(s).c_str());
+    absl::FPrintF(stderr, " -> %s\n", DumpState(s));
 
   // Put state in cache and return it.
   state_cache_.insert(s);
@@ -785,12 +803,12 @@ void DFA::ClearCache() {
   while (begin != end) {
     StateSet::iterator tmp = begin;
     ++begin;
+    // Deallocate the instruction array, which is stored separately as above.
+    std::allocator<int>().deallocate((*tmp)->inst_, (*tmp)->ninst_);
     // Deallocate the blob of memory that we allocated in DFA::CachedState().
     // We recompute mem in order to benefit from sized delete where possible.
-    int ninst = (*tmp)->ninst_;
     int nnext = prog_->bytemap_range() + 1;  // + 1 for kByteEndText slot
-    int mem = sizeof(State) + nnext*sizeof(std::atomic<State*>) +
-              ninst*sizeof(int);
+    int mem = sizeof(State) + nnext*sizeof(std::atomic<State*>);
     std::allocator<char>().deallocate(reinterpret_cast<char*>(*tmp), mem);
   }
   state_cache_.clear();
@@ -985,8 +1003,8 @@ void DFA::RunWorkqOnByte(Workq* oldq, Workq* newq,
   }
 
   if (ExtraDebug)
-    fprintf(stderr, "%s on %d[%#x] -> %s [%d]\n",
-            DumpWorkq(oldq).c_str(), c, flag, DumpWorkq(newq).c_str(), *ismatch);
+    absl::FPrintF(stderr, "%s on %d[%#x] -> %s [%d]\n",
+                  DumpWorkq(oldq), c, flag, DumpWorkq(newq), *ismatch);
 }
 
 // Processes input byte c in state, returning new state.
@@ -994,7 +1012,7 @@ void DFA::RunWorkqOnByte(Workq* oldq, Workq* newq,
 DFA::State* DFA::RunStateOnByteUnlocked(State* state, int c) {
   // Keep only one RunStateOnByte going
   // even if the DFA is being run by multiple threads.
-  MutexLock l(&mutex_);
+  absl::MutexLock l(&mutex_);
   return RunStateOnByte(state, c);
 }
 
@@ -1134,9 +1152,9 @@ DFA::RWLocker::RWLocker(CacheMutex* mu) : mu_(mu), writing_(false) {
   mu_->ReaderLock();
 }
 
-// This function is marked as NO_THREAD_SAFETY_ANALYSIS because
+// This function is marked as ABSL_NO_THREAD_SAFETY_ANALYSIS because
 // the annotations don't support lock upgrade.
-void DFA::RWLocker::LockForWriting() NO_THREAD_SAFETY_ANALYSIS {
+void DFA::RWLocker::LockForWriting() ABSL_NO_THREAD_SAFETY_ANALYSIS {
   if (!writing_) {
     mu_->ReaderUnlock();
     mu_->WriterLock();
@@ -1246,7 +1264,7 @@ DFA::StateSaver::~StateSaver() {
 DFA::State* DFA::StateSaver::Restore() {
   if (is_special_)
     return special_;
-  MutexLock l(&dfa_->mutex_);
+  absl::MutexLock l(&dfa_->mutex_);
   State* s = dfa_->CachedState(inst_, ninst_, flag_);
   if (s == NULL)
     LOG(DFATAL) << "StateSaver failed to restore state.";
@@ -1342,13 +1360,13 @@ inline bool DFA::InlinedSearchLoop(SearchParams* params) {
 
   State* s = start;
   if (ExtraDebug)
-    fprintf(stderr, "@stx: %s\n", DumpState(s).c_str());
+    absl::FPrintF(stderr, "@stx: %s\n", DumpState(s));
 
   if (s->IsMatch()) {
     matched = true;
     lastmatch = p;
     if (ExtraDebug)
-      fprintf(stderr, "match @stx! [%s]\n", DumpState(s).c_str());
+      absl::FPrintF(stderr, "match @stx! [%s]\n", DumpState(s));
     if (params->matches != NULL && kind_ == Prog::kManyMatch) {
       for (int i = s->ninst_ - 1; i >= 0; i--) {
         int id = s->inst_[i];
@@ -1365,7 +1383,7 @@ inline bool DFA::InlinedSearchLoop(SearchParams* params) {
 
   while (p != ep) {
     if (ExtraDebug)
-      fprintf(stderr, "@%td: %s\n", p - bp, DumpState(s).c_str());
+      absl::FPrintF(stderr, "@%d: %s\n", p - bp, DumpState(s));
 
     if (can_prefix_accel && s == start) {
       // In start state, only way out is to find the prefix,
@@ -1465,7 +1483,7 @@ inline bool DFA::InlinedSearchLoop(SearchParams* params) {
       else
         lastmatch = p + 1;
       if (ExtraDebug)
-        fprintf(stderr, "match @%td! [%s]\n", lastmatch - bp, DumpState(s).c_str());
+        absl::FPrintF(stderr, "match @%d! [%s]\n", lastmatch - bp, DumpState(s));
       if (params->matches != NULL && kind_ == Prog::kManyMatch) {
         for (int i = s->ninst_ - 1; i >= 0; i--) {
           int id = s->inst_[i];
@@ -1484,19 +1502,19 @@ inline bool DFA::InlinedSearchLoop(SearchParams* params) {
   // Process one more byte to see if it triggers a match.
   // (Remember, matches are delayed one byte.)
   if (ExtraDebug)
-    fprintf(stderr, "@etx: %s\n", DumpState(s).c_str());
+    absl::FPrintF(stderr, "@etx: %s\n", DumpState(s));
 
   int lastbyte;
   if (run_forward) {
-    if (params->text.end() == params->context.end())
+    if (EndPtr(params->text) == EndPtr(params->context))
       lastbyte = kByteEndText;
     else
-      lastbyte = params->text.end()[0] & 0xFF;
+      lastbyte = EndPtr(params->text)[0] & 0xFF;
   } else {
-    if (params->text.begin() == params->context.begin())
+    if (BeginPtr(params->text) == BeginPtr(params->context))
       lastbyte = kByteEndText;
     else
-      lastbyte = params->text.begin()[-1] & 0xFF;
+      lastbyte = BeginPtr(params->text)[-1] & 0xFF;
   }
 
   State* ns = s->next_[ByteMap(lastbyte)].load(std::memory_order_acquire);
@@ -1532,7 +1550,7 @@ inline bool DFA::InlinedSearchLoop(SearchParams* params) {
     matched = true;
     lastmatch = p;
     if (ExtraDebug)
-      fprintf(stderr, "match @etx! [%s]\n", DumpState(s).c_str());
+      absl::FPrintF(stderr, "match @etx! [%s]\n", DumpState(s));
     if (params->matches != NULL && kind_ == Prog::kManyMatch) {
       for (int i = s->ninst_ - 1; i >= 0; i--) {
         int id = s->inst_[i];
@@ -1623,11 +1641,11 @@ bool DFA::FastSearchLoop(SearchParams* params) {
 // state for the DFA search loop.  Fills in params and returns true on success.
 // Returns false on failure.
 bool DFA::AnalyzeSearch(SearchParams* params) {
-  const StringPiece& text = params->text;
-  const StringPiece& context = params->context;
+  absl::string_view text = params->text;
+  absl::string_view context = params->context;
 
   // Sanity check: make sure that text lies within context.
-  if (text.begin() < context.begin() || text.end() > context.end()) {
+  if (BeginPtr(text) < BeginPtr(context) || EndPtr(text) > EndPtr(context)) {
     LOG(DFATAL) << "context does not contain text";
     params->start = DeadState;
     return true;
@@ -1637,13 +1655,13 @@ bool DFA::AnalyzeSearch(SearchParams* params) {
   int start;
   uint32_t flags;
   if (params->run_forward) {
-    if (text.begin() == context.begin()) {
+    if (BeginPtr(text) == BeginPtr(context)) {
       start = kStartBeginText;
       flags = kEmptyBeginText|kEmptyBeginLine;
-    } else if (text.begin()[-1] == '\n') {
+    } else if (BeginPtr(text)[-1] == '\n') {
       start = kStartBeginLine;
       flags = kEmptyBeginLine;
-    } else if (Prog::IsWordChar(text.begin()[-1] & 0xFF)) {
+    } else if (Prog::IsWordChar(BeginPtr(text)[-1] & 0xFF)) {
       start = kStartAfterWordChar;
       flags = kFlagLastWord;
     } else {
@@ -1651,13 +1669,13 @@ bool DFA::AnalyzeSearch(SearchParams* params) {
       flags = 0;
     }
   } else {
-    if (text.end() == context.end()) {
+    if (EndPtr(text) == EndPtr(context)) {
       start = kStartBeginText;
       flags = kEmptyBeginText|kEmptyBeginLine;
-    } else if (text.end()[0] == '\n') {
+    } else if (EndPtr(text)[0] == '\n') {
       start = kStartBeginLine;
       flags = kEmptyBeginLine;
-    } else if (Prog::IsWordChar(text.end()[0] & 0xFF)) {
+    } else if (Prog::IsWordChar(EndPtr(text)[0] & 0xFF)) {
       start = kStartAfterWordChar;
       flags = kFlagLastWord;
     } else {
@@ -1675,8 +1693,8 @@ bool DFA::AnalyzeSearch(SearchParams* params) {
   if (!AnalyzeSearchHelper(params, info, flags)) {
     ResetCache(params->cache_lock);
     if (!AnalyzeSearchHelper(params, info, flags)) {
-      LOG(DFATAL) << "Failed to analyze start state.";
       params->failed = true;
+      LOG(DFATAL) << "Failed to analyze start state.";
       return false;
     }
   }
@@ -1694,9 +1712,9 @@ bool DFA::AnalyzeSearch(SearchParams* params) {
     params->can_prefix_accel = true;
 
   if (ExtraDebug)
-    fprintf(stderr, "anchored=%d fwd=%d flags=%#x state=%s can_prefix_accel=%d\n",
-            params->anchored, params->run_forward, flags,
-            DumpState(params->start).c_str(), params->can_prefix_accel);
+    absl::FPrintF(stderr, "anchored=%d fwd=%d flags=%#x state=%s can_prefix_accel=%d\n",
+                  params->anchored, params->run_forward, flags,
+                  DumpState(params->start), params->can_prefix_accel);
 
   return true;
 }
@@ -1709,7 +1727,7 @@ bool DFA::AnalyzeSearchHelper(SearchParams* params, StartInfo* info,
   if (start != NULL)
     return true;
 
-  MutexLock l(&mutex_);
+  absl::MutexLock l(&mutex_);
   start = info->start.load(std::memory_order_relaxed);
   if (start != NULL)
     return true;
@@ -1728,14 +1746,9 @@ bool DFA::AnalyzeSearchHelper(SearchParams* params, StartInfo* info,
 }
 
 // The actual DFA search: calls AnalyzeSearch and then FastSearchLoop.
-bool DFA::Search(const StringPiece& text,
-                 const StringPiece& context,
-                 bool anchored,
-                 bool want_earliest_match,
-                 bool run_forward,
-                 bool* failed,
-                 const char** epp,
-                 SparseSet* matches) {
+bool DFA::Search(absl::string_view text, absl::string_view context,
+                 bool anchored, bool want_earliest_match, bool run_forward,
+                 bool* failed, const char** epp, SparseSet* matches) {
   *epp = NULL;
   if (!ok()) {
     *failed = true;
@@ -1744,9 +1757,9 @@ bool DFA::Search(const StringPiece& text,
   *failed = false;
 
   if (ExtraDebug) {
-    fprintf(stderr, "\nprogram:\n%s\n", prog_->DumpUnanchored().c_str());
-    fprintf(stderr, "text %s anchored=%d earliest=%d fwd=%d kind %d\n",
-            std::string(text).c_str(), anchored, want_earliest_match, run_forward, kind_);
+    absl::FPrintF(stderr, "\nprogram:\n%s\n", prog_->DumpUnanchored());
+    absl::FPrintF(stderr, "text %s anchored=%d earliest=%d fwd=%d kind %d\n",
+                  text, anchored, want_earliest_match, run_forward, kind_);
   }
 
   RWLocker l(&cache_mutex_);
@@ -1770,7 +1783,7 @@ bool DFA::Search(const StringPiece& text,
     return true;
   }
   if (ExtraDebug)
-    fprintf(stderr, "start %s\n", DumpState(params.start).c_str());
+    absl::FPrintF(stderr, "start %s\n", DumpState(params.start));
   bool ret = FastSearchLoop(&params);
   if (params.failed) {
     *failed = true;
@@ -1789,17 +1802,17 @@ DFA* Prog::GetDFA(MatchKind kind) {
   // "longest match" DFA, because RE2 never does reverse
   // "first match" searches.
   if (kind == kFirstMatch) {
-    std::call_once(dfa_first_once_, [](Prog* prog) {
+    absl::call_once(dfa_first_once_, [](Prog* prog) {
       prog->dfa_first_ = new DFA(prog, kFirstMatch, prog->dfa_mem_ / 2);
     }, this);
     return dfa_first_;
   } else if (kind == kManyMatch) {
-    std::call_once(dfa_first_once_, [](Prog* prog) {
+    absl::call_once(dfa_first_once_, [](Prog* prog) {
       prog->dfa_first_ = new DFA(prog, kManyMatch, prog->dfa_mem_);
     }, this);
     return dfa_first_;
   } else {
-    std::call_once(dfa_longest_once_, [](Prog* prog) {
+    absl::call_once(dfa_longest_once_, [](Prog* prog) {
       if (!prog->reversed_)
         prog->dfa_longest_ = new DFA(prog, kLongestMatch, prog->dfa_mem_ / 2);
       else
@@ -1823,12 +1836,11 @@ void Prog::DeleteDFA(DFA* dfa) {
 //
 // This is the only external interface (class DFA only exists in this file).
 //
-bool Prog::SearchDFA(const StringPiece& text, const StringPiece& const_context,
-                     Anchor anchor, MatchKind kind, StringPiece* match0,
+bool Prog::SearchDFA(absl::string_view text, absl::string_view context,
+                     Anchor anchor, MatchKind kind, absl::string_view* match0,
                      bool* failed, SparseSet* matches) {
   *failed = false;
 
-  StringPiece context = const_context;
   if (context.data() == NULL)
     context = text;
   bool caret = anchor_start();
@@ -1837,9 +1849,9 @@ bool Prog::SearchDFA(const StringPiece& text, const StringPiece& const_context,
     using std::swap;
     swap(caret, dollar);
   }
-  if (caret && context.begin() != text.begin())
+  if (caret && BeginPtr(context) != BeginPtr(text))
     return false;
-  if (dollar && context.end() != text.end())
+  if (dollar && EndPtr(context) != EndPtr(text))
     return false;
 
   // Handle full match by running an anchored longest match
@@ -1889,10 +1901,10 @@ bool Prog::SearchDFA(const StringPiece& text, const StringPiece& const_context,
   if (match0) {
     if (reversed_)
       *match0 =
-          StringPiece(ep, static_cast<size_t>(text.data() + text.size() - ep));
+          absl::string_view(ep, static_cast<size_t>(text.data() + text.size() - ep));
     else
       *match0 =
-          StringPiece(text.data(), static_cast<size_t>(ep - text.data()));
+          absl::string_view(text.data(), static_cast<size_t>(ep - text.data()));
   }
   return true;
 }
@@ -1905,7 +1917,7 @@ int DFA::BuildAllStates(const Prog::DFAStateCallback& cb) {
   // Pick out start state for unanchored search
   // at beginning of text.
   RWLocker l(&cache_mutex_);
-  SearchParams params(StringPiece(), StringPiece(), &l);
+  SearchParams params(absl::string_view(), absl::string_view(), &l);
   params.anchored = false;
   if (!AnalyzeSearch(&params) ||
       params.start == NULL ||
@@ -1915,7 +1927,7 @@ int DFA::BuildAllStates(const Prog::DFAStateCallback& cb) {
   // Add start state to work queue.
   // Note that any State* that we handle here must point into the cache,
   // so we can simply depend on pointer-as-a-number hashing and equality.
-  std::unordered_map<State*, int> m;
+  absl::flat_hash_map<State*, int> m;
   std::deque<State*> q;
   m.emplace(params.start, static_cast<int>(m.size()));
   q.push_back(params.start);
@@ -1989,11 +2001,11 @@ bool DFA::PossibleMatchRange(std::string* min, std::string* max, int maxlen) {
   // Also note that previously_visited_states[UnseenStatePtr] will, in the STL
   // tradition, implicitly insert a '0' value at first use. We take advantage
   // of that property below.
-  std::unordered_map<State*, int> previously_visited_states;
+  absl::flat_hash_map<State*, int> previously_visited_states;
 
   // Pick out start state for anchored search at beginning of text.
   RWLocker l(&cache_mutex_);
-  SearchParams params(StringPiece(), StringPiece(), &l);
+  SearchParams params(absl::string_view(), absl::string_view(), &l);
   params.anchored = true;
   if (!AnalyzeSearch(&params))
     return false;
@@ -2033,7 +2045,7 @@ bool DFA::PossibleMatchRange(std::string* min, std::string* max, int maxlen) {
   // Build minimum prefix.
   State* s = params.start;
   min->clear();
-  MutexLock lock(&mutex_);
+  absl::MutexLock lock(&mutex_);
   for (int i = 0; i < maxlen; i++) {
     if (previously_visited_states[s] > kMaxEltRepetitions)
       break;

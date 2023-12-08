@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/strings/string_view.h"
 #include "re2/re2.h"
 
 namespace re2 {
@@ -50,7 +51,7 @@ class RE2::Set {
   // Indices are assigned in sequential order starting from 0.
   // Errors do not increment the index; if error is not NULL, *error will hold
   // the error message from the parser.
-  int Add(const StringPiece& pattern, std::string* error);
+  int Add(absl::string_view pattern, std::string* error);
 
   // Compiles the set in preparation for matching.
   // Returns false if the compiler runs out of memory.
@@ -61,12 +62,12 @@ class RE2::Set {
   // Returns true if text matches at least one of the regexps in the set.
   // Fills v (if not NULL) with the indices of the matching regexps.
   // Callers must not expect v to be sorted.
-  bool Match(const StringPiece& text, std::vector<int>* v) const;
+  bool Match(absl::string_view text, std::vector<int>* v) const;
 
   // As above, but populates error_info (if not NULL) when none of the regexps
   // in the set matched. This can inform callers when DFA execution fails, for
   // example, because they might wish to handle that case differently.
-  bool Match(const StringPiece& text, std::vector<int>* v,
+  bool Match(absl::string_view text, std::vector<int>* v,
              ErrorInfo* error_info) const;
 
  private:

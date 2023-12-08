@@ -16,13 +16,13 @@
 // atoms) that the user of this class should use to do the string
 // matching.
 
-#include <map>
 #include <string>
 #include <vector>
 
-#include "util/util.h"
+#include "absl/container/flat_hash_set.h"
 #include "re2/prefilter.h"
 #include "re2/sparse_array.h"
+#include "util/logging.h"
 
 namespace re2 {
 
@@ -58,9 +58,25 @@ class PrefilterTree {
   void PrintPrefilter(int regexpid);
 
  private:
-  typedef SparseArray<int> IntMap;
-  typedef std::map<int, int> StdIntMap;
-  typedef std::map<std::string, Prefilter*> NodeMap;
+  using IntMap = SparseArray<int>;
+
+  struct PrefilterHash {
+    size_t operator()(const Prefilter* a) const {
+      DCHECK(a != NULL);
+      return absl::Hash<Prefilter>()(*a);
+    }
+  };
+
+  struct PrefilterEqual {
+    bool operator()(const Prefilter* a, const Prefilter* b) const {
+      DCHECK(a != NULL);
+      DCHECK(b != NULL);
+      return *a == *b;
+    }
+  };
+
+  using NodeSet =
+      absl::flat_hash_set<Prefilter*, PrefilterHash, PrefilterEqual>;
 
   // Each unique node has a corresponding Entry that helps in
   // passing the matching trigger information along the tree.
@@ -77,7 +93,7 @@ class PrefilterTree {
     // are two different nodes, but they share the atom 'def'. So when
     // 'def' matches, it triggers two parents, corresponding to the two
     // different OR nodes.
-    StdIntMap* parents;
+    std::vector<int> parents;
 
     // When this node is ready to trigger the parent, what are the
     // regexps that are triggered.
@@ -90,25 +106,22 @@ class PrefilterTree {
   // This function assigns unique ids to various parts of the
   // prefilter, by looking at if these nodes are already in the
   // PrefilterTree.
-  void AssignUniqueIds(NodeMap* nodes, std::vector<std::string>* atom_vec);
+  void AssignUniqueIds(NodeSet* nodes, std::vector<std::string>* atom_vec);
 
   // Given the matching atoms, find the regexps to be triggered.
   void PropagateMatch(const std::vector<int>& atom_ids,
                       IntMap* regexps) const;
 
-  // Returns the prefilter node that has the same NodeString as this
-  // node. For the canonical node, returns node.
-  Prefilter* CanonicalNode(NodeMap* nodes, Prefilter* node);
-
-  // A string that uniquely identifies the node. Assumes that the
-  // children of node has already been assigned unique ids.
-  std::string NodeString(Prefilter* node) const;
+  // Returns the prefilter node that has the same atom/subs as this
+  // node. For the canonical node, returns node. Assumes that the
+  // children of node have already been assigned unique ids.
+  Prefilter* CanonicalNode(NodeSet* nodes, Prefilter* node);
 
   // Recursively constructs a readable prefilter string.
   std::string DebugNodeString(Prefilter* node) const;
 
   // Used for debugging.
-  void PrintDebugInfo(NodeMap* nodes);
+  void PrintDebugInfo(NodeSet* nodes);
 
   // These are all the nodes formed by Compile. Essentially, there is
   // one node for each unique atom and each unique AND/OR node.

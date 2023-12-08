@@ -12,16 +12,16 @@
 #include <string.h>
 #include <algorithm>
 #include <map>
-#include <mutex>
 #include <string>
 #include <vector>
 
-#include "util/util.h"
+#include "absl/base/call_once.h"
+#include "absl/base/macros.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/synchronization/mutex.h"
 #include "util/logging.h"
-#include "util/mutex.h"
 #include "util/utf.h"
 #include "re2/pod_array.h"
-#include "re2/stringpiece.h"
 #include "re2/walker-inl.h"
 
 namespace re2 {
@@ -74,35 +74,45 @@ bool Regexp::QuickDestroy() {
   return false;
 }
 
-// Lazily allocated.
-static Mutex* ref_mutex;
-static std::map<Regexp*, int>* ref_map;
+// Similar to EmptyStorage in re2.cc.
+struct RefStorage {
+  absl::Mutex ref_mutex;
+  absl::flat_hash_map<Regexp*, int> ref_map;
+};
+alignas(RefStorage) static char ref_storage[sizeof(RefStorage)];
+
+static inline absl::Mutex* ref_mutex() {
+  return &reinterpret_cast<RefStorage*>(ref_storage)->ref_mutex;
+}
+
+static inline absl::flat_hash_map<Regexp*, int>* ref_map() {
+  return &reinterpret_cast<RefStorage*>(ref_storage)->ref_map;
+}
 
 int Regexp::Ref() {
   if (ref_ < kMaxRef)
     return ref_;
 
-  MutexLock l(ref_mutex);
-  return (*ref_map)[this];
+  absl::MutexLock l(ref_mutex());
+  return (*ref_map())[this];
 }
 
 // Increments reference count, returns object as convenience.
 Regexp* Regexp::Incref() {
   if (ref_ >= kMaxRef-1) {
-    static std::once_flag ref_once;
-    std::call_once(ref_once, []() {
-      ref_mutex = new Mutex;
-      ref_map = new std::map<Regexp*, int>;
+    static absl::once_flag ref_once;
+    absl::call_once(ref_once, []() {
+      (void) new (ref_storage) RefStorage;
     });
 
     // Store ref count in overflow map.
-    MutexLock l(ref_mutex);
+    absl::MutexLock l(ref_mutex());
     if (ref_ == kMaxRef) {
       // already overflowed
-      (*ref_map)[this]++;
+      (*ref_map())[this]++;
     } else {
       // overflowing now
-      (*ref_map)[this] = kMaxRef;
+      (*ref_map())[this] = kMaxRef;
       ref_ = kMaxRef;
     }
     return this;
@@ -116,13 +126,13 @@ Regexp* Regexp::Incref() {
 void Regexp::Decref() {
   if (ref_ == kMaxRef) {
     // Ref count is stored in overflow map.
-    MutexLock l(ref_mutex);
-    int r = (*ref_map)[this] - 1;
+    absl::MutexLock l(ref_mutex());
+    int r = (*ref_map())[this] - 1;
     if (r < kMaxRef) {
       ref_ = static_cast<uint16_t>(r);
-      ref_map->erase(this);
+      ref_map()->erase(this);
     } else {
-      (*ref_map)[this] = r;
+      (*ref_map())[this] = r;
     }
     return;
   }
@@ -390,7 +400,13 @@ static bool TopEqual(Regexp* a, Regexp* b) {
              a->max() == b->max();
 
     case kRegexpCapture:
-      return a->cap() == b->cap() && a->name() == b->name();
+      if (a->name() == NULL || b->name() == NULL) {
+        // One pointer is null, so the other pointer should also be null.
+        return a->cap() == b->cap() && a->name() == b->name();
+      } else {
+        // Neither pointer is null, so compare the pointees for equality.
+        return a->cap() == b->cap() && *a->name() == *b->name();
+      }
 
     case kRegexpHaveMatch:
       return a->match_id() == b->match_id();
@@ -509,7 +525,7 @@ static const char *kErrorStrings[] = {
 };
 
 std::string RegexpStatus::CodeText(enum RegexpStatusCode code) {
-  if (code < 0 || code >= arraysize(kErrorStrings))
+  if (code < 0 || code >= ABSL_ARRAYSIZE(kErrorStrings))
     code = kRegexpInternalError;
   return kErrorStrings[code];
 }
@@ -585,8 +601,7 @@ class NamedCapturesWalker : public Regexp::Walker<Ignored> {
       // Record first occurrence of each name.
       // (The rule is that if you have the same name
       // multiple times, only the leftmost one counts.)
-      if (map_->find(*re->name()) == map_->end())
-        (*map_)[*re->name()] = re->cap();
+      map_->insert({*re->name(), re->cap()});
     }
     return ignored;
   }

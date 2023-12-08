@@ -13,10 +13,11 @@
 
 #include <stdio.h>
 
-#include "util/test.h"
-#include "util/flags.h"
+#include "absl/base/macros.h"
+#include "absl/flags/flag.h"
+#include "absl/strings/str_format.h"
+#include "gtest/gtest.h"
 #include "util/logging.h"
-#include "util/strutil.h"
 #include "re2/testing/exhaustive_tester.h"
 #include "re2/testing/tester.h"
 
@@ -25,15 +26,15 @@
 #define LOGGING 0
 #endif
 
-DEFINE_FLAG(bool, show_regexps, false, "show regexps during testing");
+ABSL_FLAG(bool, show_regexps, false, "show regexps during testing");
 
-DEFINE_FLAG(int, max_bad_regexp_inputs, 1,
-            "Stop testing a regular expression after finding this many "
-            "strings that break it.");
+ABSL_FLAG(int, max_bad_regexp_inputs, 1,
+          "Stop testing a regular expression after finding this many "
+          "strings that break it.");
 
 namespace re2 {
 
-static char* escape(const StringPiece& sp) {
+static char* escape(absl::string_view sp) {
   static char buf[512];
   char* p = buf;
   *p++ = '\"';
@@ -55,20 +56,21 @@ static char* escape(const StringPiece& sp) {
   return buf;
 }
 
-static void PrintResult(const RE2& re, const StringPiece& input, RE2::Anchor anchor, StringPiece *m, int n) {
+static void PrintResult(const RE2& re, absl::string_view input,
+                        RE2::Anchor anchor, absl::string_view* m, int n) {
   if (!re.Match(input, 0, input.size(), anchor, m, n)) {
-    printf("-");
+    absl::PrintF("-");
     return;
   }
   for (int i = 0; i < n; i++) {
     if (i > 0)
-      printf(" ");
+      absl::PrintF(" ");
     if (m[i].data() == NULL)
-      printf("-");
+      absl::PrintF("-");
     else
-      printf("%td-%td",
-             m[i].begin() - input.begin(),
-             m[i].end() - input.begin());
+      absl::PrintF("%d-%d",
+                   BeginPtr(m[i]) - BeginPtr(input),
+                   EndPtr(m[i]) - BeginPtr(input));
   }
 }
 
@@ -79,11 +81,13 @@ void ExhaustiveTester::HandleRegexp(const std::string& const_regexp) {
   regexps_++;
   std::string regexp = const_regexp;
   if (!topwrapper_.empty()) {
-    regexp = StringPrintf(topwrapper_.c_str(), regexp.c_str());
+    auto fmt = absl::ParsedFormat<'s'>::New(topwrapper_);
+    CHECK(fmt != nullptr);
+    regexp = absl::StrFormat(*fmt, regexp);
   }
 
-  if (GetFlag(FLAGS_show_regexps)) {
-    printf("\r%s", regexp.c_str());
+  if (absl::GetFlag(FLAGS_show_regexps)) {
+    absl::PrintF("\r%s", regexp);
     fflush(stdout);
   }
 
@@ -93,32 +97,32 @@ void ExhaustiveTester::HandleRegexp(const std::string& const_regexp) {
     if (randomstrings_)
       LOG(ERROR) << "Cannot log with random strings.";
     if (regexps_ == 1) {  // first
-      printf("strings\n");
+      absl::PrintF("strings\n");
       strgen_.Reset();
       while (strgen_.HasNext())
-        printf("%s\n", escape(strgen_.Next()));
-      printf("regexps\n");
+        absl::PrintF("%s\n", escape(strgen_.Next()));
+      absl::PrintF("regexps\n");
     }
-    printf("%s\n", escape(regexp));
+    absl::PrintF("%s\n", escape(regexp));
 
     RE2 re(regexp);
     RE2::Options longest;
     longest.set_longest_match(true);
     RE2 relongest(regexp, longest);
     int ngroup = re.NumberOfCapturingGroups()+1;
-    StringPiece* group = new StringPiece[ngroup];
+    absl::string_view* group = new absl::string_view[ngroup];
 
     strgen_.Reset();
     while (strgen_.HasNext()) {
-      StringPiece input = strgen_.Next();
+      absl::string_view input = strgen_.Next();
       PrintResult(re, input, RE2::ANCHOR_BOTH, group, ngroup);
-      printf(";");
+      absl::PrintF(";");
       PrintResult(re, input, RE2::UNANCHORED, group, ngroup);
-      printf(";");
+      absl::PrintF(";");
       PrintResult(relongest, input, RE2::ANCHOR_BOTH, group, ngroup);
-      printf(";");
+      absl::PrintF(";");
       PrintResult(relongest, input, RE2::UNANCHORED, group, ngroup);
-      printf("\n");
+      absl::PrintF("\n");
     }
     delete[] group;
     return;
@@ -137,7 +141,7 @@ void ExhaustiveTester::HandleRegexp(const std::string& const_regexp) {
     tests_++;
     if (!tester.TestInput(strgen_.Next())) {
       failures_++;
-      if (++bad_inputs >= GetFlag(FLAGS_max_bad_regexp_inputs))
+      if (++bad_inputs >= absl::GetFlag(FLAGS_max_bad_regexp_inputs))
         break;
     }
   }
@@ -164,8 +168,8 @@ void ExhaustiveTest(int maxatoms, int maxops,
                      topwrapper);
   t.Generate();
   if (!LOGGING) {
-    printf("%d regexps, %d tests, %d failures [%d/%d str]\n",
-           t.regexps(), t.tests(), t.failures(), maxstrlen, (int)stralphabet.size());
+    absl::PrintF("%d regexps, %d tests, %d failures [%d/%d str]\n",
+                 t.regexps(), t.tests(), t.failures(), maxstrlen, stralphabet.size());
   }
   EXPECT_EQ(0, t.failures());
 }
@@ -177,7 +181,7 @@ void EgrepTest(int maxatoms, int maxops, const std::string& alphabet,
                const std::string& wrapper) {
   const char* tops[] = { "", "^(?:%s)", "(?:%s)$", "^(?:%s)$" };
 
-  for (size_t i = 0; i < arraysize(tops); i++) {
+  for (size_t i = 0; i < ABSL_ARRAYSIZE(tops); i++) {
     ExhaustiveTest(maxatoms, maxops,
                    Split("", alphabet),
                    RegexpGenerator::EgrepOps(),

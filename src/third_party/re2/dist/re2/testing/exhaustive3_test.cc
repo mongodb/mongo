@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "util/test.h"
+#include "gtest/gtest.h"
 #include "util/utf.h"
 #include "re2/testing/exhaustive_tester.h"
 

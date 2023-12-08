@@ -18,11 +18,11 @@
 
 #include <string>
 
-#include "util/test.h"
+#include "absl/base/macros.h"
+#include "absl/strings/str_format.h"
+#include "gtest/gtest.h"
 #include "util/logging.h"
-#include "util/strutil.h"
 #include "util/utf.h"
-#include "re2/stringpiece.h"
 #include "re2/regexp.h"
 
 namespace re2 {
@@ -55,8 +55,8 @@ static const char* kOpcodeNames[] = {
 // Create string representation of regexp with explicit structure.
 // Nothing pretty, just for testing.
 static void DumpRegexpAppending(Regexp* re, std::string* s) {
-  if (re->op() < 0 || re->op() >= arraysize(kOpcodeNames)) {
-    *s += StringPrintf("op%d", re->op());
+  if (re->op() < 0 || re->op() >= ABSL_ARRAYSIZE(kOpcodeNames)) {
+    *s += absl::StrFormat("op%d", re->op());
   } else {
     switch (re->op()) {
       default:
@@ -129,7 +129,7 @@ static void DumpRegexpAppending(Regexp* re, std::string* s) {
       DumpRegexpAppending(re->sub()[0], s);
       break;
     case kRegexpRepeat:
-      s->append(StringPrintf("%d,%d ", re->min(), re->max()));
+      s->append(absl::StrFormat("%d,%d ", re->min(), re->max()));
       DumpRegexpAppending(re->sub()[0], s);
       break;
     case kRegexpCharClass: {
@@ -139,9 +139,9 @@ static void DumpRegexpAppending(Regexp* re, std::string* s) {
         RuneRange rr = *it;
         s->append(sep);
         if (rr.lo == rr.hi)
-          s->append(StringPrintf("%#x", rr.lo));
+          s->append(absl::StrFormat("%#x", rr.lo));
         else
-          s->append(StringPrintf("%#x-%#x", rr.lo, rr.hi));
+          s->append(absl::StrFormat("%#x-%#x", rr.lo, rr.hi));
         sep = " ";
       }
       break;

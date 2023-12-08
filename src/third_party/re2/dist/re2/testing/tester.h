@@ -10,7 +10,7 @@
 
 #include <vector>
 
-#include "re2/stringpiece.h"
+#include "absl/strings/string_view.h"
 #include "re2/prog.h"
 #include "re2/regexp.h"
 #include "re2/re2.h"
@@ -51,7 +51,7 @@ class TestInstance {
  public:
   struct Result;
 
-  TestInstance(const StringPiece& regexp, Prog::MatchKind kind,
+  TestInstance(absl::string_view regexp, Prog::MatchKind kind,
                Regexp::ParseFlags flags);
   ~TestInstance();
   Regexp::ParseFlags flags() { return flags_; }
@@ -59,20 +59,18 @@ class TestInstance {
 
   // Runs a single test case: search in text, which is in context,
   // using the given anchoring.
-  bool RunCase(const StringPiece& text, const StringPiece& context,
+  bool RunCase(absl::string_view text, absl::string_view context,
                Prog::Anchor anchor);
 
  private:
   // Runs a single search using the named engine type.
-  void RunSearch(Engine type,
-                 const StringPiece& text, const StringPiece& context,
-                 Prog::Anchor anchor,
-                 Result *result);
+  void RunSearch(Engine type, absl::string_view text, absl::string_view context,
+                 Prog::Anchor anchor, Result* result);
 
-  void LogMatch(const char* prefix, Engine e, const StringPiece& text,
-                const StringPiece& context, Prog::Anchor anchor);
+  void LogMatch(const char* prefix, Engine e, absl::string_view text,
+                absl::string_view context, Prog::Anchor anchor);
 
-  const StringPiece regexp_str_;    // regexp being tested
+  absl::string_view regexp_str_;    // regexp being tested
   Prog::MatchKind kind_;            // kind of match
   Regexp::ParseFlags flags_;        // flags for parsing regexp_str_
   bool error_;                      // error during constructor?
@@ -91,21 +89,21 @@ class TestInstance {
 // A group of TestInstances for all possible configurations.
 class Tester {
  public:
-  explicit Tester(const StringPiece& regexp);
+  explicit Tester(absl::string_view regexp);
   ~Tester();
 
   bool error() { return error_; }
 
   // Runs a single test case: search in text, which is in context,
   // using the given anchoring.
-  bool TestCase(const StringPiece& text, const StringPiece& context,
+  bool TestCase(absl::string_view text, absl::string_view context,
                 Prog::Anchor anchor);
 
   // Run TestCase(text, text, anchor) for all anchoring modes.
-  bool TestInput(const StringPiece& text);
+  bool TestInput(absl::string_view text);
 
   // Run TestCase(text, context, anchor) for all anchoring modes.
-  bool TestInputInContext(const StringPiece& text, const StringPiece& context);
+  bool TestInputInContext(absl::string_view text, absl::string_view context);
 
  private:
   bool error_;
@@ -116,7 +114,7 @@ class Tester {
 };
 
 // Run all possible tests using regexp and text.
-bool TestRegexpOnText(const StringPiece& regexp, const StringPiece& text);
+bool TestRegexpOnText(absl::string_view regexp, absl::string_view text);
 
 }  // namespace re2
 

@@ -8,14 +8,15 @@
 #include <string>
 #include <vector>
 
-#include "util/test.h"
-#include "util/flags.h"
+#include "absl/flags/flag.h"
+#include "absl/strings/str_format.h"
+#include "gtest/gtest.h"
 #include "re2/testing/exhaustive_tester.h"
 
-DEFINE_FLAG(int, regexpseed, 404, "Random regexp seed.");
-DEFINE_FLAG(int, regexpcount, 100, "How many random regexps to generate.");
-DEFINE_FLAG(int, stringseed, 200, "Random string seed.");
-DEFINE_FLAG(int, stringcount, 100, "How many random strings to generate.");
+ABSL_FLAG(int, regexpseed, 404, "Random regexp seed.");
+ABSL_FLAG(int, regexpcount, 100, "How many random regexps to generate.");
+ABSL_FLAG(int, stringseed, 200, "Random string seed.");
+ABSL_FLAG(int, stringcount, 100, "How many random strings to generate.");
 
 namespace re2 {
 
@@ -38,12 +39,12 @@ static void RandomTest(int maxatoms, int maxops,
 
   ExhaustiveTester t(maxatoms, maxops, alphabet, ops,
                      maxstrlen, stralphabet, wrapper, "");
-  t.RandomStrings(GetFlag(FLAGS_stringseed),
-                  GetFlag(FLAGS_stringcount));
-  t.GenerateRandom(GetFlag(FLAGS_regexpseed),
-                   GetFlag(FLAGS_regexpcount));
-  printf("%d regexps, %d tests, %d failures [%d/%d str]\n",
-         t.regexps(), t.tests(), t.failures(), maxstrlen, (int)stralphabet.size());
+  t.RandomStrings(absl::GetFlag(FLAGS_stringseed),
+                  absl::GetFlag(FLAGS_stringcount));
+  t.GenerateRandom(absl::GetFlag(FLAGS_regexpseed),
+                   absl::GetFlag(FLAGS_regexpcount));
+  absl::PrintF("%d regexps, %d tests, %d failures [%d/%d str]\n",
+               t.regexps(), t.tests(), t.failures(), maxstrlen, stralphabet.size());
   EXPECT_EQ(0, t.failures());
 }
 

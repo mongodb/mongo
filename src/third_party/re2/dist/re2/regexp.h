@@ -92,10 +92,9 @@
 #include <set>
 #include <string>
 
-#include "util/util.h"
+#include "absl/strings/string_view.h"
 #include "util/logging.h"
 #include "util/utf.h"
-#include "re2/stringpiece.h"
 
 namespace re2 {
 
@@ -195,10 +194,10 @@ class RegexpStatus {
   ~RegexpStatus() { delete tmp_; }
 
   void set_code(RegexpStatusCode code) { code_ = code; }
-  void set_error_arg(const StringPiece& error_arg) { error_arg_ = error_arg; }
+  void set_error_arg(absl::string_view error_arg) { error_arg_ = error_arg; }
   void set_tmp(std::string* tmp) { delete tmp_; tmp_ = tmp; }
   RegexpStatusCode code() const { return code_; }
-  const StringPiece& error_arg() const { return error_arg_; }
+  absl::string_view error_arg() const { return error_arg_; }
   bool ok() const { return code() == kRegexpSuccess; }
 
   // Copies state from status.
@@ -213,9 +212,9 @@ class RegexpStatus {
   std::string Text() const;
 
  private:
-  RegexpStatusCode code_;  // Kind of error
-  StringPiece error_arg_;  // Piece of regexp containing syntax error.
-  std::string* tmp_;       // Temporary storage, possibly where error_arg_ is.
+  RegexpStatusCode code_;        // Kind of error.
+  absl::string_view error_arg_;  // Piece of regexp containing syntax error.
+  std::string* tmp_;             // Temporary storage, possibly for error_arg_.
 
   RegexpStatus(const RegexpStatus&) = delete;
   RegexpStatus& operator=(const RegexpStatus&) = delete;
@@ -352,7 +351,7 @@ class Regexp {
   // Parses string s to produce regular expression, returned.
   // Caller must release return value with re->Decref().
   // On failure, sets *status (if status != NULL) and returns NULL.
-  static Regexp* Parse(const StringPiece& s, ParseFlags flags,
+  static Regexp* Parse(absl::string_view s, ParseFlags flags,
                        RegexpStatus* status);
 
   // Returns a _new_ simplified version of the current regexp.
@@ -369,7 +368,7 @@ class Regexp {
   // Parses the regexp src and then simplifies it and sets *dst to the
   // string representation of the simplified form.  Returns true on success.
   // Returns false and sets *status (if status != NULL) on parse error.
-  static bool SimplifyRegexp(const StringPiece& src, ParseFlags flags,
+  static bool SimplifyRegexp(absl::string_view src, ParseFlags flags,
                              std::string* dst, RegexpStatus* status);
 
   // Returns the number of capturing groups in the regexp.
@@ -467,7 +466,7 @@ class Regexp {
   class ParseState;
 
   friend class ParseState;
-  friend bool ParseCharClass(StringPiece* s, Regexp** out_re,
+  friend bool ParseCharClass(absl::string_view* s, Regexp** out_re,
                              RegexpStatus* status);
 
   // Helper for testing [sic].

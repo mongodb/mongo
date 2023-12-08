@@ -449,7 +449,7 @@ env.Library(
     ],
 )
 
-# absl_flags added as a dependency of other abseil libraries
+# absl_flags is an explicit dependency to the server build
 env.Library(
     target='absl_flags',
     source=[

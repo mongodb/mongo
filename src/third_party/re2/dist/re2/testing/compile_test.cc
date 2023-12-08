@@ -6,7 +6,8 @@
 
 #include <string>
 
-#include "util/test.h"
+#include "absl/base/macros.h"
+#include "gtest/gtest.h"
 #include "util/logging.h"
 #include "re2/regexp.h"
 #include "re2/prog.h"
@@ -127,7 +128,7 @@ static Test tests[] = {
 
 TEST(TestRegexpCompileToProg, Simple) {
   int failed = 0;
-  for (size_t i = 0; i < arraysize(tests); i++) {
+  for (size_t i = 0; i < ABSL_ARRAYSIZE(tests); i++) {
     const re2::Test& t = tests[i];
     Regexp* re = Regexp::Parse(t.regexp, Regexp::PerlX|Regexp::Latin1, NULL);
     if (re == NULL) {
@@ -156,7 +157,7 @@ TEST(TestRegexpCompileToProg, Simple) {
   EXPECT_EQ(failed, 0);
 }
 
-static void DumpByteMap(StringPiece pattern, Regexp::ParseFlags flags,
+static void DumpByteMap(absl::string_view pattern, Regexp::ParseFlags flags,
                         std::string* bytemap) {
   Regexp* re = Regexp::Parse(pattern, flags, NULL);
   EXPECT_TRUE(re != NULL);
@@ -257,7 +258,7 @@ TEST(TestCompile, InsufficientMemory) {
   re->Decref();
 }
 
-static void Dump(StringPiece pattern, Regexp::ParseFlags flags,
+static void Dump(absl::string_view pattern, Regexp::ParseFlags flags,
                  std::string* forward, std::string* reverse) {
   Regexp* re = Regexp::Parse(pattern, flags, NULL);
   EXPECT_TRUE(re != NULL);

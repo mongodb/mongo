@@ -15,6 +15,7 @@
 
 #include <stack>
 
+#include "absl/base/macros.h"
 #include "util/logging.h"
 #include "re2/regexp.h"
 
@@ -148,7 +149,8 @@ template<typename T> void Regexp::Walker<T>::Reset() {
   if (!stack_.empty()) {
     LOG(DFATAL) << "Stack not empty.";
     while (!stack_.empty()) {
-      delete[] stack_.top().child_args;
+      if (stack_.top().re->nsub_ > 1)
+        delete[] stack_.top().child_args;
       stack_.pop();
     }
   }
@@ -169,7 +171,7 @@ template<typename T> T Regexp::Walker<T>::WalkInternal(Regexp* re, T top_arg,
   for (;;) {
     T t;
     s = &stack_.top();
-    Regexp* re = s->re;
+    re = s->re;
     switch (s->n) {
       case -1: {
         if (--max_visits_ < 0) {
@@ -189,7 +191,7 @@ template<typename T> T Regexp::Walker<T>::WalkInternal(Regexp* re, T top_arg,
           s->child_args = &s->child_arg;
         else if (re->nsub_ > 1)
           s->child_args = new T[re->nsub_];
-        FALLTHROUGH_INTENDED;
+        ABSL_FALLTHROUGH_INTENDED;
       }
       default: {
         if (re->nsub_ > 0) {

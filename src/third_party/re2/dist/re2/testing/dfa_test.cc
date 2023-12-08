@@ -7,11 +7,12 @@
 #include <thread>
 #include <vector>
 
-#include "util/test.h"
-#include "util/flags.h"
+#include "absl/base/macros.h"
+#include "absl/flags/flag.h"
+#include "absl/strings/str_format.h"
+#include "gtest/gtest.h"
 #include "util/logging.h"
 #include "util/malloc_counter.h"
-#include "util/strutil.h"
 #include "re2/prog.h"
 #include "re2/re2.h"
 #include "re2/regexp.h"
@@ -20,9 +21,9 @@
 
 static const bool UsingMallocCounter = false;
 
-DEFINE_FLAG(int, size, 8, "log2(number of DFA nodes)");
-DEFINE_FLAG(int, repeat, 2, "Repetition count.");
-DEFINE_FLAG(int, threads, 4, "number of threads");
+ABSL_FLAG(int, size, 8, "log2(number of DFA nodes)");
+ABSL_FLAG(int, repeat, 2, "Repetition count.");
+ABSL_FLAG(int, threads, 4, "number of threads");
 
 namespace re2 {
 
@@ -50,7 +51,7 @@ static void DoBuild(Prog* prog) {
 TEST(Multithreaded, BuildEntireDFA) {
   // Create regexp with 2^FLAGS_size states in DFA.
   std::string s = "a";
-  for (int i = 0; i < GetFlag(FLAGS_size); i++)
+  for (int i = 0; i < absl::GetFlag(FLAGS_size); i++)
     s += "[ab]";
   s += "b";
   Regexp* re = Regexp::Parse(s, Regexp::LikePerl, NULL);
@@ -68,14 +69,14 @@ TEST(Multithreaded, BuildEntireDFA) {
   }
 
   // Build the DFA simultaneously in a bunch of threads.
-  for (int i = 0; i < GetFlag(FLAGS_repeat); i++) {
+  for (int i = 0; i < absl::GetFlag(FLAGS_repeat); i++) {
     Prog* prog = re->CompileToProg(0);
     ASSERT_TRUE(prog != NULL);
 
     std::vector<std::thread> threads;
-    for (int j = 0; j < GetFlag(FLAGS_threads); j++)
+    for (int j = 0; j < absl::GetFlag(FLAGS_threads); j++)
       threads.emplace_back(DoBuild, prog);
-    for (int j = 0; j < GetFlag(FLAGS_threads); j++)
+    for (int j = 0; j < absl::GetFlag(FLAGS_threads); j++)
       threads[j].join();
 
     // One more compile, to make sure everything is okay.
@@ -154,7 +155,7 @@ TEST(SingleThreaded, SearchDFA) {
   // Empirically, n = 18 is a good compromise between the two.
   const int n = 18;
 
-  Regexp* re = Regexp::Parse(StringPrintf("0[01]{%d}$", n),
+  Regexp* re = Regexp::Parse(absl::StrFormat("0[01]{%d}$", n),
                              Regexp::LikePerl, NULL);
   ASSERT_TRUE(re != NULL);
 
@@ -172,12 +173,14 @@ TEST(SingleThreaded, SearchDFA) {
     for (int i = 0; i < 10; i++) {
       bool matched = false;
       bool failed = false;
-      matched = prog->SearchDFA(match, StringPiece(), Prog::kUnanchored,
-                                Prog::kFirstMatch, NULL, &failed, NULL);
+      matched =
+          prog->SearchDFA(match, absl::string_view(), Prog::kUnanchored,
+                          Prog::kFirstMatch, NULL, &failed, NULL);
       ASSERT_FALSE(failed);
       ASSERT_TRUE(matched);
-      matched = prog->SearchDFA(no_match, StringPiece(), Prog::kUnanchored,
-                                Prog::kFirstMatch, NULL, &failed, NULL);
+      matched =
+          prog->SearchDFA(no_match, absl::string_view(), Prog::kUnanchored,
+                          Prog::kFirstMatch, NULL, &failed, NULL);
       ASSERT_FALSE(failed);
       ASSERT_FALSE(matched);
     }
@@ -201,17 +204,19 @@ TEST(SingleThreaded, SearchDFA) {
 
 // Helper function: searches for match, which should match,
 // and no_match, which should not.
-static void DoSearch(Prog* prog, const StringPiece& match,
-                     const StringPiece& no_match) {
+static void DoSearch(Prog* prog, absl::string_view match,
+                     absl::string_view no_match) {
   for (int i = 0; i < 2; i++) {
     bool matched = false;
     bool failed = false;
-    matched = prog->SearchDFA(match, StringPiece(), Prog::kUnanchored,
-                              Prog::kFirstMatch, NULL, &failed, NULL);
+    matched =
+        prog->SearchDFA(match, absl::string_view(), Prog::kUnanchored,
+                        Prog::kFirstMatch, NULL, &failed, NULL);
     ASSERT_FALSE(failed);
     ASSERT_TRUE(matched);
-    matched = prog->SearchDFA(no_match, StringPiece(), Prog::kUnanchored,
-                              Prog::kFirstMatch, NULL, &failed, NULL);
+    matched =
+        prog->SearchDFA(no_match, absl::string_view(), Prog::kUnanchored,
+                        Prog::kFirstMatch, NULL, &failed, NULL);
     ASSERT_FALSE(failed);
     ASSERT_FALSE(matched);
   }
@@ -224,7 +229,7 @@ TEST(Multithreaded, SearchDFA) {
 
   // Same as single-threaded test above.
   const int n = 18;
-  Regexp* re = Regexp::Parse(StringPrintf("0[01]{%d}$", n),
+  Regexp* re = Regexp::Parse(absl::StrFormat("0[01]{%d}$", n),
                              Regexp::LikePerl, NULL);
   ASSERT_TRUE(re != NULL);
   std::string no_match = DeBruijnString(n);
@@ -243,14 +248,14 @@ TEST(Multithreaded, SearchDFA) {
 
   // Run the search simultaneously in a bunch of threads.
   // Reuse same flags for Multithreaded.BuildDFA above.
-  for (int i = 0; i < GetFlag(FLAGS_repeat); i++) {
+  for (int i = 0; i < absl::GetFlag(FLAGS_repeat); i++) {
     Prog* prog = re->CompileToProg(1<<n);
     ASSERT_TRUE(prog != NULL);
 
     std::vector<std::thread> threads;
-    for (int j = 0; j < GetFlag(FLAGS_threads); j++)
+    for (int j = 0; j < absl::GetFlag(FLAGS_threads); j++)
       threads.emplace_back(DoSearch, prog, match, no_match);
-    for (int j = 0; j < GetFlag(FLAGS_threads); j++)
+    for (int j = 0; j < absl::GetFlag(FLAGS_threads); j++)
       threads[j].join();
 
     delete prog;
@@ -281,15 +286,16 @@ ReverseTest reverse_tests[] = {
 
 TEST(DFA, ReverseMatch) {
   int nfail = 0;
-  for (size_t i = 0; i < arraysize(reverse_tests); i++) {
+  for (size_t i = 0; i < ABSL_ARRAYSIZE(reverse_tests); i++) {
     const ReverseTest& t = reverse_tests[i];
     Regexp* re = Regexp::Parse(t.regexp, Regexp::LikePerl, NULL);
     ASSERT_TRUE(re != NULL);
     Prog* prog = re->CompileToReverseProg(0);
     ASSERT_TRUE(prog != NULL);
     bool failed = false;
-    bool matched = prog->SearchDFA(t.text, StringPiece(), Prog::kUnanchored,
-                                   Prog::kFirstMatch, NULL, &failed, NULL);
+    bool matched =
+        prog->SearchDFA(t.text, absl::string_view(), Prog::kUnanchored,
+                        Prog::kFirstMatch, NULL, &failed, NULL);
     if (matched != t.match) {
       LOG(ERROR) << t.regexp << " on " << t.text << ": want " << t.match;
       nfail++;
@@ -336,7 +342,7 @@ CallbackTest callback_tests[] = {
 
 TEST(DFA, Callback) {
   int nfail = 0;
-  for (size_t i = 0; i < arraysize(callback_tests); i++) {
+  for (size_t i = 0; i < ABSL_ARRAYSIZE(callback_tests); i++) {
     const CallbackTest& t = callback_tests[i];
     Regexp* re = Regexp::Parse(t.regexp, Regexp::LikePerl, NULL);
     ASSERT_TRUE(re != NULL);
@@ -349,7 +355,7 @@ TEST(DFA, Callback) {
         dump += " ";
       dump += match ? "[[" : "[";
       for (int b = 0; b < prog->bytemap_range() + 1; b++)
-        dump += StringPrintf("%d,", next[b]);
+        dump += absl::StrFormat("%d,", next[b]);
       dump.pop_back();
       dump += match ? "]]" : "]";
     });

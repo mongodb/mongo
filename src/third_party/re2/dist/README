@@ -10,6 +10,11 @@ make test
 make install
 make testinstall
 
+Building RE2 requires Abseil (https://github.com/abseil/abseil-cpp)
+to be installed on your system. Building the testing for RE2 requires
+GoogleTest (https://github.com/google/googletest) and Benchmark
+(https://github.com/google/benchmark) to be installed as well.
+
 There is a fair amount of documentation (including code snippets) in
 the re2.h header file.
 

@@ -9,13 +9,11 @@
 #include <memory>
 #include <utility>
 
-#include "util/util.h"
 #include "util/logging.h"
 #include "re2/pod_array.h"
 #include "re2/prog.h"
 #include "re2/re2.h"
 #include "re2/regexp.h"
-#include "re2/stringpiece.h"
 
 namespace re2 {
 
@@ -52,7 +50,7 @@ RE2::Set& RE2::Set::operator=(Set&& other) {
   return *this;
 }
 
-int RE2::Set::Add(const StringPiece& pattern, std::string* error) {
+int RE2::Set::Add(absl::string_view pattern, std::string* error) {
   if (compiled_) {
     LOG(DFATAL) << "RE2::Set::Add() called after compiling";
     return -1;
@@ -121,16 +119,16 @@ bool RE2::Set::Compile() {
   return prog_ != nullptr;
 }
 
-bool RE2::Set::Match(const StringPiece& text, std::vector<int>* v) const {
+bool RE2::Set::Match(absl::string_view text, std::vector<int>* v) const {
   return Match(text, v, NULL);
 }
 
-bool RE2::Set::Match(const StringPiece& text, std::vector<int>* v,
+bool RE2::Set::Match(absl::string_view text, std::vector<int>* v,
                      ErrorInfo* error_info) const {
   if (!compiled_) {
-    LOG(DFATAL) << "RE2::Set::Match() called before compiling";
     if (error_info != NULL)
       error_info->kind = kNotCompiled;
+    LOG(DFATAL) << "RE2::Set::Match() called before compiling";
     return false;
   }
 #ifdef RE2_HAVE_THREAD_LOCAL
@@ -161,9 +159,9 @@ bool RE2::Set::Match(const StringPiece& text, std::vector<int>* v,
   }
   if (v != NULL) {
     if (matches->empty()) {
-      LOG(DFATAL) << "RE2::Set::Match() matched, but no matches returned?!";
       if (error_info != NULL)
         error_info->kind = kInconsistent;
+      LOG(DFATAL) << "RE2::Set::Match() matched, but no matches returned?!";
       return false;
     }
     v->assign(matches->begin(), matches->end());
