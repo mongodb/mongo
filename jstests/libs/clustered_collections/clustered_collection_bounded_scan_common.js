@@ -63,9 +63,11 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
             verbosity: "executionStats"
         }));
 
-        assert(getPlanStage(expl, "CLUSTERED_IXSCAN"));
-        assert.eq(5, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
-        assert.eq(5, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
+        const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
+
+        assert(clusteredIxScan);
+        assert.eq(5, clusteredIxScan.minRecord);
+        assert.eq(5, clusteredIxScan.maxRecord);
 
         assert.eq(1, expl.executionStats.executionStages.nReturned);
         // In Classic, expect nReturned + 1 documents examined by design - additional cursor 'next'
@@ -85,15 +87,16 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
             verbosity: "executionStats"
         }));
 
-        assert(getPlanStage(expl, "CLUSTERED_IXSCAN"));
-        assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
-        assert.eq(val, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
+        const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
+        assert(clusteredIxScan);
+        assert(clusteredIxScan.hasOwnProperty("maxRecord"));
+        assert.eq(val, clusteredIxScan.maxRecord);
 
         if (!op.startsWith("$_internal")) {
             // Internal ops do not do type bracketing, so min record would not
             // be expected for $_internalExprLt.
-            assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
-            assert.eq(NaN, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
+            assert(clusteredIxScan.hasOwnProperty("minRecord"));
+            assert.eq(NaN, clusteredIxScan.minRecord);
         }
 
         assert.eq(expectedNReturned, expl.executionStats.executionStages.nReturned);
@@ -116,15 +119,17 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
             verbosity: "executionStats"
         }));
 
-        assert(getPlanStage(expl, "CLUSTERED_IXSCAN"));
+        const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
+
+        assert(clusteredIxScan);
         if (!op.startsWith("$_internal")) {
             // Internal ops do not do type bracketing, so no max record would not
             // be expected for $_internalExprGt.
-            assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
-            assert.eq(Infinity, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
+            assert(clusteredIxScan.hasOwnProperty("maxRecord"));
+            assert.eq(Infinity, clusteredIxScan.maxRecord);
         }
-        assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
-        assert.eq(val, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
+        assert(clusteredIxScan.hasOwnProperty("minRecord"));
+        assert.eq(val, clusteredIxScan.minRecord);
 
         assert.eq(expectedNReturned, expl.executionStats.executionStages.nReturned);
 
@@ -151,11 +156,13 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
             verbosity: "executionStats"
         }));
 
-        assert(getPlanStage(expl, "CLUSTERED_IXSCAN"));
-        assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
-        assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
-        assert.eq(minVal, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
-        assert.eq(maxVal, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
+        const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
+
+        assert(clusteredIxScan);
+        assert(clusteredIxScan.hasOwnProperty("maxRecord"));
+        assert(clusteredIxScan.hasOwnProperty("minRecord"));
+        assert.eq(minVal, clusteredIxScan.minRecord);
+        assert.eq(maxVal, clusteredIxScan.maxRecord);
 
         assert.eq(expectedNReturned, expl.executionStats.executionStages.nReturned);
 
@@ -173,9 +180,11 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
             verbosity: "executionStats"
         }));
 
-        assert(getPlanStage(expl, "CLUSTERED_IXSCAN"));
-        assert.eq(10, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
-        assert.eq(30, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
+        const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
+
+        assert(clusteredIxScan);
+        assert.eq(10, clusteredIxScan.minRecord);
+        assert.eq(30, clusteredIxScan.maxRecord);
 
         assert.eq(3, expl.executionStats.executionStages.nReturned);
         // The range scanned is 21 documents. In Classic, expect 'docsExamined' to be one higher by
@@ -198,7 +207,7 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         assert.eq(10, expl.executionStats.executionStages.nReturned);
     }
 
-    function testInternalExprBoundedScans(coll, clusterKey) {
+    function testInternalExprBoundedScans() {
         testEq("$_internalExprEq");
 
         // The IDs expected to be in the collection are:
