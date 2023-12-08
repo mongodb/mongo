@@ -84,7 +84,12 @@ private:
     struct IdPool;
     friend struct ClientState;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OperationIdManager::_mutex");
+    // This lock is acquired when destroying `ClientState`, which is a decoration on `Client`.
+    // If defined via `MONGO_MAKE_LATCH`, acquiring the lock may result in calling into
+    // `LatchAnalyzer`, which is also defined as a `Client` decoration. This could result in
+    // user-after-free accesses if the instance of `LatchAnalyzer` is destroyed before
+    // `ClientState`. Thus, we should define this as a raw mutex.
+    mutable stdx::mutex _mutex;  // NOLINT
     std::unique_ptr<IdPool> _pool;
     stdx::unordered_map<OperationId, Client*> _clientByOperationId;
 
