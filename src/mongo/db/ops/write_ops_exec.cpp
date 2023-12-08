@@ -2933,7 +2933,10 @@ write_ops::InsertCommandReply performTimeseriesWrites(
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(ns(request));
+        auto requestNs = ns(request);
+        curOp.setNS_inlock(requestNs.isTimeseriesBucketsCollection()
+                               ? requestNs.getTimeseriesViewNamespace()
+                               : requestNs);
         curOp.setLogicalOp_inlock(LogicalOp::opInsert);
         curOp.ensureStarted();
         curOp.debug().additiveMetrics.ninserted = 0;
