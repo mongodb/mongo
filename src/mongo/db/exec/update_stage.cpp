@@ -59,6 +59,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -570,48 +571,54 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         // This should be after transformAndUpdate to make sure we actually updated this doc.
         _specificStats.nMatched += _params.numStatsForDoc ? _params.numStatsForDoc(newObj) : 1;
 
-        // Restore state after modification. As restoreState may restore (recreate) cursors, make
-        // sure to restore the state outside of the WritUnitOfWork.
-        const auto stageIsEOF = isEOF();
-        const auto restoreStateRet = handlePlanStageYield(
-            expCtx(),
-            "UpdateStage restoreState",
-            [&] {
-                child()->restoreState(&collectionPtr());
-                return PlanStage::NEED_TIME;
-            },
-            [&] {
-                // yieldHandler
-                // Note we don't need to retry updating anything in this case since the update
-                // already was committed. However, we still need to return the updated document (if
-                // it was requested).
-                if (_params.request->shouldReturnAnyDocs()) {
-                    // member->obj should refer to the document we want to return.
-                    invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
+        // Don't restore stage if we do an update with IDHACK. Saves us the work of opening a new
+        // Wuow that we will never use
+        if (child()->stageType() != STAGE_IDHACK) {
+            // Restore state after modification. As restoreState may restore (recreate) cursors,
+            // make sure to restore the state outside of the WritUnitOfWork.
+            const auto stageIsEOF = isEOF();
+            const auto restoreStateRet = handlePlanStageYield(
+                expCtx(),
+                "UpdateStage restoreState",
+                [&] {
+                    child()->restoreState(&collectionPtr());
+                    return PlanStage::NEED_TIME;
+                },
+                [&] {
+                    // yieldHandler
+                    // Note we don't need to retry updating anything in this case since the update
+                    // already was committed. However, we still need to return the updated document
+                    // (if it was requested).
+                    if (_params.request->shouldReturnAnyDocs()) {
+                        // member->obj should refer to the document we want to return.
+                        invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
-                    _idReturning = id;
-                    // Keep this member around so that we can return it on the next work() call.
-                    memberFreer.dismiss();
+                        _idReturning = id;
+                        // Keep this member around so that we can return it on the next work() call.
+                        memberFreer.dismiss();
+                    }
+                    *out = WorkingSet::INVALID_ID;
+                });
+
+            if (restoreStateRet != PlanStage::NEED_TIME) {
+                if (restoreStateRet == PlanStage::NEED_YIELD && stageIsEOF &&
+                    !shard_role_details::getLocker(opCtx())->inAWriteUnitOfWork()) {
+                    // If this stage is already exhausted it won't use its children stages anymore
+                    // and therefore it's okay if we failed to restore them. Avoid requesting a
+                    // yield to the plan executor. Restoring from yield could fail due to a sharding
+                    // placement change. Throwing a StaleConfig error is undesirable after an
+                    // "update one" operation has already performed a write because the router would
+                    // retry. Unset _idReturning as we'll return the document in this stage
+                    // iteration.
+                    //
+                    // If this plan is part of a larger encompassing WUOW it would be illegal to
+                    // skip returning NEED_YIELD, so we don't skip it. In this case, such as
+                    // multi-doc transactions, this is okay as the PlanExecutor is not allowed to
+                    // auto-yield.
+                    _idReturning = WorkingSet::INVALID_ID;
+                } else {
+                    return restoreStateRet;
                 }
-                *out = WorkingSet::INVALID_ID;
-            });
-
-        if (restoreStateRet != PlanStage::NEED_TIME) {
-            if (restoreStateRet == PlanStage::NEED_YIELD && stageIsEOF &&
-                !shard_role_details::getLocker(opCtx())->inAWriteUnitOfWork()) {
-                // If this stage is already exhausted it won't use its children stages anymore and
-                // therefore it's okay if we failed to restore them. Avoid requesting a yield to the
-                // plan executor. Restoring from yield could fail due to a sharding placement
-                // change. Throwing a StaleConfig error is undesirable after an "update one"
-                // operation has already performed a write because the router would retry. Unset
-                // _idReturning as we'll return the document in this stage iteration.
-                //
-                // If this plan is part of a larger encompassing WUOW it would be illegal to skip
-                // returning NEED_YIELD, so we don't skip it. In this case, such as multi-doc
-                // transactions, this is okay as the PlanExecutor is not allowed to auto-yield.
-                _idReturning = WorkingSet::INVALID_ID;
-            } else {
-                return restoreStateRet;
             }
         }
 
