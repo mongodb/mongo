@@ -1041,10 +1041,6 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                              size_t nRecords) {
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-    int64_t totalLength = 0;
-    for (size_t i = 0; i < nRecords; i++)
-        totalLength += records[i].data.size();
-
     WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, _overwrite);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
@@ -1100,8 +1096,10 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         }
     }
 
+    int64_t totalLength = 0;
     for (size_t i = 0; i < nRecords; i++) {
         auto& record = records[i];
+        totalLength += record.data.size();
         invariant(!record.id.isNull());
         invariant(!record_id_helpers::isReserved(record.id));
         Timestamp ts = timestamps[i];
