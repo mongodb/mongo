@@ -49,6 +49,20 @@ namespace mongo::optimizer {
 enum class ExplainVersion { V1, V2, V2Compact, V3, UserFacingExplain, Vmax };
 
 /**
+ * Given the RootNode of an ABT, determine whether the ABT represents an EOF plan. This function
+ * checks for the following form:
+ *
+ * RootNode
+ * |
+ * EvaluationNode
+ * |     <>: Nothing
+ * LimitSkipNode
+ * |     limit: 0, skip: 0
+ * CoScanNode
+ */
+bool isEOFPlan(ABT::reference_type node);
+
+/**
  * This structure holds any data that is required by the explain. It is self-sufficient and separate
  * because it must outlive the other optimizer state as it is used by the runtime plan executor.
  */
@@ -182,26 +196,6 @@ public:
         bob.append(kNodeId, props._planNodeId);
 
         return bob.obj();
-    }
-
-    bool isEOFPlan(const ABT::reference_type node) {
-        // This function expects the full ABT to be the argument. So we must have a RootNode.
-        auto root = node.cast<RootNode>();
-        if (!root->getChild().is<EvaluationNode>()) {
-            // An EOF plan will have an EvaluationNode as the child of the RootNode.
-            return false;
-        }
-
-        auto eval = root->getChild().cast<EvaluationNode>();
-        if (eval->getProjection() != Constant::nothing()) {
-            // The EvaluationNode of an EOF plan will have Nothing as the projection.
-            return false;
-        }
-
-        // This is the rest of an EOF plan.
-        ABT eofChild =
-            make<LimitSkipNode>(properties::LimitSkipRequirement{0, 0}, make<CoScanNode>());
-        return eval->getChild() == eofChild;
     }
 
     BSONObj explain(const ABT::reference_type node) {

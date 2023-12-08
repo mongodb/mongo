@@ -362,6 +362,46 @@ export function getShardQueryPlans(root) {
 }
 
 /**
+ * Returns an array of strings representing the "planSummary" values found in the input explain.
+ * Assumes the given input is the root of an explain.
+ *
+ * The helper supports sharded and unsharded explain. It can be used with any optimizer. It returns
+ * an empty list for non-CQF plans, since only CQF will attach planSummary to explain output.
+ */
+export function getPlanSummaries(root) {
+    let res = [];
+
+    // Queries that use the find system have top-level queryPlanner and winningPlan fields. If it's
+    // a sharded query, the shards have their own winningPlan fields to look at.
+    if ("queryPlanner" in root && "winningPlan" in root.queryPlanner) {
+        const wp = root.queryPlanner.winningPlan;
+
+        if ("shards" in wp) {
+            for (let shard of wp.shards) {
+                res.push(shard.winningPlan.planSummary);
+            }
+        } else {
+            res.push(wp.planSummary);
+        }
+    }
+
+    // Queries that use the agg system either have a top-level stages field or a top-level shards
+    // field. getQueryPlanner pulls the queryPlanner out of the stages/cursor subfields.
+    if ("stages" in root) {
+        res.push(getQueryPlanner(root).winningPlan.planSummary);
+    }
+
+    if ("shards" in root) {
+        for (let shardName of Object.keys(root.shards)) {
+            let shard = root.shards[shardName];
+            res.push(getQueryPlanner(shard).winningPlan.planSummary);
+        }
+    }
+
+    return res.filter(elem => elem !== undefined);
+}
+
+/**
  * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns all
  * subdocuments whose stage is 'stage'. This can either be an agg stage name like "$cursor" or
  * "$sort", or a query stage name like "IXSCAN" or "SORT".

@@ -463,6 +463,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const sbe::PlanStageStats& stats,
     const boost::optional<BSONObj>& execPlanDebugInfo,
     const boost::optional<BSONObj>& optimizerExplain,
+    const boost::optional<std::string>& planSummary,
     const boost::optional<BSONArray>& remotePlanInfo,
     ExplainOptions::Verbosity verbosity) {
     BSONObjBuilder bob;
@@ -488,11 +489,16 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
 
     invariant(execPlanDebugInfo);
     BSONObjBuilder plan;
+    if (planSummary) {
+        plan.append("planSummary", *planSummary);
+    }
+
     if (optimizerExplain) {
         plan.append("queryPlan", *optimizerExplain);
     } else {
         plan.append("queryPlan", bob.obj());
     }
+
     plan.append("slotBasedPlan", *execPlanDebugInfo);
     if (remotePlanInfo && !remotePlanInfo->isEmpty()) {
         plan.append("remotePlans", *remotePlanInfo);
@@ -566,10 +572,15 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
     invariant(_root);
     auto stats = _root->getStats(true /* includeDebugInfo  */);
     invariant(stats);
+
+    // Append a planSummary only for CQF plans.
+    auto planSummary = _optimizerData ? boost::make_optional(getPlanSummary()) : boost::none;
+
     return buildPlanStatsDetails(_solution,
                                  *stats,
                                  buildExecPlanDebugInfo(_root, _rootData),
                                  buildCascadesPlan(),
+                                 planSummary,
                                  buildRemotePlanInfo(),
                                  verbosity);
 }
@@ -585,6 +596,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() con
             // `ExplainOptions::Verbosity::kExecAllPlans`, as is the case here.
             boost::none /* execPlanDebugInfo */,
             boost::none /* optimizerExplain */,
+            boost::none, /* planSummary */
             boost::none /* remotePlanInfo */,
             ExplainOptions::Verbosity::kExecAllPlans);
     }
@@ -611,6 +623,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
                                             *stats,
                                             execPlanDebugInfo,
                                             boost::none /* optimizerExplain */,
+                                            boost::none, /* planSummary */
                                             boost::none /* remotePlanInfo */,
                                             verbosity));
     }

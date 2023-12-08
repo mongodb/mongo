@@ -3189,6 +3189,10 @@ public:
     }
 
     std::string getPlanSummary(const ABT& n) {
+        if (isEOFPlan(n)) {
+            return "EOF";
+        }
+
         algebra::transport<false>(n, *this);
         return ss.str();
     }
@@ -3244,5 +3248,24 @@ std::string ExplainGenerator::explainCompoundIntervalExpr(
 std::string ExplainGenerator::explainCandidateIndex(const CandidateIndexEntry& indexEntry) {
     ExplainGeneratorV2 gen;
     return gen.printCandidateIndexEntry(indexEntry);
+}
+
+bool isEOFPlan(const ABT::reference_type node) {
+    // This function expects the full ABT to be the argument. So we must have a RootNode.
+    auto root = node.cast<RootNode>();
+    if (!root->getChild().is<EvaluationNode>()) {
+        // An EOF plan will have an EvaluationNode as the child of the RootNode.
+        return false;
+    }
+
+    auto eval = root->getChild().cast<EvaluationNode>();
+    if (eval->getProjection() != Constant::nothing()) {
+        // The EvaluationNode of an EOF plan will have Nothing as the projection.
+        return false;
+    }
+
+    // This is the rest of an EOF plan.
+    ABT eofChild = make<LimitSkipNode>(properties::LimitSkipRequirement{0, 0}, make<CoScanNode>());
+    return eval->getChild() == eofChild;
 }
 }  // namespace mongo::optimizer

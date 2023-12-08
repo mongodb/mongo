@@ -8,10 +8,7 @@ import {
     getWinningPlanFromExplain
 } from "jstests/libs/analyze_plan.js"
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {
-    leftmostLeafStage,
-    usedBonsaiOptimizer,
-} from "jstests/libs/optimizer_utils.js";
+import {leftmostLeafStage, usedBonsaiOptimizer} from "jstests/libs/optimizer_utils.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 let dbName = "test";
