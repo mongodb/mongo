@@ -33,7 +33,7 @@
 
 namespace mongo::boolean_simplification {
 inline BitsetTerm makeBitsetTerm(const Minterm& minterm) {
-    return BitsetTerm{minterm.predicates, minterm.mask};
+    return minterm;
 }
 
 inline BitsetTerm makeBitsetTerm(StringData predicates, StringData mask) {

@@ -29,14 +29,11 @@
 
 #include "mongo/db/query/boolean_simplification/bitset_algebra.h"
 
-#include <absl/container/node_hash_set.h>
-#include <boost/dynamic_bitset/dynamic_bitset.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <ostream>
 #include <utility>
 
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/stream_utils.h"
 
@@ -51,7 +48,7 @@ Maxterm::Maxterm(std::initializer_list<Minterm> init) : minterms(std::move(init)
 }
 
 bool Maxterm::isAlwaysTrue() const {
-    return minterms.size() == 1 && minterms.front().isAlwaysTrue();
+    return minterms.size() == 1 && minterms.front().isConjunctionAlwaysTrue();
 }
 
 bool Maxterm::isAlwaysFalse() const {
@@ -62,24 +59,6 @@ std::string Maxterm::toString() const {
     std::ostringstream oss{};
     oss << *this;
     return oss.str();
-}
-
-Maxterm& Maxterm::operator|=(const Minterm& rhs) {
-    minterms.emplace_back(rhs);
-    return *this;
-}
-
-Maxterm Maxterm::operator~() const {
-    if (minterms.empty()) {
-        return {Minterm{}};
-    }
-
-    Maxterm result = ~minterms.front();
-    for (size_t i = 1; i < minterms.size(); ++i) {
-        result &= ~minterms[i];
-    }
-
-    return result;
 }
 
 void Maxterm::removeRedundancies() {
@@ -160,17 +139,6 @@ std::pair<Minterm, Maxterm> extractCommonPredicates(Maxterm maxterm) {
     return {std::move(commonPredicates), std::move(maxterm)};
 }
 
-Maxterm Minterm::operator~() const {
-    Maxterm result{};
-    result.minterms.reserve(mask.count());
-    for (size_t i = 0; i < mask.size(); ++i) {
-        if (mask[i]) {
-            result.minterms.emplace_back(i, !predicates[i]);
-        }
-    }
-    return result;
-}
-
 bool operator==(const BitsetTerm& lhs, const BitsetTerm& rhs) {
     return lhs.predicates == rhs.predicates && lhs.mask == rhs.mask;
 }
@@ -180,25 +148,11 @@ std::ostream& operator<<(std::ostream& os, const BitsetTerm& term) {
     return os;
 }
 
-bool operator==(const Minterm& lhs, const Minterm& rhs) {
-    return lhs.predicates == rhs.predicates && lhs.mask == rhs.mask;
-}
-
-std::ostream& operator<<(std::ostream& os, const Minterm& minterm) {
-    os << '(' << minterm.predicates << ", " << minterm.mask << ")";
-    return os;
-}
-
 Maxterm& Maxterm::operator|=(const Maxterm& rhs) {
+    minterms.reserve(minterms.size() + rhs.minterms.size());
     for (auto& right : rhs.minterms) {
-        *this |= right;
+        minterms.emplace_back(right);
     }
-    return *this;
-}
-
-Maxterm& Maxterm::operator&=(const Maxterm& rhs) {
-    Maxterm result = *this & rhs;
-    minterms.swap(result.minterms);
     return *this;
 }
 

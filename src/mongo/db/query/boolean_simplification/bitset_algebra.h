@@ -61,6 +61,9 @@ struct BitsetTerm {
 
     BitsetTerm(Bitset bitset, Bitset mask) : predicates(bitset), mask(mask) {}
 
+    BitsetTerm(StringData bits, StringData mask)
+        : BitsetTerm{Bitset{bits.toString()}, Bitset{mask.toString()}} {}
+
     BitsetTerm(size_t bitIndex, bool val) : predicates(0ul), mask(0ul) {
         set(bitIndex, val);
     }
@@ -80,6 +83,26 @@ struct BitsetTerm {
     }
 
     /**
+     * Returns the set of bits in which the conflicting bits of the terms are set. The bits of two
+     * terms are conflicting if in one term the bit is set to 1 and in another to 0.
+     */
+    inline Bitset getConflicts(const BitsetTerm& other) const {
+        return (predicates ^ other.predicates) & (mask & other.mask);
+    }
+
+    /**
+     * Returns true if the current term can absorb the other term. For example, 'a' absorbs 'a & b'
+     * (or 'a | b'). See Absorption law for details.
+     */
+    MONGO_COMPILER_ALWAYS_INLINE bool canAbsorb(const BitsetTerm& other) const {
+        return mask == (mask & other.mask) && predicates == (mask & other.predicates);
+    }
+
+    bool isConjunctionAlwaysTrue() const {
+        return mask.none();
+    }
+
+    /**
      * Predicates bitset, if a predicate takes part in the conjunction its corresponding bit in the
      * predicates bitset set to 1 if the predicate in true form or to 0 otherwise.
      */
@@ -91,7 +114,10 @@ struct BitsetTerm {
     Bitset mask;
 };
 
-struct Minterm;
+/**
+ * Minterms represent a conjunction of an expression in Disjunctive Normal Form.
+ */
+using Minterm = BitsetTerm;
 
 /**
  * Maxterm represents top disjunction of an expression in Disjunctive Normal Form and consists of a
@@ -101,10 +127,13 @@ struct Maxterm {
     Maxterm() = default;
     Maxterm(std::initializer_list<Minterm> init);
 
-    Maxterm& operator|=(const Minterm& rhs);
     Maxterm& operator|=(const Maxterm& rhs);
-    Maxterm& operator&=(const Maxterm& rhs);
-    Maxterm operator~() const;
+
+    Maxterm& operator&=(const Maxterm& rhs) {
+        Maxterm result = *this & rhs;
+        minterms.swap(result.minterms);
+        return *this;
+    }
 
     bool isAlwaysTrue() const;
 
@@ -128,6 +157,12 @@ struct Maxterm {
 
     std::string toString() const;
 
+    /**
+     * Minterms represent a conjunction of an expression in Disjunctive Normal Form and consists of
+     * predicates which can be in true (for a predicate A, true form is just A) of false forms (for
+     * a predicate A the false form is the negation of A: ~A). Every predicate is represented by a
+     * bit in the predicates bitset.
+     */
     std::vector<Minterm> minterms;
 
 private:
@@ -141,60 +176,15 @@ private:
  */
 std::pair<Minterm, Maxterm> extractCommonPredicates(Maxterm maxterm);
 
-/**
- * Minterms represent a conjunction of an expression in Disjunctive Normal Form and consists of
- * predicates which can be in true (for a predicate A, true form is just A) of false forms (for
- * a predicate A the false form is the negation of A: ~A). Every predicate is represented by a
- * bit in the predicates bitset.
- */
-struct Minterm : private BitsetTerm {
-    using BitsetTerm::BitsetTerm;
-    using BitsetTerm::flip;
-    using BitsetTerm::mask;
-    using BitsetTerm::predicates;
-    using BitsetTerm::set;
-    using BitsetTerm::size;
-
-    Minterm(StringData bits, StringData mask)
-        : Minterm{Bitset{bits.toString()}, Bitset{mask.toString()}} {}
-
-    /**
-     * Returns the set of bits in which the conflicting bits of the minterms are set. The bits
-     * of two minterms are conflicting if in one minterm the bit is set to 1 and in another to
-     * 0.
-     */
-    inline Bitset getConflicts(const Minterm& other) const {
-        return (predicates ^ other.predicates) & (mask & other.mask);
-    }
-
-    Maxterm operator~() const;
-
-    /**
-     * Returns true if the current minterm can absorb the other minterm. For example, 'a' absorbs 'a
-     * & b'. See Absorption law for details.
-     */
-    bool canAbsorb(const Minterm& other) const {
-        return mask == (mask & other.mask) && predicates == (mask & other.predicates);
-    }
-
-    bool isAlwaysTrue() const {
-        return mask.none();
-    }
-};
-
-inline Maxterm operator&(const Minterm& lhs, const Minterm& rhs) {
-    if (lhs.getConflicts(rhs).any()) {
-        return Maxterm{};
-    }
-    return {{Minterm(lhs.predicates | rhs.predicates, lhs.mask | rhs.mask)}};
-}
-
 inline Maxterm operator&(const Maxterm& lhs, const Maxterm& rhs) {
     Maxterm result{};
     result.minterms.reserve(lhs.minterms.size() * rhs.minterms.size());
     for (const auto& left : lhs.minterms) {
         for (const auto& right : rhs.minterms) {
-            result |= left & right;
+            if (!left.getConflicts(right).any()) {
+                result.minterms.emplace_back(left.predicates | right.predicates,
+                                             left.mask | right.mask);
+            }
         }
     }
     return result;
@@ -202,13 +192,11 @@ inline Maxterm operator&(const Maxterm& lhs, const Maxterm& rhs) {
 
 bool operator==(const BitsetTerm& lhs, const BitsetTerm& rhs);
 std::ostream& operator<<(std::ostream& os, const BitsetTerm& term);
-bool operator==(const Minterm& lhs, const Minterm& rhs);
-std::ostream& operator<<(std::ostream& os, const Minterm& minterm);
 bool operator==(const Maxterm& lhs, const Maxterm& rhs);
 std::ostream& operator<<(std::ostream& os, const Maxterm& maxterm);
 
 template <typename H>
-H AbslHashValue(H h, const Minterm& mt) {
-    return H::combine(std::move(h), mt.predicates, mt.mask);
+H AbslHashValue(H h, const BitsetTerm& term) {
+    return H::combine(std::move(h), term.predicates, term.mask);
 }
 }  // namespace mongo::boolean_simplification

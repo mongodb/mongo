@@ -33,79 +33,12 @@
 namespace mongo::boolean_simplification {
 constexpr size_t nbits = 64;
 
-TEST(MintermOperationsTest, AAndB) {
-    Minterm a{"01", "01"};
-    Minterm b{"10", "10"};
-    Maxterm expectedResult{{"11", "11"}};
-
-    auto result = a & b;
-    ASSERT_EQ(expectedResult, result);
-}
-
-TEST(MintermOperationsTest, AAndNotB) {
-    Minterm a{"01", "01"};
-    Minterm b{"00", "10"};
-    Maxterm expectedResult{{"01", "11"}};
-
-    auto result = a & b;
-    ASSERT_EQ(expectedResult, result);
-}
-
-TEST(MintermOperationsTest, AAndNotA) {
-    Minterm a{"1", "1"};
-    Minterm na{"0", "1"};
-    Maxterm expectedResult{};
-
-    auto result = a & na;
-    ASSERT_EQ(expectedResult, result);
-}
-
-TEST(MintermOperationsTest, AAndA) {
-    Minterm a1{"1", "1"};
-    Minterm a2{"1", "1"};
-    Maxterm expectedResult{{"1", "1"}};
-
-    auto result = a1 & a2;
-    ASSERT_EQ(expectedResult, result);
-}
-
-TEST(MintermOperationsTest, ACDAndB) {
-    Minterm acd{"1101", "1101"};
-    Minterm b{"0010", "0010"};
-    Maxterm expectedResult{{"1111", "1111"}};
-
-    auto result = acd & b;
-    ASSERT_EQ(expectedResult, result);
-}
-
-TEST(MintermOperationsTest, ComplexExpr) {
-    Minterm acnbd{"1101", "1111"};
-    Minterm b{"0010", "0010"};
-    Maxterm expectedResult{};
-
-    auto result = acnbd & b;
-    ASSERT_EQ(expectedResult, result);
-}
-
-TEST(MintermOperationsTest, Not) {
-    Minterm a{"00010001", "00110011"};
-    Maxterm expectedResult({
-        {"00000000", "00000001"},
-        {"00000010", "00000010"},
-        {"00000000", "00010000"},
-        {"00100000", "00100000"},
-    });
-
-    auto result = ~a;
-    ASSERT_EQ(expectedResult, result);
-}
-
-TEST(MintermOperationsTest, CanAbsorb) {
-    ASSERT_TRUE(Minterm("001", "001").canAbsorb({"011", "011"}));
-    ASSERT_TRUE(Minterm("001", "001").canAbsorb({"001", "001"}));
-    ASSERT_TRUE(Minterm("001", "001").canAbsorb({"001", "101"}));
-    ASSERT_FALSE(Minterm("001", "001").canAbsorb({"000", "001"}));
-    ASSERT_FALSE(Minterm("000", "001").canAbsorb({"001", "001"}));
+TEST(BitsetTermOperationsTest, CanAbsorb) {
+    ASSERT_TRUE(BitsetTerm("001", "001").canAbsorb({"011", "011"}));
+    ASSERT_TRUE(BitsetTerm("001", "001").canAbsorb({"001", "001"}));
+    ASSERT_TRUE(BitsetTerm("001", "001").canAbsorb({"001", "101"}));
+    ASSERT_FALSE(BitsetTerm("001", "001").canAbsorb({"000", "001"}));
+    ASSERT_FALSE(BitsetTerm("000", "001").canAbsorb({"001", "001"}));
 }
 
 TEST(MaxtermOperationsTest, ABOrC) {
@@ -216,42 +149,6 @@ TEST(MaxtermOperationsTest, ComplexAnd2) {
     ASSERT_EQ(expectedResult, result);
 }
 
-TEST(MaxtermOperationsTest, NotTrue) {
-    Maxterm alwaysTrue{};
-    alwaysTrue.appendEmpty();
-
-    Maxterm alwaysFalse{};
-
-    ASSERT_EQ(alwaysFalse, ~alwaysTrue);
-}
-
-TEST(MaxtermOperationsTest, NotFalse) {
-    Maxterm alwaysFalse{};
-
-    Maxterm alwaysTrue{};
-    alwaysTrue.appendEmpty();
-
-    ASSERT_EQ(alwaysTrue, ~alwaysFalse);
-}
-
-// not (BC | A~D)
-TEST(MaxtermOperationsTest, ComplexNot) {
-    Maxterm bcOrAnd{
-        {"0110", "0110"},
-        {"0001", "1001"},
-    };
-
-    Maxterm expectedResult{
-        {"0000", "0011"},  // ~A & ~B
-        {"1000", "1010"},  // ~B & D
-        {"0000", "0101"},  // ~A & ~C
-        {"1000", "1100"},  // ~C & D
-    };
-
-    auto result = ~bcOrAnd;
-    ASSERT_EQ(expectedResult, result);
-}
-
 TEST(ExtractCommonPredicatesTest, PositiveAndNegativeCommonPredicates) {
     Maxterm maxterm{
         {"11000", "11010"},
@@ -338,7 +235,7 @@ TEST(ExtractCommonPredicatesTest, NoCommonPredicates) {
 
     auto [commonPredicates, outputMaxterm] = extractCommonPredicates(maxterm);
 
-    ASSERT_TRUE(commonPredicates.isAlwaysTrue());
+    ASSERT_TRUE(commonPredicates.isConjunctionAlwaysTrue());
     ASSERT_EQ(maxterm, outputMaxterm);
 }
 
@@ -348,7 +245,7 @@ TEST(ExtractCommonPredicatesTest, AlwaysFalseInput) {
     ASSERT_TRUE(maxterm.isAlwaysFalse());
 
     auto [commonPredicates, outputMaxterm] = extractCommonPredicates(maxterm);
-    ASSERT_TRUE(commonPredicates.isAlwaysTrue());
+    ASSERT_TRUE(commonPredicates.isConjunctionAlwaysTrue());
     ASSERT_TRUE(outputMaxterm.isAlwaysFalse());
 }
 
@@ -359,7 +256,7 @@ TEST(ExtractCommonPredicatesTest, AlwaysTrueInput) {
     ASSERT_TRUE(maxterm.isAlwaysTrue());
 
     auto [commonPredicates, outputMaxterm] = extractCommonPredicates(maxterm);
-    ASSERT_TRUE(commonPredicates.isAlwaysTrue());
+    ASSERT_TRUE(commonPredicates.isConjunctionAlwaysTrue());
     ASSERT_TRUE(outputMaxterm.isAlwaysTrue());
 }
 
