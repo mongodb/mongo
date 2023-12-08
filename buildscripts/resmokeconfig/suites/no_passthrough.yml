@@ -17,8 +17,6 @@ selector:
   - jstests/concurrency/*.js
   exclude_files:
   - jstests/noPassthrough/libs/*.js
-  # Disable inmem_full as per SERVER-27014
-  - jstests/noPassthrough/inmem_full.js
   exclude_with_any_tags:
 
 # noPassthrough tests start their own mongod's.
