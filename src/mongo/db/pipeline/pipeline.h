@@ -586,4 +586,6 @@ extern ServiceContext::Decoration<std::unique_ptr<Pipeline, PipelineDeleter> (*)
     Pipeline* origPipeline,
     boost::optional<UUID> uuid)>
     generateMetadataPipelineFunc;
+
+using PipelinePtr = std::unique_ptr<Pipeline, PipelineDeleter>;
 }  // namespace mongo

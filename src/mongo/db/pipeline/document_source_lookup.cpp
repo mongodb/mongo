@@ -556,16 +556,9 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     // '_unwindSrc' would be non-null, and we would not have made it here.
     invariant(!_matchSrc);
 
-    if (hasLocalFieldForeignFieldJoin()) {
-        auto matchStage =
-            makeMatchStageFromInput(inputDoc, *_localField, _foreignField->fullPath(), BSONObj());
-        // We've already allocated space for the trailing $match stage in '_resolvedPipeline'.
-        _resolvedPipeline[*_fieldMatchPipelineIdx] = matchStage;
-    }
-
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
     try {
-        pipeline = buildPipeline(inputDoc);
+        pipeline = buildPipeline(_fromExpCtx, inputDoc);
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         // If lookup on a sharded collection is disallowed and the foreign collection is sharded,
         // throw a custom exception.
@@ -639,14 +632,24 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipelineFr
     return pipeline;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
-    const Document& inputDoc) {
+template <bool isStreamsEngine>
+PipelinePtr DocumentSourceLookUp::buildPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc) {
+    if (hasLocalFieldForeignFieldJoin()) {
+        BSONObj filter =
+            !_unwindSrc || hasPipeline() ? BSONObj() : _additionalFilter.value_or(BSONObj());
+        auto matchStage =
+            makeMatchStageFromInput(inputDoc, *_localField, _foreignField->fullPath(), filter);
+        // We've already allocated space for the trailing $match stage in '_resolvedPipeline'.
+        _resolvedPipeline[*_fieldMatchPipelineIdx] = matchStage;
+    }
+
     // Copy all 'let' variables into the foreign pipeline's expression context.
-    _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
-    _fromExpCtx->forcePlanCache = true;
+    _variables.copyToExpCtx(_variablesParseState, fromExpCtx.get());
+    fromExpCtx->forcePlanCache = true;
 
     // Resolve the 'let' variables to values per the given input document.
-    resolveLetVariables(inputDoc, &_fromExpCtx->variables);
+    resolveLetVariables(inputDoc, &fromExpCtx->variables);
 
     std::unique_ptr<MongoProcessInterface::ScopedExpectUnshardedCollection>
         expectUnshardedCollectionInScope;
@@ -655,22 +658,25 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     if (!allowForeignShardedColl) {
         // Enforce that the foreign collection must be unsharded for lookup.
         expectUnshardedCollectionInScope =
-            _fromExpCtx->mongoProcessInterface->expectUnshardedCollectionInScope(
-                _fromExpCtx->opCtx, _fromExpCtx->ns, boost::none);
+            fromExpCtx->mongoProcessInterface->expectUnshardedCollectionInScope(
+                fromExpCtx->opCtx, fromExpCtx->ns, boost::none);
     }
 
-    // If we don't have a cache, build and return the pipeline immediately.
-    if (!_cache || _cache->isAbandoned()) {
+    // If we don't have a cache, build and return the pipeline immediately. We don't support caching
+    // for the streams engine.
+    if (isStreamsEngine || !_cache || _cache->isAbandoned()) {
         MakePipelineOptions pipelineOpts;
         pipelineOpts.optimize = true;
-        pipelineOpts.attachCursorSource = true;
+        // The streams engine attaches its own remote cursor source, so we don't need to do it here.
+        pipelineOpts.attachCursorSource = !isStreamsEngine;
         pipelineOpts.validator = lookupPipeValidator;
-        // By default, $lookup doesnt support sharded 'from' collections.
-        pipelineOpts.shardTargetingPolicy = allowForeignShardedColl
+        // By default, $lookup does not support sharded 'from' collections. The streams engine does
+        // not care about sharding, and so it does not allow shard targeting.
+        pipelineOpts.shardTargetingPolicy = !isStreamsEngine && allowForeignShardedColl
             ? ShardTargetingPolicy::kAllowed
             : ShardTargetingPolicy::kNotAllowed;
         try {
-            return Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
+            return Pipeline::makePipeline(_resolvedPipeline, fromExpCtx, pipelineOpts);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
             // This exception returns the information we need to resolve a sharded view. Update the
             // pipeline with the resolved view definition.
@@ -687,7 +693,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
                         "new_pipe"_attr = _resolvedPipeline);
 
             // We can now safely optimize and reattempt attaching the cursor source.
-            pipeline = Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
+            pipeline = Pipeline::makePipeline(_resolvedPipeline, fromExpCtx, pipelineOpts);
 
             return pipeline;
         }
@@ -699,7 +705,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     pipelineOpts.optimize = false;
     pipelineOpts.attachCursorSource = false;
     pipelineOpts.validator = lookupPipeValidator;
-    auto pipeline = Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
+    auto pipeline = Pipeline::makePipeline(_resolvedPipeline, fromExpCtx, pipelineOpts);
 
     // We can store the unoptimized serialization of the pipeline so that if we need to resolve
     // a sharded view later on, and we have a local-foreign field join, we will need to update
@@ -750,6 +756,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     invariant(pipeline);
     return pipeline;
 }
+
+// Explicit instantiations for buildPipeline().
+template PipelinePtr DocumentSourceLookUp::buildPipeline<false /*isStreamsEngine*/>(
+    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc);
+
+template PipelinePtr DocumentSourceLookUp::buildPipeline<true /*isStreamsEngine*/>(
+    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc);
 
 void DocumentSourceLookUp::addCacheStageAndOptimize(Pipeline& pipeline) {
     // Add the cache stage at the end and optimize. During the optimization process, the cache will
@@ -989,18 +1002,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
 
         _input = nextInput.releaseDocument();
 
-        if (hasLocalFieldForeignFieldJoin()) {
-            // At this point, if there is a pipeline, '_additionalFilter' was added to the end of
-            // '_resolvedPipeline' in doOptimizeAt(). If there is no pipeline, we must add it to the
-            // $match stage created here.
-            BSONObj filter = hasPipeline() ? BSONObj() : _additionalFilter.value_or(BSONObj());
-            auto matchStage =
-                makeMatchStageFromInput(*_input, *_localField, _foreignField->fullPath(), filter);
-            // We've already allocated space for the trailing $match stage in '_resolvedPipeline'.
-            _resolvedPipeline[*_fieldMatchPipelineIdx] = matchStage;
-        }
-
-        _pipeline = buildPipeline(*_input);
+        _pipeline = buildPipeline(_fromExpCtx, *_input);
 
         // The $lookup stage takes responsibility for disposing of its Pipeline, since it will
         // potentially be used by multiple OperationContexts, and the $lookup stage is part of an

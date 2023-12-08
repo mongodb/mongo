@@ -286,7 +286,7 @@ public:
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> getSubPipeline_forTest(const Document& inputDoc) {
-        return buildPipeline(inputDoc);
+        return buildPipeline(_fromExpCtx, inputDoc);
     }
 
     boost::intrusive_ptr<DocumentSource> clone(
@@ -307,6 +307,16 @@ public:
     const boost::optional<BSONObj>& getAdditionalFilter() const {
         return _additionalFilter;
     }
+
+    /**
+     * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a
+     * cursor and/or cache source as appropriate.
+     */
+    // TODO SERVER-84208: Refactor this method so as to clearly separate the logic for the streams
+    // engine from the logic for the classic $lookup..
+    template <bool isStreamsEngine = false>
+    PipelinePtr buildPipeline(const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
+                              const Document& inputDoc);
 
 protected:
     GetNextResult doGetNext() final;
@@ -381,12 +391,6 @@ private:
     std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
         std::vector<BSONObj> serializedPipeline,
         ExpressionContext::ResolvedNamespace resolvedNamespace);
-
-    /**
-     * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a
-     * cursor and/or cache source as appropriate.
-     */
-    std::unique_ptr<Pipeline, PipelineDeleter> buildPipeline(const Document& inputDoc);
 
     /**
      * Reinitialize the cache with a new max size. May only be called if this DSLookup was created
@@ -478,7 +482,7 @@ private:
     // The following members are used to hold onto state across getNext() calls when '_unwindSrc' is
     // not null.
     long long _cursorIndex = 0;
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    PipelinePtr _pipeline;
     boost::optional<Document> _input;
     boost::optional<Document> _nextValue;
 };
