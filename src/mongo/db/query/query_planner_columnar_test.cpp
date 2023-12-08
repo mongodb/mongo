@@ -44,8 +44,6 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -127,11 +125,11 @@ protected:
         }
     }
 
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> makeInnerPipelineStages(
+    std::vector<boost::intrusive_ptr<DocumentSource>> makeInnerPipelineStages(
         const Pipeline& pipeline) {
-        std::vector<std::unique_ptr<InnerPipelineStageInterface>> stages;
+        std::vector<boost::intrusive_ptr<DocumentSource>> stages;
         for (auto&& source : pipeline.getSources()) {
-            stages.emplace_back(std::make_unique<InnerPipelineStageImpl>(source));
+            stages.emplace_back(source);
         }
         return stages;
     }

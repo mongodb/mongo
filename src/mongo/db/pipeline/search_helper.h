@@ -182,13 +182,13 @@ public:
                                            std::unique_ptr<PlanYieldPolicyRemoteCursor>) {}
 
     virtual std::unique_ptr<RemoteCursorMap> getSearchRemoteCursors(
-        std::vector<std::unique_ptr<InnerPipelineStageInterface>>& cqPipeline) {
+        const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline) {
         return nullptr;
     }
 
     virtual std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
         const ExpressionContext* expCtx,
-        std::vector<std::unique_ptr<InnerPipelineStageInterface>>& cqPipeline) {
+        const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline) {
         return nullptr;
     }
 };

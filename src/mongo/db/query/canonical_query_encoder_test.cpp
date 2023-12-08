@@ -53,8 +53,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_test_util.h"
@@ -82,13 +80,13 @@ static const NamespaceString foreignNss =
 
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query"};
 
-std::vector<std::unique_ptr<InnerPipelineStageInterface>> parsePipeline(
+std::vector<boost::intrusive_ptr<DocumentSource>> parsePipeline(
     const boost::intrusive_ptr<ExpressionContext> expCtx, const std::vector<BSONObj>& rawPipeline) {
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> stages;
+    std::vector<boost::intrusive_ptr<DocumentSource>> stages;
     for (auto&& source : pipeline->getSources()) {
-        stages.emplace_back(std::make_unique<InnerPipelineStageImpl>(source));
+        stages.emplace_back(source);
     }
     return stages;
 }

@@ -103,8 +103,6 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
@@ -249,24 +247,21 @@ struct CompatiblePipelineStages {
     bool unpackBucket : 1;
 };
 
-// Determine if 'stage' is eligible for SBE, and if it is add it to the 'stagesForPushdown' list as
-// a 'InnerPipelineStageInterface' and return true. Return false if 'stage' is ineligible, either
-// because it is disallowed by 'allowedStages' or because it requires functionality that cannot be
-// translated to SBE.
+// Determine if 'stage' is eligible for SBE, and if it is add it to the 'stagesForPushdown' list and
+// return true. Return false if 'stage' is ineligible, either because it is disallowed by
+// 'allowedStages' or because it requires functionality that cannot be translated to SBE.
 bool pushDownPipelineStageIfCompatible(
     const OperationContext* opCtx,
     const boost::intrusive_ptr<DocumentSource>& stage,
     SbeCompatibility minRequiredCompatibility,
     const CompatiblePipelineStages& allowedStages,
-    bool isLastSource,
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>>& stagesForPushdown) {
+    std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
     if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage.get())) {
         if (!allowedStages.match || matchStage->sbeCompatibility() < minRequiredCompatibility) {
             return false;
         }
 
-        stagesForPushdown.emplace_back(
-            std::make_unique<InnerPipelineStageImpl>(matchStage, isLastSource));
+        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage.get())) {
         if (!allowedStages.group || groupStage->doingMerge() ||
@@ -274,24 +269,21 @@ bool pushDownPipelineStageIfCompatible(
             return false;
         }
 
-        stagesForPushdown.emplace_back(
-            std::make_unique<InnerPipelineStageImpl>(groupStage, isLastSource));
+        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(stage.get())) {
         if (!allowedStages.lookup || lookupStage->sbeCompatibility() < minRequiredCompatibility) {
             return false;
         }
 
-        stagesForPushdown.emplace_back(
-            std::make_unique<InnerPipelineStageImpl>(lookupStage, isLastSource));
+        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (auto unwindStage = dynamic_cast<DocumentSourceUnwind*>(stage.get())) {
         if (!allowedStages.unwind || unwindStage->sbeCompatibility() < minRequiredCompatibility) {
             return false;
         }
 
-        stagesForPushdown.emplace_back(
-            std::make_unique<InnerPipelineStageImpl>(unwindStage, isLastSource));
+        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (auto transformStage =
                    dynamic_cast<DocumentSourceSingleDocumentTransformation*>(stage.get())) {
@@ -308,13 +300,11 @@ bool pushDownPipelineStageIfCompatible(
         }
         if (auto replaceRoot =
                 sbeCompatibleReplaceRootStage(transformStage, minRequiredCompatibility)) {
-            stagesForPushdown.emplace_back(
-                std::make_unique<InnerPipelineStageImpl>(replaceRoot, isLastSource));
+            stagesForPushdown.emplace_back(std::move(replaceRoot));
             return true;
         } else if (auto projectionStage = sbeCompatibleProjectionFromSingleDocumentTransformation(
                        *transformStage, minRequiredCompatibility)) {
-            stagesForPushdown.emplace_back(
-                std::make_unique<InnerPipelineStageImpl>(projectionStage, isLastSource));
+            stagesForPushdown.emplace_back(std::move(projectionStage));
             return true;
         }
         return false;
@@ -323,8 +313,7 @@ bool pushDownPipelineStageIfCompatible(
             return false;
         }
 
-        stagesForPushdown.emplace_back(
-            std::make_unique<InnerPipelineStageImpl>(sortStage, isLastSource));
+        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (dynamic_cast<DocumentSourceLimit*>(stage.get()) ||
                dynamic_cast<DocumentSourceSkip*>(stage.get())) {
@@ -332,8 +321,7 @@ bool pushDownPipelineStageIfCompatible(
             return false;
         }
 
-        stagesForPushdown.push_back(
-            std::make_unique<InnerPipelineStageImpl>(stage.get(), isLastSource));
+        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (const auto& searchHelpers = getSearchHelpers(opCtx->getServiceContext());
                searchHelpers->isSearchStage(stage.get()) ||
@@ -342,25 +330,21 @@ bool pushDownPipelineStageIfCompatible(
             return false;
         }
 
-        stagesForPushdown.emplace_back(
-            std::make_unique<InnerPipelineStageImpl>(stage, isLastSource));
+        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (auto windowStage =
                    dynamic_cast<DocumentSourceInternalSetWindowFields*>(stage.get())) {
         if (!allowedStages.window || windowStage->sbeCompatibility() < minRequiredCompatibility) {
             return false;
         }
-        stagesForPushdown.emplace_back(
-            std::make_unique<InnerPipelineStageImpl>(windowStage, isLastSource));
+        stagesForPushdown.emplace_back(std::move(stage));
         return true;
-    } else if (auto unpackBucketStage =
-                   dynamic_cast<DocumentSourceInternalUnpackBucket*>(stage.get())) {
+    } else if (dynamic_cast<DocumentSourceInternalUnpackBucket*>(stage.get())) {
         if (!allowedStages.unpackBucket) {
             return false;
         }
 
-        stagesForPushdown.emplace_back(
-            std::make_unique<InnerPipelineStageImpl>(unpackBucketStage, isLastSource));
+        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     }
 
@@ -374,20 +358,22 @@ bool pushDownPipelineStageIfCompatible(
  * $addFields in SBE only to immediately translate its output to MutableDocument form for the
  * Classic DocumentSource execution phase. Instead, we keep the $addFields as a DocumentSource.
  *
- * 'alreadyPruned' tells whether the pipeline has had stages pruned away already.
+ * 'containsEntirePipeline' indicates that 'stagesForPushdown' contains the entire aggregation
+ * pipeline for the query, meaning that execution will use SBE exclusively, skipping the
+ * MutableDocument translation step and follow-on Classic DocumentSource processing.
  *
  * Returns true iff it pruned a stage.
  */
-bool pruneTrailingAddFields(
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>>& stagesForPushdown,
-    bool alreadyPruned) {
-    // Push down the entire pipeline when possible. (It's not possible if 'alreadyPruned' is true.)
-    if (stagesForPushdown.empty() || (!alreadyPruned && stagesForPushdown.back()->isLastSource())) {
+bool pruneTrailingAddFields(std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown,
+                            bool containsEntirePipeline) {
+    // If we are able to push down the entire pipeline, we prefer to do that, rather than pruning
+    // this $addFields stage and requiring split SBE/Classic execution.
+    if (containsEntirePipeline || stagesForPushdown.empty()) {
         return false;
     }
 
     auto projectionStage =
-        dynamic_cast<DocumentSourceInternalProjection*>(stagesForPushdown.back()->documentSource());
+        dynamic_cast<DocumentSourceInternalProjection*>(stagesForPushdown.back().get());
     if (projectionStage &&
         projectionStage->projection().type() == projection_ast::ProjectType::kAddition) {
         stagesForPushdown.pop_back();
@@ -405,10 +391,9 @@ bool pruneTrailingAddFields(
  *
  * Returns true iff it pruned a stage.
  */
-bool pruneTrailingUnwind(
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>>& stagesForPushdown) {
+bool pruneTrailingUnwind(std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
     if (!stagesForPushdown.empty() &&
-        dynamic_cast<DocumentSourceUnwind*>(stagesForPushdown.back()->documentSource())) {
+        dynamic_cast<DocumentSourceUnwind*>(stagesForPushdown.back().get())) {
         stagesForPushdown.pop_back();
         return true;
     }
@@ -419,9 +404,9 @@ bool pruneTrailingUnwind(
  * After copying as many pipeline stages as possible into the 'stagesForPushdown' pipeline, this
  * second pass takes off any stages that may not benefit from execution in SBE.
  */
-void prunePushdownStages(
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>>& stagesForPushdown,
-    SbeCompatibility minRequiredCompatibility) {
+void prunePushdownStages(std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown,
+                         SbeCompatibility minRequiredCompatibility,
+                         bool allStagesPushedDown) {
     bool pruned = false;       // have any stages been pruned?
     bool prunedThisIteration;  // were any stages pruned in the current loop iteration?
     do {
@@ -432,7 +417,7 @@ void prunePushdownStages(
         } else {
             // Otherwise, remove trailing $addFields stages that we don't expect to improve
             // performance when they execute in SBE.
-            if (pruneTrailingAddFields(stagesForPushdown, pruned)) {
+            if (pruneTrailingAddFields(stagesForPushdown, allStagesPushedDown && !pruned)) {
                 prunedThisIteration = true;
                 pruned = true;
             }
@@ -457,7 +442,10 @@ constexpr size_t kSbeMaxPipelineStages = 100;
 
 /**
  * Finds a prefix of stages from the given pipeline to prepare for pushdown into the inner query
- * layer so that it can be executed using SBE. Unless pushdown is completely disabled by
+ * layer so that it can be executed using SBE. Populates 'stagesForPushdown' with the result and
+ * returns true iff _all_ stages were included in pushdown.
+ *
+ * Unless pushdown is completely disabled by
  * {'internalQueryFrameworkControl': 'forceClassicEngine'}, a stage can be extracted from the
  * pipeline if and only if all the stages before it are extracted and it meets the criteria for its
  * stage type. When 'internalQueryFrameworkControl' is set to 'trySbeRestricted', only '$group',
@@ -506,18 +494,15 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  *   - The 'featureFlagTimeSeriesInSbe' flag is enabled and
  *   - the 'internalQuerySlotBasedExecutionDisableTimeSeriesPushdown', is _not_ enabled,
  */
-std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStagesForPushdown(
+bool findSbeCompatibleStagesForPushdown(
     const MultipleCollectionAccessor& collections,
     const CanonicalQuery* cq,
     bool needsMerge,
-    const Pipeline* pipeline) {
-    // We will eventually use the extracted group stages to populate 'CanonicalQuery::pipeline'
-    // which requires stages to be wrapped in an interface.
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> stagesForPushdown;
-
+    const Pipeline* pipeline,
+    std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
     // No pushdown if we're using the classic engine.
     if (cq->getForceClassicEngine()) {
-        return {};
+        return false;
     }
 
     const auto& sources = pipeline->getSources();
@@ -592,28 +577,28 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
             cq->getExpCtx()->sbePipelineCompatibility == SbeCompatibility::fullyCompatible,
     };
 
+    bool allStagesPushedDown = true;
     for (auto itr = sources.begin(); itr != sources.end(); ++itr) {
         // Push down at most kMaxPipelineStages stages for execution in SBE.
         if (stagesForPushdown.size() >= kSbeMaxPipelineStages) {
             break;
         }
 
-        const bool isLastSource = itr->get() == sources.back().get();
         if (!pushDownPipelineStageIfCompatible(pipeline->getContext()->opCtx,
                                                *itr,
                                                minRequiredCompatibility,
                                                allowedStages,
-                                               isLastSource,
                                                stagesForPushdown)) {
             // Stop pushing stages down once we hit an incompatible stage.
+            allStagesPushedDown = false;
             break;
         }
     }
 
     // Remove stage patterns where pushing down may degrade performance.
-    prunePushdownStages(stagesForPushdown, minRequiredCompatibility);
+    prunePushdownStages(stagesForPushdown, minRequiredCompatibility, allStagesPushedDown);
 
-    return stagesForPushdown;
+    return allStagesPushedDown;
 }  // findSbeCompatibleStagesForPushdown
 
 /**
@@ -739,8 +724,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     auto extractAndAttachPipelineStages = [&collections, &pipeline, needsMerge{expCtx->needsMerge}](
                                               auto* canonicalQuery, bool attachOnly) {
         if (attachOnly) {
-            canonicalQuery->setCqPipeline(findSbeCompatibleStagesForPushdown(
-                collections, canonicalQuery, needsMerge, pipeline));
+            std::vector<boost::intrusive_ptr<DocumentSource>> stagesForPushdown;
+            bool allStagesPushedDown = findSbeCompatibleStagesForPushdown(
+                collections, canonicalQuery, needsMerge, pipeline, stagesForPushdown);
+            canonicalQuery->setCqPipeline(std::move(stagesForPushdown), allStagesPushedDown);
         } else {
             trimPipelineStages(pipeline, canonicalQuery->cqPipeline().size());
         }
@@ -1708,8 +1695,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
 
     const CanonicalQuery* cq = executor->getCanonicalQuery();
 
-    if (!cq->cqPipeline().empty() &&
-        searchHelper->isSearchStage(cq->cqPipeline().front()->documentSource())) {
+    if (!cq->cqPipeline().empty() && searchHelper->isSearchStage(cq->cqPipeline().front().get())) {
         // The $search is pushed down into SBE executor.
         if (auto cursor = searchHelper->getSearchMetadataCursor(searchStage)) {
             // Create a yield policy for metadata cursor.

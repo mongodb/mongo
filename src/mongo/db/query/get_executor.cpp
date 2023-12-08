@@ -105,7 +105,6 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
@@ -1677,7 +1676,7 @@ attemptToGetSlotBasedExecutor(
     // Either we did not meet the criteria for attempting SBE, or we attempted query planning and
     // determined that SBE should not be used. Reset any fields that may have been modified, and
     // fall back to classic engine.
-    canonicalQuery->setCqPipeline({});
+    canonicalQuery->setCqPipeline({}, false);
     canonicalQuery->setSbeCompatible(false);
     return std::move(canonicalQuery);
 }

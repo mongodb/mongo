@@ -295,7 +295,7 @@ void QueryPlannerTest::runQuery(BSONObj query) {
 void QueryPlannerTest::runQueryWithPipeline(
     BSONObj query,
     BSONObj proj,
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> queryLayerPipeline) {
+    std::vector<boost::intrusive_ptr<DocumentSource>> queryLayerPipeline) {
     runQueryFull(query,
                  BSONObj(),
                  proj,
@@ -351,16 +351,15 @@ void QueryPlannerTest::runQuerySortProjSkipLimitHint(const BSONObj& query,
     runQueryFull(query, sort, proj, skip, limit, hint, BSONObj(), BSONObj());
 }
 
-void QueryPlannerTest::runQueryFull(
-    const BSONObj& query,
-    const BSONObj& sort,
-    const BSONObj& proj,
-    long long skip,
-    long long limit,
-    const BSONObj& hint,
-    const BSONObj& minObj,
-    const BSONObj& maxObj,
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline) {
+void QueryPlannerTest::runQueryFull(const BSONObj& query,
+                                    const BSONObj& sort,
+                                    const BSONObj& proj,
+                                    long long skip,
+                                    long long limit,
+                                    const BSONObj& hint,
+                                    const BSONObj& minObj,
+                                    const BSONObj& maxObj,
+                                    std::vector<boost::intrusive_ptr<DocumentSource>> pipeline) {
     clearState();
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);

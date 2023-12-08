@@ -78,7 +78,6 @@
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/query/analyze_regex.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -1095,12 +1094,12 @@ void encodeKeyForAutoParameterizedMatchSBE(OperationContext* opCtx,
  * Encode the stages pushed down to SBE via CanonicalQuery::cqPipeline.
  */
 void encodePipeline(const ExpressionContext* expCtx,
-                    const std::vector<std::unique_ptr<InnerPipelineStageInterface>>& cqPipeline,
+                    const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline,
                     BufBuilder* bufBuilder) {
     bufBuilder->appendChar(kEncodeSectionDelimiter);
     std::vector<Value> serializedArray;
     for (auto& stage : cqPipeline) {
-        auto documentSource = stage->documentSource();
+        auto documentSource = stage.get();
         if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(documentSource)) {
             // Match expressions are parameterized so need to be encoded differently.
             encodeKeyForAutoParameterizedMatchSBE(

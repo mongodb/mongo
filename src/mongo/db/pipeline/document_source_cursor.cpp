@@ -421,7 +421,7 @@ void DocumentSourceCursor::initializeBatchSizeCounts() {
             return;
         }
         for (const auto& ds : cq->cqPipeline()) {
-            if (ds->documentSource()->getSourceName() == DocumentSourceLimit::kStageName) {
+            if (ds->getSourceName() == DocumentSourceLimit::kStageName) {
                 // $limit is pushed down into executor, skipping batch size count limitation.
                 return;
             }

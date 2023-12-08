@@ -170,7 +170,7 @@ CanonicalQuery::CanonicalQuery(OperationContext* opCtx,
 
 void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
                             std::unique_ptr<ParsedFindCommand> parsedFind,
-                            std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
+                            std::vector<boost::intrusive_ptr<DocumentSource>> cqPipeline,
                             bool isCountLike,
                             bool isSearchQuery) {
     _expCtx = expCtx;

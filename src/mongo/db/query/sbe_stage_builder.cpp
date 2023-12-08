@@ -173,7 +173,7 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
         return;
     }
     auto& searchHelper = getSearchHelpers(cq.getOpCtx()->getServiceContext());
-    auto stage = cq.cqPipeline().front()->documentSource();
+    auto stage = cq.cqPipeline().front().get();
 
     // Build a SearchNode in order to retrieve the search info.
     auto sn = searchHelper->getSearchNode(stage);
@@ -334,7 +334,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     // (query_planner.cpp).
     input_params::bind(cq.getPrimaryMatchExpression(), *data, preparingFromCache);
     for (auto& innerStage : cq.cqPipeline()) {
-        auto matchStage = dynamic_cast<DocumentSourceMatch*>(innerStage->documentSource());
+        auto matchStage = dynamic_cast<DocumentSourceMatch*>(innerStage.get());
         if (matchStage) {
             input_params::bind(matchStage->getMatchExpression(), *data, preparingFromCache);
         }

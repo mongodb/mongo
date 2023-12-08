@@ -76,7 +76,6 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
@@ -559,7 +558,7 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
                 feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe());
 
         auto searchNode = getSearchHelpers(query.getOpCtx()->getServiceContext())
-                              ->getSearchNode(query.cqPipeline().front()->documentSource());
+                              ->getSearchNode(query.cqPipeline().front().get());
 
         if (searchNode->searchQuery.getBoolField(kReturnStoredSourceArg) ||
             searchNode->isSearchMeta) {
@@ -1784,19 +1783,24 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
     }
 
     std::unique_ptr<QuerySolutionNode> solnForAgg = std::make_unique<SentinelNode>();
-    for (auto& innerStage : query.cqPipeline()) {
-        auto groupStage = dynamic_cast<DocumentSourceGroup*>(innerStage->documentSource());
+    const std::vector<boost::intrusive_ptr<DocumentSource>>& innerPipelineStages =
+        query.cqPipeline();
+    for (size_t i = 0; i < innerPipelineStages.size(); ++i) {
+        bool isLastSource =
+            (i + 1 == (innerPipelineStages.size())) && query.containsEntirePipeline();
+        const auto innerStage = innerPipelineStages[i].get();
+
+        auto groupStage = dynamic_cast<DocumentSourceGroup*>(innerStage);
         if (groupStage) {
-            solnForAgg =
-                std::make_unique<GroupNode>(std::move(solnForAgg),
-                                            groupStage->getIdExpression(),
-                                            groupStage->getAccumulationStatements(),
-                                            groupStage->doingMerge(),
-                                            innerStage->isLastSource() /* shouldProduceBson */);
+            solnForAgg = std::make_unique<GroupNode>(std::move(solnForAgg),
+                                                     groupStage->getIdExpression(),
+                                                     groupStage->getAccumulationStatements(),
+                                                     groupStage->doingMerge(),
+                                                     isLastSource /* shouldProduceBson */);
             continue;
         }
 
-        auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(innerStage->documentSource());
+        auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(innerStage);
         if (lookupStage) {
             tassert(6369000,
                     "This $lookup stage should be compatible with SBE",
@@ -1815,22 +1819,21 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                lookupStage->getAsField().fullPath(),
                                                strategy,
                                                std::move(idxEntry),
-                                               innerStage->isLastSource() /* shouldProduceBson */);
+                                               isLastSource /* shouldProduceBson */);
             solnForAgg = std::move(eqLookupNode);
             continue;
         }
 
         // 'projectionStage' pushdown pushes both $project and $addFields to SBE, as the latter is
         // implemented as a variant of the former.
-        auto projectionStage =
-            dynamic_cast<DocumentSourceInternalProjection*>(innerStage->documentSource());
+        auto projectionStage = dynamic_cast<DocumentSourceInternalProjection*>(innerStage);
         if (projectionStage) {
             solnForAgg = std::make_unique<ProjectionNodeDefault>(
                 std::move(solnForAgg), nullptr, projectionStage->projection());
             continue;
         }
 
-        auto unwindStage = dynamic_cast<DocumentSourceUnwind*>(innerStage->documentSource());
+        auto unwindStage = dynamic_cast<DocumentSourceUnwind*>(innerStage);
         if (unwindStage) {
             solnForAgg = std::make_unique<UnwindNode>(std::move(solnForAgg) /* child */,
                                                       unwindStage->getUnwindPath() /* fieldPath */,
@@ -1839,15 +1842,14 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             continue;
         }
 
-        auto replaceRootStage =
-            dynamic_cast<DocumentSourceInternalReplaceRoot*>(innerStage->documentSource());
+        auto replaceRootStage = dynamic_cast<DocumentSourceInternalReplaceRoot*>(innerStage);
         if (replaceRootStage) {
             solnForAgg = std::make_unique<ReplaceRootNode>(std::move(solnForAgg),
                                                            replaceRootStage->newRootExpression());
             continue;
         }
 
-        auto matchStage = dynamic_cast<DocumentSourceMatch*>(innerStage->documentSource());
+        auto matchStage = dynamic_cast<DocumentSourceMatch*>(innerStage);
         if (matchStage) {
             // Parameterize the pushed-down match expression if there is not already a reason not
             // to.
@@ -1872,7 +1874,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             continue;
         }
 
-        auto sortStage = dynamic_cast<DocumentSourceSort*>(innerStage->documentSource());
+        auto sortStage = dynamic_cast<DocumentSourceSort*>(innerStage);
         if (sortStage) {
             auto pattern =
                 sortStage->getSortKeyPattern()
@@ -1884,22 +1886,22 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             continue;
         }
 
-        auto limitStage = dynamic_cast<DocumentSourceLimit*>(innerStage->documentSource());
+        auto limitStage = dynamic_cast<DocumentSourceLimit*>(innerStage);
         if (limitStage) {
             solnForAgg = std::make_unique<LimitNode>(std::move(solnForAgg), limitStage->getLimit());
             continue;
         }
 
-        auto skipStage = dynamic_cast<DocumentSourceSkip*>(innerStage->documentSource());
+        auto skipStage = dynamic_cast<DocumentSourceSkip*>(innerStage);
         if (skipStage) {
             solnForAgg = std::make_unique<SkipNode>(std::move(solnForAgg), skipStage->getSkip());
             continue;
         }
 
-        auto isSearch = getSearchHelpers(query.getOpCtx()->getServiceContext())
-                            ->isSearchStage(innerStage->documentSource());
-        auto isSearchMeta = getSearchHelpers(query.getOpCtx()->getServiceContext())
-                                ->isSearchMetaStage(innerStage->documentSource());
+        auto isSearch =
+            getSearchHelpers(query.getOpCtx()->getServiceContext())->isSearchStage(innerStage);
+        auto isSearchMeta =
+            getSearchHelpers(query.getOpCtx()->getServiceContext())->isSearchMetaStage(innerStage);
         if (isSearch || isSearchMeta) {
             // In the $search case, we create the $search query solution node in QueryPlanner::Plan
             // instead of here. The empty branch here assures that we don't hit the tassert below
@@ -1907,8 +1909,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             continue;
         }
 
-        auto windowStage =
-            dynamic_cast<DocumentSourceInternalSetWindowFields*>(innerStage->documentSource());
+        auto windowStage = dynamic_cast<DocumentSourceInternalSetWindowFields*>(innerStage);
         if (windowStage) {
             auto windowNode = std::make_unique<WindowNode>(std::move(solnForAgg),
                                                            windowStage->getPartitionBy(),
@@ -1918,8 +1919,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             continue;
         }
 
-        auto unpackBucketStage =
-            dynamic_cast<DocumentSourceInternalUnpackBucket*>(innerStage->documentSource());
+        auto unpackBucketStage = dynamic_cast<DocumentSourceInternalUnpackBucket*>(innerStage);
         if (unpackBucketStage) {
             const auto& unpacker = unpackBucketStage->bucketUnpacker();
 

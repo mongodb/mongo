@@ -46,7 +46,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_entry.h"
@@ -106,13 +105,11 @@ protected:
 
     void runQuery(BSONObj query);
 
+    void runQueryWithPipeline(BSONObj query,
+                              BSONObj proj,
+                              std::vector<boost::intrusive_ptr<DocumentSource>> queryLayerPipeline);
     void runQueryWithPipeline(
-        BSONObj query,
-        BSONObj proj,
-        std::vector<std::unique_ptr<InnerPipelineStageInterface>> queryLayerPipeline);
-    void runQueryWithPipeline(
-        BSONObj query,
-        std::vector<std::unique_ptr<InnerPipelineStageInterface>> queryLayerPipeline) {
+        BSONObj query, std::vector<boost::intrusive_ptr<DocumentSource>> queryLayerPipeline) {
         runQueryWithPipeline(query, BSONObj(), std::move(queryLayerPipeline));
     }
 
@@ -142,16 +139,15 @@ protected:
                                        long long limit,
                                        const BSONObj& hint);
 
-    void runQueryFull(
-        const BSONObj& query,
-        const BSONObj& sort,
-        const BSONObj& proj,
-        long long skip,
-        long long limit,
-        const BSONObj& hint,
-        const BSONObj& minObj,
-        const BSONObj& maxObj,
-        std::vector<std::unique_ptr<InnerPipelineStageInterface>> queryLayerPipeline = {});
+    void runQueryFull(const BSONObj& query,
+                      const BSONObj& sort,
+                      const BSONObj& proj,
+                      long long skip,
+                      long long limit,
+                      const BSONObj& hint,
+                      const BSONObj& minObj,
+                      const BSONObj& maxObj,
+                      std::vector<boost::intrusive_ptr<DocumentSource>> queryLayerPipeline = {});
 
     //
     // Same as runQuery* functions except we expect a failed status from the planning stage.

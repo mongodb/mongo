@@ -41,8 +41,6 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_planner.h"
@@ -59,14 +57,11 @@ using namespace mongo;
 
 class QueryPlannerPipelinePushdownTest : public QueryPlannerTest {
 protected:
-    /**
-     * Makes a vector of InnerPipelineStageInterface that carries the input DocumentSources.
-     */
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> makeInnerPipelineStages(
+    std::vector<boost::intrusive_ptr<DocumentSource>> makeInnerPipelineStages(
         const Pipeline& pipeline) {
-        std::vector<std::unique_ptr<InnerPipelineStageInterface>> stages;
+        std::vector<boost::intrusive_ptr<DocumentSource>> stages;
         for (auto&& source : pipeline.getSources()) {
-            stages.emplace_back(std::make_unique<InnerPipelineStageImpl>(source));
+            stages.emplace_back(source);
         }
         return stages;
     }

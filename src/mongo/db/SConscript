@@ -1580,7 +1580,6 @@ execEnv.Library(
         'ops/update_result.cpp',
         'pipeline/document_source_cursor.cpp',
         'pipeline/document_source_geo_near_cursor.cpp',
-        'pipeline/inner_pipeline_stage_impl.cpp',
         'pipeline/pipeline_d.cpp',
         'pipeline/plan_executor_pipeline.cpp',
         'pipeline/plan_explainer_pipeline.cpp',
