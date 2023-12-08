@@ -189,11 +189,27 @@
  *    since the MSVC compiler ignores attributes it does not recognize.
  *
  *
- * MONGO_USED
+ * MONGO_COMPILER_USED
  *
- *    Tells the compiler that the value is not to be optimized out, even if the compiler believes it
- *    is unused. This ensure that the symbol and value are always compiled into the binary and can
- *    be used for debugging and other uses. Equivalent to adding [[gnu::used]] to the declaration.
+ *    Do not optimize the function, static variable, or class template static data member, even if
+ *    it is unused. Expands to `[[gnu::used]]` on GCC and Clang, and is ignored on MSVC.
+ *
+ *    Example:
+ *        namespace {
+ *        MONGO_COMPILER_USED int64_t locaInteger = 8675309;
+ *        MONGO_COMPILER_USED void localFunction() {}
+ *        template <typename T>
+ *        struct someTemplatedStruct {
+ *            MONGO_COMPILER_USED static inline int32_t classStaticInteger = 24601;
+ *            MONGO_COMPILER_USED static constexpr auto classStaticString = "Unused string.";
+ *        };
+ *        }  // namespace
+ *
+ *    See:
+ *    -
+ * https://gcc.gnu.org/onlinedocs/gcc/Common-Variable-Attributes.html#index-used-variable-attribute
+ *    -
+ * https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-used-function-attribute
  *
  *
  * MONGO_GSL_POINTER
