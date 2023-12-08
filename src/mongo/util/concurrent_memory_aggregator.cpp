@@ -52,7 +52,7 @@ private:
 };  // class ChunkedMemoryAggregatorDeleter
 
 ConcurrentMemoryAggregator::ConcurrentMemoryAggregator(
-    std::unique_ptr<ConcurrentMemoryAggregator::UsageMonitor> usageMonitor)
+    std::shared_ptr<ConcurrentMemoryAggregator::UsageMonitor> usageMonitor)
     : _usageMonitor(std::move(usageMonitor)) {}
 
 ConcurrentMemoryAggregator::~ConcurrentMemoryAggregator() {

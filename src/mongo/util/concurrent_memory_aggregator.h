@@ -65,7 +65,7 @@ public:
                                             const ConcurrentMemoryAggregator* memoryAggregator) = 0;
     };  // class UsageMonitor
 
-    ConcurrentMemoryAggregator(std::unique_ptr<UsageMonitor> usageMonitor = nullptr);
+    ConcurrentMemoryAggregator(std::shared_ptr<UsageMonitor> usageMonitor = nullptr);
 
     ~ConcurrentMemoryAggregator();
 
@@ -116,7 +116,7 @@ private:
     void remove(const ChunkedMemoryAggregator* aggregator);
 
     // Custom user supplied callback that gets notified when the memory usage increases.
-    std::unique_ptr<UsageMonitor> _usageMonitor;
+    std::shared_ptr<UsageMonitor> _usageMonitor;
 
     // Overall memory usage based on deltas reported by the individual chunked memory aggregators.
     AtomicWord<int64_t> _curMemoryUsageBytes;

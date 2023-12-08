@@ -58,7 +58,7 @@ public:
 };  // class MemoryAggregatorTest
 
 TEST_F(ConcurrentMemoryAggregatorTest, Simple) {
-    auto memoryAggregator = std::make_unique<ConcurrentMemoryAggregator>();
+    auto memoryAggregator = std::make_shared<ConcurrentMemoryAggregator>();
     const auto& localMemoryAggregators = getChunkedMemoryAggregators(memoryAggregator.get());
     ASSERT_EQUALS(0, memoryAggregator->getCurrentMemoryUsageBytes());
     ASSERT_TRUE(localMemoryAggregators.empty());
@@ -100,7 +100,7 @@ TEST_F(ConcurrentMemoryAggregatorTest, Simple) {
 }
 
 TEST_F(ConcurrentMemoryAggregatorTest, OverCount) {
-    auto memoryAggregator = std::make_unique<ConcurrentMemoryAggregator>();
+    auto memoryAggregator = std::make_shared<ConcurrentMemoryAggregator>();
     auto local = memoryAggregator->createChunkedMemoryAggregator(kOptions);
     auto handle = local->createUsageHandle();
 
@@ -145,7 +145,7 @@ TEST_F(ConcurrentMemoryAggregatorTest, OverCount) {
 }
 
 TEST_F(ConcurrentMemoryAggregatorTest, LowMemoryUsage) {
-    auto memoryAggregator = std::make_unique<ConcurrentMemoryAggregator>();
+    auto memoryAggregator = std::make_shared<ConcurrentMemoryAggregator>();
     const auto& localMemoryAggregators = getChunkedMemoryAggregators(memoryAggregator.get());
     ASSERT_EQUALS(0, memoryAggregator->getCurrentMemoryUsageBytes());
     ASSERT_TRUE(localMemoryAggregators.empty());
@@ -193,10 +193,10 @@ TEST_F(ConcurrentMemoryAggregatorTest, UsageMonitorCallback) {
         std::vector<std::tuple<int64_t, int64_t, const ConcurrentMemoryAggregator*>> _invocations;
     };  // class MockUsageMonitor
 
-    auto _mockUsageMonitor = std::make_unique<MockUsageMonitor>();
+    auto _mockUsageMonitor = std::make_shared<MockUsageMonitor>();
     MockUsageMonitor* mockUsageMonitor = _mockUsageMonitor.get();
     auto memoryAggregator =
-        std::make_unique<ConcurrentMemoryAggregator>(std::move(_mockUsageMonitor));
+        std::make_shared<ConcurrentMemoryAggregator>(std::move(_mockUsageMonitor));
     const auto& localMemoryAggregators = getChunkedMemoryAggregators(memoryAggregator.get());
 
     auto local = memoryAggregator->createChunkedMemoryAggregator(kOptions);
@@ -243,7 +243,7 @@ TEST_F(ConcurrentMemoryAggregatorTest, UsageMonitorCallback) {
 }
 
 TEST_F(ConcurrentMemoryAggregatorTest, MultipleChunkedMemoryAggregators) {
-    auto memoryAggregator = std::make_unique<ConcurrentMemoryAggregator>();
+    auto memoryAggregator = std::make_shared<ConcurrentMemoryAggregator>();
     const auto& localMemoryAggregators = getChunkedMemoryAggregators(memoryAggregator.get());
     ASSERT_EQUALS(0, memoryAggregator->getCurrentMemoryUsageBytes());
     ASSERT_TRUE(localMemoryAggregators.empty());
@@ -292,7 +292,7 @@ TEST_F(ConcurrentMemoryAggregatorTest, ConcurrentChunkedMemoryAggregators) {
     static const int64_t kNumConcurrentChunkedMemoryAggregators = 10;
     static const int64_t kNumUpdates = 1'000'000;
 
-    auto memoryAggregator = std::make_unique<ConcurrentMemoryAggregator>();
+    auto memoryAggregator = std::make_shared<ConcurrentMemoryAggregator>();
     const auto& localMemoryAggregators = getChunkedMemoryAggregators(memoryAggregator.get());
     ASSERT_EQUALS(0, memoryAggregator->getCurrentMemoryUsageBytes());
     ASSERT_TRUE(localMemoryAggregators.empty());
