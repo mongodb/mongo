@@ -36,6 +36,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
