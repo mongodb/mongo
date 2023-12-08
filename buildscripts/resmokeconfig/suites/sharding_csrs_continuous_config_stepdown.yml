@@ -225,9 +225,9 @@ selector:
   # interrupt the addShard operation resulting in the test cluster not being initalized properly.
   # TODO SERVER-51495: Re-enable these tests after resharding, moveCollection, and unshardCollection
   # are resilient to config server primary failovers.
-  - jstests/sharding/*reshard*.js
-  - jstests/sharding/*move*collection*.js
-  - jstests/sharding/*unshard_collection*.js
+  - jstests/sharding/**/*reshard*.js
+  - jstests/sharding/**/*move*collection*.js
+  - jstests/sharding/**/*unshard_collection*.js
 
   # SERVER-51805 splitChunk op is not idempotent
   - jstests/sharding/mongos_get_shard_version.js
