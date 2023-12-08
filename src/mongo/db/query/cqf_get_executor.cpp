@@ -992,15 +992,25 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     {
         const auto& memo = phaseManager.getMemo();
         const auto& memoStats = memo.getStats();
-        OPTIMIZER_DEBUG_LOG(6264800,
-                            5,
-                            "Optimizer stats",
-                            "memoGroups"_attr = memo.getGroupCount(),
-                            "memoLogicalNodes"_attr = memo.getLogicalNodeCount(),
-                            "memoPhysNodes"_attr = memo.getPhysicalNodeCount(),
-                            "memoIntegrations"_attr = memoStats._numIntegrations,
-                            "physPlansExplored"_attr = memoStats._physPlanExplorationCount,
-                            "physMemoChecks"_attr = memoStats._physMemoCheckCount);
+        if (memoStats._estimatedCost) {
+            CurOp::get(opCtx)->debug().estimatedCost = memoStats._estimatedCost->getCost();
+        }
+        if (memoStats._ce) {
+            CurOp::get(opCtx)->debug().estimatedCardinality = (double)*memoStats._ce;
+        }
+        OPTIMIZER_DEBUG_LOG(
+            6264800,
+            5,
+            "Optimizer stats",
+            "memoGroups"_attr = memo.getGroupCount(),
+            "memoLogicalNodes"_attr = memo.getLogicalNodeCount(),
+            "memoPhysNodes"_attr = memo.getPhysicalNodeCount(),
+            "memoIntegrations"_attr = memoStats._numIntegrations,
+            "physPlansExplored"_attr = memoStats._physPlanExplorationCount,
+            "physMemoChecks"_attr = memoStats._physMemoCheckCount,
+            "estimatedCost"_attr =
+                (memoStats._estimatedCost ? memoStats._estimatedCost->getCost() : -1.0),
+            "estimatedCardinality"_attr = (memoStats._ce ? (double)*memoStats._ce : -1.0));
     }
 
     const auto explainMemoFn = [&phaseManager]() {

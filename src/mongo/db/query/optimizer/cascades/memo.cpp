@@ -695,6 +695,13 @@ void Memo::clear() {
 const Memo::Stats& Memo::getStats() const {
     return _stats;
 }
+void Memo::setStatsCE(const CEType& ce) {
+    _stats._ce = ce;
+}
+
+void Memo::setStatsEstimatedCost(const CostType& cost) {
+    _stats._estimatedCost = cost;
+}
 
 size_t Memo::getLogicalNodeCount() const {
     size_t result = 0;
