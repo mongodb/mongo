@@ -36,6 +36,7 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_pre_and_post_images_options',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
+        'clustered_collection_options',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/common',
@@ -43,7 +44,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
-        'clustered_collection_options',
     ],
 )
 
@@ -419,7 +419,6 @@ env.Library(
         'capped_visibility',
         'catalog_helpers',
         'catalog_stats',
-        'clustered_collection_options',
         'collection_crud',
         'collection_options',
         'collection_query_info',
@@ -474,7 +473,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/util/progress_meter',
         'catalog_impl',
-        'clustered_collection_options',
         'collection_options',
         'index_catalog',
         'index_key_validate',
@@ -568,7 +566,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         '$BUILD_DIR/mongo/db/views/views',
         'cannot_convert_index_to_unique_info',
-        'clustered_collection_options',
         'collection_crud',
         'collection_options',
         'collection_uuid_mismatch_info',

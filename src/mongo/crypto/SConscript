@@ -128,14 +128,14 @@ fleCryptoEnv.Library(
 )
 
 env.Library(
-    target="fle_fields",
+    target='fle_fields',
     source=[
-        "fle_field_schema.idl",
-        "fle_fields_util.cpp",
+        'fle_field_schema.idl',
+        'fle_fields_util.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        "encrypted_field_config",
+        '$BUILD_DIR/mongo/db/server_base',
+        'encrypted_field_config',
     ],
 )
 
@@ -176,9 +176,7 @@ env.Library(
     target='jwt_types',
     source='jwt_types.idl',
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 

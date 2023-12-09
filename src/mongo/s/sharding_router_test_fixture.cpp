@@ -46,7 +46,6 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/logical_time.h"
@@ -62,7 +61,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
@@ -89,6 +87,7 @@
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/sharding_task_executor.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -135,21 +134,14 @@ ShardingTestFixture::ShardingTestFixture(bool withMockCatalogCache)
     CollatorFactoryInterface::set(service, std::make_unique<CollatorFactoryMock>());
 
     // Set up executor pool used for most operations.
-    auto makeMetadataHookList = [&] {
-        auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-        hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(service));
-        hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
-        return hookList;
-    };
-
     auto fixedNet = std::make_unique<executor::NetworkInterfaceMock>();
-    fixedNet->setEgressMetadataHook(makeMetadataHookList());
+    fixedNet->setEgressMetadataHook(makeShardingEgressHooksList(service));
     _mockNetwork = fixedNet.get();
     _fixedExecutor = makeShardingTestExecutor(std::move(fixedNet));
     _networkTestEnv = std::make_unique<NetworkTestEnv>(_fixedExecutor.get(), _mockNetwork);
 
     auto netForPool = std::make_unique<executor::NetworkInterfaceMock>();
-    netForPool->setEgressMetadataHook(makeMetadataHookList());
+    netForPool->setEgressMetadataHook(makeShardingEgressHooksList(service));
     auto _mockNetworkForPool = netForPool.get();
     auto execForPool = makeShardingTestExecutor(std::move(netForPool));
     _networkTestEnvForPool =

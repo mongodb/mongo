@@ -18,16 +18,24 @@ env.Library(
     ],
 )
 
-env.Library(target='query_stats_parse', source=['transform_algorithm.idl'], LIBDEPS=[
-    '$BUILD_DIR/mongo/base',
-    '$BUILD_DIR/mongo/idl/idl_parser',
-])
+env.Library(
+    target='query_stats_parse',
+    source=[
+        'transform_algorithm.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
 
 env.Library(
     target='query_stats',
-    source=['query_stats.cpp', 'query_stats_entry.cpp', 'key.cpp'],
+    source=[
+        'query_stats.cpp',
+        'query_stats_entry.cpp',
+        'key.cpp',
+    ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/profile_filter',
@@ -36,7 +44,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/db/server_options',
-        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
         '$BUILD_DIR/mongo/rpc/client_metadata',
@@ -48,6 +55,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )

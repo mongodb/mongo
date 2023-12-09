@@ -54,7 +54,6 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -90,7 +89,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -99,7 +97,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
@@ -137,14 +134,6 @@ const auto getInstance = ServiceContext::declareDecoration<ShardingInitializatio
 
 const ReplicaSetAwareServiceRegistry::Registerer<ShardingInitializationMongoD> _registryRegisterer(
     "ShardingInitializationMongoDRegistry");
-
-auto makeEgressHooksList(ServiceContext* service) {
-    auto unshardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
-    unshardedHookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(service));
-    unshardedHookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
-
-    return unshardedHookList;
-}
 
 /**
  * Updates the config server field of the shardIdentity document with the given connection string if
@@ -621,7 +610,7 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         validator->stopKeyManager();
     }
 
-    globalConnPool.addHook(new ShardingConnectionHook(makeEgressHooksList(service)));
+    globalConnPool.addHook(new ShardingConnectionHook(makeShardingEgressHooksList(service)));
 
     auto catalogCache = std::make_unique<CatalogCache>(service, CatalogCacheLoader::get(opCtx));
 
@@ -654,7 +643,7 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         opCtx,
         std::move(catalogCache),
         std::move(shardRegistry),
-        [service] { return makeEgressHooksList(service); },
+        [service] { return makeShardingEgressHooksList(service); },
         // We only need one task executor here because sharding task
         // executors aren't used for user queries in mongod.
         1,

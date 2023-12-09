@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/client_metadata_propagation_egress_hook.h"
+#include "mongo/s/client_metadata_propagation_egress_hook.h"
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/write_block_bypass.h"

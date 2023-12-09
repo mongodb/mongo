@@ -63,7 +63,6 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_remote_gen.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/request_types/placement_history_commands_gen.h"
 #include "mongo/util/duration.h"

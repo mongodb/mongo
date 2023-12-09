@@ -86,7 +86,6 @@
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
 #include "mongo/db/client.h"
-#include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
@@ -1372,12 +1371,10 @@ auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {
         stdx::lock_guard<Client> lk(cc());
         cc().setSystemOperationUnkillableByStepdown(lk);
     };
-    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-    hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
-    hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
     return std::make_unique<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(tpOptions),
-        executor::makeNetworkInterface("ReplNodeDbWorkerNetwork", nullptr, std::move(hookList)));
+        executor::makeNetworkInterface(
+            "ReplNodeDbWorkerNetwork", nullptr, makeShardingEgressHooksList(serviceContext)));
 }
 
 auto makeReplicationExecutor(ServiceContext* serviceContext) {

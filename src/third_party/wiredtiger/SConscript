@@ -258,9 +258,11 @@ if wtbinEnv["LINK"] == "$SMARTLINK" and get_option("link-model") != "dynamic":
     wtbinEnv["LINK"] = "$CXX"
 
 wtbin = wtbinEnv.Program(
-    target="wt",
-    source=Glob("src/utilities/*.c"),
-    LIBDEPS=["wiredtiger"],
+    target='wt',
+    source=Glob('src/utilities/*.c'),
+    LIBDEPS=[
+        'wiredtiger',
+    ],
     AIB_COMPONENT='wiredtiger',
     AIB_COMPONENTS_EXTRA=[
         'dist-test',

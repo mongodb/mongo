@@ -118,25 +118,28 @@ env.Library(
 env.Library(
     target='sharding_initialization',
     source=[
-        'sharding_initialization.cpp',
         'sharding_task_executor_pool_controller.cpp',
         'sharding_task_executor_pool.idl',
-        'client/sharding_connection_hook.cpp',
-        'client/sharding_network_connection_hook.cpp',
+        'sharding_initialization.cpp',
         'initialize_tenant_to_shard_cache.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/util/periodic_runner_factory',
+        'client_metadata_propagation_egress_hook.cpp',
+        'client/sharding_network_connection_hook.cpp',
+        'client/sharding_connection_hook.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/executor/async_multicaster',
         '$BUILD_DIR/mongo/executor/connection_pool_executor',
         '$BUILD_DIR/mongo/executor/scoped_task_executor',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
+        '$BUILD_DIR/mongo/util/periodic_runner_factory',
         'catalog/sharding_catalog_client_impl',
-        'coreshard',
+        'grid',
         'query_analysis_sampler',
         'sharding_task_executor',
     ],
@@ -153,11 +156,11 @@ env.Library(
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         'client/shard_interface',
         'client/sharding_client',
-        'coreshard',
         'mongos_server_parameters',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/executor/hedge_options_util',
+        'grid',
     ],
 )
 
@@ -283,7 +286,6 @@ env.Library(
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/coll_mod_command_idl',
         '$BUILD_DIR/mongo/db/commands/cluster_server_parameter_cmds_idl',
@@ -326,10 +328,14 @@ env.Library(
     source=[
         'balancer_configuration.cpp',
         'catalog_cache.cpp',
+        'catalog_cache_loader.cpp',
         'client/config_shard_wrapper.cpp',
         'client/shard_factory.cpp',
         'client/shard_registry.cpp',
+        'cluster_identity_loader.cpp',
+        'config_server_catalog_cache_loader.cpp',
         'grid.cpp',
+        'shard_util.cpp',
         'sharding_index_catalog_cache.cpp',
         'sharding_state.cpp',
     ],
@@ -345,22 +351,6 @@ env.Library(
         'client/shard_interface',
         'common_s',
         'query/cluster_cursor_manager',
-    ],
-)
-
-# This library contains sharding functionality used by both mongod and mongos
-env.Library(
-    target='coreshard',
-    source=[
-        'catalog_cache_loader.cpp',
-        'cluster_identity_loader.cpp',
-        'config_server_catalog_cache_loader.cpp',
-        'shard_util.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/client_metadata_propagation_egress_hook',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        'grid',
     ],
 )
 
@@ -488,7 +478,6 @@ env.Library(
         'commands/cluster_commands_common',
         'commands/sharded_cluster_commands',
         'commands/sharded_cluster_sharding_commands',
-        'coreshard',
         'mongos_server_parameters',
         'mongos_topology_coordinator',
         'query/cluster_cursor_cleanup_job',
@@ -542,6 +531,7 @@ env.Library(
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
         '$BUILD_DIR/mongo/util/latch_analyzer'
         if get_option('use-diagnostic-latches') == 'on' else [],
+        '$BUILD_DIR/mongo/util/periodic_runner_factory',
         '$BUILD_DIR/mongo/util/signal_handlers',
         'client/sharding_client',
         'commands/cluster_commands',
@@ -587,7 +577,7 @@ env.Program(
         # library to inject a static or mongo initializer to mongos,
         # please add that library as a private libdep of
         # mongos_initializers.
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
         'mongos_main',
     ],
     AIB_COMPONENT="mongos",
@@ -616,7 +606,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/network_interface_mock',
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        'coreshard',
+        'grid',
         'write_ops/batch_write_types',
     ],
 )
@@ -633,10 +623,12 @@ env.Library(
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'catalog/sharding_catalog_client_impl',
-        'coreshard',
         'sharding_router_api',
         'sharding_task_executor',
         'sharding_test_fixture_common',
+    ],
+    LIBDEPS_PRIVATE=[
+        'sharding_initialization',
     ],
 )
 
@@ -720,7 +712,6 @@ env.CppUnitTest(
         'catalog/sharding_catalog_client_mock',
         'commands/cluster_commands',
         'commands/cluster_commands_common',
-        'coreshard',
         'load_balancer_support',
         'mongos_topology_coordinator',
         'sessions_collection_sharded',

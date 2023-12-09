@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/s/client/shard.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -38,8 +39,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_remote_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

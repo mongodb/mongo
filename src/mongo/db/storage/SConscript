@@ -95,15 +95,20 @@ env.Library(
 )
 
 ksdecode = env.Program(
-    target='ksdecode', source=[
+    target='ksdecode',
+    source=[
         'key_string_decode.cpp',
-    ], LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'key_string',
-    ], AIB_COMPONENT='ksdecode', AIB_COMPONENTS_EXTRA=[
+    ],
+    AIB_COMPONENT='ksdecode',
+    AIB_COMPONENTS_EXTRA=[
         'dist-test',
-    ])
+    ],
+)
 
 env.Library(
     target='execution_context',
@@ -358,7 +363,6 @@ env.Library(
         'record_store_test_updatewithdamages.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/record_id_helpers',
@@ -703,7 +707,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/resumable_index_builds_idl',

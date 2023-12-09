@@ -406,7 +406,6 @@ env.Library(
         'storage_interface',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
     ],
@@ -1112,7 +1111,7 @@ env.Library(
         'task_runner',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
         '$BUILD_DIR/mongo/db/index_build_entry_helpers',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',

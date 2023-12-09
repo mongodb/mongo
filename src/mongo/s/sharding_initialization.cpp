@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <boost/move/utility_core.hpp>
 #include <memory>
 #include <string>
@@ -53,6 +52,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/async_multicaster.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -76,6 +76,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
+#include "mongo/s/client_metadata_propagation_egress_hook.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/initialize_tenant_to_shard_cache.h"
@@ -95,7 +96,6 @@
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -179,6 +179,14 @@ std::unique_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
         std::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
 
     return std::make_unique<executor::ShardingTaskExecutor>(std::move(executor));
+}
+
+std::unique_ptr<rpc::EgressMetadataHookList> makeShardingEgressHooksList(ServiceContext* service) {
+    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+    hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(service));
+    hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
+
+    return hookList;
 }
 
 Status initializeGlobalShardingState(

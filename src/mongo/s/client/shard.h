@@ -56,6 +56,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/s/client/shard_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/duration.h"

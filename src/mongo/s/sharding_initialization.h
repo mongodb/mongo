@@ -41,6 +41,8 @@
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 
@@ -48,7 +50,6 @@ namespace mongo {
 
 class CatalogCache;
 class ConnectionString;
-class OperationContext;
 class ShardFactory;
 class Status;
 class ShardingCatalogClient;
@@ -59,8 +60,6 @@ class TaskExecutor;
 }  // namespace executor
 
 namespace rpc {
-class EgressMetadataHook;
-
 using ShardingEgressMetadataHookBuilder = std::function<std::unique_ptr<EgressMetadataHook>()>;
 }  // namespace rpc
 
@@ -69,6 +68,8 @@ using ShardingEgressMetadataHookBuilder = std::function<std::unique_ptr<EgressMe
  */
 std::unique_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
     std::unique_ptr<executor::NetworkInterface> net);
+
+std::unique_ptr<rpc::EgressMetadataHookList> makeShardingEgressHooksList(ServiceContext* service);
 
 /**
  * Initializes the global ShardingCatalogClient, ShardingCatalogManager, and Grid objects.
