@@ -1165,7 +1165,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> handleClusteredScanHint(
 }
 
 
-static StatusWith<std::vector<std::unique_ptr<QuerySolution>>> doPlan(
+StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     const CanonicalQuery& query, const QueryPlannerParams& params) {
     LOGV2_DEBUG(20967,
                 5,
@@ -1454,7 +1454,7 @@ static StatusWith<std::vector<std::unique_ptr<QuerySolution>>> doPlan(
             // generate the plan cache key.
             std::unique_ptr<PlanCacheIndexTree> cacheData;
             auto statusWithCacheData =
-                QueryPlanner::cacheDataFromTaggedTree(nextTaggedTree.get(), relevantIndices);
+                cacheDataFromTaggedTree(nextTaggedTree.get(), relevantIndices);
             if (!statusWithCacheData.isOK()) {
                 LOGV2_DEBUG(20977,
                             5,
@@ -1745,28 +1745,6 @@ static StatusWith<std::vector<std::unique_ptr<QuerySolution>>> doPlan(
 
     invariant(out.size() > 0);
     return {std::move(out)};
-}  // doPlan
-
-StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
-    const CanonicalQuery& query, const QueryPlannerParams& params) {
-    auto result = doPlan(query, params);
-
-    if (kDebugBuild && !disableMatchExpressionOptimization.shouldFail() && result.isOK()) {
-        // Loop through the result QuerySolutions to make sure the hashes are unique. If they are
-        // not unique, we could end up multiplanning duplicate plans which is inefficient. We don't
-        // check this when match expressions are unoptimized because the planner can produce dups in
-        // this case.
-        const auto& plans = result.getValue();
-        stdx::unordered_set<size_t> planHashes;
-        for (const auto& plan : plans) {
-            planHashes.insert(plan->hash());
-        }
-        invariant(planHashes.size() == plans.size(),
-                  "Query planner produced query solutions with a non-unique set of hashes. Either "
-                  "the hash is missing components or the planner produces duplicate plans.");
-    }
-
-    return result;
 }  // QueryPlanner::plan
 
 /**
