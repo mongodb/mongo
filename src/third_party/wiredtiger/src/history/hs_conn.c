@@ -92,8 +92,8 @@ __wt_hs_config(WT_SESSION_IMPL *session, const char **cfg)
         WT_ERR_MSG(session, EINVAL, "max history store size %" PRId64 " below minimum %d", cval.val,
           WT_HS_FILE_MIN);
 
-    /* in-memory or readonly configurations do not have a history store. */
-    if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
+    /* The history store is not available for in-memory configurations. */
+    if (F_ISSET(conn, WT_CONN_IN_MEMORY))
         return (0);
 
     WT_ERR(__hs_start_internal_session(session, &tmp_setup_session));
@@ -112,6 +112,12 @@ __wt_hs_config(WT_SESSION_IMPL *session, const char **cfg)
      */
     btree->file_max = (uint64_t)cval.val;
     WT_STAT_CONN_SET(session, cache_hs_ondisk_max, btree->file_max);
+
+    /*
+     * Now that we have the history store's handle, we may set the flag because we know the file is
+     * open.
+     */
+    F_SET(conn, WT_CONN_HS_OPEN);
 
 err:
     if (tmp_setup_session != NULL)
@@ -141,10 +147,6 @@ __wt_hs_open(WT_SESSION_IMPL *session, const char **cfg)
     WT_RET(__wt_session_create(session, WT_HS_URI, WT_HS_CONFIG));
 
     WT_RET(__wt_hs_config(session, cfg));
-
-    /* The statistics server is already running, make sure we don't race. */
-    WT_WRITE_BARRIER();
-    F_SET(conn, WT_CONN_HS_OPEN);
 
     return (0);
 }
