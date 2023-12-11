@@ -34,6 +34,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/execution_control/throughput_probing.h"
@@ -161,6 +162,24 @@ Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newR
         return Status(ErrorCodes::IllegalOperation,
                       "Attempting to update concurrent read transactions limit before the read "
                       "TicketHolder is initialized");
+    }
+    return Status::OK();
+}
+
+Status TicketHolderManager::validateConcurrentWriteTransactions(const int32_t& newWriteTransactions,
+                                                                const boost::optional<TenantId>) {
+    if (!getTestCommandsEnabled() && newWriteTransactions < 5) {
+        return Status(ErrorCodes::BadValue,
+                      "Concurrent write transactions limit must be greater than or equal to 5.");
+    }
+    return Status::OK();
+}
+
+Status TicketHolderManager::validateConcurrentReadTransactions(const int32_t& newReadTransactions,
+                                                               const boost::optional<TenantId>) {
+    if (!getTestCommandsEnabled() && newReadTransactions < 5) {
+        return Status(ErrorCodes::BadValue,
+                      "Concurrent read transactions limit must be greater than or equal to 5.");
     }
     return Status::OK();
 }

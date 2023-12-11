@@ -41,12 +41,13 @@ server_parameters:
     on_update: "TicketHolderManager::updateConcurrentWriteTransactions"
     deprecated_name:
       - wiredTigerConcurrentWriteTransactions
-    # Default value being 0 means we're allowing the underlying storage engines to use their default values.
+    # Default value being 0 on startup means we're allowing the underlying storage engines 
+    # to use their default values. Updating it to 0 again after startup does not use the default value.
     # This parameter is only compatible with the 'kFixedConcurrentTransactions' option for
     # storageEngineConcurrencyAdjustmentAlgorithm.
     default: 0
     validator:
-      gte: 5
+      callback: "TicketHolderManager::validateConcurrentWriteTransactions"
 
   storageEngineConcurrentReadTransactions:
     description: "Storage Engine Concurrent Read Transactions"
@@ -56,12 +57,13 @@ server_parameters:
     on_update: "TicketHolderManager::updateConcurrentReadTransactions"
     deprecated_name:
       - wiredTigerConcurrentReadTransactions
-    # Default value being 0 means we're allowing the underlying storage engines to use their default values.
+    # Default value being 0 on startup means we're allowing the underlying storage engines 
+    # to use their default values. Updating it to 0 again after startup does not use the default value.
     # This parameter is only compatible with the 'kFixedConcurrentTransactions' option for
     # storageEngineConcurrencyAdjustmentAlgorithm.
     default: 0
     validator:
-      gte: 5
+      callback: "TicketHolderManager::validateConcurrentReadTransactions"
 
   lowPriorityAdmissionBypassThreshold:
     description: >-

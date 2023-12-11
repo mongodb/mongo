@@ -65,6 +65,10 @@ public:
 
     static Status updateConcurrentWriteTransactions(const int32_t& newWriteTransactions);
     static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
+    static Status validateConcurrentWriteTransactions(const int32_t& newWriteTransactions,
+                                                      boost::optional<TenantId>);
+    static Status validateConcurrentReadTransactions(const int32_t& newReadTransactions,
+                                                     boost::optional<TenantId>);
 
     // The 'lowPriorityAdmissionBypassThreshold' is only applicable when ticket admission is
     // controlled via PriorityTicketHolders.
