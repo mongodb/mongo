@@ -323,10 +323,12 @@ public:
         _size = _remaining =
             remainder ? initialAllocation + pageSize - remainder : initialAllocation;
         _start = _ptr = systemAllocate(_size);
+        gSecureAllocCountInfo().updateSecureAllocBytesInPages(static_cast<int32_t>(_size));
     }
 
     ~Allocation() {
         systemDeallocate(_start, _size);
+        gSecureAllocCountInfo().updateSecureAllocBytesInPages(-static_cast<int32_t>(_size));
     }
 
     /**
@@ -389,7 +391,7 @@ MONGO_INITIALIZER_GENERAL(SecureAllocator, (), ())
 
 void* GlobalSecureAllocator::allocate(std::size_t bytes, std::size_t alignOf) {
     stdx::lock_guard<stdx::mutex> lk(allocatorMutex);
-
+    gSecureAllocCountInfo().updateSecureAllocByteCount(static_cast<int32_t>(bytes));
     if (lastAllocation) {
         auto out = lastAllocation->allocate(bytes, alignOf);
 
@@ -409,6 +411,7 @@ void GlobalSecureAllocator::deallocate(void* ptr, std::size_t bytes) {
     secureZeroMemory(ptr, bytes);
 
     stdx::lock_guard<stdx::mutex> lk(allocatorMutex);
+    gSecureAllocCountInfo().updateSecureAllocByteCount(-static_cast<int32_t>(bytes));
 
     secureTable.erase(ptr);
 }
@@ -426,6 +429,11 @@ void* allocate(std::size_t bytes, std::size_t alignOf) {
 
 void deallocate(void* ptr, std::size_t bytes) {
     return gSecureAllocator().deallocate(ptr, bytes);
+}
+
+SecureAllocCountInfo& gSecureAllocCountInfo() {
+    static StaticImmortal<SecureAllocCountInfo> obj;
+    return *obj;
 }
 
 }  // namespace mongo::secure_allocator_details

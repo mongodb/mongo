@@ -33,7 +33,10 @@
 #include "mongo/base/secure_allocator.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/processinfo.h"
 
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 namespace mongo {
 
 TEST(SecureAllocator, SecureVector) {
@@ -133,6 +136,45 @@ TEST(SecureAllocator, allocatorCanBeDisabled) {
     }
 
     ASSERT_GT(pegInvokationCount, pegInvokationCountLast);
+}
+
+TEST(SecureAllocator, secureAllocBytesCount) {
+    ProcessInfo p;
+    auto pageSize = p.getPageSize();
+    using namespace mongo::secure_allocator_details;
+    uint32_t initAllocCnt = gSecureAllocCountInfo().getSecureAllocByteCount();
+    uint32_t allocCnt = initAllocCnt;
+    uint32_t expectedPageBytesCnt, pageBytesCnt;
+    uint32_t initPageBytesCnt = gSecureAllocCountInfo().getSecureAllocBytesInPages();
+    pageBytesCnt = initPageBytesCnt;
+
+    auto halfPageSize = pageSize / 2;
+    {
+        SecureArray<uint8_t, 2048> array1;
+        if (pageBytesCnt - initAllocCnt >= 2048) {
+            expectedPageBytesCnt = pageBytesCnt;
+        } else {
+            expectedPageBytesCnt = pageBytesCnt + pageSize;
+        }
+
+        pageBytesCnt = gSecureAllocCountInfo().getSecureAllocBytesInPages();
+        allocCnt = gSecureAllocCountInfo().getSecureAllocByteCount();
+        ASSERT_EQUALS(halfPageSize + initAllocCnt, allocCnt);
+        ASSERT_EQUALS(expectedPageBytesCnt, gSecureAllocCountInfo().getSecureAllocBytesInPages());
+
+        SecureArray<uint8_t, 2048> array2;
+        if (pageBytesCnt - allocCnt >= 2048) {
+            expectedPageBytesCnt = pageBytesCnt;
+        } else {
+            expectedPageBytesCnt = pageBytesCnt + pageSize;
+        }
+        allocCnt = gSecureAllocCountInfo().getSecureAllocByteCount();
+        pageBytesCnt = gSecureAllocCountInfo().getSecureAllocBytesInPages();
+        ASSERT_EQUALS(pageSize + initAllocCnt, allocCnt);
+        ASSERT_EQUALS(expectedPageBytesCnt, gSecureAllocCountInfo().getSecureAllocBytesInPages());
+    }
+    ASSERT_EQUALS(initAllocCnt, gSecureAllocCountInfo().getSecureAllocByteCount());
+    ASSERT_EQUALS(initPageBytesCnt, gSecureAllocCountInfo().getSecureAllocBytesInPages());
 }
 
 }  // namespace mongo

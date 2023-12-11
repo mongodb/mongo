@@ -55,6 +55,31 @@ namespace secure_allocator_details {
 void* allocate(std::size_t bytes, std::size_t alignOf);
 void deallocate(void* ptr, std::size_t bytes);
 
+/**
+ * This class keeps track of secure allocation byte count and secure allocation bytes that are
+ * allocated in paged allocations.
+ */
+class SecureAllocCountInfo {
+public:
+    uint32_t getSecureAllocByteCount() {
+        return secureAllocByteCount;
+    }
+    uint32_t getSecureAllocBytesInPages() {
+        return secureAllocBytesInPages;
+    }
+    void updateSecureAllocByteCount(int32_t cnt) {
+        secureAllocByteCount += cnt;
+    }
+    void updateSecureAllocBytesInPages(int32_t cnt) {
+        secureAllocBytesInPages += cnt;
+    }
+
+private:
+    uint32_t secureAllocByteCount{0};
+    uint32_t secureAllocBytesInPages{0};
+};
+SecureAllocCountInfo& gSecureAllocCountInfo();
+
 inline void* allocateWrapper(std::size_t bytes, std::size_t alignOf, bool secure) {
     if (secure) {
         return allocate(bytes, alignOf);
