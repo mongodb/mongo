@@ -2,7 +2,7 @@
 //
 // @tags: [
 //   # The test runs commands that are not allowed with security token: dataSize.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   # Cannot implicitly shard accessed collections because the "dataSize" command returns an
 //   # "keyPattern must equal shard key" error response.
 //   assumes_unsharded_collection,

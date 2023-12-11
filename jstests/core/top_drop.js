@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   # The test runs commands that are not allowed with security token: top.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   assumes_against_mongod_not_mongos,
  *   requires_non_retryable_writes,
  * ]

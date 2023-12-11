@@ -7,7 +7,7 @@
  *
  * @tags: [
  *   # The test runs commands that are not allowed with security token: _hashBSONElement.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   no_selinux,
  * ]
  */

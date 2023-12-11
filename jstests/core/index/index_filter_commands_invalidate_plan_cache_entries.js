@@ -5,7 +5,7 @@
  * @tags: [
  *   # The test runs commands that are not allowed with security token: planCacheClearFilters,
  *   # planCacheSetFilter.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   # This test attempts to perform queries with plan cache filters set up. The index filter
  *   # commands and the queries to which those index filters apply could be routed to different
  *   # nodes.

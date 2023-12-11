@@ -4,7 +4,7 @@
  *
  * @tags: [
  *   # The test runs commands that are not allowed with security token: getLog.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   uses_parallel_shell,
  *   # This test uses currentOp to check whether an aggregate command is running. In replica set
  *   # environments, because currentOp is run against the admin database it is routed to the

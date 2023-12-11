@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   # The test runs commands that are not allowed with security token: emptycapped.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   requires_collstats,
  *   requires_non_retryable_commands,
  *   uses_testing_only_commands,

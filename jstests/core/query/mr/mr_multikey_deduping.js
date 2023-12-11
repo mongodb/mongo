@@ -2,7 +2,7 @@
 //
 // @tags: [
 //   # The test runs commands that are not allowed with security token: mapReduce.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   # MR commands may not see previous inserts because MR does not support causal consistency so we
 //   # add this tag to exclude transactional passthroughs which commit versions in an ascynchronos
 //   # fashion and can cause stale reads.

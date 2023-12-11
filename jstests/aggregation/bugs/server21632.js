@@ -2,7 +2,7 @@
 // run against a sharded collection is wrapped in a "shards" object with keys for each shard.
 // @tags: [
 //   assumes_unsharded_collection,
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 // ]
 //
 // This test is designed to stress $sample, and any optimizations a storage engine might provide.

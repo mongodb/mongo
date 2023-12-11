@@ -8,7 +8,7 @@
 // @tags: [
 //   # The test runs commands that are not allowed with security token: compact, dataSize,reIndex,
 //   # whatsmyuri.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   assumes_read_preference_unchanged,
 //   does_not_support_repeated_reads,
 //   requires_collstats,

@@ -15,7 +15,7 @@
  *   # planCacheClear command may return different values after a failover.
  *   does_not_support_stepdowns,
  *   # planCacheClear is not allowed with a security token.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   # Implicit index creation may change the plan used.
  *   assumes_no_implicit_index_creation,
  *   # This test checks a new field "solutionHash" in $planCacheStats, not available in previous

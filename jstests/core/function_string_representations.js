@@ -4,7 +4,7 @@
  * the arguments to mapReduce as strings.
  * @tags: [
  *   # The test runs commands that are not allowed with security token: mapReduce.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   does_not_support_stepdowns,
  *   uses_map_reduce_with_temp_collections,
  *   # Uses $where operator

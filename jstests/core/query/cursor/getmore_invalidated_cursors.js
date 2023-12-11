@@ -3,7 +3,7 @@
 //
 // @tags: [
 //   # The test runs commands that are not allowed with security token: killCursors.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   assumes_balancer_off,
 //   requires_collstats,
 //   requires_getmore,

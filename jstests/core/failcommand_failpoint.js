@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   # The test runs commands that are not allowed with security token: whatsmyuri.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   no_selinux,

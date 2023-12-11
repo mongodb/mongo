@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   # The test runs commands that are not allowed with security token: fsyncUnlock.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   assumes_superuser_permissions,
  *   uses_parallel_shell,
  * ]

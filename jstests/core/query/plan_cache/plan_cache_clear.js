@@ -3,7 +3,7 @@
 //
 // @tags: [
 //   # The test runs commands that are not allowed with security token: planCacheClear, reIndex.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   # This test attempts to perform queries and introspect/manipulate the server's plan cache
 //   # entries. The former operation may be routed to a secondary in the replica set, whereas the
 //   # latter must be routed to the primary.

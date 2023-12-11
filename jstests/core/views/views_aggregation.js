@@ -6,7 +6,7 @@
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   # The killCursors command is not allowed with a security token.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   requires_getmore,
  *   requires_non_retryable_commands,
  *   # Explain of a resolved view must be executed by mongos.

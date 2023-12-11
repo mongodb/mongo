@@ -6,7 +6,7 @@
  *   assumes_against_mongod_not_mongos,
  *   multiversion_incompatible,
  *   # The test runs commands that are not allowed with security token: compact.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   # Cannot compact when using the in-memory storage engine.
  *   requires_persistence,
  *   requires_timeseries,

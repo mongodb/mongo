@@ -13,7 +13,7 @@ selector:
   # Exclude tests which use commands that aren't supported in Serverless.
   - command_not_supported_in_serverless
   # Exclude tests which we know use commands that don't support a security token.
-  - not_allowed_with_security_token
+  - not_allowed_with_signed_security_token
   # Theses tests expect replication is not enabled.
   - assumes_standalone_mongod
   # capped collections are banned in Serverless.

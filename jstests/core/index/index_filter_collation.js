@@ -4,7 +4,7 @@
  * @tags: [
  *   # The test runs commands that are not allowed with security token: planCacheListFilters,
  *   # planCacheSetFilter.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   # Needs to create a collection with a collation.
  *   assumes_no_implicit_collection_creation_after_drop,
  *   # This test attempts to perform queries with plan cache filters set up. The former operation

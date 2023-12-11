@@ -4,7 +4,7 @@
  *
  * @tags: [
  *     # The test runs commands that are not allowed with security token: setProfilingLevel.
- *     not_allowed_with_security_token,
+ *     not_allowed_with_signed_security_token,
  *     # Plan cache stats doesn't support different read concerns.
  *     assumes_read_concern_unchanged,
  *     # Explain of a resolved view must be executed by mongos.

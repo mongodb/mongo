@@ -5,7 +5,7 @@
  * will cause a transaction abortion which will make the overrides infinite loop.
  *
  * @tags: [
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   # The test runs commands that are not allowed with security token: bulkWrite.
  *   command_not_supported_in_serverless,
  *   # Contains commands that fail which will fail the entire transaction

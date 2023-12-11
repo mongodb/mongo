@@ -6,7 +6,7 @@
  * @tags: [
  *   # Can't wrap queries in facets without going past max BSON depth.
  *   do_not_wrap_aggregations_in_facets,
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  * ]
  */
 

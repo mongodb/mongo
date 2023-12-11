@@ -2,7 +2,7 @@
 // @tags: [
 //  does_not_support_stepdowns,
 //  requires_profiling,
-//  not_allowed_with_security_token,
+//  not_allowed_with_signed_security_token,
 // ]
 
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";

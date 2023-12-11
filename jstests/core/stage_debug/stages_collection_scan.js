@@ -2,7 +2,7 @@
 //
 // @tags: [
 //   # The test runs commands that are not allowed with security token: stageDebug.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
 //   tenant_migration_incompatible,

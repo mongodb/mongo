@@ -18,7 +18,7 @@
  *   #      return different values after a failover
  *   tenant_migration_incompatible,
  *   does_not_support_stepdowns,
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

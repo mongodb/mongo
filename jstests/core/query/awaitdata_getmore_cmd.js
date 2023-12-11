@@ -2,7 +2,7 @@
 //
 // @tags: [
 //   # The test runs commands that are not allowed with security token: getDefaultRWConcern.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   # This test attempts to perform a getMore command and find it using the currentOp command. The
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be
 //   # routed to the primary.

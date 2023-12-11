@@ -2,7 +2,7 @@
 //
 // @tags: [
 //  # The test runs commands that are not allowed with security token: endSession.
-//  not_allowed_with_security_token,
+//  not_allowed_with_signed_security_token,
 //  uses_transactions,
 //  uses_snapshot_read_concern,
 //  # Retrying an aborted transaction is allowed on shardsvrs.

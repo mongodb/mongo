@@ -3,7 +3,7 @@
  * @tags: [
  *   assumes_read_preference_unchanged,
  *   assumes_read_concern_unchanged,
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   assumes_unsharded_collection
  * ]
  */

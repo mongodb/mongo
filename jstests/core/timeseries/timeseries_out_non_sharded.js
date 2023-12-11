@@ -11,7 +11,7 @@
  *   requires_fcv_71,
  *   featureFlagAggOutTimeseries,
  *   # TODO(mbroadst): Some bug here, appears to be double-prefixing
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";

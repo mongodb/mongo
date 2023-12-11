@@ -3,7 +3,7 @@
  * that they can be correctly recovered from the cache with new parameter values.
  *
  * @tags: [
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,

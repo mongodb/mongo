@@ -12,7 +12,7 @@
  * @tags: [
  *   # The test runs commands that are not allowed with security token: planCacheListFilters,
  *   # planCacheSetFilter.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   # Command 'planCacheSetFilter' may return different values after a failover.
  *   does_not_support_stepdowns,
  *   # In some scenarios this test asserts that a collection scan is the chosen plan.

@@ -4,7 +4,7 @@
  * @tags: [
  *    requires_fcv_63,
  *    # The test runs commands that are not allowed with security token: query.
- *    not_allowed_with_security_token,
+ *    not_allowed_with_signed_security_token,
  * ]
  */
 // The OP_QUERY protocol used to permit commands to be wrapped inside a key named "$query" or

@@ -3,7 +3,7 @@
  * data. Memory checks are per node, so only test when the data is all in one place.
  *
  * @tags: [
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  * ]
  */
 

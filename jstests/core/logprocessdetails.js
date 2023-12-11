@@ -2,7 +2,7 @@
  * SERVER-7140 test. Checks that process info is re-logged on log rotation
  * @tags: [
  *   # The test runs commands that are not allowed with security token: getLog, logRotate.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   assumes_superuser_permissions,
  *   does_not_support_stepdowns,
  *   no_selinux,

@@ -5,7 +5,7 @@
  * requires_profiling,
  * assumes_read_concern_unchanged,
  * do_not_wrap_aggregations_in_facets,
- * not_allowed_with_security_token,
+ * not_allowed_with_signed_security_token,
  * ]
  */
 import "jstests/libs/sbe_assert_error_override.js";

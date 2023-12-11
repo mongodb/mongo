@@ -4,7 +4,7 @@
 // @tags: [
 //   # The test runs commands that are not allowed with security token: applyOps,
 //   # cloneCollectionAsCapped, mapReduce, reIndex.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   assumes_no_implicit_collection_creation_after_drop,
 //   # Asserts that some queries use a collection scan.
 //   assumes_no_implicit_index_creation,

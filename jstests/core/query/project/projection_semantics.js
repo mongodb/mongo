@@ -11,7 +11,7 @@
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
  *   # server parameters are stored in-memory only so are not transferred onto the recipient.
  *   tenant_migration_incompatible,
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   requires_sbe,
  * ]
  */

@@ -2,7 +2,7 @@
 //
 // @tags: [
 //   # The test runs commands that are not allowed with security token: setProfilingLevel.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   # Asserts on the number of index keys modified.
 //   assumes_no_implicit_index_creation,
 //   does_not_support_stepdowns,

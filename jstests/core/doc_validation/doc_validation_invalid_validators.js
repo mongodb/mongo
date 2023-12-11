@@ -3,7 +3,7 @@
 //
 // @tags: [
 //   # The test runs commands that are not allowed with security token: eval.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_non_retryable_commands,
 // ]

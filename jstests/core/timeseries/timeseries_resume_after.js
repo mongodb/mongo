@@ -4,7 +4,7 @@
  *
  * @tags: [
  *   # The test runs commands that are not allowed with security token: killCursors.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   # Queries on mongoS may not request or provide a resume token.
  *   assumes_against_mongod_not_mongos,
  *   # Resuming may not work properly with stepdowns/tenant migration.

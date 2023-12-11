@@ -6,7 +6,7 @@
 //   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
 //   tenant_migration_incompatible,
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 // ]
 const outer = db.outer;
 const inner = db.inner;

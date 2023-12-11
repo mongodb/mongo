@@ -3,7 +3,7 @@
 // @tags: [
 //   # The test runs commands that are not allowed with security token: ConnectionStatus,
 //   # connectionStatus, createUser, logout.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   assumes_superuser_permissions,
 //   assumes_write_concern_unchanged,
 //   creates_and_authenticates_user,

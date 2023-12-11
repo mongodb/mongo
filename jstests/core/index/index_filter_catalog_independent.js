@@ -5,7 +5,7 @@
  * @tags: [
  *   # The test runs commands that are not allowed with security token: planCacheListFilters,
  *   # planCacheSetFilter.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   # This test performs queries with index filters set up. Since index filters are local to a
  *   # mongod, and do not replicate, this test must issue all of its commands against the same node.
  *   assumes_read_preference_unchanged,

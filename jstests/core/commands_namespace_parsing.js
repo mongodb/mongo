@@ -7,7 +7,7 @@
 //   # mergeChunks, moveChunk, movePrimary, planCacheClear, planCacheClearFilters,
 //   # planCacheListFilters, planCacheSetFilter, reIndex, shardCollection, split,
 //   # updateZoneKeyRange.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 //   requires_fastcount,

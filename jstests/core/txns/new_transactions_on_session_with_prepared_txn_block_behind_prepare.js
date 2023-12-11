@@ -5,7 +5,7 @@
  * @tags: [
  *   # The test runs commands that are not allowed with security token: endSession,
  *   # prepareTransaction.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   uses_transactions,
  *   uses_prepare_transaction,
  *   uses_parallel_shell

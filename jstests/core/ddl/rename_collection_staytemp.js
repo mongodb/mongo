@@ -1,7 +1,7 @@
 /*
  * @tags: [
  *   # The test runs commands that are not allowed with security token: applyOps.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   requires_non_retryable_commands,
  *   requires_replication,
  *   # applyOps is not supported on mongos

@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   # The test runs commands that are not allowed with security token: validateDBMetadata.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   no_selinux,
  *   requires_timeseries,
  * # TODO SERVER-82166 remove "balancer off" tag once PM-2077 is over: migration can cause an index

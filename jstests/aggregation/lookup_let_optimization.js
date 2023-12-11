@@ -3,7 +3,7 @@
  * pipeline are evaluated correctly.
  * @tags: [
  *   requires_pipeline_optimization,
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  * ]
  */
 

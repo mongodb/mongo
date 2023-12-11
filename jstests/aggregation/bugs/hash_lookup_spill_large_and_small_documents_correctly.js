@@ -1,7 +1,7 @@
 // Regression test to check that different document sizes work correctly with $lookup.
 // @tags: [
 //   requires_fcv_71,
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 // ]
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 

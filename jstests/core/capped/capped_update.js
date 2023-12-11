@@ -5,7 +5,7 @@
  *
  * @tags: [
  *   # The test runs commands that are not allowed with security token: godinsert.
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  *   requires_capped,
  *   uses_testing_only_commands,
  *   # godinsert and can't run under replication

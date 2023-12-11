@@ -2,7 +2,7 @@
 //
 // @tags: [
 //   # The test runs commands that are not allowed with security token: createRole, dropRole.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   requires_multi_updates,
 //   requires_non_retryable_commands,
 //   # `rolesInfo` response has empty database name that doesn't work with the response checker of

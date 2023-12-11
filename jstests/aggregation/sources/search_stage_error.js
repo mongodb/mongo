@@ -5,7 +5,7 @@
  *   do_not_wrap_aggregations_in_facets,
  *   # $search/$searchMeta do not support any read concern other than "local"
  *   assumes_read_concern_unchanged,
- *   not_allowed_with_security_token,
+ *   not_allowed_with_signed_security_token,
  * ]
  */
 const coll = db.searchCollector;

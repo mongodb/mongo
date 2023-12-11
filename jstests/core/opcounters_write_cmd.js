@@ -1,7 +1,7 @@
 // Test that opcounters get incremented properly.
 // @tags: [
 //   # unrecognized command "invalid" is not allowed with security tolen.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   uses_multiple_connections,
 //   assumes_standalone_mongod,
 //   # The config fuzzer may run logical session cache refreshes in the background, which modifies

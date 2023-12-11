@@ -1,7 +1,7 @@
 // @tags: [
 //   # The test runs a lot of commands that are not allowed with security token: addShard,
 //   # addShardToZone, appendOplogNote, applyOps, and so on.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   assumes_unsharded_collection,
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,

@@ -7,7 +7,7 @@
  *
  * @tags: [
  *    # The test runs commands that are not allowed with security token: top.
- *    not_allowed_with_security_token,
+ *    not_allowed_with_signed_security_token,
  *    assumes_read_preference_unchanged,
  *    requires_fastcount,
  *    # This test contains assertions on the number of executed operations, and tenant migrations

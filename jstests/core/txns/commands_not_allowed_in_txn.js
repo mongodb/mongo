@@ -3,7 +3,7 @@
 // @tags: [
 //   # The test runs commands that are not allowed with security token: applyOps, endSession,
 //   # mapReduce.
-//   not_allowed_with_security_token,
+//   not_allowed_with_signed_security_token,
 //   uses_snapshot_read_concern,
 //   uses_transactions,
 //   # Tenant migrations don't support applyOps.
