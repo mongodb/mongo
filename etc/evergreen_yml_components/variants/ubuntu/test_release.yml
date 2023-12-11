@@ -52,9 +52,9 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2204-large
+  - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -109,9 +109,9 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2004-package
+  - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -175,9 +175,9 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_audit_gen
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2004-package
+  - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -241,9 +241,9 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_audit_gen
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2204-large
+  - name: .timeseries_crud
   - name: test_packages_release
     distros:
     - ubuntu2204-large
@@ -311,9 +311,9 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu1804-arm64-build
+  - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -411,9 +411,9 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2204-arm64-large
+  - name: .timeseries_crud
   - name: test_packages_release
     distros:
     - ubuntu2204-arm64-large

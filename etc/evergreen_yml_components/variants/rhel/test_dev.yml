@@ -119,9 +119,9 @@ variables:
   - name: .crypt
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2004-package
+  - name: .timeseries_crud
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl

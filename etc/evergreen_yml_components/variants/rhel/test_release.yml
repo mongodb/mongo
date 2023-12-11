@@ -82,9 +82,9 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2004-package
+  - name: .timeseries_crud
   - name: selinux_rhel7_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -162,9 +162,9 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2004-package
+  - name: .timeseries_crud
   - name: selinux_rhel8_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -357,9 +357,9 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu1804-arm64-build
+  - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -421,9 +421,9 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: .stitch
   - name: .crypt
-  - name: .timeseries_crud
     distros:
     - rhel82-arm64-large
+  - name: .timeseries_crud
   - name: .publish_crypt
   - name: test_packages
     distros:
@@ -480,9 +480,9 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2204-large
+  - name: .timeseries_crud
   - name: selinux_rhel9_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -550,9 +550,9 @@ buildvariants:
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2204-large
+  - name: .timeseries_crud
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -608,9 +608,9 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2204-arm64-small
+  - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -674,9 +674,9 @@ buildvariants:
   - name: sharding_auth_gen
   - name: .stitch
   - name: .crypt
-  - name: .timeseries_crud
     distros:
     - rhel90-arm64-large
+  - name: .timeseries_crud
   - name: .publish_crypt
   - name: test_packages
     distros:

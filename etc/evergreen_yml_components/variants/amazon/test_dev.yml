@@ -131,9 +131,9 @@ buildvariants:
   - name: search_ssl
   - name: secondary_reads_passthrough_gen
   - name: .serverless
-  - name: .timeseries_crud
     distros:
     - amazon2-arm64-large
+  - name: .timeseries_crud
   - name: session_jscore_passthrough
   - name: .shard_split
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -254,9 +254,9 @@ buildvariants:
   - name: search_ssl
   - name: secondary_reads_passthrough_gen
   - name: .serverless
-  - name: .timeseries_crud
     distros:
     - amazon2-arm64-large
+  - name: .timeseries_crud
   - name: session_jscore_passthrough
   - name: .shard_split
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt

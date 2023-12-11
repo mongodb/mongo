@@ -78,9 +78,9 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2204-large
+  - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -192,9 +192,9 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: test_packages
-  - name: .timeseries_crud
     distros:
     - ubuntu2204-large
+  - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
