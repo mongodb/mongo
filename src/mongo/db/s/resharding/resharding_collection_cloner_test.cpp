@@ -99,7 +99,7 @@ public:
     MockMongoInterface(std::deque<DocumentSource::GetNextResult> mockResults)
         : _mockResults(std::move(mockResults)) {}
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         Pipeline* ownedPipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final {
@@ -111,14 +111,14 @@ public:
         return pipeline;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         const AggregateCommandRequest& aggRequest,
         Pipeline* pipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final {
-        return attachCursorSourceToPipeline(pipeline, shardTargetingPolicy, std::move(readConcern));
+        return preparePipelineForExecution(pipeline, shardTargetingPolicy, std::move(readConcern));
     }
 
 private:

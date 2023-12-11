@@ -66,7 +66,7 @@
 namespace mongo {
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-NonShardServerProcessInterface::attachCursorSourceToPipeline(
+NonShardServerProcessInterface::preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
@@ -74,7 +74,7 @@ NonShardServerProcessInterface::attachCursorSourceToPipeline(
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-NonShardServerProcessInterface::attachCursorSourceToPipeline(
+NonShardServerProcessInterface::preparePipelineForExecution(
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

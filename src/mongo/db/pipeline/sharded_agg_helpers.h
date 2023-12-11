@@ -242,11 +242,18 @@ bool checkIfMustRunOnAllShards(const NamespaceString& nss, PipelineDataSource pi
 Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx);
 
 /**
- * Uses sharded_agg_helpers to split the pipeline and dispatch half to the shards, leaving the
- * merging half executing in this process after attaching a $mergeCursors. Will retry on network
- * errors and also on StaleConfig errors to avoid restarting the entire operation.
+ * Prepares the given pipeline for execution. This involves:
+ * (1) Determining if the pipeline needs to have a cursor source attached.
+ * (2) If a cursor source is needed, attaching one. This may involve a local or remote cursor,
+ * depending on whether or not the pipeline's expression context permits local reads and a local
+ * read could be used to serve the pipeline. (3) Splitting the pipeline if required, and dispatching
+ * half to the shards, leaving the merging half executing in this process after attaching a
+ * $mergeCursors.
+ *
+ * Will retry on network errors and also on StaleConfig errors to avoid restarting the entire
+ * operation. Returns `ownedPipeline`, but made-ready for execution.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none);

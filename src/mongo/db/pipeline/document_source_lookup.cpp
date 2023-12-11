@@ -698,7 +698,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
         auto shardTargetingPolicy = allowForeignShardedColl ? ShardTargetingPolicy::kAllowed
                                                             : ShardTargetingPolicy::kNotAllowed;
         try {
-            pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
+            pipeline = pExpCtx->mongoProcessInterface->preparePipelineForExecution(
                 pipeline.release(), shardTargetingPolicy);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
             // This exception returns the information we need to resolve a sharded view. Update the
@@ -722,7 +722,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
                         "new_pipe"_attr = _resolvedPipeline);
 
             // Try to attach the cursor source again.
-            pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
+            pipeline = pExpCtx->mongoProcessInterface->preparePipelineForExecution(
                 pipeline.release(), shardTargetingPolicy);
         }
     }

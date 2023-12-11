@@ -539,16 +539,15 @@ Status ShardServerProcessInterface::insertTimeseries(
         expCtx, ns, std::move(insertCommand), wc, targetEpoch);
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter>
-ShardServerProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipeline,
-                                                          ShardTargetingPolicy shardTargetingPolicy,
-                                                          boost::optional<BSONObj> readConcern) {
-    return sharded_agg_helpers::attachCursorToPipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::preparePipelineForExecution(
+    Pipeline* ownedPipeline,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern) {
+    return sharded_agg_helpers::preparePipelineForExecution(
         ownedPipeline, shardTargetingPolicy, std::move(readConcern));
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter>
-ShardServerProcessInterface::attachCursorSourceToPipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::preparePipelineForExecution(
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

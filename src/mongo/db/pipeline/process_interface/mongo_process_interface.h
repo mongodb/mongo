@@ -397,7 +397,7 @@ public:
      * If `shardTargetingPolicy` is kNotAllowed, the cursor will only be for local reads regardless
      * of whether or not this function is called in a sharded environment.
      */
-    virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    virtual std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         Pipeline* pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) = 0;
@@ -406,7 +406,7 @@ public:
      * Same as above but takes in an aggRequest and pipeline. This preserves any
      * aggregation options set on the AggregateCommandRequest.
      */
-    virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    virtual std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         const AggregateCommandRequest& aggRequest,
         Pipeline* pipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -458,6 +458,11 @@ public:
      * Returns the name of the local shard if sharding is enabled, or an empty string.
      */
     virtual std::string getShardName(OperationContext* opCtx) const = 0;
+
+    /**
+     * Returns the the local shard if this process is a shardsvr, else boost::none.
+     */
+    virtual boost::optional<ShardId> getShardId(OperationContext* opCtx) const = 0;
 
     /**
      * Returns whether or not this process is running as part of a sharded cluster.

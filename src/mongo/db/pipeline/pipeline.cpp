@@ -853,7 +853,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     pipeline->validateCommon(alreadyOptimized);
 
     if (opts.attachCursorSource) {
-        pipeline = expCtx->mongoProcessInterface->attachCursorSourceToPipeline(
+        pipeline = expCtx->mongoProcessInterface->preparePipelineForExecution(
             pipeline.release(), opts.shardTargetingPolicy, std::move(opts.readConcern));
     }
 
@@ -891,12 +891,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     pipeline->validateCommon(alreadyOptimized);
     aggRequest.setPipeline(pipeline->serializeToBson());
 
-    return expCtx->mongoProcessInterface->attachCursorSourceToPipeline(aggRequest,
-                                                                       pipeline.release(),
-                                                                       expCtx,
-                                                                       shardCursorsSortSpec,
-                                                                       opts.shardTargetingPolicy,
-                                                                       std::move(readConcern));
+    return expCtx->mongoProcessInterface->preparePipelineForExecution(aggRequest,
+                                                                      pipeline.release(),
+                                                                      expCtx,
+                                                                      shardCursorsSortSpec,
+                                                                      opts.shardTargetingPolicy,
+                                                                      std::move(readConcern));
 }
 
 Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(

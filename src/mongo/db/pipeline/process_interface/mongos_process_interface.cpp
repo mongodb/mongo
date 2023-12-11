@@ -131,7 +131,7 @@ MongosProcessInterface::getWriteSizeEstimator(OperationContext* opCtx,
     return std::make_unique<TargetPrimaryWriteSizeEstimator>();
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorSourceToPipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
@@ -140,11 +140,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorS
             "shardTargetingPolicy cannot be kNotAllowed on mongos",
             shardTargetingPolicy != ShardTargetingPolicy::kNotAllowed);
 
-    return sharded_agg_helpers::attachCursorToPipeline(
+    return sharded_agg_helpers::preparePipelineForExecution(
         ownedPipeline, shardTargetingPolicy, std::move(readConcern));
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorSourceToPipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::preparePipelineForExecution(
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

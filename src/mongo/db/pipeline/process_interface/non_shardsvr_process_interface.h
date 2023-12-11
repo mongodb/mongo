@@ -81,12 +81,12 @@ public:
                                      const NamespaceString& ns,
                                      bool includeBuildUUIDs) override;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         Pipeline* pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) override;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         const AggregateCommandRequest& aggRequest,
         Pipeline* pipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

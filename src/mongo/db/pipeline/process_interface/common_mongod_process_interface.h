@@ -125,6 +125,8 @@ public:
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) final;
     std::string getShardName(OperationContext* opCtx) const final;
 
+    boost::optional<ShardId> getShardId(OperationContext* opCtx) const final;
+
     bool inShardedEnvironment(OperationContext* opCtx) const final;
 
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,

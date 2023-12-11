@@ -916,7 +916,7 @@ public:
         return false;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         Pipeline* ownedPipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final {
@@ -936,7 +936,7 @@ public:
         return pipeline;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         const AggregateCommandRequest& aggRequest,
         Pipeline* pipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

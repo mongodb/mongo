@@ -139,9 +139,19 @@
 
 namespace mongo {
 namespace sharded_agg_helpers {
+
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(shardedAggregateHangBeforeEstablishingShardCursors);
+
+struct TargetingResults {
+    BSONObj shardQuery;
+    BSONObj shardTargetingCollation;
+    std::set<ShardId> shardIds;
+    bool needsSplit;
+    bool mustRunOnAllShards;
+    Timestamp shardRegistryReloadTime;
+};
 
 /**
  * Given a document representing an aggregation command such as
@@ -782,12 +792,6 @@ void abandonCacheIfSentToShards(Pipeline* shardsPipeline) {
     }
 }
 
-ShardId getLocalShardId(OperationContext* opCtx) {
-    return serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)
-        ? ShardId::kConfigServerId
-        : ShardingState::get(opCtx)->shardId();
-}
-
 boost::optional<CollectionRoutingInfo> getCollectionRoutingInfoForTargeting(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, PipelineDataSource pipelineDataSource) {
     auto executionNsRoutingInfoStatus = getExecutionNsRoutingInfo(expCtx->opCtx, expCtx->ns);
@@ -804,6 +808,137 @@ boost::optional<CollectionRoutingInfo> getCollectionRoutingInfoForTargeting(
                                                : boost::optional<CollectionRoutingInfo>{};
 }
 
+/** Check if the first stage of `pipeline` can execute without an attached cursor source. */
+bool firstStageCanExecuteWithoutCursor(const Pipeline& pipeline) {
+    boost::optional<DocumentSource*> hasFirstStage = pipeline.getSources().empty()
+        ? boost::optional<DocumentSource*>{}
+        : pipeline.getSources().front().get();
+    if (!hasFirstStage) {
+        return false;
+    }
+    const auto firstStage = *hasFirstStage;
+
+    // In this helper, we expect that we are viewing the first stage of a pipeline that does
+    // not yet have a mergeCursors prepended to it.
+    tassert(8375100,
+            "Expected pipeline without a prepended mergeCursors",
+            !dynamic_cast<const DocumentSourceMergeCursors*>(firstStage));
+
+    auto constraints = firstStage->constraints();
+    if (constraints.requiresInputDocSource) {
+        return false;
+    }
+    // Here we check the hostRequirment because there is at least one stage ($indexStats) which
+    // does not require input data, but is still expected to fan out and contact remote shards
+    // nonetheless.
+    return constraints.hostRequirement == StageConstraints::HostTypeRequirement::kLocalOnly ||
+        constraints.hostRequirement == StageConstraints::HostTypeRequirement::kRunOnceAnyNode;
+}
+
+/**
+ * Given a pipeline's ShardTargetingPolicy and the NamespaceString of its expression context,
+ * returns true if the pipeline is required to have a cursor source that does a local read from the
+ * current process.
+ */
+bool isRequiredToReadLocalData(const ShardTargetingPolicy& shardTargetingPolicy,
+                               const NamespaceString& ns) {
+    // Certain namespaces are shard-local; that is, they exist independently on every shard. For
+    // these namespaces, a local cursor should always be used.
+    // TODO SERVER-59957: use NamespaceString::isPerShardNamespace instead.
+    auto shouldAlwaysAttachLocalCursorForNamespace = [](const NamespaceString& ns) {
+        return (ns.isLocalDB() || ns.isConfigDotCacheDotChunks() ||
+                ns.isReshardingLocalOplogBufferCollection() ||
+                ns == NamespaceString::kConfigImagesNamespace ||
+                ns.isChangeStreamPreImagesCollection());
+    };
+
+    return shardTargetingPolicy == ShardTargetingPolicy::kNotAllowed ||
+        shouldAlwaysAttachLocalCursorForNamespace(ns);
+}
+
+/**
+ * Given a pipeline's TargetingResults and this process' ShardId, return true if we can use a local
+ * read as the cursor source for the pipeline. Also considers the readConcern of the pipeline
+ * (passed as argument), vs. the readConcern of the operation the pipeline is running under
+ * (obtained from the provided opCtx).
+ */
+bool canUseLocalReadAsCursorSource(OperationContext* opCtx,
+                                   const TargetingResults& targeting,
+                                   const ShardId& localShardId,
+                                   boost::optional<BSONObj> readConcern) {
+    // If there is no targetingCri, we can't enter the shard role correctly, so we need to
+    // fallback to remote read.
+    bool useLocalRead = !targeting.needsSplit && targeting.shardIds.size() == 1 &&
+        *targeting.shardIds.begin() == localShardId;
+
+    // If subpipeline has a different read concern, we need to perform remote read to
+    // satisfy it.
+    useLocalRead = useLocalRead &&
+        (!readConcern ||
+         readConcern->woCompare(repl::ReadConcernArgs::get(opCtx).toBSONInner(),
+                                BSONObj{} /* ordering */,
+                                BSONObj::ComparisonRules::kConsiderFieldName |
+                                    BSONObj::ComparisonRules::kIgnoreFieldOrder) == 0);
+    return useLocalRead;
+}
+
+/**
+ * Attempts to attach a cursor source to the passed in pipeline via a local read.
+ * Possibly mutates pipelineToTarget by releasing ownership to the cursor source.
+ * Returns a pipeline with a cursor source attach on success. On failure, returns nullptr.
+ *
+ * Failure may occur before or after the pipelineToTarget is released; callers must check
+ * if the pointer was released before using it again.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
+    OperationContext* opCtx,
+    std::unique_ptr<Pipeline, PipelineDeleter>& pipelineToTarget,
+    const ExpressionContext& expCtx,
+    const CollectionRoutingInfo& targetingCri,
+    const ShardId& localShardId) {
+    try {
+        const auto& cm = targetingCri.cm;
+        ScopedSetShardRole shardRole{
+            opCtx,
+            expCtx.ns,
+            cm.hasRoutingTable() ? targetingCri.getShardVersion(localShardId)
+                                 : ShardVersion::UNSHARDED(),
+            boost::optional<DatabaseVersion>{!cm.hasRoutingTable(), cm.dbVersion()}};
+
+        // TODO SERVER-77402 Wrap this in a shardRoleRetry loop instead of
+        // catching exceptions. attachCursorSourceToPipelineForLocalRead enters the
+        // shard role but does not refresh the shard if the shard has stale metadata.
+        // Proceeding to do normal shard targeting, which will go through the
+        // service_entry_point and refresh the shard if needed.
+        auto pipelineWithCursor =
+            expCtx.mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
+                pipelineToTarget.release());
+
+        LOGV2_DEBUG(5837600,
+                    3,
+                    "Performing local read",
+                    logAttrs(expCtx.ns),
+                    "pipeline"_attr = pipelineWithCursor->serializeToBson(),
+                    "comment"_attr = expCtx.opCtx->getComment());
+
+        return pipelineWithCursor;
+    } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
+        // The current node has stale information about this collection, proceed with
+        // shard targeting, which has logic to handle refreshing that may be needed.
+    } catch (ExceptionForCat<ErrorCategory::StaleShardVersionError>&) {
+        // The current node has stale information about this collection, proceed with
+        // shard targeting, which has logic to handle refreshing that may be needed.
+    } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
+        // The current node may be trying to run a pipeline on a namespace which is an
+        // unresolved view, proceed with shard targeting,
+    } catch (ExceptionFor<ErrorCodes::IllegalChangeToExpectedShardVersion>&) {
+    } catch (ExceptionFor<ErrorCodes::IllegalChangeToExpectedDatabaseVersion>&) {
+        // The current node's shard or database version of target namespace was updated
+        // mid-operation. Proceed with remote request to re-initialize operation
+        // context.
+    }
+    return nullptr;
+}
 }  // namespace
 
 std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
@@ -989,15 +1124,6 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
                                  !explain, /* appendWC */
                                  shardCommand);
 }
-
-struct TargetingResults {
-    BSONObj shardQuery;
-    BSONObj shardTargetingCollation;
-    std::set<ShardId> shardIds;
-    bool needsSplit;
-    bool mustRunOnAllShards;
-    Timestamp shardRegistryReloadTime;
-};
 
 TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                 const Pipeline* pipeline,
@@ -1748,54 +1874,31 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
                                                       std::move(readConcern));
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
     auto expCtx = ownedPipeline->getContext();
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
-    boost::optional<DocumentSource*> hasFirstStage = pipeline->getSources().empty()
-        ? boost::optional<DocumentSource*>{}
-        : pipeline->getSources().front().get();
-
-    if (hasFirstStage) {
-        // Make sure the first stage isn't already a $mergeCursors, and also check if it is a stage
-        // which needs to actually get a cursor attached or not.
-        const auto* firstStage = *hasFirstStage;
-        invariant(!dynamic_cast<const DocumentSourceMergeCursors*>(firstStage));
-        // Here we check the hostRequirment because there is at least one stage ($indexStats) which
-        // does not require input data, but is still expected to fan out and contact remote shards
-        // nonetheless.
-        if (auto constraints = firstStage->constraints(); !constraints.requiresInputDocSource &&
-            (constraints.hostRequirement == StageConstraints::HostTypeRequirement::kLocalOnly ||
-             constraints.hostRequirement ==
-                 StageConstraints::HostTypeRequirement::kRunOnceAnyNode)) {
-            // There's no need to attach a cursor here - the first stage provides its own data and
-            // is meant to be run locally (e.g. $documents).
-            return pipeline;
-        }
+    if (firstStageCanExecuteWithoutCursor(*pipeline)) {
+        // There's no need to attach a cursor here - the first stage provides its own data and
+        // is meant to be run locally (e.g. $documents).
+        return pipeline;
     }
 
-    // Helper to decide whether we should ignore the given shardTargetingPolicy for this namespace.
-    // Certain namespaces are shard-local; that is, they exist independently on every shard. For
-    // these namespaces, a local cursor should always be used.
-    // TODO SERVER-59957: use NamespaceString::isPerShardNamespace instead.
-    auto shouldAlwaysAttachLocalCursorForNamespace = [](const NamespaceString& ns) {
-        return (ns.isLocalDB() || ns.isConfigDotCacheDotChunks() ||
-                ns.isReshardingLocalOplogBufferCollection() ||
-                ns == NamespaceString::kConfigImagesNamespace ||
-                ns.isChangeStreamPreImagesCollection());
-    };
-
-    if (shardTargetingPolicy == ShardTargetingPolicy::kNotAllowed ||
-        shouldAlwaysAttachLocalCursorForNamespace(expCtx->ns)) {
+    if (isRequiredToReadLocalData(shardTargetingPolicy, expCtx->ns)) {
+        tassert(8375101,
+                "Only shard role operations can perform local reads.",
+                expCtx->opCtx->getService()->role().has(ClusterRole::ShardServer));
         auto pipelineToTarget = pipeline->clone();
-
         return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
             pipelineToTarget.release());
     }
 
+
+    // We're not required to read locally, and we need a cursor source. We need to perform routing
+    // to see what shard(s) the pipeline targets.
     sharding::router::CollectionRouter router(expCtx->opCtx->getServiceContext(), expCtx->ns);
     return router.route(
         expCtx->opCtx,
@@ -1819,64 +1922,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
             TargetingResults targeting = targetPipeline(
                 expCtx, pipeline.get(), pipelineDataSource, shardTargetingPolicy, targetingCri);
 
-            const ShardId localShardId = getLocalShardId(opCtx);
-            // If there is no targetingCri, we can't enter the shard role correctly, so we need to
-            // fallback to remote read.
-            bool useLocalRead = !targeting.needsSplit && targeting.shardIds.size() == 1 &&
-                *targeting.shardIds.begin() == localShardId;
-
-            // If subpipeline have different read concern, we need to perform remote read to
-            // satifly it.
-            useLocalRead = useLocalRead &&
-                (!readConcern ||
-                 readConcern->woCompare(repl::ReadConcernArgs::get(opCtx).toBSONInner(),
-                                        BSONObj{} /* ordering */,
-                                        BSONObj::ComparisonRules::kConsiderFieldName |
-                                            BSONObj::ComparisonRules::kIgnoreFieldOrder) == 0);
-
-            if (useLocalRead) {
-                try {
-                    const auto& cm = targetingCri->cm;
-                    ScopedSetShardRole shardRole{
-                        opCtx,
-                        expCtx->ns,
-                        cm.hasRoutingTable() ? targetingCri->getShardVersion(localShardId)
-                                             : ShardVersion::UNSHARDED(),
-                        boost::optional<DatabaseVersion>{!cm.hasRoutingTable(), cm.dbVersion()}};
-
-                    // TODO SERVER-77402 Wrap this in a shardRoleRetry loop instead of
-                    // catching exceptions. attachCursorSourceToPipelineForLocalRead enters the
-                    // shard role but does not refresh the shard if the shard has stale metadata.
-                    // Proceeding to do normal shard targeting, which will go through the
-                    // service_entry_point and refresh the shard if needed.
-                    auto pipelineWithCursor =
-                        expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-                            pipelineToTarget.release());
-
-                    LOGV2_DEBUG(5837600,
-                                3,
-                                "Performing local read",
-                                logAttrs(expCtx->ns),
-                                "pipeline"_attr = pipelineWithCursor->serializeToBson(),
-                                "comment"_attr = expCtx->opCtx->getComment());
-
+            const auto localShardId = expCtx->mongoProcessInterface->getShardId(opCtx);
+            if (localShardId &&
+                canUseLocalReadAsCursorSource(opCtx, targeting, *localShardId, readConcern)) {
+                if (auto pipelineWithCursor = tryAttachCursorSourceForLocalRead(
+                        opCtx, pipelineToTarget, *expCtx, *targetingCri, *localShardId)) {
                     return pipelineWithCursor;
-                } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
-                    // The current node has stale information about this collection, proceed with
-                    // shard targeting, which has logic to handle refreshing that may be needed.
-                } catch (ExceptionForCat<ErrorCategory::StaleShardVersionError>&) {
-                    // The current node has stale information about this collection, proceed with
-                    // shard targeting, which has logic to handle refreshing that may be needed.
-                } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
-                    // The current node may be trying to run a pipeline on a namespace which is an
-                    // unresolved view, proceed with shard targeting,
-                } catch (ExceptionFor<ErrorCodes::IllegalChangeToExpectedShardVersion>&) {
-                } catch (ExceptionFor<ErrorCodes::IllegalChangeToExpectedDatabaseVersion>&) {
-                    // The current node's shard or database version of target namespace was updated
-                    // mid-operation. Proceed with remote request to re-initialize operation
-                    // context.
                 }
-
                 // The local read failed. Recreate 'pipelineToTarget' if it was released above.
                 if (!pipelineToTarget) {
                     pipelineToTarget = pipeline->clone();

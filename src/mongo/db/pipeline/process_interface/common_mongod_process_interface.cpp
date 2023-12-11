@@ -535,11 +535,19 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
 }
 
 std::string CommonMongodProcessInterface::getShardName(OperationContext* opCtx) const {
-    if (ShardingState::get(opCtx)->enabled()) {
-        return ShardingState::get(opCtx)->shardId().toString();
+    if (auto shardId = getShardId(opCtx)) {
+        return shardId->toString();
     }
 
     return std::string();
+}
+
+boost::optional<ShardId> CommonMongodProcessInterface::getShardId(OperationContext* opCtx) const {
+    if (ShardingState::get(opCtx)->enabled()) {
+        return ShardingState::get(opCtx)->shardId();
+    }
+
+    return {};
 }
 
 bool CommonMongodProcessInterface::inShardedEnvironment(OperationContext* opCtx) const {

@@ -255,6 +255,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    boost::optional<ShardId> getShardId(OperationContext*) const final {
+        return {};
+    }
+
     bool inShardedEnvironment(OperationContext* opCtx) const final {
         return true;
     }
@@ -323,12 +327,12 @@ public:
      * retry on network errors and also on StaleConfig errors to avoid restarting the entire
      * operation.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         Pipeline* pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         const AggregateCommandRequest& aggRequest,
         Pipeline* pipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

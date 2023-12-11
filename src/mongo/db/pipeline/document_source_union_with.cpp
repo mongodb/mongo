@@ -270,7 +270,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
         logStartingSubPipeline(serializedPipe);
         try {
             _pipeline =
-                pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(_pipeline.release());
+                pExpCtx->mongoProcessInterface->preparePipelineForExecution(_pipeline.release());
             _executionState = ExecutionProgress::kIteratingSubPipeline;
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
             _pipeline = buildPipelineFromViewDefinition(

@@ -59,7 +59,7 @@ StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRe
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipeline(
+StubLookupSingleDocumentProcessInterface::preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
@@ -67,7 +67,7 @@ StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipeline(
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipeline(
+StubLookupSingleDocumentProcessInterface::preparePipelineForExecution(
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

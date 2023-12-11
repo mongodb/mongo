@@ -214,14 +214,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         Pipeline* pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) override {
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
         const AggregateCommandRequest& aggRequest,
         Pipeline* pipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -254,6 +254,10 @@ public:
 
     std::string getShardName(OperationContext* opCtx) const override {
         MONGO_UNREACHABLE;
+    }
+
+    boost::optional<ShardId> getShardId(OperationContext* opCtx) const override {
+        return boost::none;
     }
 
     bool inShardedEnvironment(OperationContext* opCtx) const override {
