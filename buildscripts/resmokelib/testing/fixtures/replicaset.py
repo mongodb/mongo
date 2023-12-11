@@ -48,7 +48,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                  use_replica_set_connection_string=None, linear_chain=False,
                  default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
                  replicaset_logging_prefix=None, replset_name=None, config_shard=None,
-                 use_auto_bootstrap_procedure=None):
+                 use_auto_bootstrap_procedure=None, initial_sync_uninitialized_fcv=False,
+                 hide_initial_sync_node_from_conn_string=False):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, fixturelib,
@@ -73,6 +74,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.replicaset_logging_prefix = replicaset_logging_prefix
         self.num_nodes = num_nodes
         self.replset_name = replset_name
+        self.initial_sync_uninitialized_fcv = initial_sync_uninitialized_fcv
+        self.hide_initial_sync_node_from_conn_string = hide_initial_sync_node_from_conn_string
         # Used by the enhanced multiversion system to signify multiversion mode.
         # None implies no multiversion run.
         self.fcv = None
@@ -152,6 +155,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         if self.initial_sync_node:
             self.initial_sync_node.setup()
             self.initial_sync_node.await_ready()
+            if self.initial_sync_uninitialized_fcv:
+                self._pause_initial_sync_at_uninitialized_fcv(self.initial_sync_node)
 
         if not self.use_auto_bootstrap_procedure:
             # We need only to wait to connect to the first node of the replica set because we first
@@ -385,7 +390,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # Since this method is called at startup we expect the nodes 1 to n to be secondaries even
         # when self.all_nodes_electable is True.
         secondaries = self.nodes[1:]
-        if self.initial_sync_node:
+        if self.initial_sync_node and not self.initial_sync_uninitialized_fcv:
             secondaries.append(self.initial_sync_node)
 
         for secondary in secondaries:
@@ -509,6 +514,53 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         primary = self.nodes[0]
         primary.mongo_client().admin.command(cmd)
 
+    def _check_initial_sync_node_has_uninitialized_fcv(self, initial_sync_node):
+        sync_node_conn = initial_sync_node.mongo_client()
+        self.logger.info("Checking that initial sync node has uninitialized fcv")
+        try:
+            fcv = sync_node_conn.admin.command(
+                {'getParameter': 1, 'featureCompatibilityVersion': 1})
+
+            msg = "Initial sync node should have an uninitialized FCV, but got fcv: " + str(fcv)
+            raise self.fixturelib.ServerFailure(msg)
+        except pymongo.errors.OperationFailure as err:
+            if err.code == 258:  #codeName == 'UnknownFeatureCompatibilityVersion'
+                return
+            raise
+
+    def _pause_initial_sync_at_uninitialized_fcv(self, initial_sync_node):
+        failpointOnCmd = {
+            'configureFailPoint': 'initialSyncHangAfterResettingFCV', 'mode': 'alwaysOn'
+        }
+        sync_node_conn = initial_sync_node.mongo_client()
+        self.logger.info("Pausing initial sync at failpoint")
+        sync_node_conn.admin.command(failpointOnCmd)
+        self._check_initial_sync_node_has_uninitialized_fcv(initial_sync_node)
+
+    def _unpause_and_finish_initial_sync(self, initial_sync_node):
+        failpoint_off_cmd = {
+            'configureFailPoint': 'initialSyncHangAfterResettingFCV', 'mode': 'off'
+        }
+        self.logger.info("Unpausing initial sync")
+        sync_node_conn = initial_sync_node.mongo_client()
+        sync_node_conn.admin.command(failpoint_off_cmd)
+
+        wait_for_initial_sync_finish_cmd = bson.SON(
+            [("replSetTest", 1), ("waitForMemberState", 2),
+             ("timeoutMillis", interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000)])
+        while True:
+            try:
+                self.logger.info("Waiting for initial sync to finish")
+                sync_node_conn.admin.command(wait_for_initial_sync_finish_cmd)
+                break
+            except pymongo.errors.OperationFailure as err:
+                if err.code not in (self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                                    self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                    raise
+                msg = ("Interrupted while waiting for node to reach secondary state, retrying: {}"
+                       ).format(err)
+                self.logger.error(msg)
+
     def _do_teardown(self, mode=None):
         self.logger.info("Stopping all members of the replica set '%s'...", self.replset_name)
 
@@ -520,6 +572,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
         if self.initial_sync_node:
+            if self.initial_sync_uninitialized_fcv:
+                self._check_initial_sync_node_has_uninitialized_fcv(self.initial_sync_node)
+                self._unpause_and_finish_initial_sync(self.initial_sync_node)
             teardown_handler.teardown(self.initial_sync_node, "initial sync node", mode=mode)
 
         # Terminate the secondaries first to reduce noise in the logs.
@@ -838,7 +893,14 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
     def get_internal_connection_string(self):
         """Return the internal connection string."""
         conn_strs = [node.get_internal_connection_string() for node in self.nodes]
-        if self.initial_sync_node:
+
+        # ReplicaSetFixture sets initial sync nodes as hidden,
+        # which causes a mismatch if the replica set is added to the sharded cluster
+        # through addShard, because the replica set's internal connection string normally
+        # does include the initial sync node, but the list of hosts in the replica set from
+        # running `hello`/`isMaster` does not include it. Setting hide_initial_sync_node_from_conn_string
+        # to True force-hides it from the connection string.
+        if self.initial_sync_node and not self.hide_initial_sync_node_from_conn_string:
             conn_strs.append(self.initial_sync_node.get_internal_connection_string())
         return self.replset_name + "/" + ",".join(conn_strs)
 

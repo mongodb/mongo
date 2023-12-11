@@ -156,6 +156,9 @@ MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeChoosingSyncSource);
 // Failpoint which causes the initial sync function to hang after finishing.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterFinish);
 
+// Failpoint which causes the initial sync function to hang after resetting the in-memory FCV.
+MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterResettingFCV);
+
 // Failpoints for synchronization, shared with cloners.
 extern FailPoint initialSyncFuzzerSynchronizationPoint1;
 extern FailPoint initialSyncFuzzerSynchronizationPoint2;
@@ -687,6 +690,11 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
                 "latest feature compatibility version, we will find out when we clone the "
                 "server configuration collection (admin.system.version)");
     serverGlobalParams.mutableFCV.reset();
+
+    if (MONGO_unlikely(initialSyncHangAfterResettingFCV.shouldFail())) {
+        LOGV2(8206400, "initialSyncHangAfterResettingFCV fail point enabled");
+        initialSyncHangAfterResettingFCV.pauseWhileSet();
+    }
 
     // Clear the oplog buffer.
     _oplogBuffer->clear(makeOpCtx().get());
