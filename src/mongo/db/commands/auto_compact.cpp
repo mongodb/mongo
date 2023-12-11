@@ -57,8 +57,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassertStatusOK(autoCompact(
-                opCtx, request().getCommandParameter(), request().getFreeSpaceTargetMB()));
+            uassertStatusOK(autoCompact(opCtx,
+                                        request().getCommandParameter(),
+                                        request().getRunOnce(),
+                                        request().getFreeSpaceTargetMB()));
         }
 
     private:
@@ -102,6 +104,7 @@ MONGO_REGISTER_COMMAND(AutoCompactCmd).forShard();
 
 Status autoCompact(OperationContext* opCtx,
                    bool enable,
+                   bool runOnce,
                    boost::optional<int64_t> freeSpaceTargetMB) {
 
     auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
@@ -131,7 +134,8 @@ Status autoCompact(OperationContext* opCtx,
             excludedIdents.push_back(collection->getSharedIdent()->getIdent());
     }
 
-    StorageEngine::AutoCompactOptions options{enable, freeSpaceTargetMB, std::move(excludedIdents)};
+    StorageEngine::AutoCompactOptions options{
+        enable, runOnce, freeSpaceTargetMB, std::move(excludedIdents)};
 
     Status status = storageEngine->autoCompact(opCtx, options);
     if (!status.isOK())

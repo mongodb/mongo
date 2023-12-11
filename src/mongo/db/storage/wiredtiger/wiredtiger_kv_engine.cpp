@@ -630,6 +630,7 @@ void WiredTigerKVEngine::notifyStartupComplete(OperationContext* opCtx) {
             opCtx->getServiceContext()->userWritesAllowed() && storageGlobalParams.syncdelay > 0);
 
     StorageEngine::AutoCompactOptions options{/*enable=*/true,
+                                              /*runOnce=*/false,
                                               /*freeSpaceTargetMB=*/boost::none,
                                               /*excludedIdents*/ std::vector<StringData>()};
 
@@ -2780,6 +2781,9 @@ Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
                 config << "\"" << _uri(ident) + ".wt\",";
             }
             config << "]";
+        }
+        if (options.runOnce) {
+            config << ",run_once=true";
         }
     } else {
         config << "background=false";

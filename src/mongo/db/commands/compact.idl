@@ -65,4 +65,7 @@ commands:
                 optional: true
                 type: safeInt64
                 validator: { gte: 1 }
-            
+            runOnce:
+                description: "Run compact once on every file on the node."
+                type: bool
+                default: false

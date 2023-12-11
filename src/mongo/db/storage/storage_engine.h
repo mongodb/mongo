@@ -733,6 +733,7 @@ public:
      */
     struct AutoCompactOptions {
         bool enable = false;
+        bool runOnce = false;
         boost::optional<int64_t> freeSpaceTargetMB;
         std::vector<StringData> excludedIdents;
     };

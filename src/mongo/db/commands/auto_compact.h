@@ -43,6 +43,7 @@ namespace mongo {
  */
 Status autoCompact(OperationContext* opCtx,
                    bool enable,
+                   bool runOnce,
                    boost::optional<int64_t> freeSpaceTargetMB);
 
 }  // namespace mongo
