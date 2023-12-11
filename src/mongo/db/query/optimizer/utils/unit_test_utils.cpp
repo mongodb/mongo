@@ -150,7 +150,22 @@ OptPhaseManager makePhaseManager(
     const boost::optional<cost_model::CostModelCoefficients>& costModel,
     DebugInfo debugInfo,
     QueryHints queryHints) {
-    return OptPhaseManager{std::move(phaseSet),
+    return makePhaseManager({std::move(phaseSet), kDefaultExplorationSet, kDefaultSubstitutionSet},
+                            prefixId,
+                            std::move(metadata),
+                            costModel,
+                            std::move(debugInfo),
+                            std::move(queryHints));
+}
+
+OptPhaseManager makePhaseManager(
+    OptPhaseManager::PhasesAndRewrites phasesAndRewrites,
+    PrefixId& prefixId,
+    Metadata metadata,
+    const boost::optional<cost_model::CostModelCoefficients>& costModel,
+    DebugInfo debugInfo,
+    QueryHints queryHints) {
+    return OptPhaseManager{std::move(phasesAndRewrites),
                            prefixId,
                            false /*requireRID*/,
                            std::move(metadata),
@@ -172,7 +187,24 @@ OptPhaseManager makePhaseManager(
     const boost::optional<cost_model::CostModelCoefficients>& costModel,
     DebugInfo debugInfo,
     QueryHints queryHints) {
-    return OptPhaseManager{std::move(phaseSet),
+    return makePhaseManager({std::move(phaseSet), kDefaultExplorationSet, kDefaultSubstitutionSet},
+                            prefixId,
+                            std::move(metadata),
+                            std::move(ce),
+                            costModel,
+                            std::move(debugInfo),
+                            std::move(queryHints));
+}
+
+OptPhaseManager makePhaseManager(
+    OptPhaseManager::PhasesAndRewrites phasesAndRewrites,
+    PrefixId& prefixId,
+    Metadata metadata,
+    std::unique_ptr<CardinalityEstimator> ce,
+    const boost::optional<cost_model::CostModelCoefficients>& costModel,
+    DebugInfo debugInfo,
+    QueryHints queryHints) {
+    return OptPhaseManager{std::move(phasesAndRewrites),
                            prefixId,
                            false /*requireRID*/,
                            std::move(metadata),
@@ -192,7 +224,7 @@ OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
                                            Metadata metadata,
                                            DebugInfo debugInfo,
                                            QueryHints queryHints) {
-    return OptPhaseManager{std::move(phaseSet),
+    return OptPhaseManager{{std::move(phaseSet), kDefaultExplorationSet, kDefaultSubstitutionSet},
                            prefixId,
                            true /*requireRID*/,
                            std::move(metadata),

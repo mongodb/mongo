@@ -497,6 +497,82 @@ static ExecParams createExecutor(
             pipelineMatchExpr};
 }
 
+OptPhaseManager createSamplingPhaseManager(const cost_model::CostModelCoefficients& costModel,
+                                           PrefixId& prefixId,
+                                           const Metadata& metadata,
+                                           const ConstFoldFn& constFold,
+                                           const QueryHints& hints,
+                                           const QueryParameterMap& queryParameters) {
+    Metadata metadataForSampling = metadata;
+    for (auto& entry : metadataForSampling._scanDefs) {
+        // Do not use indexes for sampling.
+        entry.second.getIndexDefs().clear();
+
+        // Setting the scan order for all scan definitions will cause any PhysicalScanNodes
+        // in the tree for that scan to have the appropriate scan order.
+        entry.second.setScanOrder(internalCascadesOptimizerSamplingCEScanStartOfColl.load()
+                                      ? ScanOrder::Forward
+                                      : ScanOrder::Random);
+
+        // Do not perform shard filtering for sampling.
+        entry.second.shardingMetadata().setMayContainOrphans(false);
+    }
+
+    return {OptPhaseManager::PhasesAndRewrites::getDefaultForSampling(),
+            prefixId,
+            false /*requireRID*/,
+            std::move(metadataForSampling),
+            std::make_unique<HeuristicEstimator>(),
+            std::make_unique<HeuristicEstimator>(),
+            std::make_unique<CostEstimatorImpl>(costModel),
+            defaultConvertPathToInterval,
+            constFold,
+            DebugInfo::kDefaultForProd,
+            {._numSamplingChunks = hints._numSamplingChunks,
+             ._samplingCollectionSizeMin = hints._samplingCollectionSizeMin,
+             ._samplingCollectionSizeMax = hints._samplingCollectionSizeMax,
+             ._sqrtSampleSizeEnabled = hints._sqrtSampleSizeEnabled} /*hints*/,
+            queryParameters};
+}
+
+// Helper to construct an appropriate 'CardinalityEstimator'.
+std::unique_ptr<CardinalityEstimator> createCardinalityEstimator(
+    const cost_model::CostModelCoefficients& costModel,
+    const NamespaceString& nss,
+    OperationContext* opCtx,
+    const int64_t collectionSize,
+    PrefixId& prefixId,
+    const Metadata& metadata,
+    const ConstFoldFn& constFold,
+    const QueryHints& hints,
+    bool collectionExists,
+    const QueryParameterMap& queryParameters) {
+
+    // TODO: SERVER-70241: Handle "auto" estimation mode.
+    if (internalQueryCardinalityEstimatorMode == ce::kSampling) {
+        if (collectionExists && collectionSize > internalCascadesOptimizerSampleSizeMin.load()) {
+            return std::make_unique<SamplingEstimator>(
+                createSamplingPhaseManager(
+                    costModel, prefixId, metadata, constFold, hints, queryParameters),
+                collectionSize,
+                std::make_unique<HeuristicEstimator>(),
+                std::make_unique<ce::SBESamplingExecutor>(opCtx));
+        } else {
+            return std::make_unique<HeuristicEstimator>();
+        }
+
+    } else if (internalQueryCardinalityEstimatorMode == ce::kHistogram) {
+        return std::make_unique<HistogramEstimator>(
+            std::make_shared<stats::CollectionStatisticsImpl>(collectionSize, nss),
+            std::make_unique<HeuristicEstimator>());
+
+    } else if (internalQueryCardinalityEstimatorMode == ce::kHeuristic) {
+        return std::make_unique<HeuristicEstimator>();
+    }
+
+    tasserted(6624252,
+              str::stream() << "Unknown estimator mode: " << internalQueryCardinalityEstimatorMode);
+}
 }  // namespace
 
 static void populateAdditionalScanDefs(
@@ -732,115 +808,6 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     return {std::move(scanDefs), numberOfPartitions};
 }
 
-enum class CEMode { kSampling, kHistogram, kHeuristic };
-
-static OptPhaseManager createPhaseManager(const CEMode mode,
-                                          const cost_model::CostModelCoefficients& costModel,
-                                          const NamespaceString& nss,
-                                          OperationContext* opCtx,
-                                          const int64_t collectionSize,
-                                          PrefixId& prefixId,
-                                          const bool requireRID,
-                                          Metadata metadata,
-                                          const ConstFoldFn& constFold,
-                                          QueryHints hints,
-                                          QueryParameterMap queryParameters) {
-    switch (mode) {
-        case CEMode::kSampling: {
-            Metadata metadataForSampling = metadata;
-            for (auto& entry : metadataForSampling._scanDefs) {
-                // Do not use indexes for sampling.
-                entry.second.getIndexDefs().clear();
-
-                // Setting the scan order for all scan definitions will cause any PhysicalScanNodes
-                // in the tree for that scan to have the appropriate scan order.
-                entry.second.setScanOrder(internalCascadesOptimizerSamplingCEScanStartOfColl.load()
-                                              ? ScanOrder::Forward
-                                              : ScanOrder::Random);
-
-                // Do not perform shard filtering for sampling.
-                entry.second.shardingMetadata().setMayContainOrphans(false);
-            }
-
-
-            // For sampling estimator, we do not run constant folding, path fusion and exploration
-            // phases.
-            OptPhaseManager::PhaseSet rewritesSetForSampling{OptPhase::MemoSubstitutionPhase,
-                                                             OptPhase::MemoImplementationPhase,
-                                                             OptPhase::PathLower,
-                                                             OptPhase::ConstEvalPost_ForSampling};
-            OptPhaseManager phaseManagerForSampling{
-                std::move(rewritesSetForSampling),
-                prefixId,
-                false /*requireRID*/,
-                std::move(metadataForSampling),
-                std::make_unique<HeuristicEstimator>(),
-                std::make_unique<HeuristicEstimator>(),
-                std::make_unique<CostEstimatorImpl>(costModel),
-                defaultConvertPathToInterval,
-                constFold,
-                DebugInfo::kDefaultForProd,
-                {._numSamplingChunks = hints._numSamplingChunks,
-                 ._samplingCollectionSizeMin = hints._samplingCollectionSizeMin,
-                 ._samplingCollectionSizeMax = hints._samplingCollectionSizeMax,
-                 ._sqrtSampleSizeEnabled = hints._sqrtSampleSizeEnabled} /*hints*/,
-                queryParameters};
-
-            auto samplingEstimator = std::make_unique<SamplingEstimator>(
-                std::move(phaseManagerForSampling),
-                collectionSize,
-                std::make_unique<HeuristicEstimator>(),
-                std::make_unique<ce::SBESamplingExecutor>(opCtx));
-
-            return {OptPhaseManager::getAllProdRewrites(),
-                    prefixId,
-                    requireRID,
-                    std::move(metadata),
-                    std::move(samplingEstimator),
-                    std::make_unique<HeuristicEstimator>(),
-                    std::make_unique<CostEstimatorImpl>(costModel),
-                    defaultConvertPathToInterval,
-                    constFold,
-                    DebugInfo::kDefaultForProd,
-                    std::move(hints),
-                    std::move(queryParameters)};
-        }
-
-        case CEMode::kHistogram:
-            return {OptPhaseManager::getAllProdRewrites(),
-                    prefixId,
-                    requireRID,
-                    std::move(metadata),
-                    std::make_unique<HistogramEstimator>(
-                        std::make_shared<stats::CollectionStatisticsImpl>(collectionSize, nss),
-                        std::make_unique<HeuristicEstimator>()),
-                    std::make_unique<HeuristicEstimator>(),
-                    std::make_unique<CostEstimatorImpl>(costModel),
-                    defaultConvertPathToInterval,
-                    constFold,
-                    DebugInfo::kDefaultForProd,
-                    std::move(hints),
-                    std::move(queryParameters)};
-
-        case CEMode::kHeuristic:
-            return {OptPhaseManager::getAllProdRewrites(),
-                    prefixId,
-                    requireRID,
-                    std::move(metadata),
-                    std::make_unique<HeuristicEstimator>(),
-                    std::make_unique<HeuristicEstimator>(),
-                    std::make_unique<CostEstimatorImpl>(costModel),
-                    defaultConvertPathToInterval,
-                    constFold,
-                    DebugInfo::kDefaultForProd,
-                    std::move(hints),
-                    std::move(queryParameters)};
-
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
 boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -951,36 +918,32 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     OPTIMIZER_DEBUG_LOG(
         6264803, 5, "Translated ABT", "explain"_attr = ExplainGenerator::explainV2Compact(abt));
 
+    auto phasesAndRewrites = OptPhaseManager::PhasesAndRewrites::getDefaultForProd();
     const int64_t numRecords = collectionExists ? collection->numRecords(opCtx) : -1;
-    CEMode mode = CEMode::kHeuristic;
-
-    // TODO: SERVER-70241: Handle "auto" estimation mode.
-    if (internalQueryCardinalityEstimatorMode == ce::kSampling) {
-        if (collectionExists && numRecords > internalCascadesOptimizerSampleSizeMin.load()) {
-            mode = CEMode::kSampling;
-        }
-    } else if (internalQueryCardinalityEstimatorMode == ce::kHistogram) {
-        mode = CEMode::kHistogram;
-    } else if (internalQueryCardinalityEstimatorMode == ce::kHeuristic) {
-        mode = CEMode::kHeuristic;
-    } else {
-        tasserted(6624252,
-                  str::stream() << "Unknown estimator mode: "
-                                << internalQueryCardinalityEstimatorMode);
-    }
-
     auto costModel = cost_model::costModelManager(opCtx->getServiceContext()).getCoefficients();
-    OptPhaseManager phaseManager = createPhaseManager(mode,
-                                                      costModel,
-                                                      nss,
-                                                      opCtx,
-                                                      numRecords,
-                                                      prefixId,
-                                                      requireRID,
-                                                      std::move(metadata),
-                                                      constFold,
-                                                      std::move(queryHints),
-                                                      std::move(queryParameters));
+    auto cardinalityEstimator = createCardinalityEstimator(costModel,
+                                                           nss,
+                                                           opCtx,
+                                                           numRecords,
+                                                           prefixId,
+                                                           metadata,
+                                                           constFold,
+                                                           queryHints,
+                                                           collectionExists,
+                                                           queryParameters);
+    OptPhaseManager phaseManager{std::move(phasesAndRewrites),
+                                 prefixId,
+                                 requireRID,
+                                 std::move(metadata),
+                                 std::move(cardinalityEstimator),
+                                 std::make_unique<HeuristicEstimator>(),
+                                 std::make_unique<CostEstimatorImpl>(costModel),
+                                 defaultConvertPathToInterval,
+                                 constFold,
+                                 DebugInfo::kDefaultForProd,
+                                 std::move(queryHints),
+                                 std::move(queryParameters)};
+
     auto resultPlans = phaseManager.optimizeNoAssert(std::move(abt), false /*includeRejected*/);
     if (resultPlans.empty()) {
         // Could not find a plan.

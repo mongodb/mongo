@@ -54,15 +54,30 @@
 
 namespace mongo::optimizer {
 
-OptPhaseManager::PhaseSet OptPhaseManager::_allProdRewrites = {OptPhase::ConstEvalPre,
-                                                               OptPhase::PathFuse,
-                                                               OptPhase::MemoSubstitutionPhase,
-                                                               OptPhase::MemoExplorationPhase,
-                                                               OptPhase::MemoImplementationPhase,
-                                                               OptPhase::PathLower,
-                                                               OptPhase::ConstEvalPost};
+const OptPhaseManager::PhaseSet kDefaultProdPhases = {OptPhase::ConstEvalPre,
+                                                      OptPhase::PathFuse,
+                                                      OptPhase::MemoSubstitutionPhase,
+                                                      OptPhase::MemoExplorationPhase,
+                                                      OptPhase::MemoImplementationPhase,
+                                                      OptPhase::PathLower,
+                                                      OptPhase::ConstEvalPost};
 
-OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
+const OptPhaseManager::PhaseSet kSamplingPhases = {OptPhase::MemoSubstitutionPhase,
+                                                   OptPhase::MemoImplementationPhase,
+                                                   OptPhase::PathLower,
+                                                   OptPhase::ConstEvalPost_ForSampling};
+
+OptPhaseManager::PhasesAndRewrites OptPhaseManager::PhasesAndRewrites::getDefaultForProd() {
+    return {kDefaultProdPhases, kDefaultExplorationSet, kDefaultSubstitutionSet};
+}
+
+OptPhaseManager::PhasesAndRewrites OptPhaseManager::PhasesAndRewrites::getDefaultForSampling() {
+    // For the sampling estimator, we do not run constant folding, path fusion, or exploration
+    // phases.
+    return {kSamplingPhases, kDefaultExplorationSet, kDefaultSubstitutionSet};
+}
+
+OptPhaseManager::OptPhaseManager(OptPhaseManager::PhasesAndRewrites phasesAndRewrites,
                                  PrefixId& prefixId,
                                  const bool requireRID,
                                  Metadata metadata,
@@ -74,7 +89,7 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  DebugInfo debugInfo,
                                  QueryHints queryHints,
                                  QueryParameterMap queryParameters)
-    : _phaseSet(std::move(phaseSet)),
+    : _phasesAndRewrites(std::move(phasesAndRewrites)),
       _debugInfo(std::move(debugInfo)),
       _hints(std::move(queryHints)),
       _metadata(std::move(metadata)),
@@ -173,7 +188,7 @@ void OptPhaseManager::runStructuralPhases(C1 instance1,
 
 void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
                                             VariableEnvironment& env,
-                                            const LogicalRewriter::RewriteSet& rewriteSet,
+                                            const LogicalRewriteSet& rewriteSet,
                                             GroupIdType& rootGroupId,
                                             const bool runStandalone,
                                             std::unique_ptr<LogicalRewriter>& logicalRewriter,
@@ -293,7 +308,7 @@ PlanExtractorResult OptPhaseManager::runMemoRewritePhases(const bool includeReje
 
     runMemoLogicalRewrite(OptPhase::MemoSubstitutionPhase,
                           env,
-                          LogicalRewriter::getSubstitutionSet(),
+                          _phasesAndRewrites.substitutionSet,
                           rootGroupId,
                           true /*runStandalone*/,
                           logicalRewriter,
@@ -301,7 +316,7 @@ PlanExtractorResult OptPhaseManager::runMemoRewritePhases(const bool includeReje
 
     runMemoLogicalRewrite(OptPhase::MemoExplorationPhase,
                           env,
-                          LogicalRewriter::getExplorationSet(),
+                          _phasesAndRewrites.explorationSet,
                           rootGroupId,
                           !hasPhase(OptPhase::MemoImplementationPhase),
                           logicalRewriter,
@@ -424,11 +439,11 @@ PlanAndProps OptPhaseManager::optimizeAndReturnProps(ABT input) {
 }
 
 bool OptPhaseManager::hasPhase(const OptPhase phase) const {
-    return _phaseSet.find(phase) != _phaseSet.cend();
+    return _phasesAndRewrites.phaseSet.find(phase) != _phasesAndRewrites.phaseSet.cend();
 }
 
 const OptPhaseManager::PhaseSet& OptPhaseManager::getAllProdRewrites() {
-    return _allProdRewrites;
+    return kDefaultProdPhases;
 }
 
 MemoPhysicalNodeId OptPhaseManager::getPhysicalNodeId() const {

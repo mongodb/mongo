@@ -79,9 +79,11 @@ TEST(SamplingEstimatorTest, SampleIndexedFields) {
 
     QueryParameterMap qp;
     // We are not lowering the paths.
-    OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
-                                             OptPhase::MemoExplorationPhase,
-                                             OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManagerForSampling{{{OptPhase::MemoSubstitutionPhase,
+                                              OptPhase::MemoExplorationPhase,
+                                              OptPhase::MemoImplementationPhase},
+                                             kDefaultExplorationSet,
+                                             kDefaultSubstitutionSet},
                                             prefixId,
                                             false /*requireRID*/,
                                             metadata,
@@ -99,9 +101,11 @@ TEST(SamplingEstimatorTest, SampleIndexedFields) {
 
     // Not optimizing fully.
     OptPhaseManager phaseManager{
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
+        {{OptPhase::MemoSubstitutionPhase,
+          OptPhase::MemoExplorationPhase,
+          OptPhase::MemoImplementationPhase},
+         kDefaultExplorationSet,
+         kDefaultSubstitutionSet},
         prefixId,
         false /*requireRID*/,
         metadata,
@@ -168,9 +172,11 @@ TEST(SamplingEstimatorTest, DoNotSampleUnindexedFields) {
 
     QueryParameterMap qp;
     // We are not lowering the paths.
-    OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
-                                             OptPhase::MemoExplorationPhase,
-                                             OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManagerForSampling{{{OptPhase::MemoSubstitutionPhase,
+                                              OptPhase::MemoExplorationPhase,
+                                              OptPhase::MemoImplementationPhase},
+                                             kDefaultExplorationSet,
+                                             kDefaultSubstitutionSet},
                                             prefixId,
                                             false /*requireRID*/,
                                             metadata,
@@ -188,9 +194,11 @@ TEST(SamplingEstimatorTest, DoNotSampleUnindexedFields) {
 
     // Not optimizing fully.
     OptPhaseManager phaseManager{
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
+        {{OptPhase::MemoSubstitutionPhase,
+          OptPhase::MemoExplorationPhase,
+          OptPhase::MemoImplementationPhase},
+         kDefaultExplorationSet,
+         kDefaultSubstitutionSet},
         prefixId,
         false /*requireRID*/,
         metadata,
@@ -236,9 +244,11 @@ TEST_F(NodeSBE, SampleTwoPredicatesAtOnceTest) {
                                       qp);
 
     // We are not lowering the paths.
-    OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
-                                             OptPhase::MemoExplorationPhase,
-                                             OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManagerForSampling{{{OptPhase::MemoSubstitutionPhase,
+                                              OptPhase::MemoExplorationPhase,
+                                              OptPhase::MemoImplementationPhase},
+                                             kDefaultExplorationSet,
+                                             kDefaultSubstitutionSet},
                                             prefixId,
                                             false /*requireRID*/,
                                             metadata,
@@ -256,9 +266,11 @@ TEST_F(NodeSBE, SampleTwoPredicatesAtOnceTest) {
 
     // Not optimizing fully.
     OptPhaseManager phaseManager{
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
+        {{OptPhase::MemoSubstitutionPhase,
+          OptPhase::MemoExplorationPhase,
+          OptPhase::MemoImplementationPhase},
+         kDefaultExplorationSet,
+         kDefaultSubstitutionSet},
         prefixId,
         false /*requireRID*/,
         metadata,

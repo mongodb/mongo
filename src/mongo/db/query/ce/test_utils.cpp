@@ -93,8 +93,9 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
     if constexpr (kCETestLogOnly) {
         std::cout << ExplainGenerator::explainV2(abt) << std::endl;
     }
+
     QueryParameterMap qp;  // Intentionally unused
-    OptPhaseManager phaseManager{_optPhases,
+    OptPhaseManager phaseManager{{_optPhases, kDefaultExplorationSet, kDefaultSubstitutionSet},
                                  _prefixId,
                                  false /*requireRID*/,
                                  _metadata,

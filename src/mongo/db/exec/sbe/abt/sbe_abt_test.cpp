@@ -733,9 +733,11 @@ TEST_F(NodeSBE, SamplingTest) {
                                       qp);
 
     // We are not lowering the paths.
-    OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
-                                             OptPhase::MemoExplorationPhase,
-                                             OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManagerForSampling{{{OptPhase::MemoSubstitutionPhase,
+                                              OptPhase::MemoExplorationPhase,
+                                              OptPhase::MemoImplementationPhase},
+                                             kDefaultExplorationSet,
+                                             kDefaultSubstitutionSet},
                                             prefixId,
                                             false /*requireRID*/,
                                             metadata,
@@ -753,9 +755,11 @@ TEST_F(NodeSBE, SamplingTest) {
 
     // Not optimizing fully.
     OptPhaseManager phaseManager{
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
+        {{OptPhase::MemoSubstitutionPhase,
+          OptPhase::MemoExplorationPhase,
+          OptPhase::MemoImplementationPhase},
+         kDefaultExplorationSet,
+         kDefaultSubstitutionSet},
         prefixId,
         false /*requireRID*/,
         metadata,

@@ -64,54 +64,10 @@
 
 namespace mongo::optimizer::cascades {
 
-LogicalRewriter::RewriteSet LogicalRewriter::_explorationSet = {
-    {LogicalRewriteType::GroupByExplore, 1},
-    {LogicalRewriteType::SargableSplit, 2},
-    {LogicalRewriteType::FilterRIDIntersectReorder, 2},
-    {LogicalRewriteType::EvaluationRIDIntersectReorder, 2}};
-
-LogicalRewriter::RewriteSet LogicalRewriter::_substitutionSet = {
-    {LogicalRewriteType::FilterEvaluationReorder, 1},
-    {LogicalRewriteType::FilterCollationReorder, 1},
-    {LogicalRewriteType::EvaluationCollationReorder, 1},
-    {LogicalRewriteType::EvaluationLimitSkipReorder, 1},
-
-    {LogicalRewriteType::FilterGroupByReorder, 1},
-    {LogicalRewriteType::GroupCollationReorder, 1},
-
-    {LogicalRewriteType::FilterUnwindReorder, 1},
-    {LogicalRewriteType::EvaluationUnwindReorder, 1},
-    {LogicalRewriteType::UnwindCollationReorder, 1},
-
-    {LogicalRewriteType::FilterExchangeReorder, 1},
-    {LogicalRewriteType::ExchangeEvaluationReorder, 1},
-
-    {LogicalRewriteType::FilterUnionReorder, 1},
-
-    {LogicalRewriteType::CollationMerge, 1},
-    {LogicalRewriteType::LimitSkipMerge, 1},
-
-    {LogicalRewriteType::SargableFilterReorder, 1},
-    {LogicalRewriteType::SargableEvaluationReorder, 1},
-    {LogicalRewriteType::SargableDisjunctiveReorder, 1},
-
-    {LogicalRewriteType::FilterValueScanPropagate, 1},
-    {LogicalRewriteType::EvaluationValueScanPropagate, 1},
-    {LogicalRewriteType::SargableValueScanPropagate, 1},
-    {LogicalRewriteType::CollationValueScanPropagate, 1},
-    {LogicalRewriteType::LimitSkipValueScanPropagate, 1},
-    {LogicalRewriteType::ExchangeValueScanPropagate, 1},
-
-    {LogicalRewriteType::LimitSkipSubstitute, 1},
-
-    {LogicalRewriteType::FilterSubstitute, 2},
-    {LogicalRewriteType::EvaluationSubstitute, 2},
-    {LogicalRewriteType::SargableMerge, 2}};
-
 LogicalRewriter::LogicalRewriter(const Metadata& metadata,
                                  Memo& memo,
                                  PrefixId& prefixId,
-                                 RewriteSet rewriteSet,
+                                 LogicalRewriteSet rewriteSet,
                                  const DebugInfo& debugInfo,
                                  const QueryHints& hints,
                                  const PathToIntervalFn& pathToInterval,
@@ -2271,14 +2227,6 @@ void LogicalRewriter::bindSingleNode(const MemoLogicalNodeId nodeMemoId,
         RewriteContext ctx(*this, rule, nodeMemoId);
         R<Type>()(node, ctx);
     }
-}
-
-const LogicalRewriter::RewriteSet& LogicalRewriter::getExplorationSet() {
-    return _explorationSet;
-}
-
-const LogicalRewriter::RewriteSet& LogicalRewriter::getSubstitutionSet() {
-    return _substitutionSet;
 }
 
 }  // namespace mongo::optimizer::cascades

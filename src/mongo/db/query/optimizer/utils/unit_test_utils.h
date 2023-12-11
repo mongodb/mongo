@@ -219,6 +219,18 @@ OptPhaseManager makePhaseManager(
     QueryHints queryHints = {});
 
 /**
+ * A convenience factory function to create OptPhaseManager for unit tests with cost model.
+ */
+OptPhaseManager makePhaseManager(
+    OptPhaseManager::PhasesAndRewrites phasesAndRewrites,
+    PrefixId& prefixId,
+    Metadata metadata,
+    std::unique_ptr<CardinalityEstimator> ce,
+    const boost::optional<cost_model::CostModelCoefficients>& costModel,
+    DebugInfo debugInfo,
+    QueryHints queryHints = {});
+
+/**
  * A convenience factory function to create OptPhaseManager for unit tests with CE hints and cost
  * model.
  */
@@ -227,6 +239,18 @@ OptPhaseManager makePhaseManager(
     PrefixId& prefixId,
     Metadata metadata,
     std::unique_ptr<CardinalityEstimator> ce,
+    const boost::optional<cost_model::CostModelCoefficients>& costModel,
+    DebugInfo debugInfo,
+    QueryHints queryHints = {});
+
+/**
+ * A convenience factory function to create OptPhaseManager for unit tests with CE hints and cost
+ * model.
+ */
+OptPhaseManager makePhaseManager(
+    OptPhaseManager::PhasesAndRewrites phasesAndRewrites,
+    PrefixId& prefixId,
+    Metadata metadata,
     const boost::optional<cost_model::CostModelCoefficients>& costModel,
     DebugInfo debugInfo,
     QueryHints queryHints = {});

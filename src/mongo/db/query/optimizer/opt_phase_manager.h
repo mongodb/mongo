@@ -40,6 +40,7 @@
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/cascades/logical_rewriter.h"
+#include "mongo/db/query/optimizer/cascades/logical_rewrites.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/cascades/physical_rewriter.h"
 #include "mongo/db/query/optimizer/containers.h"
@@ -105,7 +106,20 @@ class OptPhaseManager {
 public:
     using PhaseSet = opt::unordered_set<OptPhase>;
 
-    OptPhaseManager(PhaseSet phaseSet,
+    /**
+     * Helper struct to configure which phases & rewrites the optimizer should run.
+     */
+    struct PhasesAndRewrites {
+        PhaseSet phaseSet;
+        LogicalRewriteSet explorationSet;
+        LogicalRewriteSet substitutionSet;
+
+        // Factories for common configurations.
+        static PhasesAndRewrites getDefaultForProd();
+        static PhasesAndRewrites getDefaultForSampling();
+    };
+
+    OptPhaseManager(PhasesAndRewrites phasesAndRewrites,
                     PrefixId& prefixId,
                     bool requireRID,
                     Metadata metadata,
@@ -175,7 +189,7 @@ private:
 
     void runMemoLogicalRewrite(OptPhase phase,
                                VariableEnvironment& env,
-                               const LogicalRewriter::RewriteSet& rewriteSet,
+                               const LogicalRewriteSet& rewriteSet,
                                GroupIdType& rootGroupId,
                                bool runStandalone,
                                std::unique_ptr<LogicalRewriter>& logicalRewriter,
@@ -193,14 +207,10 @@ private:
                                                            VariableEnvironment& env,
                                                            ABT& input);
 
-
     /**
-     * Set of rewrites intended for use in production; excludes rewrites that only make the plan
-     * easier to read or easier to compare.
+     * Stores the set of phases and logical rewrites that the optimizer will run.
      */
-    static PhaseSet _allProdRewrites;
-
-    const PhaseSet _phaseSet;
+    const PhasesAndRewrites _phasesAndRewrites;
 
     const DebugInfo _debugInfo;
 
