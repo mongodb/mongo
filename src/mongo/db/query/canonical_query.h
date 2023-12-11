@@ -80,15 +80,12 @@ public:
      */
 
     /**
-     * Used for creating sub-queries from an existing CanonicalQuery.
-     *
-     * 'root' must be an expression in baseQuery.root().
-     *
-     * Does not take ownership of 'root'.
+     * Construct a 'CanonicalQuery' for a subquery of the given query. This function should only be
+     * invoked by the subplanner. 'baseQuery' must contain a MatchExpression with rooted $or. This
+     * function returns a 'CanonicalQuery' housing a copy of the i'th child of the root.
      */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx,
-                                                                    const CanonicalQuery& baseQuery,
-                                                                    MatchExpression* root);
+    static StatusWith<std::unique_ptr<CanonicalQuery>> makeForSubplanner(
+        OperationContext* opCtx, const CanonicalQuery& baseQuery, size_t i);
 
     /**
      * Returns true if "query" describes an exact-match query on _id.
@@ -275,7 +272,8 @@ private:
                 bool canHaveNoopMatchNodes,
                 std::unique_ptr<MatchExpression> root,
                 const ProjectionPolicies& projectionPolicies,
-                std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline);
+                std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
+                bool optimizeMatchExpression);
 
     // Initializes '_sortPattern', adding any metadata dependencies implied by the sort.
     //

@@ -142,7 +142,9 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                  parsingCanProduceNoopMatchNodes(extensionsCallback, allowedFeatures),
                  std::move(me),
                  projectionPolicies,
-                 std::move(pipeline));
+                 std::move(pipeline),
+                 true /*optimizeMatchExpression*/
+        );
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -151,8 +153,15 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 }
 
 // static
-StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* root) {
+StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::makeForSubplanner(
+    OperationContext* opCtx, const CanonicalQuery& baseQuery, size_t i) {
+    tassert(8401301,
+            "expected MatchExpression with rooted $or",
+            baseQuery.root()->matchType() == MatchExpression::OR);
+    tassert(8401302,
+            "attempted to get out of bounds child of $or",
+            baseQuery.root()->numChildren() > i);
+    auto root = baseQuery.root()->getChild(i);
     auto findCommand = std::make_unique<FindCommandRequest>(baseQuery.nss());
     BSONObjBuilder builder;
     root->serialize(&builder, true);
@@ -168,13 +177,20 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
     cq->setExplain(baseQuery.getExplain());
+
+    // Note: we do not optimize the MatchExpression representing the branch of the top-level $or
+    // that we are currently examining. This is because repeated invocations of
+    // MatchExpression::optimize() may change the order of predicates in the MatchExpression, due to
+    // new rewrites being unlocked by previous ones. We need to preserve the order of predicates to
+    // allow index tagging to work properly. See SERVER-84013 for more details.
     Status initStatus = cq->init(opCtx,
                                  baseQuery.getExpCtx(),
                                  std::move(findCommand),
-                                 baseQuery.canHaveNoopMatchNodes(),
+                                 baseQuery._canHaveNoopMatchNodes,
                                  root->shallowClone(),
                                  ProjectionPolicies::findProjectionPolicies(),
-                                 {} /* an empty pipeline */);
+                                 {} /* an empty pipeline */,
+                                 false /*optimizeMatchExpression*/);
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -188,7 +204,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
                             bool canHaveNoopMatchNodes,
                             std::unique_ptr<MatchExpression> root,
                             const ProjectionPolicies& projectionPolicies,
-                            std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline) {
+                            std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
+                            bool optimizeMatchExpression) {
     _expCtx = expCtx;
     _findCommand = std::move(findCommand);
 
@@ -200,7 +217,13 @@ Status CanonicalQuery::init(OperationContext* opCtx,
         return validStatus.getStatus();
     }
     auto unavailableMetadata = validStatus.getValue();
-    _root = MatchExpression::normalize(std::move(root));
+
+    if (optimizeMatchExpression) {
+        _root = MatchExpression::normalize(std::move(root));
+    } else {
+        _root = std::move(root);
+    }
+
     if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
         const bool hasNoTextNodes =
             !QueryPlannerCommon::hasNode(_root.get(), MatchExpression::TEXT);
