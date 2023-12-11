@@ -278,7 +278,7 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
         assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand), isExplain));
 
     MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
-    auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, firstClauseExpr));
+    auto childCq = assertGet(CanonicalQuery::makeForSubplanner(opCtx.get(), *baseCq, 0));
 
     BSONObjBuilder expectedFilter;
     firstClauseExpr->serialize(&expectedFilter);
@@ -319,8 +319,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithNoCollation) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{$or:[{a:1,b:1},{a:1,c:1}]}"));
     auto baseCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand)));
-    MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
-    auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, firstClauseExpr));
+    auto childCq = assertGet(CanonicalQuery::makeForSubplanner(opCtx.get(), *baseCq, 0));
     ASSERT_TRUE(baseCq->getCollator() == nullptr);
     ASSERT_TRUE(childCq->getCollator() == nullptr);
 }
@@ -334,8 +333,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithCollation) {
     findCommand->setCollation(BSON("locale"
                                    << "reverse"));
     auto baseCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand)));
-    MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
-    auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, firstClauseExpr));
+    auto childCq = assertGet(CanonicalQuery::makeForSubplanner(opCtx.get(), *baseCq, 0));
     ASSERT(baseCq->getCollator());
     ASSERT(childCq->getCollator());
     ASSERT_TRUE(*(childCq->getCollator()) == *(baseCq->getCollator()));
