@@ -384,7 +384,10 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
                 planExecutorHangBeforeShouldWaitForInserts.pauseWhileSet();
             }
 
-            if (!_yieldPolicy ||
+            // The !notifier check is necessary because shouldWaitForInserts can return 'true' when
+            // shouldListenForInserts returned 'false' (above) in the case of a deadline becoming
+            // "unexpired" due to the system clock going backwards.
+            if (!_yieldPolicy || !notifier ||
                 !insert_listener::shouldWaitForInserts(_opCtx, _cq.get(), _yieldPolicy.get())) {
                 return PlanExecutor::ExecState::IS_EOF;
             }
