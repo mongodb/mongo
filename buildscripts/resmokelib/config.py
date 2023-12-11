@@ -105,7 +105,7 @@ DEFAULTS = {
     "shuffle": None,
     "stagger_jobs": None,
     "majority_read_concern": "on",
-    "enable_enterprise_tests": None,
+    "enable_enterprise_tests": "on",
     "shell_seed": None,
     "storage_engine": "wiredTiger",
     "storage_engine_cache_size_gb": None,
@@ -328,6 +328,9 @@ DRY_RUN = None
 
 # If set, specifies which node is the config shard. Can also be set to 'any'.
 CONFIG_SHARD = None
+
+# if set, enables enterprise jstest to automatically be included
+ENABLE_ENTERPRISE_TESTS = None
 
 # URL to connect to the Evergreen service.
 EVERGREEN_URL = None
