@@ -487,6 +487,7 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
         "awaitData: true,"
         "allowPartialResults: true,"
         "readOnce: true,"
+        "includeQueryStatsMetrics: true,"
         "allowSpeculativeMajorityRead: true, '$db': 'test'}");
 
     unique_ptr<FindCommandRequest> findCommand(
@@ -498,6 +499,7 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
     ASSERT(findCommand->getTailable() && findCommand->getAwaitData());
     ASSERT(findCommand->getAllowPartialResults());
     ASSERT(findCommand->getReadOnce());
+    ASSERT(findCommand->getIncludeQueryStatsMetrics());
     ASSERT(findCommand->getAllowSpeculativeMajorityRead());
 }
 
@@ -523,6 +525,14 @@ TEST(QueryRequestTest, ParseFromCommandReadOnceDefaultsToFalse) {
     unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT(!findCommand->getReadOnce());
+}
+
+TEST(QueryRequestTest, ParseFromCommandIncludeQueryStatsMetricsDefaultsToFalse) {
+    BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test'}");
+
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
+    ASSERT(!findCommand->getIncludeQueryStatsMetrics());
 }
 
 TEST(QueryRequestTest, ParseFromCommandValidMinMax) {
@@ -903,6 +913,14 @@ TEST(QueryRequestTest, ParseFromCommandLegacyRuntimeConstantsSubfieldsWrongType)
                           << "test");
     ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
                        AssertionException,
+                       ErrorCodes::TypeMismatch);
+}
+
+TEST(QueryRequestTest, ParseFromCommandIncludeQueryStatsMetricsWrongType) {
+    BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test', 'includeQueryStatsMetrics': 42}");
+
+    ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
+                       DBException,
                        ErrorCodes::TypeMismatch);
 }
 

@@ -65,6 +65,36 @@ GetMoreCommandRequest createGetMoreCommandRequest(
     return request;
 }
 
+std::unique_ptr<GetMoreCommandRequest> parseFromBSON(const BSONObj& cmdObj) {
+    static constexpr bool apiStrict = false;
+    return std::make_unique<GetMoreCommandRequest>(
+        GetMoreCommandRequest::parse(IDLParserContext("GetMoreCommandRequest", apiStrict), cmdObj));
+}
+
+TEST(GetMoreRequestTest, ShouldParseAllKnownOptions) {
+    repl::OpTime optime{Timestamp{0, 100}, 2};
+    BSONObj inputBson = BSON("getMore" << CursorId(123) << "collection"
+                                       << "testcoll"
+                                       << "$db"
+                                       << "testdb"
+                                       << "batchSize" << 99 << "maxTimeMS" << 789 << "term" << 1LL
+                                       << "lastKnownCommittedOpTime" << optime.toBSON()
+                                       << "includeQueryStatsMetrics" << true);
+
+    auto request = parseFromBSON(inputBson);
+
+    ASSERT_TRUE(request->getBatchSize());
+    ASSERT_TRUE(request->getMaxTimeMS());
+    ASSERT_TRUE(request->getTerm());
+    ASSERT_TRUE(request->getLastKnownCommittedOpTime());
+
+    ASSERT_EQ(*request->getBatchSize(), 99);
+    ASSERT_EQ(*request->getMaxTimeMS(), 789);
+    ASSERT_EQ(*request->getTerm(), 1LL);
+    ASSERT_EQ(*request->getLastKnownCommittedOpTime(), optime);
+    ASSERT_TRUE(request->getIncludeQueryStatsMetrics());
+}
+
 TEST(GetMoreRequestTest, toBSONMissingOptionalFields) {
     GetMoreCommandRequest request = createGetMoreCommandRequest("testcoll", 123);
     BSONObj requestObj = request.toBSON({});

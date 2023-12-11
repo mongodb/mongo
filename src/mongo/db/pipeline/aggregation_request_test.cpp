@@ -89,7 +89,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
         "collation: {locale: 'en_US'}, cursor: {batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, "
         "readConcern: {level: 'linearizable'}, $queryOptions: {$readPreference: 'nearest'}, "
         "exchange: {policy: 'roundrobin', consumers:NumberInt(2)}, isMapReduceCommand: true, $db: "
-        "'local', $_isClusterQueryWithoutShardKeyCmd: true}");
+        "'local', $_isClusterQueryWithoutShardKeyCmd: true, includeQueryStatsMetrics: true}");
     auto uuid = UUID::gen();
     BSONObjBuilder uuidBob;
     uuid.appendToBuilder(&uuidBob, AggregateCommandRequest::kCollectionUUIDFieldName);
@@ -120,6 +120,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
                            << "nearest"));
     ASSERT_TRUE(request.getExchange().has_value());
     ASSERT_TRUE(request.getIsMapReduceCommand());
+    ASSERT_TRUE(request.getIncludeQueryStatsMetrics());
     ASSERT_EQ(*request.getCollectionUUID(), uuid);
 }
 
@@ -241,6 +242,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setCollectionUUID(uuid);
     request.setIsClusterQueryWithoutShardKeyCmd(true);
 
+    request.setIncludeQueryStatsMetrics(true);
+
     auto expectedSerialization = Document{
         {AggregateCommandRequest::kCommandName, nss.coll()},
         {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
@@ -258,7 +261,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
         {AggregateCommandRequest::kRequestReshardingResumeTokenFieldName, true},
         {AggregateCommandRequest::kIsMapReduceCommandFieldName, true},
         {AggregateCommandRequest::kCollectionUUIDFieldName, uuid},
-        {AggregateCommandRequest::kIsClusterQueryWithoutShardKeyCmdFieldName, true}};
+        {AggregateCommandRequest::kIsClusterQueryWithoutShardKeyCmdFieldName, true},
+        {AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName, true}};
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
                        expectedSerialization);
 }
@@ -519,6 +523,19 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge) {
     const BSONObj nonBoolNeedsMerge = fromjson("{needsMerge: 1}");
     aggregationRequestParseFailureHelper(
         nss, validRequest, nonBoolNeedsMerge, ErrorCodes::TypeMismatch);
+}
+
+TEST(AggregationRequestTest, ShouldRejectNonBoolIncludeQueryStatsMetrics) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
+    const BSONObj validRequest = fromjson(
+        "{aggregate: 'collection',"
+        "pipeline: [{$match: {a: 'abc'}}], "
+        "cursor: {},"
+        "includeQueryStatsMetrics: false, "
+        "$db: 'a'}");
+    const BSONObj nonBoolIncludeQueryStatsMetrics = fromjson("{includeQueryStatsMetrics: 1}");
+    aggregationRequestParseFailureHelper(
+        nss, validRequest, nonBoolIncludeQueryStatsMetrics, ErrorCodes::TypeMismatch);
 }
 
 TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfFromMongosNotPresent) {
