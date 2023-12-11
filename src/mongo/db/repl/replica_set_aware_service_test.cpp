@@ -290,7 +290,7 @@ public:
 
         auto serviceContext = getServiceContext();
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
-        replCoord->setMyLastAppliedOpTimeAndWallTime(
+        replCoord->setMyLastAppliedOpTimeAndWallTimeForward(
             repl::OpTimeAndWallTime(repl::OpTime(Timestamp(1, 1), _term), Date_t()));
         repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 

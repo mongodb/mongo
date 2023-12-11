@@ -167,7 +167,7 @@ protected:
             _term++;
             ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));
             ASSERT_OK(replCoord->updateTerm(opCtx.get(), _term));
-            replCoord->setMyLastAppliedOpTimeAndWallTime(
+            replCoord->setMyLastAppliedOpTimeAndWallTimeForward(
                 OpTimeAndWallTime(OpTime(Timestamp(1, 1), _term), Date_t()));
         }
     }

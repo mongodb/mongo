@@ -666,7 +666,7 @@ public:
 
     void setReplCoordAppliedOpTime(const repl::OpTime& opTime, Date_t wallTime = Date_t()) {
         repl::ReplicationCoordinator::get(_opCtx->getServiceContext())
-            ->setMyLastAppliedOpTimeAndWallTime({opTime, wallTime});
+            ->setMyLastAppliedOpTimeAndWallTimeForward({opTime, wallTime});
         ASSERT_OK(repl::ReplicationCoordinator::get(_opCtx->getServiceContext())
                       ->updateTerm(_opCtx, opTime.getTerm()));
     }

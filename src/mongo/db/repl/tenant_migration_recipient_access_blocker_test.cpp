@@ -104,7 +104,7 @@ public:
 
             auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
             ASSERT_OK(replCoord->updateTerm(opCtx(), 1));
-            replCoord->setMyLastAppliedOpTimeAndWallTime(
+            replCoord->setMyLastAppliedOpTimeAndWallTimeForward(
                 OpTimeAndWallTime(OpTime(Timestamp(1, 1), 1), Date_t()));
             ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
             ReplicationCoordinator::set(serviceContext, std::move(replCoord));

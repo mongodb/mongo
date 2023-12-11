@@ -380,7 +380,7 @@ public:
         ASSERT_OK(replCoord->updateTerm(operationContext(), _term));
 
         WriteUnitOfWork wuow{operationContext()};
-        replCoord->setMyLastAppliedOpTimeAndWallTime(repl::OpTimeAndWallTime(
+        replCoord->setMyLastAppliedOpTimeAndWallTimeForward(repl::OpTimeAndWallTime(
             repl::OpTime(repl::getNextOpTime(operationContext()).getTimestamp(), _term), Date_t()));
         wuow.commit();
 

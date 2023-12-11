@@ -218,14 +218,6 @@ void ReplicationCoordinatorNoOp::setMyLastDurableOpTimeAndWallTimeForward(
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime&) {
-    MONGO_UNREACHABLE;
-}
-
-void ReplicationCoordinatorNoOp::setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime&) {
-    MONGO_UNREACHABLE;
-}
-
 void ReplicationCoordinatorNoOp::resetMyLastOpTimes() {
     MONGO_UNREACHABLE;
 }

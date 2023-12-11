@@ -164,11 +164,6 @@ public:
     bool isCommitQuorumSatisfied(const CommitQuorumOptions& commitQuorum,
                                  const std::vector<mongo::HostAndPort>& members) const override;
 
-    void setMyLastAppliedOpTimeAndWallTime(
-        const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
-    void setMyLastDurableOpTimeAndWallTime(
-        const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
-
     void setMyLastWrittenOpTimeAndWallTimeForward(
         const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
     void setMyLastAppliedOpTimeAndWallTimeForward(const repl::OpTimeAndWallTime& opTimeAndWallTime,

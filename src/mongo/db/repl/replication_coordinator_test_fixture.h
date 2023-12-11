@@ -149,7 +149,7 @@ protected:
         if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
-        getReplCoord()->setMyLastAppliedOpTimeAndWallTime({opTime, wallTime});
+        getReplCoord()->setMyLastAppliedOpTimeAndWallTimeForward({opTime, wallTime});
     }
 
     void replCoordSetMyLastAppliedOpTimeForward(const OpTime& opTime, Date_t wallTime = Date_t()) {
@@ -163,7 +163,7 @@ protected:
         if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
-        getReplCoord()->setMyLastDurableOpTimeAndWallTime({opTime, wallTime});
+        getReplCoord()->setMyLastDurableOpTimeAndWallTimeForward({opTime, wallTime});
     }
 
     void replCoordSetMyLastDurableOpTimeForward(const OpTime& opTime, Date_t wallTime = Date_t()) {

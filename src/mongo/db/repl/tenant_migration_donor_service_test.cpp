@@ -133,7 +133,7 @@ class TenantMigrationDonorServiceTest : public ServiceContextMongoDTest {
 
         ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));
         ASSERT_OK(replCoord->updateTerm(opCtx.get(), _term));
-        replCoord->setMyLastAppliedOpTimeAndWallTime(
+        replCoord->setMyLastAppliedOpTimeAndWallTimeForward(
             OpTimeAndWallTime(OpTime(Timestamp(1, 1), _term), Date_t()));
 
         _registry->onStepUpComplete(opCtx.get(), _term);

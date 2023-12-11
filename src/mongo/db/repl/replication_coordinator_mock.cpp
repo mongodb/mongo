@@ -261,21 +261,6 @@ void ReplicationCoordinatorMock::_setMyLastAppliedOpTimeAndWallTime(
     }
 }
 
-void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTime(
-    const OpTimeAndWallTime& opTimeAndWallTime) {
-    stdx::lock_guard<Mutex> lk(_mutex);
-
-    _setMyLastAppliedOpTimeAndWallTime(lk, opTimeAndWallTime);
-}
-
-void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTime(
-    const OpTimeAndWallTime& opTimeAndWallTime) {
-    stdx::lock_guard<Mutex> lk(_mutex);
-
-    _myLastDurableOpTime = opTimeAndWallTime.opTime;
-    _myLastDurableWallTime = opTimeAndWallTime.wallTime;
-}
-
 void ReplicationCoordinatorMock::setMyLastWrittenOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime) {
     stdx::lock_guard<Mutex> lk(_mutex);
@@ -288,7 +273,9 @@ void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp) {
     stdx::lock_guard<Mutex> lk(_mutex);
 
-    if (opTimeAndWallTime.opTime > _myLastAppliedOpTime) {
+    // = is necessary here because in some unit test setup, we want to update the term while not
+    // changing the opTime.
+    if (opTimeAndWallTime.opTime >= _myLastAppliedOpTime) {
         _setMyLastAppliedOpTimeAndWallTime(lk, opTimeAndWallTime);
     }
 }
@@ -297,7 +284,9 @@ void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime) {
     stdx::lock_guard<Mutex> lk(_mutex);
 
-    if (opTimeAndWallTime.opTime > _myLastDurableOpTime) {
+    // = is necessary here because in some unit test setup, we want to update the term while not
+    // changing the opTime.
+    if (opTimeAndWallTime.opTime >= _myLastDurableOpTime) {
         _myLastDurableOpTime = opTimeAndWallTime.opTime;
         _myLastDurableWallTime = opTimeAndWallTime.wallTime;
     }

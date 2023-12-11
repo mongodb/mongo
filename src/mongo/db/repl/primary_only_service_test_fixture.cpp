@@ -143,7 +143,7 @@ void stepUp(OperationContext* opCtx,
 
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
     ASSERT_OK(replCoord->updateTerm(opCtx, term));
-    replCoord->setMyLastAppliedOpTimeAndWallTime({newOpTime, {}});
+    replCoord->setMyLastAppliedOpTimeAndWallTimeForward({newOpTime, {}});
 
     registry->onStepUpComplete(opCtx, term);
 }

@@ -87,7 +87,7 @@ public:
         auto replCoord = ReplicationCoordinator::get(getServiceContext());
         ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));
         ASSERT_OK(replCoord->updateTerm(opCtx.get(), term));
-        replCoord->setMyLastAppliedOpTimeAndWallTime(
+        replCoord->setMyLastAppliedOpTimeAndWallTimeForward(
             OpTimeAndWallTime(OpTime(Timestamp(1, 1), term), Date_t()));
     }
 

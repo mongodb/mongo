@@ -1487,27 +1487,6 @@ void ReplicationCoordinatorImpl::setMyLastDurableOpTimeAndWallTimeForward(
     }
 }
 
-void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeAndWallTime(
-    const OpTimeAndWallTime& opTimeAndWallTime) {
-    const auto opTime = opTimeAndWallTime.opTime;
-    // Update the global timestamp before setting the last applied opTime forward so the last
-    // applied optime is never greater than the latest cluster time in the logical clock.
-    _externalState->setGlobalTimestamp(getServiceContext(), opTime.getTimestamp());
-
-    stdx::unique_lock<Latch> lock(_mutex);
-    // The optime passed to this function is required to represent a consistent database state.
-    _setMyLastAppliedOpTimeAndWallTime(lock, opTimeAndWallTime, false);
-    signalOplogWaiters();
-    _reportUpstream_inlock(std::move(lock));
-}
-
-void ReplicationCoordinatorImpl::setMyLastDurableOpTimeAndWallTime(
-    const OpTimeAndWallTime& opTimeAndWallTime) {
-    stdx::unique_lock<Latch> lock(_mutex);
-    _setMyLastDurableOpTimeAndWallTime(lock, opTimeAndWallTime, false);
-    _reportUpstream_inlock(std::move(lock));
-}
-
 void ReplicationCoordinatorImpl::resetMyLastOpTimes() {
     stdx::unique_lock<Latch> lock(_mutex);
     _resetMyLastOpTimes(lock);
@@ -4447,7 +4426,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
 
     // Since the JournalListener has not yet been set up, we must manually set our
     // durableOpTime.
-    setMyLastDurableOpTimeAndWallTime(lastAppliedOpTimeAndWallTime);
+    setMyLastDurableOpTimeAndWallTimeForward(lastAppliedOpTimeAndWallTime);
 
     // Sets the initial data timestamp on the storage engine so it can assign a timestamp
     // to data on disk. We do this after writing the "initiating set" oplog entry.

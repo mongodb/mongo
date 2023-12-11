@@ -370,30 +370,6 @@ public:
                                              const NamespaceString& ns) = 0;
 
     /**
-     * Updates our internal tracking of the last OpTime applied to this node. Also updates our
-     * internal tracking of the wall clock time corresponding to that operation.
-     *
-     * The new value of "opTime" must be no less than any prior value passed to this method, and
-     * it is the caller's job to properly synchronize this behavior.  The exception to this rule
-     * is that after calls to resetLastOpTimesFromOplog(), the minimum acceptable value for
-     * "opTime" is reset based on the contents of the oplog, and may go backwards due to
-     * rollback. Additionally, the optime given MUST represent a consistent database state.
-     */
-    virtual void setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) = 0;
-
-    /**
-     * Updates our internal tracking of the last OpTime durable to this node. Also updates our
-     * internal tracking of the wall clock time corresponding to that operation.
-     *
-     * The new value of "opTime" must be no less than any prior value passed to this method, and
-     * it is the caller's job to properly synchronize this behavior.  The exception to this rule
-     * is that after calls to resetLastOpTimesFromOplog(), the minimum acceptable value for
-     * "opTime" is reset based on the contents of the oplog, and may go backwards due to
-     * rollback.
-     */
-    virtual void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) = 0;
-
-    /**
      * Updates our internal tracking of the last OpTime that an oplog entry is written into memory
      * on this node.
      */

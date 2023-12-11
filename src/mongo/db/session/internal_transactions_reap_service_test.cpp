@@ -118,7 +118,7 @@ protected:
         // Set a last applied opTime to satisfy an invariant in the primary only service registry.
         auto newLastAppliedOpTime = repl::OpTime(Timestamp(1, 1), 1);
         repl::ReplicationCoordinator::get(getServiceContext())
-            ->setMyLastAppliedOpTimeAndWallTime({newLastAppliedOpTime, Date_t()});
+            ->setMyLastAppliedOpTimeAndWallTimeForward({newLastAppliedOpTime, Date_t()});
         ReplicaSetAwareServiceRegistry::get(getServiceContext()).onStepUpComplete(opCtx(), 1LL);
     }
 

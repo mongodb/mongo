@@ -493,7 +493,7 @@ public:
 
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
         ASSERT_OK(replCoord->updateTerm(opCtx, _term));
-        replCoord->setMyLastAppliedOpTimeAndWallTime({newOpTime, {}});
+        replCoord->setMyLastAppliedOpTimeAndWallTimeForward({newOpTime, {}});
 
         _registry->onStepUpComplete(opCtx, _term);
     }

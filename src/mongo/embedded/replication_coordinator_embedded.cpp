@@ -220,14 +220,6 @@ void ReplicationCoordinatorEmbedded::setMyLastDurableOpTimeAndWallTimeForward(
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime&) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
-void ReplicationCoordinatorEmbedded::setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime&) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 void ReplicationCoordinatorEmbedded::resetMyLastOpTimes() {
     UASSERT_NOT_IMPLEMENTED;
 }

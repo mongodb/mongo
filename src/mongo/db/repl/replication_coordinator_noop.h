@@ -160,8 +160,6 @@ public:
                                  const std::vector<mongo::HostAndPort>& members) const final;
 
     void setMyLastWrittenOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime) final;
-    void setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
-    void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastAppliedOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime,
                                                   bool advanceGlobalTimestamp) final;
     void setMyLastDurableOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime) final;

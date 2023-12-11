@@ -170,8 +170,6 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
     // initialDataTimestamp). If we crash before the first stable checkpoint is taken, we are
     // guaranteed to come back up with the initial sync flag. In this corner case, this node has to
     // be resynced.
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    OpTimeAndWallTime opTimeAndWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime();
     BSONObj update = BSON("$unset" << kInitialSyncFlag);
 
     _updateMinValidDocument(opCtx, update);
@@ -184,8 +182,9 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
     setOplogTruncateAfterPoint(opCtx, Timestamp());
 
     if (!getGlobalServiceContext()->getStorageEngine()->isEphemeral()) {
+        // This will set lastDurable after journal flush is completed so we after this function, we
+        // will have both valid lastApplied and lastDurable.
         JournalFlusher::get(opCtx)->waitForJournalFlush();
-        replCoord->setMyLastDurableOpTimeAndWallTime(opTimeAndWallTime);
     }
 }
 

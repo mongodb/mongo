@@ -203,7 +203,7 @@ protected:
         auto lastAppliedOpTimeAndWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime();
         auto newOpTime =
             repl::OpTime(targetTimestamp, lastAppliedOpTimeAndWallTime.opTime.getTerm());
-        replCoord->setMyLastAppliedOpTimeAndWallTime(
+        replCoord->setMyLastAppliedOpTimeAndWallTimeForward(
             repl::OpTimeAndWallTime(newOpTime, lastAppliedOpTimeAndWallTime.wallTime));
 
         // Verify the Timestamp is set accordingly.
