@@ -83,29 +83,34 @@ checkLog = (function() {
      * complete equality. In addition, the `expectedCount` param ensures that the log appears
      * exactly as many times as expected.
      */
-    const checkContainsWithCountJson = function(
-        conn, id, attrsDict, expectedCount, severity = null, isRelaxed = false) {
-        const logMessages = getGlobalLog(conn);
-        if (logMessages === null) {
-            return false;
-        }
+    const checkContainsWithCountJson = function(conn,
+                                                id,
+                                                attrsDict,
+                                                expectedCount,
+                                                severity = null,
+                                                isRelaxed = false,
+                                                comparator =
+                                                    (actual, expected) => {
+                                                        return actual === expected;
+                                                    },
+                                                context = null) {
+        const messages = getFilteredLogMessages(conn, id, attrsDict, severity, isRelaxed, context);
 
-        let count = 0;
-        for (let logMsg of logMessages) {
-            let obj;
-            try {
-                obj = JSON.parse(logMsg);
-            } catch (ex) {
-                print('checkLog.checkContainsOnce: JsonJSON.parse() failed: ' + tojson(ex) + ': ' +
-                      logMsg);
-                throw ex;
-            }
+        const count = messages.length;
 
-            if (_compareLogs(obj, id, severity, attrsDict, isRelaxed)) {
-                count++;
-            }
-        }
-        return count === expectedCount;
+        return comparator(count, expectedCount);
+    };
+
+    /*
+     * Similar to checkContainsWithCountJson, but checks whether there are at least 'expectedCount'
+     * instances of 'id' in the logs.
+     */
+    const checkContainsWithAtLeastCountJson = function(
+        conn, id, attrsDict, expectedCount, severity = null, isRelaxed = false, context = null) {
+        return checkContainsWithCountJson(
+            conn, id, attrsDict, expectedCount, severity, isRelaxed, (actual, expected) => {
+                return actual >= expected;
+            }, context);
     };
 
     /*
@@ -129,6 +134,36 @@ checkLog = (function() {
         }
 
         return false;
+    };
+
+    /*
+     * See checkContainsWithCountJson comment.
+     */
+    const getFilteredLogMessages = function(
+        conn, id, attrsDict, severity = null, isRelaxed = false, context = null) {
+        const logMessages = getGlobalLog(conn);
+        if (logMessages === null) {
+            return false;
+        }
+
+        let messages = [];
+
+        for (let logMsg of logMessages) {
+            let obj;
+            try {
+                obj = JSON.parse(logMsg);
+            } catch (ex) {
+                print('checkLog.checkContainsOnce: JsonJSON.parse() failed: ' + tojson(ex) + ': ' +
+                      logMsg);
+                throw ex;
+            }
+
+            if (_compareLogs(obj, id, severity, attrsDict, isRelaxed)) {
+                messages.push(obj);
+            }
+        }
+
+        return messages;
     };
 
     /*
@@ -371,8 +406,10 @@ checkLog = (function() {
         containsRelaxedJson: containsRelaxedJson,
         containsWithCount: containsWithCount,
         containsWithAtLeastCount: containsWithAtLeastCount,
+        checkContainsWithAtLeastCountJson: checkContainsWithAtLeastCountJson,
         formatAsLogLine: formatAsLogLine,
-        formatAsJsonLogLine: formatAsJsonLogLine
+        formatAsJsonLogLine: formatAsJsonLogLine,
+        getFilteredLogMessages: getFilteredLogMessages,
     };
 })();
 })();

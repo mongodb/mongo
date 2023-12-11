@@ -117,6 +117,18 @@ public:
         return _durable;
     }
 
+    // Force a WT checkpoint, this will not update internal timestamps.
+    void forceCheckpoint(bool useStableTimestamp);
+
+    StorageEngine::CheckpointIteration getCheckpointIteration() const override {
+        return StorageEngine::CheckpointIteration{_currentCheckpointIteration.load()};
+    }
+
+    bool hasDataBeenCheckpointed(
+        StorageEngine::CheckpointIteration checkpointIteration) const override {
+        return _ephemeral || _finishedCheckpointIteration.load() > checkpointIteration;
+    }
+
     bool isEphemeral() const override {
         return _ephemeral;
     }
@@ -365,6 +377,10 @@ private:
         StorageEngine::DropIdentCallback callback;
     };
 
+    void _checkpoint(WT_SESSION* session);
+
+    void _checkpoint(WT_SESSION* session, bool useTimestamp);
+
     /**
      * Opens a connection on the WiredTiger database 'path' with the configuration 'wtOpenConfig'.
      * Only returns when successful. Intializes both '_conn' and '_fileVersion'.
@@ -492,5 +508,21 @@ private:
     // Pins the oplog so that OplogStones will not truncate oplog history equal or newer to this
     // timestamp.
     AtomicWord<std::uint64_t> _pinnedOplogTimestamp;
+
+    // Limits the actions of concurrent checkpoint callers as we update some internal data during a
+    // checkpoint. WT has a mutex of its own to only have one checkpoint active at all times so this
+    // is only to protect our internal updates.
+    Mutex _checkpointMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::_checkpointMutex");
+
+    // Counters used for computing whether a checkpointIteration has lapsed or not.
+    //
+    // We use two counters because one isn't sufficient to prove correctness. With two counters we
+    // first increase the first one in order to inform later operations that they will be part of
+    // the next checkpoint. The second one is there to inform waiters on whether they've
+    // successfully been checkpointed or not.
+    //
+    // This is valid because durability is a state all operations will converge to eventually.
+    AtomicWord<std::uint64_t> _currentCheckpointIteration{0};
+    AtomicWord<std::uint64_t> _finishedCheckpointIteration{0};
 };
 }  // namespace mongo

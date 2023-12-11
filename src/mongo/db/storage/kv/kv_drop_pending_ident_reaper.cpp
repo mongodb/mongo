@@ -43,12 +43,32 @@
 
 namespace mongo {
 
+bool KVDropPendingIdentReaper::IdentInfo::isExpired(const KVEngine* engine,
+                                                    const Timestamp& ts) const {
+    return dropToken.expired() &&
+        stdx::visit(
+               visit_helper::Overloaded{[&](const Timestamp& dropTs) {
+                                            return dropTs < ts || dropTs == Timestamp::min();
+                                        },
+                                        [&](const StorageEngine::CheckpointIteration& iteration) {
+                                            return engine->hasDataBeenCheckpointed(iteration);
+                                        }},
+               dropTime);
+}
+
 KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(engine) {}
 
-void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestamp,
-                                                   std::shared_ptr<Ident> ident,
-                                                   StorageEngine::DropIdentCallback&& onDrop) {
+void KVDropPendingIdentReaper::addDropPendingIdent(
+    const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
+    std::shared_ptr<Ident> ident,
+    StorageEngine::DropIdentCallback&& onDrop) {
     stdx::lock_guard<Latch> lock(_mutex);
+    auto dropTimestamp =
+        stdx::visit(visit_helper::Overloaded{[](const Timestamp& ts) { return ts; },
+                                             [](const StorageEngine::CheckpointIteration&) {
+                                                 return Timestamp::min();
+                                             }},
+                    dropTime);
     const auto equalRange = _dropPendingIdents.equal_range(dropTimestamp);
     const auto& lowerBound = equalRange.first;
     const auto& upperBound = equalRange.second;
@@ -57,14 +77,25 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestam
         IdentInfo info;
         info.identName = ident->getIdent();
         info.dropToken = ident;
+        info.dropTime = dropTime;
         info.onDrop = std::move(onDrop);
         _dropPendingIdents.insert(std::make_pair(dropTimestamp, info));
     } else {
-        LOGV2_FATAL_NOTRACE(51023,
-                            "Failed to add drop-pending ident, duplicate timestamp and ident pair",
-                            "ident"_attr = ident->getIdent(),
-                            "dropTimestamp"_attr = dropTimestamp);
+        LOGV2_WARNING(8097403,
+                      "Ignoring duplicate ident drop with same drop time",
+                      "ident"_attr = ident->getIdent(),
+                      "dropTimestamp"_attr = dropTimestamp);
     }
+}
+
+bool KVDropPendingIdentReaper::hasExpiredIdents(const Timestamp& ts) const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    auto [it, end] = _dropPendingIdents.equal_range(Timestamp::min());
+    if (end != _dropPendingIdents.end()) {
+        // Include the earliest timestamped write as well.
+        end++;
+    }
+    return std::any_of(it, end, [&](const auto& kv) { return kv.second.isExpired(_engine, ts); });
 }
 
 boost::optional<Timestamp> KVDropPendingIdentReaper::getEarliestDropTimestamp() const {
@@ -97,7 +128,8 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
             // This collection/index satisfies the 'ts' requirement to be safe to drop, but we must
             // also check that there are no active operations remaining that still retain a
             // reference by which to access the collection/index data.
-            if (it->second.dropToken.expired()) {
+            const auto& info = it->second;
+            if (info.isExpired(_engine, ts)) {
                 toDrop.insert(*it);
             }
         }
@@ -161,7 +193,12 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
 
 void KVDropPendingIdentReaper::clearDropPendingState() {
     stdx::lock_guard<Latch> lock(_mutex);
-    _dropPendingIdents.clear();
+    // We only delete the timestamped drops. Non-timestamped drops cannot be rolled back, and the
+    // drops should still go through.
+    auto firstElem = std::find_if_not(_dropPendingIdents.begin(),
+                                      _dropPendingIdents.end(),
+                                      [](const auto& kv) { return kv.first == Timestamp::min(); });
+    _dropPendingIdents.erase(firstElem, _dropPendingIdents.end());
 }
 
 }  // namespace mongo

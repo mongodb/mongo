@@ -166,10 +166,17 @@ public:
     std::set<std::string> getDropPendingIdents() const final {
         return {};
     }
-    void addDropPendingIdent(const Timestamp& dropTimestamp,
-                             std::shared_ptr<Ident> ident,
-                             DropIdentCallback&& onDrop) final {}
+    void addDropPendingIdent(
+        const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
+        std::shared_ptr<Ident> ident,
+        DropIdentCallback&& onDrop) final {}
     void checkpoint() final {}
+    StorageEngine::CheckpointIteration getCheckpointIteration() const final {
+        return StorageEngine::CheckpointIteration{0};
+    }
+    bool hasDataBeenCheckpointed(StorageEngine::CheckpointIteration checkpointIteration) const {
+        return false;
+    }
     Status currentFilesCompatible(OperationContext* opCtx) const final {
         return Status::OK();
     }

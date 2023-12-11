@@ -81,7 +81,6 @@ const MissingIndexIdent = class {
             index: 'a_1',
             namespace: coll.getFullName(),
             ident: ident,
-            commitTimestamp: {$timestamp: {t: 0, i: 0}},
         });
 
         // The oldest timestamp moving forward will cause the ident reaper to drop the ident.

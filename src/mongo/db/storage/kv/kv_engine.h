@@ -217,6 +217,15 @@ public:
 
     virtual bool isDurable() const = 0;
 
+    virtual StorageEngine::CheckpointIteration getCheckpointIteration() const {
+        return StorageEngine::CheckpointIteration{0};
+    }
+
+    virtual bool hasDataBeenCheckpointed(
+        StorageEngine::CheckpointIteration checkpointIteration) const {
+        MONGO_UNREACHABLE;
+    }
+
     /**
      * Returns true if the KVEngine is ephemeral -- that is, it is NOT persistent and all data is
      * lost after shutdown. Otherwise, returns false.

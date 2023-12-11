@@ -54,7 +54,7 @@ const checkDirRemoved = function(dbName, dbDirPath) {
         },
         "dbpath contained '" + dbName +
             "' directory when it should have been removed:" + tojson(listFiles(dbDirPath)),
-        10 * 1000);  // The periodic task to run data table cleanup runs once a second.
+        20 * 1000);  // The periodic task to run data table cleanup runs once a second.
 };
 
 const db = m.getDB(dbname);
@@ -64,12 +64,18 @@ checkDirExists(dbname, dbpath);
 // Test that dropping the last collection in the database causes the database directory to be
 // removed.
 assert(db.bar.drop());
+// We force a checkpoint, this will make the catalog get checkpointed and let the ident drops
+// through.
+db.adminCommand({fsync: 1});
 checkDirRemoved(dbname, dbpath);
 
 // Test that dropping the entire database causes the database directory to be removed.
 assert.commandWorked(db.bar.insert({x: 1}));
 checkDirExists(dbname, dbpath);
 assert.commandWorked(db.dropDatabase());
+// We force a checkpoint, this will make the catalog get checkpointed and let the ident drops
+// through.
+db.adminCommand({fsync: 1});
 checkDirRemoved(dbname, dbpath);
 
 MongoRunner.stopMongod(m);
