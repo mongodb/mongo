@@ -53,8 +53,8 @@ void appendLegacyGeoLiteral(BSONObjBuilder* bob,
     }
 
     StringData fieldName = e.fieldNameStringData();
-    if (fieldName == kNearSphereField || fieldName == kNearField) {
-        // Legacy $nearSphere and $near requires at minimum 2 coordinates to be
+    if (fieldName == kNearSphereField || fieldName == kNearField || fieldName == kGeoNearField) {
+        // Legacy $geoNear, $nearSphere, and $near require at minimum 2 coordinates to be
         // re-parseable, so the representative value is [1, 1].
         bob->appendArray(fieldName, BSON_ARRAY(1 << 1));
     } else if (fieldName == kCenterField || fieldName == kCenterSphereField) {
