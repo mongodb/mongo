@@ -1594,6 +1594,10 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
 
 void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTime(
     WithLock lk, const OpTimeAndWallTime& opTimeAndWallTime, bool isRollbackAllowed) {
+    // On secondary it is not possible for lastDurable to be set beyond lastApplied, because
+    // lastApplied is only updated at the completion of an oplog batch. But on primary it is
+    // possible because we only update lastApplied as part of the onCommit hook of the storage
+    // transaction, which may be delayed, but this should be fine.
     _topCoord->setMyLastDurableOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
     // If we are using durable times to calculate the commit level, update it now.
