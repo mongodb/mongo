@@ -128,5 +128,6 @@ feature_flags:
     featureFlagUseSorterChecksumV2:
         description: "Feature flag to enable v2 version of sorter file checksum"
         cpp_varname: gFeatureFlagUseSorterChecksumV2
-        default: false
+        default: true
+        version: 7.3
         shouldBeFCVGated: true
