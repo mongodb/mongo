@@ -131,7 +131,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                                  std::move(me),
                                  projectionPolicies,
                                  std::move(pipeline),
-                                 isCountLike);
+                                 isCountLike,
+                                 true /*optimizeMatchExpression*/);
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -140,8 +141,15 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 }
 
 // static
-StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalizeSubQuery(
-    OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* root) {
+StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::makeForSubplanner(
+    OperationContext* opCtx, const CanonicalQuery& baseQuery, size_t i) {
+    tassert(8401301,
+            "expected MatchExpression with rooted $or",
+            baseQuery.root()->matchType() == MatchExpression::OR);
+    tassert(8401302,
+            "attempted to get out of bounds child of $or",
+            baseQuery.root()->numChildren() > i);
+    auto root = baseQuery.root()->getChild(i);
     auto findCommand = std::make_unique<FindCommandRequest>(baseQuery.nss());
     findCommand->setFilter(root->serialize());
     findCommand->setProjection(baseQuery.getFindCommandRequest().getProjection().getOwned());
@@ -155,6 +163,12 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalizeSubQuery
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
     cq->setExplain(baseQuery.getExplain());
+
+    // Note: we do not optimize the MatchExpression representing the branch of the top-level $or
+    // that we are currently examining. This is because repeated invocations of
+    // MatchExpression::optimize() may change the order of predicates in the MatchExpression, due to
+    // new rewrites being unlocked by previous ones. We need to preserve the order of predicates to
+    // allow index tagging to work properly. See SERVER-84013 for more details.
     Status initStatus =
         cq->init(opCtx,
                  baseQuery.getExpCtx(),
@@ -162,8 +176,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalizeSubQuery
                  root->clone(),
                  ProjectionPolicies::findProjectionPolicies(),
                  {} /* an empty pipeline */,
-                 false  // The parent query countLike is independent from the subquery countLike.
-        );
+                 false,  // The parent query countLike is independent from the subquery countLike.
+                 false /*optimizeMatchExpression*/);
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -177,7 +191,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
                             std::unique_ptr<MatchExpression> root,
                             const ProjectionPolicies& projectionPolicies,
                             std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
-                            bool isCountLike) {
+                            bool isCountLike,
+                            bool optimizeMatchExpression) {
     _expCtx = expCtx;
     _findCommand = std::move(findCommand);
 
@@ -192,7 +207,12 @@ Status CanonicalQuery::init(OperationContext* opCtx,
         return validStatus.getStatus();
     }
     auto unavailableMetadata = validStatus.getValue();
-    _root = MatchExpression::normalize(std::move(root));
+
+    if (optimizeMatchExpression) {
+        _root = MatchExpression::normalize(std::move(root));
+    } else {
+        _root = std::move(root);
+    }
 
     // Perform auto-parameterization only if the query is SBE-compatible and caching is enabled.
     if (expCtx->sbeCompatibility != SbeCompatibility::notCompatible &&
