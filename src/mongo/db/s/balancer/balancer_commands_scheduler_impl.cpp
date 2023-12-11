@@ -44,6 +44,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/remote_command_request.h"
@@ -260,6 +261,21 @@ SemiFuture<NumMergedChunks> BalancerCommandsSchedulerImpl::requestMergeAllChunks
             return MergeAllChunksOnShardResponse::parse(
                        IDLParserContext{"MergeAllChunksOnShardResponse"}, remoteResponse.data)
                 .getNumMergedChunks();
+        })
+        .semi();
+}
+
+SemiFuture<void> BalancerCommandsSchedulerImpl::requestMoveCollection(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& toShardId,
+    const ShardId& dbPrimaryShardId) {
+    auto commandInfo =
+        std::make_shared<MoveCollectionCommandInfo>(nss, toShardId, dbPrimaryShardId);
+
+    return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
+        .then([](const executor::RemoteCommandResponse& remoteResponse) {
+            return processRemoteResponse(remoteResponse);
         })
         .semi();
 }

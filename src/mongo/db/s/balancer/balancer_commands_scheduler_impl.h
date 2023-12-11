@@ -68,6 +68,7 @@
 #include "mongo/s/request_types/merge_chunk_request_gen.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -311,6 +312,34 @@ public:
     }
 };
 
+class MoveCollectionCommandInfo : public CommandInfo {
+public:
+    MoveCollectionCommandInfo(const NamespaceString& nss,
+                              const ShardId& toShardId,
+                              const ShardId& dbPrimaryShard)
+        : CommandInfo(dbPrimaryShard, nss, boost::none), _toShardId(toShardId) {}
+
+    BSONObj serialise() const override {
+        ShardsvrReshardCollection shardsvrReshardCollection(getNameSpace());
+        shardsvrReshardCollection.setDbName(getNameSpace().dbName());
+
+        ReshardCollectionRequest reshardCollectionRequest;
+        reshardCollectionRequest.setKey(BSON("_id" << 1));
+        reshardCollectionRequest.setProvenance(ProvenanceEnum::kBalancerMoveCollection);
+
+        std::vector<mongo::ShardKeyRange> destinationShard = {_toShardId};
+        reshardCollectionRequest.setShardDistribution(destinationShard);
+        reshardCollectionRequest.setForceRedistribution(true);
+        reshardCollectionRequest.setNumInitialChunks(1);
+
+        shardsvrReshardCollection.setReshardCollectionRequest(std::move(reshardCollectionRequest));
+        return shardsvrReshardCollection.toBSON({});
+    }
+
+private:
+    const ShardId _toShardId;
+};
+
 /**
  * Helper data structure for submitting the remote command associated to a BalancerCommandsScheduler
  * Request.
@@ -456,6 +485,11 @@ public:
     SemiFuture<NumMergedChunks> requestMergeAllChunksOnShard(OperationContext* opCtx,
                                                              const NamespaceString& nss,
                                                              const ShardId& shardId) override;
+
+    SemiFuture<void> requestMoveCollection(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const ShardId& toShardId,
+                                           const ShardId& dbPrimaryShardId) override;
 
 private:
     enum class SchedulerState { Recovering, Running, Stopping, Stopped };
