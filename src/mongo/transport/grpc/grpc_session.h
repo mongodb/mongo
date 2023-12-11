@@ -64,7 +64,27 @@ namespace mongo::transport::grpc {
 class GRPCSession : public Session {
 public:
     explicit GRPCSession(TransportLayer* tl, HostAndPort remote, boost::optional<UUID> clientId)
-        : _tl(tl), _remote(std::move(remote)), _clientId(std::move(clientId)) {}
+        : _tl(tl), _remote(std::move(remote)), _clientId(std::move(clientId)) {
+        SockAddr remoteAddr;
+        try {
+            remoteAddr = SockAddr::create(_remote.host(), _remote.port(), AF_UNSPEC);
+        } catch (const DBException& ex) {
+            // If {remote} fails to parse for any reason, allow the session to continue anyway.
+            // {_restrictionEnvironment} will end up with an AF_UNSPEC remote address
+            // and will fail closed, rejecting any AddressRestriction present for the user/role.
+            LOGV2_DEBUG(8128400,
+                        2,
+                        "Unable to parse peer name",
+                        "host"_attr = _remote.host(),
+                        "port"_attr = _remote.port(),
+                        "error"_attr = ex.toStatus());
+        }
+
+        // libgrpc does not expose local socket name for us.
+        // This means that any attempt to use a {serverAddress} authentication restriction
+        // with the GRPC protocol will fail to permit login.
+        _restrictionEnvironment = RestrictionEnvironment(std::move(remoteAddr), SockAddr());
+    }
 
     virtual ~GRPCSession() {
         if (_cleanupCallback)
@@ -228,7 +248,7 @@ public:
     }
 
     const RestrictionEnvironment& getAuthEnvironment() const override {
-        MONGO_UNIMPLEMENTED;
+        return _restrictionEnvironment;
     }
 
 protected:
@@ -257,6 +277,7 @@ private:
 
     const HostAndPort _remote;
     const boost::optional<UUID> _clientId;
+    RestrictionEnvironment _restrictionEnvironment;
 
     boost::optional<std::function<void(const GRPCSession&)>> _cleanupCallback;
     synchronized_value<boost::optional<Status>> _terminationStatus;
