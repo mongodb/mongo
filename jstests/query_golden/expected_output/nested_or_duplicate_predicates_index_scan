@@ -1,0 +1,77 @@
+
+
+[jsTest] ----
+[jsTest] Resetting collection. Inserting docs:
+[jsTest] ----
+
+{  "City" : "Buffalo",  "Country" : {  "_id" : "US" },  "State" : "NewYork",  "_id" : 1 }
+{  "City" : "SanFrancisco",  "Country" : {  "_id" : "US" },  "State" : "California",  "_id" : 0 }
+Collection count: 2
+
+
+[jsTest] ----
+[jsTest] Creating indexes:
+[jsTest] ----
+
+{  "Country._id" : 1,  "State" : 1 }
+
+
+[jsTest] ----
+[jsTest] find({
+[jsTest] 	"$or" : [
+[jsTest] 		{
+[jsTest] 			"Country._id" : "DNE"
+[jsTest] 		},
+[jsTest] 		{
+[jsTest] 			"Country._id" : "US",
+[jsTest] 			"State" : "California",
+[jsTest] 			"$or" : [
+[jsTest] 				{
+[jsTest] 					"City" : "SanFrancisco"
+[jsTest] 				},
+[jsTest] 				{
+[jsTest] 					"City" : {
+[jsTest] 						"$in" : [
+[jsTest] 							"SanFrancisco"
+[jsTest] 						]
+[jsTest] 					}
+[jsTest] 				}
+[jsTest] 			]
+[jsTest] 		}
+[jsTest] 	]
+[jsTest] })
+[jsTest] ----
+
+{  "City" : "SanFrancisco",  "Country" : {  "_id" : "US" },  "State" : "California",  "_id" : 0 }
+
+
+[jsTest] ----
+[jsTest] find({
+[jsTest] 	"$or" : [
+[jsTest] 		{
+[jsTest] 			"Country._id" : "DNE"
+[jsTest] 		},
+[jsTest] 		{
+[jsTest] 			"Country._id" : "US",
+[jsTest] 			"State" : "California",
+[jsTest] 			"$or" : [
+[jsTest] 				{
+[jsTest] 					"City" : "SanFrancisco"
+[jsTest] 				},
+[jsTest] 				{
+[jsTest] 					"City" : {
+[jsTest] 						"$in" : [
+[jsTest] 							"SanFrancisco"
+[jsTest] 						]
+[jsTest] 					}
+[jsTest] 				},
+[jsTest] 				{
+[jsTest] 					"Country._id" : "DNE"
+[jsTest] 				}
+[jsTest] 			]
+[jsTest] 		}
+[jsTest] 	]
+[jsTest] })
+[jsTest] ----
+
+{  "City" : "SanFrancisco",  "Country" : {  "_id" : "US" },  "State" : "California",  "_id" : 0 }
