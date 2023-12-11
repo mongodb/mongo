@@ -79,24 +79,24 @@ void
 __wt_rts_progress_msg(WT_SESSION_IMPL *session, WT_TIMER *rollback_start, uint64_t rollback_count,
   uint64_t *rollback_msg_count, bool walk)
 {
-    uint64_t time_diff;
+    uint64_t time_diff_ms;
 
     /* Time since the rollback started. */
-    __wt_timer_evaluate(session, rollback_start, &time_diff);
+    __wt_timer_evaluate_ms(session, rollback_start, &time_diff_ms);
 
-    if ((time_diff / WT_PROGRESS_MSG_PERIOD) > *rollback_msg_count) {
+    if ((time_diff_ms / (1000 * WT_PROGRESS_MSG_PERIOD)) > *rollback_msg_count) {
         if (walk)
             __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
               "Rollback to stable has been performing on %s for %" PRIu64
-              " seconds. For more detailed logging, enable WT_VERB_RTS ",
-              session->dhandle->name, time_diff);
+              " milliseconds. For more detailed logging, enable WT_VERB_RTS ",
+              session->dhandle->name, time_diff_ms);
         else
             __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
               "Rollback to stable has been running for %" PRIu64
-              " seconds and has inspected %" PRIu64
+              " milliseconds and has inspected %" PRIu64
               " files. For more detailed logging, enable WT_VERB_RTS",
-              time_diff, rollback_count);
-        *rollback_msg_count = time_diff / WT_PROGRESS_MSG_PERIOD;
+              time_diff_ms, rollback_count);
+        *rollback_msg_count = time_diff_ms / (1000 * WT_PROGRESS_MSG_PERIOD);
     }
 }
 
