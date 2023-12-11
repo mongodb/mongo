@@ -14,10 +14,7 @@
 
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {enableLocalReadLogs, getLocalReadCount} from "jstests/libs/local_reads.js";
-import {
-    profilerHasNumMatchingEntriesOrThrow,
-    profilerHasZeroMatchingEntriesOrThrow,
-} from "jstests/libs/profiler.js";
+import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({shards: 2, mongos: 2});
 const testName = "sharded_lookup";
@@ -152,9 +149,11 @@ function assertLookupExecution(pipeline, opts, expected) {
 
         // If there is a nested $lookup within the top-level $lookup subpipeline, confirm that
         // execution is as expected.
-        // TODO SERVER-79580: Revisit this assertion in follow up patch.
         if (expected.nestedExec) {
             // Confirm that the nested $lookup subpipeline execution is as expected.
+            // TODO SERVER-83860: Consider asserting that we don't execute $lookup against the
+            // 'reviews' collection in the event that we designate a merging shard for nested
+            // $lookup stages against sharded collections.
             profilerHasNumMatchingEntriesOrThrow({
                 profileDB: shardList[i],
                 filter:

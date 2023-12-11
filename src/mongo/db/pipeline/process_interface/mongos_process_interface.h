@@ -119,6 +119,11 @@ public:
 
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
 
+    boost::optional<ShardId> determineSpecificMergeShard(OperationContext* opCtx,
+                                                         const NamespaceString& ns) const final {
+        return CommonProcessInterface::findOwningShard(opCtx, ns);
+    }
+
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
                   std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,

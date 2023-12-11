@@ -69,6 +69,7 @@
 #include "mongo/db/pipeline/document_source_test_optimizations.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/common_process_interface.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
@@ -3699,6 +3700,27 @@ TEST(PipelineOptimizationTest, MergeUnwindPipelineWithSortLimitPipelinePlacesLim
 
 namespace Sharded {
 
+/**
+ * Stub process interface used to allow accessing the CatalogCache for those tests which involve
+ * selecting a specific shard merger.
+ */
+class ShardMergerMongoProcessInterface : public StubMongoProcessInterface {
+public:
+    ShardMergerMongoProcessInterface(CatalogCacheMock* catalogCache)
+        : StubMongoProcessInterface(), _catalogCache(catalogCache) {}
+
+    boost::optional<ShardId> determineSpecificMergeShard(OperationContext* opCtx,
+                                                         const NamespaceString& ns) const override {
+        if (_catalogCache) {
+            return CommonProcessInterface::findOwningShard(opCtx, _catalogCache, ns);
+        }
+        return boost::none;
+    }
+
+private:
+    CatalogCacheMock* _catalogCache;
+};
+
 class PipelineOptimizations : public ShardServerTestFixtureWithCatalogCacheMock {
 public:
     // Allows tests to override the default resolvedNamespaces.
@@ -3725,6 +3747,8 @@ public:
         boost::intrusive_ptr<ExpressionContextForTest> ctx = createExpressionContext(request);
         TempDir tempDir("PipelineTest");
         ctx->tempDir = tempDir.path();
+        ctx->mongoProcessInterface =
+            std::make_shared<Sharded::ShardMergerMongoProcessInterface>(getCatalogCacheMock());
 
         // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
         // operations will be able to have a resolved view definition.

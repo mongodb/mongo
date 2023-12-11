@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/uuid.h"
 
@@ -148,6 +149,24 @@ public:
     static std::vector<FieldPath> shardKeyToDocumentKeyFields(
         const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields);
 
+    /**
+     * Utility which determines which shard owns 'nss'. More precisely, if 'nss' resides on
+     * a single shard and is not sharded (that is, it is either unsplittable or untracked), we
+     * return the id of the shard which owns 'nss'. Note that this decision is inherently racy and
+     * subject to become stale. This is okay because either choice will work correctly, we are
+     * simply applying a heuristic optimization.
+     *
+     * As written, this function can only be called in a sharded context.
+     *
+     * Note that the first overload looks up an instance of 'CatalogCache', while the second takes
+     * it as a parameter.
+     */
+    static boost::optional<ShardId> findOwningShard(OperationContext* opCtx,
+                                                    const NamespaceString& nss);
+    static boost::optional<ShardId> findOwningShard(OperationContext* opCtx,
+                                                    CatalogCache* catalogCache,
+                                                    const NamespaceString& nss);
+
 
     std::vector<BSONObj> getCurrentOps(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        CurrentOpConnectionsMode connMode,
@@ -160,12 +179,16 @@ public:
     virtual std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const override;
 
-
     virtual void updateClientOperationTime(OperationContext* opCtx) const final;
 
     boost::optional<ShardVersion> refreshAndGetCollectionVersion(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss) const override;
+
+    boost::optional<ShardId> determineSpecificMergeShard(
+        OperationContext* opCtx, const NamespaceString& nss) const override {
+        return boost::none;
+    };
 
     std::string getHostAndPort(OperationContext* opCtx) const override;
 

@@ -52,7 +52,6 @@
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/document_source_merge_spec.h"
-#include "mongo/db/pipeline/specific_shard_merger.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/explain_options.h"
@@ -329,13 +328,15 @@ StageConstraints DocumentSourceMerge::constraints(Pipeline::SplitState pipeState
                             LookupRequirement::kNotAllowed,
                             UnionRequirement::kNotAllowed};
     if (pipeState == Pipeline::SplitState::kSplitForMerge) {
-        result.mergeShardId = determineSpecificMergeShard(pExpCtx->opCtx, getOutputNs());
+        result.mergeShardId = pExpCtx->mongoProcessInterface->determineSpecificMergeShard(
+            pExpCtx->opCtx, getOutputNs());
     }
     return result;
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distributedPlanLogic() {
-    return determineSpecificMergeShard(pExpCtx->opCtx, getOutputNs())
+    return pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx,
+                                                                       getOutputNs())
         ? DocumentSourceWriter::distributedPlanLogic()
         : boost::none;
 }

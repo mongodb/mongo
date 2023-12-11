@@ -237,7 +237,7 @@ bool DocumentSourceFacet::validateOperationContext(const OperationContext* opCtx
            });
 }
 
-StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
+StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState state) const {
     // Currently we don't split $facet to have a merger part and a shards part (see SERVER-24154).
     // This means that if any stage in any of the $facet pipelines needs to run on the primary shard
     // or on mongoS, then the entire $facet stage must run there.
@@ -246,6 +246,7 @@ StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
 
     HostTypeRequirement host = HostTypeRequirement::kNone;
 
+    boost::optional<ShardId> mergeShardId;
     // Iterate through each pipeline to determine the HostTypeRequirement for the $facet stage.
     // Because we have already validated that there are no conflicting HostTypeRequirements during
     // parsing, if we observe any of the 'definitiveHosts' types in any of the pipelines then the
@@ -254,11 +255,24 @@ StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
     for (auto fi = _facets.begin(); fi != _facets.end() && !definitiveHosts.count(host); fi++) {
         const auto& sources = fi->pipeline->getSources();
         for (auto si = sources.begin(); si != sources.end() && !definitiveHosts.count(host); si++) {
-            const auto hostReq = (*si)->constraints().resolvedHostTypeRequirement(pExpCtx);
+            const auto subConstraints = (*si)->constraints(state);
+            const auto hostReq = subConstraints.resolvedHostTypeRequirement(pExpCtx);
+
             if (hostReq != HostTypeRequirement::kNone) {
                 host = hostReq;
             }
+
+            // Capture the first merging shard requested by a subpipeline.
+            if (!mergeShardId) {
+                mergeShardId = subConstraints.mergeShardId;
+            }
         }
+    }
+
+    // Clear the captured merging shard if 'host' is incompatible with merging on a shard.
+    if (!(host == HostTypeRequirement::kNone || host == HostTypeRequirement::kRunOnceAnyNode ||
+          host == HostTypeRequirement::kAnyShard)) {
+        mergeShardId = boost::none;
     }
 
     // Resolve the disk use, lookup, and transaction requirement of this $facet by iterating through
@@ -274,6 +288,10 @@ StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
     for (const auto& facet : _facets) {
         constraints =
             StageConstraints::getStrictestConstraints(facet.pipeline->getSources(), constraints);
+    }
+
+    if (mergeShardId) {
+        constraints.mergeShardId = mergeShardId;
     }
     return constraints;
 }

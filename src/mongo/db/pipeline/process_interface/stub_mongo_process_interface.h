@@ -88,6 +88,11 @@ public:
         return false;
     }
 
+    boost::optional<ShardId> determineSpecificMergeShard(
+        OperationContext* opCtx, const NamespaceString& nss) const override {
+        return boost::none;
+    };
+
     void updateClientOperationTime(OperationContext* opCtx) const override {}
 
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,

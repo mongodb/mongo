@@ -217,6 +217,15 @@ public:
     }
 
     /**
+     * Utility which determines which shard we should merge on. More precisely, if 'nss' is
+     * unsplittable or untracked, we should route to the shard which owns 'nss'. Note that this
+     * decision is inherently racy and subject to become stale. This is okay because either choice
+     * will work correctly, we are simply applying a heuristic optimization.
+     */
+    virtual boost::optional<ShardId> determineSpecificMergeShard(
+        OperationContext* opCtx, const NamespaceString& ns) const = 0;
+
+    /**
      * Advances the proxied write time associated with the client in ReplClientInfo to
      * be at least as high as the one tracked by the OperationTimeTracker associated with the
      * given operation context.

@@ -69,7 +69,6 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
-#include "mongo/db/pipeline/specific_shard_merger.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -516,7 +515,8 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
     // sharded (that is, it is either unsplittable or untracked), then we should merge on the shard
     // which owns the inner collection.
     if (pipeState == Pipeline::SplitState::kSplitForMerge) {
-        constraints.mergeShardId = determineSpecificMergeShard(pExpCtx->opCtx, _fromNs);
+        constraints.mergeShardId =
+            pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx, _fromNs);
     }
 
     constraints.canSwapWithMatch = true;

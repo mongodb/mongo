@@ -251,6 +251,36 @@ std::vector<FieldPath> CommonProcessInterface::shardKeyToDocumentKeyFields(
     return result;
 }
 
+boost::optional<ShardId> CommonProcessInterface::findOwningShard(OperationContext* opCtx,
+                                                                 const NamespaceString& nss) {
+    // Do not attempt to refresh the catalog cache when holding a lock.
+    if (shard_role_details::getLocker(opCtx)->isLocked()) {
+        return boost::none;
+    }
+    auto* grid = Grid::get(opCtx);
+    tassert(7958000, "Grid should be initialized", grid && grid->isInitialized());
+
+    return CommonProcessInterface::findOwningShard(opCtx, grid->catalogCache(), nss);
+}
+
+boost::optional<ShardId> CommonProcessInterface::findOwningShard(OperationContext* opCtx,
+                                                                 CatalogCache* catalogCache,
+                                                                 const NamespaceString& nss) {
+    tassert(7958001, "CatalogCache should be initialized", catalogCache);
+    auto [cm, _] = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+
+    if (cm.hasRoutingTable()) {
+        if (cm.isUnsplittable()) {
+            return cm.getMinKeyShardIdWithSimpleCollation();
+        } else {
+            return boost::none;
+        }
+    } else {
+        return cm.dbPrimary();
+    }
+    return boost::none;
+}
+
 std::string CommonProcessInterface::getHostAndPort(OperationContext* opCtx) const {
     return getHostNameCachedAndPort();
 }

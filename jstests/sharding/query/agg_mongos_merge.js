@@ -249,12 +249,36 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
 
     // Test that $facet is merged on mongoS if no pipeline has a specific host type requirement,
     // regardless of 'allowDiskUse'.
-    // TODO SERVER-79580: Ideally, we should be merging on the owner of 'unshardedColl' (that is,
-    // shard0). This doesn't happen because not all stages (including $facet) are aware of
-    // 'StageConstraints::mergeShardId'. As such, we should determine which stages that take
-    // subpipeline(s) need to propagate 'mergeShardId' when computing 'constraints'.
     assertMergeOnMongoS({
-            testName: "agg_mongos_merge_facet_pipe_needs_primary_shard_disk_use_" + allowDiskUse,
+        testName: "agg_mongos_merge_facet_pipe_no_specific_merging_shard_disk_use_" + allowDiskUse,
+        pipeline: [
+            {$match: {_id: {$gte: -200, $lte: 200}}},
+            {
+              $facet: {
+                  pipe1: [{$match: {_id: {$gt: 0}}}, {$skip: 10}, {$limit: 150}],
+                  pipe2: [
+                      {$match: {_id: {$lt: 0}}},
+                      {
+                        $lookup: {
+                            from: mongosColl.getName(),
+                            localField: "_id",
+                            foreignField: "_id",
+                            as: "lookupField"
+                        }
+                      }
+                  ]
+              }
+            }
+        ],
+        allowDiskUse: allowDiskUse,
+        expectedCount: 1
+    });
+
+    // Test that $facet is merged on a specific mongoD if a facet pipeline requests a specific
+    // merging shard. Here, the inner collection of the $lookup in the second facet pipeline is
+    // unsplittable, so the $lookup will request to merge on the shard which owns said collection.
+    assertMergeOnMongoD({
+            testName: "agg_mongod_merge_facet_pipe_needs_specific_shard_merger_disk_use_" + allowDiskUse,
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
                 {
@@ -274,6 +298,7 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
                   }
                 }
             ],
+            mergeType: "specificShard",
             allowDiskUse: allowDiskUse,
             expectedCount: 1
         });

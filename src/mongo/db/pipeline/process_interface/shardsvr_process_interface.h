@@ -78,6 +78,12 @@ public:
      */
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
 
+
+    boost::optional<ShardId> determineSpecificMergeShard(OperationContext* opCtx,
+                                                         const NamespaceString& ns) const final {
+        return CommonProcessInterface::findOwningShard(opCtx, ns);
+    }
+
     void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& nss,
                                       ChunkVersion targetCollectionPlacementVersion) const final;
