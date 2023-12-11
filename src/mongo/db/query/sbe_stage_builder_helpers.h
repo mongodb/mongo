@@ -1130,7 +1130,7 @@ inline StringData getTopLevelField(const T& path) {
     return StringData(getRawStringData(path), idx != std::string::npos ? idx : path.size());
 }
 
-inline std::vector<std::string> getTopLevelFields(std::vector<std::string> setOfPaths) {
+inline std::vector<std::string> getTopLevelFields(const std::vector<std::string>& setOfPaths) {
     StringDataSet topLevelFieldsSet;
     std::vector<std::string> topLevelFields;
 
@@ -1140,11 +1140,7 @@ inline std::vector<std::string> getTopLevelFields(std::vector<std::string> setOf
 
         auto [_, inserted] = topLevelFieldsSet.insert(field);
         if (inserted) {
-            if (path.find('.') == std::string::npos) {
-                topLevelFields.emplace_back(std::move(path));
-            } else {
-                topLevelFields.emplace_back(field.toString());
-            }
+            topLevelFields.emplace_back(field.toString());
         }
     }
 
