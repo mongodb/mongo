@@ -34,6 +34,8 @@ env.Library(
         'query_stats.cpp',
         'query_stats_entry.cpp',
         'key.cpp',
+        'supplemental_metrics_stats.cpp',
+        'optimizer_metrics_stats_entry.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -65,6 +67,7 @@ env.CppUnitTest(
     target="db_query_query_stats_test",
     source=[
         "query_stats_test.cpp",
+        "supplemental_metrics_test.cpp",
         "query_stats_store_test.cpp",
         "rate_limiting_test.cpp",
     ],

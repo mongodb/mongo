@@ -52,6 +52,7 @@
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
 #include "mongo/db/query/query_stats/query_stats_entry.h"
 #include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/db/service_context.h"
@@ -227,6 +228,7 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
                      std::unique_ptr<Key> key,
-                     const QueryStatsSnapshot& snapshot);
+                     const QueryStatsSnapshot& snapshot,
+                     std::unique_ptr<SupplementalStatsEntry> supplementalMetrics = nullptr);
 
 }  // namespace mongo::query_stats
