@@ -3,9 +3,9 @@
 include:
 - filename: etc/evergreen_yml_components/configuration.yml
 - filename: etc/evergreen_yml_components/definitions.yml
-- filename: etc/evergreen_yml_components/variants/task_generation.yml
+- filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
+- filename: etc/evergreen_yml_components/variants/misc/security_daily_cron.yml
 - filename: etc/evergreen_yml_components/variants/atlas/test_release.yml
-- filename: etc/evergreen_yml_components/variants/misc_release.yml
 - filename: etc/evergreen_yml_components/variants/amazon/test_release.yml
 - filename: etc/evergreen_yml_components/variants/debian/test_release.yml
 - filename: etc/evergreen_yml_components/variants/rhel/test_release.yml
@@ -24,11 +24,13 @@ include:
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 # - filename: etc/evergreen_yml_components/variants/ninja/build.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
-# - filename: etc/evergreen_yml_components/variants/classic_engine.yml
+# - filename: etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 # - filename: etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 # - filename: etc/evergreen_yml_components/variants/rhel/build_dev.yml
+### Uncomment when using this file for a LTS or Rapid release branch. ###
+# - filename: etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
 
 
 parameters:

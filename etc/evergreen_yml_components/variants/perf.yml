@@ -28,7 +28,6 @@ variables:
 
 
 # THIS HAS COPIES IN:
-# - etc/evergreen.yml
 # - etc/evergreen_yml_components/variants/perf.yml
 # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
