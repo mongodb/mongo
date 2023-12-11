@@ -50,25 +50,6 @@ LogService getLogService() {
     return logService;
 }
 
-StringData toStringData(LogService service) {
-    switch (service) {
-        case LogService::unknown:
-            return "unknown";
-        case LogService::none:
-            return "none";
-        case LogService::shard:
-            return "shard";
-        case LogService::router:
-            return "router";
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-StringData getNameForLog(LogService service) {
-    return toStringData(service).substr(0, 1);
-}
-
 std::ostream& operator<<(std::ostream& os, LogService service) {
     return os << toStringData(service);
 }

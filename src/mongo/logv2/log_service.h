@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
 
 namespace mongo::logv2 {
 
@@ -65,12 +66,40 @@ void setLogService(LogService logService);
 LogService getLogService();
 
 /** Returns full name. */
-StringData toStringData(LogService logService);
+inline StringData toStringData(LogService logService) {
+    switch (logService) {
+        case LogService::unknown:
+            return "unknown";
+        case LogService::none:
+            return "none";
+        case LogService::shard:
+            return "shard";
+        case LogService::router:
+            return "router";
+        case LogService::defer:
+            MONGO_UNREACHABLE;
+    }
+    MONGO_UNREACHABLE;
+}
 
 /**
  * Returns short name suitable for inclusion in formatted log message (just the first character).
  */
-StringData getNameForLog(LogService logService);
+inline StringData getNameForLog(LogService logService) {
+    switch (logService) {
+        // whenever we don't have a logService, emit "-"
+        case LogService::unknown:
+        case LogService::none:
+            return "-"_sd;
+        case LogService::shard:
+            return "S"_sd;
+        case LogService::router:
+            return "R"_sd;
+        case LogService::defer:
+            MONGO_UNREACHABLE;
+    }
+    MONGO_UNREACHABLE;
+}
 
 /** Appends the full name returned by toStringData(). */
 std::ostream& operator<<(std::ostream& os, LogService service);
