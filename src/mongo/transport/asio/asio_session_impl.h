@@ -275,6 +275,15 @@ protected:
     std::shared_ptr<const SSLConnectionContext> _sslContext;
 #endif
 
+    /**
+     * Synchronizes construction of _sslSocket in maybeHandshakeSSLForIngress and access of
+     * _sslSocket during shutdown in end(). Without synchronization, end() can operate on _socket
+     * while its ownership is being passed to _sslSocket.
+     * TODO (SERVER-83933) Remove this mutex after SSL handshake logic is moved to occur before
+     * concurrent accesses can occur.
+     */
+    Mutex _sslSocketLock{};
+
     AsioTransportLayer* const _tl;
     bool _isIngressSession;
     bool _isFromLoadBalancer = false;

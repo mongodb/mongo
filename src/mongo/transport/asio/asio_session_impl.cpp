@@ -155,12 +155,13 @@ CommonAsioSession::CommonAsioSession(
 }
 
 void CommonAsioSession::end() {
-    if (getSocket().is_open()) {
-        std::error_code ec;
+    std::error_code ec;
+    {
+        stdx::lock_guard lg(_sslSocketLock);
         getSocket().shutdown(GenericSocket::shutdown_both, ec);
-        if ((ec) && (ec != asio::error::not_connected)) {
-            LOGV2_ERROR(23841, "Error shutting down socket", "error"_attr = ec.message());
-        }
+    }
+    if ((ec) && (ec != asio::error::not_connected)) {
+        LOGV2_ERROR(23841, "Error shutting down socket", "error"_attr = ec.message());
     }
 }
 
@@ -695,7 +696,11 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
                 });
         }
 
-        _sslSocket.emplace(std::move(_socket), *_sslContext->ingress, "");
+        {
+            stdx::lock_guard lg(_sslSocketLock);
+            _sslSocket.emplace(std::move(_socket), *_sslContext->ingress, "");
+        }
+
         auto doHandshake = [&] {
             if (_blockingMode == sync) {
                 std::error_code ec;
