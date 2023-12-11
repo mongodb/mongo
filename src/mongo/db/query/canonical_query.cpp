@@ -106,11 +106,10 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* 
 }
 
 // static
-StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::make(OperationContext* opCtx,
-                                                                 const CanonicalQuery& baseQuery,
-                                                                 MatchExpression* matchExpr) {
+StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::makeForSubplanner(
+    OperationContext* opCtx, const CanonicalQuery& baseQuery, size_t i) {
     try {
-        return std::make_unique<CanonicalQuery>(opCtx, baseQuery, matchExpr);
+        return std::make_unique<CanonicalQuery>(opCtx, baseQuery, i);
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -140,12 +139,19 @@ CanonicalQuery::CanonicalQuery(CanonicalQueryParams&& params) {
            std::move(parsedFind),
            std::move(params.pipeline),
            params.isCountLike,
-           params.isSearchQuery);
+           params.isSearchQuery,
+           true /*optimizeMatchExpression*/);
 }
 
-CanonicalQuery::CanonicalQuery(OperationContext* opCtx,
-                               const CanonicalQuery& baseQuery,
-                               MatchExpression* matchExpr) {
+CanonicalQuery::CanonicalQuery(OperationContext* opCtx, const CanonicalQuery& baseQuery, size_t i) {
+    tassert(8401301,
+            "expected MatchExpression with rooted $or",
+            baseQuery.getPrimaryMatchExpression()->matchType() == MatchExpression::OR);
+    tassert(8401302,
+            "attempted to get out of bounds child of $or",
+            baseQuery.getPrimaryMatchExpression()->numChildren() > i);
+    auto matchExpr = baseQuery.getPrimaryMatchExpression()->getChild(i);
+
     auto findCommand = std::make_unique<FindCommandRequest>(baseQuery.nss());
     findCommand->setFilter(matchExpr->serialize());
     findCommand->setProjection(baseQuery.getFindCommandRequest().getProjection().getOwned());
@@ -161,18 +167,25 @@ CanonicalQuery::CanonicalQuery(OperationContext* opCtx,
         matchExpr->clone(),
         std::move(findCommand)));
 
+    // Note: we do not optimize the MatchExpression representing the branch of the top-level $or
+    // that we are currently examining. This is because repeated invocations of
+    // MatchExpression::optimize() may change the order of predicates in the MatchExpression, due to
+    // new rewrites being unlocked by previous ones. We need to preserve the order of predicates to
+    // allow index tagging to work properly. See SERVER-84013 for more details.
     initCq(baseQuery.getExpCtx(),
            std::move(parsedFind),
            {} /* an empty cqPipeline */,
            false,  // The parent query countLike is independent from the subquery countLike.
-           baseQuery.isSearchQuery());
+           baseQuery.isSearchQuery(),
+           false /*optimizeMatchExpression*/);
 }
 
 void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
                             std::unique_ptr<ParsedFindCommand> parsedFind,
                             std::vector<boost::intrusive_ptr<DocumentSource>> cqPipeline,
                             bool isCountLike,
-                            bool isSearchQuery) {
+                            bool isSearchQuery,
+                            bool optimizeMatchExpression) {
     _expCtx = expCtx;
 
     _findCommand = std::move(parsedFind->findCommandRequest);
@@ -181,10 +194,15 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
         QueryKnobConfiguration::decoration(expCtx->opCtx).getInternalQueryFrameworkControlForOp();
     _forceClassicEngine = frameworkControl == QueryFrameworkControlEnum::kForceClassicEngine;
 
-    // TODO SERVER-76509: Enable Boolean expression simplification in Bonsai.
-    _primaryMatchExpression = MatchExpression::normalize(
-        std::move(parsedFind->filter),
-        /* enableSimplification*/ !_expCtx->inLookup && !isBonsaiEnabled(frameworkControl));
+    if (optimizeMatchExpression) {
+        // TODO SERVER-76509: Enable Boolean expression simplification in Bonsai.
+        _primaryMatchExpression = MatchExpression::normalize(
+            std::move(parsedFind->filter),
+            /* enableSimplification*/ !_expCtx->inLookup && !isBonsaiEnabled(frameworkControl));
+    } else {
+        _primaryMatchExpression = std::move(parsedFind->filter);
+    }
+
     if (parsedFind->proj) {
         if (parsedFind->proj->requiresMatchDetails()) {
             // Sadly, in some cases the match details cannot be generated from the unoptimized

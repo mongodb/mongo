@@ -100,22 +100,18 @@ public:
     static StatusWith<std::unique_ptr<CanonicalQuery>> make(CanonicalQueryParams&& params);
 
     /**
-     * Used for creating sub-queries from an existing CanonicalQuery.
-     *
-     * 'matchExpr' must be an expression in baseQuery.getPrimaryMatchExpression().
-     *
-     * Does not take ownership of 'root'.
+     * Used for creating sub-queries from an existing CanonicalQuery, only for use by
+     * 'makeForSubplanner()'.
      */
-    CanonicalQuery(OperationContext* opCtx,
-                   const CanonicalQuery& baseQuery,
-                   MatchExpression* matchExpr);
+    CanonicalQuery(OperationContext* opCtx, const CanonicalQuery& baseQuery, size_t i);
 
     /**
-     * Deprecated factory method for creating CanonicalQuery.
+     * Construct a 'CanonicalQuery' for a subquery of the given query. This function should only be
+     * invoked by the subplanner. 'baseQuery' must contain a MatchExpression with rooted $or. This
+     * function returns a 'CanonicalQuery' housing a copy of the i'th child of the root.
      */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> make(OperationContext* opCtx,
-                                                            const CanonicalQuery& baseQuery,
-                                                            MatchExpression* matchExpr);
+    static StatusWith<std::unique_ptr<CanonicalQuery>> makeForSubplanner(
+        OperationContext* opCtx, const CanonicalQuery& baseQuery, size_t i);
 
     /**
      * Returns true if "query" describes an exact-match query on _id.
@@ -355,7 +351,8 @@ private:
                 std::unique_ptr<ParsedFindCommand> parsedFind,
                 std::vector<boost::intrusive_ptr<DocumentSource>> cqPipeline,
                 bool isCountLike,
-                bool isSearchQuery);
+                bool isSearchQuery,
+                bool optimizeMatchExpression);
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 

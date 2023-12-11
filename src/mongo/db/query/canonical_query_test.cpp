@@ -318,7 +318,7 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
                              .explain = isExplain});
 
     MatchExpression* firstClauseExpr = baseCq->getPrimaryMatchExpression()->getChild(0);
-    auto childCq = std::make_unique<CanonicalQuery>(opCtx.get(), *baseCq, firstClauseExpr);
+    auto childCq = std::make_unique<CanonicalQuery>(opCtx.get(), *baseCq, 0);
 
     ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getFilter(), firstClauseExpr->serialize());
 
@@ -360,7 +360,7 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQueryWithSpecialFeature) {
     // MatchExpression tree as part of canonicalization. This will put the text search clause
     // second.
     MatchExpression* secondClauseExpr = baseCq->getPrimaryMatchExpression()->getChild(1);
-    auto childCq = std::make_unique<CanonicalQuery>(opCtx.get(), *baseCq, secondClauseExpr);
+    auto childCq = std::make_unique<CanonicalQuery>(opCtx.get(), *baseCq, 1);
 
     ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getFilter(), secondClauseExpr->serialize());
 
@@ -405,8 +405,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithNoCollation) {
     auto baseCq = std::make_unique<CanonicalQuery>(
         CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
                              .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-    MatchExpression* firstClauseExpr = baseCq->getPrimaryMatchExpression()->getChild(0);
-    auto childCq = std::make_unique<CanonicalQuery>(opCtx.get(), *baseCq, firstClauseExpr);
+    auto childCq = std::make_unique<CanonicalQuery>(opCtx.get(), *baseCq, 0);
     ASSERT_TRUE(baseCq->getCollator() == nullptr);
     ASSERT_TRUE(childCq->getCollator() == nullptr);
 }
@@ -422,8 +421,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithCollation) {
     auto baseCq = std::make_unique<CanonicalQuery>(
         CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
                              .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-    MatchExpression* firstClauseExpr = baseCq->getPrimaryMatchExpression()->getChild(0);
-    auto childCq = std::make_unique<CanonicalQuery>(opCtx.get(), *baseCq, firstClauseExpr);
+    auto childCq = std::make_unique<CanonicalQuery>(opCtx.get(), *baseCq, 0);
     ASSERT(baseCq->getCollator());
     ASSERT(childCq->getCollator());
     ASSERT_TRUE(*(childCq->getCollator()) == *(baseCq->getCollator()));

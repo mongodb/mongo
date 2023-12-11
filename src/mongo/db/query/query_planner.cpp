@@ -2067,14 +2067,13 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
         planningResult.branches.push_back(
             std::make_unique<SubqueriesPlanningResult::BranchPlanningResult>());
         auto branchResult = planningResult.branches.back().get();
-        auto orChild = planningResult.orExpression->getChild(i);
 
         // Turn the i-th child into its own query.
-
-        auto statusWithCQ = CanonicalQuery::make(opCtx, query, orChild);
+        auto statusWithCQ = CanonicalQuery::makeForSubplanner(opCtx, query, i);
         if (!statusWithCQ.isOK()) {
             str::stream ss;
-            ss << "Can't canonicalize subchild " << orChild->debugString() << " "
+            ss << "Can't canonicalize subchild "
+               << planningResult.orExpression->getChild(i)->debugString() << " "
                << statusWithCQ.getStatus().reason();
             return Status(ErrorCodes::BadValue, ss);
         }
