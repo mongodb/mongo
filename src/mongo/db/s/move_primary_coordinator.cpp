@@ -48,6 +48,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -649,7 +650,7 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
     // Enable write blocking bypass to allow cleaning of stale data even if writes are disallowed.
     WriteBlockBypass::get(opCtx).set(true);
 
-    invariant(_doc.getCollectionsToClone());
+    invariant(_doc.getCollectionsToClone().has_value());
 
     auto trackedUnsplittableCollections =
         Grid::get(opCtx)->catalogClient()->getUnsplittableCollectionNamespacesForDbOutsideOfShards(
@@ -658,27 +659,27 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
             {ShardingState::get(opCtx)->shardId().toString()},
             repl::ReadConcernLevel::kMajorityReadConcern);
 
-    DBDirectClient dbClient(opCtx);
-
     const auto dropColl = [&](const NamespaceString& nssToDrop) {
-        const auto dropStatus = [&] {
-            BSONObj dropResult;
-            dbClient.runCommand(_dbName, BSON("drop" << nssToDrop.coll()), dropResult);
-            return getStatusFromCommandResult(dropResult);
-        }();
-
-        if (!dropStatus.isOK()) {
+        DropReply unused;
+        try {
+            uassertStatusOK(
+                dropCollection(opCtx,
+                               nssToDrop,
+                               &unused,
+                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops,
+                               false /*fromMigrate*/));
+        } catch (const DBException& e) {
             LOGV2_WARNING(7120210,
                           "Failed to drop stale collection on donor",
                           logAttrs(nssToDrop),
-                          "error"_attr = redact(dropStatus));
+                          "error"_attr = redact(e));
         }
     };
 
-    for (const auto& nss : *_doc.getCollectionsToClone()) {
+    for (const auto& nss : trackedUnsplittableCollections) {
         dropColl(nss);
     }
-    for (const auto& nss : trackedUnsplittableCollections) {
+    for (const auto& nss : *_doc.getCollectionsToClone()) {
         dropColl(nss);
     }
 }
