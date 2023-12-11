@@ -1297,6 +1297,7 @@ TEST_F(AuthorizationSessionTest, CanListOwnCollectionsWithPrivilege) {
 
 const auto kAnyResource = ResourcePattern::forAnyResource(boost::none);
 const auto kAnyNormalResource = ResourcePattern::forAnyNormalResource(boost::none);
+const auto kAnySystemBucketResource = ResourcePattern::forAnySystemBuckets(boost::none);
 
 TEST_F(AuthorizationSessionTest, CanCheckIfHasAnyPrivilegeOnResource) {
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
@@ -1969,6 +1970,21 @@ TEST_F(SystemBucketsTest, CheckBuiltinRolesForSystemBuckets) {
                                                                ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(otherDbSystemBucketResource,
                                                                ActionType::find));
+
+    // If we have clusterMonitor, make sure the following actions are authorized o any system
+    // bucket: collStats, dbStats, getDatabaseVersion, getShardVersion and indexStats.
+    authzSession->assumePrivilegesForBuiltinRole(RoleName("clusterMonitor", "admin"));
+
+    ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(kAnySystemBucketResource,
+                                                               ActionType::collStats));
+    ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(kAnySystemBucketResource,
+                                                               ActionType::dbStats));
+    ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(kAnySystemBucketResource,
+                                                               ActionType::getDatabaseVersion));
+    ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(kAnySystemBucketResource,
+                                                               ActionType::getShardVersion));
+    ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(kAnySystemBucketResource,
+                                                               ActionType::indexStats));
 }
 
 TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeInResourceDBForSystemBuckets) {

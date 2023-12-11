@@ -277,6 +277,8 @@ roles:
                   - getDatabaseVersion
                   - getShardVersion
                   - indexStats
+            - matchType: any_system_buckets
+              actions: *clusterMonitorRoleDatabaseActions
             - matchType: database
               db: 'config'
               actions: *clusterMonitorRoleDatabaseActions
