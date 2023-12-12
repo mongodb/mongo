@@ -398,11 +398,6 @@ public:
     // after optimizations.
     Microseconds planningTime{0};
 
-    // Cost computed by the cost-based optimizer.
-    boost::optional<double> estimatedCost;
-    // Cardinality computed by the cost-based optimizer.
-    boost::optional<double> estimatedCardinality;
-
     // Amount of CPU time used by this thread. Will remain -1 if this platform does not support
     // this feature.
     Nanoseconds cpuTime{-1};

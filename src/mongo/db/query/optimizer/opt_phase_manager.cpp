@@ -293,10 +293,6 @@ PlanExtractorResult OptPhaseManager::runMemoPhysicalRewrite(
         }
     }
 
-    if (!result.empty()) {
-        _memo.setStatsEstimatedCost(result.front().getRootAnnotation()._cost);
-        _memo.setStatsCE(result.front().getRootAnnotation()._adjustedCE);
-    }
     return result;
 }
 

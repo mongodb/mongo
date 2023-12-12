@@ -211,10 +211,6 @@ public:
         size_t _physPlanExplorationCount = 0;
         // Number of checks to winner's circle.
         size_t _physMemoCheckCount = 0;
-        // The estimated cost of the winning plan.
-        boost::optional<CostType> _estimatedCost;
-        // The cardinality estimate of the Root node of the winning plan.
-        boost::optional<CEType> _ce;
     };
 
     struct GroupIdVectorHash {
@@ -281,8 +277,6 @@ public:
     void clear();
 
     const Stats& getStats() const;
-    void setStatsCE(const CEType& ce);
-    void setStatsEstimatedCost(const CostType& cost);
     size_t getLogicalNodeCount() const;
     size_t getPhysicalNodeCount() const;
 
