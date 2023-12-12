@@ -35,6 +35,9 @@
 namespace mongo::simple8b {
 namespace {
 
+// Sentinel to represent missing, this value is not encodable in simple8b
+static constexpr int64_t kMissing = std::numeric_limits<int64_t>::max();
+
 // Performs addition as unsigned and cast back to signed to get overflow defined to wrapped around
 // instead of undefined behavior.
 static constexpr int64_t add(int64_t lhs, int64_t rhs) {
@@ -70,11 +73,34 @@ struct SimpleDecoder {
         return decoded;
     }
 
+    // Calculate the prefix sum of all slots.
+    template <typename T>
+    static T prefixSum(uint64_t encoded, T& prefix) {
+        T decoded = 0;
+        for (int i = iters; i; --i) {
+            uint64_t slot = encoded & mask;
+            if (slot != mask) {
+                prefix = add(prefix, Simple8bTypeUtil::decodeInt64(slot));
+                decoded = add(decoded, prefix);
+            }
+            encoded >>= bits;
+        };
+        return decoded;
+    }
+
     // Returns value of last slot. Treats missing as 0.
     static int64_t lastIgnoreSkip(uint64_t encoded) {
         encoded >>= (bits * (iters - 1));
         if (encoded == mask)
             return 0;
+        return Simple8bTypeUtil::decodeInt64(encoded);
+    }
+
+    // Returns value of last slot. 'kMissing' is returned for missing.
+    static int64_t last(uint64_t encoded) {
+        encoded >>= (bits * (iters - 1));
+        if (encoded == mask)
+            return kMissing;
         return Simple8bTypeUtil::decodeInt64(encoded);
     }
 };
@@ -85,7 +111,7 @@ struct SimpleDecoder {
 template <int bits>
 struct TableDecoder {
     // Type to store in lookup table, depends on bit width per slot.
-    using T = std::conditional_t<bits <= 8, int8_t, int16_t>;
+    using StorageT = std::conditional_t<bits <= 8, int8_t, int16_t>;
 
     // Constant to constrain table size.
     static constexpr int kMaxTableSize = 1 << 13;
@@ -107,12 +133,18 @@ struct TableDecoder {
     // Verify that lookup table is within size limit and that it can store our possible range of
     // values
     static_assert(entries <= kMaxTableSize, "lookup table too large");
-    static_assert(kMaxSlotValue <= std::numeric_limits<T>::max(),
+    static_assert(kMaxSlotValue <= std::numeric_limits<StorageT>::max(),
                   "lookup table cannot store full decoded value range");
-    static_assert(kMinSlotValue >= std::numeric_limits<T>::min(),
+    static_assert(kMinSlotValue >= std::numeric_limits<StorageT>::min(),
                   "lookup table cannot store full decoded value range");
 
-    T table[entries];
+    struct TableEntry {
+        // Decoded signed value for this slot.
+        StorageT decoded = 0;
+        // Number of non-missing entries. Can be 0 or 1.
+        int8_t num = 0;
+    };
+    TableEntry table[entries];
 
     // Initialize lookup table
     constexpr TableDecoder() : table() {
@@ -120,7 +152,8 @@ struct TableDecoder {
             uint64_t slot = i;
             bool skip = slot == mask;
             if (!skip) {
-                table[i] += Simple8bTypeUtil::decodeInt64(slot);
+                table[i].decoded += Simple8bTypeUtil::decodeInt64(slot);
+                ++table[i].num;
             }
         }
     }
@@ -130,7 +163,20 @@ struct TableDecoder {
     T sum(uint64_t encoded) const {
         T decoded = 0;
         for (int i = iters; i; --i) {
-            decoded += table[encoded % entries];
+            decoded += table[encoded % entries].decoded;
+            encoded >>= shift;
+        };
+        return decoded;
+    }
+
+    // Calculate the prefix sum of all slots.
+    template <typename T>
+    T prefixSum(uint64_t encoded, T& prefix) const {
+        T decoded = 0;
+        for (int i = iters; i; --i) {
+            const auto& entry = table[encoded % entries];
+            prefix = add(prefix, entry.decoded);
+            decoded = add(decoded, prefix * entry.num);
             encoded >>= shift;
         };
         return decoded;
@@ -139,7 +185,17 @@ struct TableDecoder {
     // Returns value of last slot. Treats missing as 0
     int64_t lastIgnoreSkip(uint64_t encoded) const {
         encoded >>= (bits * (iters - 1));
-        return table[encoded];
+        return table[encoded].decoded;
+    }
+
+    // Returns value of last slot. 'kMissing' is returned for missing.
+    int64_t last(uint64_t encoded) const {
+        encoded >>= (bits * (iters - 1));
+        const auto& entry = table[encoded];
+        if (!entry.num) {
+            return kMissing;
+        }
+        return entry.decoded;
     }
 };
 
@@ -170,6 +226,15 @@ struct ParallelTableDecoder {
     // Smallest possible value that can be stored in this slot
     static constexpr int64_t kMinSlotValue = Simple8bTypeUtil::decodeInt64(mask - 2);
 
+    // Calculate number of values that needs to be stored for prefix sum
+    static constexpr int numValuesForParallelPrefixSum(int parallel) {
+        int sum = 0;
+        for (int i = parallel; i; --i) {
+            sum += i;
+        }
+        return sum;
+    }
+
     // Verify that lookup table is within size limit and that it can store our possible range of
     // values
     static_assert(
@@ -180,8 +245,19 @@ struct ParallelTableDecoder {
                   "lookup table cannot store full decoded value range");
     static_assert(kMinSlotValue * parallel >= std::numeric_limits<int8_t>::min(),
                   "lookup table cannot store full decoded value range");
+    static_assert(kMaxSlotValue * numValuesForParallelPrefixSum(parallel) <=
+                      std::numeric_limits<int8_t>::max(),
+                  "lookup table cannot store full decoded value range");
+    static_assert(kMinSlotValue * numValuesForParallelPrefixSum(parallel) >=
+                      std::numeric_limits<int8_t>::min(),
+                  "lookup table cannot store full decoded value range");
 
-    int8_t table[entries];
+    struct TableEntry {
+        int8_t sum = 0;
+        int8_t prefixSum = 0;
+        int8_t num = 0;
+    };
+    TableEntry table[entries];
 
     // Initialize lookup table
     constexpr ParallelTableDecoder() : table() {
@@ -189,7 +265,16 @@ struct ParallelTableDecoder {
             for (int j = 0; j < parallel; ++j) {
                 uint64_t slot = (i >> (j * bits)) & mask;
                 if (slot != mask) {
-                    table[i] += Simple8bTypeUtil::decodeInt64(slot);
+                    ++table[i].num;
+                }
+            }
+            int8_t num = table[i].num;
+            for (int j = 0; j < parallel; ++j) {
+                uint64_t slot = (i >> (j * bits)) & mask;
+                if (slot != mask) {
+                    int64_t decoded = Simple8bTypeUtil::decodeInt64(slot);
+                    table[i].sum += decoded;
+                    table[i].prefixSum += decoded * (num--);
                 }
             }
         }
@@ -200,10 +285,86 @@ struct ParallelTableDecoder {
     T sum(uint64_t encoded) const {
         T decoded = 0;
         for (int i = iters; i; --i) {
-            decoded = add(decoded, table[encoded % entries]);
+            decoded = add(decoded, table[encoded % entries].sum);
             encoded >>= shift;
         };
         return decoded;
+    }
+
+    // Calculate the prefix sum of all slots.
+    template <typename T>
+    T prefixSum(uint64_t encoded, T& prefix) const {
+        T decoded = 0;
+        for (int i = iters; i; --i) {
+            auto index = encoded % entries;
+            const auto& entry = table[index];
+
+            decoded = add(decoded, prefix * entry.num + entry.prefixSum);
+            prefix = add(prefix, entry.sum);
+
+            encoded >>= shift;
+        };
+        return decoded;
+    }
+};
+
+// Special table-based decoder for the special 1 bit per slot case. The only two representable
+// values is '0' or 'missing'. We can use this to take some shortcuts.
+struct OneDecoder {
+    // Constant to constrain table size, 2^X.
+    static constexpr int kMaxTableSizeExp = 12;
+    static constexpr int kMaxTableSize = 1 << kMaxTableSizeExp;
+
+    static constexpr int bits = 1;
+
+    // Number of slots that we can decode together
+    static constexpr int parallel = kMaxTableSizeExp / bits;
+
+    // Number of shift to get to the next decoding iteration.
+    static constexpr int shift = bits * parallel;
+    // Number of decoding iterations in this block
+    static constexpr int iters = (60 / bits * bits + shift - 1) / shift;
+    // Number of entries in lookup table
+    static constexpr int entries = 1 << shift;
+    // Bit mask to extract a single slot and to check for the missing bit pattern.
+    static constexpr uint64_t mask = (1ull << bits) - 1;
+
+    // Table contains number of non-skipped entries
+    int8_t table[entries];
+
+    // Initialize lookup table
+    constexpr OneDecoder() : table() {
+        for (unsigned i = 0; i < entries; ++i) {
+            for (int j = 0; j < parallel; ++j) {
+                uint64_t slot = (i >> (j * bits)) & mask;
+                if (slot != mask) {
+                    ++table[i];
+                }
+            }
+        }
+    }
+
+    // Calculate the prefix sum of all slots.
+    template <typename T>
+    T prefixSum(uint64_t encoded, T& prefix) const {
+        T decoded = 0;
+        for (int i = iters; i; --i) {
+            auto num = table[encoded % entries];
+
+            decoded = add(decoded, prefix * num);
+
+            encoded >>= shift;
+        };
+        return decoded;
+    }
+
+    // Returns value of last slot. 'kMissing' is returned for missing.
+    int64_t last(uint64_t encoded) const {
+        encoded >>= (iters * parallel - 1);
+        if (encoded == mask) {
+            return kMissing;
+        }
+        return 0;
     }
 };
 
@@ -235,12 +396,43 @@ struct ExtendedDecoder {
         return decoded;
     }
 
+    // Calculate the prefix sum of all slots.
+    template <typename T>
+    T prefixSum(uint64_t encoded, T& prefix) const {
+        T decoded = 0;
+        for (int i = iters; i; --i) {
+            if ((encoded & mask) != mask) {
+                uint64_t count = encoded & countMask;
+                make_unsigned_t<T> value = (encoded >> countBits) & valueMask;
+
+                prefix = add(prefix, Simple8bTypeUtil::decodeInt(value << (count * countScale)));
+                decoded = add(decoded, prefix);
+            }
+
+            encoded >>= bits;
+        };
+        return decoded;
+    }
+
     // Returns value of last slot. Treats missing as 0
     template <typename T>
     T lastIgnoreSkip(uint64_t encoded) const {
         encoded >>= (bits * (iters - 1));
         if ((encoded & mask) == mask)
             return 0;
+
+        uint64_t count = encoded & countMask;
+        make_unsigned_t<T> value = (encoded >> countBits) & valueMask;
+
+        return Simple8bTypeUtil::decodeInt(value << (count * countScale));
+    }
+
+    // Returns value of last slot. 'kMissing' is returned for missing.
+    template <typename T>
+    T last(uint64_t encoded) const {
+        encoded >>= (bits * (iters - 1));
+        if ((encoded & mask) == mask)
+            return kMissing;
 
         uint64_t count = encoded & countMask;
         make_unsigned_t<T> value = (encoded >> countBits) & valueMask;
@@ -255,6 +447,7 @@ static constexpr ParallelTableDecoder<3> decoderParallel3;
 static constexpr ParallelTableDecoder<4> decoderParallel4;
 static constexpr ParallelTableDecoder<5> decoderParallel5;
 static constexpr ParallelTableDecoder<6> decoderParallel6;
+static constexpr OneDecoder decoder1;
 static constexpr TableDecoder<2> decoder2;
 static constexpr TableDecoder<3> decoder3;
 static constexpr TableDecoder<4> decoder4;
@@ -398,6 +591,112 @@ T decodeLastSlotIgnoreSkip(uint64_t encoded) {
     return 0;
 }
 
+template <typename T>
+T decodeLastSlot(uint64_t encoded) {
+    auto selector = encoded & simple8b_internal::kBaseSelectorMask;
+    encoded >>= 4;
+    switch (selector) {
+        case 1:
+            return decoder1.last(encoded);
+        case 2:
+            return decoder2.last(encoded);
+        case 3:
+            return decoder3.last(encoded);
+        case 4:
+            return decoder4.last(encoded);
+        case 5:
+            return decoder5.last(encoded);
+        case 6:
+            return decoder6.last(encoded);
+        case 7: {
+
+            auto extended = encoded & simple8b_internal::kBaseSelectorMask;
+            encoded >>= 4;
+            switch (extended) {
+                case 0:
+                    return decoder7.last(encoded);
+                case 1:
+                    return decoderExtended7_1.last<T>(encoded);
+                case 2:
+                    return decoderExtended7_2.last<T>(encoded);
+                case 3:
+                    return decoderExtended7_3.last<T>(encoded);
+                case 4:
+                    return decoderExtended7_4.last<T>(encoded);
+                case 5:
+                    return decoderExtended7_5.last<T>(encoded);
+                case 6:
+                    return decoderExtended7_6.last<T>(encoded);
+                case 7:
+                    return decoderExtended7_7.last<T>(encoded);
+                case 8:
+                    return decoderExtended7_8.last<T>(encoded);
+                case 9:
+                    return decoderExtended7_9.last<T>(encoded);
+                default:
+                    invariant(false);  // invalid encoding
+                    break;
+            }
+            break;
+        }
+        case 8: {
+            auto extended = encoded & simple8b_internal::kBaseSelectorMask;
+            encoded >>= 4;
+            switch (extended) {
+                case 0:
+                    return decoder8.last(encoded);
+                case 1:
+                    return decoderExtended8_1.last<T>(encoded);
+                case 2:
+                    return decoderExtended8_2.last<T>(encoded);
+                case 3:
+                    return decoderExtended8_3.last<T>(encoded);
+                case 4:
+                    return decoderExtended8_4.last<T>(encoded);
+                case 5:
+                    return decoderExtended8_5.last<T>(encoded);
+                case 6:
+                    return decoderExtended8_6.last<T>(encoded);
+                case 7:
+                    return decoderExtended8_7.last<T>(encoded);
+                case 8:
+                    return decoderExtended8_8.last<T>(encoded);
+                case 9:
+                    return decoderExtended8_9.last<T>(encoded);
+                case 10:
+                    return decoderExtended8_10.last<T>(encoded);
+                case 11:
+                    return decoderExtended8_11.last<T>(encoded);
+                case 12:
+                    return decoderExtended8_12.last<T>(encoded);
+                case 13:
+                    return decoderExtended8_13.last<T>(encoded);
+                default:
+                    invariant(false);  // invalid encoding
+                    break;
+            }
+            break;
+        }
+        case 9:
+            return decoder10.last(encoded);
+        case 10:
+            return decoder12.last(encoded);
+        case 11:
+            return decoder15.last(encoded);
+        case 12:
+            return decoder20.last(encoded);
+        case 13:
+            return decoder30.last(encoded);
+        case 14:
+            return decoder60.last(encoded);
+        case 15:
+            break;
+        default:
+            break;
+    }
+    return 0;
+}
+
 // Decodes and sums all slots in simple8b block, writes last encountered non-rle block in
 // 'prevNonRLE'.
 template <typename T>
@@ -508,6 +807,126 @@ T decodeAndSum(uint64_t encoded, uint64_t* prevNonRLE) {
     return 0;
 }
 
+// Decodes and sums all slots in simple8b block, writes last encountered non-rle block in
+// 'prevNonRLE'.
+template <typename T>
+T decodeAndPrefixSum(uint64_t encoded, T& prefix, uint64_t* prevNonRLE) {
+    auto selector = encoded & simple8b_internal::kBaseSelectorMask;
+    if (selector != simple8b_internal::kRleSelector) {
+        *prevNonRLE = encoded;
+    }
+    encoded >>= 4;
+    switch (selector) {
+        case 1:
+            return decoder1.prefixSum<T>(encoded, prefix);
+        case 2:
+            return decoderParallel2.prefixSum<T>(encoded, prefix);
+        case 3:
+            return decoderParallel3.prefixSum<T>(encoded, prefix);
+        case 4:
+            return decoderParallel4.prefixSum<T>(encoded, prefix);
+        case 5:
+            return decoderParallel5.prefixSum<T>(encoded, prefix);
+        case 6:
+            return decoderParallel6.prefixSum<T>(encoded, prefix);
+        case 7: {
+            auto extended = encoded & simple8b_internal::kBaseSelectorMask;
+            encoded >>= 4;
+            switch (extended) {
+                case 0:
+                    return decoder7.prefixSum<T>(encoded, prefix);
+                case 1:
+                    return decoderExtended7_1.prefixSum<T>(encoded, prefix);
+                case 2:
+                    return decoderExtended7_2.prefixSum<T>(encoded, prefix);
+                case 3:
+                    return decoderExtended7_3.prefixSum<T>(encoded, prefix);
+                case 4:
+                    return decoderExtended7_4.prefixSum<T>(encoded, prefix);
+                case 5:
+                    return decoderExtended7_5.prefixSum<T>(encoded, prefix);
+                case 6:
+                    return decoderExtended7_6.prefixSum<T>(encoded, prefix);
+                case 7:
+                    return decoderExtended7_7.prefixSum<T>(encoded, prefix);
+                case 8:
+                    return decoderExtended7_8.prefixSum<T>(encoded, prefix);
+                case 9:
+                    return decoderExtended7_9.prefixSum<T>(encoded, prefix);
+                default:
+                    break;
+            }
+            break;
+        }
+        case 8: {
+            auto extended = encoded & simple8b_internal::kBaseSelectorMask;
+            encoded >>= 4;
+            switch (extended) {
+                case 0:
+                    return decoder8.prefixSum<T>(encoded, prefix);
+                case 1:
+                    return decoderExtended8_1.prefixSum<T>(encoded, prefix);
+                case 2:
+                    return decoderExtended8_2.prefixSum<T>(encoded, prefix);
+                case 3:
+                    return decoderExtended8_3.prefixSum<T>(encoded, prefix);
+                case 4:
+                    return decoderExtended8_4.prefixSum<T>(encoded, prefix);
+                case 5:
+                    return decoderExtended8_5.prefixSum<T>(encoded, prefix);
+                case 6:
+                    return decoderExtended8_6.prefixSum<T>(encoded, prefix);
+                case 7:
+                    return decoderExtended8_7.prefixSum<T>(encoded, prefix);
+                case 8:
+                    return decoderExtended8_8.prefixSum<T>(encoded, prefix);
+                case 9:
+                    return decoderExtended8_9.prefixSum<T>(encoded, prefix);
+                case 10:
+                    return decoderExtended8_10.prefixSum<T>(encoded, prefix);
+                case 11:
+                    return decoderExtended8_11.prefixSum<T>(encoded, prefix);
+                case 12:
+                    return decoderExtended8_12.prefixSum<T>(encoded, prefix);
+                case 13:
+                    return decoderExtended8_13.prefixSum<T>(encoded, prefix);
+                default:
+                    break;
+            }
+            break;
+        }
+        case 9:
+            return decoder10.prefixSum<T>(encoded, prefix);
+        case 10:
+            return decoder12.prefixSum<T>(encoded, prefix);
+        case 11:
+            return decoder15.prefixSum<T>(encoded, prefix);
+        case 12:
+            return decoder20.prefixSum<T>(encoded, prefix);
+        case 13:
+            return decoder30.prefixSum<T>(encoded, prefix);
+        case 14:
+            return decoder60.prefixSum<T>(encoded, prefix);
+        case simple8b_internal::kRleSelector: {
+            T last = decodeLastSlot<T>(*prevNonRLE);
+            if (last == kMissing)
+                return 0;
+
+            // Number of repeated values
+            auto num = ((encoded & 0xf) + 1) * simple8b_internal::kRleMultiplier;
+            // We can calculate prefix sum like this because num is always even and value is always
+            // the same for RLE.
+            T sum = add(prefix * num, last * (num + 1) * (num / 2));
+            prefix = add(prefix, last * num);
+            return sum;
+        }
+        default:
+            break;
+    }
+    fassertFailed(8297300);
+    return 0;
+}
+
 }  // namespace
 
 template <typename T>
@@ -523,8 +942,23 @@ T sum(const char* buffer, size_t size, uint64_t& prevNonRLE) {
     return sum;
 }
 
+template <typename T>
+T prefixSum(const char* buffer, size_t size, T& prefix, uint64_t& prevNonRLE) {
+    invariant(size % 8 == 0);
+    const char* end = buffer + size;
+    T sum = 0;
+    while (buffer != end) {
+        uint64_t encoded = ConstDataView(buffer).read<LittleEndian<uint64_t>>();
+        sum = add(sum, decodeAndPrefixSum<T>(encoded, prefix, &prevNonRLE));
+        buffer += sizeof(uint64_t);
+    }
+    return sum;
+}
+
 // Explicit template instantiations for our supported types
 template int64_t sum<int64_t>(const char*, size_t, uint64_t&);
 template int128_t sum<int128_t>(const char*, size_t, uint64_t&);
+template int64_t prefixSum<int64_t>(const char*, size_t, int64_t&, uint64_t&);
+template int128_t prefixSum<int128_t>(const char*, size_t, int128_t&, uint64_t&);
 
 }  // namespace mongo::simple8b

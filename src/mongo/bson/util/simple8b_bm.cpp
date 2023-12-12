@@ -202,15 +202,67 @@ void BM_sumUnoptimized(benchmark::State& state) {
 
     size_t totalBytes = 0;
 
+    auto sum = [](const char* buffer, int size) {
+        Simple8b<uint64_t> s8b(buffer, size);
+        int64_t s = 0;
+        for (auto&& val : s8b) {
+            if (val) {
+                s += Simple8bTypeUtil::decodeInt64(*val);
+            }
+        }
+        return s;
+    };
+
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Simple8b<uint64_t> s8b(buf.get(), size);
+        benchmark::DoNotOptimize(sum(buf.get(), size));
+        totalBytes += size;
+    }
+
+    state.SetBytesProcessed(totalBytes);
+}
+
+void BM_prefixSum(benchmark::State& state) {
+    BufBuilder buffer = generateIntegers();
+    auto size = buffer.len();
+    auto buf = buffer.release();
+
+    size_t totalBytes = 0;
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        uint64_t prev = simple8b::kSingleSkip;
+        int64_t prefix = 0;
+        benchmark::DoNotOptimize(simple8b::prefixSum<int64_t>(buf.get(), size, prefix, prev));
+        totalBytes += size;
+    }
+
+    state.SetBytesProcessed(totalBytes);
+}
+
+void BM_prefixSumUnoptimized(benchmark::State& state) {
+    BufBuilder buffer = generateIntegers();
+    auto size = buffer.len();
+    auto buf = buffer.release();
+
+    size_t totalBytes = 0;
+
+    auto prefixSum = [](const char* buffer, int size) {
+        Simple8b<uint64_t> s8b(buffer, size);
         int64_t sum = 0;
+        int64_t prefixSum = 0;
         for (auto&& val : s8b) {
             if (val) {
                 sum += Simple8bTypeUtil::decodeInt64(*val);
+                prefixSum += sum;
             }
         }
+        return prefixSum;
+    };
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(prefixSum(buf.get(), size));
         totalBytes += size;
     }
 
@@ -225,5 +277,7 @@ BENCHMARK(BM_selectorSeven)->Arg(100);
 BENCHMARK(BM_decode);
 BENCHMARK(BM_sum);
 BENCHMARK(BM_sumUnoptimized);
+BENCHMARK(BM_prefixSum);
+BENCHMARK(BM_prefixSumUnoptimized);
 
 }  // namespace mongo
