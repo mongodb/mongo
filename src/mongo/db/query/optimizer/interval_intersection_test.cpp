@@ -636,7 +636,7 @@ TEST(IntervalIntersection, IntervalPermutations) {
      * range of [0, N), with random inclusion/exclusion of the endpoints. Intersect the intervals
      * and verify against ground truth.
      */
-    const size_t numThreads = ProcessInfo::getNumLogicalCores();
+    const size_t numThreads = ProcessInfo::getNumCores();
     std::cout << "Testing " << numPermutations << " interval permutations using " << numThreads
               << " cores...\n";
     auto timeBegin = Date_t::now();
