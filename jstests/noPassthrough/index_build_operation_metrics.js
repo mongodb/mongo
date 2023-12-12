@@ -9,7 +9,18 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 var rst = new ReplSetTest({
     nodes: 2,
-    nodeOptions: {setParameter: {"aggregateOperationResourceConsumptionMetrics": true}}
+    nodeOptions: {
+        setParameter: {
+            "aggregateOperationResourceConsumptionMetrics": true,
+            // Resource consumption metrics may be overstated due to write conflicts.
+            // Existing test assertions assume the absence of write conflicts.
+            // Increasing the log verbosity for retrying write operations due to write
+            // conflicts helps provide context when investigating future test assertion
+            // failures around resource consumption metrics.
+            // This log configuration is copied from temporarily_unavailable_error.js.
+            logComponentVerbosity: tojson({control: 1, write: 1}),
+        }
+    }
 });
 rst.startSet();
 rst.initiate();
