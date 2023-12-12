@@ -55,6 +55,28 @@
 namespace mongo {
 namespace bulk_write_exec {
 
+class BulkWriteExecStats {
+public:
+    void noteTargetedShard(const BulkWriteCommandRequest& clientRequest,
+                           const TargetedWriteBatch& targetedBatch);
+    void noteNumShardsOwningChunks(size_t nsIdx, int nShardsOwningChunks);
+
+    boost::optional<int> getNumShardsOwningChunks(size_t nsIdx) const;
+
+    void updateMetrics(OperationContext* opCtx,
+                       const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+                       bool updatedShardKey);
+
+private:
+    // Indexed by the namespace index.
+    stdx::unordered_map<size_t, int> _numShardsOwningChunks;
+    stdx::unordered_set<ShardId> _targetedShards;
+    stdx::unordered_map<
+        size_t,
+        stdx::unordered_map<BatchedCommandRequest::BatchType, stdx::unordered_set<ShardId>>>
+        _targetedShardsPerNsAndBatchType;
+};
+
 /**
  * Contains counters which aggregate all the individual bulk write responses.
  */
@@ -75,6 +97,7 @@ struct BulkWriteReplyInfo {
     SummaryFields summaryFields;
     boost::optional<BulkWriteWriteConcernError> wcErrors;
     boost::optional<std::vector<StmtId>> retriedStmtIds;
+    BulkWriteExecStats execStats;
 };
 
 /**
@@ -90,7 +113,8 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
  * Processes a response from an FLE insert/update/delete command and converts it to equivalent
  * BulkWriteReplyInfo.
  */
-BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType,
+BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
+                                      const BulkWriteCRUDOp::OpType& firstOpType,
                                       const BatchedCommandResponse& response);
 
 /**
@@ -308,6 +332,9 @@ public:
      */
     void finishExecutingWriteWithoutShardKeyWithId();
 
+    void noteTargetedShard(const TargetedWriteBatch& targetedBatch);
+    void noteNumShardsOwningChunks(size_t nsIdx, int nShardsOwningChunks);
+
 private:
     // The OperationContext the client bulkWrite request is run on.
     OperationContext* const _opCtx;
@@ -367,6 +394,8 @@ private:
     int _nModified = 0;
     int _nUpserted = 0;
     int _nDeleted = 0;
+
+    BulkWriteExecStats _stats;
 };
 
 /**

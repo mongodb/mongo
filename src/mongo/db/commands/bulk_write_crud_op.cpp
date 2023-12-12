@@ -33,10 +33,7 @@
 
 namespace mongo {
 
-BulkWriteCRUDOp::BulkWriteCRUDOp(const std::variant<mongo::BulkWriteInsertOp,
-                                                    mongo::BulkWriteUpdateOp,
-                                                    mongo::BulkWriteDeleteOp>& op)
-    : _op{op}, _type{op.index()} {}
+BulkWriteCRUDOp::BulkWriteCRUDOp(const BulkWriteOpVariant& op) : _op{op}, _type{op.index()} {}
 
 BulkWriteCRUDOp::OpType BulkWriteCRUDOp::getType() const {
     return _type;

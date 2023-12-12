@@ -307,30 +307,6 @@ UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
     return UpdateShardKeyResult{sharedBlock->updatedShardKey, std::move(upsertedId)};
 }
 
-void updateHostsTargetedMetrics(OperationContext* opCtx,
-                                BatchedCommandRequest::BatchType batchType,
-                                int nShardsOwningChunks,
-                                int nShardsTargeted) {
-    NumHostsTargetedMetrics::QueryType writeType;
-    switch (batchType) {
-        case BatchedCommandRequest::BatchType_Insert:
-            writeType = NumHostsTargetedMetrics::QueryType::kInsertCmd;
-            break;
-        case BatchedCommandRequest::BatchType_Update:
-            writeType = NumHostsTargetedMetrics::QueryType::kUpdateCmd;
-            break;
-        case BatchedCommandRequest::BatchType_Delete:
-            writeType = NumHostsTargetedMetrics::QueryType::kDeleteCmd;
-            break;
-
-            MONGO_UNREACHABLE;
-    }
-
-    auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
-        opCtx, nShardsTargeted, nShardsOwningChunks);
-    NumHostsTargetedMetrics::get(opCtx).addNumHostsTargeted(writeType, targetType);
-}
-
 }  // namespace
 
 bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,

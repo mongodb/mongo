@@ -300,6 +300,19 @@ public:
             return _bulkWriteUpdateRequest->getFilter();
         }
     }
+
+    /**
+     * Returns the arrayFilters the update operation this `UpdateRef` refers to.
+     */
+    const boost::optional<std::vector<mongo::BSONObj>>& getArrayFilters() const {
+        if (_batchUpdateRequest) {
+            return _batchUpdateRequest->getArrayFilters();
+        } else {
+            tassert(7961100, "invalid bulkWrite update op reference", _bulkWriteUpdateRequest);
+            return _bulkWriteUpdateRequest->getArrayFilters();
+        }
+    }
+
     /**
      * Returns the `multi` value for the update operation this `UpdateRef` refers to.
      */
@@ -537,5 +550,7 @@ private:
      */
     BatchedCommandRequest::BatchType _batchType;
 };
+
+BatchedCommandRequest::BatchType convertOpType(BulkWriteCRUDOp::OpType opType);
 
 }  // namespace mongo

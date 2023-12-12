@@ -153,9 +153,7 @@ private:
 
     stdx::unordered_map<NamespaceString, size_t> _nsInfoIdxes;
 
-    std::vector<
-        std::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>>
-        _ops;
+    std::vector<BulkWriteOpVariant> _ops;
     std::vector<mongo::NamespaceInfoEntry> _nsInfos;
 
     /**

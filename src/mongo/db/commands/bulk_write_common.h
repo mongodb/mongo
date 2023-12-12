@@ -128,5 +128,13 @@ write_ops::DeleteCommandRequest makeDeleteCommandRequestForFLE(
 
 BulkWriteCommandRequest makeSingleOpBulkWriteCommandRequest(
     const BulkWriteCommandRequest& bulkWriteReq, size_t opIdx);
+
+/**
+ * Helper for bulkWrite use of incrementUpdateMetrics.
+ */
+void incrementBulkWriteUpdateMetrics(
+    const write_ops::UpdateModification& updateMod,
+    const mongo::NamespaceString& ns,
+    const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters);
 }  // namespace bulk_write_common
 }  // namespace mongo

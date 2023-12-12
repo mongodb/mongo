@@ -381,6 +381,8 @@ env.Library(
         '$BUILD_DIR/mongo/logv2/logv2_options',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'bulk_write_parser',
+        'update_metrics',
+        'write_commands_common',
     ],
 )
 

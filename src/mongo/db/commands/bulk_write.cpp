@@ -69,7 +69,6 @@
 #include "mongo/db/commands/bulk_write_crud_op.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
-#include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/commands/write_commands_common.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
@@ -1543,13 +1542,8 @@ public:
         const BSONObj& _commandObj;
         const mongo::BulkWriteUpdateOp* _firstUpdateOp{nullptr};
     };
-
-    // Update related command execution metrics.
-    static UpdateMetrics updateMetrics;
 };
 MONGO_REGISTER_COMMAND(BulkWriteCmd).forShard();
-
-UpdateMetrics BulkWriteCmd::updateMetrics{"bulkWrite"};
 
 bool handleUpdateOp(OperationContext* opCtx,
                     const BulkWriteUpdateOp* op,
@@ -1607,10 +1601,8 @@ bool handleUpdateOp(OperationContext* opCtx,
                 opCtx, bucketNs, updateRequest, executor, &out);
             responses.addUpdateReply(opCtx, currentOpIdx, out);
 
-            incrementUpdateMetrics(op->getUpdateMods(),
-                                   nsEntry.getNs(),
-                                   BulkWriteCmd::updateMetrics,
-                                   op->getArrayFilters());
+            bulk_write_common::incrementBulkWriteUpdateMetrics(
+                op->getUpdateMods(), nsEntry.getNs(), op->getArrayFilters());
             return out.canContinue;
         }
 
@@ -1626,10 +1618,8 @@ bool handleUpdateOp(OperationContext* opCtx,
                 responses.addUpdateReply(
                     currentOpIdx, numMatched, numDocsModified, upserted, stmtId);
 
-                incrementUpdateMetrics(op->getUpdateMods(),
-                                       nsEntry.getNs(),
-                                       BulkWriteCmd::updateMetrics,
-                                       op->getArrayFilters());
+                bulk_write_common::incrementBulkWriteUpdateMetrics(
+                    op->getUpdateMods(), nsEntry.getNs(), op->getArrayFilters());
                 return true;
             }
         }
@@ -1695,10 +1685,8 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                 &updateRequest);
                     lastOpFixer.finishedOpSuccessfully();
                     responses.addUpdateReply(currentOpIdx, result, boost::none);
-                    incrementUpdateMetrics(op->getUpdateMods(),
-                                           nsEntry.getNs(),
-                                           BulkWriteCmd::updateMetrics,
-                                           op->getArrayFilters());
+                    bulk_write_common::incrementBulkWriteUpdateMetrics(
+                        op->getUpdateMods(), nsEntry.getNs(), op->getArrayFilters());
                     return true;
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
                     auto cq = uassertStatusOK(

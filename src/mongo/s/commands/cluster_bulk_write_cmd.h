@@ -207,7 +207,7 @@ public:
             bulk_write_exec::BulkWriteReplyInfo replyInfo) const {
             const auto& req = bulkRequest;
             auto reqObj = unparsedRequest.body;
-            auto& [replyItems, summaryFields, wcErrors, retriedStmtIds] = replyInfo;
+            auto& [replyItems, summaryFields, wcErrors, retriedStmtIds, _] = replyInfo;
             const NamespaceString cursorNss =
                 NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
 
@@ -342,9 +342,17 @@ public:
             }
 
             auto bulkWriteReply = cluster::bulkWrite(opCtx, bulkRequest, targeters);
-            handleWouldChangeOwningShardError(opCtx, bulkRequest, bulkWriteReply, targeters);
+            bool updatedShardKey =
+                handleWouldChangeOwningShardError(opCtx, bulkRequest, bulkWriteReply, targeters);
+            bulk_write_exec::BulkWriteExecStats execStats = std::move(bulkWriteReply.execStats);
+
             response = _populateCursorReply(opCtx, bulkRequest, request, std::move(bulkWriteReply));
             result.appendElements(response.toBSON());
+
+            // TODO SERVER-83869 handle BulkWriteExecStats for batches of size > 1 containing
+            // updates that modify a document’s owning shard.
+            execStats.updateMetrics(opCtx, targeters, updatedShardKey);
+
             return true;
         }
 
@@ -404,8 +412,10 @@ public:
          * If the provided response contains a WouldChangeOwningShardError, handles executing the
          * transactional delete from old shard and insert to new shard, and updates the response
          * accordingly. If it does not contain such an error, does nothing.
+         *
+         * Returns true if a document shard key update was actually performed.
          */
-        void handleWouldChangeOwningShardError(
+        bool handleWouldChangeOwningShardError(
             OperationContext* opCtx,
             const BulkWriteCommandRequest& request,
             bulk_write_exec::BulkWriteReplyInfo& response,
@@ -413,7 +423,7 @@ public:
             auto wcosInfo =
                 getWouldChangeOwningShardErrorInfo(response, opCtx->inMultiDocumentTransaction());
             if (!wcosInfo)
-                return;
+                return false;
 
             // A shard should only give us back this error if one of these conditions are true. If
             // neither are, we would get back an IllegalOperation error instead.
@@ -459,6 +469,10 @@ public:
                         [&](DBException& e) { response.replyItems[0].setStatus(e.toStatus()); });
             }
 
+            // See BulkWriteOp::generateReplyInfo, it is easier to handle this metric for
+            // WouldChangeOwningShardError here.
+            globalOpCounters.gotUpdate();
+
             if (updatedShardKey) {
                 // Remove the WCOS error from the count. Since this write must have been sent in its
                 // own batch it is not possible there are statistics for any other writes in
@@ -482,6 +496,8 @@ public:
 
                 response.replyItems[0] = successReply;
             }
+
+            return updatedShardKey;
         }
 
         void explain(OperationContext* opCtx,

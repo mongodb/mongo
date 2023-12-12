@@ -68,6 +68,7 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
@@ -986,6 +987,30 @@ const HostOpTimeMap& BatchWriteExecStats::getWriteOpTimes() const {
 
 boost::optional<int> BatchWriteExecStats::getNumShardsOwningChunks() const {
     return _numShardsOwningChunks;
+}
+
+void updateHostsTargetedMetrics(OperationContext* opCtx,
+                                BatchedCommandRequest::BatchType batchType,
+                                int nShardsOwningChunks,
+                                int nShardsTargeted) {
+    NumHostsTargetedMetrics::QueryType writeType;
+    switch (batchType) {
+        case BatchedCommandRequest::BatchType_Insert:
+            writeType = NumHostsTargetedMetrics::QueryType::kInsertCmd;
+            break;
+        case BatchedCommandRequest::BatchType_Update:
+            writeType = NumHostsTargetedMetrics::QueryType::kUpdateCmd;
+            break;
+        case BatchedCommandRequest::BatchType_Delete:
+            writeType = NumHostsTargetedMetrics::QueryType::kDeleteCmd;
+            break;
+
+            MONGO_UNREACHABLE;
+    }
+
+    auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
+        opCtx, nShardsTargeted, nShardsOwningChunks);
+    NumHostsTargetedMetrics::get(opCtx).addNumHostsTargeted(writeType, targetType);
 }
 
 }  // namespace mongo

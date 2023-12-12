@@ -364,19 +364,7 @@ BatchItemRef::BatchItemRef(const BatchedCommandRequest* request, int index)
 BatchItemRef::BatchItemRef(const BulkWriteCommandRequest* request, int index)
     : _bulkWriteRequest(*request), _index(index) {
     invariant(index < int(request->getOps().size()));
-    switch (BulkWriteCRUDOp(request->getOps()[index]).getType()) {
-        case BulkWriteCRUDOp::OpType::kInsert:
-            _batchType = BatchedCommandRequest::BatchType_Insert;
-            break;
-        case BulkWriteCRUDOp::OpType::kUpdate:
-            _batchType = BatchedCommandRequest::BatchType_Update;
-            break;
-        case BulkWriteCRUDOp::OpType::kDelete:
-            _batchType = BatchedCommandRequest::BatchType_Delete;
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
+    _batchType = convertOpType(BulkWriteCRUDOp(request->getOps()[index]).getType());
 }
 
 int BatchItemRef::getSizeForBatchWriteBytes() const {
@@ -460,6 +448,20 @@ int BatchItemRef::getSizeForBulkWriteBytes() const {
             dassert(estSize >= deleteOp.toBSON().objsize());
             return estSize;
         }
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+BatchedCommandRequest::BatchType convertOpType(BulkWriteCRUDOp::OpType opType) {
+    switch (opType) {
+        case BulkWriteCRUDOp::OpType::kInsert:
+            return BatchedCommandRequest::BatchType_Insert;
+        case BulkWriteCRUDOp::OpType::kUpdate:
+            return BatchedCommandRequest::BatchType_Update;
+        case BulkWriteCRUDOp::OpType::kDelete:
+            return BatchedCommandRequest::BatchType_Delete;
+            break;
         default:
             MONGO_UNREACHABLE;
     }

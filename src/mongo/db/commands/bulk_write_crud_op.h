@@ -39,6 +39,9 @@
 
 namespace mongo {
 
+using BulkWriteOpVariant =
+    std::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>;
+
 /**
  * The BulkWriteCRUDOp class makes working with
  * variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp> easier.
@@ -47,9 +50,7 @@ class BulkWriteCRUDOp {
 public:
     enum OpType : size_t { kInsert = 0, kUpdate = 1, kDelete = 2 };
 
-    BulkWriteCRUDOp(const std::variant<mongo::BulkWriteInsertOp,
-                                       mongo::BulkWriteUpdateOp,
-                                       mongo::BulkWriteDeleteOp>& op);
+    BulkWriteCRUDOp(const BulkWriteOpVariant& op);
 
     OpType getType() const;
     unsigned int getNsInfoIdx() const;

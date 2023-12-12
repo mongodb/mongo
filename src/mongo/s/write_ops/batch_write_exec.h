@@ -122,4 +122,9 @@ private:
     boost::optional<int> _numShardsOwningChunks;
 };
 
+void updateHostsTargetedMetrics(OperationContext* opCtx,
+                                BatchedCommandRequest::BatchType batchType,
+                                int nShardsOwningChunks,
+                                int nShardsTargeted);
+
 }  // namespace mongo

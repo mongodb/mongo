@@ -116,6 +116,8 @@ void executeChildBatches(OperationContext* opCtx,
 
     std::vector<AsyncRequestsSender::Request> requests;
     for (auto& childBatch : childBatches) {
+        bulkWriteOp.noteTargetedShard(*childBatch.second);
+
         auto request = [&]() {
             auto bulkReq = bulkWriteOp.buildBulkCommandRequest(
                 targeters, *childBatch.second, allowShardKeyUpdatesWithoutFullShardKeyInQuery);
@@ -212,7 +214,8 @@ void fillOKInsertReplies(BulkWriteReplyInfo& replyInfo, int size) {
 
 }  // namespace
 
-BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType,
+BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
+                                      const BulkWriteCRUDOp::OpType& firstOpType,
                                       const BatchedCommandResponse& response) {
     BulkWriteReplyInfo replyInfo;
     if (response.toStatus().isOK()) {
@@ -273,7 +276,122 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
         }
         // TODO (SERVER-81280): Handle write concern errors.
     }
+
+    switch (firstOpType) {
+        // We support only 1 update or 1 delete or multiple inserts for FLE bulkWrites.
+        case BulkWriteCRUDOp::kInsert:
+            globalOpCounters.gotInserts(response.getN());
+            break;
+        case BulkWriteCRUDOp::kUpdate: {
+            const auto& updateRequest = request.getUpdateRequest();
+            const mongo::write_ops::UpdateOpEntry& updateOpEntry = updateRequest.getUpdates()[0];
+            bulk_write_common::incrementBulkWriteUpdateMetrics(updateOpEntry.getU(),
+                                                               updateRequest.getNamespace(),
+                                                               updateOpEntry.getArrayFilters());
+            break;
+        }
+        case BulkWriteCRUDOp::kDelete:
+            globalOpCounters.gotDelete();
+            break;
+        default:
+            MONGO_UNREACHABLE
+    }
+
     return replyInfo;
+}
+
+BatchedCommandRequest makeFLECommandRequest(OperationContext* opCtx,
+                                            const BulkWriteCommandRequest& clientRequest,
+                                            const std::vector<BulkWriteOpVariant>& ops) {
+    BulkWriteCRUDOp firstOp(ops[0]);
+    auto firstOpType = firstOp.getType();
+    if (firstOpType == BulkWriteCRUDOp::kInsert) {
+        std::vector<mongo::BSONObj> documents;
+        documents.reserve(ops.size());
+        for (const auto& opVariant : ops) {
+            BulkWriteCRUDOp op(opVariant);
+            uassert(ErrorCodes::InvalidOptions,
+                    "BulkWrite with Queryable Encryption and multiple operations supports only "
+                    "insert.",
+                    op.getType() == BulkWriteCRUDOp::kInsert);
+            documents.push_back(op.getInsert()->getDocument());
+        }
+
+        write_ops::InsertCommandRequest insertOp =
+            bulk_write_common::makeInsertCommandRequestForFLE(
+                documents, clientRequest, clientRequest.getNsInfo()[0]);
+
+        return BatchedCommandRequest(insertOp);
+    } else if (firstOpType == BulkWriteCRUDOp::kUpdate) {
+        uassert(ErrorCodes::InvalidOptions,
+                "BulkWrite update with Queryable Encryption supports only a single operation.",
+                ops.size() == 1);
+
+        write_ops::UpdateCommandRequest updateCommand =
+            bulk_write_common::makeUpdateCommandRequestFromUpdateOp(
+                firstOp.getUpdate(), clientRequest, /*currentOpIdx=*/0);
+
+        return BatchedCommandRequest(updateCommand);
+    } else {
+        uassert(ErrorCodes::InvalidOptions,
+                "BulkWrite delete with Queryable Encryption supports only a single operation.",
+                ops.size() == 1);
+
+        write_ops::DeleteCommandRequest deleteCommand =
+            bulk_write_common::makeDeleteCommandRequestForFLE(
+                opCtx, firstOp.getDelete(), clientRequest, clientRequest.getNsInfo()[0]);
+
+        return BatchedCommandRequest(deleteCommand);
+    }
+}
+
+void BulkWriteExecStats::noteTargetedShard(const BulkWriteCommandRequest& clientRequest,
+                                           const TargetedWriteBatch& targetedBatch) {
+    const ShardId& shardId = targetedBatch.getShardId();
+    _targetedShards.insert(shardId);
+    for (const auto& write : targetedBatch.getWrites()) {
+        BulkWriteCRUDOp bulkWriteOp(clientRequest.getOps().at(write->writeOpRef.first));
+        auto nsIdx = bulkWriteOp.getNsInfoIdx();
+        auto batchType = convertOpType(bulkWriteOp.getType());
+        _targetedShardsPerNsAndBatchType[nsIdx][batchType].insert(shardId);
+    }
+}
+
+void BulkWriteExecStats::noteNumShardsOwningChunks(size_t nsIdx, int nShardsOwningChunks) {
+    _numShardsOwningChunks[nsIdx] = nShardsOwningChunks;
+}
+
+void BulkWriteExecStats::updateMetrics(OperationContext* opCtx,
+                                       const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+                                       bool updatedShardKey) {
+    // Record the number of shards targeted by this bulkWrite.
+    CurOp::get(opCtx)->debug().nShards = _targetedShards.size();
+
+    for (size_t nsIdx = 0; nsIdx < targeters.size(); ++nsIdx) {
+        auto it = _targetedShardsPerNsAndBatchType.find(nsIdx);
+        if (it == _targetedShardsPerNsAndBatchType.end()) {
+            continue;
+        }
+        auto nShardsOwningChunks = getNumShardsOwningChunks(nsIdx);
+        for (const auto& [batchType, shards] : it->second) {
+            if (shards.size() > 0) {
+                int nShards = shards.size() + (updatedShardKey ? 1 : 0);
+
+                if (nShardsOwningChunks.has_value()) {
+                    updateHostsTargetedMetrics(
+                        opCtx, batchType, nShardsOwningChunks.value(), nShards);
+                }
+            }
+        }
+    }
+}
+
+boost::optional<int> BulkWriteExecStats::getNumShardsOwningChunks(size_t nsIdx) const {
+    auto it = _numShardsOwningChunks.find(nsIdx);
+    if (it == _numShardsOwningChunks.end()) {
+        return boost::none;
+    }
+    return it->second;
 }
 
 std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
@@ -285,56 +403,15 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
         BatchedCommandResponse response;
         FLEBatchResult fleResult;
 
-        if (firstOpType == BulkWriteCRUDOp::kInsert) {
-            std::vector<mongo::BSONObj> documents;
-            documents.reserve(ops.size());
-            for (const auto& opVariant : ops) {
-                BulkWriteCRUDOp op(opVariant);
-                uassert(ErrorCodes::InvalidOptions,
-                        "BulkWrite with Queryable Encryption and multiple operations supports only "
-                        "insert.",
-                        op.getType() == BulkWriteCRUDOp::kInsert);
-                documents.push_back(op.getInsert()->getDocument());
-            }
-
-            write_ops::InsertCommandRequest insertOp =
-                bulk_write_common::makeInsertCommandRequestForFLE(
-                    documents, clientRequest, clientRequest.getNsInfo()[0]);
-
-            BatchedCommandRequest fleRequest(insertOp);
-            fleResult = processFLEBatch(
-                opCtx, fleRequest, nullptr /* stats */, &response, {} /*targetEpoch*/);
-        } else if (firstOpType == BulkWriteCRUDOp::kUpdate) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "BulkWrite update with Queryable Encryption supports only a single operation.",
-                    ops.size() == 1);
-
-            write_ops::UpdateCommandRequest updateCommand =
-                bulk_write_common::makeUpdateCommandRequestFromUpdateOp(
-                    firstOp.getUpdate(), clientRequest, /*currentOpIdx=*/0);
-
-            BatchedCommandRequest fleRequest(updateCommand);
-            fleResult = processFLEBatch(
-                opCtx, fleRequest, nullptr /* stats */, &response, {} /*targetEpoch*/);
-        } else {
-            uassert(ErrorCodes::InvalidOptions,
-                    "BulkWrite delete with Queryable Encryption supports only a single operation.",
-                    ops.size() == 1);
-
-            write_ops::DeleteCommandRequest deleteCommand =
-                bulk_write_common::makeDeleteCommandRequestForFLE(
-                    opCtx, firstOp.getDelete(), clientRequest, clientRequest.getNsInfo()[0]);
-
-            BatchedCommandRequest fleRequest(deleteCommand);
-            fleResult = processFLEBatch(
-                opCtx, fleRequest, nullptr /* stats */, &response, {} /*targetEpoch*/);
-        }
+        BatchedCommandRequest fleRequest = makeFLECommandRequest(opCtx, clientRequest, ops);
+        fleResult =
+            processFLEBatch(opCtx, fleRequest, nullptr /* stats */, &response, {} /*targetEpoch*/);
 
         if (fleResult == FLEBatchResult::kNotProcessed) {
             return {FLEBatchResult::kNotProcessed, BulkWriteReplyInfo()};
         }
 
-        BulkWriteReplyInfo replyInfo = processFLEResponse(firstOpType, response);
+        BulkWriteReplyInfo replyInfo = processFLEResponse(fleRequest, firstOpType, response);
         return {FLEBatchResult::kProcessed, std::move(replyInfo)};
     } catch (const DBException& ex) {
         LOGV2_WARNING(7749700,
@@ -677,6 +754,10 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
         }
     }
 
+    for (size_t nsIdx = 0; nsIdx < targeters.size(); ++nsIdx) {
+        bulkWriteOp.noteNumShardsOwningChunks(nsIdx, targeters[nsIdx]->getNShardsOwningChunks());
+    }
+
     LOGV2_DEBUG(7263701, 4, "Finished execution of bulkWrite");
     return bulkWriteOp.generateReplyInfo();
 }
@@ -735,9 +816,7 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
 
     // A single bulk command request batch may contain operations of different
     // types, i.e. they may be inserts, updates or deletes.
-    std::vector<
-        std::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>>
-        ops;
+    std::vector<BulkWriteOpVariant> ops;
     std::vector<NamespaceInfoEntry> nsInfo = _clientRequest.getNsInfo();
 
     std::vector<int> stmtIds;
@@ -1264,15 +1343,31 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
         dassert(writeOp.getWriteState() != WriteOpState_Pending || _aborted);
         auto writeOpState = writeOp.getWriteState();
 
-        // TODO (SERVER-79611): Improve mongos metrics.
         if (writeOpState == WriteOpState_Completed || writeOpState == WriteOpState_Error) {
             switch (writeOp.getWriteItem().getOpType()) {
                 case BatchedCommandRequest::BatchType_Insert:
                     globalOpCounters.gotInsert();
                     break;
-                case BatchedCommandRequest::BatchType_Update:
-                    globalOpCounters.gotUpdate();
+                case BatchedCommandRequest::BatchType_Update: {
+                    // It is easier to handle the metric in handleWouldChangeOwningShardError for
+                    // WouldChangeOwningShard. See getWouldChangeOwningShardErrorInfo for the batch
+                    // size check. In the case of a WouldChangeOwningShard outside of a transaction,
+                    // we will re-run cluster::bulkWrite so generateReplyInfo() gets called twice.
+                    if (writeOpState != WriteOpState_Error ||
+                        writeOp.getOpError().getStatus() != ErrorCodes::WouldChangeOwningShard ||
+                        _writeOps.size() > 1) {
+                        globalOpCounters.gotUpdate();
+                    }
+                    UpdateRef updateRef = writeOp.getWriteItem().getUpdateRef();
+
+                    const auto opIdx = writeOp.getWriteItem().getItemIndex();
+                    const auto& bulkWriteOp = BulkWriteCRUDOp(_clientRequest.getOps()[opIdx]);
+                    const auto& ns = _clientRequest.getNsInfo()[bulkWriteOp.getNsInfoIdx()].getNs();
+
+                    bulk_write_common::incrementBulkWriteUpdateMetrics(
+                        updateRef.getUpdateMods(), ns, updateRef.getArrayFilters());
                     break;
+                }
                 case BatchedCommandRequest::BatchType_Delete:
                     globalOpCounters.gotDelete();
                     break;
@@ -1323,7 +1418,11 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
         }
     }
 
-    return {std::move(replyItems), summary, generateWriteConcernError(), _retriedStmtIds};
+    return {std::move(replyItems),
+            summary,
+            generateWriteConcernError(),
+            _retriedStmtIds,
+            std::move(_stats)};
 }
 
 void BulkWriteOp::saveWriteConcernError(ShardId shardId,
@@ -1475,10 +1574,16 @@ int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {
     return builder.obj().objsize();
 }
 
+void BulkWriteOp::noteTargetedShard(const TargetedWriteBatch& targetedBatch) {
+    _stats.noteTargetedShard(_clientRequest, targetedBatch);
+}
+
+void BulkWriteOp::noteNumShardsOwningChunks(size_t nsIdx, int nShardsOwningChunks) {
+    _stats.noteNumShardsOwningChunks(nsIdx, nShardsOwningChunks);
+}
+
 void addIdsForInserts(BulkWriteCommandRequest& origCmdRequest) {
-    std::vector<
-        std::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>>
-        newOps;
+    std::vector<BulkWriteOpVariant> newOps;
     newOps.reserve(origCmdRequest.getOps().size());
 
     for (const auto& op : origCmdRequest.getOps()) {

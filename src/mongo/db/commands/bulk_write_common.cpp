@@ -43,6 +43,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands/bulk_write_crud_op.h"
+#include "mongo/db/commands/write_commands_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/update_request.h"
@@ -321,6 +322,16 @@ BulkWriteCommandRequest makeSingleOpBulkWriteCommandRequest(
     singleOpRequest.setStmtId(bulk_write_common::getStatementId(bulkWriteReq, opIdx));
     singleOpRequest.setDbName(DatabaseName::kAdmin);
     return singleOpRequest;
+}
+
+// Update related command execution metrics.
+static UpdateMetrics bulkWriteUpdateMetric{"bulkWrite"};
+
+void incrementBulkWriteUpdateMetrics(
+    const write_ops::UpdateModification& updateMod,
+    const mongo::NamespaceString& ns,
+    const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters) {
+    incrementUpdateMetrics(updateMod, ns, bulkWriteUpdateMetric, arrayFilters);
 }
 
 }  // namespace bulk_write_common
