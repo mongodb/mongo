@@ -266,37 +266,16 @@ def exists(env):
     return True
 
 
-def macos_archive_sign_builder(source, target, env, for_signature):
-    if env['PLATFORM'] != 'darwin' or env.GetOption("ninja") != 'disabled':
-        return ""
-
-    if env.GetOption("release") is not None:
-        print("MacOS release build found, signing with release entitlements.")
-        entitlements_file = 'etc/macos_release_entitlements.xml'
-        signing_type = 'notarizeAndSign'
-    else:
-        print("MacOS dev build found, signing with insecure development entitlements.")
-        entitlements_file = 'etc/macos_dev_entitlements.xml'
-        signing_type = 'sign'
-
-    archive_name = env.File(target[0])
-    macos_notory_cmd = f"{sys.executable} evergreen/macos_notary.py --archive-name={archive_name} --entitlements-file={entitlements_file} --signing-type={signing_type}"
-
-    return macos_notory_cmd
-
-
 def generate(env):
     if not env.get("AUTO_INSTALL_ENABLED"):
         env.Tool("auto_install_binaries")
 
     bld = SCons.Builder.Builder(
-        action=SCons.Action.ListAction([
-            SCons.Action.CommandGeneratorAction(
-                archive_builder,
-                {"cmdstr": "Building package ${TARGETS[0]} from ${SOURCES[1:]}"}
-            ),
-            SCons.Action.CommandGeneratorAction(macos_archive_sign_builder, {})
-        ]))
+        action=SCons.Action.CommandGeneratorAction(
+            archive_builder,
+            {"cmdstr": "Building package ${TARGETS[0]} from ${SOURCES[1:]}"},
+        )
+    )
     env.Append(BUILDERS={"AutoArchive": bld})
     env["AUTO_ARCHIVE_TARBALL_SUFFIX"] = env.get(
         "AUTO_ARCHIVE_TARBALL_SUFFIX", "tar.gz"
