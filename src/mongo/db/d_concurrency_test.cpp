@@ -50,6 +50,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/fast_map_noalloc.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/curop.h"

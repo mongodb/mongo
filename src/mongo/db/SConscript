@@ -61,6 +61,7 @@ env.Library(
     source=[
         env.BazelIdlc('basic_types.idl')[0],
         'cluster_role.cpp',
+        'dump_lock_manager.cpp',
         'feature_compatibility_version_document.idl',
         'feature_compatibility_version_parser.cpp',
         'feature_flag.cpp',
@@ -930,6 +931,7 @@ env.Library(
     source=[
         'catalog/collection_operation_source.cpp',
         'direct_shard_client_tracker.cpp',
+        'dump_lock_manager_impl.cpp',
         'locker_api.cpp',
         'replica_set_endpoint_sharding_state.cpp',
         'replica_set_endpoint_util.cpp',

@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"

@@ -624,8 +624,7 @@ class MongoDBDumpLocks(gdb.Command):
         try:
             # Call into mongod, and dump the state of lock manager
             # Note that output will go to mongod's standard output, not the debugger output window
-            gdb.execute("call mongo::shard_role_details::dumpLockManager()", from_tty=False,
-                        to_string=False)
+            gdb.execute("call mongo::dumpLockManager()", from_tty=False, to_string=False)
         except gdb.error as gdberr:
             print("Ignoring error '%s' in dump_mongod_locks" % str(gdberr))
 

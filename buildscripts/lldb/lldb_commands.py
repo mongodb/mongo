@@ -34,7 +34,7 @@ def PrintGlobalServiceContext(debugger, *_args):  # pylint: disable=invalid-name
 
 def MongoDBDumpLocks(debugger, *_args):  # pylint: disable=invalid-name
     """Dump locks in the mongod process."""
-    debugger.HandleCommand("call mongo::shard_role_details::dumpLockManager()")
+    debugger.HandleCommand("call mongo::dumpLockManager()")
 
 
 def BreakpointOnAssert(debugger, command, _exec_ctx, _result, _internal_dict):  # pylint: disable=invalid-name

@@ -71,6 +71,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"

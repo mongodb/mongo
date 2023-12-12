@@ -75,6 +75,7 @@
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/dump_lock_manager.h"
 #include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/mongod_options_storage_gen.h"
@@ -2667,7 +2668,7 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
         }
 
         // Dump all locks to identify which thread(s) are holding RSTL.
-        shard_role_details::dumpLockManager();
+        dumpLockManager();
 
         auto lockerInfo = shard_role_details::getLocker(opCtx)->getLockerInfo(
             CurOp::get(opCtx)->getLockStatsBase());

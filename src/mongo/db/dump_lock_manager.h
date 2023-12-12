@@ -29,39 +29,11 @@
 
 #pragma once
 
-#include <memory>
-
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/operation_context.h"
-
 namespace mongo {
-namespace shard_role_details {
 
 /**
- * Interface for locking.  Caller DOES NOT own pointer.
+ * Dumps the contents of all locks to the log.
  */
-inline Locker* getLocker(OperationContext* opCtx) {
-    return opCtx->lockState_DO_NOT_USE();
-}
+void dumpLockManager();
 
-inline const Locker* getLocker(const OperationContext* opCtx) {
-    return opCtx->lockState_DO_NOT_USE();
-}
-
-/**
- * Sets the locker for use by this OperationContext. Call during OperationContext initialization,
- * only.
- */
-void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker);
-
-/**
- * Swaps the locker, releasing the old locker to the caller.
- * The Client lock is going to be acquired by this function.
- */
-std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Locker> newLocker);
-std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
-                                   std::unique_ptr<Locker> newLocker,
-                                   WithLock lk);
-
-}  // namespace shard_role_details
 }  // namespace mongo

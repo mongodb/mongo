@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/locker_api.h"

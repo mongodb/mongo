@@ -27,41 +27,15 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/dump_lock_manager.h"
 
-#include <memory>
-
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/base/shim.h"
 
 namespace mongo {
-namespace shard_role_details {
 
-/**
- * Interface for locking.  Caller DOES NOT own pointer.
- */
-inline Locker* getLocker(OperationContext* opCtx) {
-    return opCtx->lockState_DO_NOT_USE();
+void dumpLockManager() {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(dumpLockManager);
+    return w();
 }
 
-inline const Locker* getLocker(const OperationContext* opCtx) {
-    return opCtx->lockState_DO_NOT_USE();
-}
-
-/**
- * Sets the locker for use by this OperationContext. Call during OperationContext initialization,
- * only.
- */
-void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker);
-
-/**
- * Swaps the locker, releasing the old locker to the caller.
- * The Client lock is going to be acquired by this function.
- */
-std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Locker> newLocker);
-std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
-                                   std::unique_ptr<Locker> newLocker,
-                                   WithLock lk);
-
-}  // namespace shard_role_details
 }  // namespace mongo

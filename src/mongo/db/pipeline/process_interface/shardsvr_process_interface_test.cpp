@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/locker_api.h"
 #include "mongo/db/pipeline/document_source.h"

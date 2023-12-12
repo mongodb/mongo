@@ -27,41 +27,41 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-#include <memory>
+#include "mongo/db/dump_lock_manager.h"
 
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/base/shim.h"
+#include "mongo/db/concurrency/lock_manager.h"
+#include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
-namespace shard_role_details {
+namespace {
 
-/**
- * Interface for locking.  Caller DOES NOT own pointer.
- */
-inline Locker* getLocker(OperationContext* opCtx) {
-    return opCtx->lockState_DO_NOT_USE();
+template <typename T>
+std::string formatHex(T&& x) {
+    return format(FMT_STRING("{:#x}"), x);
 }
 
-inline const Locker* getLocker(const OperationContext* opCtx) {
-    return opCtx->lockState_DO_NOT_USE();
+std::string formatPtr(const void* x) {
+    return formatHex(reinterpret_cast<uintptr_t>(x));
 }
 
-/**
- * Sets the locker for use by this OperationContext. Call during OperationContext initialization,
- * only.
- */
-void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker);
+void dumpLockManagerImpl() {
+    auto service = getGlobalServiceContext();
+    auto lockManager = LockManager::get(service);
 
-/**
- * Swaps the locker, releasing the old locker to the caller.
- * The Client lock is going to be acquired by this function.
- */
-std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Locker> newLocker);
-std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
-                                   std::unique_ptr<Locker> newLocker,
-                                   WithLock lk);
+    BSONArrayBuilder locks;
+    lockManager->getLockInfoArray(LockManager::getLockToClientMap(service), true, nullptr, &locks);
+    LOGV2_OPTIONS(20521,
+                  logv2::LogTruncation::Disabled,
+                  "lock manager dump",
+                  "addr"_attr = formatPtr(lockManager),
+                  "locks"_attr = locks.arr());
+}
 
-}  // namespace shard_role_details
+auto dumpLockManagerRegistration =
+    MONGO_WEAK_FUNCTION_REGISTRATION(dumpLockManager, dumpLockManagerImpl);
+}  // namespace
 }  // namespace mongo

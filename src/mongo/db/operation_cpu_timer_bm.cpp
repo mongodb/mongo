@@ -30,6 +30,7 @@
 #include <benchmark/benchmark.h>
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_cpu_timer.h"

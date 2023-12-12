@@ -50,6 +50,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/locker_api.h"
 #include "mongo/db/read_write_concern_defaults.h"

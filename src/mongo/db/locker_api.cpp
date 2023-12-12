@@ -29,22 +29,8 @@
 
 #include "mongo/db/locker_api.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 namespace mongo {
 namespace shard_role_details {
-namespace {
-
-template <typename T>
-std::string formatHex(T&& x) {
-    return format(FMT_STRING("{:#x}"), x);
-}
-
-std::string formatPtr(const void* x) {
-    return formatHex(reinterpret_cast<uintptr_t>(x));
-}
-
-}  // namespace
 
 void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker) {
     opCtx->setLockState_DO_NOT_USE(std::move(locker));
@@ -59,19 +45,6 @@ std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
                                    std::unique_ptr<Locker> newLocker,
                                    WithLock lk) {
     return opCtx->swapLockState_DO_NOT_USE(std::move(newLocker), lk);
-}
-
-void dumpLockManager() {
-    auto service = getGlobalServiceContext();
-    auto lockManager = LockManager::get(service);
-
-    BSONArrayBuilder locks;
-    lockManager->getLockInfoArray(LockManager::getLockToClientMap(service), true, nullptr, &locks);
-    LOGV2_OPTIONS(20521,
-                  logv2::LogTruncation::Disabled,
-                  "lock manager dump",
-                  "addr"_attr = formatPtr(lockManager),
-                  "locks"_attr = locks.arr());
 }
 
 }  // namespace shard_role_details

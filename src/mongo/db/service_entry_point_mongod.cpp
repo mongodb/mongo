@@ -44,6 +44,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync_locked.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"

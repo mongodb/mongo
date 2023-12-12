@@ -29,6 +29,7 @@
 
 #include "mongo/tools/workload_simulation/simulation.h"
 
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/locker_api.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

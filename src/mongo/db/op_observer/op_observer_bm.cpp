@@ -32,6 +32,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
 #include "mongo/db/op_observer/fallback_op_observer.h"

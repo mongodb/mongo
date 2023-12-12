@@ -42,6 +42,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/locker_api.h"
