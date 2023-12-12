@@ -213,7 +213,8 @@ private:
                         const key_string::Value& keyString,
                         const BSONObj& keyStringBson,
                         const SortedDataIndexAccessMethod* iam,
-                        const IndexCatalogEntry* indexCatalogEntry);
+                        const IndexCatalogEntry* indexCatalogEntry,
+                        const BSONObj& indexSpec);
 
     /**
      * Runs the data consistency and missing index key check.

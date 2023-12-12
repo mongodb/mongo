@@ -60,7 +60,8 @@ function getMissingIndexKeysQuery(numMissing) {
         $and: [
             {"data.context.missingIndexKeys": {$exists: true}},
             {$expr: {$eq: [{$size: "$data.context.missingIndexKeys"}, numMissing]}}
-        ]
+        ],
+        "data.context.missingIndexKeys": {$elemMatch: {"indexSpec": {$exists: true}}}
     };
 }
 

@@ -123,7 +123,8 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     const BSONObj& maxKey,
     const boost::optional<Timestamp>& timestamp,
     const repl::OpTime& optime,
-    const boost::optional<CollectionOptions>& options = boost::none);
+    const boost::optional<CollectionOptions>& options = boost::none,
+    const boost::optional<BSONObj>& indexSpec = boost::none);
 
 
 struct ReadSourceWithTimestamp {

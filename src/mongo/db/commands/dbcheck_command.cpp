@@ -1130,6 +1130,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                         str::stream() << "cannot find any keys in index " << indexName << " for ns "
                                       << _info.nss.toStringForErrorMsg() << " and uuid "
                                       << _info.uuid.toString());
+        BSONObjBuilder context;
+        context.append("indexSpec", index->infoObj());
         const auto logEntry =
             dbCheckWarningHealthLogEntry(_info.nss,
                                          _info.uuid,
@@ -1137,7 +1139,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                                          "there are no keys left in the index",
                                          ScopeEnum::Index,
                                          OplogEntriesEnum::Batch,
-                                         status);
+                                         status,
+                                         context.done());
         HealthLogInterface::get(opCtx)->log(*logEntry);
         batchStats.finishedIndexBatch = true;
         batchStats.finishedIndexCheck = true;
@@ -1162,7 +1165,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                            keyString,
                            keyStringBson,
                            iam,
-                           indexCatalogEntry);
+                           indexCatalogEntry,
+                           index->infoObj());
         } else {
             LOGV2_DEBUG(7971700, 3, "Skipping reverse lookup for extra index keys dbcheck");
         }
@@ -1223,7 +1227,8 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
                                const key_string::Value& keyString,
                                const BSONObj& keyStringBson,
                                const SortedDataIndexAccessMethod* iam,
-                               const IndexCatalogEntry* indexCatalogEntry) {
+                               const IndexCatalogEntry* indexCatalogEntry,
+                               const BSONObj& indexSpec) {
     // Check that the recordId exists in the record store.
     // TODO SERVER-80654: Handle secondary indexes with the old format that doesn't store
     // keystrings with the RecordId appended.
@@ -1259,9 +1264,9 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
                                  << recordId.toStringHumanReadable() << " from index " << indexName
                                  << " for ns " << _info.nss.toStringForErrorMsg());
         BSONObjBuilder context;
-        context.append("indexName", indexName);
         context.append("keyString", keyStringBson);
         context.append("recordId", recordId.toStringHumanReadable());
+        context.append("indexSpec", indexSpec);
 
         // TODO SERVER-79301: Update scope enums for health log entries.
         auto logEntry =
@@ -1336,10 +1341,10 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
                              << keyStringBson << " from index " << indexName << " for ns "
                              << _info.nss.toStringForErrorMsg());
     BSONObjBuilder context;
-    context.append("indexName", indexName);
     context.append("expectedKeyString", keyStringBson);
     context.append("recordId", recordId.toStringHumanReadable());
     context.append("recordData", recordBson);
+    context.append("indexSpec", indexSpec);
 
     // TODO SERVER-79301: Update scope enums for health log entries.
     auto logEntry = dbCheckErrorHealthLogEntry(_info.nss,

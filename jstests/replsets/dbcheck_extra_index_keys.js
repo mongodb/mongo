@@ -28,12 +28,14 @@ const allErrorsOrWarningsQuery = {
 };
 const recordNotFoundQuery = {
     "severity": "error",
-    "msg": "found extra index key entry without corresponding document"
+    "msg": "found extra index key entry without corresponding document",
+    "data.context.indexSpec": {$exists: true}
 };
 const recordDoesNotMatchQuery = {
     "severity": "error",
     "msg":
-        "found index key entry with corresponding document/keystring set that does not contain the expected key string"
+        "found index key entry with corresponding document/keystring set that does not contain the expected key string",
+    "data.context.indexSpec": {$exists: true}
 };
 const collNotFoundWarningQuery = {
     severity: "warning",

@@ -237,19 +237,19 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
 /**
  * Get a HealthLogEntry for a dbCheck batch.
  */
-std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
-    const boost::optional<UUID>& batchId,
-    const NamespaceString& nss,
-    const boost::optional<UUID>& collectionUUID,
-    int64_t count,
-    int64_t bytes,
-    const std::string& expectedHash,
-    const std::string& foundHash,
-    const BSONObj& batchStart,
-    const BSONObj& batchEnd,
-    const boost::optional<Timestamp>& readTimestamp,
-    const repl::OpTime& optime,
-    const boost::optional<CollectionOptions>& options) {
+std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(const boost::optional<UUID>& batchId,
+                                                  const NamespaceString& nss,
+                                                  const boost::optional<UUID>& collectionUUID,
+                                                  int64_t count,
+                                                  int64_t bytes,
+                                                  const std::string& expectedHash,
+                                                  const std::string& foundHash,
+                                                  const BSONObj& batchStart,
+                                                  const BSONObj& batchEnd,
+                                                  const boost::optional<Timestamp>& readTimestamp,
+                                                  const repl::OpTime& optime,
+                                                  const boost::optional<CollectionOptions>& options,
+                                                  const boost::optional<BSONObj>& indexSpec) {
     auto hashes = expectedFound(expectedHash, foundHash);
 
     BSONObjBuilder builder;
@@ -267,6 +267,9 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
         builder.append("readTimestamp", *readTimestamp);
     }
     builder.append("optime", optime.toBSON());
+    if (indexSpec) {
+        builder.append("indexSpec", indexSpec.get());
+    }
 
     const auto hashesMatch = hashes.first;
     const auto severity = [&] {
@@ -557,7 +560,9 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
             // represent the storage accesses. Therefore, we increment the number of keys seen.
             _countKeysSeen++;
             if (!ksEntry) {
-                _missingIndexKeys.push_back(BSON(descriptor->indexName() << key.toString()));
+                _missingIndexKeys.push_back(BSON(descriptor->indexName()
+                                                 << key.toString() << "indexSpec"
+                                                 << descriptor->infoObj()));
                 continue;
             }
 
@@ -568,7 +573,8 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
                 _missingIndexKeys.push_back(BSON(descriptor->indexName()
                                                  << key.toString() << "foundRecordId"
                                                  << foundRecordId.toString() << "expectedRecordId"
-                                                 << currentRecordId.toString()));
+                                                 << currentRecordId.toString() << "indexSpec"
+                                                 << descriptor->infoObj()));
             }
         }
     }
@@ -823,6 +829,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         // TODO SERVER-78399: Clean up this check once feature flag is removed.
         const boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters =
             entry.getSecondaryIndexCheckParameters();
+        const IndexDescriptor* indexDescriptor = nullptr;
         if (secondaryIndexCheckParameters) {
             mongo::DbCheckValidationModeEnum validateMode =
                 secondaryIndexCheckParameters.get().getValidateMode();
@@ -838,7 +845,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                    &dataThrottle,
                                    indexName);
 
-                    const IndexDescriptor* indexDescriptor =
+                    indexDescriptor =
                         collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
                     if (!indexDescriptor) {
                         std::string msg = "cannot find index " + indexName + " for ns " +
@@ -917,18 +924,20 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                     "found"_attr = found,
                     "readTimestamp"_attr = entry.getReadTimestamp());
 
-        auto logEntry = dbCheckBatchEntry(entry.getBatchId(),
-                                          entry.getNss(),
-                                          collection->uuid(),
-                                          hasher->countSeen(),
-                                          hasher->bytesSeen(),
-                                          expected,
-                                          found,
-                                          batchStart,
-                                          hasher->lastKey(),
-                                          entry.getReadTimestamp(),
-                                          optime,
-                                          collection->getCollectionOptions());
+        auto logEntry = dbCheckBatchEntry(
+            entry.getBatchId(),
+            entry.getNss(),
+            collection->uuid(),
+            hasher->countSeen(),
+            hasher->bytesSeen(),
+            expected,
+            found,
+            batchStart,
+            hasher->lastKey(),
+            entry.getReadTimestamp(),
+            optime,
+            collection->getCollectionOptions(),
+            indexDescriptor ? boost::make_optional(indexDescriptor->infoObj()) : boost::none);
 
         // TODO(SERVER-78399): Remove 'batchesProcessed' logic and expect that
         // 'getLogBatchToHealthLog' from the enry always exists.
