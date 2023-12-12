@@ -6060,25 +6060,6 @@ tasks:
   - func: "upload pip requirements"
   - func: "run idl tests"
 
-- name: blackduck_scanner
-  patchable: false
-  commands:
-  - *f_expansions_write
-  - func: "do non-compile setup"
-  - command: subprocess.exec
-    type: setup
-    params:
-      binary: bash
-      silent: true
-      args:
-        - "src/evergreen/blackduck_setup.sh"
-  - command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      args:
-        - "src/evergreen/blackduck_hub.sh"
-
 - name: tla_plus
   commands:
   - *f_expansions_write
@@ -8242,14 +8223,6 @@ buildvariants:
   - name: lint_fuzzer_sanity_all
   - name: powercycle_sentinel
   - name: powercycle_smoke_skip_compile_gen
-
-- name: security-daily-cron
-  display_name: "~ Security Daily Cron"
-  run_on:
-  - rhel80-small
-  stepback: false
-  tasks:
-  - name: blackduck_scanner
 
 ###########################################
 #         Windows buildvariants           #
