@@ -373,6 +373,13 @@ public:
      */
     static void removeEncryptionFromConfigString(std::string* configString);
 
+    /**
+     * Removes encryption configuration from storage engine collection options.
+     * See CollectionOptions.storageEngine and WiredTigerUtil::removeEncryptionFromConfigString().
+     * TODO(SERVER-81069): Remove this since it's intrinsically tied to encryption options only.
+     */
+    static BSONObj getSanitizedStorageOptionsForSecondaryReplication(const BSONObj& options);
+
 private:
     /**
      * Casts unsigned 64-bit statistics value to T.
