@@ -1103,7 +1103,7 @@ private:
     std::unique_ptr<PlanStageStaticData> _data;
 
     const QuerySolutionNode* _root{nullptr};
-    absl::flat_hash_map<const QuerySolutionNode*, QsnAnalysis> _analysis;
+    absl::node_hash_map<const QuerySolutionNode*, QsnAnalysis> _analysis;
 
     bool _buildHasStarted{false};
 
