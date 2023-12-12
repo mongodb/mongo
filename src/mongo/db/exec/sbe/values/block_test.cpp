@@ -594,15 +594,6 @@ public:
     boost::optional<size_t> tryCount() const override {
         return _vals.size();
     }
-    std::pair<TypeTags, Value> tryMin() const override {
-        return {TypeTags::Nothing, Value{0u}};
-    }
-    std::pair<TypeTags, Value> tryMax() const override {
-        return {TypeTags::Nothing, Value{0u}};
-    }
-    boost::optional<bool> tryDense() const override {
-        return boost::none;
-    }
     value::DeblockedTagVals deblock(
         boost::optional<value::DeblockedTagValStorage>& storage) const override {
         return {_vals.size(), _tags.data(), _vals.data()};
@@ -676,7 +667,7 @@ TEST_F(ValueBlockTest, TestTokenize) {
     ASSERT_EQ(outIdxs, expIdxs);
 }
 
-// Test MonoBlock::Tokenize().
+// Test MonoBlock::tokenize().
 TEST_F(ValueBlockTest, MonoBlockTokenize) {
     {
         auto [strTag, strVal] = value::makeNewString("not a small string"_sd);
@@ -705,6 +696,94 @@ TEST_F(ValueBlockTest, MonoBlockTokenize) {
         std::vector<size_t> expIdxs{0, 0, 0, 0};
         ASSERT_EQ(outIdxs, expIdxs);
     }
+}
+
+// Int32Block::tokenize(), Int64Block::tokenize(), and DateBlock::tokenize() are effectively
+// identical so they are combined into 1 test.
+TEST_F(ValueBlockTest, IntBlockTokenize) {
+    {
+        // Test that first token is Nothing for non-dense blocks.
+        auto block = std::make_unique<value::Int32Block>();
+
+        block->push_back(value::bitcastFrom<int32_t>(2));
+        block->pushNothing();
+        block->push_back(value::bitcastFrom<int32_t>(0));
+        block->push_back(value::bitcastFrom<int32_t>(2));
+        block->pushNothing();
+        block->pushNothing();
+        block->push_back(value::bitcastFrom<int32_t>(1));
+        block->pushNothing();
+        block->pushNothing();
+
+        auto [outTokens, outIdxs] = block->tokenize();
+        ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(4));
+
+        auto outTokensBson = blockToBsonArr(*outTokens);
+        ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [null, 2, 0, 1]}"));
+
+        std::vector<size_t> expIdxs{1, 0, 2, 1, 0, 0, 3, 0, 0};
+        ASSERT_EQ(outIdxs, expIdxs);
+    }
+
+    {
+        // Test on leading Nothing.
+        auto block = std::make_unique<value::Int32Block>();
+
+        block->pushNothing();
+        block->push_back(value::bitcastFrom<int32_t>(0));
+
+        auto [outTokens, outIdxs] = block->tokenize();
+        ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(2));
+
+        auto outTokensBson = blockToBsonArr(*outTokens);
+        ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [null, 0]}"));
+
+        std::vector<size_t> expIdxs{0, 1};
+        ASSERT_EQ(outIdxs, expIdxs);
+    }
+
+    {
+        // Test on dense input.
+        auto block = std::make_unique<value::Int32Block>();
+
+        block->push_back(value::bitcastFrom<int32_t>(2));
+        block->push_back(value::bitcastFrom<int32_t>(0));
+        block->push_back(value::bitcastFrom<int32_t>(2));
+        block->push_back(value::bitcastFrom<int32_t>(1));
+
+        auto [outTokens, outIdxs] = block->tokenize();
+        ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(3));
+
+        auto outTokensBson = blockToBsonArr(*outTokens);
+        ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [2, 0, 1]}"));
+
+        std::vector<size_t> expIdxs{0, 1, 0, 2};
+        ASSERT_EQ(outIdxs, expIdxs);
+    }
+}
+
+// Test that default implementation still works for DoubleBlock's.
+TEST_F(ValueBlockTest, DoubleBlockTokenize) {
+    auto block = std::make_unique<value::DoubleBlock>();
+
+    block->pushNothing();
+    block->push_back(1.1);
+    block->push_back(std::numeric_limits<double>::quiet_NaN());
+    block->pushNothing();
+    block->pushNothing();
+    block->push_back(std::numeric_limits<double>::signaling_NaN());
+    block->push_back(2.2);
+    block->push_back(1.1);
+    block->push_back(std::numeric_limits<double>::quiet_NaN());
+
+    auto [outTokens, outIdxs] = block->tokenize();
+    ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(4));
+
+    auto outTokensBson = blockToBsonArr(*outTokens);
+    ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [null, 1.1, NaN, 2.2]}"));
+
+    std::vector<size_t> expIdxs{0, 1, 2, 0, 0, 2, 3, 1, 2};
+    ASSERT_EQ(outIdxs, expIdxs);
 }
 
 }  // namespace mongo::sbe
