@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -277,6 +278,16 @@ DEATH_TEST_REGEX(ElemMatchValueMatchExpression,
     const size_t numChildren = 1;
     ASSERT_EQ(op.numChildren(), numChildren);
     ASSERT_THROWS_CODE(op.getChild(numChildren), AssertionException, 6400205);
+}
+
+TEST(ElemMatchValueMatchExpression, IsReducedToAlwaysFalseIfContainsIt) {
+    auto baseOperand = BSON("$gt" << 6);
+    auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperand["$gt"]);
+    auto expr = std::make_unique<ElemMatchValueMatchExpression>("a"_sd, std::move(gt));
+    expr->add(std::make_unique<AlwaysFalseMatchExpression>());
+    ASSERT_FALSE(expr->isTriviallyFalse());
+    auto optimizedExpr = MatchExpression::optimize(std::move(expr), true);
+    ASSERT(optimizedExpr->isTriviallyFalse());
 }
 
 /**

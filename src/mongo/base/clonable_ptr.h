@@ -367,9 +367,8 @@ public:
      *                                            [](const T& p){ return p; }}; // GOOD IDEA!!!
      * ~~~
      */
-    template <typename CloneFactory_ = CloneFactory,
-              typename Derived,
-              typename = typename std::enable_if<std::is_empty<CloneFactory_>::value>::type>
+    template <typename CloneFactory_ = CloneFactory, typename Derived>
+    requires std::is_base_of_v<T, Derived> && std::is_empty_v<CloneFactory_>
     inline clonable_ptr(UniquePtr<Derived> p) : data{CloneFactory{}, std::move(p)} {}
 
     /*!
