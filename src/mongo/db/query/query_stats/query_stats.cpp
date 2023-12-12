@@ -163,7 +163,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         // small enough to allow us to shrink the overall memory footprint of the data structure if
         // the user requested that we do so.
         constexpr double approxEntrySize = 0.004 * 1024 * 1024;  // 4KB
-        if (numPartitions < ProcessInfo::getNumCores()) {
+        if (numPartitions < ProcessInfo::getNumLogicalCores()) {
             numPartitions = std::ceil(double(size) / (approxEntrySize * 10));
         }
 

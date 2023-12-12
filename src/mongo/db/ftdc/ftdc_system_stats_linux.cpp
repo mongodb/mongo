@@ -111,7 +111,12 @@ public:
 
             // Include the number of cpus to simplify client calculations
             ProcessInfo p;
-            subObjBuilder.append("num_cpus", static_cast<int>(p.getNumAvailableCores()));
+            subObjBuilder.append("num_logical_cores", static_cast<int>(p.getNumLogicalCores()));
+            const auto num_cores_avlbl_to_process = p.getNumCoresAvailableToProcess();
+            if (num_cores_avlbl_to_process > 0) {
+                subObjBuilder.append("num_cores_available_to_process",
+                                     static_cast<int>(num_cores_avlbl_to_process));
+            }
 
             processStatusErrors(
                 procparser::parseProcStatFile("/proc/stat"_sd, kCpuKeys, &subObjBuilder),
