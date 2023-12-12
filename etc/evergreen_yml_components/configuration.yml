@@ -77,7 +77,6 @@ post:
 - func: "save local client logs"
 - func: "save code coverage data"
 - func: "save jepsen artifacts"
-- func: "save blackduck artifacts"
 - func: "save mongo coredumps"
 - func: "save failed unittests"
 - func: "save hang analyzer debugger files"

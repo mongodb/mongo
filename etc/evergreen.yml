@@ -509,17 +509,6 @@ buildvariants:
   - name: powercycle_sentinel
   - name: powercycle_smoke_skip_compile_gen
 
-- name: &security-daily-cron security-daily-cron
-  modules:
-  - enterprise
-  display_name: "~ Security Daily Cron"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - rhel80-small
-  stepback: false
-  tasks:
-  - name: blackduck_scanner
-
 - name: tooling-metrics-x86
   display_name: "* Tooling Metrics x86"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
