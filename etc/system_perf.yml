@@ -1178,6 +1178,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup: atlas-like-replica.2022-10
+      mongodb_setup_release: 2022-11
       infrastructure_provisioning: M60-like-replica.2023-04
       infrastructure_provisioning_release: 2023-09
       workload_setup: 2022-11
@@ -1211,6 +1212,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup: atlas-like-replica.2023-09
+      mongodb_setup_release: 2022-11
       infrastructure_provisioning: M60-like-replica.2023-09
       infrastructure_provisioning_release: 2023-09
       workload_setup: 2022-11
@@ -1241,6 +1243,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup: atlas-like-replica-query-stats.2022-10
+      mongodb_setup_release: 2022-11
       infrastructure_provisioning: M60-like-replica.2023-04
       infrastructure_provisioning_release: 2023-09
       workload_setup: 2022-11
