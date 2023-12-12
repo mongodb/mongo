@@ -119,7 +119,6 @@ post:
 - func: "kill processes"
 - func: "save local client logs"
 - func: "save jepsen artifacts"
-- func: "save blackduck artifacts"
 - func: "save mongo coredumps"
 - func: "generate hang analyzer tasks"
 - func: "save failed unittests"

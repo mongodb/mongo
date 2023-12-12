@@ -4,7 +4,6 @@ include:
 - filename: etc/evergreen_yml_components/configuration.yml
 - filename: etc/evergreen_yml_components/definitions.yml
 - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
-- filename: etc/evergreen_yml_components/variants/misc/security_daily_cron.yml
 - filename: etc/evergreen_yml_components/variants/atlas/test_release.yml
 - filename: etc/evergreen_yml_components/variants/amazon/test_release.yml
 - filename: etc/evergreen_yml_components/variants/debian/test_release.yml
