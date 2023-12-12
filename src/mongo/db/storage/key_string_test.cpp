@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>
@@ -388,6 +389,33 @@ TEST_F(KeyStringBuilderTest, Simple1) {
 
 TEST_F(KeyStringBuilderTest, DeprecatedBinData) {
     ROUNDTRIP(version, BSON("" << BSONBinData(nullptr, 0, ByteArrayDeprecated)));
+}
+
+TEST_F(KeyStringBuilderTest, ValidColumn) {
+    BSONColumnBuilder cb;
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    cb.append(BSON("a" << 1).getField("a"));
+    cb.append(BSON("a" << 2).getField("a"));
+    cb.append(BSON("a" << 1).getField("a"));
+    BSONBinData columnData = cb.finalize();
+    BSONObj objData = BSON("" << columnData);
+
+    ROUNDTRIP(version, objData);
+}
+
+TEST_F(KeyStringBuilderTest, InvalidColumn) {
+    const BSONObj objData = BSON("" << BSONBinData("foobar", 6, Column));
+    const key_string::Builder builder(version, objData, ALL_ASCENDING);
+    auto KeyStringBuilderSize = builder.getSize();
+    ASSERT(KeyStringBuilderSize > 0);
+
+    ASSERT_THROWS_CODE(
+        key_string::toBsonSafe(
+            builder.getBuffer(), KeyStringBuilderSize, ALL_ASCENDING, builder.getTypeBits()),
+        AssertionException,
+        50833);
 }
 
 TEST_F(KeyStringBuilderTest, ActualBytesDouble) {

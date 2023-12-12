@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/bson/bson_validate.h"
 #include <algorithm>
 #include <boost/optional.hpp>
 #include <cfloat>
@@ -1648,10 +1649,22 @@ void toBsonValue(uint8_t ctype,
             BinDataType subType = BinDataType(readType<uint8_t>(reader, inverted));
             const void* ptr = reader->skip(size);
             if (!inverted) {
+                // Column is structured, it does not support arbitrary data
+                if (subType == BinDataType::Column) {
+                    keyStringAssert(50833,
+                                    "Expected valid BSONColumn data",
+                                    validateBSONColumn((const char*)ptr, size).isOK());
+                }
                 *stream << BSONBinData(ptr, size, subType);
             } else {
                 std::unique_ptr<char[]> flipped(new char[size]);
                 memcpy_flipBits(flipped.get(), ptr, size);
+                // Column is structured, it does not support arbitrary data
+                if (subType == BinDataType::Column) {
+                    keyStringAssert(50833,
+                                    "Expected valid BSONColumn data",
+                                    validateBSONColumn((const char*)flipped.get(), size).isOK());
+                }
                 *stream << BSONBinData(flipped.get(), size, subType);
             }
             break;
