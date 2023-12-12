@@ -1315,4 +1315,22 @@ void WiredTigerUtil::removeEncryptionFromConfigString(std::string* configString)
     encryptionOptsRegex->substitute("", configString, pcre::SUBSTITUTE_GLOBAL);
 }
 
+// static
+BSONObj WiredTigerUtil::getSanitizedStorageOptionsForSecondaryReplication(const BSONObj& options) {
+    // Storage options may contain settings for non-WiredTiger storage engines (e.g. inMemory).
+    // We should leave these settings intact.
+    if (auto wtElem = options[kWiredTigerEngineName]) {
+        BSONObj wtObj = wtElem.Obj();
+        if (auto configStringElem = wtObj.getField(kConfigStringField)) {
+            auto configString = configStringElem.String();
+            removeEncryptionFromConfigString(&configString);
+            // Return a new BSONObj with the configString field sanitized.
+            return options.addFields(BSON(kWiredTigerEngineName << wtObj.addFields(
+                                              BSON(kConfigStringField << configString))));
+        }
+    }
+
+    return options;
+}
+
 }  // namespace mongo
