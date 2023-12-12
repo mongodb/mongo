@@ -206,6 +206,9 @@ public:
                                const ChunkManager& cm);
 
 private:
+    // Maximum number of database creation attempts, which may fail due to a concurrent drop.
+    static const size_t kMaxDatabaseCreationAttempts;
+
     CollectionRoutingInfo _init(OperationContext* opCtx, bool refresh);
 
     /**
