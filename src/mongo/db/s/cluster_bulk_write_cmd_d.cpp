@@ -58,6 +58,11 @@ struct ClusterBulkWriteCmdD {
         // which triggers an invariant, so only shard servers can run this.
         ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
     }
+
+    static void checkCanExplainHere(OperationContext* opCtx) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "Cannot explain a cluster insert command on a mongod");
+    }
 };
 MONGO_REGISTER_COMMAND(ClusterBulkWriteCmd<ClusterBulkWriteCmdD>).forShard();
 

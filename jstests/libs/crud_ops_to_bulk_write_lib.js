@@ -44,6 +44,16 @@ export const BulkWriteUtils = (function() {
         return nsInfos;
     }
 
+    function getBulkWriteCmd() {
+        return {
+            "bulkWrite": 1,
+            "ops": bufferedOps,
+            "nsInfo": nsInfos,
+            "ordered": (ordered != null) ? ordered : true,
+            "bypassDocumentValidation": bypassDocumentValidation,
+        };
+    }
+
     function flushCurrentBulkWriteBatch(
         conn, lsid, originalRunCommand, makeRunCommandArgs, additionalParameters = {}) {
         // Should not be possible to reach if bypassDocumentValidation is not set.
@@ -231,11 +241,10 @@ export const BulkWriteUtils = (function() {
             "filter": update.q,
             "updateMods": update.u,
             "multi": update.multi ? update.multi : false,
-            "upsert": update.upsert ? update.upsert : false,
-            "upsertSupplied": update.upsertSupplied ? update.upsertSupplied : false,
+            "upsert": update.upsert ? update.upsert : false
         };
 
-        ["arrayFilters", "collation", "hint", "sampleId"].forEach(property => {
+        ["arrayFilters", "collation", "hint", "sampleId", "upsertSupplied"].forEach(property => {
             if (update.hasOwnProperty(property)) {
                 op[property] = update[property];
             }
@@ -323,6 +332,7 @@ export const BulkWriteUtils = (function() {
         canProcessAsBulkWrite: canProcessAsBulkWrite,
         getCurrentBatchSize: getCurrentBatchSize,
         getBulkWriteState: getBulkWriteState,
-        getNamespaces: getNamespaces
+        getNamespaces: getNamespaces,
+        getBulkWriteCmd: getBulkWriteCmd
     };
 })();

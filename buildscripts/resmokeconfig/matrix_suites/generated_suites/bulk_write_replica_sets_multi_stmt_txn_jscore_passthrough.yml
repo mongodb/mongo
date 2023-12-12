@@ -193,6 +193,8 @@ selector:
   - jstests/core/failcommand_failpoint.js
   - jstests/core/version_api_v1_command_coverage.js
   - jstests/core/write/write_commands_reject_unknown_fields.js
+  - jstests/core/query/explain/explain_uuid.js
+  - jstests/core/query/explain/explain_includes_command.js
   - jstests/libs/txns/txn_passthrough_runner_selftest.js
   exclude_with_any_tags:
   - assumes_standalone_mongod

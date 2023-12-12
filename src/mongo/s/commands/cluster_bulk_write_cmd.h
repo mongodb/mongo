@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -69,6 +71,8 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/collection_routing_info_targeter.h"
+#include "mongo/s/commands/cluster_explain.h"
+#include "mongo/s/commands/cluster_write_cmd.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor.h"
@@ -165,6 +169,10 @@ public:
     private:
         void preRunImplHook(OperationContext* opCtx) const {
             Impl::checkCanRunHere(opCtx);
+        }
+
+        void preExplainImplHook(OperationContext* opCtx) const {
+            Impl::checkCanExplainHere(opCtx);
         }
 
         void doCheckAuthorizationHook(AuthorizationSession* authzSession) const {
@@ -459,6 +467,38 @@ public:
 
                 response.replyItems[0] = successReply;
             }
+        }
+
+        void explain(OperationContext* opCtx,
+                     ExplainOptions::Verbosity verbosity,
+                     rpc::ReplyBuilderInterface* result) {
+            preExplainImplHook(opCtx);
+
+            uassert(ErrorCodes::InvalidLength,
+                    "explained bulkWrite must be of size 1",
+                    _request.getOps().size() == 1U);
+
+            auto op = BulkWriteCRUDOp(_request.getOps()[0]);
+            BatchedCommandRequest batchedRequest = [&]() {
+                auto type = op.getType();
+                if (type == BulkWriteCRUDOp::kInsert) {
+                    return BatchedCommandRequest::buildInsertOp(
+                        _request.getNsInfo()[op.getNsInfoIdx()].getNs(),
+                        {op.getInsert()->getDocument()});
+                } else if (type == BulkWriteCRUDOp::kUpdate) {
+                    return BatchedCommandRequest(
+                        bulk_write_common::makeUpdateCommandRequestFromUpdateOp(
+                            op.getUpdate(), _request, 0));
+                } else if (type == BulkWriteCRUDOp::kDelete) {
+                    return BatchedCommandRequest(bulk_write_common::makeDeleteCommandRequestForFLE(
+                        opCtx, op.getDelete(), _request, _request.getNsInfo()[op.getNsInfoIdx()]));
+                } else {
+                    MONGO_UNREACHABLE;
+                }
+            }();
+
+            ClusterWriteCmd::executeWriteOpExplain(
+                opCtx, batchedRequest, batchedRequest.toBSON(), verbosity, result);
         }
 
         const OpMsgRequest* _opMsgRequest;

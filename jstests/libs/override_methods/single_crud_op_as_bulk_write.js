@@ -56,6 +56,24 @@ function runCommandSingleOpBulkWriteOverride(
         }
     }
 
+    if (cmdNameLower == "explain") {
+        if (BulkWriteUtils.canProcessAsBulkWrite(Object.keys(cmdObj[cmdNameLower])[0])) {
+            let letVar = null;
+            if (cmdObj[cmdNameLower]["let"]) {
+                letVar = cmdObj[cmdNameLower]["let"];
+            }
+            let key = Object.keys(cmdObj[cmdNameLower])[0];
+            BulkWriteUtils.processCRUDOp(dbName, key, cmdObj[cmdNameLower]);
+            cmdObj[cmdNameLower] = BulkWriteUtils.getBulkWriteCmd();
+            if (letVar) {
+                cmdObj[cmdNameLower]["let"] = letVar;
+            }
+            BulkWriteUtils.resetBulkWriteBatch();
+
+            jsTestLog("New explain: " + tojson(cmdObj));
+        }
+    }
+
     // Non-CRUD op, run command as normal and return results.
     return originalRunCommand.apply(conn, makeRunCommandArgs(cmdObj));
 }

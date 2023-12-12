@@ -30,6 +30,10 @@
     - jstests/core/version_api_v1_command_coverage.js
     # This test adds unknown fields to insert/update/delete ops which we ignore
     - jstests/core/write/write_commands_reject_unknown_fields.js
+    # Expects explain to fail for using UUID instead of collection name.
+    - jstests/core/query/explain/explain_uuid.js
+    # Checks for specific name in the command that was executed that we override.
+    - jstests/core/query/explain/explain_includes_command.js
 
 - name: single_op_txns_excluded_files
   value:
@@ -51,6 +55,8 @@
     # Asserts a location specific error code failure that happens after we fail out in bulkWrite.
     - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
     - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
+    # The way we override explain doesn't work with FLE tests.
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/explain*.js
 
 - name: txn_passthrough_runner_selftest
   value:

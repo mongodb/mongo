@@ -441,3 +441,83 @@ assert(!res.cursor.firstBatch[1], "bulkWrite command response: " + tojson(res));
 assert.eq(res.cursor.ns, "admin.$cmd.bulkWrite", "bulkWrite command response: " + tojson(res));
 
 coll.drop();
+
+// Explained upsert against an empty collection should succeed and be a no-op.
+res = db.adminCommand({
+    explain: {
+        bulkWrite: 1,
+        ops: [
+            {update: 0, filter: {_id: 1}, updateMods: {$set: {skey: "MongoDB2"}}, upsert: true},
+        ],
+        nsInfo: [{ns: "test.coll"}],
+        ordered: false
+    }
+});
+assert.commandWorked(res);
+
+// Collection should still not exist.
+assert.eq(coll.find().itcount(), 0);
+
+assert.eq(res.executionStats.totalDocsExamined, 0, "bulkWrite explain response: " + tojson(res));
+
+coll.drop();
+
+// Explained update should succeed and be a no-op.
+coll.insert({_id: 1, skey: "MongoDB"});
+res = db.adminCommand({
+    explain: {
+        bulkWrite: 1,
+        ops: [
+            {update: 0, filter: {_id: 1}, updateMods: {$set: {skey: "MongoDB2"}}},
+        ],
+        nsInfo: [{ns: "test.coll"}],
+        ordered: false
+    }
+});
+assert.commandWorked(res);
+
+assert.eq(coll.find({skey: "MongoDB"}).itcount(), 1);
+
+assert.eq(res.executionStats.totalDocsExamined, 1, "bulkWrite explain response: " + tojson(res));
+
+coll.drop();
+
+// Explained delete should succeed and be a no-op.
+coll.insert({_id: 1});
+res = db.adminCommand({
+    explain: {
+        bulkWrite: 1,
+        ops: [
+            {delete: 0, filter: {_id: 1}},
+        ],
+        nsInfo: [{ns: "test.coll"}],
+        ordered: false
+    }
+});
+assert.commandWorked(res);
+
+assert.eq(coll.find().itcount(), 1);
+
+assert.eq(res.executionStats.totalDocsExamined, 1, "bulkWrite explain response: " + tojson(res));
+
+coll.drop();
+
+coll.insert({_id: 1, skey: "MongoDB"});
+coll.insert({_id: 2, skey: "MongoDB"});
+res = db.adminCommand({
+    explain: {
+        bulkWrite: 1,
+        ops: [
+            {delete: 0, filter: {skey: "MongoDB"}, multi: true},
+        ],
+        nsInfo: [{ns: "test.coll"}],
+        ordered: false
+    }
+});
+assert.commandWorked(res);
+
+assert.eq(coll.find().itcount(), 2);
+
+assert.eq(res.executionStats.totalDocsExamined, 2, "bulkWrite explain response: " + tojson(res));
+
+coll.drop();

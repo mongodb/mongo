@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/operation_context.h"
 #include "mongo/s/commands/cluster_bulk_write_cmd.h"
 
 #include "mongo/db/commands/bulk_write_common.h"
@@ -50,6 +51,10 @@ struct ClusterBulkWriteCmdS {
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
+        // Can always run on a mongos.
+    }
+
+    static void checkCanExplainHere(OperationContext* opCtx) {
         // Can always run on a mongos.
     }
 };

@@ -193,7 +193,7 @@ write_ops::UpdateOpEntry makeUpdateOpEntryFromUpdateOp(const BulkWriteUpdateOp* 
     update.setU(op->getUpdateMods());
     update.setHint(op->getHint());
     update.setCollation(op->getCollation());
-    update.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
+    update.setArrayFilters(op->getArrayFilters());
     update.setUpsert(op->getUpsert());
     update.setUpsertSupplied(op->getUpsertSupplied());
     update.setSampleId(op->getSampleId());

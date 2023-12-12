@@ -104,23 +104,38 @@ public:
                                                   BatchedCommandResponse* response,
                                                   BatchWriteExecStats stats);
 
-protected:
-    class InvocationBase;
-
-    ClusterWriteCmd(StringData name) : Command(name) {}
-
-private:
     /**
      * Executes a write command against a particular database, and targets the command based on
      * a write operation.
      *
      * Does *not* retry or retarget if the metadata is stale.
      */
-    static void _commandOpWrite(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const BSONObj& command,
-                                BatchItemRef targetingBatchItem,
-                                std::vector<AsyncRequestsSender::Response>* results);
+    static void commandOpWrite(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& command,
+                               BatchItemRef targetingBatchItem,
+                               std::vector<AsyncRequestsSender::Response>* results);
+
+    /**
+     * Runs a two-phase protocol to explain an updateOne/deleteOne without a shard key or _id.
+     * Returns true if we successfully ran the protocol, false otherwise.
+     */
+    static bool runExplainWithoutShardKey(OperationContext* opCtx,
+                                          const BatchedCommandRequest& req,
+                                          const NamespaceString& nss,
+                                          ExplainOptions::Verbosity verbosity,
+                                          BSONObjBuilder* result);
+
+    static void executeWriteOpExplain(OperationContext* opCtx,
+                                      const BatchedCommandRequest& batchedRequest,
+                                      const BSONObj& requestObj,
+                                      ExplainOptions::Verbosity verbosity,
+                                      rpc::ReplyBuilderInterface* result);
+
+protected:
+    class InvocationBase;
+
+    ClusterWriteCmd(StringData name) : Command(name) {}
 };
 
 class ClusterWriteCmd::InvocationBase : public CommandInvocation {
@@ -178,15 +193,6 @@ private:
     const ClusterWriteCmd* command() const {
         return static_cast<const ClusterWriteCmd*>(definition());
     }
-
-    /**
-     * Runs a two-phase protocol to explain an updateOne/deleteOne without a shard key or _id.
-     * Returns true if we successfully ran the protocol, false otherwise.
-     */
-    bool _runExplainWithoutShardKey(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    ExplainOptions::Verbosity verbosity,
-                                    BSONObjBuilder* result);
 
     const OpMsgRequest* _request;
     BatchedCommandRequest _batchedRequest;
