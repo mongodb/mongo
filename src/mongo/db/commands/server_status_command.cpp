@@ -37,7 +37,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -279,12 +278,6 @@ public:
             b.append("note", "not all mem info support on this platform");
             b.appendBool("supported", false);
         }
-
-        using namespace mongo::secure_allocator_details;
-        b.appendNumber("secureAllocByteCount",
-                       static_cast<int>(gSecureAllocCountInfo().getSecureAllocByteCount()));
-        b.appendNumber("secureAllocBytesInPages",
-                       static_cast<int>(gSecureAllocCountInfo().getSecureAllocBytesInPages()));
     }
 };
 
