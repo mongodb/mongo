@@ -85,9 +85,9 @@ export const $config = (function() {
             var res =
                 db.runCommand({compact: this.threadCollName, force: true, freeSpaceTargetMB: 1});
 
-            // Ensure the compact command was successful.
+            // The compact command can be successful or interrupted because of cache pressure.
             if (!isEphemeral(db)) {
-                assert.commandWorked(res);
+                assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
             } else {
                 assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
                 return;
