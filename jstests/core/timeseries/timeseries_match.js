@@ -1,13 +1,28 @@
 /**
- * Tests $match path semantics for time series collections.
+ * Tests $match usage of block processing for time series.
  * @tags: [
  *   requires_timeseries,
  *   does_not_support_stepdowns,
  *   directly_against_shardsvrs_incompatible,
+ *   # During fcv upgrade/downgrade the engine might not be what we expect.
+ *   cannot_run_during_upgrade_downgrade,
+ *   # "Explain of a resolved view must be executed by mongos"
+ *   directly_against_shardsvrs_incompatible,
+ *   # Some suites use mixed-binary cluster setup where some nodes might have the flag enabled while
+ *   # others -- not. For this test we need control over whether the flag is set on the node that
+ *   # ends up executing the query.
+ *   assumes_standalone_mongod
  * ]
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {
+    getAggPlanStage,
+    getEngine,
+    getQueryPlanner,
+    getSingleNodeExplain
+} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
@@ -47,51 +62,117 @@ TimeseriesTest.run((insert) => {
 
         // All fields missing.
     });
+    insert(coll, {
+        _id: 3,
+        [timeFieldName]: new Date(datePrefix + 400),
+        [metaFieldName]: "cpu",
+        // All fields missing, except topLevelArray, which contains arrays of arrays.
+        topLevelArray: [[101, 102], [103, 104], [[105]]],
+    });
+    insert(coll, {
+        _id: 4,
+        [timeFieldName]: new Date(datePrefix + 500),
+        [metaFieldName]: "cpu",
+        // Different schema from above.
+        arrOfObj: [{x: [101, 102, 103]}, {x: [104]}],
+    });
 
-    //
-    // These queries are written in an odd way so that SBE can be used.
-    //
+    const kTestCases = [
+        {pred: {"topLevelScalar": {$gt: 123}}, ids: [1], usesBlockProcessing: true},
+        {pred: {"topLevelScalar": {$gte: 123}}, ids: [0, 1], usesBlockProcessing: true},
+        {pred: {"topLevelScalar": {$lt: 456}}, ids: [0], usesBlockProcessing: true},
+        {pred: {"topLevelScalar": {$lte: 456}}, ids: [0, 1], usesBlockProcessing: true},
+        {pred: {"topLevelScalar": {$eq: 456}}, ids: [1], usesBlockProcessing: true},
+        {pred: {"topLevelScalar": {$ne: 456}}, ids: [0, 2, 3, 4], usesBlockProcessing: true},
 
-    /* $match tests */
+        {pred: {"topLevelArray": {$gt: 4}}, ids: [1], usesBlockProcessing: true},
+        {pred: {"topLevelArray": {$gte: 4}}, ids: [0, 1], usesBlockProcessing: true},
+        {pred: {"topLevelArray": {$lt: 101}}, ids: [0], usesBlockProcessing: true},
+        {pred: {"topLevelArray": {$lte: 101}}, ids: [0, 1], usesBlockProcessing: true},
+        {pred: {"topLevelArray": {$eq: 102}}, ids: [1], usesBlockProcessing: true},
 
-    function testMatch(filter, ids) {
-        let res = coll.aggregate([{$match: filter}, {$project: {_id: 1}}]).toArray();
+        {pred: {"arrOfObj.x": {$gt: 4}}, ids: [1, 4], usesBlockProcessing: true},
+        {pred: {"arrOfObj.x": {$gte: 4}}, ids: [0, 1, 4], usesBlockProcessing: true},
+        {pred: {"arrOfObj.x": {$lt: 101}}, ids: [0], usesBlockProcessing: true},
+        {pred: {"arrOfObj.x": {$lte: 101}}, ids: [0, 1, 4], usesBlockProcessing: true},
+        {pred: {"arrOfObj.x": {$eq: 102}}, ids: [1, 4], usesBlockProcessing: true},
+        {pred: {"arrOfObj.x": {$ne: 102}}, ids: [0, 2, 3], usesBlockProcessing: true},
 
-        assert.eq(res, ids);
+        {
+            pred: {"time": {$gt: new Date(datePrefix + 100)}},
+            ids: [1, 2, 3, 4],
+            usesBlockProcessing: true
+        },
+        {
+            pred: {"time": {$gte: new Date(datePrefix + 100)}},
+            ids: [0, 1, 2, 3, 4],
+            usesBlockProcessing: true
+        },
+        {pred: {"time": {$lt: new Date(datePrefix + 200)}}, ids: [0], usesBlockProcessing: true},
+        {
+            pred: {"time": {$lte: new Date(datePrefix + 200)}},
+            ids: [0, 1],
+            usesBlockProcessing: true
+        },
+        {pred: {"time": {$eq: new Date(datePrefix + 300)}}, ids: [2], usesBlockProcessing: true},
+        {
+            pred: {"time": {$ne: new Date(datePrefix + 200)}},
+            ids: [0, 2, 3, 4],
+            usesBlockProcessing: true
+        },
+        {
+            pred: {"time": {$gt: new Date(datePrefix + 100), $lt: new Date(datePrefix + 300)}},
+            ids: [1],
+            usesBlockProcessing: true
+        },
+        {
+            pred: {"time": {$eq: {"obj": new Date(datePrefix + 100)}}},
+            ids: [],
+            usesBlockProcessing: true
+        },
+
+        // Equality to array does not use block processing.
+        {pred: {"topLevelArray": {$eq: [101, 102]}}, ids: [3], usesBlockProcessing: false},
+        {pred: {"topLevelScalar": {$eq: [999, 999]}}, ids: [], usesBlockProcessing: false}
+    ];
+
+    const sbeEnabled = checkSBEEnabled(db, ["featureFlagTimeSeriesInSbe"]);
+    for (let testCase of kTestCases) {
+        const pipe = [{$match: testCase.pred}, {$project: {_id: 1}}];
+
+        // Check results.
+        {
+            const results = coll.aggregate(pipe).toArray().map((x) => x._id)
+            results.sort();
+            assert.eq(testCase.ids, results, () => "Test case " + tojson(testCase));
+        }
+
+        // Check that explain indicates block processing is being used. This is a best effort
+        // check.
+        const explain = coll.explain().aggregate(pipe);
+        const engineUsed = getEngine(explain);
+        const singleNodeQueryPlanner = getQueryPlanner(getSingleNodeExplain(explain));
+        printjson(singleNodeQueryPlanner);
+        function testCaseAndExplainFn(description) {
+            return () => description + " for test case " + tojson(testCase) +
+                " failed with explain " + tojson(singleNodeQueryPlanner);
+        }
+
+        if (sbeEnabled) {
+            const sbePlan = singleNodeQueryPlanner.winningPlan.slotBasedPlan.stages;
+
+            if (testCase.usesBlockProcessing) {
+                assert.eq(engineUsed, "sbe");
+
+                // Check for the fold function.
+                assert(sbePlan.includes("cellFoldValues_F"),
+                       testCaseAndExplainFn("Expected explain to use block processing"));
+            } else {
+                assert(!sbePlan.includes("cellFoldValues_F"),
+                       testCaseAndExplainFn("Expected explain not to use block processing"));
+            }
+        }
     }
-
-    testMatch({"topLevelScalar": {$gt: 123}}, [{_id: 1}]);
-    testMatch({"topLevelScalar": {$gte: 123}}, [{_id: 0}, {_id: 1}]);
-    testMatch({"topLevelScalar": {$lt: 456}}, [{_id: 0}]);
-    testMatch({"topLevelScalar": {$lte: 456}}, [{_id: 0}, {_id: 1}]);
-    testMatch({"topLevelScalar": {$eq: 456}}, [{_id: 1}]);
-    testMatch({"topLevelScalar": {$ne: 456}}, [{_id: 0}, {_id: 2}]);
-
-    testMatch({"topLevelArray": {$gt: 4}}, [{_id: 1}]);
-    testMatch({"topLevelArray": {$gte: 4}}, [{_id: 0}, {_id: 1}]);
-    testMatch({"topLevelArray": {$lt: 101}}, [{_id: 0}]);
-    testMatch({"topLevelArray": {$lte: 101}}, [{_id: 0}, {_id: 1}]);
-    testMatch({"topLevelArray": {$eq: 102}}, [{_id: 1}]);
-    testMatch({"topLevelArray": {$ne: 102}}, [{_id: 0}, {_id: 2}]);
-
-    testMatch({"arrOfObj.x": {$gt: 4}}, [{_id: 1}]);
-    testMatch({"arrOfObj.x": {$gte: 4}}, [{_id: 0}, {_id: 1}]);
-    testMatch({"arrOfObj.x": {$lt: 101}}, [{_id: 0}]);
-    testMatch({"arrOfObj.x": {$lte: 101}}, [{_id: 0}, {_id: 1}]);
-    testMatch({"arrOfObj.x": {$eq: 102}}, [{_id: 1}]);
-    testMatch({"arrOfObj.x": {$ne: 102}}, [{_id: 0}, {_id: 2}]);
-
-    testMatch({"time": {$gt: new Date(datePrefix + 100)}}, [{_id: 1}, {_id: 2}]);
-    testMatch({"time": {$gte: new Date(datePrefix + 100)}}, [{_id: 0}, {_id: 1}, {_id: 2}]);
-    testMatch({"time": {$lt: new Date(datePrefix + 200)}}, [{_id: 0}]);
-    testMatch({"time": {$lte: new Date(datePrefix + 200)}}, [{_id: 0}, {_id: 1}]);
-    testMatch({"time": {$eq: new Date(datePrefix + 300)}}, [{_id: 2}]);
-    testMatch({"time": {$ne: new Date(datePrefix + 200)}}, [{_id: 0}, {_id: 2}]);
-
-    testMatch({"time": {$gt: new Date(datePrefix + 100), $lt: new Date(datePrefix + 300)}},
-              [{_id: 1}]);
-
-    testMatch({"time": {"obj": new Date(datePrefix + 100)}}, []);
 
     // Special test case which can result in an empty event filter being compiled (SERVER-84001).
     {
@@ -101,6 +182,6 @@ TimeseriesTest.run((insert) => {
             {$project: {_id: 1}}
         ];
         const res = coll.aggregate(pipe).toArray()
-        assert.eq(res.length, 3);
+        assert.eq(res.length, coll.count());
     }
 });
