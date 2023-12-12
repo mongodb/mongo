@@ -60,8 +60,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet ARM AWS 2023-11
-  # Leave off for now
-  activate: false
+  cron: &linux-1-node-repl-cron "0 0 * * 4" # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     <<: *linux_arm64_generic_expansions
@@ -125,7 +124,6 @@ buildvariants:
   name: perf-standalone-classic-query-engine.intel.aws.2023-11
   display_name: PERF Standalone (Classic Query Engine) Intel AWS 2023-11
   cron: &cron_query_perf_schedule "0 0 * * 4"  # 00:00 on Thursday
-  activate: false
   modules: *perf_modules
   expansions:
     <<: *amazon2_x86_expansions
@@ -165,12 +163,10 @@ buildvariants:
     - name: tpch_10_denormalized
     - name: canaries_only
 
-
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-standalone-sbe.intel.aws.2023-11
   display_name: PERF Standalone (SBE) Intel AWS 2023-11
-  # cron: *cron_query_perf_schedule
-  activate: false
+  cron: *cron_query_perf_schedule
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -190,8 +186,7 @@ buildvariants:
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-1-node-replSet-classic-query-engine.intel.aws.2023-11
   display_name: PERF Intel 1-Node ReplSet (Classic Query Engine) Intel AWS 2023-11
-  # cron: &linux-1-node-repl-cron "0 0 * * 4"  # 00:00 on Thursday
-  activate: false
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -217,8 +212,7 @@ buildvariants:
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-1-node-replSet-sbe.intel.aws.2023-11
   display_name: PERF 1-Node ReplSet (SBE) Intel AWS 2023-11
-  # cron: *linux-1-node-repl-cron
-  activate: false
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -238,8 +232,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-lite-all-feature-flags.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet (graviton lite, all FF) ARM AWS 2023-11
-  # cron: *linux-1-node-repl-cron
-  activate: false
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -266,11 +259,11 @@ buildvariants:
     - name: column_store_tpch_10_denormalized_unindexed
     - name: ssb_column_store_comparison
 
+# TODO: Fix Atlas variants (SERVER-83171)
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-atlas-M30-real.arm.aws.2023-11
   display_name: PERF M30-Atlas ReplSet ARM AWS 2023-11
-  # cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
-  activate: false
+  cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup: atlas
@@ -296,8 +289,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-atlas-M60-real.arm.aws.2023-11
   display_name: PERF M60-Atlas ReplSet ARM AWS 2023-11
-  # cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
-  activate: false
+  cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup: atlas
@@ -327,8 +319,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-atlas-M60-shard-real-multi-client.arm.aws.2023-11
   display_name: PERF M60-Shard Atlas Multiple Workload Clients ARM AWS 2023-11
-  # cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
-  activate: false
+  cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup: atlas-shard
@@ -384,8 +375,7 @@ buildvariants:
   display_name: PERF Standalone ARM AWS 2023-11
   # TODO SERVER-74399 Reduce frequency back to baseline.
   # cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
-  activate: false
-  # cron: &linux-standalone-cron "0 0 * * *"  # Everyday at 00:00
+  cron: &linux-standalone-cron "0 0 * * *"  # Everyday at 00:00
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -435,8 +425,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone-all-feature-flags.arm.aws.2023-11
   display_name: PERF Standalone (all feature flags) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
+  cron: *linux-standalone-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -513,8 +502,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone-classic-query-engine.arm.aws.2023-11
   display_name: PERF Standalone (Classic Query Engine) ARM AWS 2023-11
-  activate: false
-  # cron: *cron_query_perf_schedule
+  cron: *cron_query_perf_schedule
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -534,8 +522,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone-sbe.arm.aws.2023-11
   display_name: PERF Standalone (SBE) ARM AWS 2023-11
-  activate: false
-  # cron: *cron_query_perf_schedule
+  cron: *cron_query_perf_schedule
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -555,8 +542,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone-sampling-bonsai.arm.aws.2023-11
   display_name: PERF Standalone (Bonsai with Sampling CE) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -578,8 +564,7 @@ buildvariants:
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-standalone-sampling-bonsai.intel.aws.2023-11
   display_name: PERF Standalone (Bonsai with Sampling CE) Intel AWS 2023-11
-  activate: false
-  # cron: *cron_query_perf_schedule
+  cron: *cron_query_perf_schedule
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -599,8 +584,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone-heuristic-bonsai.arm.aws.2023-11
   display_name: PERF Standalone (Bonsai with Heuristic CE) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -620,8 +604,7 @@ buildvariants:
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-standalone-heuristic-bonsai.intel.aws.2023-11
   display_name: PERF Standalone (Bonsai with Heuristic CE) Intel AWS 2023-11
-  activate: false
-  # cron: *cron_query_perf_schedule
+  cron: *cron_query_perf_schedule
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -641,8 +624,7 @@ buildvariants:
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-1-node-replSet-sampling-bonsai.intel.aws.2023-11
   display_name: PERF 1-Node ReplSet (Bonsai with Sampling CE) Intel AWS 2023-11
-  activate: false
-  # cron: *linux-1-node-repl-cron
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -666,8 +648,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-sampling-bonsai.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet (Bonsai with Sampling CE) ARM AWS 2023-11
-  activate: false
-  # cron: *linux-1-node-repl-cron
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -687,8 +668,7 @@ buildvariants:
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-1-node-replSet-heuristic-bonsai.intel.aws.2023-11
   display_name: PERF 1-Node ReplSet (Bonsai with Heuristic CE) Intel AWS 2023-11
-  activate: false
-  # cron: *linux-1-node-repl-cron
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -708,8 +688,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-heuristic-bonsai.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet (Bonsai with Heuristic CE) ARM AWS 2023-11
-  activate: false
-  # cron: *linux-1-node-repl-cron
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -729,8 +708,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-classic-query-engine.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet (Classic Query Engine) ARM AWS 2023-11
-  activate: false
-  # cron: *linux-1-node-repl-cron
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -750,8 +728,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-sbe.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet (SBE) ARM AWS 2023-11
-  activate: false
-  # cron: *linux-1-node-repl-cron
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -772,8 +749,7 @@ buildvariants:
   name: perf-standalone-query-stats.arm.aws.2023-11
   display_name: PERF Standalone (QueryStats) ARM AWS 2023-11
   # Match the baseline non-query-stats cron
-  activate: false
-  # cron: *linux-standalone-cron
+  cron: *linux-standalone-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -811,8 +787,7 @@ buildvariants:
   name: perf-standalone-limited-query-stats.arm.aws.2023-11
   display_name: PERF Standalone (Rate Limited QueryStats) ARM AWS 2023-11
   # Match the baseline non-query-stats cron
-  activate: false
-  # cron: *linux-standalone-cron
+  cron: *linux-standalone-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -840,8 +815,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-all-feature-flags.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet (all feature flags) ARM AWS 2023-11
-  activate: false
-  # cron: *linux-1-node-repl-cron
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -865,8 +839,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-test-commands.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet With Test Commands ARM AWS 2023-11
-  activate: false
-  # cron: *linux-1-node-repl-cron
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -889,8 +862,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone-audit.arm.aws.2023-11
   display_name: PERF Standalone Audit ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -915,8 +887,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-audit-log-encryption-no-compression.arm.aws.2023-11
   display_name: PERF Single-node Replica Set Audit w/ At-Rest Log Encryption (No compression) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -936,8 +907,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-audit.arm.aws.2023-11
   display_name: PERF Single-node Replica Set Audit ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -957,8 +927,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-query-stats.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet (QueryStats) ARM AWS 2023-11
-  activate: false
-  # cron: *linux-1-node-repl-cron
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1000,8 +969,7 @@ buildvariants:
 
 # - name: perf-shard-lite-fle.arm.aws.2023-11
 #   display_name: PERF Shard Lite FLE ARM AWS 2023-11
-#   activate: false
-#   # cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+# #   # cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
 #   modules: *perf_modules
 #   expansions:
 #     mongodb_setup_release: 2022-11
@@ -1030,8 +998,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-audit-log-encryption-compression.arm.aws.2023-11
   display_name: PERF Single-node Replica Set Audit w/ At-Rest Log Encryption (With compression) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1050,8 +1017,7 @@ buildvariants:
 
 # - name: perf-1-node-replSet-fle.arm.aws.2023-11
 #   display_name: PERF 1-Node ReplSet FLE ARM AWS 2023-11
-#   activate: false
-#   # cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+# #   # cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
 #   modules: *perf_modules
 #   expansions:
 #     mongodb_setup_release: 2022-11
@@ -1079,8 +1045,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-ese-cbc.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet ESE CBC ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: *linux-1-node-repl-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1106,8 +1071,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-ese-gcm.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet ESE GCM ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 1 * *"  # 00:00 on the first of each month
+  cron: "0 0 1 * *"  # 00:00 on the first of each month
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1133,8 +1097,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-15gbwtcache.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet 15 GB WiredTiger Cache ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 2,4"  # 00:00 on Tuesday,Thursday
+  cron: "0 0 * * 2,4"  # 00:00 on Tuesday,Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1160,8 +1123,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-1dayhistory-15gbwtcache.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1189,8 +1151,7 @@ buildvariants:
   <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-shard.arm.aws.2023-11
   display_name: PERF 3-Shard Cluster ARM AWS 2023-11
-  activate: false
-  # cron: &linux-3-shard-cron "0 0 * * 4"  # 00:00 on Thursday
+  cron: &linux-3-shard-cron "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions: &shard-baseline-expansions
     mongodb_setup_release: 2022-11
@@ -1245,8 +1206,7 @@ buildvariants:
 - <<: *shard-baseline
   name: perf-3-shard-query-stats.arm.aws.2023-11
   display_name: PERF 3-Shard Cluster (QueryStats) ARM AWS 2023-11
-  activate: false
-  # cron: *linux-3-shard-cron
+  cron: *linux-3-shard-cron
   modules: *perf_modules
   expansions:
     <<: *shard-baseline-expansions
@@ -1279,8 +1239,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-shard-heuristic-bonsai.arm.aws.2023-11
   display_name: PERF 3-Shard Cluster (Bonsai with Heuristic CE) ARM AWS 2023-11
-  activate: false
-  # cron: *linux-3-shard-cron
+  cron: *linux-3-shard-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1304,8 +1263,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-shard-lite-audit.arm.aws.2023-11
   display_name: PERF Shard Lite Cluster Audit ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1327,8 +1285,7 @@ buildvariants:
   <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-shard-lite.arm.aws.2023-11
   display_name: PERF Shard Lite Cluster ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
   modules: *perf_modules
   expansions: &shard-lite-baseline-expansions
     mongodb_setup_release: 2022-11
@@ -1378,8 +1335,7 @@ buildvariants:
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-shard-lite-intel.intel.aws.2023-11
   display_name: PERF Shard Lite Cluster Intel AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1406,8 +1362,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-shard-lite-read-concern-available.arm.aws.2023-11
   display_name: PERF Shard Lite ReadConcern Available ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1431,8 +1386,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-shard-lite-all-feature-flags.arm.aws.2023-11
   display_name: PERF Shard Lite (all feature flags) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1494,8 +1448,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-shard-single.arm.aws.2023-11
   display_name: PERF Shard Single ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 2,4"  # 00:00 on Tuesday,Thursday
+  cron: "0 0 * * 2,4"  # 00:00 on Tuesday,Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1517,8 +1470,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet ARM AWS 2023-11
-  activate: false
-  # cron: &linux-3-node-cron "0 0 * * 1,2,3,4,5,6"  # Everyday except Sunday at 00:00
+  cron: &linux-3-node-cron "0 0 * * 1,2,3,4,5,6"  # Everyday except Sunday at 00:00
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1607,8 +1559,7 @@ buildvariants:
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-3-node-replSet-intel.intel.aws.2023-11
   display_name: PERF 3-Node ReplSet Intel AWS 2023-11
-  activate: false
-  # cron: *linux-3-node-cron
+  cron: *linux-3-node-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1664,8 +1615,7 @@ buildvariants:
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-3-node-replSet-intel-query-stats.intel.aws.2023-11
   display_name: PERF 3-Node ReplSet (QueryStats) Intel AWS 2023-11
-  activate: false
-  # cron: *linux-3-node-cron
+  cron: *linux-3-node-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1685,8 +1635,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-last-continuous-fcv.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet (Last Continuous FCV) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1746,8 +1695,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-last-lts-fcv.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet (Last LTS FCV) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1807,8 +1755,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-all-feature-flags.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet (all feature flags) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1871,8 +1818,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-notls.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet (No TLS) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup: replica-tls-disabled
@@ -1896,8 +1842,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-maintenance-events.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet (Maintenance Events) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1931,8 +1876,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-2-node-replSet-initialsync.arm.aws.2023-11
   display_name: PERF 2-Node ReplSet Initial Sync ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1956,8 +1900,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-cpu-cycle-metrics.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet CPU Cycle Metrics ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1979,8 +1922,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-replSet-initialsync-logkeeper.arm.aws.2023-11
   display_name: PERF ReplSet Initial Sync LogKeeper ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -2032,8 +1974,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-replSet-audit.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet Audit ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -2056,8 +1997,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-replSet-auth-delay.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet (Auth Delay) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -2079,8 +2019,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-query-stats.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet (QueryStats) ARM AWS 2023-11
-  activate: false
-  # cron: *linux-3-node-cron
+  cron: *linux-3-node-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -2145,8 +2084,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-250mbwtcache.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet 250 MB WiredTiger Cache ARM AWS 2023-11
-  activate: false
-  # cron: *linux-3-node-cron
+  cron: *linux-3-node-cron
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -2171,9 +2109,8 @@ buildvariants:
   name: perf-mongo-perf-standalone-template.arm.aws.2023-11
   display_name: PERF Mongo-Perf Standalone Template (Don't Use)
   # TODO SERVER-74399 Reduce frequency back to baseline.
-  activate: false
   # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
-  # cron: &linux-mongo-perf-cron "0 0 * * *"  # Everyday at 00:00
+  cron: &linux-mongo-perf-cron "0 0 * * *"  # Everyday at 00:00
   modules: *perf_modules
   expansions: &standalone-arm-expansions
     mongodb_setup_release: 2022-11
@@ -2224,6 +2161,7 @@ buildvariants:
   display_name: PERF Monogo-Perf Standalone inMemory ARM AWS 2023-11
   modules: *perf_modules
   expansions: *standalone-arm-expansions
+  cron: *linux-mongo-perf-cron
   tasks:
     - name: big_collection
     - name: genny_scale_InsertRemove
@@ -2256,26 +2194,24 @@ buildvariants:
     - name: tie-breaking-heuristics
 
 # Specialized Temporary Variants to understand the impact of query stats better.
-# - <<: *linux-mongo-perf-standalone-arm
-#   name: perf-fast-query-mongo-perf-baseline.2023-11
-#   display_name: PERF Fast Query Monog-Perf (Baseline) ARM AWS 2023-11
-#   # TODO SERVER-78295 Fold these tasks in to the regular variants on the normal schedule.
-#   activate: false
-#   # cron: &fast-query-cron 0 */4 * * * # Every 4 hours, temporarily.
-#   tasks:
-#   - name: fast_running_queries
-#   - name: fast_running_queries_large_dataset
-#   - name: genny_query_TenMDocCollection_IntId
-#   - name: genny_query_TenMDocCollection_ObjectId
-#   - name: genny_query_TenMDocCollection_SubDocId
-#   - name: views-aggregation
-#   - name: views-query
+- <<: *linux-mongo-perf-standalone-arm
+  name: perf-fast-query-mongo-perf-baseline.2023-11
+  display_name: PERF Fast Query Monog-Perf (Baseline) ARM AWS 2023-11
+  # TODO SERVER-78295 Fold these tasks in to the regular variants on the normal schedule.
+  cron: &fast-query-cron 0 */4 * * * # Every 4 hours, temporarily.
+  tasks:
+  - name: fast_running_queries
+  - name: fast_running_queries_large_dataset
+  - name: genny_query_TenMDocCollection_IntId
+  - name: genny_query_TenMDocCollection_ObjectId
+  - name: genny_query_TenMDocCollection_SubDocId
+  - name: views-aggregation
+  - name: views-query
 
 - <<: *linux-mongo-perf-standalone-arm
   name: perf-fast-query-mongo-perf-query-stats.arm.aws.2023-11
   display_name: PERF Fast Query Mongo-Perf (QueryStats) ARM AWS 2023-11
-  activate: false
-  # cron: *fast-query-cron
+  cron: *fast-query-cron
   tasks:
     - name: fast_running_queries
     - name: fast_running_queries_large_dataset
@@ -2294,8 +2230,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-arm
   name: perf-fast-query-mongo-perf-limited-query-stats.arm.aws.2023-11
   display_name: PERF Fast Query Mongo-Perf (Limited QueryStats) ARM AWS 2023-11
-  activate: false
-  # cron: *fast-query-cron
+  cron: *fast-query-cron
   tasks:
     - name: fast_running_queries
     - name: fast_running_queries_large_dataset
@@ -2391,8 +2326,7 @@ buildvariants:
   <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-mongo-perf-repl.arm.aws.2023-11
   display_name: PERF Mongo-Perf 1-Node ReplSet inMemory ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   modules: *perf_modules
   expansions: &repl-arm-expansions
     mongodb_setup_release: 2022-11
@@ -2420,8 +2354,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-arm
   name: perf-mongo-perf-standalone-all-feature-flags.arm.aws.2023-11
   display_name: PERF Mongo-Perf Standalone inMemory (all feature flags) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   expansions:
     <<: *standalone-arm-expansions
     mongodb_setup: mongo-perf-standalone-all-feature-flags.2023-02
@@ -2460,8 +2393,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-arm
   name: perf-mongo-perf-standalone-classic-query-engine.arm.aws.2023-11
   display_name: PERF Mongo-Perf Standalone inMemory (Classic Query Engine) ARM AWS 2023-11
-  activate: false
-  # cron: *cron_query_perf_schedule
+  cron: *cron_query_perf_schedule
   expansions:
     <<: *standalone-arm-expansions
     mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
@@ -2502,8 +2434,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-arm
   name: perf-mongo-perf-standalone-sbe.arm.aws.2023-11
   display_name: PERF Mongo-Perf Standalone inMemory (SBE) ARM AWS 2023-11
-  activate: false
-  # cron: *cron_query_perf_schedule
+  cron: *cron_query_perf_schedule
   expansions:
     <<: *standalone-arm-expansions
     mongodb_setup: mongo-perf-standalone-sbe.2023-02
@@ -2544,8 +2475,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-arm
   name: perf-mongo-perf-standalone-sampling-bonsai.arm.aws.2023-11
   display_name: PERF Mongo-Perf Standalone inMemory (Bonsai with Sampling CE) ARM AWS 2023-11
-  activate: false
-  # cron: *cron_query_perf_schedule
+  cron: *cron_query_perf_schedule
   expansions:
     <<: *standalone-arm-expansions
     mongodb_setup: mongo-perf-standalone-sampling-bonsai.2023-02
@@ -2560,8 +2490,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-arm
   name: perf-mongo-perf-standalone-heuristic-bonsai.arm.aws.2023-11
   display_name: PERF Mongo-Perf Standalone inMemory (Bonsai with Heuristic CE) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   expansions:
     <<: *standalone-arm-expansions
     mongodb_setup: mongo-perf-standalone-heuristic-bonsai.2023-02
@@ -2571,8 +2500,7 @@ buildvariants:
 - <<: *linux-mongo-perf-repl-arm
   name: perf-mongo-perf-repl-all-feature-flags.arm.aws.2023-01
   display_name: PERF Mongo-Perf 1-Node ReplSet inMemory (all feature flags) ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   expansions:
     <<: *repl-arm-expansions
     mongodb_setup: mongo-perf-replica-all-feature-flags.2023-02
@@ -2584,8 +2512,7 @@ buildvariants:
   <<: *amazon2_x86_compile_variant_dependency
   name: perf-mongo-perf-standalone.intel.aws.2023-11
   display_name: PERF Mongo-Perf Standalone inMemory Intel AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   modules: *perf_modules
   expansions: &standalone-intel-expansions
     <<: *standalone-arm-expansions
@@ -2627,8 +2554,7 @@ buildvariants:
   <<: *amazon2_x86_compile_variant_dependency
   name: perf-mongo-perf-repl.intel.aws.2023-11
   display_name: PERF Mongo-Perf 1-Node ReplSet inMemory Intel AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   expansions: &repl-intel-expansions
     <<: *repl-arm-expansions
     infrastructure_provisioning: workload_client_mongod_combined_intel.2023-11
@@ -2647,8 +2573,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-intel
   name: perf-mongo-perf-standalone-all-feature-flags.intel.aws.2023-01
   display_name: PERF Mongo-Perf Standalone inMemory (all feature flags) Intel AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   expansions:
     <<: *standalone-intel-expansions
     mongodb_setup: mongo-perf-standalone-all-feature-flags.2023-02
@@ -2660,8 +2585,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-intel
   name: perf-mongo-perf-standalone-classic-query-engine.intel.aws.2023-01
   display_name: PERF Mongo-Perf Standalone inMemory (Classic Query Engine) Intel AWS 2023-11
-  activate: false
-  # cron: *cron_query_perf_schedule
+  cron: *cron_query_perf_schedule
   expansions:
     <<: *standalone-intel-expansions
     mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
@@ -2702,8 +2626,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-intel
   name: perf-mongo-perf-standalone-sbe.intel.aws.2023-01
   display_name: PERF Mongo-Perf Standalone inMemory (SBE) Intel AWS 2023-11
-  activate: false
-  # cron: *cron_query_perf_schedule
+  cron: *cron_query_perf_schedule
   expansions:
     <<: *standalone-intel-expansions
     mongodb_setup: mongo-perf-standalone-sbe.2023-02
@@ -2744,8 +2667,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-intel
   name: perf-mongo-perf-standalone-sampling-bonsai.intel.aws.2023-11
   display_name: PERF Mongo-Perf Standalone inMemory (Bonsai with Sampling CE) Intel AWS 2023-11
-  activate: false
-  # cron: *cron_query_perf_schedule
+  cron: *cron_query_perf_schedule
   expansions:
     <<: *standalone-intel-expansions
     mongodb_setup: mongo-perf-standalone-sampling-bonsai.2023-02
@@ -2755,8 +2677,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-intel
   name: perf-mongo-perf-standalone-heuristic-bonsai.intel.aws.2023-01
   display_name: PERF Mongo-Perf Standalone inMemory (Bonsai with Heuristic CE) Intel AWS 2023-11
-  activate: false
-  # cron: *cron_query_perf_schedule
+  cron: *cron_query_perf_schedule
   expansions:
     <<: *standalone-intel-expansions
     mongodb_setup: mongo-perf-standalone-heuristic-bonsai.2023-02
@@ -2766,8 +2687,7 @@ buildvariants:
 - <<: *linux-mongo-perf-repl-intel
   name: perf-mongo-perf-repl-all-feature-flags.intel.aws.2023-01
   display_name: PERF Mongo-Perf 1-Node ReplSet inMemory (all feature flags) Intel AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   expansions:
     <<: *repl-intel-expansions
     mongodb_setup: mongo-perf-replica-all-feature-flags.2023-02
@@ -2778,8 +2698,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-longRunning.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet Long-Running ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 1 * *"  # 00:00 on the first of each month
+  cron: "0 0 1 * *"  # 00:00 on the first of each month
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -2800,8 +2719,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-arm-3-shard-resharding.arm.aws.2023-11
   display_name: PERF 3-Shard Resharding ARM AWS 2023-11
-  activate: false
-  # cron: "0 0 * * 4"  # 00:00 on Thursday
+  cron: "0 0 * * 4"  # 00:00 on Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
