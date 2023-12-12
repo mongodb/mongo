@@ -283,32 +283,20 @@ public:
      * Return true if this bitset is a subset of subset 'other'.
      */
     MONGO_COMPILER_ALWAYS_INLINE bool isSubsetOf(const DynamicBitset& other) const {
-        assertSize(other);
-        const auto* data = _storage.data();
-        const auto* otherData = other._storage.data();
-        for (size_t i = 0; i < _storage.size(); ++i) {
-            if (data[i] != (data[i] & otherData[i])) {
-                return false;
-            }
-        }
-
-        return true;
+        return allOf([](BlockType thisBlock,
+                        BlockType otherBlock) { return thisBlock == (thisBlock & otherBlock); },
+                     _storage,
+                     other._storage);
     }
 
     /**
      * Return true if this bitset has common set bits with 'other'.
      */
     MONGO_COMPILER_ALWAYS_INLINE bool intersects(const DynamicBitset& other) const {
-        assertSize(other);
-        const auto* data = _storage.data();
-        const auto* otherData = other._storage.data();
-        for (size_t i = 0; i < _storage.size(); ++i) {
-            if (data[i] & otherData[i]) {
-                return true;
-            }
-        }
-
-        return false;
+        return anyOf(
+            [](BlockType thisBlock, BlockType otherBlock) { return thisBlock & otherBlock; },
+            _storage,
+            other._storage);
     }
 
     /**
@@ -317,18 +305,12 @@ public:
      */
     MONGO_COMPILER_ALWAYS_INLINE bool isEqualToMasked(const DynamicBitset& other,
                                                       const DynamicBitset& mask) const {
-        assertSize(other);
-        assertSize(mask);
-        const auto data = _storage.data();
-        const auto otherData = other._storage.data();
-        const auto maskData = mask._storage.data();
-        for (size_t i = 0; i < _storage.size(); ++i) {
-            if (data[i] != (maskData[i] & otherData[i])) {
-                return false;
-            }
-        }
-
-        return true;
+        return allOf([](BlockType thisBlock,
+                        BlockType otherBlock,
+                        BlockType maskBlock) { return thisBlock == (otherBlock & maskBlock); },
+                     _storage,
+                     other._storage,
+                     mask._storage);
     }
 
     /**
@@ -396,6 +378,24 @@ public:
      */
     MONGO_COMPILER_ALWAYS_INLINE size_t size() const {
         return _storage.size() * Storage::kBlockSize;
+    }
+
+    /**
+     * Iterates over integer blocks of the bitsets and returns true if the predicate returns true
+     * for at least one set of corresponing blocks.
+     */
+    template <class Predicate, typename... Bitset>
+    friend bool anyOf(Predicate predicate, const DynamicBitset& s, const Bitset&... ss) {
+        return anyOf(predicate, s._storage, ss._storage...);
+    }
+
+    /**
+     * Iterates over integer blocks of the bitsets and returns true if the predicate returns true
+     * for all sets of corresponing blocks.
+     */
+    template <class Predicate, typename... Bitset>
+    friend bool allOf(Predicate predicate, const DynamicBitset& s, const Bitset&... ss) {
+        return allOf(predicate, s._storage, ss._storage...);
     }
 
     template <typename BT, size_t NB>

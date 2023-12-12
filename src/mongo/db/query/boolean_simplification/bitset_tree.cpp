@@ -34,19 +34,6 @@
 
 namespace mongo::boolean_simplification {
 namespace {
-/**
- * Return the index of thefirst set bit or the bitset's size if no bit is set.
- */
-size_t findFirst(const Bitset& bitset) {
-    for (size_t i = 0; i < bitset.size(); ++i) {
-        if (bitset[i]) {
-            return i;
-        }
-    }
-
-    return bitset.size();
-}
-
 boost::optional<Maxterm> convertToDNF(const BitsetTreeNode& node,
                                       size_t maximumNumberOfMinterms,
                                       bool isNegated);
@@ -60,7 +47,7 @@ Minterm makeMintermFromConjunction(const BitsetTerm& conjunctionTerm, bool isNeg
 }
 
 Maxterm makeMaxtermFromDisjunction(const BitsetTerm& disjunctionTerm, bool isNegated) {
-    Maxterm result{};
+    Maxterm result{disjunctionTerm.size()};
     for (size_t pos = 0; pos < disjunctionTerm.mask.size(); ++pos) {
         if (disjunctionTerm.mask[pos]) {
             result.append(pos, disjunctionTerm.predicates[pos] ^ isNegated);
@@ -125,7 +112,7 @@ boost::optional<Maxterm> convertToDNF(const BitsetTreeNode& node,
             MONGO_UNREACHABLE_TASSERT(8163010);
     }
 
-    Maxterm result{};
+    Maxterm result{node.leafChildren.size()};
 
     switch (nodeType) {
         case BitsetTreeNode::And:
@@ -167,6 +154,13 @@ BitsetTreeNode restoreBitsetTree(const Minterm& minterm) {
 }
 }  // namespace
 
+void BitsetTreeNode::ensureBitsetSize(size_t size) {
+    leafChildren.resize(size);
+    for (auto& child : internalChildren) {
+        child.ensureBitsetSize(size);
+    }
+}
+
 void BitsetTreeNode::applyDeMorganImpl(bool isParentNegated) {
     const bool isThisNegated = isNegated ^ isParentNegated;
     isNegated = false;
@@ -202,7 +196,7 @@ BitsetTreeNode convertToBitsetTree(const Maxterm& maxterm) {
         BitsetTreeNode node{BitsetTreeNode::Or, false};
         for (const auto& minterm : maxterm.minterms) {
             if (minterm.mask.count() == 1) {
-                const size_t bitIndex = findFirst(minterm.mask);
+                const size_t bitIndex = minterm.mask.findFirst();
                 node.leafChildren.set(bitIndex, minterm.predicates[bitIndex]);
             } else {
                 node.internalChildren.emplace_back(restoreBitsetTree(minterm));

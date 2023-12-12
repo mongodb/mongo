@@ -33,7 +33,7 @@
 
 namespace mongo::boolean_simplification {
 TEST(ConvertToBitsetTreeTests, AlwaysTrue) {
-    Maxterm maxterm{Minterm{}};
+    Maxterm maxterm{Minterm{0}};
 
     BitsetTreeNode expectedTree{BitsetTreeNode::And, false};
 
@@ -42,7 +42,7 @@ TEST(ConvertToBitsetTreeTests, AlwaysTrue) {
 }
 
 TEST(ConvertToBitsetTreeTests, AlwaysFalse) {
-    Maxterm maxterm{};
+    Maxterm maxterm{0};
 
     BitsetTreeNode expectedTree{BitsetTreeNode::Or, false};
 

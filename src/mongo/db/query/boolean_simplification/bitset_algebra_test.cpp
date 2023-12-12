@@ -240,7 +240,7 @@ TEST(ExtractCommonPredicatesTest, NoCommonPredicates) {
 }
 
 TEST(ExtractCommonPredicatesTest, AlwaysFalseInput) {
-    Maxterm maxterm{};
+    Maxterm maxterm{0};
 
     ASSERT_TRUE(maxterm.isAlwaysFalse());
 
@@ -250,7 +250,7 @@ TEST(ExtractCommonPredicatesTest, AlwaysFalseInput) {
 }
 
 TEST(ExtractCommonPredicatesTest, AlwaysTrueInput) {
-    Maxterm maxterm{};
+    Maxterm maxterm{0};
     maxterm.appendEmpty();
 
     ASSERT_TRUE(maxterm.isAlwaysTrue());

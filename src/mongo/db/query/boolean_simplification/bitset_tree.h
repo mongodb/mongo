@@ -49,7 +49,12 @@ namespace mongo::boolean_simplification {
 struct BitsetTreeNode {
     enum Type { Or, And };
 
-    BitsetTreeNode(Type type, bool isNegated) : type(type), isNegated(isNegated), leafChildren() {}
+    BitsetTreeNode(Type type, bool isNegated) : type(type), isNegated(isNegated), leafChildren(0) {}
+
+    /**
+     * Resize leafChildren to be the same size.
+     */
+    void ensureBitsetSize(size_t size);
 
     /**
      * Represents whether the node is conjunction (AND) or disjunction(OR) of its children.

@@ -36,7 +36,7 @@ namespace mongo::boolean_simplification {
  */
 void bitsetAlgebra_createAndMaxterm(benchmark::State& state) {
     for (auto _ : state) {
-        Maxterm maxterm{};
+        Maxterm maxterm{64};
         maxterm.append(10, true);
     }
 }
@@ -48,9 +48,9 @@ void bitsetAlgebra_createOrMaxterm(benchmark::State& state) {
     const size_t numPredicates = static_cast<size_t>(state.range());
 
     for (auto _ : state) {
-        Maxterm maxterm{};
+        Maxterm maxterm{numPredicates};
         for (size_t predicateIndex = 0; predicateIndex < numPredicates; ++predicateIndex) {
-            maxterm.append(predicateIndex % kBitsetNumberOfBits, true);
+            maxterm.append(predicateIndex % maxterm.numberOfBits(), true);
         }
     }
 }
@@ -60,10 +60,10 @@ void bitsetAlgebra_createOrMaxterm(benchmark::State& state) {
  */
 void bitsetAlgebra_createMaxterm(benchmark::State& state) {
     const size_t numMinterms = static_cast<size_t>(state.range());
-    const size_t numPredicates = numMinterms % kBitsetNumberOfBits;
+    const size_t numPredicates = numMinterms;
 
     for (auto _ : state) {
-        Maxterm maxterm{};
+        Maxterm maxterm{numPredicates};
         for (size_t index = 0; index < numMinterms; ++index) {
             maxterm.appendEmpty();
             for (size_t predicateIndex = 0; predicateIndex < numPredicates; ++predicateIndex) {

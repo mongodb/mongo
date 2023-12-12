@@ -556,4 +556,44 @@ TEST(InlinedStorageTests, MovedFromObjects) {
     assertMovedFrom(inlined);
     assertMovedFrom(heaped);
 }
+
+template <size_t InlinedCapacity>
+void allOfAssert() {
+    using Storage = InlinedStorage<size_t, InlinedCapacity>;
+
+    ASSERT_TRUE(allOf(std::equal_to<size_t>(), Storage{0, 1, 2}, Storage{0, 1, 2}));
+    ASSERT_FALSE(allOf(std::equal_to<size_t>(), Storage{0, 1, 2}, Storage{1, 2, 2}));
+    ASSERT_FALSE(allOf(std::equal_to<size_t>(), Storage{0, 1, 2}, Storage{1, 2, 3}));
+
+    auto eq3 = [](size_t t0, size_t t1, size_t t2) {
+        return t0 == t1 && t0 == t2;
+    };
+    ASSERT_TRUE(allOf(eq3, Storage{0, 1, 2}, Storage{0, 1, 2}, Storage{0, 1, 2}));
+    ASSERT_FALSE(allOf(eq3, Storage{0, 1, 2}, Storage{0, 1, 2}, Storage{0, 2, 2}));
+}
+
+TEST(InlinedStorageTests, AllOf) {
+    // On Heap
+    allOfAssert<1>();
+
+    // Inlined
+    allOfAssert<3>();
+}
+
+template <size_t InlinedCapacity>
+void anyOfAssert() {
+    using Storage = InlinedStorage<size_t, InlinedCapacity>;
+
+    ASSERT_TRUE(anyOf(std::equal_to<size_t>(), Storage{0, 1, 2}, Storage{0, 1, 2}));
+    ASSERT_TRUE(anyOf(std::equal_to<size_t>(), Storage{0, 1, 2}, Storage{1, 2, 2}));
+    ASSERT_FALSE(anyOf(std::equal_to<size_t>(), Storage{0, 1, 2}, Storage{1, 2, 3}));
+}
+
+TEST(InlinedStorageTests, AnyOf) {
+    // On Heap
+    anyOfAssert<1>();
+
+    // Inlined
+    anyOfAssert<3>();
+}
 }  // namespace mongo

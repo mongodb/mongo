@@ -232,9 +232,7 @@ boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
                 "expression"_attr = root->debugString());
 
     auto bitsetAndExpressions =
-        transformToBitsetTree(root,
-                              std::min(boolean_simplification::kBitsetNumberOfBits,
-                                       settings.maximumNumberOfUniquePredicates));
+        transformToBitsetTree(root, settings.maximumNumberOfUniquePredicates);
 
     if (MONGO_unlikely(!bitsetAndExpressions.has_value())) {
         LOGV2_DEBUG(8113911,

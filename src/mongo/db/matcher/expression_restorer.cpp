@@ -61,10 +61,10 @@ private:
                 !node.isNegated);
 
         std::vector<std::unique_ptr<MatchExpression>> children{};
-        for (size_t bitIndex = 0; bitIndex < node.leafChildren.mask.size(); ++bitIndex) {
-            if (node.leafChildren.mask[bitIndex]) {
-                children.emplace_back(restoreOneLeaf(node.leafChildren, bitIndex));
-            }
+        for (size_t bitIndex = node.leafChildren.mask.findFirst();
+             bitIndex < node.leafChildren.mask.size();
+             bitIndex = node.leafChildren.mask.findNext(bitIndex)) {
+            children.emplace_back(restoreOneLeaf(node.leafChildren, bitIndex));
         }
 
         for (const auto& child : node.internalChildren) {

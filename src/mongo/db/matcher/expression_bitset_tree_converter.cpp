@@ -467,6 +467,8 @@ boost::optional<BitsetTreeTransformResult> transformToBitsetTree(
         return boost::none;
     }
 
+    bitsetRoot.ensureBitsetSize(context.getMaxtermSize());
+
     switch (context.bitConflict) {
         case Context::None:
             break;

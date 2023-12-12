@@ -43,8 +43,20 @@ void BitsetTerm::flip() {
     predicates &= mask;
 }
 
-Maxterm::Maxterm(std::initializer_list<Minterm> init) : minterms(std::move(init)) {
+Maxterm::Maxterm(size_t size) : _numberOfBits(size) {}
+
+Maxterm::Maxterm(std::initializer_list<Minterm> init)
+    : minterms(std::move(init)), _numberOfBits(0) {
     tassert(7507918, "Maxterm cannot be initilized with empty list of minterms", !minterms.empty());
+    for (auto& minterm : minterms) {
+        _numberOfBits = std::max(minterm.size(), _numberOfBits);
+    }
+
+    for (auto& minterm : minterms) {
+        if (_numberOfBits > minterm.size()) {
+            minterm.resize(_numberOfBits);
+        }
+    }
 }
 
 bool Maxterm::isAlwaysTrue() const {
@@ -86,22 +98,22 @@ void Maxterm::removeRedundancies() {
 }
 
 void Maxterm::append(size_t bitIndex, bool val) {
-    minterms.emplace_back(bitIndex, val);
+    minterms.emplace_back(_numberOfBits, bitIndex, val);
 }
 
 void Maxterm::appendEmpty() {
-    minterms.emplace_back();
+    minterms.emplace_back(_numberOfBits);
 }
 
 std::pair<Minterm, Maxterm> extractCommonPredicates(Maxterm maxterm) {
     if (maxterm.minterms.empty()) {
-        return {Minterm{}, std::move(maxterm)};
+        return {Minterm{maxterm.numberOfBits()}, std::move(maxterm)};
     }
 
-    Bitset commonTruePredicates{};
+    Bitset commonTruePredicates{maxterm.numberOfBits()};
     commonTruePredicates.set();
 
-    Bitset commonFalsePredicates{};
+    Bitset commonFalsePredicates{maxterm.numberOfBits()};
     commonFalsePredicates.set();
 
     for (const auto& minterm : maxterm.minterms) {
@@ -146,14 +158,6 @@ bool operator==(const BitsetTerm& lhs, const BitsetTerm& rhs) {
 std::ostream& operator<<(std::ostream& os, const BitsetTerm& term) {
     os << '(' << term.predicates << ", " << term.mask << ")";
     return os;
-}
-
-Maxterm& Maxterm::operator|=(const Maxterm& rhs) {
-    minterms.reserve(minterms.size() + rhs.minterms.size());
-    for (auto& right : rhs.minterms) {
-        minterms.emplace_back(right);
-    }
-    return *this;
 }
 
 bool operator==(const Maxterm& lhs, const Maxterm& rhs) {
