@@ -437,92 +437,22 @@ void updateCollectionMetadataInTransaction(OperationContext* opCtx,
                                            const ChunkVersion& placementVersion,
                                            const std::set<ShardId>& shardIds,
                                            const OperationSessionInfo& osi) {
-    /*
-     * As part of this chain, we will do the following operations:
-     * 1. Delete any existing chunk entries (there can be 1 or 0 depending on whether we are
-     * creating a collection or converting from unsplittable to splittable).
-     * 2. Insert new chunk entries - there can be a maximum of  (2 * number of shards) or (number of
-     * zones) new chunks.
-     * 3. Replace the old collection entry with the new one (change the version and the shard key).
-     * 4. Update the placement information.
-     */
     const auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
                                       ExecutorPtr txnExec) {
-        write_ops::DeleteCommandRequest deleteOp(ChunkType::ConfigNS);
-        deleteOp.setDeletes({[&] {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(BSON(ChunkType::collectionUUID.name() << coll.getUuid()));
-            entry.setMulti(false);
-            return entry;
-        }()});
+        auto ops = sharding_ddl_util::getOperationsToCreateOrShardCollectionOnShardingCatalog(
+            coll, chunks, placementVersion, shardIds);
 
-        return txnClient.runCRUDOp({deleteOp}, {0})
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& deleteChunkEntryResponse) {
-                uassertStatusOK(deleteChunkEntryResponse.toStatus());
+        StmtId statementsCounter = 0;
+        for (auto&& op : ops) {
+            const auto numOps = op.sizeWriteOps();
+            std::vector<StmtId> statementIds(numOps);
+            std::iota(statementIds.begin(), statementIds.end(), statementsCounter);
+            statementsCounter += numOps;
+            const auto response = txnClient.runCRUDOpSync(op, std::move(statementIds));
+            uassertStatusOK(response.toStatus());
+        }
 
-                std::vector<StmtId> chunkStmts;
-                BatchedCommandRequest insertChunkEntries([&]() {
-                    write_ops::InsertCommandRequest insertOp(ChunkType::ConfigNS);
-                    std::vector<BSONObj> entries;
-                    entries.reserve(chunks.size());
-                    chunkStmts.reserve(chunks.size());
-                    int counter = 1;
-                    for (const auto& chunk : chunks) {
-                        entries.push_back(chunk.toConfigBSON());
-                        chunkStmts.push_back({counter++});
-                    }
-                    insertOp.setDocuments(std::move(entries));
-                    insertOp.setWriteCommandRequestBase([] {
-                        write_ops::WriteCommandRequestBase wcb;
-                        wcb.setOrdered(false);
-                        return wcb;
-                    }());
-                    return insertOp;
-                }());
-
-                return txnClient.runCRUDOp(insertChunkEntries, chunkStmts);
-            })
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& insertChunkEntriesResponse) {
-                uassertStatusOK(insertChunkEntriesResponse.toStatus());
-                write_ops::UpdateCommandRequest updateCollectionEntry(CollectionType::ConfigNS);
-                updateCollectionEntry.setUpdates({[&] {
-                    write_ops::UpdateOpEntry updateEntry;
-                    updateEntry.setMulti(false);
-                    updateEntry.setUpsert(true);
-                    updateEntry.setQ(
-                        BSON(CollectionType::kNssFieldName
-                             << NamespaceStringUtil::serialize(coll.getNss(),
-                                                               SerializationContext::stateDefault())
-                             << CollectionType::kUuidFieldName << coll.getUuid()));
-                    updateEntry.setU(mongo::write_ops::UpdateModification(
-                        coll.toBSON(), write_ops::UpdateModification::ReplacementTag{}));
-                    return updateEntry;
-                }()});
-                int collUpdateId = 1 + chunks.size() + 1;
-                return txnClient.runCRUDOp(updateCollectionEntry, {collUpdateId});
-            })
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& updateCollectionEntryResponse) {
-                uassertStatusOK(updateCollectionEntryResponse.toStatus());
-
-                NamespacePlacementType placementInfo(
-                    NamespaceString(coll.getNss()),
-                    placementVersion.getTimestamp(),
-                    std::vector<mongo::ShardId>(shardIds.cbegin(), shardIds.cend()));
-                placementInfo.setUuid(coll.getUuid());
-
-                write_ops::InsertCommandRequest insertPlacementEntry(
-                    NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
-                int historyUpdateId = 1 + chunks.size() + 2;
-                return txnClient.runCRUDOp(insertPlacementEntry, {historyUpdateId});
-            })
-            .thenRunOn(txnExec)
-            .then([](const BatchedCommandResponse& insertPlacementEntryResponse) {
-                uassertStatusOK(insertPlacementEntryResponse.toStatus());
-            })
-            .semi();
+        return SemiFuture<void>::makeReady();
     };
 
     // Ensure that this function will only return once the transaction gets majority committed

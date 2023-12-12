@@ -804,5 +804,72 @@ boost::optional<CollectionType> getCollectionFromConfigServer(OperationContext* 
     }
 }
 
+std::vector<BatchedCommandRequest> getOperationsToCreateOrShardCollectionOnShardingCatalog(
+    const CollectionType& coll,
+    const std::vector<ChunkType>& chunks,
+    const ChunkVersion& placementVersion,
+    const std::set<ShardId>& shardIds) {
+    const auto& nss = coll.getNss();
+    const auto& uuid = coll.getUuid();
+    tassert(8377600,
+            str::stream() << "Can't create collection " << toStringForLogging(nss)
+                          << " without chunks",
+            !chunks.empty());
+    tassert(8377601,
+            str::stream() << "Can't create collection " << toStringForLogging(nss)
+                          << " without shards owning data",
+            !shardIds.empty());
+
+    std::vector<BSONObj> chunkEntries;
+    chunkEntries.reserve(chunks.size());
+    for (const auto& chunk : chunks) {
+        chunkEntries.push_back(chunk.toConfigBSON());
+    }
+
+    write_ops::DeleteCommandRequest deleteChunkIfTheCollectionExistsAsUnsplittable(
+        ChunkType::ConfigNS);
+    deleteChunkIfTheCollectionExistsAsUnsplittable.setDeletes({[&] {
+        auto deleteQuery = BSON(ChunkType::collectionUUID.name() << uuid);
+        return write_ops::DeleteOpEntry{std::move(deleteQuery), false /* multi */};
+    }()});
+
+    write_ops::InsertCommandRequest insertChunks(ChunkType::ConfigNS, std::move(chunkEntries));
+    insertChunks.setWriteCommandRequestBase([] {
+        write_ops::WriteCommandRequestBase wcb;
+        wcb.setOrdered(false);
+        return wcb;
+    }());
+
+    write_ops::UpdateCommandRequest upsertCollection(CollectionType::ConfigNS);
+    upsertCollection.setUpdates({[&] {
+        auto updateQuery =
+            BSON(CollectionType::kNssFieldName
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+                 << CollectionType::kUuidFieldName << uuid);
+        mongo::write_ops::UpdateModification updateModification{
+            coll.toBSON(), write_ops::UpdateModification::ReplacementTag{}};
+        write_ops::UpdateOpEntry updateEntry{std::move(updateQuery), std::move(updateModification)};
+        updateEntry.setUpsert(true);
+        return updateEntry;
+    }()});
+
+    write_ops::InsertCommandRequest insertPlacementHistory = [&]() {
+        NamespacePlacementType placementInfo{
+            nss,
+            placementVersion.getTimestamp(),
+            std::vector<mongo::ShardId>(shardIds.cbegin(), shardIds.cend())};
+        placementInfo.setUuid(uuid);
+        return write_ops::InsertCommandRequest(NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                                               {placementInfo.toBSON()});
+    }();
+
+    std::vector<BatchedCommandRequest> ret;
+    ret.emplace_back(std::move(deleteChunkIfTheCollectionExistsAsUnsplittable));
+    ret.emplace_back(std::move(insertChunks));
+    ret.emplace_back(std::move(upsertCollection));
+    ret.emplace_back(std::move(insertPlacementHistory));
+    return ret;
+}
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo

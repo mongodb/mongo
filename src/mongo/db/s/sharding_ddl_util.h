@@ -329,5 +329,20 @@ const KeyPattern& unsplittableCollectionShardKey();
 boost::optional<CollectionType> getCollectionFromConfigServer(OperationContext* opCtx,
                                                               const NamespaceString& nss);
 
+/*
+ * The returned operations to execute on the sharding catalog are the following:
+ * 1. Delete any existing chunk entries (there can be 0 or 1 depending on whether we are
+ * creating a new collection or sharding a pre-existing unsplittable collection).
+ * 2. Insert new chunk entries.
+ * 3. Upsert the collection entry (update in case of pre-existing unspittable collection or insert
+ * if the collection did not exist).
+ * 4. Insert the placement information.
+ */
+std::vector<BatchedCommandRequest> getOperationsToCreateOrShardCollectionOnShardingCatalog(
+    const CollectionType& coll,
+    const std::vector<ChunkType>& chunks,
+    const ChunkVersion& placementVersion,
+    const std::set<ShardId>& shardIds);
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo
