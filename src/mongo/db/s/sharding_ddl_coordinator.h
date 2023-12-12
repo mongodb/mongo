@@ -152,6 +152,19 @@ protected:
     virtual ShardingDDLCoordinatorMetadata const& metadata() const = 0;
     virtual void setMetadata(ShardingDDLCoordinatorMetadata&& metadata) = 0;
 
+    /**
+     * Returns a set of basic coordinator attributes to be used for logging.
+     */
+    logv2::DynamicAttributes getBasicCoordinatorAttrs() const;
+
+    /**
+     * Returns the set of attributes to be used for coordinator logging. Implementations must be
+     * sure to return a DynamicAttributes object that starts with the attributes returned by
+     * getBasicCoordinatorAttrs().
+     */
+    virtual logv2::DynamicAttributes getCoordinatorLogAttrs() const {
+        return getBasicCoordinatorAttrs();
+    }
     /*
      * Performs a noop write on all shards and the configsvr using the sessionId and txnNumber
      * specified in 'osi'.

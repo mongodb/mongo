@@ -111,12 +111,13 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
            })
         .until([this, resource, lockMode](Status status) {
             if (!status.isOK()) {
-                LOGV2_WARNING(6819300,
-                              "DDL lock acquisition attempt failed",
-                              "coordinatorId"_attr = _coordId,
-                              "resource"_attr = toStringForLogging(resource),
-                              "mode"_attr = modeName(lockMode),
-                              "error"_attr = redact(status));
+                LOGV2_WARNING(
+                    6819300,
+                    "DDL lock acquisition attempt failed",
+                    logv2::DynamicAttributes{getCoordinatorLogAttrs(),
+                                             "resource"_attr = toStringForLogging(resource),
+                                             "mode"_attr = modeName(lockMode),
+                                             "error"_attr = redact(status)});
             }
             // Sharding DDL operations are not rollbackable so in case we recovered a coordinator
             // from disk we need to ensure eventual completion of the DDL operation, so we must
@@ -224,9 +225,10 @@ ExecutorFuture<void> ShardingDDLCoordinator::_translateTimeseriesNss(
             if (!status.isOK()) {
                 LOGV2_WARNING(6675600,
                               "Failed to fetch information for the bucket namespace",
-                              logAttrs(originalNss().makeTimeseriesBucketsNamespace()),
-                              "coordinatorId"_attr = _coordId,
-                              "error"_attr = redact(status));
+                              logv2::DynamicAttributes{
+                                  getCoordinatorLogAttrs(),
+                                  logAttrs(originalNss().makeTimeseriesBucketsNamespace()),
+                                  "error"_attr = redact(status)});
             }
             // Sharding DDL operations are not rollbackable so in case we recovered a coordinator
             // from disk we need to ensure eventual completion of the operation, so we must
@@ -301,8 +303,7 @@ void ShardingDDLCoordinator::interrupt(Status status) {
     LOGV2_DEBUG(5390535,
                 1,
                 "Sharding DDL Coordinator received an interrupt",
-                "coordinatorId"_attr = _coordId,
-                "reason"_attr = redact(status));
+                logv2::DynamicAttributes{getCoordinatorLogAttrs(), "reason"_attr = redact(status)});
 
     // Resolve any unresolved promises to avoid hanging.
     stdx::lock_guard<Latch> lg(_mutex);
@@ -312,6 +313,12 @@ void ShardingDDLCoordinator::interrupt(Status status) {
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
     }
+}
+
+logv2::DynamicAttributes ShardingDDLCoordinator::getBasicCoordinatorAttrs() const {
+    logv2::DynamicAttributes attrs;
+    attrs.add("coordinatorId", _coordId);
+    return attrs;
 }
 
 SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -389,7 +396,9 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             static constexpr auto& errorMsg =
                 "Failed to complete construction of sharding DDL coordinator";
             LOGV2_ERROR(
-                5390530, errorMsg, "coordinatorId"_attr = _coordId, "reason"_attr = redact(status));
+                5390530,
+                errorMsg,
+                logv2::DynamicAttributes{getCoordinatorLogAttrs(), "reason"_attr = redact(status)});
 
             stdx::lock_guard<Latch> lg(_mutex);
             if (!_constructionCompletionPromise.getFuture().isReady()) {
@@ -421,8 +430,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                         !token.isCanceled()) {
                         LOGV2_INFO(5656000,
                                    "Re-executing sharding DDL coordinator",
-                                   "coordinatorId"_attr = _coordId,
-                                   "reason"_attr = redact(status));
+                                   logv2::DynamicAttributes{getCoordinatorLogAttrs(),
+                                                            "reason"_attr = redact(status)});
                         _firstExecution = false;
                         return false;
                     }
@@ -457,10 +466,11 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             if (cleanup()) {
                 try {
                     if (!completionStatus.isOK()) {
-                        LOGV2_ERROR(7524000,
-                                    "Failed sharding DDL coordinator",
-                                    "coordinatorId"_attr = _coordId,
-                                    "reason"_attr = redact(completionStatus));
+                        LOGV2_ERROR(
+                            7524000,
+                            "Failed sharding DDL coordinator",
+                            logv2::DynamicAttributes{getCoordinatorLogAttrs(),
+                                                     "reason"_attr = redact(completionStatus)});
                     }
 
                     hangBeforeRemovingCoordinatorDocument.pauseWhileSet();

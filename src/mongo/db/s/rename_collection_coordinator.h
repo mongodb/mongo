@@ -75,6 +75,9 @@ public:
         return *_response;
     }
 
+protected:
+    logv2::DynamicAttributes getCoordinatorLogAttrs() const override;
+
 private:
     StringData serializePhase(const Phase& phase) const override {
         return RenameCollectionCoordinatorPhase_serializer(phase);

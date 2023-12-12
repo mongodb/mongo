@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/constants.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -679,6 +680,29 @@ private:
 
 class DynamicAttributes {
 public:
+    DynamicAttributes() = default;
+
+    /**
+     * This constructor allows users to construct DynamicAttributes in the same style as normal
+     * LOGV2 calls. Example:
+     *
+     * DynamicAttributes(
+     *    DynamicAttributes{}, // Something that can be returned by a function
+     *    "attr1"_attr = val1,
+     *    "attr2"_attr = val2
+     * )
+     *
+     * This can be useful for classes that want to provide a set of basic attributes for sub-classes
+     * to extend with their own attributes.
+     */
+    template <typename... Args>
+    DynamicAttributes(DynamicAttributes&& other,
+                      Args&&... args) requires(detail::IsNamedArg<Args>&&...)
+        : _attributes(std::move(other._attributes)),
+          _copiedStrings(std::move(other._copiedStrings)) {
+        (add(std::forward<Args>(args)), ...);
+    }
+
     // Do not allow rvalue references and temporary objects to avoid lifetime problem issues
     template <size_t N,
               typename T,
@@ -732,6 +756,11 @@ public:
     }
 
 private:
+    template <typename T>
+    void add(const detail::NamedArg<T>& namedArg) {
+        _attributes.emplace_back(namedArg.name, namedArg.value);
+    }
+
     // This class is meant to be wrapped by TypeErasedAttributeStorage below that provides public
     // accessors. Let it access all our internals.
     friend class mongo::logv2::TypeErasedAttributeStorage;

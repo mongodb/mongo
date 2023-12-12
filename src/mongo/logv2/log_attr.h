@@ -60,6 +60,15 @@ struct NamedArg {
     const T& value;
 };
 
+template <typename T>
+struct isNamedArg : public std::false_type {};
+
+template <typename T>
+struct isNamedArg<NamedArg<T>> : public std::true_type {};
+
+template <typename T>
+concept IsNamedArg = isNamedArg<T>::value;
+
 struct AttrUdl {
     const char* name;
 

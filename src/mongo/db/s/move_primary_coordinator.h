@@ -69,6 +69,9 @@ public:
     void checkIfOptionsConflict(const BSONObj& doc) const override;
     bool canAlwaysStartWhenUserWritesAreDisabled() const override;
 
+protected:
+    logv2::DynamicAttributes getCoordinatorLogAttrs() const override;
+
 private:
     StringData serializePhase(const Phase& phase) const override;
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;

@@ -651,6 +651,11 @@ void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
             SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
 
+logv2::DynamicAttributes RenameCollectionCoordinator::getCoordinatorLogAttrs() const {
+    return logv2::DynamicAttributes{getBasicCoordinatorAttrs(),
+                                    "destinationNamespace"_attr = _request.getTo()};
+}
+
 std::set<NamespaceString> RenameCollectionCoordinator::_getAdditionalLocksToAcquire(
     OperationContext* opCtx) {
     return {_request.getTo()};

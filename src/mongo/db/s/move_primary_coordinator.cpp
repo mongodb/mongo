@@ -111,6 +111,11 @@ bool MovePrimaryCoordinator::canAlwaysStartWhenUserWritesAreDisabled() const {
     return true;
 }
 
+logv2::DynamicAttributes MovePrimaryCoordinator::getCoordinatorLogAttrs() const {
+    return logv2::DynamicAttributes{getBasicCoordinatorAttrs(),
+                                    "toShardId"_attr = _doc.getToShardId()};
+}
+
 StringData MovePrimaryCoordinator::serializePhase(const Phase& phase) const {
     return MovePrimaryCoordinatorPhase_serializer(phase);
 }
