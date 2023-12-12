@@ -279,19 +279,21 @@ void ExecCommandClient::_prologue() {
             "Invalid database name: '{}'"_format(dbname),
             DatabaseName::validDBName(dbname, DatabaseName::DollarInDbNameBehavior::Allow));
 
-    StringMap<int> topLevelFields;
+    StringDataSet topLevelFields(8);
     for (auto&& element : request.body) {
         StringData fieldName = element.fieldNameStringData();
-        if (fieldName == "help" && element.type() == Bool && element.Bool()) {
+        if (fieldName == CommandHelpers::kHelpFieldName && element.type() == Bool &&
+            element.Bool()) {
             auto body = result->getBodyBuilder();
-            body.append("help", "help for: {} {}"_format(c->getName(), c->help()));
+            body.append(CommandHelpers::kHelpFieldName,
+                        "help for: {} {}"_format(c->getName(), c->help()));
             CommandHelpers::appendSimpleCommandStatus(body, true, "");
             iassert(Status(ErrorCodes::SkipCommandExecution, "Already served help command"));
         }
 
         uassert(ErrorCodes::FailedToParse,
                 "Parsed command object contains duplicate top level key: {}"_format(fieldName),
-                topLevelFields[fieldName]++ == 0);
+                topLevelFields.insert(fieldName).second);
     }
 
     try {
@@ -306,11 +308,6 @@ void ExecCommandClient::_prologue() {
     rpc::TrackingMetadata trackingMetadata;
     trackingMetadata.initWithOperName(c->getName());
     rpc::TrackingMetadata::get(opCtx) = trackingMetadata;
-
-    // Extract and process metadata from the command request body.
-    ReadPreferenceSetting::get(opCtx) =
-        uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(request.body));
-    VectorClock::get(opCtx)->gossipIn(opCtx, request.body, !c->requiresAuth());
 }
 
 Future<void> ExecCommandClient::_run() {
