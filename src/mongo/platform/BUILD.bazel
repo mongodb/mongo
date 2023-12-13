@@ -7,7 +7,6 @@ mongo_cc_library(
     hdrs=[
         "visibility_test_libcommon.h",
         "visibility.h",
-        "basic.h",
     ],
     srcs=[
         "visibility_test_libcommon.cpp",

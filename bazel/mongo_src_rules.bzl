@@ -64,6 +64,71 @@ LIBUNWIND_DEFINES = select({
     "//conditions:default": [],
 })
 
+def force_includes_copt(package_name, name):
+
+    if package_name.startswith("src/mongo"):
+        basic_h = "mongo/platform/basic.h"
+        return select({
+            "@platforms//os:windows": ["/FI", basic_h],
+            "//conditions:default": ["-include", basic_h],
+        })
+
+    if package_name.startswith("src/third_party/mozjs"):
+        return select({
+            "//bazel/config:linux_aarch64": ["-include", "third_party/mozjs/platform/aarch64/linux/build/js-confdefs.h"],
+            "//bazel/config:linux_x86_64": ["-include", "third_party/mozjs/platform/x86_64/linux/build/js-confdefs.h"],
+            "//bazel/config:linux_ppc64le": ["-include", "third_party/mozjs/platform/ppc64le/linux/build/js-confdefs.h"],
+            "//bazel/config:linux_s390x": ["-include", "third_party/mozjs/platform/s390x/linux/build/js-confdefs.h"],
+            "//bazel/config:windows_x86_64": ["/FI", "third_party/mozjs/platform/x86_64/windows/build/js-confdefs.h"],
+            "//bazel/config:macos_x86_64": ["-include", "third_party/mozjs/platform/x86_64/macOS/build/js-confdefs.h"],
+            "//bazel/config:macos_aarch64": ["-include", "third_party/mozjs/platform/aarch64/macOS/build/js-confdefs.h"],
+        })
+            
+    if name in ['scripting', 'scripting_mozjs_test', 'encrypted_dbclient']:
+        return select({
+            "//bazel/config:linux_aarch64": ["-include", "third_party/mozjs/platform/aarch64/linux/build/js-config.h"],
+            "//bazel/config:linux_x86_64": ["-include", "third_party/mozjs/platform/x86_64/linux/build/js-config.h"],
+            "//bazel/config:linux_ppc64le": ["-include", "third_party/mozjs/platform/ppc64le/linux/build/js-config.h"],
+            "//bazel/config:linux_s390x": ["-include", "third_party/mozjs/platform/s390x/linux/build/js-config.h"],
+            "//bazel/config:windows_x86_64": ["/FI", "third_party/mozjs/platform/x86_64/windows/build/js-config.h"],
+            "//bazel/config:macos_x86_64": ["-include", "third_party/mozjs/platform/x86_64/macOS/build/js-config.h"],
+            "//bazel/config:macos_aarch64": ["-include", "third_party/mozjs/platform/aarch64/macOS/build/js-config.h"],
+        })
+
+    return []
+
+def force_includes_hdr(package_name, name):
+    if package_name.startswith("src/mongo"):
+        return select({
+            "@platforms//os:windows": ["//src/mongo/platform:basic.h", "//src/mongo/platform:windows_basic.h"],
+            "//conditions:default": ["//src/mongo/platform:basic.h"],
+        })
+        return 
+
+    if package_name.startswith("src/third_party/mozjs"):
+        return select({
+            "//bazel/config:linux_aarch64": ["//src/third_party/mozjs:platform/aarch64/linux/build/js-confdefs.h"],
+            "//bazel/config:linux_x86_64": ["//src/third_party/mozjs:platform/x86_64/linux/build/js-confdefs.h"],
+            "//bazel/config:linux_ppc64le": ["//src/third_party/mozjs:platform/ppc64le/linux/build/js-confdefs.h"],
+            "//bazel/config:linux_s390x": ["//src/third_party/mozjs:platform/s390x/linux/build/js-confdefs.h"],
+            "//bazel/config:windows_x86_64": ["//src/third_party/mozjs:/platform/x86_64/windows/build/js-confdefs.h"],
+            "//bazel/config:macos_x86_64": ["//src/third_party/mozjs:platform/x86_64/macOS/build/js-confdefs.h"],
+            "//bazel/config:macos_aarch64": ["//src/third_party/mozjs:platform/aarch64/macOS/build/js-confdefs.h"],
+        })
+            
+    if name in ['scripting', 'scripting_mozjs_test', 'encrypted_dbclient']:
+        return select({
+            "//bazel/config:linux_aarch64": ["//src/third_party/mozjs:platform/aarch64/linux/build/js-config.h"],
+            "//bazel/config:linux_x86_64": ["//src/third_party/mozjs:platform/x86_64/linux/build/js-config.h"],
+            "//bazel/config:linux_ppc64le": ["//src/third_party/mozjs:platform/ppc64le/linux/build/js-config.h"],
+            "//bazel/config:linux_s390x": ["//src/third_party/mozjs:platform/s390x/linux/build/js-config.h"],
+            "//bazel/config:windows_x86_64": ["//src/third_party/mozjs:/platform/x86_64/windows/build/js-config.h"],
+            "//bazel/config:macos_x86_64": ["//src/third_party/mozjs:platform/x86_64/macOS/build/js-config.h"],
+            "//bazel/config:macos_aarch64": ["//src/third_party/mozjs:platform/aarch64/macOS/build/js-config.h"],
+        })
+
+    return []
+
 def mongo_cc_library(
         name,
         srcs = [],
@@ -100,14 +165,17 @@ def mongo_cc_library(
         deps += LIBUNWIND_DEPS
         local_defines += LIBUNWIND_DEFINES
 
+    fincludes_copt = force_includes_copt(native.package_name(), name)
+    fincludes_hdr = force_includes_hdr(native.package_name(), name)
+
     native.cc_library(
         name = name,
         srcs = srcs,
-        hdrs = hdrs,
+        hdrs = hdrs + fincludes_hdr,
         deps = deps,
         visibility = visibility,
         testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + copts,
+        copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
         data = data,
         tags = tags,
         linkstatic = select({
@@ -146,14 +214,17 @@ def mongo_cc_binary(
         is ignored on windows since linking into DLLs is not currently supported.
       local_defines: macro definitions passed to all source and header files.
     """
+    
+    fincludes_copt = force_includes_copt(native.package_name(), name)
+    fincludes_hdr = force_includes_hdr(native.package_name(), name)
 
     native.cc_binary(
         name = name,
-        srcs = srcs,
+        srcs = srcs + fincludes_hdr,
         deps = deps + LIBUNWIND_DEPS,
         visibility = visibility,
         testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + copts,
+        copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
         data = data,
         tags = tags,
         linkstatic = select({

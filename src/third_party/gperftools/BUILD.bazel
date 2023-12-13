@@ -66,7 +66,7 @@ mongo_cc_library(
             "@//bazel/config:linux_x86_64": [
                 "-Isrc/third_party/gperftools/platform/linux_x86_64/internal/src",
             ],
-            "@//bazel/config:linux_ppc": [
+            "@//bazel/config:linux_ppc64le": [
                 "-Isrc/third_party/gperftools/platform/linux_ppc64le/internal/src",
             ],
             "@//bazel/config:linux_s390x": [
