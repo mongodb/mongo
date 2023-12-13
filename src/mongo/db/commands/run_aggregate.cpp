@@ -115,6 +115,8 @@
 #include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -1002,6 +1004,25 @@ query_shape::CollectionType determineCollectionType(
     return ctx ? ctx->getCollectionType() : query_shape::CollectionType::kUnknown;
 }
 
+// TODO: SERVER-73632 Remove feature flag for PM-635.
+// Remove query settings lookup as it is only done on mongos.
+query_settings::QuerySettings lookupQuerySettingsForAgg(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const AggregateCommandRequest& aggregateCommandRequest,
+    const Pipeline& pipeline,
+    const stdx::unordered_set<NamespaceString>& involvedNamespaces,
+    const NamespaceString& nss) {
+    auto opCtx = expCtx->opCtx;
+    auto serializationContext = aggregateCommandRequest.getSerializationContext();
+    return ShardingState::get(opCtx)->enabled()
+        ? aggregateCommandRequest.getQuerySettings().get_value_or({})
+        : query_settings::lookupQuerySettings(expCtx, nss, serializationContext, [&]() {
+              query_shape::AggCmdShape shape(
+                  aggregateCommandRequest, nss, involvedNamespaces, pipeline, expCtx);
+              return shape.sha256Hash(opCtx, serializationContext);
+          });
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     OperationContext* opCtx,
     const NamespaceString& origNss,
@@ -1078,6 +1099,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
     // $$USER_ROLES for the aggregation.
     expCtx->setUserRoles();
+
+    // Lookup the query settings and attach it to the 'expCtx'.
+    expCtx->setQuerySettings(lookupQuerySettingsForAgg(
+        expCtx, request, *pipeline, pipelineInvolvedNamespaces, request.getNamespace()));
+
     return pipeline;
 }
 

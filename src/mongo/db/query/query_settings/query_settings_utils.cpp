@@ -208,33 +208,27 @@ RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
 }
 
-query_settings::QuerySettings lookupForFind(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                            const ParsedFindCommand& parsedRequest,
-                                            const NamespaceString& nss) {
-    // No QuerySettings lookup for IDHACK queries.
+QuerySettings lookupQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  const NamespaceString& nss,
+                                  const mongo::SerializationContext& serializationContext,
+                                  std::function<query_shape::QueryShapeHash()> queryShapeHashFn) {
     if (!feature_flags::gFeatureFlagQuerySettings.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-        isIdHackEligibleQueryWithoutCollator(*parsedRequest.findCommandRequest)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return query_settings::QuerySettings();
     }
 
-    auto opCtx = expCtx->opCtx;
-    auto& manager = query_settings::QuerySettingsManager::get(opCtx);
-    auto queryShapeHashFn = [&]() {
-        auto& opDebug = CurOp::get(opCtx)->debug();
+    auto* opCtx = expCtx->opCtx;
+    auto& manager = QuerySettingsManager::get(opCtx);
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    auto hashFn = [&]() {
         if (opDebug.queryStatsInfo.key) {
-            return opDebug.queryStatsInfo.key->getQueryShapeHash(
-                opCtx, parsedRequest.findCommandRequest->getSerializationContext());
+            return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
         }
-
-        return std::make_unique<query_shape::FindCmdShape>(parsedRequest, expCtx)
-            ->sha256Hash(opCtx, parsedRequest.findCommandRequest->getSerializationContext());
+        return queryShapeHashFn();
     };
 
     // Return the found query settings or an empty one.
-    return manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
-        .get_value_or({})
-        .first;
+    return manager.getQuerySettingsForQueryShapeHash(opCtx, hashFn, nss).get_value_or({}).first;
 }
 
 namespace utils {

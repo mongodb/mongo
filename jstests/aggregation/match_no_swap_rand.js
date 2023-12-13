@@ -15,7 +15,6 @@
  * ]
  */
 import {getPlanStage, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 function getWinningPlanForPipeline({coll, pipeline}) {
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));

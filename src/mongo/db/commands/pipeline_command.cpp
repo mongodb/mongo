@@ -69,6 +69,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -125,6 +126,13 @@ public:
                                             aggregationRequest.getNamespace(),
                                             aggregationRequest,
                                             false));
+
+        // TODO: SERVER-73632 Remove feature flag for PM-635.
+        // Forbid users from passing 'querySettings' explicitly.
+        uassert(7708001,
+                "BSON field 'querySettings' is an unknown field",
+                ShardingState::get(opCtx)->enabled() ||
+                    !aggregationRequest.getQuerySettings().has_value());
 
         return std::make_unique<Invocation>(
             this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));

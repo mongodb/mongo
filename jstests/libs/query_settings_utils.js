@@ -1,7 +1,7 @@
 /**
  * Utility class for testing query settings.
  */
-import {getQueryPlanner} from "jstests/libs/analyze_plan.js";
+import {getQueryPlanners} from "jstests/libs/analyze_plan.js";
 
 export class QuerySettingsUtils {
     /**
@@ -97,7 +97,7 @@ export class QuerySettingsUtils {
      *
      * The settings list is not expected to be in any particular order.
      */
-    assertQueryShapeConfiguration(expectedQueryShapeConfigurations) {
+    assertQueryShapeConfiguration(expectedQueryShapeConfigurations, shouldRunExplain = true) {
         assert.soon(
             () => {
                 const current = this.getQuerySettings().map(x => tojson(x)).sort();
@@ -108,8 +108,10 @@ export class QuerySettingsUtils {
             "current query settings = " + tojson(this.getQuerySettings()) +
                 ", expected query settings = " + tojson(expectedQueryShapeConfigurations));
 
-        for (let {representativeQuery, settings} of expectedQueryShapeConfigurations) {
-            this.assertExplainQuerySettings(representativeQuery, settings);
+        if (shouldRunExplain) {
+            for (let {representativeQuery, settings} of expectedQueryShapeConfigurations) {
+                this.assertExplainQuerySettings(representativeQuery, settings);
+            }
         }
     }
 
@@ -120,11 +122,20 @@ export class QuerySettingsUtils {
         // Pass query without the $db field to explain command, because it injects the $db field
         // inside the query before processing.
         const {$db: _, ...queryWithoutDollarDb} = query;
-        if (query.find) {
-            const explain =
-                assert.commandWorked(this.db.runCommand({explain: queryWithoutDollarDb}));
-            const queryPlanner = getQueryPlanner(explain);
-            assert.docEq(expectedQuerySettings, queryPlanner.querySettings, queryPlanner);
+        const explain = (() => {
+            if (query.find) {
+                return assert.commandWorked(this.db.runCommand({explain: queryWithoutDollarDb}));
+            } else if (query.aggregate) {
+                return assert.commandWorked(
+                    this.db.runCommand({explain: {...queryWithoutDollarDb, cursor: {}}}));
+            } else {
+                return null;
+            }
+        })();
+        if (explain) {
+            getQueryPlanners(explain).forEach(queryPlanner => {
+                assert.docEq(expectedQuerySettings, queryPlanner.querySettings, queryPlanner);
+            });
         }
     }
 

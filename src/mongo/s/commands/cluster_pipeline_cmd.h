@@ -85,6 +85,11 @@ public:
                                             aggregationRequest,
                                             true));
 
+        // Forbid users from passing 'querySettings' explicitly.
+        uassert(7708000,
+                "BSON field 'querySettings' is an unknown field",
+                !aggregationRequest.getQuerySettings().has_value());
+
         return std::make_unique<Invocation>(
             this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));
     }

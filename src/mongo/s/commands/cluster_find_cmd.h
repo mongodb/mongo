@@ -148,13 +148,19 @@ public:
                      rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanExplainHere(opCtx);
 
-            auto&& [expCtx, parsedFind] = parseQueryAndLookupQuerySettings(opCtx);
+            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
+            auto expCtx = makeExpressionContext(opCtx, *findCommand);
+            auto parsedFind = uassertStatusOK(parsed_find_command::parse(
+                expCtx,
+                {.findCommand = std::move(findCommand),
+                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
             // Update 'findCommand' by setting the looked up query settings, such that they can be
             // applied on the shards.
-            auto& findCommand = parsedFind->findCommandRequest;
-            if (!expCtx->getQuerySettings().toBSON().isEmpty()) {
-                findCommand->setQuerySettings(expCtx->getQuerySettings());
+            auto querySettings = lookupQuerySettings(expCtx, *parsedFind);
+            findCommand = std::move(parsedFind->findCommandRequest);
+            if (!querySettings.toBSON().isEmpty()) {
+                findCommand->setQuerySettings(std::move(querySettings));
             }
 
             try {
@@ -226,8 +232,18 @@ public:
 
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-            auto&& [expCtx, parsedFind] = parseQueryAndLookupQuerySettings(opCtx);
+            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
+            auto expCtx = makeExpressionContext(opCtx, *findCommand);
+            auto parsedFind = uassertStatusOK(parsed_find_command::parse(
+                expCtx,
+                {.findCommand = std::move(findCommand),
+                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
+
             registerRequestForQueryStats(expCtx, *parsedFind);
+
+            // Perform the query settings lookup and attach it to 'expCtx'.
+            expCtx->setQuerySettings(lookupQuerySettings(expCtx, *parsedFind));
+
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedFind)});
 
@@ -323,22 +339,22 @@ public:
         }
 
         /**
-         * Parses the '_request' into ParsedFindCommand, looks up the query settings and attaches
-         * them to the ExpressionContext.
+         * Perform query settings lookup for non IDHACK queries.
          */
-        std::pair<boost::intrusive_ptr<ExpressionContext>, std::unique_ptr<ParsedFindCommand>>
-        parseQueryAndLookupQuerySettings(OperationContext* opCtx) {
-            auto findRequest = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
-            auto expCtx = makeExpressionContext(opCtx, *findRequest);
-            auto parsedFind = uassertStatusOK(parsed_find_command::parse(
-                expCtx,
-                {.findCommand = std::move(findRequest),
-                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
+        query_settings::QuerySettings lookupQuerySettings(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx,
+            const ParsedFindCommand& parsedFind) {
+            // No QuerySettings lookup for IDHACK queries.
+            if (isIdHackEligibleQueryWithoutCollator(*parsedFind.findCommandRequest)) {
+                return {};
+            }
 
-            // Look up the query settings and attach them to the ExpressionContext.
-            expCtx->setQuerySettings(
-                query_settings::lookupForFind(expCtx, *parsedFind, expCtx->ns));
-            return {std::move(expCtx), std::move(parsedFind)};
+            auto opCtx = expCtx->opCtx;
+            auto serializationContext = parsedFind.findCommandRequest->getSerializationContext();
+            return query_settings::lookupQuerySettings(expCtx, ns(), serializationContext, [&]() {
+                query_shape::FindCmdShape findCmdShape(parsedFind, expCtx);
+                return findCmdShape.sha256Hash(opCtx, serializationContext);
+            });
         }
 
         void retryOnViewError(

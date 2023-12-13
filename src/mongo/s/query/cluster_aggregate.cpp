@@ -70,6 +70,8 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -332,6 +334,16 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                 request, *pipeline, expCtx, involvedNamespaces, executionNss);
         });
     }
+
+    // Perform the query settings lookup and attach it to the ExpressionContext.
+    auto serializationContext = request.getSerializationContext();
+    expCtx->setQuerySettings(
+        query_settings::lookupQuerySettings(expCtx, executionNss, serializationContext, [&]() {
+            query_shape::AggCmdShape shape(
+                request, executionNss, involvedNamespaces, *pipeline, expCtx);
+            return shape.sha256Hash(opCtx, serializationContext);
+        }));
+
     return pipeline;
 }
 

@@ -113,6 +113,7 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'aggregate-param-allowDiskUse',
     'aggregate-param-cursor',
     'aggregate-param-hint',
+    'aggregate-param-allowedIndexes',
     'aggregate-param-needsMerge',
     'aggregate-param-fromMongos',
     'aggregate-param-$_requestReshardingResumeToken',

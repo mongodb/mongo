@@ -6,6 +6,7 @@
 // ]
 //
 
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js"
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const collName = jsTestName();
@@ -51,6 +52,7 @@ const nonExistentQueryShapeHash = "0".repeat(64);
 {
     // Ensure that setQuerySettings command fails when there are more than one collection in the
     // input query and namespaces are not explicitly given.
+    assertDropAndRecreateCollection(db, "order");
     assert.commandFailedWithCode(
             db.adminCommand({
                 setQuerySettings: {
@@ -75,14 +77,15 @@ const nonExistentQueryShapeHash = "0".repeat(64);
 
     const queryInstance = {
         aggregate: "order",
-        $db: "someDb",
+        $db: db.getName(),
         pipeline: [{
             $lookup:
                 {from: "inventory", localField: "item", foreignField: "sku", as: "inventory_docs"}
         }]
     };
     const settings = {
-        "indexHints": {"ns": {"db": "someDb", "coll": "inventory"}, "allowedIndexes": [{"sku": 1}]}
+        "indexHints":
+            {"ns": {"db": db.getName(), "coll": "inventory"}, "allowedIndexes": [{"sku": 1}]}
     };
     assert.commandWorked(db.adminCommand({setQuerySettings: queryInstance, settings: settings}));
     qsutils.assertQueryShapeConfiguration(
@@ -92,6 +95,7 @@ const nonExistentQueryShapeHash = "0".repeat(64);
 
 {
     // Ensure that index hint may not refer to a collection which is not involved in the query.
+    assertDropAndRecreateCollection(db, "order");
     assert.commandFailedWithCode(db.adminCommand({
         setQuerySettings: {
             aggregate: "order",
@@ -112,14 +116,14 @@ const nonExistentQueryShapeHash = "0".repeat(64);
 
     const queryInstance = {
         aggregate: "order",
-        $db: "testDB",
+        $db: db.getName(),
         pipeline: [{
             $lookup:
                 {from: "inventory", localField: "item", foreignField: "sku", as: "inventory_docs"}
         }]
     };
     const settings = {
-        "indexHints": {"ns": {"db": "testDB", "coll": "order"}, "allowedIndexes": []}
+        "indexHints": {"ns": {"db": db.getName(), "coll": "order"}, "allowedIndexes": []}
     };
     assert.commandWorked(db.adminCommand({setQuerySettings: queryInstance, settings: settings}));
     qsutils.assertQueryShapeConfiguration(

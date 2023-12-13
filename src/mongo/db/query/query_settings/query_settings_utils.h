@@ -53,11 +53,12 @@ RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
                                                  const boost::optional<TenantId>& tenantId);
 
 /**
- * Performs the lookup for the QuerySettings given the 'parsedRequest'.
+ * Performs the query settings lookup for the currently run query.
  */
-query_settings::QuerySettings lookupForFind(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                            const ParsedFindCommand& parsedFind,
-                                            const NamespaceString& nss);
+QuerySettings lookupQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  const NamespaceString& nss,
+                                  const mongo::SerializationContext& serializationContext,
+                                  std::function<query_shape::QueryShapeHash()> queryShapeHashFn);
 
 namespace utils {
 

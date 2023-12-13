@@ -6,6 +6,16 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {usedBonsaiOptimizer} from "jstests/libs/optimizer_utils.js";
 
 /**
+ * Returns query planner part of explain for every node in the explain report.
+ */
+export function getQueryPlanners(explain) {
+    return getAllNodeExplains(explain).map(explain => {
+        const queryPlanner = getNestedProperty(explain, "queryPlanner");
+        return queryPlanner ? queryPlanner : explain;
+    });
+}
+
+/**
  * Utility to return the 'queryPlanner' section of 'explain'. The input is the root of the explain
  * output.
  *
@@ -27,6 +37,19 @@ export function getQueryPlanner(explain) {
     const cursorStage = stage.$cursor
     assert(cursorStage.hasOwnProperty("queryPlanner"), explain);
     return cursorStage.queryPlanner;
+}
+
+/**
+ * Extracts and returns an array of explain outputs for every shard in a sharded cluster; returns
+ * the original explain output in case of a single replica set.
+ */
+export function getAllNodeExplains(explain) {
+    const shards = getNestedProperty(explain, "shards");
+    if (shards) {
+        const shardNames = Object.keys(shards);
+        return shardNames.map(shardName => shards[shardName]);
+    }
+    return [explain];
 }
 
 /**
@@ -928,21 +951,27 @@ export function assertFetchFilter({coll, predicate, expectedFilter, nReturned}) 
 }
 
 /**
- * Recursively checks if a javascript object contains a nested property key. Note, this only
- * recurses into other objects, array elements are ignored.
+ * Recursively checks if a javascript object contains a nested property key and returns the value.
+ * Note, this only recurses into other objects, array elements are ignored.
  *
  * This helper function can be used for any optimizer.
  */
-function hasNestedProperty(object, key) {
-    if (typeof object !== "object")
-        return false;
-    if (object.hasOwnProperty(key))
-        return true;
-    for (const child of Object.values(object)) {
-        if (hasNestedProperty(child, key))
-            return true;
+function getNestedProperty(object, key) {
+    if (typeof object !== "object") {
+        return null;
     }
-    return false;
+
+    for (const k in object) {
+        if (k == key) {
+            return object[k];
+        }
+
+        const result = getNestedProperty(object[k], key);
+        if (result) {
+            return result;
+        }
+    }
+    return null;
 }
 
 /**
@@ -952,7 +981,7 @@ function hasNestedProperty(object, key) {
  */
 export function getEngine(explain) {
     const queryPlanner = {...getQueryPlanner(explain)};
-    return hasNestedProperty(queryPlanner, "slotBasedPlan") ? "sbe" : "classic";
+    return getNestedProperty(queryPlanner, "slotBasedPlan") ? "sbe" : "classic";
 }
 
 /**

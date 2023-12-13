@@ -44,6 +44,11 @@ const query = {
     // original query shape.
     skip: 3,
 };
+const aggQuery = {
+    aggregate: coll.getName(),
+    pipeline: [{$match: {a: 1}}],
+    cursor: {}
+};
 const querySettingsQuery = qsutils.makeFindQueryInstance({filter: {a: 1, b: 1}, skip: 3});
 const querySettingsA = {
     indexHints: {allowedIndexes: ["a_1"]}
@@ -130,5 +135,8 @@ function assertQuerySettingsApplication(findCmd, settings, shouldCheckPlanCache 
 // Ensure that users can not pass query settings to the commands explicitly.
 {
     assert.commandFailedWithCode(db.runCommand({...query, querySettings: querySettingsAB}),
-                                 [7746900, 7746901])
+                                 [7746900, 7746901]);
+
+    assert.commandFailedWithCode(db.runCommand({...aggQuery, querySettings: querySettingsAB}),
+                                 [7708000, 7708001])
 }

@@ -42,6 +42,7 @@ imports:
     - "mongo/db/pipeline/external_data_source_option.idl"
     - "mongo/db/pipeline/legacy_runtime_constants.idl"
     - "mongo/db/query/hint.idl"
+    - "mongo/db/query/query_settings/query_settings.idl"
     - "mongo/db/query/cursor_response.idl"
     - "mongo/db/write_concern_options.idl"
 
@@ -240,6 +241,11 @@ commands:
                 type: indexHint
                 optional: true
                 stability: stable
+            querySettings:
+              description: "Query settings for the given query"
+              type: QuerySettings
+              optional: true
+              stability: unstable
             writeConcern:
                 description: "A document that expresses the write concern to use with the $out or $merge stage."
                 type: WriteConcern

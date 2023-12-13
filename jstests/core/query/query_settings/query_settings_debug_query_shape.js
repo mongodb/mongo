@@ -20,7 +20,7 @@ const settings = {
 // command is issued on the nonexistent database and collection.
 assertDropAndRecreateCollection(db, collName);
 
-function runTest({queryInstance, expectedDebugQueryShape}) {
+function runTest({queryInstance, expectedDebugQueryShape, shouldRunExplain = true}) {
     // Ensure that no query settings are present at the start of the test.
     qsutils.assertQueryShapeConfiguration([]);
 
@@ -29,9 +29,11 @@ function runTest({queryInstance, expectedDebugQueryShape}) {
     assert.commandWorked(
         db.adminCommand({setQuerySettings: queryInstance, settings}),
     );
-    qsutils.assertQueryShapeConfiguration([
-        qsutils.makeQueryShapeConfiguration(settings, queryInstance),
-    ]);
+    qsutils.assertQueryShapeConfiguration(
+        [
+            qsutils.makeQueryShapeConfiguration(settings, queryInstance),
+        ],
+        shouldRunExplain);
 
     // Compare the actual debug query shape against the expected one. Using 'assert.docEq()' has the
     // added bonus of ensuring that the 'tenantId' does not get leaked within the 'cmdNs' property.
@@ -135,4 +137,6 @@ runTest({
         command: "aggregate",
         pipeline: [{$querySettings: {showDebugQueryShape: true}}]
     },
+    // Since it's a collectionless aggregate, the explain does not contain the 'queryPlanner' field.
+    shouldRunExplain: false,
 });
