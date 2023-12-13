@@ -847,6 +847,14 @@ server_parameters:
     default: false
     test_only: true
 
+  internalCascadesOptimizerDisableSargableWhenNoIndexes:
+    description: "Disable sargable rewrites when there are no indexes."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerDisableSargableWhenNoIndexes"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
   internalCascadesOptimizerFastIndexNullHandling:
     description: "Controls if we prefer to cover queries which may return nulls with indexes."
     set_at: [ startup, runtime ]

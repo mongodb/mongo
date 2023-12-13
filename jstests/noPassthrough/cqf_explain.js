@@ -8,7 +8,11 @@ import {
     getWinningPlanFromExplain
 } from "jstests/libs/analyze_plan.js"
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {leftmostLeafStage, usedBonsaiOptimizer} from "jstests/libs/optimizer_utils.js";
+import {
+    leftmostLeafStage,
+    runWithParams,
+    usedBonsaiOptimizer
+} from "jstests/libs/optimizer_utils.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 let dbName = "test";
@@ -310,6 +314,9 @@ let conn = MongoRunner.runMongod({
     setParameter: {
         featureFlagCommonQueryFramework: true,
         "failpoint.enableExplainInBonsai": tojson({mode: "alwaysOn"}),
+        // TODO SERVER-76509: Remove once we are simplifying expressions without Filter -> Sargable
+        // rewrite.
+        internalCascadesOptimizerDisableSargableWhenNoIndexes: false
     }
 });
 assert.neq(null, conn, "mongod was unable to start up");
@@ -327,11 +334,17 @@ let shardingConn = new ShardingTest({
             setParameter: {
                 "failpoint.enableExplainInBonsai": tojson({mode: "alwaysOn"}),
                 featureFlagCommonQueryFramework: true,
+                // TODO SERVER-76509: Remove once we are simplifying expressions without Filter ->
+                // Sargable rewrite.
+                internalCascadesOptimizerDisableSargableWhenNoIndexes: false
             }
         },
         mongosOptions: {
             setParameter: {
                 featureFlagCommonQueryFramework: true,
+                // TODO SERVER-76509: Remove once we are simplifying expressions without Filter ->
+                // Sargable rewrite.
+                internalCascadesOptimizerDisableSargableWhenNoIndexes: false
             }
         },
     }

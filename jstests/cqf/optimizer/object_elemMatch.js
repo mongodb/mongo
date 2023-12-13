@@ -1,6 +1,7 @@
 import {
     assertValueOnPlanPath,
-    checkCascadesOptimizerEnabled
+    checkCascadesOptimizerEnabled,
+    runWithParams
 } from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
@@ -19,20 +20,59 @@ assert.commandWorked(t.insert({a: [{"": [1, 2], c: [3, 4]}]}));
 
 {
     // Object elemMatch. Currently we do not support index here.
-    const res = t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {a: 2, b: 1}}}}]);
+    const res = runWithParams(
+        [{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}],
+        () => t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {a: 2, b: 1}}}}]));
     assert.eq(1, res.executionStats.nReturned);
     assertValueOnPlanPath("PhysicalScan", res, "child.child.child.nodeType");
 }
 
 {
+    // When Sargable is disabled, we expect to have a single Filter node instead of two.
+    const res = runWithParams(
+        [{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: true}],
+        () => t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {a: 2, b: 1}}}}]));
+    assert.eq(1, res.executionStats.nReturned);
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
+}
+
+{
     // Should not be getting any results.
-    const res = t.explain("executionStats").aggregate([
-        {$match: {a: {$elemMatch: {b: {$elemMatch: {}}, c: {$elemMatch: {}}}}}}
-    ]);
+    const res = runWithParams(
+        [{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}],
+        () => t.explain("executionStats").aggregate([
+            {$match: {a: {$elemMatch: {b: {$elemMatch: {}}, c: {$elemMatch: {}}}}}}
+        ]));
     assert.eq(0, res.executionStats.nReturned);
 }
+
 {
-    const res = t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {"": 1}}}}]);
+    // Should not be getting any results.
+    const res =
+        runWithParams([{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: true}],
+                      () => t.explain("executionStats").aggregate([
+                          {$match: {a: {$elemMatch: {b: {$elemMatch: {}}, c: {$elemMatch: {}}}}}}
+                      ]));
+    assert.eq(0, res.executionStats.nReturned);
+}
+
+{
+    const res = runWithParams(
+        [
+            {key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false},
+        ],
+        () => t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {"": 1}}}}]));
     assert.eq(1, res.executionStats.nReturned);
     assertValueOnPlanPath("PhysicalScan", res, "child.child.child.nodeType");
+}
+
+{
+    // When Sargable is disabled, we expect to have a single Filter node instead of two.
+    const res = runWithParams(
+        [
+            {key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: true},
+        ],
+        () => t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {"": 1}}}}]));
+    assert.eq(1, res.executionStats.nReturned);
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }

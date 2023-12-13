@@ -94,11 +94,8 @@ std::vector<ABT::reference_type> collectComposedBounded(const ABT& n, size_t max
  * consisting of an EvalFilter over the original path and input.
  */
 constexpr size_t kMaxPathConjunctionDecomposition = 20;
-boost::optional<ABT> decomposeToFilterNodes(const ABT& input,
-                                            const ABT& path,
-                                            const ABT& pathInput,
-                                            size_t minDepth,
-                                            size_t maxDepth = kMaxPathConjunctionDecomposition);
+boost::optional<ABT> decomposeToFilterNodes(
+    const ABT& input, const ABT& path, const ABT& pathInput, size_t minDepth, size_t maxDepth);
 
 /**
  * Returns true if the path represented by 'node' is of the form PathGet "field" PathId

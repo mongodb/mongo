@@ -111,7 +111,8 @@ ABT translatePipeline(const Metadata& metadata,
                       PrefixId& prefixId,
                       const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss,
                       bool parameterized,
-                      QueryParameterMap* parameters) {
+                      QueryParameterMap* parameters,
+                      size_t maxFilterDepth) {
     auto opCtx = cc().makeOperationContext();
     auto pipeline =
         parsePipeline(NamespaceString::createNamespaceString_forTest("a." + scanDefName),
@@ -129,7 +130,8 @@ ABT translatePipeline(const Metadata& metadata,
                                   scanProjName,
                                   make<ScanNode>(scanProjName, std::move(scanDefName)),
                                   prefixId,
-                                  parameters ? *parameters : qp);
+                                  parameters ? *parameters : qp,
+                                  maxFilterDepth);
 }
 
 void serializeOptPhases(std::ostream& stream, opt::unordered_set<OptPhase> phaseSet) {

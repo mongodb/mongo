@@ -43,6 +43,7 @@
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -58,7 +59,8 @@ ABT translatePipeline(const Metadata& metadata,
                       PrefixId& prefixId,
                       const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {},
                       bool parameterized = false,
-                      QueryParameterMap* = nullptr);
+                      QueryParameterMap* = nullptr,
+                      size_t maxDepth = kMaxPathConjunctionDecomposition);
 
 void formatGoldenTestHeader(StringData variationName,
                             StringData pipelineStr,

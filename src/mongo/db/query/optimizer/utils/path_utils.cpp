@@ -82,6 +82,12 @@ boost::optional<ABT> decomposeToFilterNodes(const ABT& input,
                                             const ABT& pathInput,
                                             const size_t minDepth,
                                             const size_t maxDepth) {
+    if (maxDepth == 1 && minDepth == maxDepth) {
+        // When maxDepth = 1, a conjunctive path is not decomposed into a sequence of FilterNodes.
+        // In this case the path is attached directly to a single FilterNode.
+        return make<FilterNode>(make<EvalFilter>(path, pathInput), input);
+    }
+
     ABT::reference_type subPathRef = path.ref();
     FieldPathType fieldPath;
     while (const auto newPath = subPathRef.cast<PathGet>()) {
@@ -92,7 +98,7 @@ boost::optional<ABT> decomposeToFilterNodes(const ABT& input,
     ABT subPath{subPathRef};
     if (auto composition = collectComposedBounded(subPath, maxDepth);
         composition.size() >= minDepth) {
-        // Remove the path composition and insert two filter nodes.
+        // Remove the path composition and insert separate filter nodes.
         ABT result = input;
         for (const auto& element : composition) {
             result = make<FilterNode>(

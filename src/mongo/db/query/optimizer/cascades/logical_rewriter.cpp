@@ -627,6 +627,11 @@ struct SubstituteMerge<SargableNode, SargableNode> {
 };
 
 template <class Type>
+struct SubstituteSimplify {
+    void operator()(ABT::reference_type nodeRef, RewriteContext& ctx) = delete;
+};
+
+template <class Type>
 struct SubstituteConvert {
     void operator()(ABT::reference_type nodeRef, RewriteContext& ctx) = delete;
 };
@@ -1052,7 +1057,8 @@ struct SubstituteConvert<FilterNode> {
             if (auto result = decomposeToFilterNodes(filterNode.getChild(),
                                                      evalFilter->getPath(),
                                                      evalFilter->getInput(),
-                                                     2 /*minDepth*/)) {
+                                                     2 /*minDepth*/,
+                                                     kMaxPathConjunctionDecomposition)) {
                 ctx.addNode(*result, true /*substitute*/);
                 return;
             }
@@ -1087,6 +1093,41 @@ struct SubstituteConvert<FilterNode> {
         }
 
         convertFilterToSargableNode(node, filterNode, ctx, scanProjName);
+    }
+};
+
+template <>
+struct SubstituteSimplify<FilterNode> {
+    void operator()(ABT::reference_type node, RewriteContext& ctx) {
+        // TODO SERVER-83835: Implement more granular rewrites.
+        const FilterNode& filterNode = *node.cast<FilterNode>();
+
+        using namespace properties;
+        const LogicalProps& props = ctx.getAboveLogicalProps();
+        if (!hasProperty<IndexingAvailability>(props)) {
+            return;
+        }
+        const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(props);
+        const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
+
+        const ScanDefinition& scanDef =
+            ctx.getMetadata()._scanDefs.at(indexingAvailability.getScanDefName());
+        if (!scanDef.exists()) {
+            return;
+        }
+        const MultikeynessTrie& trie = scanDef.getMultikeynessTrie();
+
+        if (simplifyFilterPath(filterNode, ctx, scanProjName, trie)) {
+            return;
+        }
+
+        if (ctx.getHints()._enableNotPushdown) {
+            if (auto filter = NotPushdown::simplify(filterNode.getFilter(), ctx.getPrefixId())) {
+                ctx.addNode(make<FilterNode>(std::move(*filter), filterNode.getChild()),
+                            true /*substitute*/);
+                return;
+            }
+        }
     }
 };
 
@@ -2096,6 +2137,8 @@ void LogicalRewriter::initializeRewrites() {
                     &LogicalRewriter::bindAboveBelow<SargableNode, SargableNode, SubstituteMerge>);
     registerRewrite(LogicalRewriteType::FilterSubstitute,
                     &LogicalRewriter::bindSingleNode<FilterNode, SubstituteConvert>);
+    registerRewrite(LogicalRewriteType::FilterSimplify,
+                    &LogicalRewriter::bindSingleNode<FilterNode, SubstituteSimplify>);
     registerRewrite(LogicalRewriteType::EvaluationSubstitute,
                     &LogicalRewriter::bindSingleNode<EvaluationNode, SubstituteConvert>);
 

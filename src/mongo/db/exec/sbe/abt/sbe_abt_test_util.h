@@ -46,6 +46,10 @@
 
 namespace mongo::optimizer {
 
+bool compareResults(const std::vector<BSONObj>& expected,
+                    const std::vector<BSONObj>& actual,
+                    bool preserveFieldOrder);
+
 class NodeSBE : public ServiceContextTest {};
 
 class ABTRecorder : public ce::SamplingExecutor {

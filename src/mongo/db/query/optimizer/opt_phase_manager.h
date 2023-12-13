@@ -117,6 +117,7 @@ public:
         // Factories for common configurations.
         static PhasesAndRewrites getDefaultForProd();
         static PhasesAndRewrites getDefaultForSampling();
+        static PhasesAndRewrites getDefaultForUnindexed();
     };
 
     OptPhaseManager(PhasesAndRewrites phasesAndRewrites,

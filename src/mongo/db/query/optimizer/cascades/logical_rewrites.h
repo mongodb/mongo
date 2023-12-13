@@ -82,4 +82,44 @@ const LogicalRewriteSet kDefaultSubstitutionSet = {
     {LogicalRewriteType::EvaluationSubstitute, 2},
     {LogicalRewriteType::SargableMerge, 2}};
 
+// Alternate list of rewrites which avoids splitting Filter nodes into chains of Filter nodes, and
+// does not generate SargableNodes. This allows us to skip unnecessary work when we know we cannot
+// obtain an index scan plan.
+const LogicalRewriteSet kUnindexedSubstitutionSet = {
+    {LogicalRewriteType::FilterEvaluationReorder, 1},
+    {LogicalRewriteType::FilterCollationReorder, 1},
+    {LogicalRewriteType::EvaluationCollationReorder, 1},
+    {LogicalRewriteType::EvaluationLimitSkipReorder, 1},
+
+    {LogicalRewriteType::FilterGroupByReorder, 1},
+    {LogicalRewriteType::GroupCollationReorder, 1},
+
+    {LogicalRewriteType::FilterUnwindReorder, 1},
+    {LogicalRewriteType::EvaluationUnwindReorder, 1},
+    {LogicalRewriteType::UnwindCollationReorder, 1},
+
+    {LogicalRewriteType::FilterExchangeReorder, 1},
+    {LogicalRewriteType::ExchangeEvaluationReorder, 1},
+
+    {LogicalRewriteType::FilterUnionReorder, 1},
+
+    {LogicalRewriteType::CollationMerge, 1},
+    {LogicalRewriteType::LimitSkipMerge, 1},
+
+    {LogicalRewriteType::FilterValueScanPropagate, 1},
+    {LogicalRewriteType::EvaluationValueScanPropagate, 1},
+    {LogicalRewriteType::CollationValueScanPropagate, 1},
+    {LogicalRewriteType::LimitSkipValueScanPropagate, 1},
+    {LogicalRewriteType::ExchangeValueScanPropagate, 1},
+
+    {LogicalRewriteType::LimitSkipSubstitute, 1},
+
+    {LogicalRewriteType::FilterSimplify, 2},
+};
+
+// Alternate list of Exploration rewrites relevant in unindexed case.
+const LogicalRewriteSet kUnindexedExplorationSet = {
+    {LogicalRewriteType::GroupByExplore, 1},
+};
+
 }  // namespace mongo::optimizer::cascades

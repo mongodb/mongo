@@ -103,6 +103,7 @@
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/const_fold_interface.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -497,6 +498,52 @@ static ExecParams createExecutor(
             pipelineMatchExpr};
 }
 
+bool isIndexDefinitionId(const IndexDefinition& idx) {
+    const auto& spec = idx.getCollationSpec();
+    if (spec.size() != 1) {
+        return false;
+    }
+
+    // Multikey _id index (where we sometimes have array _ids).
+    static const IndexCollationEntry multikeyIdIndex(
+        make<PathGet>("_id", make<PathTraverse>(PathTraverse::kUnlimited, make<PathIdentity>())),
+        CollationOp::Ascending);
+
+    // _id index with no Traverse (non-multikey).
+    static const IndexCollationEntry nonMultikeyIdIndex(make<PathGet>("_id", make<PathIdentity>()),
+                                                        CollationOp::Ascending);
+
+    return *spec.begin() == nonMultikeyIdIndex || *spec.begin() == multikeyIdIndex;
+}
+
+bool shouldSkipSargableRewrites(OperationContext* opCtx,
+                                Metadata metadata,
+                                const std::string& scanDefName,
+                                const QueryHints& hints) {
+    if (!internalCascadesOptimizerDisableSargableWhenNoIndexes.load()) {
+        return false;
+    }
+
+    if (hints._disableScan || hints._forceIndexScanForPredicates) {
+        // If we cannot use collection scans, we should generate SargableNodes.
+        return false;
+    }
+
+    if (hints._disableIndexes == DisableIndexOptions::DisableAll) {
+        // If we cannot use indexes, then there is no point in generating SargableNodes.
+        return true;
+    }
+
+    // TODO SERVER-84133: Check if query references _id. If so, we cannot skip sargable rewrites
+    // here (this can never happen for 'tryBonsai', but is possible for 'forceBonsai').
+
+    // Otherwise, we only skip SargableNode rewrites if we have 0 or exactly one index; the _id
+    // index.
+    const auto& indexDefs = metadata._scanDefs[scanDefName].getIndexDefs();
+    return indexDefs.empty() ||
+        (indexDefs.size() == 1 && isIndexDefinitionId(indexDefs.begin()->second));
+};
+
 OptPhaseManager createSamplingPhaseManager(const cost_model::CostModelCoefficients& costModel,
                                            PrefixId& prefixId,
                                            const Metadata& metadata,
@@ -862,6 +909,14 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                      queryHints,
                                      prefixId);
 
+    // Determine whether or not we will generate SargableNodes (and associated rewrites) and split
+    // FilterNodes into chains of FilterNodes.
+    const bool skipSargable = shouldSkipSargableRewrites(opCtx, metadata, scanDefName, queryHints);
+    const size_t maxFilterDepth = skipSargable ? 1 : kMaxPathConjunctionDecomposition;
+    auto phasesAndRewrites = skipSargable
+        ? OptPhaseManager::PhasesAndRewrites::getDefaultForUnindexed()
+        : OptPhaseManager::PhasesAndRewrites::getDefaultForProd();
+
     ABT abt = collectionExists
         ? make<ScanNode>(scanProjName, scanDefName)
         : make<ValueScanNode>(ProjectionNameVector{scanProjName},
@@ -896,8 +951,15 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
             MatchExpression::parameterize(
                 dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())->getMatchExpression());
         }
-        abt = translatePipelineToABT(
-            metadata, *pipeline, scanProjName, std::move(abt), prefixId, queryParameters);
+
+        abt = translatePipelineToABT(metadata,
+                                     *pipeline,
+                                     scanProjName,
+                                     std::move(abt),
+                                     prefixId,
+                                     queryParameters,
+                                     maxFilterDepth);
+
     } else {
         // Clear match expression auto-parameterization by setting max param count to zero before
         // CQ to ABT translation
@@ -906,9 +968,16 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
         if (!_isCacheable) {
             MatchExpression::unparameterize(canonicalQuery->getPrimaryMatchExpression());
         }
-        abt = translateCanonicalQueryToABT(
-            metadata, *canonicalQuery, scanProjName, std::move(abt), prefixId, queryParameters);
+
+        abt = translateCanonicalQueryToABT(metadata,
+                                           *canonicalQuery,
+                                           scanProjName,
+                                           std::move(abt),
+                                           prefixId,
+                                           queryParameters,
+                                           maxFilterDepth);
     }
+
     // If pipeline exists and is cacheable, save the MatchExpression in ExecParams for binding.
     const auto pipelineMatchExpr = pipeline && _isCacheable
         ? boost::make_optional(
@@ -918,7 +987,6 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     OPTIMIZER_DEBUG_LOG(
         6264803, 5, "Translated ABT", "explain"_attr = ExplainGenerator::explainV2Compact(abt));
 
-    auto phasesAndRewrites = OptPhaseManager::PhasesAndRewrites::getDefaultForProd();
     const int64_t numRecords = collectionExists ? collection->numRecords(opCtx) : -1;
     auto costModel = cost_model::costModelManager(opCtx->getServiceContext()).getCoefficients();
     auto cardinalityEstimator = createCardinalityEstimator(costModel,

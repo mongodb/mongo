@@ -19,7 +19,9 @@ for (let i = 0; i < 100; i++) {
 const res = runWithParams(
     [
         {key: "internalCascadesOptimizerExplainVersion", value: "v2"},
-        {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true}
+        {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true},
+        // TODO SERVER-83441: This should be fixed by projection pushdown for Filter nodes.
+        {key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}
     ],
     () => t.explain("executionStats").aggregate([
         {$match: {a: 2}},

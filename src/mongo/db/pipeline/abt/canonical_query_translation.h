@@ -33,6 +33,7 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer {
@@ -42,6 +43,7 @@ ABT translateCanonicalQueryToABT(const Metadata& metadata,
                                  ProjectionName scanProjName,
                                  ABT initialNode,
                                  PrefixId& prefixId,
-                                 QueryParameterMap& queryParameters);
+                                 QueryParameterMap& queryParameters,
+                                 size_t maxFilterDepth = kMaxPathConjunctionDecomposition);
 
 }  // namespace mongo::optimizer

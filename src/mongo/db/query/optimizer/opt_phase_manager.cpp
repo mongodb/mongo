@@ -77,6 +77,13 @@ OptPhaseManager::PhasesAndRewrites OptPhaseManager::PhasesAndRewrites::getDefaul
     return {kSamplingPhases, kDefaultExplorationSet, kDefaultSubstitutionSet};
 }
 
+OptPhaseManager::PhasesAndRewrites OptPhaseManager::PhasesAndRewrites::getDefaultForUnindexed() {
+    // When we don't have indexes, we will always end up with FilterNodes at the end of
+    // optimization. We therefore skip any rewrites that generate or utilize SargableNodes, instead
+    // performing equivalent rewrites on FilterNodes directly.
+    return {kDefaultProdPhases, kUnindexedExplorationSet, kUnindexedSubstitutionSet};
+}
+
 OptPhaseManager::OptPhaseManager(OptPhaseManager::PhasesAndRewrites phasesAndRewrites,
                                  PrefixId& prefixId,
                                  const bool requireRID,

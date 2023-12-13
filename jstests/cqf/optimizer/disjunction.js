@@ -145,7 +145,10 @@ IndexScan [{'<rid>': rid_1}, scanDefName: cqf_disjunction_, indexDefName: a_1, i
     const params = [
         {key: 'internalCascadesOptimizerExplainVersion', value: "v2"},
         {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true},
-        {key: "internalCascadesOptimizerDisableIndexes", value: true}
+        {key: "internalCascadesOptimizerDisableIndexes", value: true},
+        // TODO SERVER-83574: Enable after implementing rewriting single-field disjunctions to
+        // eqMember.
+        {key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}
     ];
 
     //

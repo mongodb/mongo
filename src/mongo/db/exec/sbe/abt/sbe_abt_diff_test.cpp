@@ -46,47 +46,6 @@
 namespace mongo::optimizer {
 namespace {
 
-static bool compareBSONObj(const BSONObj& actual,
-                           const BSONObj& expected,
-                           const bool preserveFieldOrder) {
-    BSONObj::ComparisonRulesSet rules = BSONObj::ComparisonRules::kConsiderFieldName;
-    if (!preserveFieldOrder) {
-        rules |= BSONObj::ComparisonRules::kIgnoreFieldOrder;
-    }
-    return actual.woCompare(expected, BSONObj(), rules) == 0;
-}
-
-static bool compareResults(const std::vector<BSONObj>& expected,
-                           const std::vector<BSONObj>& actual,
-                           const bool preserveFieldOrder) {
-    if (expected.size() != actual.size()) {
-        std::cout << "Different result size: expected: " << expected.size()
-                  << " vs actual: " << actual.size() << "\n";
-
-        std::cout << "Expected results:\n";
-        for (const auto& result : expected) {
-            std::cout << result << "\n";
-        }
-        std::cout << "Actual results:\n";
-        for (const auto& result : actual) {
-            std::cout << result << "\n";
-        }
-
-        return false;
-    }
-
-    for (size_t i = 0; i < expected.size(); i++) {
-        if (!compareBSONObj(actual.at(i), expected.at(i), preserveFieldOrder)) {
-            std::cout << "Result at position " << i << "/" << expected.size()
-                      << " mismatch: expected: " << expected.at(i) << " vs actual: " << actual.at(i)
-                      << "\n";
-            return false;
-        }
-    }
-
-    return true;
-}
-
 using TestContextFn = std::function<ServiceContext::UniqueOperationContext()>;
 
 static std::vector<BSONObj> fromjson(const std::vector<std::string>& jsonVector) {

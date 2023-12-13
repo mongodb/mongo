@@ -1,7 +1,8 @@
 import {
     assertValueOnPath,
     checkCascadesOptimizerEnabled,
-    navigateToPlanPath
+    navigateToPlanPath,
+    runWithParams
 } from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
@@ -30,36 +31,42 @@ assert.commandWorked(collB.insert({a: 5, b: 4}));
 assert.commandWorked(collB.insert({a: 6, b: 5}));
 assert.commandWorked(collB.insert({a: 6, b: 6}));
 assert.commandWorked(collB.insert({a: 7, b: 7}));
+runWithParams(
+    [
+        // TODO SERVER-83937: Because we are not generating a SargableNode here, we are not pushing
+        // down the EvaluationNode into the PhysicalScan.
+        {key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}
+    ],
+    () => {
+        {
+            // Assert plan with nested fields. The top-level fields should be covered by the scans.
+            const res = collA.explain("executionStats").aggregate([
+                {$lookup: {from: "collB", localField: "a.a1", foreignField: "b.b1", as: "out"}}
+            ]);
 
-{
-    // Assert plan with nested fields. The top-level fields should be covered by the scans.
-    const res = collA.explain("executionStats").aggregate([
-        {$lookup: {from: "collB", localField: "a.a1", foreignField: "b.b1", as: "out"}}
-    ]);
+            const nljNode = navigateToPlanPath(res, "child.child.child");
+            assertValueOnPath("NestedLoopJoin", nljNode, "nodeType");
 
-    const nljNode = navigateToPlanPath(res, "child.child.child");
-    assertValueOnPath("NestedLoopJoin", nljNode, "nodeType");
+            const leftScan = nljNode.leftChild.child;
+            assertValueOnPath("PhysicalScan", leftScan, "nodeType");
+            assert(leftScan.fieldProjectionMap.hasOwnProperty("_id"));
+            assert(leftScan.fieldProjectionMap.hasOwnProperty("a"));
 
-    const leftScan = nljNode.leftChild.child;
-    assertValueOnPath("PhysicalScan", leftScan, "nodeType");
-    assert(leftScan.fieldProjectionMap.hasOwnProperty("_id"));
-    assert(leftScan.fieldProjectionMap.hasOwnProperty("a"));
+            const rightScan = nljNode.rightChild;
+            assertValueOnPath("PhysicalScan", rightScan, "nodeType");
+            assert(rightScan.fieldProjectionMap.hasOwnProperty("b"));
+        }
 
-    const rightScan = nljNode.rightChild;
-    assertValueOnPath("PhysicalScan", rightScan, "nodeType");
-    assert(rightScan.fieldProjectionMap.hasOwnProperty("b"));
-}
+        try {
+            // TODO: these results need to be updated as the lookup implementation is completed. See
+            // comments visitor of DocumentSourceLookUp in abt/document_source_visitor.
 
-try {
-    // TODO: these results need to be updated as the lookup implementation is completed. See
-    // comments visitor of DocumentSourceLookUp in abt/document_source_visitor.
+            // Prevent unwind and sort from being reordered with lookup.
+            assert.commandWorked(db.adminCommand(
+                {'configureFailPoint': 'disablePipelineOptimization', 'mode': 'alwaysOn'}));
 
-    // Prevent unwind and sort from being reordered with lookup.
-    assert.commandWorked(
-        db.adminCommand({'configureFailPoint': 'disablePipelineOptimization', 'mode': 'alwaysOn'}));
-
-    {
-        const res =
+            {
+                const res =
             collA
                 .aggregate([
                     {$lookup: {from: "collB", localField: "a", foreignField: "a", as: "result"}},
@@ -70,29 +77,29 @@ try {
                 ])
                 .toArray();
 
-        assert.eq(res, [
-            {a: 2, b: 2, ra: 2, rb: 1},
-            {a: 2, b: 3, ra: 2, rb: 1},
-            {a: 3, b: 4, ra: 3, rb: 2},
-            {a: 3, b: 4, ra: 3, rb: 3},
-            {a: 5, b: 5, ra: 5, rb: 4},
-            {a: 6, b: 6, ra: 6, rb: 5},
-            {a: 6, b: 6, ra: 6, rb: 6},
-            {a: 6, b: 7, ra: 6, rb: 5},
-            {a: 6, b: 7, ra: 6, rb: 6}
-        ]);
-    }
+                assert.eq(res, [
+                    {a: 2, b: 2, ra: 2, rb: 1},
+                    {a: 2, b: 3, ra: 2, rb: 1},
+                    {a: 3, b: 4, ra: 3, rb: 2},
+                    {a: 3, b: 4, ra: 3, rb: 3},
+                    {a: 5, b: 5, ra: 5, rb: 4},
+                    {a: 6, b: 6, ra: 6, rb: 5},
+                    {a: 6, b: 6, ra: 6, rb: 6},
+                    {a: 6, b: 7, ra: 6, rb: 5},
+                    {a: 6, b: 7, ra: 6, rb: 6}
+                ]);
+            }
 
-    collA.drop();
-    collB.drop();
+            collA.drop();
+            collB.drop();
 
-    assert.commandWorked(collA.insert({a: [1, 2], b: 1}));
+            assert.commandWorked(collA.insert({a: [1, 2], b: 1}));
 
-    assert.commandWorked(collB.insert({a: [2, 3], b: 1}));
-    assert.commandWorked(collB.insert({a: [1, 3], b: 1}));
+            assert.commandWorked(collB.insert({a: [2, 3], b: 1}));
+            assert.commandWorked(collB.insert({a: [1, 3], b: 1}));
 
-    {
-        const res =
+            {
+                const res =
             collA
                 .aggregate([
                     {$lookup: {from: "collB", localField: "a", foreignField: "a", as: "result"}},
@@ -103,10 +110,12 @@ try {
                 ])
                 .toArray();
 
-        assert.eq(res,
-                  [{a: [1, 2], b: 1, ra: [1, 3], rb: 1}, {a: [1, 2], b: 1, ra: [2, 3], rb: 1}]);
-    }
-} finally {
-    assert.commandWorked(
-        db.adminCommand({'configureFailPoint': 'disablePipelineOptimization', 'mode': 'off'}));
-}
+                assert.eq(
+                    res,
+                    [{a: [1, 2], b: 1, ra: [1, 3], rb: 1}, {a: [1, 2], b: 1, ra: [2, 3], rb: 1}]);
+            }
+        } finally {
+            assert.commandWorked(db.adminCommand(
+                {'configureFailPoint': 'disablePipelineOptimization', 'mode': 'off'}));
+        }
+    });

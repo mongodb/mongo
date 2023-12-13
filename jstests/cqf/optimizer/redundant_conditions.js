@@ -23,7 +23,9 @@ for (let i = 0; i < 100; i++) {
     const res = runWithParams(
         [
             {key: 'internalCascadesOptimizerExplainVersion', value: "v2"},
-            {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true}
+            {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true},
+            // TODO SERVER-76509: Enable simplification for filter node expressions.
+            {key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}
         ],
         () => t.explain("executionStats").find({$and: [{a: 1}, {a: 1}]}).finish());
     assert.eq(1, res.executionStats.nReturned);

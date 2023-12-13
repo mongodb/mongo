@@ -54,7 +54,8 @@ ABT translateCanonicalQueryToABT(const Metadata& metadata,
                                  ProjectionName scanProjName,
                                  ABT initialNode,
                                  PrefixId& prefixId,
-                                 QueryParameterMap& queryParameters) {
+                                 QueryParameterMap& queryParameters,
+                                 size_t maxFilterDepth) {
     auto matchExpr = generateMatchExpression(canonicalQuery.getPrimaryMatchExpression(),
                                              true /* allowAggExpression */,
                                              scanProjName,
@@ -64,7 +65,7 @@ ABT translateCanonicalQueryToABT(const Metadata& metadata,
     {
         // Decompose conjunction in the filter into a serial chain of FilterNodes.
         auto result = decomposeToFilterNodes(
-            initialNode, matchExpr, make<Variable>(scanProjName), 1 /*minDepth*/);
+            initialNode, matchExpr, make<Variable>(scanProjName), 1 /*minDepth*/, maxFilterDepth);
         initialNode = std::move(*result);
     }
 

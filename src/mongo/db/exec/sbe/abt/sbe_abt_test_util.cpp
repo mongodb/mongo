@@ -81,6 +81,46 @@
 
 namespace mongo::optimizer {
 
+namespace {
+bool compareBSONObj(const BSONObj& actual, const BSONObj& expected, bool preserveFieldOrder) {
+    BSONObj::ComparisonRulesSet rules = BSONObj::ComparisonRules::kConsiderFieldName;
+    if (!preserveFieldOrder) {
+        rules |= BSONObj::ComparisonRules::kIgnoreFieldOrder;
+    }
+    return actual.woCompare(expected, BSONObj(), rules) == 0;
+}
+}  // namespace
+
+bool compareResults(const std::vector<BSONObj>& expected,
+                    const std::vector<BSONObj>& actual,
+                    const bool preserveFieldOrder) {
+    if (expected.size() != actual.size()) {
+        std::cout << "Different result size: expected: " << expected.size()
+                  << " vs actual: " << actual.size() << "\n";
+
+        std::cout << "Expected results:\n";
+        for (const auto& result : expected) {
+            std::cout << result << "\n";
+        }
+        std::cout << "Actual results:\n";
+        for (const auto& result : actual) {
+            std::cout << result << "\n";
+        }
+
+        return false;
+    }
+
+    for (size_t i = 0; i < expected.size(); i++) {
+        if (!compareBSONObj(actual.at(i), expected.at(i), preserveFieldOrder)) {
+            std::cout << "Result at position " << i << "/" << expected.size()
+                      << " mismatch: expected: " << expected.at(i) << " vs actual: " << actual.at(i)
+                      << "\n";
+            return false;
+        }
+    }
+
+    return true;
+}
 
 boost::optional<optimizer::SelectivityType> ABTRecorder::estimateSelectivity(
     const Metadata& /*metadata*/,
@@ -142,7 +182,9 @@ ABT createValueArray(const std::vector<BSONObj>& inputObjs) {
 
 std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
                                const std::string& pipelineStr,
-                               const std::vector<BSONObj>& inputObjs) {
+                               const std::vector<BSONObj>& inputObjs,
+                               OptPhaseManager::PhasesAndRewrites phasesAndRewrites,
+                               size_t maxFilterDepth) {
     auto prefixId = PrefixId::createForTests();
     Metadata metadata{{}};
 
@@ -161,12 +203,13 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
                                                           std::move(valueArray),
                                                           true /*hasRID*/),
                                       prefixId,
-                                      qp);
+                                      qp,
+                                      maxFilterDepth);
 
     OPTIMIZER_DEBUG_LOG(
         6264807, 5, "SBE translated ABT", "explain"_attr = ExplainGenerator::explainV2(tree));
 
-    auto phaseManager = makePhaseManager(OptPhaseManager::getAllProdRewrites(),
+    auto phaseManager = makePhaseManager(std::move(phasesAndRewrites),
                                          prefixId,
                                          {{}},
                                          boost::none /*costModel*/,
@@ -219,6 +262,31 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
     sbePlan->close();
 
     return results;
+}
+
+std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
+                               const std::string& pipelineStr,
+                               const std::vector<BSONObj>& inputObjs) {
+    OPTIMIZER_DEBUG_LOG(
+        8197301, 5, "Run test with default rewrites", "pipeline"_attr = pipelineStr);
+    auto resultsDefault = runSBEAST(opCtx,
+                                    pipelineStr,
+                                    inputObjs,
+                                    OptPhaseManager::PhasesAndRewrites::getDefaultForProd(),
+                                    kMaxPathConjunctionDecomposition);
+
+    OPTIMIZER_DEBUG_LOG(8197301,
+                        5,
+                        "Run test again without splitting Filters or generating SargableNodes",
+                        "pipeline"_attr = pipelineStr);
+    auto resultsNoSargable = runSBEAST(opCtx,
+                                       pipelineStr,
+                                       inputObjs,
+                                       OptPhaseManager::PhasesAndRewrites::getDefaultForUnindexed(),
+                                       1);
+
+    compareResults(resultsDefault, resultsNoSargable, true /*preserveFieldOrder*/);
+    return resultsDefault;
 }
 
 std::vector<BSONObj> runPipeline(OperationContext* opCtx,

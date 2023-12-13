@@ -373,8 +373,11 @@ void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
     {
         // If we have a top-level composition, flatten it into a chain of separate FilterNodes. We
         // are adding the entire subtree to the context.
-        auto result = decomposeToFilterNodes(
-            entry._node, matchExpr, make<Variable>(entry._rootProjection), 1 /*minDepth*/);
+        auto result = decomposeToFilterNodes(entry._node,
+                                             matchExpr,
+                                             make<Variable>(entry._rootProjection),
+                                             1 /*minDepth*/,
+                                             visitorCtx->maxFilterDepth);
         ctx.setNode(entry._rootProjection, std::move(*result));
         entry = ctx.getNode();
     }
@@ -558,9 +561,10 @@ ABT translatePipelineToABT(const Metadata& metadata,
                            ProjectionName scanProjName,
                            ABT initialNode,
                            PrefixId& prefixId,
-                           QueryParameterMap& queryParameters) {
+                           QueryParameterMap& queryParameters,
+                           size_t maxFilterDepth) {
     AlgebrizerContext ctx(prefixId, {scanProjName, std::move(initialNode)}, queryParameters);
-    ABTDocumentSourceTranslationVisitorContext visitorCtx(ctx, metadata);
+    ABTDocumentSourceTranslationVisitorContext visitorCtx(ctx, metadata, maxFilterDepth);
 
     ServiceContext* serviceCtx = pipeline.getContext()->opCtx->getServiceContext();
     auto& reg = getDocumentSourceVisitorRegistry(serviceCtx);

@@ -38,13 +38,16 @@
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer {
 
 struct ABTDocumentSourceTranslationVisitorContext : public DocumentSourceVisitorContextBase {
-    ABTDocumentSourceTranslationVisitorContext(AlgebrizerContext& ctx, const Metadata& metadata)
-        : algCtx(ctx), metadata(metadata) {}
+    ABTDocumentSourceTranslationVisitorContext(AlgebrizerContext& ctx,
+                                               const Metadata& metadata,
+                                               size_t maxFilterDepth)
+        : algCtx(ctx), metadata(metadata), maxFilterDepth(maxFilterDepth) {}
 
     // Prevent copying and moving as this object has reference members.
     ABTDocumentSourceTranslationVisitorContext(const ABTDocumentSourceTranslationVisitorContext&) =
@@ -60,6 +63,9 @@ struct ABTDocumentSourceTranslationVisitorContext : public DocumentSourceVisitor
 
     AlgebrizerContext& algCtx;
     const Metadata& metadata;
+
+    // This configures the maximum number of FilterNodes that a single FilterNode may be split into.
+    const size_t maxFilterDepth;
 };
 
 ABT translatePipelineToABT(const Metadata& metadata,
@@ -67,6 +73,7 @@ ABT translatePipelineToABT(const Metadata& metadata,
                            ProjectionName scanProjName,
                            ABT initialNode,
                            PrefixId& prefixId,
-                           QueryParameterMap& queryParameters);
+                           QueryParameterMap& queryParameters,
+                           size_t maxFilterDepth = kMaxPathConjunctionDecomposition);
 
 }  // namespace mongo::optimizer
