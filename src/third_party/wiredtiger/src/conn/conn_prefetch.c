@@ -108,9 +108,13 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
         /*
          * It's a weird case, but if verify is utilizing prefetch and encounters a corrupted block,
          * stop using prefetch. Some of the guarantees about ref and page freeing are ignored in
-         * that case, which can invalidate entries on the prefetch queue.
+         * that case, which can invalidate entries on the prefetch queue. Don't prefetch fast
+         * deleted pages - they have special performance and visibility considerations associated
+         * with them. Don't prefetch fast deleted pages to avoid wasted effort. We can skip reading
+         * these deleted pages into the cache if the fast truncate information is visible in the
+         * session transaction snapshot.
          */
-        if (!F_ISSET(conn, WT_CONN_DATA_CORRUPTION))
+        if (!F_ISSET(conn, WT_CONN_DATA_CORRUPTION) && pe->ref->page_del == NULL)
             WT_WITH_DHANDLE(session, pe->dhandle, ret = __wt_prefetch_page_in(session, pe));
 
         /*
