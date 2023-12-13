@@ -14,7 +14,7 @@
 		"clang-format.executable": "/opt/mongodbtoolchain/v4/bin/clang-format",
 		"clang-tidy.executable": "buildscripts/clang_tidy_vscode.py",
 		"editor.codeActionsOnSave": {
-			"source.fixAll.eslint": true
+			"source.fixAll.eslint": "explicit"
 		},
 		"eslint.validate": [
 			"javascript"
