@@ -1,0 +1,26 @@
+/*! @page portability General information on portability
+
+@section cpu Supported CPU architectures
+
+The supported list of CPU target architectures may be found by inspecting the \c WT_ARCH variable
+present in the \c cmake configuration. Note that the \c loongarch64 platform is community-supported.
+
+@section posix POSIX compliance
+
+WiredTiger aims to be generally portable to any 64-bit system supporting the ANSI C11 and POSIX
+1003.1 standards. Unfortunately, the real world is a little messier than the standards dictate, so
+WiredTiger may not compile (or work correctly) on every POSIX platform.
+
+If WiredTiger does fail to compile (or work correctly) on your platform, we welcome either a
+<a href="https://github.com/wiredtiger/wiredtiger/wiki/Creating-tickets-that-are-likely-to-be-actioned">bug report</a>
+or a
+<a href="https://github.com/wiredtiger/wiredtiger/wiki/Contributing-to-WiredTiger">pull request</a>.
+
+@section testing Testing
+
+To see a list of the CPU and operating system combinations WiredTiger is currently tested on, please
+visit <a href="https://evergreen.mongodb.com/waterfall/wiredtiger">our test results page</a>. This
+list is determined by the availability of suitable machines. The lack of an operating system or CPU
+architecture on this page does not make it unsupported.
+
+*/

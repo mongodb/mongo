@@ -25,6 +25,7 @@ see:
 
 For more information about building and installing WiredTiger, see:
 
+- @subpage portability
 - @subpage build-posix
 - @subpage build-windows
 
