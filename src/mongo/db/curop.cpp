@@ -986,6 +986,14 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("planningTimeMicros", durationCount<Microseconds>(planningTime));
     }
 
+    if (estimatedCost) {
+        pAttrs->add("estimatedCost", *estimatedCost);
+    }
+
+    if (estimatedCardinality) {
+        pAttrs->add("estimatedCardinality", *estimatedCardinality);
+    }
+
     if (prepareConflictDurationMillis > Milliseconds::zero()) {
         pAttrs->add("prepareConflictDuration", prepareConflictDurationMillis);
     }
@@ -1380,6 +1388,10 @@ void OpDebug::append(OperationContext* opCtx,
         b.appendNumber("planningTimeMicros", durationCount<Microseconds>(planningTime));
     }
 
+    OPDEBUG_APPEND_OPTIONAL(b, "estimatedCost", estimatedCost);
+
+    OPDEBUG_APPEND_OPTIONAL(b, "estimatedCardinality", estimatedCardinality);
+
     if (totalOplogSlotDurationMicros > Microseconds::zero()) {
         b.appendNumber("totalOplogSlotDurationMicros",
                        durationCount<Microseconds>(totalOplogSlotDurationMicros));
@@ -1711,6 +1723,14 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
 
     addIfNeeded("planningTimeMicros", [](auto field, auto args, auto& b) {
         b.appendNumber(field, durationCount<Microseconds>(args.op.planningTime));
+    });
+
+    addIfNeeded("estimatedCost", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.estimatedCost);
+    });
+
+    addIfNeeded("estimatedCardinality", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.estimatedCardinality);
     });
 
     addIfNeeded("totalOplogSlotDurationMicros", [](auto field, auto args, auto& b) {
