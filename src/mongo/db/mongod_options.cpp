@@ -799,6 +799,9 @@ Status storeMongodOptions(const moe::Environment& params) {
         }
     }
 
+    serverGlobalParams.upgradeBackCompat = params.count("upgradeBackCompat");
+    serverGlobalParams.downgradeBackCompat = params.count("downgradeBackCompat");
+
     setGlobalReplSettings(replSettings);
     return Status::OK();
 }
