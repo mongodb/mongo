@@ -139,14 +139,8 @@ list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
             str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
             it != parserMap.end());
 
-    uassert(
-        ErrorCodes::QueryFeatureNotAllowed,
-        str::stream() << stageName
-                      << " is not allowed in the current feature compatibility version. See "
-                      << feature_compatibility_version_documentation::kCompatibilityLink
-                      << " for more information.",
-        !expCtx->maxFeatureCompatibilityVersion || !it->second.featureFlag ||
-            it->second.featureFlag->isEnabledOnVersion(*expCtx->maxFeatureCompatibilityVersion));
+    auto& entry = it->second;
+    expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(stageName, entry.featureFlag);
 
     return it->second.parser(stageSpec, expCtx);
 }

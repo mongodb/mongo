@@ -106,17 +106,8 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
 
     auto&& [parser, allowedWithApiStrict, allowedWithClientType, featureFlag] =
         AccumulationStatement::getParser(accName);
-    auto allowedMaxVersion = expCtx->maxFeatureCompatibilityVersion;
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            // We would like to include the current version and the required minimum version in this
-            // error message, but using FeatureCompatibilityVersion::toString() would introduce a
-            // dependency cycle (see SERVER-31968).
-            str::stream() << accName
-                          << " is not allowed in the current feature compatibility version. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << " for more information.",
-            !featureFlag || !allowedMaxVersion ||
-                featureFlag->isEnabledOnVersion(*allowedMaxVersion));
+
+    expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(accName, featureFlag);
 
     tassert(5837900, "Accumulators should only appear in a user operation", expCtx->opCtx);
     assertLanguageFeatureIsAllowed(

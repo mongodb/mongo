@@ -516,6 +516,14 @@ public:
         return _varsReferencedInQuery.count(var);
     }
 
+    /**
+     * Throws if the provided feature flag is not enabled in the current FCV or
+     * 'maxFeatureCompatibilityVersion' if set. Will do nothing if the feature flag is enabled
+     * or boost::none.
+     */
+    void throwIfFeatureFlagIsNotEnabledOnFCV(StringData name,
+                                             const boost::optional<FeatureFlag>& flag);
+
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
 

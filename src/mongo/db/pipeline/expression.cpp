@@ -246,19 +246,8 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
             str::stream() << "Unrecognized expression '" << opName << "'",
             it != parserMap.end());
 
-    // Make sure we are allowed to use this expression under the current feature compatibility
-    // version.
     auto& entry = it->second;
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            // We would like to include the current version and the required minimum version in this
-            // error message, but using FeatureCompatibilityVersion::toString() would introduce a
-            // dependency cycle (see SERVER-31968).
-            str::stream() << opName
-                          << " is not allowed in the current feature compatibility version. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << " for more information.",
-            !expCtx->maxFeatureCompatibilityVersion || !entry.featureFlag ||
-                entry.featureFlag->isEnabledOnVersion(*expCtx->maxFeatureCompatibilityVersion));
+    expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(opName, entry.featureFlag);
 
     if (expCtx->opCtx) {
         assertLanguageFeatureIsAllowed(

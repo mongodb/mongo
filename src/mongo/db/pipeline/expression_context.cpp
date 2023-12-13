@@ -37,6 +37,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/basic_types.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
@@ -414,6 +415,25 @@ void ExpressionContext::setUserRoles() {
     if (isSystemVarReferencedInQuery(Variables::kUserRolesId) && enableAccessToUserRoles.load()) {
         variables.defineUserRoles(opCtx);
     }
+}
+
+void ExpressionContext::throwIfFeatureFlagIsNotEnabledOnFCV(
+    StringData name, const boost::optional<FeatureFlag>& flag) {
+    if (!flag) {
+        return;
+    }
+
+    const auto version = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    auto versionToCheck = maxFeatureCompatibilityVersion ? maxFeatureCompatibilityVersion : version;
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            // We would like to include the current version and the required minimum version in this
+            // error message, but using FeatureCompatibilityVersion::toString() would introduce a
+            // dependency cycle (see SERVER-31968).
+            str::stream() << name
+                          << " is not allowed in the current feature compatibility version. See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << " for more information.",
+            flag->isEnabledOnVersion(*versionToCheck));
 }
 
 }  // namespace mongo

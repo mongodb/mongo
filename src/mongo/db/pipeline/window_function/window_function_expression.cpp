@@ -99,15 +99,8 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
                 const auto& parserRegistration = parserFCV->second;
                 const auto& parser = parserRegistration.parser;
                 const auto& featureFlag = parserRegistration.featureFlag;
-                uassert(ErrorCodes::QueryFeatureNotAllowed,
-                        str::stream()
-                            << exprName
-                            << " is not allowed in the current feature compatibility version. See "
-                            << feature_compatibility_version_documentation::kCompatibilityLink
-                            << " for more information.",
-                        !expCtx->maxFeatureCompatibilityVersion || !featureFlag ||
-                            featureFlag->isEnabledOnVersion(
-                                *expCtx->maxFeatureCompatibilityVersion));
+
+                expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(exprName, featureFlag);
 
                 auto allowedWithApi = parserRegistration.allowedWithApi;
 

@@ -78,7 +78,8 @@ assert.eq(1, res.length, res);
 
 // Running $queryStats should return an error.
 assert.commandFailedWithCode(
-    testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}), 6579000);
+    testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
+    ErrorCodes.QueryFeatureNotAllowed);
 
 // Upgrade FCV and confirm $queryStats can be run.
 assert.commandWorked(rst.getPrimary().getDB("admin").runCommand(
@@ -112,7 +113,7 @@ assert.eq(1, res.length, res);
 assert.commandFailedWithCode(
     testDB.adminCommand(
         {aggregate: 1, pipeline: [{$queryStats: {}}, {$sort: {key: 1}}], cursor: {}}),
-    6579000);
+    ErrorCodes.QueryFeatureNotAllowed);
 
 // Successfully upgrade.
 assert.commandWorked(rst.getPrimary().getDB("admin").runCommand(
