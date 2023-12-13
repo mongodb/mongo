@@ -290,6 +290,20 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
     if (auto tlm = svcCtx->getTransportLayerManager()) {
         tlm->checkMaxOpenSessionsAtStartup();
     }
+
+    // Check that swappiness is at a minimum (either 0 or 1)
+    if (boost::filesystem::exists("/proc/sys/vm/swappiness")) {
+        std::fstream f("/proc/sys/vm/swappiness", ios_base::in);
+        unsigned val;
+        f >> val;
+        if (val > 1) {
+            LOGV2_WARNING_OPTIONS(8386700,
+                                  {logv2::LogTag::kStartupWarnings},
+                                  "We suggest setting /proc/sys/vm/swappiness to 0 or 1, as "
+                                  "swapping can cause performance problems. ",
+                                  "currentValue"_attr = val);
+        }
+    }
 #endif  // __linux__
 
 #ifndef _WIN32
