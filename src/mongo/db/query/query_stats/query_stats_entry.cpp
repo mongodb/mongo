@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/query/query_stats/query_stats_entry.h"
-#include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
 
 #include <boost/optional.hpp>
 
@@ -48,19 +47,8 @@ BSONObj QueryStatsEntry::toBSON() const {
     docsReturned.appendTo(builder, "docsReturned");
     builder.append("firstSeenTimestamp", firstSeenTimestamp);
     builder.append("latestSeenTimestamp", latestSeenTimestamp);
-    if (supplementalStatsMap) {
-        builder.append("supplementalMetrics", supplementalStatsMap->toBSON());
-    }
     return builder.obj();
 }
 
-void QueryStatsEntry::addSupplementalStats(std::unique_ptr<SupplementalStatsEntry> metric) {
-    if (metric) {
-        if (!supplementalStatsMap) {
-            supplementalStatsMap = std::make_unique<SupplementalStatsMap>();
-        }
-        supplementalStatsMap->update(std::move(metric));
-    }
-}
 
 }  // namespace mongo::query_stats
