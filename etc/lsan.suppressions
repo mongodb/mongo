@@ -9,4 +9,7 @@ leak:mongo::Interruptible::installWaitListener
 # The singleton must live throughout the lifetime of all SSL threads
 leak::mongo::SSLThreadInfo::ThreadIDManager::idManager
 
+# Threads leak from thread pools not joined at shutdown.
+leak:mongo::ThreadPool::Impl::_startWorkerThread_inlock()
+
 leak:glob64
