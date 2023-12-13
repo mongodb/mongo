@@ -120,13 +120,13 @@ execution time) replacing the entire prior value sequence once committed.
 predate the non-timestamped write will continue to see the prior
 database state until they commit or get a new snapshot.)
 
-Applications are expected to write the value sequence in order; that
-is, for each key in the database, every write should commit with a
+Applications are required to write the value sequence in order; that
+is, for each key in the database, every write must commit with a
 timestamp later than the latest existing timestamp for that key.
-This is currently not enforced; because MongoDB sometimes issues out
-of order updates, they must for the time being be handled.
-<!-- XXX and it would probably be good to document what the resolution
-rules/semantics are, except I haven't any idea... -->
+By default, WiredTiger will enforce that once timestamps are used for
+a key, they must always be used, and that the timestamps never
+decrease. This may be altered by using the \c write_timestamp_usage
+configuration for WT_SESSION::create.
 
 @section arch-timestamp-representation Representation of timestamps and time windows
 
