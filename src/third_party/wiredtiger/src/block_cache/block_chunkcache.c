@@ -1237,6 +1237,10 @@ __wt_chunkcache_setup(WT_SESSION_IMPL *session, const char *cfg[])
         if (cval.len == 0)
             WT_RET_MSG(session, EINVAL, "chunk cache storage path not provided in the config.");
 
+        if (F_ISSET(S2C(session), WT_CONN_READONLY))
+            WT_RET_MSG(
+              session, EINVAL, "on-disk chunk cache incompatible with read-only connection");
+
         WT_RET(__wt_strndup(session, cval.str, cval.len, &chunkcache->storage_path));
         WT_RET(__wt_open(session, chunkcache->storage_path, WT_FS_OPEN_FILE_TYPE_DATA,
           WT_FS_OPEN_CREATE | WT_FS_OPEN_FORCE_MMAP, &chunkcache->fh));
