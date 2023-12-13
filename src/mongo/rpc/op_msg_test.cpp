@@ -1185,8 +1185,6 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
     ASSERT_EQ(msg.getDatabase(), dbStringWithTid);
 }
 
-// TODO: SERVER-81825 will update the OpMsgRequestBuilder create methods to no longer use $tenant.
-// After, the $tenant field in newBody can be removed
 TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
@@ -1209,7 +1207,7 @@ TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
     auto msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
         DatabaseName::createDatabaseName_forTest(tenantId, "db"), vts, std::move(body));
 
-    auto const newBody = BSON("ping" << 1 << "$tenant" << tenantId << "$db"
+    auto const newBody = BSON("ping" << 1 << "$db"
                                      << "db");
     ASSERT_BSONOBJ_EQ(msg.body, newBody);
     ASSERT_EQ(static_cast<const void*>(msg.body.objdata()), bodyPtr);

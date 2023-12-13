@@ -71,7 +71,10 @@ using LegacyCommandAndFlags = std::tuple<BSONObj, int>;
 /**
  * Upconverts a legacy command request into an OpMessageRequest.
  */
-OpMsgRequest upconvertRequest(const DatabaseName& dbName, BSONObj legacyCmdObj, int queryFlags);
+OpMsgRequest upconvertRequest(const DatabaseName& dbName,
+                              BSONObj legacyCmdObj,
+                              int queryFlags,
+                              boost::optional<auth::ValidatedTenancyScope> vts = boost::none);
 
 
 /**

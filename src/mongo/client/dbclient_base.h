@@ -258,10 +258,15 @@ public:
      *  'info': The result object the database returns. Typically has { ok : ..., errmsg : ... }
      *          fields set.
      *  'options': See enum QueryOptions - normally not needed to run a command.
+     *  'vts': optional validated tenancy scope used to include tenancy information on a command
      *
      *  Returns true if the command returned "ok".
      */
-    bool runCommand(const DatabaseName& dbName, BSONObj cmd, BSONObj& info, int options = 0);
+    bool runCommand(const DatabaseName& dbName,
+                    BSONObj cmd,
+                    BSONObj& info,
+                    int options = 0,
+                    boost::optional<auth::ValidatedTenancyScope> vts = boost::none);
 
     /*
      * Wraps up the runCommand function avove, but returns the DBClient that actually ran the
@@ -270,10 +275,12 @@ public:
      *
      * This is used in the shell so that cursors can send getMore through the correct connection.
      */
-    std::tuple<bool, DBClientBase*> runCommandWithTarget(const DatabaseName& dbName,
-                                                         BSONObj cmd,
-                                                         BSONObj& info,
-                                                         int options = 0);
+    std::tuple<bool, DBClientBase*> runCommandWithTarget(
+        const DatabaseName& dbName,
+        BSONObj cmd,
+        BSONObj& info,
+        int options = 0,
+        boost::optional<auth::ValidatedTenancyScope> vts = boost::none);
 
     /**
      * See the opMsg overload comment for why this function takes a shared_ptr ostensibly to this.
@@ -742,7 +749,8 @@ private:
 
     OpMsgRequest _upconvertRequest(const DatabaseName& dbName,
                                    BSONObj legacyCmdObj,
-                                   int queryFlags = 0);
+                                   int queryFlags = 0,
+                                   boost::optional<auth::ValidatedTenancyScope> vts = boost::none);
 
     bool _alwaysAppendDollarTenant = false;
 
