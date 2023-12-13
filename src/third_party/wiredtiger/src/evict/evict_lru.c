@@ -904,6 +904,17 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
     }
 
     /*
+     * Special operations don't enable eviction, however the underlying command (e.g. verify) may
+     * choose to turn on eviction. This falls outside of the typical eviction flow, and here
+     * eviction may forcibly remove pages from the cache. Consequently, we may end up evicting
+     * internal pages which still have child pages present on the pre-fetch queue. Remove any refs
+     * still present on the pre-fetch queue so that they are not accidentally accessed in an invalid
+     * way later on.
+     */
+    if (F_ISSET(session, WT_SESSION_PREFETCH))
+        WT_ERR(__wt_conn_prefetch_clear_tree(session, false));
+
+    /*
      * Ensure no new pages from the file will be queued for eviction after this point, then clear
      * any existing LRU eviction walk for the file.
      */

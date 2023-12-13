@@ -103,7 +103,7 @@ __wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH_QUEUE_ENTRY *pe)
         WT_ERR(__wt_page_in(session, pe->ref, WT_READ_PREFETCH));
         WT_ERR(__wt_page_release(session, pe->ref, 0));
     } else
-        ret = WT_ERROR;
+        return (WT_ERROR);
 
 err:
     return (ret);

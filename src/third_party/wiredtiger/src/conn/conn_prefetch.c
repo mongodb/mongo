@@ -154,7 +154,13 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
     pe->first_home = ref->home;
     pe->dhandle = session->dhandle;
     __wt_spin_lock(session, &conn->prefetch_lock);
-    if (F_ISSET(ref, WT_REF_FLAG_PREFETCH))
+
+    /*
+     * Don't add refs from trees that have eviction disabled since they are probably being closed,
+     * also never add the same ref twice. These checks need to be carried out while holding the
+     * pre-fetch lock - which is why they are internal to the push function.
+     */
+    if (S2BT(session)->evict_disabled > 0 || F_ISSET(ref, WT_REF_FLAG_PREFETCH))
         ret = EBUSY;
     else {
         F_SET(ref, WT_REF_FLAG_PREFETCH);
