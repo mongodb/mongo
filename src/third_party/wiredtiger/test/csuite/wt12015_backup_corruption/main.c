@@ -233,42 +233,56 @@ do_work_after_failure(bool backup_from_min)
     WT_SESSION *session;
     int i, id;
     char backup_home[64], backup_id[32], src_backup_home[64], src_backup_id[32], *str;
+    bool do_incr;
 
     /* Reopen the database and find available backup IDs. */
     testutil_wiredtiger_open(opts, WT_HOME_DIR, env_config, NULL, &conn, false, false);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    ret = session->open_cursor(session, "backup:query_id", NULL, NULL, &cursor);
-    testutil_check(ret);
+    do_incr = true;
     id = -1;
-    while ((ret = cursor->next(cursor)) == 0) {
-        testutil_check(cursor->get_key(cursor, &str));
-        testutil_assert(strncmp(str, "ID", 2) == 0);
-        i = atoi(str + 2);
-        if (id < 0)
-            id = i;
-        else if (backup_from_min)
-            id = WT_MIN(id, i);
-        else
-            id = WT_MAX(id, i);
-        printf("Found backup %d\n", i);
-    }
-    testutil_assert(ret == WT_NOTFOUND);
-    testutil_check(cursor->close(cursor));
-    testutil_assert(id >= 0);
+    ret = session->open_cursor(session, "backup:query_id", NULL, NULL, &cursor);
+    if (ret == 0) {
+        while ((ret = cursor->next(cursor)) == 0) {
+            testutil_check(cursor->get_key(cursor, &str));
+            testutil_assert(strncmp(str, "ID", 2) == 0);
+            i = atoi(str + 2);
+            if (id < 0)
+                id = i;
+            else if (backup_from_min)
+                id = WT_MIN(id, i);
+            else
+                id = WT_MAX(id, i);
+            printf("Found backup %d\n", i);
+        }
+        testutil_assert(ret == WT_NOTFOUND);
+        testutil_check(cursor->close(cursor));
+        testutil_assert(id >= 0);
+    } else if (ret == EINVAL) {
+        do_incr = false;
+        id = 0;
+    } else
+        testutil_check(ret);
 
     /* Do more regular work. */
     populate_table(session, TABLE_URI, NUM_BACKUPS, 100 * WT_THOUSAND);
 
-    /* Create an incremental backup. */
+    /*
+     * Create a backup. It might be a full or incremental depending on the state of the system and
+     * querying IDs after recovery and if IDs exist.
+     */
     testutil_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%d", NUM_BACKUPS);
     testutil_snprintf(backup_id, sizeof(backup_id), "ID%d", NUM_BACKUPS);
-    testutil_snprintf(src_backup_home, sizeof(src_backup_home), BACKUP_BASE "%d", id);
-    testutil_snprintf(src_backup_id, sizeof(src_backup_id), "ID%d", id);
-
-    printf("Create incremental backup %d from %d\n", NUM_BACKUPS, id);
-    testutil_backup_create_incremental(conn, WT_HOME_DIR, backup_home, backup_id, src_backup_home,
-      src_backup_id, false /* verbose */, NULL, NULL, NULL);
+    if (!do_incr) {
+        printf("Create full backup into %s\n", backup_home);
+        testutil_backup_create_full(conn, WT_HOME_DIR, backup_home, backup_id, true, 32, NULL);
+    } else {
+        testutil_snprintf(src_backup_home, sizeof(src_backup_home), BACKUP_BASE "%d", id);
+        testutil_snprintf(src_backup_id, sizeof(src_backup_id), "ID%d", id);
+        printf("Create incremental backup %d from %d\n", NUM_BACKUPS, id);
+        testutil_backup_create_incremental(conn, WT_HOME_DIR, backup_home, backup_id,
+          src_backup_home, src_backup_id, false /* verbose */, NULL, NULL, NULL);
+    }
 
     /* Cleanup. */
     testutil_check(session->close(session, NULL));
@@ -433,8 +447,7 @@ main(int argc, char *argv[])
     memset(opts, 0, sizeof(*opts));
 
     env_config = ENV_CONFIG_DEFAULT;
-    /* FIXME-WT-11669 Enable the tests by setting the following variable to 0. */
-    scenario = -1;
+    scenario = 0;
 
     /* Parse the command-line arguments. */
     testutil_parse_begin_opt(argc, argv, SHARED_PARSE_OPTIONS, opts);

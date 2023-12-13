@@ -504,6 +504,7 @@ bitstring
 bitwise
 blk
 blkcache
+blkincr
 blkmod
 bm
 bnd
