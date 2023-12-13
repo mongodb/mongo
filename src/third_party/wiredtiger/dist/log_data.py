@@ -83,10 +83,8 @@ optypes = [
 
 # system operations
     LogOperationType('checkpoint_start', 'checkpoint start', []),
-    LogOperationType('prev_lsn', 'previous LSN', [('WT_LSN', 'prev_lsn')]),
-    # Incremental backup IDs.
-    LogOperationType('backup_id', 'incremental backup id', [
-        ('uint32', 'index'), ('uint64', 'granularity'), ('string', 'id')]),
+    LogOperationType('prev_lsn', 'previous LSN',
+        [('WT_LSN', 'prev_lsn')]),
 
 # diagnostic operations
 # Operations used only for diagnostic purposes should be have their type
