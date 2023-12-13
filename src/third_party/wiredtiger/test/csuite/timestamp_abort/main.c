@@ -98,7 +98,7 @@ static const char *const uri_shadow = "shadow";
 static const char *const ckpt_file = "checkpoint_done";
 
 static bool backup_verify_immediately, backup_verify_quick;
-static bool columns, stress, use_backups, use_lazyfs, use_ts;
+static bool columns, stress, use_backups, use_lazyfs, use_ts, verify_model;
 static uint32_t backup_force_stop_interval, backup_full_interval, backup_granularity_kb;
 
 static TEST_OPTS *opts, _opts;
@@ -127,19 +127,16 @@ extern char *__wt_optarg;
 #define ENV_CONFIG_ADD_EVICT_DIRTY ",eviction_dirty_target=20,eviction_dirty_trigger=90"
 #define ENV_CONFIG_ADD_STRESS ",timing_stress_for_test=[prepare_checkpoint_delay]"
 
-#define ENV_CONFIG_DEF                                        \
+#define ENV_CONFIG_BASE                                       \
     "cache_size=%" PRIu32                                     \
     "M,create,"                                               \
     "debug_mode=(table_logging=true,checkpoint_retention=5)," \
     "eviction_updates_target=20,eviction_updates_trigger=90," \
-    "log=(enabled,file_max=10M,remove=true),session_max=%d,"  \
+    "log=(enabled,file_max=10M,remove=%s),session_max=%d,"    \
     "statistics=(all),statistics_log=(wait=%d,json,on_close)"
-#define ENV_CONFIG_TXNSYNC \
-    ENV_CONFIG_DEF         \
-    ",transaction_sync=(enabled,method=none)"
-#define ENV_CONFIG_TXNSYNC_FSYNC \
-    ENV_CONFIG_DEF               \
-    ",transaction_sync=(enabled,method=fsync)"
+
+#define ENV_CONFIG_ADD_TXNSYNC ",transaction_sync=(enabled,method=none)"
+#define ENV_CONFIG_ADD_TXNSYNC_FSYNC ",transaction_sync=(enabled,method=fsync)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their
@@ -969,15 +966,22 @@ run_workload(uint32_t workload_iteration)
      */
     cache_mb = ((32 * WT_KILOBYTE * 10) * nth) / WT_MEGABYTE + 20;
 
-    if (opts->inmem)
-        testutil_snprintf(
-          envconf, sizeof(envconf), ENV_CONFIG_DEF, cache_mb, SESSION_MAX, STAT_WAIT);
-    else if (use_lazyfs)
-        testutil_snprintf(
-          envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC_FSYNC, cache_mb, SESSION_MAX, STAT_WAIT);
-    else
-        testutil_snprintf(
-          envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, cache_mb, SESSION_MAX, STAT_WAIT);
+    /*
+     * Do not remove log files when using model verification. The current implementation requires
+     * the debug log to be present from the beginning of time, as it uses it to populate the model.
+     * (To remove this requirement in the future, we could explore the possibility of populating the
+     * model from an earlier checkpoint and then rolling forward using the debug log, just from that
+     * position.)
+     */
+    testutil_snprintf(envconf, sizeof(envconf), ENV_CONFIG_BASE, cache_mb,
+      verify_model ? "false" : "true", SESSION_MAX, STAT_WAIT);
+
+    if (!opts->inmem) {
+        if (use_lazyfs)
+            testutil_strcat(envconf, sizeof(envconf), ENV_CONFIG_ADD_TXNSYNC_FSYNC);
+        else
+            testutil_strcat(envconf, sizeof(envconf), ENV_CONFIG_ADD_TXNSYNC);
+    }
     if (opts->compat)
         strcat(envconf, TESTUTIL_ENV_CONFIG_COMPAT);
     if (stress)
@@ -1222,7 +1226,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
     uint64_t commit_fp, durable_fp, stable_val;
     uint32_t i;
     int ret;
-    char backup_dir[PATH_MAX], buf[PATH_MAX], fname[64], kname[64];
+    char backup_dir[PATH_MAX], buf[PATH_MAX], fname[64], kname[64], verify_dir[PATH_MAX];
     char ts_string[WT_TS_HEX_STRING_SIZE];
     bool fatal;
 
@@ -1235,7 +1239,8 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
      * Open the connection which forces recovery to be run.
      */
     if (backup_index == 0) {
-        testutil_wiredtiger_open(opts, WT_HOME_DIR, NULL, &reopen_event, &conn, true, false);
+        testutil_snprintf(verify_dir, sizeof(verify_dir), "%s", WT_HOME_DIR);
+        testutil_wiredtiger_open(opts, verify_dir, NULL, &reopen_event, &conn, true, false);
         printf("Connection open and recovery complete. Verify content\n");
         /* Compare against the copy of the home directory just before recovery. */
         if (use_backups) {
@@ -1252,9 +1257,9 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
             backup_verify(conn, workload_iteration);
     } else {
         testutil_snprintf(backup_dir, sizeof(backup_dir), BACKUP_BASE "%" PRIu32, backup_index);
-        testutil_snprintf(buf, sizeof(buf), CHECK_BASE "%" PRIu32, backup_index);
+        testutil_snprintf(verify_dir, sizeof(verify_dir), CHECK_BASE "%" PRIu32, backup_index);
         testutil_remove(CHECK_BASE "*");
-        testutil_copy(backup_dir, buf);
+        testutil_copy(backup_dir, verify_dir);
 
         /*
          * Open the database connection to the backup. But don't pass the general event handler, so
@@ -1262,7 +1267,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
          * trying to create it would cause the test to abort as we currently allow only one
          * statistics thread at a time.
          */
-        testutil_wiredtiger_open(opts, buf, NULL, &other_event, &conn, true, false);
+        testutil_wiredtiger_open(opts, verify_dir, NULL, &other_event, &conn, true, false);
     }
 
     /* Sleep to guarantee the statistics thread has enough time to run. */
@@ -1474,15 +1479,22 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
         printf("OPLOG: %" PRIu64 " record(s) absent from %" PRIu64 "\n", absent_oplog, count);
         fatal = true;
     }
+    if (fatal)
+        return (EXIT_FAILURE);
 
-    if (fatal) {
-        ret = EXIT_FAILURE;
-    } else {
-        ret = EXIT_SUCCESS;
-        printf("%" PRIu64 " records verified\n", count);
+    printf("%" PRIu64 " records verified\n", count);
+
+    /*
+     * Also verify using the model. This must be called after the recovery is complete, and the
+     * database is closed. At this point, verify only the main database (not backups) for
+     * expediency.
+     */
+    if (verify_model && backup_index == 0) {
+        printf("Running model-based verification: %s\n", verify_dir);
+        testutil_verify_model(opts, verify_dir);
     }
 
-    return (ret);
+    return (EXIT_SUCCESS);
 }
 
 /*
@@ -1542,11 +1554,12 @@ main(int argc, char *argv[])
     use_backups = false;
     use_lazyfs = lazyfs_is_implicitly_enabled();
     use_ts = true;
+    verify_model = false;
     verify_only = false;
 
     testutil_parse_begin_opt(argc, argv, SHARED_PARSE_OPTIONS, opts);
 
-    while ((ch = __wt_getopt(progname, argc, argv, "BcF:I:LlsT:t:vz" SHARED_PARSE_OPTIONS)) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "BcF:I:LlMsT:t:vz" SHARED_PARSE_OPTIONS)) != EOF)
         switch (ch) {
         case 'B':
             use_backups = true;
@@ -1568,6 +1581,9 @@ main(int argc, char *argv[])
             break;
         case 'l':
             use_lazyfs = true;
+            break;
+        case 'M':
+            verify_model = true;
             break;
         case 's':
             stress = true;
@@ -1605,6 +1621,7 @@ main(int argc, char *argv[])
      */
     testutil_parse_end_opt(opts);
 
+    testutil_deduce_build_dir(opts);
     testutil_work_dir_from_path(home, sizeof(home), opts->home);
 
     /*
@@ -1670,12 +1687,13 @@ main(int argc, char *argv[])
                ", force stop interval: %" PRIu32 "\n",
           use_backups ? "true" : "false", backup_full_interval, backup_force_stop_interval);
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
-        printf("CONFIG: %s%s%s%s%s%s%s%s%s -F %" PRIu32 " -h %s -I %" PRIu32 " -T %" PRIu32
+        printf("CONFIG: %s%s%s%s%s%s%s%s%s%s -F %" PRIu32 " -h %s -I %" PRIu32 " -T %" PRIu32
                " -t %" PRIu32 " " TESTUTIL_SEED_FORMAT "\n",
           progname, use_backups ? " -B" : "", opts->compat ? " -C" : "", columns ? " -c" : "",
-          use_lazyfs ? " -l" : "", opts->inmem ? " -m" : "", opts->tiered_storage ? " -PT" : "",
-          stress ? " -s" : "", !use_ts ? " -z" : "", backup_full_interval, opts->home,
-          num_iterations, nth, timeout, opts->data_seed, opts->extra_seed);
+          use_lazyfs ? " -l" : "", verify_model ? " -M" : "", opts->inmem ? " -m" : "",
+          opts->tiered_storage ? " -PT" : "", stress ? " -s" : "", !use_ts ? " -z" : "",
+          backup_full_interval, opts->home, num_iterations, nth, timeout, opts->data_seed,
+          opts->extra_seed);
 
         /*
          * Go inside the home directory (typically WT_TEST), but not all the way into the database's

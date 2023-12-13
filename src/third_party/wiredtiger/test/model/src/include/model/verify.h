@@ -31,6 +31,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "model/data_value.h"
 #include "wiredtiger.h"
@@ -92,6 +93,13 @@ public:
      *     Verify the next key-value pair. This method is not thread-safe.
      */
     bool verify_next(const data_value &key, const data_value &value);
+
+    /*
+     * kv_table_verify_cursor::get_prev --
+     *     Get the previous key-value pair, but do not move the iterator. This method is not
+     *     thread-safe.
+     */
+    std::pair<data_value, data_value> get_prev() const;
 
 private:
     std::map<data_value, kv_table_item> &_data;

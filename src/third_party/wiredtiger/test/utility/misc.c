@@ -444,6 +444,22 @@ testutil_copy_if_exists(WT_SESSION *session, const char *name)
 }
 
 /*
+ * testutil_verify_model --
+ *     Run the model verification tool on the database. The database must be closed, and it has to
+ *     be created with debug logging and with log file removal set to false.
+ */
+void
+testutil_verify_model(TEST_OPTS *opts, const char *home)
+{
+    char tool_path[PATH_MAX];
+
+    testutil_build_dir(opts, tool_path, sizeof(tool_path));
+    testutil_strcat(tool_path, sizeof(tool_path), "/test/model/tools/model_verify_debug_log");
+
+    testutil_system("%s -h \"%s\"", tool_path, home);
+}
+
+/*
  * testutil_is_flag_set --
  *     Return if an environment variable flag is set.
  */

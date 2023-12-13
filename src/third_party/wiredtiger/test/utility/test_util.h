@@ -249,6 +249,12 @@ typedef struct {
     } while (0)
 
 /*
+ * testutil_strcat --
+ *     Do strcat; fail on error.
+ */
+#define testutil_strcat(out, size, str) testutil_check(__wt_strcat(out, size, str))
+
+/*
  * testutil_snprintf --
  *     Do snprintf; fail on error.
  */
@@ -555,6 +561,7 @@ void testutil_tiered_sleep(TEST_OPTS *, WT_SESSION *, uint64_t, bool *);
 void testutil_tiered_storage_configuration(
   TEST_OPTS *, const char *, char *, size_t, char *, size_t);
 uint64_t testutil_time_us(WT_SESSION *);
+void testutil_verify_model(TEST_OPTS *opts, const char *);
 void testutil_verify_src_backup(WT_CONNECTION *, const char *, const char *, char *);
 void testutil_work_dir_from_path(char *, size_t, const char *);
 WT_THREAD_RET thread_append(void *);

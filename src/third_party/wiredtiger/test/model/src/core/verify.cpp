@@ -83,6 +83,23 @@ kv_table_verify_cursor::verify_next(const data_value &key, const data_value &val
 }
 
 /*
+ * kv_table_verify_cursor::get_prev --
+ *     Get the previous key-value pair, but do not move the iterator. This method is not
+ *     thread-safe.
+ */
+std::pair<data_value, data_value>
+kv_table_verify_cursor::get_prev() const
+{
+    if (_iterator == _data.begin())
+        throw model_exception("The iterator is at the beginning");
+
+    auto i = _iterator;
+    i--;
+
+    return make_pair(i->first, i->second.get());
+}
+
+/*
  * kv_table_verifier::verify --
  *     Verify the table by comparing a WiredTiger table against the model, with or without using a
  *     checkpoint. Throw an exception on error.
@@ -132,8 +149,10 @@ kv_table_verifier::verify(WT_CONNECTION *connection, kv_checkpoint_ptr ckpt)
                 std::cout << "Verification: key = " << key << ", value = " << value << std::endl;
             if (!model_cursor.verify_next(key, value)) {
                 std::ostringstream ss;
+                auto prev = model_cursor.get_prev();
                 ss << "\"" << key << "=" << value
-                   << "\" is not the next key-value pair in the model";
+                   << "\" is not the next key-value pair in the model; expected "
+                   << "\"" << prev.first << "=" << prev.second << "\"";
                 throw verify_exception(ss.str());
             }
         }

@@ -118,7 +118,7 @@ public:
      *     Get the corresponding value. Return NONE if not found. Throw an exception on error.
      */
     inline data_value
-    get(timestamp_t timestamp) const
+    get(timestamp_t timestamp = k_timestamp_latest) const
     {
         return get(kv_transaction_snapshot_ptr(nullptr), k_txn_none, timestamp);
     }
