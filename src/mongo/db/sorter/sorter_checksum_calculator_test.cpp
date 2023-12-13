@@ -61,7 +61,7 @@ TEST(SorterChecksumCalculatorTest, RandomBitFlips) {
         fullCalculator.addData(kData.rawData(), kData.size());
         size_t expectedChecksum = fullCalculator.checksum();
 
-        PseudoRandom random{expectedChecksum};
+        PseudoRandom random{static_cast<uint64_t>(expectedChecksum)};
 
         for (size_t count = 1; count <= 8; ++count) {
             std::string data(kData.begin(), kData.end());
