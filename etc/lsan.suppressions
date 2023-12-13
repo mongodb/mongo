@@ -14,6 +14,9 @@ leak:mongo::setThreadName
 leak:mongo::getThreadName
 leak:__cxa_thread_atexit_impl
 
+# Threads leak from thread pools not joined at shutdown.
+leak:mongo::ThreadPool::Impl::_startWorkerThread_inlock()
+
 leak:glob64
 
 # Cleanup on io_context may not run due to race with shutdown.
