@@ -763,8 +763,10 @@ is not affected as this option is only syntactic sugar.
     have a variant of strings and structs.
     - Variant string support differentiates the type to choose based on the BSON type.
     - Variant struct support differentiates the type to choose based on the *first* field of the
-      struct. The first field must be unique in each struct across the structs. See `bulkWrite` for
-      an example.
+      struct. The first field must be unique in each struct across the structs. When parsing a
+      BSON object as a variant of multiple structs, the parser assumes that the first field
+      declared in the IDL struct is always the first field in its BSON representation.
+      See `bulkWrite` for an example.
 - `ignore` - bool - true means field generates no code but is ignored by the generated deserializer.
   Used to deprecate fields that no longer have an affect but allow strict parsers to ignore them.
 - `optional` - bool - true means the field is optional. Generated C++ type is
