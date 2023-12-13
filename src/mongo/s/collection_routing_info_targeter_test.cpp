@@ -1014,6 +1014,20 @@ TEST(CollectionRoutingInfoTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocu
                   BSON("nested" << BSON("value" << 123)));
 }
 
+TEST_F(CollectionRoutingInfoTargeterTest, TestRoutingWithout_id) {
+    // Create 5 chunks and 5 shards such that shardId '0' has chunk [MinKey, null), '1' has chunk
+    // [null, -100), '2' has chunk [-100, 0), '3' has chunk ['0', 100) and '4' has chunk
+    // [100, MaxKey).
+    std::vector<BSONObj> splitPoints = {
+        BSON("a.b" << BSONNULL), BSON("a.b" << -100), BSON("a.b" << 0), BSON("a.b" << 100)};
+    const auto targeter = prepare(BSON("a.b" << 1 << "_id" << 1), splitPoints);
+    // Tests that routing writes when the shard key includes the _id field will throw an error if
+    // the document does not contain _id.
+    ASSERT_THROWS_CODE(targeter.targetInsert(operationContext(), BSON("a.b" << 10)),
+                       DBException,
+                       ErrorCodes::InvalidIdField);
+}
+
 /**
  * Fixture that populates the CatalogCache with 'kNss' as an unsharded collection not tracked on the
  * configsvr, or a non-existent collection.

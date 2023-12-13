@@ -427,6 +427,11 @@ ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCt
     const BSONObj shardKey = [&]() {
         const auto& shardKeyPattern = _cri.cm.getShardKeyPattern();
         BSONObj shardKey;
+        if (shardKeyPattern.hasId()) {
+            uassert(ErrorCodes::InvalidIdField,
+                    "Document is missing _id field, which is part of the shard key pattern",
+                    doc.hasField("_id"));
+        }
         if (_isRequestOnTimeseriesViewNamespace) {
             auto tsFields = _cri.cm.getTimeseriesFields();
             tassert(5743701, "Missing timeseriesFields on buckets collection", tsFields);
