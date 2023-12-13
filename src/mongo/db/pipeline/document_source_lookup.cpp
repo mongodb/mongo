@@ -85,6 +85,7 @@
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
@@ -517,6 +518,20 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
     if (pipeState == Pipeline::SplitState::kSplitForMerge) {
         constraints.mergeShardId =
             pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx, _fromNs);
+    }
+
+    // If we have not yet designated a merging shard, and are either executing on mongod, the
+    // foreign collection is unsharded, or sharded $lookup is not allowed, designate the current
+    // shard as the merging shard. This is done to prevent pushing this $lookup to the shards part
+    // of the pipeline. This is an important optimization designating as this $lookup  as a merging
+    // stage allows us to execute a single $lookup (as opposed to executing one $lookup on each
+    // involved shard). When this stage is part of a deeply nested pipeline, it  prevents creating
+    // an exponential explosion of cursors/resources (proportional to the level of pipeline
+    // nesting).
+    if (!constraints.mergeShardId && hostRequirement == HostTypeRequirement::kNone &&
+        !(pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs) &&
+          foreignShardedLookupAllowed())) {
+        constraints.mergeShardId = ShardingState::get(pExpCtx->opCtx)->shardId();
     }
 
     constraints.canSwapWithMatch = true;

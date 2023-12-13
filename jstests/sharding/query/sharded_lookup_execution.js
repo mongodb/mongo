@@ -14,7 +14,10 @@
 
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {enableLocalReadLogs, getLocalReadCount} from "jstests/libs/local_reads.js";
-import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
+import {
+    profilerHasNumMatchingEntriesOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow
+} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({shards: 2, mongos: 2});
 const testName = "sharded_lookup";
@@ -150,10 +153,19 @@ function assertLookupExecution(pipeline, opts, expected) {
         // If there is a nested $lookup within the top-level $lookup subpipeline, confirm that
         // execution is as expected.
         if (expected.nestedExec) {
+            // Confirm that a nested $lookup is never on the shards part of the pipeline split and
+            // doesn't get dispatched to a foreign shard (that is, we should designate a merging
+            // shard to execute the nested $lookup).
+            profilerHasZeroMatchingEntriesOrThrow({
+                profileDB: shardList[i],
+                filter: {
+                    "command.aggregate": reviewsColl.getName(),
+                    "command.comment": opts.comment,
+                    "command.pipeline.$lookup": {$exists: true}
+                }
+            });
+
             // Confirm that the nested $lookup subpipeline execution is as expected.
-            // TODO SERVER-83860: Consider asserting that we don't execute $lookup against the
-            // 'reviews' collection in the event that we designate a merging shard for nested
-            // $lookup stages against sharded collections.
             profilerHasNumMatchingEntriesOrThrow({
                 profileDB: shardList[i],
                 filter:
@@ -394,10 +406,11 @@ assertLookupExecution(pipeline, {comment: "sharded_to_sharded_to_sharded_targete
     // For every document that flows through the $lookup stage, the node executing the $lookup will
     // target the shard(s) that holds the relevant data for the sharded foreign collection.
     subpipelineExec: [0, 2],
-    // When executing the subpipeline, the nested $lookup stage will target and execute on the
-    // non-merging shard and will target shards to execute the nested $lookup subpipeline.
-    nestedExec: [1, 0],
-    nestedLocalExec: [0, 2],
+    // When executing the subpipeline, the nested $lookup stage will stay on the merging half of the
+    // pipeline and execute on the merging node, targeting shards to execute the nested $lookup
+    // subpipeline.
+    nestedExec: [0, 2],
+    nestedLocalExec: [1, 0],
 });
 
 // Test sharded local collection and sharded foreign collection with a targeted top-level $lookup
@@ -474,10 +487,10 @@ assertLookupExecution(pipeline, {comment: "sharded_to_sharded_view_to_sharded"},
     // that holds the relevant data for the sharded foreign view.
     subpipelineExec: [0, 2],
     // When executing the subpipeline, the "nested" $lookup stage contained in the view pipeline
-    // will target and execute on the non-merging shard and will target shards to execute the nested
-    // subpipeline.
-    nestedExec: [1, 0],
-    nestedLocalExec: [0, 2],
+    // will stay on the merging half of the pipeline and execute on the merging node, targeting
+    // shards to execute the nested subpipeline.
+    nestedExec: [0, 2],
+    nestedLocalExec: [1, 0],
 });
 
 // Test that a targeted $lookup on a sharded collection can execute correctly on mongos.

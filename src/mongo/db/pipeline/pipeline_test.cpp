@@ -4266,7 +4266,7 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* mergePipeJson */
         ,
         false /* needsPrimaryShardMerger */,
-        boost::none /* needsSpecificShardMerger */);
+        _myShardName /* needsSpecificShardMerger */);
 };
 
 }  // namespace needsPrimaryShardMerger

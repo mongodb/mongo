@@ -268,8 +268,8 @@ testGraphLookupView({
         subjects: ["Physics", "Science", "Theoretical Physics"]}},
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
-    // another four on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
-    expectedExceptions: {"test.docs": 1, "test.subjects": 4},
+    // one on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
+    expectedExceptions: {"test.docs": 1, "test.subjects": 1},
 });
 
 // Create a view with a pipeline on 'physicists' to test resolution of a view on another view.
@@ -323,8 +323,8 @@ testGraphLookupView({
          subjects: ["Physics", "Science", "Theoretical Physics"]}},
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
-    // another two on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
-    expectedExceptions: {"test.docs": 1, "test.subjects": 2},
+    // another one on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
+    expectedExceptions: {"test.docs": 1, "test.subjects": 1},
 });
 
 sharded.stop();

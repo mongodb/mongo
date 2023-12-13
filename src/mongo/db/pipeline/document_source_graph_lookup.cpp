@@ -70,13 +70,13 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 
 namespace mongo {
 
@@ -250,7 +250,12 @@ boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceGraphLookUp::distributedPlanLogic() {
     // If $graphLookup into a sharded foreign collection is allowed, top-level $graphLookup
     // stages can run in parallel on the shards.
-    if (foreignShardedGraphLookupAllowed() && pExpCtx->subPipelineDepth == 0) {
+    // TODO SERVER-83902: This check will fail if the inner side is a sharded view as we will not
+    // infer that '_from' is a view until we issue an aggregate to perform the search against
+    // '_from'. The result is that $graphLookup will execute on as a merger when the 'from'
+    // collection is a view (regardless of whether it is sharded or not).
+    if (foreignShardedGraphLookupAllowed() && pExpCtx->subPipelineDepth == 0 &&
+        pExpCtx->mongoProcessInterface->isSharded(_fromExpCtx->opCtx, _from)) {
         return boost::none;
     }
 
@@ -546,18 +551,11 @@ DocumentSource::GetModPathsReturn DocumentSourceGraphLookUp::getModifiedPaths() 
 }
 
 StageConstraints DocumentSourceGraphLookUp::constraints(Pipeline::SplitState pipeState) const {
-    // If we are in a mongos, graphLookup on sharded foreign collections is allowed, and the foreign
-    // collection is sharded, then the host type requirement is mongos or a shard. Otherwise, it's
-    // the primary shard.
-    HostTypeRequirement hostRequirement =
-        (pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _from) &&
-         foreignShardedGraphLookupAllowed())
-        ? HostTypeRequirement::kNone
-        : HostTypeRequirement::kPrimaryShard;
-
+    // $graphLookup can execute on a mongos or a shard, so its host type requirement is 'kNone'. If
+    // it needs to execute on a specific merging shard, it can request this later.
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kNone,
-                                 hostRequirement,
+                                 HostTypeRequirement::kNone,
                                  DiskUseRequirement::kNoDiskUse,
                                  FacetRequirement::kAllowed,
                                  TransactionRequirement::kAllowed,
@@ -566,6 +564,28 @@ StageConstraints DocumentSourceGraphLookUp::constraints(Pipeline::SplitState pip
 
     constraints.canSwapWithMatch = true;
     constraints.canSwapWithSkippingOrLimitingStage = !_unwind;
+
+    // If this $graphLookup is on the merging half of the pipeline and the inner collection isn't
+    // sharded (that is, it is either unsplittable or untracked), then we should merge on the shard
+    // which owns the inner collection.
+    if (pipeState == Pipeline::SplitState::kSplitForMerge) {
+        constraints.mergeShardId =
+            pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx, _from);
+    }
+
+    // If we have not yet designated a merging shard, and are either executing on mongod, the
+    // foreign collection is unsharded, or sharded $graphLookup is not allowed, designate the
+    // current shard as the merging shard. This is done to prevent pushing this $graphLookup to the
+    // shards part of the pipeline. This is an important optimization as designating this
+    // $graphLookup as a merging stage allows us to execute a single $graphLookup (as opposed
+    // executing one $graphLookup on each involved shard). When this stage is part of a deeply
+    // nested pipeline, it prevents creating an exponential explosion of cursors/resources
+    // (proportional to the level of pipeline nesting).
+    if (!constraints.mergeShardId &&
+        !(pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _from) &&
+          foreignShardedGraphLookupAllowed())) {
+        constraints.mergeShardId = ShardingState::get(pExpCtx->opCtx)->shardId();
+    }
 
     return constraints;
 }
