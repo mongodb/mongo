@@ -1802,7 +1802,7 @@ void TopologyCoordinator::changeMemberState_forTest(const MemberState& newMember
     switch (newMemberState.s) {
         case MemberState::RS_PRIMARY:
             _role = Role::kCandidate;
-            processWinElection(OID(), electionTime);
+            processWinElection(electionTime);
             invariant(_role == Role::kLeader);
             break;
         case MemberState::RS_SECONDARY:
@@ -2264,7 +2264,7 @@ void TopologyCoordinator::fillHelloForReplSet(std::shared_ptr<HelloResponse> res
     }
     response->setMe(selfConfig.getHostAndPort(horizonString));
     if (_iAmPrimary()) {
-        response->setElectionId(_electionId);
+        response->setElectionId(OID::fromTerm(_electionIdTerm));
     }
 }
 
@@ -2298,8 +2298,8 @@ Timestamp TopologyCoordinator::getElectionTime() const {
     return _electionTime;
 }
 
-OID TopologyCoordinator::getElectionId() const {
-    return _electionId;
+long long TopologyCoordinator::getElectionIdTerm() const {
+    return _electionIdTerm;
 }
 
 int TopologyCoordinator::getCurrentPrimaryIndex() const {
@@ -2673,18 +2673,13 @@ bool TopologyCoordinator::canAcceptWrites() const {
     return _leaderMode == LeaderMode::kWritablePrimary;
 }
 
-void TopologyCoordinator::setElectionInfo(OID electionId, Timestamp electionOpTime) {
-    invariant(_role == Role::kLeader);
-    _electionTime = electionOpTime;
-    _electionId = electionId;
-}
-
-void TopologyCoordinator::processWinElection(OID electionId, Timestamp electionOpTime) {
+void TopologyCoordinator::processWinElection(Timestamp electionOpTime) {
     invariant(_role == Role::kCandidate);
     invariant(_leaderMode == LeaderMode::kNotLeader);
     _role = Role::kLeader;
     _setLeaderMode(LeaderMode::kLeaderElect);
-    setElectionInfo(electionId, electionOpTime);
+    _electionIdTerm = _term;
+    _electionTime = electionOpTime;
     _currentPrimaryIndex = _selfIndex;
     _clearSyncSource();
     _forceSyncSourceIndex = -1;
@@ -2698,7 +2693,7 @@ void TopologyCoordinator::processLoseElection() {
     invariant(_leaderMode == LeaderMode::kNotLeader);
     const HostAndPort syncSourceAddress = getSyncSourceAddress();
     _electionTime = Timestamp(0, 0);
-    _electionId = OID();
+    _electionIdTerm = repl::OpTime::kUninitializedTerm;
     _role = Role::kFollower;
 }
 

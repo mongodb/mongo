@@ -235,6 +235,8 @@ public:
      */
     bool isElectableNodeInSingleNodeReplicaSet() const;
 
+    // Returns _electionIdTerm.
+    long long getElectionIdTerm() const;
 
     ////////////////////////////////////////////////////////////
     //
@@ -649,11 +651,6 @@ public:
     void voteForMyselfV1();
 
     /**
-     * Sets election id and election optime.
-     */
-    void setElectionInfo(OID electionId, Timestamp electionOpTime);
-
-    /**
      * Performs state updates associated with winning an election.
      *
      * It is an error to call this if the topology coordinator is not in candidate mode.
@@ -661,7 +658,7 @@ public:
      * Exactly one of either processWinElection or processLoseElection must be called if
      * processHeartbeatResponse returns StartElection, to exit candidate mode.
      */
-    void processWinElection(OID electionId, Timestamp electionOpTime);
+    void processWinElection(Timestamp electionOpTime);
 
     /**
      * Performs state updates associated with losing an election.
@@ -884,9 +881,6 @@ public:
 
     // Returns _electionTime.  Only used in unittests.
     Timestamp getElectionTime() const;
-
-    // Returns _electionId.  Only used in unittests.
-    OID getElectionId() const;
 
     // Returns the name for a role.  Only used in unittests.
     static std::string roleToString(TopologyCoordinator::Role role);
@@ -1137,9 +1131,10 @@ private:
     // This node's topology version. This is updated upon a significant topology change.
     TopologyVersion _topologyVersion;
 
-    // This is a unique id that is generated and set each time we transition to PRIMARY, as the
-    // result of an election.
-    OID _electionId;
+    // The term in which this node was elected primary.  Used to generate the election ID
+    // for 'hello' responses.
+    long long _electionIdTerm = repl::OpTime::kUninitializedTerm;
+
     // The time at which the current PRIMARY was elected.
     Timestamp _electionTime;
 

@@ -1765,9 +1765,11 @@ TEST_F(ReplCoordTest, ElectionIdTracksTermInPV1) {
     // No election has taken place yet.
     {
         auto term = getTopoCoord().getTerm();
-        auto electionId = getTopoCoord().getElectionId();
+        auto electionIdTerm = getTopoCoord().getElectionIdTerm();
+        auto electionId = getReplCoord()->getElectionId();
 
         ASSERT_EQUALS(0, term);
+        ASSERT_EQUALS(repl::OpTime::kUninitializedTerm, electionIdTerm);
         ASSERT_FALSE(electionId.isSet());
     }
 
@@ -1778,9 +1780,11 @@ TEST_F(ReplCoordTest, ElectionIdTracksTermInPV1) {
     // Check that the electionId is set properly after the election.
     {
         auto term = getTopoCoord().getTerm();
-        auto electionId = getTopoCoord().getElectionId();
+        auto electionIdTerm = getTopoCoord().getElectionIdTerm();
+        auto electionId = getReplCoord()->getElectionId();
 
         ASSERT_EQUALS(1, term);
+        ASSERT_EQUALS(term, electionIdTerm);
         ASSERT_EQUALS(OID::fromTerm(term), electionId);
     }
 
@@ -1797,9 +1801,11 @@ TEST_F(ReplCoordTest, ElectionIdTracksTermInPV1) {
     // Check that the electionId is again properly set after the new election.
     {
         auto term = getTopoCoord().getTerm();
-        auto electionId = getTopoCoord().getElectionId();
+        auto electionIdTerm = getTopoCoord().getElectionIdTerm();
+        auto electionId = getReplCoord()->getElectionId();
 
         ASSERT_EQUALS(2, term);
+        ASSERT_EQUALS(term, electionIdTerm);
         ASSERT_EQUALS(OID::fromTerm(term), electionId);
     }
 }

@@ -386,6 +386,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _splitSessionManager(InternalSessionPool::get(service)) {
 
     _termShadow.store(OpTime::kUninitializedTerm);
+    _electionIdTermShadow.store(_topCoord->getElectionIdTerm());
 
     invariant(_service);
 
@@ -3298,7 +3299,10 @@ bool ReplicationCoordinatorImpl::shouldRelaxIndexConstraints(OperationContext* o
 }
 
 OID ReplicationCoordinatorImpl::getElectionId() {
-    return OID::fromTerm(_electionIdTerm.load());
+    auto electionIdTerm = _electionIdTermShadow.load();
+    if (electionIdTerm == OpTime::kUninitializedTerm)
+        return OID();
+    return OID::fromTerm(electionIdTerm);
 }
 
 int ReplicationCoordinatorImpl::getMyId() const {
@@ -4799,15 +4803,15 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
 void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) {
     invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
 
-    // Get the term from the topology coordinator, which we then use to generate the election ID.
-    // We intentionally wait until the end of this function
-    int64_t electionIdTerm = _topCoord->getTerm();
-    OID electionId = OID::fromTerm(electionIdTerm);
-
-    ON_BLOCK_EXIT([&] { _electionIdTerm.store(electionIdTerm); });
-
     auto ts = VectorClockMutable::get(getServiceContext())->tickClusterTime(1).asTimestamp();
-    _topCoord->processWinElection(electionId, ts);
+    _topCoord->processWinElection(ts);
+
+    // Get the term from the topology coordinator, which we use to generate the election ID.
+    // We intentionally wait until the end of this function to store the term in the
+    // atomic shadow variable.
+    auto electionIdTerm = _topCoord->getElectionIdTerm();
+
+    ON_BLOCK_EXIT([&] { _electionIdTermShadow.store(electionIdTerm); });
 
     const PostMemberStateUpdateAction nextAction = _updateMemberStateFromTopologyCoordinator(lk);
 

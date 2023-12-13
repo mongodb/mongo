@@ -1814,8 +1814,9 @@ private:
     // Set to true when we are in the process of shutting down replication.
     bool _inShutdown;  // (M)
 
-    // The term of the last election that resulted in this node becoming primary.
-    AtomicWord<int64_t> _electionIdTerm;  // (S)
+    // The term of the last election that resulted in this node becoming primary.  "Shadow" because
+    // this follows the authoritative value in the topology coordinatory.
+    AtomicWord<long long> _electionIdTermShadow;  // (S)
 
     // Used to signal threads waiting for changes to _memberState.
     stdx::condition_variable _memberStateChange;  // (M)

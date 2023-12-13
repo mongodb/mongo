@@ -2879,7 +2879,7 @@ TEST_F(TopoCoordTest, NodeTransitionsToRemovedWhenRemovedFromConfigEvenWhenPrima
                                                         StartElectionReasonEnum::kElectionTimeout));
 
     // win election and primary
-    getTopoCoord().processWinElection(OID::gen(), Timestamp());
+    getTopoCoord().processWinElection(Timestamp());
     ASSERT_TRUE(TopologyCoordinator::Role::kLeader == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
@@ -2914,7 +2914,7 @@ TEST_F(TopoCoordTest, NodeTransitionsToSecondaryWhenReconfiggingToBeUnelectable)
                                                         StartElectionReasonEnum::kElectionTimeout));
 
     // win election and primary
-    getTopoCoord().processWinElection(OID::gen(), Timestamp());
+    getTopoCoord().processWinElection(Timestamp());
     ASSERT_TRUE(TopologyCoordinator::Role::kLeader == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
@@ -2952,7 +2952,7 @@ TEST_F(TopoCoordTest, NodeMaintainsPrimaryStateAcrossReconfigIfNodeRemainsElecta
                                                         StartElectionReasonEnum::kElectionTimeout));
 
     // win election and primary
-    getTopoCoord().processWinElection(OID::gen(), Timestamp());
+    getTopoCoord().processWinElection(Timestamp());
     ASSERT_TRUE(TopologyCoordinator::Role::kLeader == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
