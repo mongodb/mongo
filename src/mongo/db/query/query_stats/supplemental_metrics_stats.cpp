@@ -27,40 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats/query_stats_entry.h"
-#include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
-
-#include <boost/optional.hpp>
-
-#include "mongo/crypto/hash_block.h"
-#include "mongo/crypto/sha256_block.h"
+#include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::query_stats {
 
-BSONObj QueryStatsEntry::toBSON() const {
-    BSONObjBuilder builder{sizeof(QueryStatsEntry) + 100};
-    builder.append("lastExecutionMicros", (long long)lastExecutionMicros);
-    builder.append("execCount", (long long)execCount);
-    totalExecMicros.appendTo(builder, "totalExecMicros");
-    firstResponseExecMicros.appendTo(builder, "firstResponseExecMicros");
-    docsReturned.appendTo(builder, "docsReturned");
-    builder.append("firstSeenTimestamp", firstSeenTimestamp);
-    builder.append("latestSeenTimestamp", latestSeenTimestamp);
-    if (supplementalStatsMap) {
-        builder.append("supplementalMetrics", supplementalStatsMap->toBSON());
+BSONObj SupplementalStatsMap::toBSON() const {
+    BSONObjBuilder builder{sizeof(SupplementalStatsMap)};
+    for (const auto& entry : _metrics) {
+        entry.second->appendTo(builder);
     }
     return builder.obj();
 }
 
-void QueryStatsEntry::addSupplementalStats(std::unique_ptr<SupplementalStatsEntry> metric) {
-    if (metric) {
-        if (!supplementalStatsMap) {
-            supplementalStatsMap = std::make_unique<SupplementalStatsMap>();
-        }
-        supplementalStatsMap->update(std::move(metric));
+void SupplementalStatsMap::update(std::unique_ptr<SupplementalStatsEntry> metric) {
+    auto&& [metricEntry, wasInserted] = _metrics.try_emplace(metric->metricType, std::move(metric));
+    if (!wasInserted) {
+        metricEntry->second->updateStats(&*(std::move(metric)));
     }
+}
+std::unique_ptr<SupplementalStatsMap> SupplementalStatsMap::clone() const {
+    return std::make_unique<SupplementalStatsMap>(*this);
 }
 
 }  // namespace mongo::query_stats
