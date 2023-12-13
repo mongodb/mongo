@@ -185,3 +185,23 @@ class ProcessTestCase(TestCase, UndoDBUtilsMixin):
     def _make_process(self):
         """Return a new Process instance that could be used to run the test or log the command."""
         raise NotImplementedError("_make_process must be implemented by TestCase subclasses")
+
+
+class TestCaseFactory:
+    def __init__(self, factory_class):
+        if not issubclass(factory_class, TestCase):
+            raise TypeError("factory_class should be a subclass of Interface.TestCase",
+                            factory_class)
+        self._factory_class = factory_class
+
+    def create_test_case(self, *args, **kwargs) -> TestCase:
+        return self._factory_class(*args, **kwargs)
+
+    def create_test_case_for_thread(self, logger, num_clients=1, thread_id=0) -> TestCase:
+        """Create a test case to be run in a separate thread."""
+        raise NotImplementedError(
+            "create_test_case_for_thread must be implemented by TestCaseFactory subclasses")
+
+    def configure(self, fixture, *args, **kwargs):
+        """Configure the test case factory."""
+        raise NotImplementedError("configure must be implemented by TestCaseFactory subclasses")
