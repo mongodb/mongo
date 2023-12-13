@@ -75,7 +75,7 @@ class test_rollback_to_stable40(test_rollback_to_stable_base):
         cursor[2] = value_a
         cursor[3] = value_a
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
-        
+
         # Update the first and last key with another value with a large timestamp.
         self.session.begin_transaction()
         cursor[1] = value_d
@@ -113,7 +113,7 @@ class test_rollback_to_stable40(test_rollback_to_stable_base):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(501))
 
         # 1. This checkpoint will move the globally visible update to the first of the key range.
-        # 2. The existing updates in the history store are having with a larger timestamp are 
+        # 2. The existing updates in the history store are having with a larger timestamp are
         #    obsolete, so they are not explicitly removed.
         # 3. Any of the history store updates that are already evicted will not rewrite by the
         #    checkpoint.

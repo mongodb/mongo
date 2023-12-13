@@ -30,7 +30,7 @@
 
 '''
 Usage -
-The input file should be a JSON file in the format {"key": 100, "key2": 200 ...}. 
+The input file should be a JSON file in the format {"key": 100, "key2": 200 ...}.
 The script will generate two output JSON files (Evergreen and Atlas compatible) based on this input data.
 '''
 

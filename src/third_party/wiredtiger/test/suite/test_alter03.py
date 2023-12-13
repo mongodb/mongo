@@ -132,7 +132,7 @@ class test_alter03(TieredConfigMixin, wttest.WiredTigerTestCase):
     def test_alter03_lsm_app_metadata(self):
         if self.is_tiered_scenario():
             self.skipTest('Tiered storage does not support LSM.')
-        
+
         uri = "lsm:" + self.name
         create_params = 'key_format=i,value_format=i,'
         app_meta_orig = 'app_metadata="meta_data_1",'

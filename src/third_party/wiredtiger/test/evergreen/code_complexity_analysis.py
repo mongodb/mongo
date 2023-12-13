@@ -35,7 +35,7 @@ def get_code_complexity(summaryFile, dataFile):
     complexityDict['Average'] = get_average(summaryFile)
     complexityDict['Stats Ranges'] = get_complexity_ranges_list(dataFile, dataFrame)
     complexityDict['Top ' + str(numberOfRegions) + ' Regions'] = get_region_list(dataFile, dataFrame, numberOfRegions)
-    
+
     resultList.append(complexityDict)
     return (resultList)
 

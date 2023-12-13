@@ -78,7 +78,7 @@ class test_backup29(backup_base):
     def compare_bitmap(self, orig, new):
         # Compare the bitmaps from the metadata. Once a bit is set, it should never
         # be cleared. But new bits could be set. So the check is only: if the original
-        # bitmap has a bit set then the current bitmap must be set for that bit also. 
+        # bitmap has a bit set then the current bitmap must be set for that bit also.
         #
         # First convert both bitmaps to a binary string, accounting for any possible leading
         # zeroes (that would be truncated off). Then compare bit by bit.
@@ -169,7 +169,7 @@ class test_backup29(backup_base):
         self.setup_test()
 
         self.pr("Waiting to sweep handles")
-        # Create another table and populate it, and checkpoint. 
+        # Create another table and populate it, and checkpoint.
         self.session.create(self.active_uri, self.create_config)
         c = self.session.open_cursor(self.active_uri)
         for i in range(1, self.few):
@@ -181,7 +181,7 @@ class test_backup29(backup_base):
         # The only files sweep won't close should be the metadata, the history store, the
         # lock file, the statistics file, and our active file.
         final_nfile = 5
-        
+
         # Keep updating and checkpointing this table until all other handles have been swept.
         # The checkpoints have the side effect of sweeping the session cache, which will allow
         # dhandles to be closed.

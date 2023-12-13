@@ -75,7 +75,7 @@ class test_cursor_bound04(bound_base):
         key = cursor.get_key()
         self.assertEqual(key, self.check_key(self.start_key))
         cursor.reset()
-        
+
         # Test bound api: Test lower bound setting with positioned cursor.
         self.set_bounds(cursor, 45, "lower")
         self.assertEqual(cursor.next(), 0)
@@ -136,7 +136,7 @@ class test_cursor_bound04(bound_base):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: cursor.bound("bound=upper,inclusive=false"),
             '/Invalid argument/')
         cursor.reset()
-        
+
         # Test bound api: Test inclusive upper bound setting with positioned cursor.
         self.set_bounds(cursor, 55, "upper")
         self.assertEqual(cursor.next(), 0)
@@ -201,7 +201,7 @@ class test_cursor_bound04(bound_base):
         self.cursor_traversal_bound(cursor, 45, 50, True)
         self.assertEqual(cursor.prev(), 0)
         key = cursor.get_key()
-        self.assertEqual(key, self.check_key(50))  
+        self.assertEqual(key, self.check_key(50))
         cursor.reset()
 
         # Test bound api: Test that next() works after prev() traversal.
@@ -210,7 +210,7 @@ class test_cursor_bound04(bound_base):
         self.cursor_traversal_bound(cursor, 45, 50, False)
         self.assertEqual(cursor.next(), 0)
         key = cursor.get_key()
-        self.assertEqual(key, self.check_key(45)) 
+        self.assertEqual(key, self.check_key(45))
         cursor.reset()
 
         # Test special case where we position with bounds then clear, then traverse opposite

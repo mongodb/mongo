@@ -90,11 +90,11 @@ class test_truncate19(wttest.WiredTigerTestCase):
             trunc_rows = 10000
 
             self.do_truncate(ds, start_num, trunc_rows)
-            
+
             # Check stats to make sure we fast-deleted at least one page.
             stat_cursor = self.session.open_cursor('statistics:', None, None)
             fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
-  
+
             self.assertGreater(fastdelete_pages, 0)
 
             # Take a checkpoint.
@@ -102,7 +102,7 @@ class test_truncate19(wttest.WiredTigerTestCase):
             # Ensure the datasize is smaller than 600M
             self.assertGreater(600000000, os.path.getsize("oplog.wt"))
             session3.rollback_transaction()
-        
+
             self.append_rows(uri, ds, end_num, trunc_rows, value_a)
 
             end_num = end_num + trunc_rows

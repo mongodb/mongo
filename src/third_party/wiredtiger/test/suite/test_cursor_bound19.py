@@ -78,7 +78,7 @@ class test_cursor_bound19(bound_base):
         start = 0
         columns_param = "columns=("
         for _ in self.value_format:
-            columns_param += "v{0},".format(str(start)) 
+            columns_param += "v{0},".format(str(start))
             start += 1
         columns_param += ")"
         self.session.create(suburi, columns_param)
@@ -91,7 +91,7 @@ class test_cursor_bound19(bound_base):
         self.set_bounds(index_cursor, 40, "upper")
         self.cursor_traversal_bound(index_cursor, 30, 40, True, 22)
         self.cursor_traversal_bound(index_cursor, 30, 40, False, 22)
-        
+
         # Test basic search near scenarios.
         index_cursor.set_key(self.gen_key(20))
         self.assertEqual(index_cursor.search_near(), 1)
@@ -108,7 +108,7 @@ class test_cursor_bound19(bound_base):
         # Test basic search scnarios.
         index_cursor.set_key(self.gen_key(20))
         self.assertEqual(index_cursor.search(), wiredtiger.WT_NOTFOUND)
-        
+
         index_cursor.set_key(self.gen_key(35))
         self.assertEqual(index_cursor.search(), 0)
 
@@ -132,13 +132,13 @@ class test_cursor_bound19(bound_base):
         self.set_bounds(index_cursor, 40, "upper", True)
         self.cursor_traversal_bound(index_cursor, 30, 40, True, 20)
         self.cursor_traversal_bound(index_cursor, 30, 40, False, 20)
-        
+
         index_cursor.set_key(self.gen_key(20))
         self.assertEqual(index_cursor.search_near(), 1)
         self.assertEqual(index_cursor.get_key(), self.check_key(31))
 
         index_cursor.set_key(self.gen_key(30))
         self.assertEqual(index_cursor.search(), wiredtiger.WT_NOTFOUND)
-               
+
 if __name__ == '__main__':
     wttest.run()

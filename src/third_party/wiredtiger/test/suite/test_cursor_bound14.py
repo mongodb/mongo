@@ -82,7 +82,7 @@ class test_cursor_bound14(bound_base):
         cursor.set_key(self.gen_key(95))
         cursor.set_value(self.gen_val(100))
         self.assertEqual(cursor.insert(), 0)
-        
+
         if (self.lower_bounds):
             self.set_bounds(cursor, 45, "lower", self.lower_inclusive)
         if (self.upper_bounds):
@@ -112,7 +112,7 @@ class test_cursor_bound14(bound_base):
             self.assertEqual(cursor.update(), wiredtiger.WT_NOTFOUND)
         else:
             self.assertEqual(cursor.update(), 0)
-        
+
 
         cursor.set_key(self.gen_key(95))
         cursor.set_value(self.gen_val(120))
@@ -138,9 +138,9 @@ class test_cursor_bound14(bound_base):
             self.assertEqual(cursor.reserve(), 0)
         self.session.commit_transaction()
 
-        # Test bound API: test modifies on an existing key outside of bounds. 
-        # Only test this with string format as cursor modify is not supported for 
-        # complex strings. 
+        # Test bound API: test modifies on an existing key outside of bounds.
+        # Only test this with string format as cursor modify is not supported for
+        # complex strings.
         if (not self.use_colgroup and self.value_format == 'S'):
             self.session.begin_transaction()
             cursor.set_key(self.gen_key(10))
@@ -157,7 +157,7 @@ class test_cursor_bound14(bound_base):
             else:
                 self.assertEqual(cursor.modify(mods), 0)
             self.session.commit_transaction()
-        
+
         # Test bound API: test removing on an existing key outside of bounds.
         cursor.set_key(self.gen_key(10))
         if (self.lower_bounds):

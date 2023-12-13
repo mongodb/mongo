@@ -94,8 +94,8 @@ def detailed_perf_stats(config: PerfConfig, reported_stats: List[PerfStat]):
 
 def configure_for_extra_accuracy(config: PerfConfig, arguments: List[str]) -> List[str]:
     """
-    When the `extra_accuracy` flag is set we want to run each test multiple times to 
-    ensure a more stable result. However, this can take a lot of time for longer tests 
+    When the `extra_accuracy` flag is set we want to run each test multiple times to
+    ensure a more stable result. However, this can take a lot of time for longer tests
     so limit them to only a few minutes.
     """
 
@@ -104,7 +104,7 @@ def configure_for_extra_accuracy(config: PerfConfig, arguments: List[str]) -> Li
     print("==================")
     print(f"Extra accuracy flag set. Overriding runmax to {new_run_max} and setting -o {new_run_time}")
     print("==================")
-    
+
     config.run_max = new_run_max
 
     if arguments:
@@ -116,7 +116,7 @@ def configure_for_extra_accuracy(config: PerfConfig, arguments: List[str]) -> Li
                 else:
                     arguments[i] = arg + "," + new_run_time
                     return
-                    
+
     # There is no `-o` argument yet. Add one.
     if not(arguments):
         arguments = []

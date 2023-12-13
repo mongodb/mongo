@@ -34,9 +34,9 @@ import wiredtiger, wttest
 # test_verbose04.py
 # Verify the use of the `all` field to set verbose categories.
 
-# Enabling tiered alters the logs produced by WiredTiger during this test, 
-# breaking our assumptions about what log output to expect. This doesn't 
-# impact the logic under test (the "all" configuration field) so we'll 
+# Enabling tiered alters the logs produced by WiredTiger during this test,
+# breaking our assumptions about what log output to expect. This doesn't
+# impact the logic under test (the "all" configuration field) so we'll
 # disable this test under tiered."
 @wttest.skip_for_hook("tiered", "Enabling tiered alters the logs produced by WiredTiger")
 class test_verbose04(test_verbose_base):
@@ -48,13 +48,13 @@ class test_verbose04(test_verbose_base):
     scenarios = make_scenarios(format)
 
     collection_cfg = 'key_format=S,value_format=S'
-    
+
     # Define all the verbose flags.
     all_verbose_categories = [
       'WT_VERB_API',
       'WT_VERB_BACKUP',
       'WT_VERB_BLOCK',
-      'WT_VERB_BLKCACHE', 
+      'WT_VERB_BLKCACHE',
       'WT_VERB_CHECKPOINT',
       'WT_VERB_CHECKPOINT_CLEANUP',
       'WT_VERB_CHECKPOINT_PROGRESS',
@@ -101,7 +101,7 @@ class test_verbose04(test_verbose_base):
         # Close the initial connection. We will be opening new connections with different verbosity
         # settings throughout this test.
         self.close_conn()
-  
+
         # Test passing a single verbose category, 'all' along with the verbosity level
         # WT_VERBOSE_DEBUG_1 (1). Ensuring the verbose output generated matches any of the existing verbose categories.
         # 'all' category.
@@ -116,8 +116,8 @@ class test_verbose04(test_verbose_base):
             session.create(uri, self.collection_cfg)
             session.compact(uri)
             session.close()
-            
-        # At this time, no verbose messages should be generated with the following set of operations and the verbosity level 
+
+        # At this time, no verbose messages should be generated with the following set of operations and the verbosity level
         # WT_VERBOSE_INFO (0), hence we don't expect any output.
         with self.expect_verbose(['all:0'], self.all_verbose_categories, self.is_json, False) as conn:
             uri = 'table:test_verbose04_all'
@@ -127,7 +127,7 @@ class test_verbose04(test_verbose_base):
             c['all'] = 'all'
             c.close()
             session.close()
-            
+
         # Test passing another single verbose category, 'all' with different verbosity levels.
         # Since there are verbose messages with the category WT_VERB_COMPACT and the verbosity
         # levels WT_VERBOSE_INFO (0) through WT_VERBOSE_DEBUG_5 (5), we can test them all.
@@ -142,7 +142,7 @@ class test_verbose04(test_verbose_base):
                 session.create(uri, self.collection_cfg)
                 session.compact(uri)
                 session.close()
-                
+
     # Test use cases passing multiple verbose categories, ensuring we only produce verbose output
     # for specified categories.
     def test_verbose_multiple(self):
@@ -151,12 +151,12 @@ class test_verbose04(test_verbose_base):
         # verbosity levels to each category. Ensuring the only verbose output generated is related
         # to those two categories.
         cfgs = ['api:0,all:1,version:0', 'version:0,all,api:0']
-        
+
         #all_verbose_categories_except_api_and_version contains all verbose flags except WT_VERB_API and WT_VERB_VERSION.
         all_verbose_categories_except_api_and_version = self.all_verbose_categories.copy()
         all_verbose_categories_except_api_and_version.remove('WT_VERB_API')
         all_verbose_categories_except_api_and_version.remove('WT_VERB_VERSION')
-            
+
         for cfg in cfgs:
             with self.expect_verbose([cfg], all_verbose_categories_except_api_and_version, self.is_json) as conn:
                 # Perform a set of simple API operations (table creations and cursor operations) to

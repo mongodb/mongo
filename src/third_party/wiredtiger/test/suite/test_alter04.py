@@ -88,7 +88,7 @@ class test_alter04(TieredConfigMixin, wttest.WiredTigerTestCase):
     def test_alter04_cache(self):
         if self.is_tiered_scenario() and (self.uri == 'lsm:' or self.uri == 'file:'):
             self.skipTest('Tiered storage does not support LSM or file URIs.')
-        
+
         uri = self.uri + self.name
         create_params = 'key_format=i,value_format=i,'
         complex_params = ''

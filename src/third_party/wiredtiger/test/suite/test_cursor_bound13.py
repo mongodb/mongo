@@ -60,7 +60,7 @@ class test_cursor_bound13(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(uri)
         cursor2 = self.session.open_cursor(uri, None, "debug=(release_evict=true)")
-        
+
         # Basic character array.
         l = "abcdefghijklmnopqrstuvwxyz"
 
@@ -107,7 +107,7 @@ class test_cursor_bound13(wttest.WiredTigerTestCase):
         cursor3.set_key("aazab")
         self.assertEqual(cursor3.search_near(), -1)
         self.assertEqual(cursor3.get_key(), self.check_key(expected_key))
-        
+
         # The only visible key is aaz.
         # If we try to do a search_near() with the prefixes "a" or "aa" without the changes
         # introduced in WT-7912, we fail to find the key aaz although it is a valid result.

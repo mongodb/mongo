@@ -49,7 +49,7 @@ class test_sweep05(wttest.WiredTigerTestCase):
         r['60min'] = stat_cursor[wiredtiger.stat.conn.no_session_sweep_60min][2]
         stat_cursor.close()
         return r
-    
+
     def assert_stats(self, expected_5min, expected_60min):
         stats = self.get_stats()
         self.assertEquals(stats['5min'], expected_5min)
@@ -84,7 +84,7 @@ class test_sweep05(wttest.WiredTigerTestCase):
             session1.reset()
             self.assert_stats(0, 0)
             time.sleep(60)
-        
+
         # The default session + session 2 should be marked as rogue.
         time.sleep(120)
         self.ignoreStdoutPatternIfExists('did not run a sweep')
@@ -134,7 +134,7 @@ class test_sweep05(wttest.WiredTigerTestCase):
             self.use_session(session1, 'table1')
             session1.reset()
             time.sleep(60)
-        
+
         # The default session did not have a sweep for a long time; the default session + session 2
         # did not have a sweep for 5 min.
         time.sleep(60)

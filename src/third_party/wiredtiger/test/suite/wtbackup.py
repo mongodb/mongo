@@ -149,8 +149,8 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
 
     #
     # Uses a backup cursor to perform a selective backup, by iterating through the cursor
-    # grabbing files that do not exist in the remove list to copy over into a given directory. 
-    # When dealing with a test that performs multiple incremental backups, we need to perform a 
+    # grabbing files that do not exist in the remove list to copy over into a given directory.
+    # When dealing with a test that performs multiple incremental backups, we need to perform a
     # proper backup on each incremental directory as a starting base.
     #
     def take_selective_backup(self, backup_dir, remove_list, backup_cur=None):

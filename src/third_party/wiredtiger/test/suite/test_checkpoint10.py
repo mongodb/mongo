@@ -69,7 +69,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         cfg = 'statistics=(all),timing_stress_for_test=[checkpoint_slow]'
         if self.do_log:
             cfg += ',log=(enabled=true)'
-        return cfg 
+        return cfg
 
     def large_updates(self, uri, ds, nrows, value):
         cursor = self.session.open_cursor(uri)

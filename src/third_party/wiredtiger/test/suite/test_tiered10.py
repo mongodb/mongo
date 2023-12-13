@@ -72,7 +72,7 @@ class test_tiered10(wttest.WiredTigerTestCase, TieredConfigMixin):
 
     def check(self, tc, base, n):
         get_check(self, tc, base, n)
-    
+
     # Test calling the flush_tier API.
     def test_tiered(self):
         # Have two connections running in different directories, but sharing

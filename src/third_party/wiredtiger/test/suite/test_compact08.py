@@ -53,10 +53,10 @@ class test_compact08(wttest.WiredTigerTestCase):
         with self.expectedStdoutPattern('Background compact cannot be configured for in-memory or readonly databases'):
             self.assertRaisesException(wiredtiger.WiredTigerError,
                 lambda: self.background_compaction())
-        
+
         # Reopen in readonly mode.
         self.reopen_conn(config='in_memory=false,readonly=true')
-        
+
         # Foreground compaction.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.foreground_compaction(),

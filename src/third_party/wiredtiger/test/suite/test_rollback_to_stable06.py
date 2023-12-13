@@ -132,10 +132,10 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
             self.assertEqual(hs_removed, 0)
         else:
             self.assertGreaterEqual(upd_aborted + hs_removed + keys_removed, nrows * 4)
-        
+
         # Reinsert the same updates with the same timestamps and flush to disk.
-        # If the updates have not been correctly removed by RTS WiredTiger will 
-        # see the key already exists in the history store and abort. 
+        # If the updates have not been correctly removed by RTS WiredTiger will
+        # see the key already exists in the history store and abort.
         self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
         self.large_updates(uri, value_b, ds, nrows, self.prepare, 30)
         self.large_updates(uri, value_c, ds, nrows, self.prepare, 40)

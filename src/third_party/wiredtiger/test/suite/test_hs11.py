@@ -115,12 +115,12 @@ class test_hs11(wttest.WiredTigerTestCase):
                     cursor.modify([wiredtiger.Modify("m", 0, 1)])
             self.timestamps += 1
 
-        # Start a long running transaction at timestamp 5. 
+        # Start a long running transaction at timestamp 5.
         if self.long_run_txn:
             session2 = self.conn.open_session()
             session2.begin_transaction('read_timestamp=5')
 
-        # Apply an update without timestamp. If we have a long running transaction this update 
+        # Apply an update without timestamp. If we have a long running transaction this update
         # should not be globally visible until that transaction has ended.
         for i in range(1, self.nrows):
             self.session.begin_transaction('no_timestamp=true')
@@ -136,7 +136,7 @@ class test_hs11(wttest.WiredTigerTestCase):
         self.session.checkpoint()
         if self.long_run_txn:
             session2.rollback_transaction()
-            
+
         # At this point any updates with no timestamp should be globally visible.
         self.evict_cursor(uri, self.nrows)
 

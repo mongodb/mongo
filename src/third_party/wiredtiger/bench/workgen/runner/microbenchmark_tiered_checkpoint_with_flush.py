@@ -41,7 +41,7 @@ tiered.populate()
 ops = Operation(Operation.OP_SLEEP, "30") + Operation(Operation.OP_CHECKPOINT, "") + \
     Operation(Operation.OP_SLEEP, "30") + Operation(Operation.OP_CHECKPOINT, "flush_tier=(enabled,force)")
 
-checkpoint_thread = Thread(ops) 
+checkpoint_thread = Thread(ops)
 tiered.set_checkpoint_thread(checkpoint_thread)
 tiered.run_workload()
 tiered.print_stats()

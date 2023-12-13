@@ -31,7 +31,7 @@ import wttest
 import wiredtiger
 
 # test_prepare19.py
-# Test that for in-memory configurations of WiredTiger if rolling back a prepared, reconciled 
+# Test that for in-memory configurations of WiredTiger if rolling back a prepared, reconciled
 # update results in an empty update chain then a tombstone is appended to the chain
 class test_prepare19(wttest.WiredTigerTestCase):
 
@@ -44,7 +44,7 @@ class test_prepare19(wttest.WiredTigerTestCase):
 
         self.session.create(uri, config)
 
-        # Place more than 1000 aborted updates on the update chain. 
+        # Place more than 1000 aborted updates on the update chain.
         for i in range(1, 1100):
             self.session.begin_transaction()
             cursor = self.session.open_cursor(uri, None)
@@ -69,7 +69,7 @@ class test_prepare19(wttest.WiredTigerTestCase):
         cursor[1] = ""
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(timestamp))
 
-        # This write conflict on the same page as key 1 results in a forced 
+        # This write conflict on the same page as key 1 results in a forced
         # eviction when the key has more than 1000 updates in its update chain.
         write_conflict_session = self.conn.open_session()
         write_conflict_session.create(uri, config)

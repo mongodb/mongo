@@ -33,7 +33,7 @@ from wtscenario import make_scenarios
 from wiredtiger import WT_NOTFOUND
 
 # test_truncate21.py
-# Test truncate, logging and recovery when truncate has no work to do. 
+# Test truncate, logging and recovery when truncate has no work to do.
 class test_truncate21(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB,log=(enabled)'
     dir = "newdir"
@@ -72,7 +72,7 @@ class test_truncate21(wttest.WiredTigerTestCase):
     def test_truncate21(self):
 
         # Create one table of each type: FLCS, row-store and VLCS.
-        # Put the same data into each (per allowed by type). 
+        # Put the same data into each (per allowed by type).
         self.session.create(self.uri_fix, self.create_fix)
         self.session.create(self.uri_row, self.create_row)
 

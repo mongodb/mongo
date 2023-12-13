@@ -311,7 +311,7 @@ class test_cursor_bound11(wttest.WiredTigerTestCase):
         self.assertEqual(bound_skip_count - skip_count, 1)
         skip_count = bound_skip_count
 
-        # We early exit here as "cc" is not the last key. 
+        # We early exit here as "cc" is not the last key.
         self.assertEqual(self.get_stat(stat.conn.cursor_bounds_next_early_exit, session2), 1)
 
         session2.rollback_transaction()

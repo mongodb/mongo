@@ -53,13 +53,13 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         ('window-size-0', dict(key='key61', winsize=0, expected_num_lines=1*2))
     ]
     scenarios = make_scenarios(format_values)
-    
+
     def gen_key(self, i):
         return 'key' + str(i)
 
     def gen_value(self, i):
         return 'value' + str(i)
-    
+
     def get_num_data_lines_from_dump(self, file):
         """
         Get the number of lines corresponding to data from a dump file.
@@ -79,7 +79,7 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create(self.uri, self.table_format)
         self.populate_table(self.uri, self.n_rows)
 
-        
+
         self.runWt(['dump', '-k', self.key, '-w', str(self.winsize), self.uri], outfilename=self.output)
         num_lines = self.get_num_data_lines_from_dump(self.output)
         assert num_lines == self.expected_num_lines, num_lines

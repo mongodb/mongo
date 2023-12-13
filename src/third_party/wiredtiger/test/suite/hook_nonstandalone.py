@@ -34,7 +34,7 @@
 #   Skip tests that are not compatible to non-standalone build:
 #     python run.py --hook nonstandalone base01
 #
-# This hook is used to test the non-standalone build 
+# This hook is used to test the non-standalone build
 
 from __future__ import print_function
 
@@ -52,7 +52,7 @@ class NonStandAloneHookCreator(wthooks.WiredTigerHookCreator):
 
     # Skip tests that won't work on non-standalone build
     def register_skipped_test(self, tests):
-        # There are no general categories of tests to skip for non-standalone. 
+        # There are no general categories of tests to skip for non-standalone.
         # Individual tests are skipped via the skip_for_hook decorator
         pass
 

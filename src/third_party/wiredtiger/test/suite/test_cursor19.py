@@ -47,7 +47,7 @@ class test_cursor19(wttest.WiredTigerTestCase):
 
     def create(self):
         self.session.create(self.uri, 'key_format={},value_format=S'.format(self.keyformat))
-    
+
     def verify_value(self, version_cursor, expected_start_ts, expected_start_durable_ts, expected_stop_ts, expected_stop_durable_ts, expected_type, expected_prepare_state, expected_flags, expected_location, expected_value):
         values = version_cursor.get_values()
         # Ignore the transaction ids from the value in the verification

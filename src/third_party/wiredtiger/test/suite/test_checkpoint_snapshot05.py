@@ -141,19 +141,19 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
             else:
                 cursor1.set_value(self.valueb + str(i))
             self.assertEqual(cursor1.update(), 0)
-        
+
         # Commit the transaction concurrently with the checkpoint.
         done = threading.Event()
         ckpt = checkpoint_thread(self.conn, done, checkpoint_count_max=1)
         try:
             ckpt.start()
-            
+
             # Wait for checkpoint to acquire its snapshot executing the commit.
             ckpt_snapshot = 0
             while not ckpt_snapshot:
                 with open_cursor(self.session, 'statistics:') as stat_cursor:
                     ckpt_snapshot = stat_cursor[stat.conn.checkpoint_snapshot_acquired][2]
-                
+
                 # We want the checkpoint thread to advance without actually completing.
                 # Hence the configuration: timing_stress_for_test=[checkpoint_slow].
                 # Though the appropriate poll interval is really a guess, favor aggression

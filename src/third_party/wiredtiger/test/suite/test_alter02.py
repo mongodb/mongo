@@ -74,7 +74,7 @@ class test_alter02(TieredConfigMixin, wttest.WiredTigerTestCase):
         return None
     def ConnectionOpen(self):
         self.home = '.'
-        
+
         tiered_config = self.conn_config()
         tiered_config += self.extensionsConfig()
         # In case the open starts additional threads, flush first to avoid confusion.
@@ -140,7 +140,7 @@ class test_alter02(TieredConfigMixin, wttest.WiredTigerTestCase):
     def test_alter02_log(self):
         if self.is_tiered_scenario() and (self.uri == 'lsm:' or self.uri == 'file:'):
             self.skipTest('Tiered storage does not support LSM or file URIs.')
-        
+
         uri = self.uri + self.name
         create_params = 'key_format=i,value_format=S,'
         complex_params = ''

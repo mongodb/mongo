@@ -65,7 +65,7 @@ class test_tiered14(wttest.WiredTigerTestCase, TieredConfigMixin):
     # Load the storage store extension.
     def conn_extensions(self, extlist):
         TieredConfigMixin.conn_extensions(self, extlist)
-    
+
     def progress(self, s):
         outstr = "testnum {}, position {}: {}".format(self.testnum, self.position, s)
         self.verbose(3, outstr)

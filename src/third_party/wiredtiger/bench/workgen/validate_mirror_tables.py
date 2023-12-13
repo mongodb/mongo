@@ -91,16 +91,16 @@ def get_mirror_file(db_dir, filename):
     mirror = None
 
     if result:
-        app_metadata = dict((a.strip(), b.strip())  
-            for a, b in (element.split('=')  
-                for element in result[0].split(',')))  
+        app_metadata = dict((a.strip(), b.strip())
+            for a, b in (element.split('=')
+                for element in result[0].split(',')))
 
         if app_metadata.get('workgen_dynamic_table') == 'true' and \
            app_metadata.get('workgen_table_mirror') != None :
             mirror = app_metadata['workgen_table_mirror']
             mirror = mirror.split(':')[1]
 
-    session.close()    
+    session.close()
     connection.close()
     return mirror
 
@@ -119,7 +119,7 @@ def main(sysargs):
     for item in mirrors:
         stdout = None
         try:
-            with open(os.devnull, "w") as f, redirect_stdout(f):       
+            with open(os.devnull, "w") as f, redirect_stdout(f):
                 stdout = wiredtiger_compare_uri(item)
         except SystemExit as e:
             if e.code != 0:

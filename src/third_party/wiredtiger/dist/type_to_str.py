@@ -62,7 +62,7 @@ if __name__ == '__main__':
                                    'src/include/btmem.h',
                                    tfile)
         tfile.write('\n')
-        
+
         generate_string_conversion('Convert a page type to its string representation.',
                                    'page_type',
                                    r'^#define\s+(WT_PAGE_(?!.*VERSION)[A-Z0-9_]+)\s+[0-9]+\s+/\*',

@@ -118,7 +118,7 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
             self.pr('checkpoint_time_total ' + str(time_total))
 
             # Account for When the connection re-opens on an existing datable as we perform a
-            # checkpoint during the open stage. 
+            # checkpoint during the open stage.
             expected_ckpts = 3 if multiplier > 1 else 2
             self.assertEqual(num_ckpt, expected_ckpts)
             self.assertEqual(running, 0)

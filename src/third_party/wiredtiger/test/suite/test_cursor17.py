@@ -144,7 +144,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.largest_key(), 0)
         self.assertEquals(cursor.get_key(), 200)
         self.session.rollback_transaction()
-    
+
     def test_invisible_timestamp(self):
         self.populate(100)
 
@@ -158,7 +158,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.largest_key(), 0)
         self.assertEqual(cursor.get_key(), 200)
         self.session.rollback_transaction()
-    
+
     def test_prepared_update(self):
         self.populate(100)
 

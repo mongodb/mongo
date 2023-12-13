@@ -88,9 +88,9 @@ class test_cursor_bound10(bound_base):
             for i in range(1, 1001):
                 evict_cursor.set_key(self.gen_key(i))
                 evict_cursor.search()
-                evict_cursor.reset() 
+                evict_cursor.reset()
         return cursor
- 
+
     def test_bound_general_scenario(self):
         cursor = self.create_session_and_cursor()
 
@@ -106,7 +106,7 @@ class test_cursor_bound10(bound_base):
         self.cursor_traversal_bound(cursor, None, 900, self.next, 100)
         self.session.commit_transaction()
         self.assertEqual(cursor.bound("action=clear"), 0)
-        
+
         self.set_bounds(cursor, 900, "upper")
         self.session.begin_transaction('read_timestamp=' +  self.timestamp_str(150))
         self.cursor_traversal_bound(cursor, None, 900, self.next, 400)
@@ -131,7 +131,7 @@ class test_cursor_bound10(bound_base):
         self.cursor_traversal_bound(cursor, 50, None, self.next, 51)
         self.session.commit_transaction()
         self.assertEqual(cursor.bound("action=clear"), 0)
-        
+
         self.set_bounds(cursor, 50, "lower")
         self.session.begin_transaction('read_timestamp=' +  self.timestamp_str(150))
         self.cursor_traversal_bound(cursor, 50, None, self.next, 451)
@@ -158,14 +158,14 @@ class test_cursor_bound10(bound_base):
         self.cursor_traversal_bound(cursor, 50, 900, self.next, 51)
         self.session.commit_transaction()
         self.assertEqual(cursor.bound("action=clear"), 0)
-        
+
         self.set_bounds(cursor, 50, "lower")
         self.set_bounds(cursor, 900, "upper")
         self.session.begin_transaction('read_timestamp=' +  self.timestamp_str(150))
         self.cursor_traversal_bound(cursor, 50, 900, self.next, 351)
         self.session.commit_transaction()
         self.assertEqual(cursor.bound("action=clear"), 0)
-        
+
         self.set_bounds(cursor, 50, "lower")
         self.set_bounds(cursor, 900, "upper")
         self.session.begin_transaction('read_timestamp=' +  self.timestamp_str(250))

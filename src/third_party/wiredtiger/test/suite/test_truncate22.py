@@ -44,15 +44,15 @@ class test_truncate22(wttest.WiredTigerTestCase):
 
     def test_truncate22(self):
         # Create a table.
-        ds = SimpleDataSet(self, self.uri, 0, 
-                        key_format=self.key_format, 
+        ds = SimpleDataSet(self, self.uri, 0,
+                        key_format=self.key_format,
                         value_format=self.value_format)
         ds.populate()
-        
+
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp(f'oldest_timestamp={self.timestamp_str(1)}')
         self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(1)}')
-        
+
         # Insert a large amount of data.
         self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri)
@@ -65,19 +65,19 @@ class test_truncate22(wttest.WiredTigerTestCase):
 
         self.session.begin_transaction()
         self.session.timestamp_transaction(f'commit_timestamp={self.timestamp_str(5)}')
-        
+
         c1 = ds.open_cursor(self.uri, None)
         c1.set_key(ds.key(1))
         c2 = ds.open_cursor(self.uri, None)
         c2.set_key(ds.key(self.nrows // 2))
         self.session.truncate(None, c1, c2, None)
-        
+
         self.session.commit_transaction()
-        
+
         # Advance stable.
         self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(10)}')
         self.session.checkpoint()
-        
+
         # Check that we removed the first half of the dataset as part of the truncation.
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.nrows // 2):

@@ -239,7 +239,7 @@ class test_truncate13(wttest.WiredTigerTestCase):
         if self.advance_oldest:
             # Optionally make the truncation globally visible.
             self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(40))
-        
+
         # Checkpoint again with the deletion.
         self.session.checkpoint()
 

@@ -59,7 +59,7 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
 
     def conn_config(self):
         return get_conn_config(self) + '),statistics=(fast),timing_stress_for_test=(tiered_flush_finish)'
-        
+
     # Load the storage store extension.
     def conn_extensions(self, extlist):
         TieredConfigMixin.conn_extensions(self, extlist)
@@ -133,6 +133,6 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.reopen_conn()
 
         self.verify(key_count)
-        
+
 if __name__ == '__main__':
     wttest.run()

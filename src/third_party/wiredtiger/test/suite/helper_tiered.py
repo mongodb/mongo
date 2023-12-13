@@ -98,14 +98,14 @@ def get_check(storage_source, tc, base, n):
     tc.set_key(str(n))
     storage_source.assertEquals(tc.search(), wiredtiger.WT_NOTFOUND)
 
-# Generate a unique object prefix for the S3 store. 
+# Generate a unique object prefix for the S3 store.
 def generate_prefix(random_prefix = '', test_name = ''):
     # Generates a unique prefix to be used with the object keys, eg:
     # "s3test/python/2022-31-01-16-34-10/623843294--".
-    # Objects with the prefix pattern "s3test/*" are deleted after a certain period of time 
+    # Objects with the prefix pattern "s3test/*" are deleted after a certain period of time
     # according to the lifecycle rule on the S3 bucket. Should you wish to make any changes to the
     # prefix pattern or lifecycle of the object, please speak to the release manager.
-    # Group all the python test objects under s3test/python/ 
+    # Group all the python test objects under s3test/python/
     prefix = 's3test/python/'
     # Group each test run together by random number and date. If a random prefix isn't provided
     # generate a new one now.
@@ -175,7 +175,7 @@ def gen_tiered_storage_sources(random_prefix='', test_name='', tiered_only=False
     ]
 
     # Return a sublist to use for the tiered test scenarios as last item on list is not a scenario
-    # for the tiered tests.  
+    # for the tiered tests.
     if tiered_only:
         return tiered_storage_sources[:-1]
 
@@ -262,7 +262,7 @@ class TieredConfigMixin:
         # Handle non_tiered storage scenarios.
         if not self.is_tiered_scenario():
             return ''
-        
+
         config = self.tiered_extension_config()
         if config == None:
             config = ''
@@ -288,10 +288,10 @@ class TieredConfigMixin:
 
         if (self.ss_name == 's3_store'):
             import boto3
-            # The bucket from the storage source is expected to be a name and a region, separated by a 
+            # The bucket from the storage source is expected to be a name and a region, separated by a
             # semi-colon. eg: 'abcd;ap-southeast-2'.
             bucket_name, region = bucket_name.split(';')
-            
+
             # Get the bucket resource and list the objects within that bucket that match the prefix for a
             # given test.
             s3 = boto3.resource('s3')
@@ -303,7 +303,7 @@ class TieredConfigMixin:
                 bucket.download_file(o.key, file_path)
         elif (self.ss_name == 'gcp_store'):
             from google.cloud import storage
-            
+
             storage_client = storage.Client()
             blobs = storage_client.list_blobs(bucket_name, prefix=prefix)
 
@@ -313,8 +313,8 @@ class TieredConfigMixin:
         elif (self.ss_name == 'azure_store'):
             from azure.storage.blob import BlobServiceClient
 
-            blob_service_client = BlobServiceClient.from_connection_string(self.auth_token.strip('\"')) 
-            container_client = blob_service_client.get_container_client(container=bucket_name) 
+            blob_service_client = BlobServiceClient.from_connection_string(self.auth_token.strip('\"'))
+            container_client = blob_service_client.get_container_client(container=bucket_name)
             blob_list = container_client.list_blobs(name_starts_with=prefix)
 
             for blob in blob_list:

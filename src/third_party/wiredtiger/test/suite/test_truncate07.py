@@ -175,7 +175,7 @@ class test_truncate07(wttest.WiredTigerTestCase):
 
         # Evict the lot so that we can fast-truncate.
         # For now, evict every 4th key explicitly; FUTURE: improve this to evict each page only
-        # once when we have a good way to do that. 
+        # once when we have a good way to do that.
         if self.do_evict:
             for i in range(1, nrows + 1, 4):
                 self.evict(ds.uri, ds.key(i), value_a)

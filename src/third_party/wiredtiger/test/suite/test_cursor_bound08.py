@@ -120,7 +120,7 @@ class test_cursor_bound08(bound_base):
         self.cursor_traversal_bound(cursor, 45, None, True)
         self.assertEqual(cursor.bound("action=clear"), 0)
         self.assertEqual(self.get_stat(stat.conn.cursor_bounds_next_unpositioned), 1)
-    
+
          # Test bound api: Test that cursor prev unpositioned stat gets incremented with an upper bound.
         self.set_bounds(cursor, 50, "upper")
         self.cursor_traversal_bound(cursor, None, 50, False)

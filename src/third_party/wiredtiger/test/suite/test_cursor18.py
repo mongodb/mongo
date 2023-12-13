@@ -48,7 +48,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
 
     def create(self):
         self.session.create(self.uri, 'key_format={},value_format={}'.format(self.keyformat, self.valueformat))
-    
+
     def verify_value(self, version_cursor, expected_start_ts, expected_start_durable_ts, expected_stop_ts, expected_stop_durable_ts, expected_type, expected_prepare_state, expected_flags, expected_location, expected_value):
         values = version_cursor.get_values()
         # Ignore the transaction ids from the value in the verification
@@ -249,7 +249,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         self.assertEquals(version_cursor.next(), wiredtiger.WT_NOTFOUND)
         self.session.rollback_transaction()
 
-        # We want to test that the version cursor is working as expected when used multiple times 
+        # We want to test that the version cursor is working as expected when used multiple times
         # on the same table on different keys.
         self.session.begin_transaction()
         cursor[2] = 1
@@ -314,7 +314,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         self.assertEquals(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, 1, 0, 3, 1, 0, 1, 0)
         self.assertEquals(version_cursor.next(), wiredtiger.WT_NOTFOUND)
-    
+
     def test_reuse_version_cursor(self):
         self.create()
 
@@ -379,7 +379,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         self.assertEquals(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, 2, 0, 3, 1, 0, 1, 0)
         self.assertEquals(version_cursor.next(), wiredtiger.WT_NOTFOUND)
-    
+
     def test_search_when_positioned(self):
         self.create()
 
@@ -401,7 +401,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
             self.pr('got expected exception: ' + str(e))
             self.assertTrue(str(e).find('WT_ROLLBACK') >= 0)
         self.assertTrue(gotException, msg = 'expected exception')
-    
+
     def test_concurrent_insert(self):
         self.create()
 

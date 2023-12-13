@@ -17,22 +17,22 @@ import sys
 
 def last_commit_from_dev():
     # Find the commit from develop at which point the current branch diverged.
-    # rev-list will show all commits that are present on our current branch but not on develop, and 
-    # the oldest of these is our first commit post-divergence. If this commit exists then 
-    # we can take its parent. If no such commits exist then we're currently on a commit in the 
+    # rev-list will show all commits that are present on our current branch but not on develop, and
+    # the oldest of these is our first commit post-divergence. If this commit exists then
+    # we can take its parent. If no such commits exist then we're currently on a commit in the
     # develop branch and can use HEAD instead
 
-    earliest_commit = subprocess.run( "git rev-list HEAD...develop | tail -n 1", 
+    earliest_commit = subprocess.run( "git rev-list HEAD...develop | tail -n 1",
         shell=True, capture_output=True, text=True).stdout
 
     commit_on_dev = f"{earliest_commit}~" if earliest_commit else "HEAD"
 
-    return subprocess.run(f"git rev-parse {commit_on_dev}", 
+    return subprocess.run(f"git rev-parse {commit_on_dev}",
         shell=True, capture_output=True, text=True).stdout.strip()
 
 if __name__ == "__main__":
     # Allow users to execute any function defined in this file via the command line.
-    # If a function name is provided and that function is defined in this file then execute 
+    # If a function name is provided and that function is defined in this file then execute
     # it along with any provided arguments.
     functions = dict(inspect.getmembers(sys.modules[__name__], predicate=inspect.isfunction))
 

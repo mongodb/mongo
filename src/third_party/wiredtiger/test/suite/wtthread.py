@@ -40,7 +40,7 @@ class checkpoint_thread(threading.Thread):
         self.conn = conn
         self.done = done
         self.checkpoint_count = 0
-        
+
         if "checkpoint_count_max" in kwargs:
             count_max = int(kwargs["checkpoint_count_max"])
             if count_max <= 0:

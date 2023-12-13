@@ -70,7 +70,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         ('unnamed', dict(first_checkpoint=None)),
     ]
     scenarios = make_scenarios(format_values, name_values)
-        
+
 
     def large_updates(self, uri, ds, nrows, value, ts):
         cursor = self.session.open_cursor(uri)

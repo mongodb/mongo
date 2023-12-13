@@ -62,9 +62,9 @@ class test_tiered04(wttest.WiredTigerTestCase, TieredConfigMixin):
             os.mkdir(self.bucket)
             os.mkdir(self.bucket1)
         self.saved_conn = get_conn_config(self) + 'local_retention=%d)'\
-             % self.retention 
+             % self.retention
         return self.saved_conn
-   
+
     # Load the storage store extension.
     def conn_extensions(self, extlist):
         TieredConfigMixin.conn_extensions(self, extlist)

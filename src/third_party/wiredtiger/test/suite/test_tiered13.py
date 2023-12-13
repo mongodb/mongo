@@ -33,7 +33,7 @@ import os, shutil, wiredtiger
 from helper_tiered import get_conn_config, gen_tiered_storage_sources, TieredConfigMixin
 from test_import01 import test_import_base
 from wtscenario import make_scenarios
-import wttest 
+import wttest
 
 class test_tiered13(test_import_base, TieredConfigMixin):
     storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered13', tiered_only=True)

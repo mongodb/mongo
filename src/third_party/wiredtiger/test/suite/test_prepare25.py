@@ -125,12 +125,12 @@ class test_prepare25(wttest.WiredTigerTestCase):
                     cursor.set_key(i)
                     self.assertEquals(cursor.search(), wiredtiger.WT_NOTFOUND)
                 self.session.rollback_transaction()
-            
+
             # Verify we can still read back value c
             self.session.begin_transaction('read_timestamp=' + self.timestamp_str(ts + 40))
             self.assertEquals(cursor[i], value_c)
             self.session.rollback_transaction()
-            
+
             ts += 50
 
 if __name__ == '__main__':

@@ -65,7 +65,7 @@ class test_cursor_bound17(bound_base):
     def test_bound_checkpoint_or_rollback(self):
         cursor = self.create_session_and_cursor()
 
-        # Test bound api: Test that when checkpoint resets all cursors it doesn't clear the bounds 
+        # Test bound api: Test that when checkpoint resets all cursors it doesn't clear the bounds
         # on all the cursors.
         self.set_bounds(cursor, 30, "lower")
         self.set_bounds(cursor, 60, "upper")
@@ -76,7 +76,7 @@ class test_cursor_bound17(bound_base):
         self.cursor_traversal_bound(cursor, 30, 60, False)
         cursor.reset()
 
-        # Test bound api: Test that when rollback resets all cursors it doesn't clear the bounds 
+        # Test bound api: Test that when rollback resets all cursors it doesn't clear the bounds
         # on all the cursors.
         self.session.begin_transaction()
         self.set_bounds(cursor, 30, "lower")
@@ -88,7 +88,7 @@ class test_cursor_bound17(bound_base):
         self.cursor_traversal_bound(cursor, 30, 60, False)
         cursor.reset()
 
-        # Test bound api: Test that when commit resets all cursors it doesn't clear the bounds 
+        # Test bound api: Test that when commit resets all cursors it doesn't clear the bounds
         # on all the cursors.
         self.session.begin_transaction()
         self.set_bounds(cursor, 30, "lower")
@@ -100,7 +100,7 @@ class test_cursor_bound17(bound_base):
         self.cursor_traversal_bound(cursor, 30, 60, False)
         cursor.reset()
 
-        # Test bound api: Test that when reconfigure resets all cursors it doesn't clear the bounds 
+        # Test bound api: Test that when reconfigure resets all cursors it doesn't clear the bounds
         # on all the cursors.
         self.set_bounds(cursor, 30, "lower")
         self.set_bounds(cursor, 60, "upper")

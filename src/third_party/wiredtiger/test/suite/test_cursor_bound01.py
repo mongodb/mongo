@@ -40,7 +40,7 @@ class test_cursor_bound01(bound_base):
         ('table', dict(uri='table:', use_index = False, use_colgroup = False)),
         ('lsm', dict(uri='lsm:', use_index = False, use_colgroup = False)),
         ('colgroup', dict(uri='table:', use_index = False, use_colgroup = False)),
-        ('index', dict(uri='table:', use_index = True, use_colgroup = False)), 
+        ('index', dict(uri='table:', use_index = True, use_colgroup = False)),
     ]
 
     format_values = [
@@ -79,7 +79,7 @@ class test_cursor_bound01(bound_base):
             cursor = self.session.open_cursor(uri)
 
         # LSM format is not supported with range cursors.
-        if self.uri == 'lsm:': 
+        if self.uri == 'lsm:':
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: cursor.bound("action=set,bound=lower"),
                 '/Operation not supported/')
             return
@@ -156,9 +156,9 @@ class test_cursor_bound01(bound_base):
         # store doesn't support the next_random config.
         if (self.key_format != 'r'):
             cursor = self.session.open_cursor(uri, None, "next_random=true")
-            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 40, "lower"), 
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 40, "lower"),
                 '/Operation not supported/')
-            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 60, "upper"), 
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 60, "upper"),
                 '/Operation not supported/')
 
 if __name__ == '__main__':

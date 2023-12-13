@@ -31,7 +31,7 @@ from wtbound import set_prefix_bound, bound_base
 
 # test_cursor_bound15.py
 # This test checks the edge case that a search_near call with bounds and prefix key
-# will return the right value of exact. 
+# will return the right value of exact.
 class test_cursor_bound15(bound_base):
     key_format_values = [
         ('var_string', dict(key_format='S')),
@@ -44,7 +44,7 @@ class test_cursor_bound15(bound_base):
     ]
 
     scenarios = make_scenarios(key_format_values, eviction)
-    
+
     def check_key(self, key):
         if self.key_format == 'u':
             return key.encode()
@@ -80,73 +80,73 @@ class test_cursor_bound15(bound_base):
                 cursor2.set_key(prefix + l[k])
                 self.assertEqual(cursor2.search(), 0)
                 self.assertEqual(cursor2.reset(), 0)
-        
+
         # Begin transaction at timestamp 250, all keys should be visible.
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(250))
         cursor3 = self.session.open_cursor(uri)
         cursor3.reset()
 
         # Test bound api:  Test with only lower bound set.
-        self.assertEqual(self.set_bounds(cursor3, "aab", "lower"), 0) 
+        self.assertEqual(self.set_bounds(cursor3, "aab", "lower"), 0)
         cursor3.set_key("ab")
         self.assertEqual(cursor3.search_near(), -1)
         self.assertEqual(cursor3.get_key(), self.check_key("aaz"))
         cursor3.reset()
 
-        self.assertEqual(self.set_bounds(cursor3, "aac", "lower"), 0) 
+        self.assertEqual(self.set_bounds(cursor3, "aac", "lower"), 0)
         cursor3.set_key("ab")
         self.assertEqual(cursor3.search_near(), -1)
         self.assertEqual(cursor3.get_key(), self.check_key("aaz"))
         cursor3.reset()
 
-        self.assertEqual(self.set_bounds(cursor3, "aaz", "lower", True), 0) 
+        self.assertEqual(self.set_bounds(cursor3, "aaz", "lower", True), 0)
         cursor3.set_key("aaz")
         self.assertEqual(cursor3.search_near(), 0)
         self.assertEqual(cursor3.get_key(), self.check_key("aaz"))
         cursor3.reset()
 
-        self.assertEqual(self.set_bounds(cursor3, "a", "lower"), 0) 
+        self.assertEqual(self.set_bounds(cursor3, "a", "lower"), 0)
         cursor3.set_key("aa")
         self.assertEqual(cursor3.search_near(), 1)
         self.assertEqual(cursor3.get_key(), self.check_key("aaa"))
         cursor3.reset()
 
         # Test bound api: Test with only upper bound set.
-        self.assertEqual(self.set_bounds(cursor3, "aac", "upper", True), 0) 
+        self.assertEqual(self.set_bounds(cursor3, "aac", "upper", True), 0)
         cursor3.set_key("aad")
         self.assertEqual(cursor3.search_near(), -1)
         self.assertEqual(cursor3.get_key(), self.check_key("aac"))
         cursor3.reset()
 
-        self.assertEqual(self.set_bounds(cursor3, "aaz", "upper"), 0) 
+        self.assertEqual(self.set_bounds(cursor3, "aaz", "upper"), 0)
         cursor3.set_key("aac")
         self.assertEqual(cursor3.search_near(), 0)
         self.assertEqual(cursor3.get_key(), self.check_key("aac"))
         cursor3.reset()
 
-        self.assertEqual(self.set_bounds(cursor3, "ac", "upper"), 0) 
+        self.assertEqual(self.set_bounds(cursor3, "ac", "upper"), 0)
         cursor3.set_key("aa")
         self.assertEqual(cursor3.search_near(), 1)
         self.assertEqual(cursor3.get_key(), self.check_key("aaa"))
         cursor3.reset()
 
         # Test bound api: Test with both bounds set.
-        self.assertEqual(self.set_bounds(cursor3, "aaa", "lower"), 0) 
-        self.assertEqual(self.set_bounds(cursor3, "aad", "upper"), 0) 
+        self.assertEqual(self.set_bounds(cursor3, "aaa", "lower"), 0)
+        self.assertEqual(self.set_bounds(cursor3, "aad", "upper"), 0)
         cursor3.set_key("aae")
         self.assertEqual(cursor3.search_near(), -1)
         self.assertEqual(cursor3.get_key(), self.check_key("aad"))
         cursor3.reset()
 
-        self.assertEqual(self.set_bounds(cursor3, "aaa", "lower"), 0) 
-        self.assertEqual(self.set_bounds(cursor3, "aae", "upper"), 0) 
+        self.assertEqual(self.set_bounds(cursor3, "aaa", "lower"), 0)
+        self.assertEqual(self.set_bounds(cursor3, "aae", "upper"), 0)
         cursor3.set_key("aad")
         self.assertEqual(cursor3.search_near(), 0)
         self.assertEqual(cursor3.get_key(), self.check_key("aad"))
         cursor3.reset()
 
-        self.assertEqual(self.set_bounds(cursor3, "aac", "lower", True), 0) 
-        self.assertEqual(self.set_bounds(cursor3, "aaz", "upper", True), 0) 
+        self.assertEqual(self.set_bounds(cursor3, "aac", "lower", True), 0)
+        self.assertEqual(self.set_bounds(cursor3, "aaz", "upper", True), 0)
         cursor3.set_key("aab")
         self.assertEqual(cursor3.search_near(), 1)
         self.assertEqual(cursor3.get_key(), self.check_key("aac"))

@@ -31,7 +31,7 @@ import wttest
 
 # test_checkpoint26.py
 # Test the timing stress setting for checkpoint_evict_page.
-# The setting forces checkpoint to evict all pages that are reconciled. The debug mode is effective 
+# The setting forces checkpoint to evict all pages that are reconciled. The debug mode is effective
 # in testing scenarios where checkpoint itself starts to evict pages. Have a big enough cache and
 # small data pages so that eviction activity is small, allowing checkpoint to reconcile and
 # evict pages.

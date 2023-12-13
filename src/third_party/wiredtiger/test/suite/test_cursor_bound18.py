@@ -67,17 +67,17 @@ class test_cursor_bound18(bound_base):
     scenarios = make_scenarios(key_formats, value_formats, config, direction)
 
     def test_bound_api(self):
-        cursor = self.create_session_and_cursor()                                                                                                                                                                                                                                        
+        cursor = self.create_session_and_cursor()
 
         # Test bound api: Test default bound api with column groups.
-        self.assertEqual(self.set_bounds(cursor, 40, "lower"), 0) 
+        self.assertEqual(self.set_bounds(cursor, 40, "lower"), 0)
         self.assertEqual(self.set_bounds(cursor, 90, "upper"), 0)
 
-        # Test bound api: Test that original bounds persist even if setting one bound fails. 
+        # Test bound api: Test that original bounds persist even if setting one bound fails.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 30, "upper"), '/Invalid argument/')
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 95, "lower"), '/Invalid argument/')
 
-        self.assertEqual(self.set_bounds(cursor, 50, "lower"), 0) 
+        self.assertEqual(self.set_bounds(cursor, 50, "lower"), 0)
         self.assertEqual(self.set_bounds(cursor, 80, "upper"), 0)
         self.cursor_traversal_bound(cursor, 50, 80, None)
 
@@ -85,11 +85,11 @@ class test_cursor_bound18(bound_base):
         cursor.set_key(self.gen_key(50))
         self.cursor_traversal_bound(cursor, 50, 90, None)
 
-        self.assertEqual(self.set_bounds(cursor, 70, "upper"), 0) 
+        self.assertEqual(self.set_bounds(cursor, 70, "upper"), 0)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.set_bounds(cursor, 80, "lower"), '/Invalid argument/')
         self.cursor_traversal_bound(cursor, 50, 70, None)
 
         # Test bound api: Test successful setting of both bounds.
-        self.assertEqual(self.set_bounds(cursor, 50, "lower"), 0) 
-        self.assertEqual(self.set_bounds(cursor, 70, "upper"), 0) 
+        self.assertEqual(self.set_bounds(cursor, 50, "lower"), 0)
+        self.assertEqual(self.set_bounds(cursor, 70, "upper"), 0)
         self.cursor_traversal_bound(cursor, 50, 70, None)

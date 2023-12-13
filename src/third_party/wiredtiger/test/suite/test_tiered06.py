@@ -47,7 +47,7 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
     # Load the storage store extension.
     def conn_extensions(self, extlist):
         TieredConfigMixin.conn_extensions(self, extlist)
-  
+
     def breakpoint(self):
         import pdb, sys
         sys.stdin = open('/dev/tty', 'r')
@@ -57,7 +57,7 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
 
     def get_storage_source(self):
         return self.conn.get_storage_source(self.ss_name)
-    
+
     def get_fs_config(self, prefix = '', cache_dir = ''):
         conf = ''
         if prefix:
@@ -127,8 +127,8 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
         if (self.ss_name != 'dir_store'):
             msg = 'No such file or directory'
             with self.expectedStderrPattern('.*does not exist in the bucket.*'):
-                self.assertRaisesException(wiredtiger.WiredTigerError, 
-                    lambda: fs.fs_open_file(session, 'foobar2', FileSystem.open_file_type_data, 
+                self.assertRaisesException(wiredtiger.WiredTigerError,
+                    lambda: fs.fs_open_file(session, 'foobar2', FileSystem.open_file_type_data,
                         FileSystem.open_readonly), msg)
 
         # Files that have been flushed cannot be manipulated.
@@ -165,7 +165,7 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
         # Directory store needs the bucket created as a directory on the filesystem.
         if self.ss_name == 'dir_store':
             os.mkdir(self.bucket)
-        
+
         fs = ss.ss_customize_file_system(session, self.bucket, self.auth_token,
             self.get_fs_config(prefix, cachedir))
 
@@ -325,7 +325,7 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
             self.get_fs_config(prefix, self.cachedir1))
         fs2 = ss.ss_customize_file_system(session, self.bucket1, self.auth_token,
             self.get_fs_config(prefix, self.cachedir2))
-        
+
         # Create files in the wt home directory.
         for a in ['beagle', 'bird', 'bison', 'bat']:
             self.create_wt_file(a)

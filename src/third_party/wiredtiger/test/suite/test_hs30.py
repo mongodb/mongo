@@ -138,7 +138,7 @@ class test_hs30(wttest.WiredTigerTestCase):
 
         if self.early_ckpt:
             self.session.checkpoint()
-        
+
         # Read in the other session, and then leave the transaction open.
         session2.begin_transaction()
         v = cursor2[1]

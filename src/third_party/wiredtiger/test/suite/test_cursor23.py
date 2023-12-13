@@ -70,7 +70,7 @@ class test_cursor23(wttest.WiredTigerTestCase):
             self.check_get_key_and_value(cursor=cursor, expected_key=f'{2:015d}', expected_value=['2: ', 2, '64: ', '63: '])
             cursor.next()
             self.check_get_key_and_value(cursor=cursor, expected_key=f'{3:015d}', expected_value=['3: a', 3, '96: a', '45: a'])
-            self.session.commit_transaction()            
+            self.session.commit_transaction()
 
             # Try to check the data using get_raw_key_value(), but it's not supported
             self.session.begin_transaction()
@@ -78,7 +78,7 @@ class test_cursor23(wttest.WiredTigerTestCase):
             cursor.next()
             msg = '/Unsupported cursor operation: Operation not supported/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: cursor.get_raw_key_value(), msg)
-            self.session.commit_transaction() 
+            self.session.commit_transaction()
         else:
             # Check the data using get_key() and get_value()
             self.session.begin_transaction()

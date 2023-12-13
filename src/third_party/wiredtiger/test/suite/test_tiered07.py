@@ -38,8 +38,8 @@ class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
 
     storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered07', tiered_only=True)
 
-    # FIXME-WT-8897 Disabled S3 (only indexing dirstore in storage sources) as S3 directory listing 
-    # is interpreting a directory to end in a '/', whereas the code in the tiered storage doesn't 
+    # FIXME-WT-8897 Disabled S3 (only indexing dirstore in storage sources) as S3 directory listing
+    # is interpreting a directory to end in a '/', whereas the code in the tiered storage doesn't
     # expect that. Enable when fixed.
     # Make scenarios for different cloud service providers
     flush_obj = [('ckpt', dict(first_ckpt=True)),
@@ -58,10 +58,10 @@ class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
     # Load the storage store extension.
     def conn_extensions(self, extlist):
         TieredConfigMixin.conn_extensions(self, extlist)
-    
+
     def conn_config(self):
         return TieredConfigMixin.conn_config(self)
-        
+
     def check(self, tc, base, n):
         get_check(self, tc, 0, n)
 
@@ -134,7 +134,7 @@ class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.session.create(self.newuri, 'key_format=S')
 
         # If we didn't do a checkpoint before the flush_tier then creating with the same name
-        # will succeed because no bucket objects were created. 
+        # will succeed because no bucket objects were created.
         if (self.first_ckpt):
             self.pr('check cannot create with same name')
             self.assertRaises(wiredtiger.WiredTigerError,

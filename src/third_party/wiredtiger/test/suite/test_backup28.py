@@ -53,7 +53,7 @@ class test_backup28(backup_base):
         selective_remove_file_list = []
         uri = self.pfx + 'table0'
         create_params = 'key_format=S,value_format=S,'
-    
+
         cgparam = 'columns=(k,v),colgroups=(g0),'
         # Create the main table.
         self.session.create(uri, create_params + cgparam)
@@ -63,7 +63,7 @@ class test_backup28(backup_base):
             colgroup_param = 'columns=(v),'
             suburi = 'colgroup:table0:g0'
             self.session.create(suburi, colgroup_param)
-            
+
             suburi = 'index:table0:i0'
             self.session.create(suburi, cgparam)
             self.session.checkpoint()
@@ -72,25 +72,25 @@ class test_backup28(backup_base):
 
         # Now copy the files using full backup. Selectively don't copy files based on remove list.
         all_files = self.take_selective_backup(self.dir, [])
-        
+
         target_uri_list_format = str(self.target_uri_list).replace("\'", "\"")
         if len(self.target_uri_list) and self.target_uri_list[0] == "table:table0":
             # After the full backup, open and recover the backup database, and it should succeed.
             backup_conn = self.wiredtiger_open(self.dir, "backup_restore_target={0}".format(target_uri_list_format))
             bkup_session = backup_conn.open_session()
-            
+
             # Make sure that the table recovered properly.
             c = bkup_session.open_cursor(uri, None, None)
             c.close()
             backup_conn.close()
         else:
-            # After the full backup, perform partial backup restore adding the target uris of 
-            # indexes, colgroups or lsm. This should fail and return with a message, as we only allow 
+            # After the full backup, perform partial backup restore adding the target uris of
+            # indexes, colgroups or lsm. This should fail and return with a message, as we only allow
             # table formats.
             self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
                 lambda: self.wiredtiger_open(self.dir, "backup_restore_target={0}".format(target_uri_list_format)),
                 '/partial backup restore only supports objects of type .* formats in the target uri list/')
 
-            
+
 if __name__ == '__main__':
     wttest.run()

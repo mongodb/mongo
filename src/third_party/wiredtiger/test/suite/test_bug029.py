@@ -51,7 +51,7 @@ class test_bug029(wttest.WiredTigerTestCase):
 
     def add_data(self, uri, start, count):
         cursor = self.session.open_cursor(uri, None)
-        for i in range(start, start + count): 
+        for i in range(start, start + count):
             cursor[i] = self.bigvalue
         cursor.close()
 
@@ -85,7 +85,7 @@ class test_bug029(wttest.WiredTigerTestCase):
         for i in range(10):
             self.session.checkpoint("force=1")
 
-        # Write and checkpoint a bunch of data. If we erroneously deleted our 
+        # Write and checkpoint a bunch of data. If we erroneously deleted our
         # backup checkpoint this should overwrite some of that checkpoint's
         # blocks.
         self.add_data(self.uri, 1000, 2000)

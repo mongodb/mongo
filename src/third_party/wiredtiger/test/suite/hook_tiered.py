@@ -301,7 +301,7 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
         return False
 
     # Determine whether a test should be skipped, if it should also return the reason for skipping.
-    # Some features aren't supported with tiered storage currently. If they exist in 
+    # Some features aren't supported with tiered storage currently. If they exist in
     # the test name (or scenario name) skip the test.
     def should_skip(self, test) -> (bool, str):
         skip_categories = [

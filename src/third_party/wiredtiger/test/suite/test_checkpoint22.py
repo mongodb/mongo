@@ -90,7 +90,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         ('unnamed', dict(second_checkpoint=None)),
     ]
     scenarios = make_scenarios(format_values, first_name_values, second_name_values)
-        
+
 
     def do_checkpoint(self, ckpt_name):
         if ckpt_name is None:

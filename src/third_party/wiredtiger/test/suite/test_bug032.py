@@ -32,16 +32,16 @@ from wtscenario import make_scenarios
 
 # test_bug032.py
 # This tests for the scenario discovered in WT-11845.
-# Before WT-11845 fast truncate determined if a page could be fast truncated by 
-# looking at the pages aggregated timestamp. This would lead to keys being incorrectly 
+# Before WT-11845 fast truncate determined if a page could be fast truncated by
+# looking at the pages aggregated timestamp. This would lead to keys being incorrectly
 # truncated if:
 # - Two transactions txn1 and txn2 have ids 10 and 20 respectively
 # - txn2 is committed and txn1 is still active while a truncate transaction begins.
 #   txn2 is visible to the truncate while txn1 is not.
-# - txn1 is then committed and a page containing updates from both transactions is written to disk. 
+# - txn1 is then committed and a page containing updates from both transactions is written to disk.
 #   The aggregated timestamp uses txn id 20.
-# - Truncate reads the aggregated timestamp of the page (id 20) and determines it is visible. 
-#   The page is truncated even though it contains updates from txn1 which is not visible to the 
+# - Truncate reads the aggregated timestamp of the page (id 20) and determines it is visible.
+#   The page is truncated even though it contains updates from txn1 which is not visible to the
 #   truncate operation.
 class test_bug032(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,statistics=(all)'
@@ -57,7 +57,7 @@ class test_bug032(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         for i in range(1, nrows):
             cursor[ds.key(i)] = value + str(i)
-                
+
         self.session.commit_transaction()
         cursor.close()
 
@@ -76,9 +76,9 @@ class test_bug032(wttest.WiredTigerTestCase):
         ds.create()
         self.populate(uri, ds, nrows, value_str)
 
-        # Remove txn1's key which was added by the populate phase. We want truncate and insert to race in 
-        # a way they aren't aware of each other. If there's an existing version of the key then txn1's 
-        # insert becomes a modify and truncate will see the parallel modification, rolling back instead 
+        # Remove txn1's key which was added by the populate phase. We want truncate and insert to race in
+        # a way they aren't aware of each other. If there's an existing version of the key then txn1's
+        # insert becomes a modify and truncate will see the parallel modification, rolling back instead
         # of truncating.
         self.session.begin_transaction()
         c = self.session.open_cursor(uri)
@@ -87,7 +87,7 @@ class test_bug032(wttest.WiredTigerTestCase):
         self.session.commit_transaction()
         c.close()
 
-        # Perform an in txn1 but don't commit it. 
+        # Perform an in txn1 but don't commit it.
         txn1_session = self.conn.open_session()
         txn1_session.begin_transaction()
         c1 = txn1_session.open_cursor(uri)
@@ -98,7 +98,7 @@ class test_bug032(wttest.WiredTigerTestCase):
         txn2_session = self.conn.open_session()
         txn2_session.begin_transaction()
         c2 = txn2_session.open_cursor(uri)
-        c2[ds.key(txn1_key_num + 1)] = value_str                
+        c2[ds.key(txn1_key_num + 1)] = value_str
         txn2_session.commit_transaction()
         c2.close()
 
@@ -106,7 +106,7 @@ class test_bug032(wttest.WiredTigerTestCase):
         truncate_session = self.conn.open_session()
         truncate_session.begin_transaction()
 
-        # Commit txn1. 
+        # Commit txn1.
         txn1_session.commit_transaction()
         c1.reset()
         c1.close()
@@ -122,7 +122,7 @@ class test_bug032(wttest.WiredTigerTestCase):
         truncate_session.truncate(uri, None, None, None)
         truncate_session.commit_transaction()
 
-        # Search for our key inserted by txn1. This was not truncated by the truncate operation as 
+        # Search for our key inserted by txn1. This was not truncated by the truncate operation as
         # txn1 wasn't visible.
         validate_cursor = self.session.open_cursor(ds.uri)
         validate_cursor.set_key(ds.key(txn1_key_num))

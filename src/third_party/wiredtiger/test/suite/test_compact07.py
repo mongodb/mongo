@@ -43,12 +43,12 @@ megabyte = 1024 * 1024
 # - There is more available space in the last two tables.
 # - The background compaction server only compacts the last two tables when the threshold set is
 # above the available space of the first table.
-# - Foreground compaction can be executed and can compact the first file with the lowest threshold. 
+# - Foreground compaction can be executed and can compact the first file with the lowest threshold.
 class test_compact07(wttest.WiredTigerTestCase):
     create_params = 'key_format=i,value_format=S,allocation_size=4KB,leaf_page_max=32KB,'
     conn_config = 'cache_size=100MB,statistics=(all),debug_mode=(background_compact)'
     uri_prefix = 'table:test_compact07'
-    
+
     table_numkv = 100 * 1000
     n_tables = 2
     value_size = 1024 # The value should be small enough so that we don't create overflow pages.
@@ -65,7 +65,7 @@ class test_compact07(wttest.WiredTigerTestCase):
         compact_running = stat_cursor[stat.conn.background_compact_running][2]
         stat_cursor.close()
         return compact_running
-    
+
     def get_bg_compaction_files_tracked(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         files = stat_cursor[stat.conn.background_compact_files_tracked][2]
@@ -85,7 +85,7 @@ class test_compact07(wttest.WiredTigerTestCase):
         bytes = stat_cursor[stat.dsrc.block_reuse_bytes][2]
         stat_cursor.close()
         return bytes // megabyte
-        
+
     def get_pages_rewritten(self, uri):
         stat_cursor = self.session.open_cursor('statistics:' + uri, None, None)
         pages_rewritten = stat_cursor[stat.dsrc.btree_compact_pages_rewritten][2]
@@ -103,8 +103,8 @@ class test_compact07(wttest.WiredTigerTestCase):
         for k in range(num_keys):
             c[k] = ('%07d' % k) + '_' + 'abcd' * ((value_size // 4) - 2)
         c.close()
-    
-    # Test the basic functionality of the background compaction server. 
+
+    # Test the basic functionality of the background compaction server.
     def test_compact07(self):
         # FIXME-WT-11399
         if self.runningHook('tiered'):
@@ -130,7 +130,7 @@ class test_compact07(wttest.WiredTigerTestCase):
             uri = self.uri_prefix + f'_{i}'
             self.session.create(uri, self.create_params)
             self.populate(uri, self.table_numkv, self.value_size)
-        
+
         # Write to disk.
         self.session.checkpoint()
 
@@ -149,23 +149,23 @@ class test_compact07(wttest.WiredTigerTestCase):
         # Enable background compaction with a threshold big enough so it does not process the first
         # table created but only the others with more empty space.
         self.session.compact(None, f'background=true,free_space_target={free_space_20 + 1}MB')
-        
+
         # Wait for the background server to wake up.
         compact_running = self.get_bg_compaction_running()
         while not compact_running:
             time.sleep(1)
             compact_running = self.get_bg_compaction_running()
         self.assertEqual(compact_running, 1)
-        
+
         # Background compaction should run through every file as listed in the metadata file.
         # Wait until all the eligible files have been compacted.
         while self.get_files_compacted() < self.n_tables:
             time.sleep(1)
-            
+
         # Check that we made no progress on the small file.
         self.assertEqual(self.get_pages_rewritten(uri_small), 0)
-        
-        # Check the background compaction server stats. We should have skipped at least once and 
+
+        # Check the background compaction server stats. We should have skipped at least once and
         # been successful at least once.
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         skipped = stat_cursor[stat.conn.session_table_compact_skipped][2]
@@ -185,20 +185,20 @@ class test_compact07(wttest.WiredTigerTestCase):
         # Check that we have some files in the background compaction tracking list.
         self.assertGreater(self.get_bg_compaction_files_tracked(), 0)
 
-        # Drop the tables and wait for sometime for them to be removed from the background 
+        # Drop the tables and wait for sometime for them to be removed from the background
         # compaction server list.
         for i in range(self.n_tables):
             uri = self.uri_prefix + f'_{i}'
             self.dropUntilSuccess(self.session, uri)
-        
+
         self.session.checkpoint()
-        
-        # The tables should get removed from the tracking list once they exceed the max idle time 
+
+        # The tables should get removed from the tracking list once they exceed the max idle time
         # after they're dropped. Only two tables are expected to be present: the small table and the
         # HS file.
         while self.get_bg_compaction_files_tracked() > 2:
             time.sleep(1)
-        
+
         # Stop the background compaction server.
         self.session.compact(None, 'background=false')
 

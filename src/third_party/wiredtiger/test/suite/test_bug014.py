@@ -48,7 +48,7 @@ class test_bug014(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, uri, 1000,
             key_format=self.key_format, value_format=self.value_format,
             config='allocation_size=512,leaf_page_max=512')
-                           
+
         ds.populate()
 
         # Reopen it so we can fast-delete pages.

@@ -53,7 +53,7 @@ class test_bug_031(wttest.WiredTigerTestCase):
         self.session.create(uri, 'key_format={},value_format={}'.format(
             self.key_format, self.value_format))
         cursor = self.session.open_cursor(uri)
-        
+
         # Perform a first insertion.
         self.session.begin_transaction()
         cursor[key] = value

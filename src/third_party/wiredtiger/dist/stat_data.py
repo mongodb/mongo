@@ -197,7 +197,7 @@ conn_stats = [
     ConnStat('rwlock_write', 'pthread mutex shared lock write-lock calls'),
     ConnStat('time_travel', 'detected system time went backwards'),
     ConnStat('write_io', 'total write I/Os'),
-    
+
     ##########################################
     # Background compaction statistics
     ##########################################
@@ -833,8 +833,8 @@ dsrc_stats = [
     CompressStat('compress_precomp_intl_max_page_size', 'compressed page maximum internal page size prior to compression', 'no_clear,no_scale,size'),
     CompressStat('compress_precomp_leaf_max_page_size', 'compressed page maximum leaf page size prior to compression ', 'no_clear,no_scale,size'),
     CompressStat('compress_read', 'pages read from disk'),
-    # dist/stat.py sorts stats by their descriptions and not their names. The following stat descriptions insert an extra 
-    # space before the single digit numbers (2, 4, 8) so stats will be sorted numerically (2, 4, 8, 16, 32) instead of 
+    # dist/stat.py sorts stats by their descriptions and not their names. The following stat descriptions insert an extra
+    # space before the single digit numbers (2, 4, 8) so stats will be sorted numerically (2, 4, 8, 16, 32) instead of
     # alphabetically (16, 2, 32, 4, 8).
     CompressStat('compress_read_ratio_hist_2', 'pages read from disk with compression ratio smaller than  2'),
     CompressStat('compress_read_ratio_hist_4', 'pages read from disk with compression ratio smaller than  4'),

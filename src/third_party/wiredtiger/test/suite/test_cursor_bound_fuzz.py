@@ -99,7 +99,7 @@ class key():
 #    randomized operations and validates them for correctness.
 class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
     file_name = 'test_fuzz.wt'
-    
+
     iteration_count = 200 if wttest.islongtest() else 50
     # For each iteration we do search_count searches that way we test more cases without having to
     # generate as many key ranges.
@@ -110,7 +110,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
     value_size = 100000 if wttest.islongtest() else 100
     prepare_frequency = 5/100
     update_frequency = 2/10
-    
+
     min_key = 1
     # Max_key is not inclusive so the actual max_key is max_key - 1.
     max_key = min_key + key_count
@@ -220,13 +220,13 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
             else:
                 raise e
         return ret
-    
+
     # Once we commit the prepared transaction, update and clear the prepared flags.
     def clear_prepare_key_ranges(self):
         for i in self.key_range_iter():
             self.key_range[i].clear_prepared()
 
-    # Given a bound, this functions returns the start or end expected key of the bounded range. 
+    # Given a bound, this functions returns the start or end expected key of the bounded range.
     # Note the type argument determines if we return the start or end limit. e.g. if we have a lower
     # bound then the key would be the lower bound, however if the lower bound isn't enabled then the
     # lowest possible key would be min_key. max_key isn't inclusive so we subtract 1 off it.
@@ -258,7 +258,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
                 return
             elif (self.key_range[i].is_deleted()):
                 continue
-            else:   
+            else:
                 self.assertTrue(False)
 
     # Validate a prepare conflict in the cursor->next scenario.
@@ -273,7 +273,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
             # We walked part of the way through a valid key range before we hit the prepared
             # update. Therefore validate the range between our current key and the
             # end range.
-            start_range = current_key   
+            start_range = current_key
         end_range = self.get_expected_limit_key(bound_set, bound_type.UPPER)
 
         # Perform validation from the start range to end range.
@@ -292,7 +292,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
             # We walked part of the way through a valid key range before we hit the prepared
             # update. Therefore validate the range between our current key and the
             # end range.
-            start_range = current_key  
+            start_range = current_key
         end_range = self.get_expected_limit_key(bound_set, bound_type.LOWER)
 
         # Perform validation from the start range to end range.
@@ -351,7 +351,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
             self.assertTrue(bound_set.in_bounds_key(current_key))
             self.assertTrue(self.key_range[current_key].equals(current_key, current_value))
             checked_keys.append(current_key)
-            
+
             # If the cursor has walked to a record that isn't -1 our current record then it
             # skipped something internally.
             # Check that the key range between key_range_it and current_key isn't visible

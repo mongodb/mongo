@@ -99,7 +99,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         fp = open(filename, "r+b")
         fp.seek(position)
         return fp
-    
+
     def open_and_offset(self, tablename, offset):
         """
         Open the file for the table, position it at the given offset.
@@ -203,7 +203,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create('table:' + self.tablename, params)
         self.populate(self.tablename)
 
-        # wt verify -d dump_address performs a depth-first traversal of the BTree. So the first 
+        # wt verify -d dump_address performs a depth-first traversal of the BTree. So the first
         # leaf page it prints is the first child of its parent. Grab the offset of this one so we
         # can corrupt it.
         self.runWt(['verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'], outfilename='dump.out')
@@ -216,8 +216,8 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             if m:
                 offset = int((int(m.group(2)) - int(m.group(1)))/2)
                 break
-        
-        # Open the file and corrupt the first page. 
+
+        # Open the file and corrupt the first page.
         with self.open_and_offset(self.tablename, offset) as f:
             for i in range(0, 100):
                 f.write(b'\x01\xff\x80')

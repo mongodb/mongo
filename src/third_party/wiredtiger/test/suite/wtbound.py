@@ -102,7 +102,7 @@ class bounds():
 
 # Shared base class used by cursor bound tests.
 class bound_base(wttest.WiredTigerTestCase):
-    # The start and end key denotes the first and last key in the table. Since 20 is a key itself, 
+    # The start and end key denotes the first and last key in the table. Since 20 is a key itself,
     # there are 60 entries between the start and end key.
     start_key = 20
     end_key = 79
@@ -137,7 +137,7 @@ class bound_base(wttest.WiredTigerTestCase):
             for i in range(self.start_key, self.end_key + 1):
                 cursor[self.gen_key(i)] = self.gen_val(count)
                 # Increase count on every even interval to produce duplicate values.
-                if (i % 2 == 0): 
+                if (i % 2 == 0):
                     count = count + 1
         else:
             for i in range(self.start_key, self.end_key + 1):
@@ -149,18 +149,18 @@ class bound_base(wttest.WiredTigerTestCase):
             for i in range(self.start_key, self.end_key):
                 evict_cursor.set_key(self.gen_key(i))
                 evict_cursor.search()
-                evict_cursor.reset() 
+                evict_cursor.reset()
             evict_cursor.close()
-        
+
         if (index):
             self.use_index = True
-        return cursor        
+        return cursor
 
     def gen_create_param(self):
         create_params = ",columns=("
         start = 0
         for _ in self.key_format:
-            create_params += "k{0},".format(str(start)) 
+            create_params += "k{0},".format(str(start))
             start += 1
 
         start = 0
@@ -168,7 +168,7 @@ class bound_base(wttest.WiredTigerTestCase):
             if v.isdigit():
                 continue
 
-            create_params += "v{0},".format(str(start)) 
+            create_params += "v{0},".format(str(start))
             start += 1
         create_params += ")"
 
@@ -176,7 +176,7 @@ class bound_base(wttest.WiredTigerTestCase):
             create_params += ",colgroups=("
             start = 0
             for _ in self.value_format:
-                create_params += "g{0},".format(str(start)) 
+                create_params += "g{0},".format(str(start))
                 start += 1
             create_params += ")"
         return create_params
@@ -194,7 +194,7 @@ class bound_base(wttest.WiredTigerTestCase):
                 tuple_key.append(self.recno(i))
             elif key == "i":
                 tuple_key.append(i)
-        
+
         if (len(key_format) == 1):
             return tuple_key[0]
         else:
@@ -209,7 +209,7 @@ class bound_base(wttest.WiredTigerTestCase):
                 tuple_val.append(self.recno(i))
             elif key == "i":
                 tuple_val.append(i)
-        
+
         if (len(self.value_format) == 1):
             return tuple_val[0]
         else:
@@ -230,7 +230,7 @@ class bound_base(wttest.WiredTigerTestCase):
                 list_key.append(i)
             elif key == "u":
                 list_key.append(str(i).encode())
-        
+
         if (len(key_format) == 1):
             return list_key[0]
         else:
@@ -251,10 +251,10 @@ class bound_base(wttest.WiredTigerTestCase):
             else:
                 self.upper_inclusive = True
 
-        # Set key and bounds.    
+        # Set key and bounds.
         cursor.set_key(self.gen_key(key))
         return cursor.bound("bound={0}{1}".format(bound_config, inclusive_config))
-    
+
     def cursor_traversal_bound(self, cursor, lower_key, upper_key, next=None, expected_count=None):
         if next == None:
             next = self.direction
@@ -291,12 +291,12 @@ class bound_base(wttest.WiredTigerTestCase):
                 self.assertTrue(self.check_key(lower_key) <= key)
             elif (lower_key):
                 self.assertTrue(self.check_key(lower_key) < key)
-                
+
             if (self.upper_inclusive and upper_key):
                 self.assertTrue(key <= self.check_key(upper_key))
             elif (upper_key):
                 self.assertTrue(key < self.check_key(upper_key))
-   
+
         if (expected_count != None):
             self.assertEqual(expected_count, count)
         else:

@@ -116,7 +116,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             cursor1[ds_1.key(i)] = value_a
             cursor2[ds_2.key(i)] = value_a
         session2.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
-        
+
         # Move stable up to 30.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
 
@@ -150,7 +150,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         # Make sure we can't read any of the rows from two tables.
         uri_1_count = self.check(ckpt_1, value_a)
         uri_2_count = self.check(ckpt_2, value_a)
-        
+
         self.assertEqual(uri_1_count, uri_2_count)
         self.assertEqual(uri_1_count, 0)
 

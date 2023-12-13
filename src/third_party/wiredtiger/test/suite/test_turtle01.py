@@ -73,7 +73,7 @@ class test_turtle01(wttest.WiredTigerTestCase):
         self.check_turtle()
         self.check_metadata()
 
-    
+
     def check_metadata(self):
         # The checkpoint metadata is contained in the last line of the turtle file.
         # Ensure that the keys are comma separated.

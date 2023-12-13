@@ -39,7 +39,7 @@ arch_doc_pages = [
     ArchDocPage('arch-cloud-storage-extension',
         ['S3_FILE_HANDLE', 'S3_FILE_SYSTEM', 'S3_STORAGE', 'azure_file_handle', 'azure_file_sytem',
          'azure_store', 'gcp_file_handle', 'gcp_file_system', 'gcp_store',  ],
-        ['ext/storage_sources/azure_store/', 'ext/storage_sources/gcp_store/', 
+        ['ext/storage_sources/azure_store/', 'ext/storage_sources/gcp_store/',
          'ext/storage_sources/s3_store/']),
     ArchDocPage('arch-compact',
         ['WT_BLOCK'],

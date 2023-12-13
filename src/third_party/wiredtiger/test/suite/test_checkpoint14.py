@@ -151,7 +151,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             ckpt = named_checkpoint_thread(self.conn, done, self.second_checkpoint)
         try:
             ckpt.start()
-            
+
             # Wait for checkpoint to start before committing.
             ckpt_started = 0
             while not ckpt_started:

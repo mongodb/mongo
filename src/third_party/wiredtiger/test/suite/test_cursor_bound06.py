@@ -69,7 +69,7 @@ class test_cursor_bound06(bound_base):
 
     def test_bound_search_scenario(self):
         cursor = self.create_session_and_cursor()
-    
+
         # Test bound API: Search for a non-existent key with no bounds.
         cursor.set_key(self.gen_key(10))
         ret = cursor.search()
@@ -118,7 +118,7 @@ class test_cursor_bound06(bound_base):
         self.assertEqual(ret, 0)
         cursor.reset()
 
-        # Test bound API: Search for a key equal to the bound. 
+        # Test bound API: Search for a key equal to the bound.
         self.set_bounds(cursor, 60, "upper", self.inclusive)
         cursor.set_key(self.gen_key(60))
         ret = cursor.search()
@@ -128,14 +128,14 @@ class test_cursor_bound06(bound_base):
             self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         cursor.reset()
 
-        # Test bound API: Search for a key equal to the bound. 
+        # Test bound API: Search for a key equal to the bound.
         self.set_bounds(cursor, 20, "upper", self.inclusive)
         cursor.set_key(self.gen_key(20))
         ret = cursor.search()
         if(self.inclusive):
             self.assertEqual(ret, 0)
         else:
-            self.assertEqual(ret, wiredtiger.WT_NOTFOUND)        
+            self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         cursor.reset()
         cursor.close()
 

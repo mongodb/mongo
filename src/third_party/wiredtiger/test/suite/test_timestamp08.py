@@ -170,7 +170,7 @@ class test_timestamp08(wttest.WiredTigerTestCase, suite_subprocess):
         cur1[1] = 1
         self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_COMMIT, 3)
 
-        # The all_durable timestamp should return 0 if there a no transactions that have committed 
+        # The all_durable timestamp should return 0 if there a no transactions that have committed
         # yet.
         self.assertTimestampsEqual(
             self.conn.query_timestamp('get=all_durable'), '0')
@@ -259,7 +259,7 @@ class test_timestamp08(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.session.begin_transaction()
         self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_COMMIT, 11)
-        
+
         # Before any running transactions have committed all_durable should return the checkpoint
         # timestamp.
         self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), self.timestamp_str(9))

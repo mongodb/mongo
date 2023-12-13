@@ -321,7 +321,7 @@ class test_timestamp26_inconsistent_update(wttest.WiredTigerTestCase):
         self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(1))
         c[ds.key(2)] = ds.value(3)
         self.session.commit_transaction()
-        
+
         # Insert key1 at timestamp 10 and key2 at 15. Then update both keys in one transaction at
         # timestamp 13, and we should get a complaint about usage.
         key1 = ds.key(3)

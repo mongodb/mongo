@@ -43,7 +43,7 @@ class test_flcs04(wttest.WiredTigerTestCase):
             self, uri, nrows, key_format='r', value_format='6t', config='leaf_page_max=4096')
         ds.populate()
 
-        
+
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
 

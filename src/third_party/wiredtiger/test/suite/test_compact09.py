@@ -41,7 +41,7 @@ class test_compact09(wttest.WiredTigerTestCase):
     create_params = 'key_format=i,value_format=S,allocation_size=4KB,leaf_page_max=32KB,'
     conn_config = 'cache_size=100MB,statistics=(all),debug_mode=(background_compact)'
     uri_prefix = 'table:test_compact09'
-    
+
     table_numkv = 100 * 1000
     n_tables = 2
     value_size = 1024 # The value should be small enough so that we don't create overflow pages.
@@ -64,7 +64,7 @@ class test_compact09(wttest.WiredTigerTestCase):
         files = stat_cursor[stat.conn.background_compact_exclude][2]
         stat_cursor.close()
         return files
-    
+
     def get_files_compacted(self):
         files_compacted = 0
         for i in range(self.n_tables):
@@ -101,7 +101,7 @@ class test_compact09(wttest.WiredTigerTestCase):
             compact_running = self.get_bg_compaction_running()
         self.assertEqual(compact_running, 1)
 
-    # Test the exclude list functionality of the background compaction server. 
+    # Test the exclude list functionality of the background compaction server.
     def test_compact09(self):
         # FIXME-WT-11399
         if self.runningHook('tiered'):
@@ -112,7 +112,7 @@ class test_compact09(wttest.WiredTigerTestCase):
             uri = self.uri_prefix + f'_{i}'
             self.session.create(uri, self.create_params)
             self.populate(uri, self.table_numkv, self.value_size)
-        
+
         # Write to disk.
         self.session.checkpoint()
 
@@ -128,7 +128,7 @@ class test_compact09(wttest.WiredTigerTestCase):
         exclude_list = f'["{self.uri_prefix}_0.wt", "{self.uri_prefix}_1.wt"]'
         config = f'background=true,free_space_target=1MB,exclude={exclude_list}'
         self.turn_on_bg_compact(config)
-        
+
         # Background compaction should exclude all files.
         while self.get_bg_compaction_files_excluded() < self.n_tables:
             time.sleep(1)
@@ -160,7 +160,7 @@ class test_compact09(wttest.WiredTigerTestCase):
         self.assertEqual(self.get_pages_rewritten(uri), 0)
         uri = self.uri_prefix + '_1'
         self.assertGreater(self.get_pages_rewritten(uri), 0)
-        
+
         # Stop the background compaction server.
         self.turn_off_bg_compact()
 

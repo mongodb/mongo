@@ -71,10 +71,10 @@ class test_prepare27(wttest.WiredTigerTestCase):
             with self.transaction(commit_timestamp = ts):
                 value = ts
                 cursor[key] = self.create_value(value)
-        
+
         # Set the stable timestamp.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
-    
+
         # At this point we have 5 updates associated with a key in the update chain:
         # 1 -> 2 -> 3 -> 4 -> 5
 
@@ -99,7 +99,7 @@ class test_prepare27(wttest.WiredTigerTestCase):
         # leave the stable one (1) in the HS. We should have the following update chain:
         # 2 -> 6 -> 5, with 6 and 5 aborted.
         self.conn.rollback_to_stable()
-    
+
         # Now search for the first record at the time it was committed.
         self.session.begin_transaction('read_timestamp=1')
         cur = self.session.open_cursor(uri, None, None)

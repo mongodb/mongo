@@ -134,7 +134,7 @@ class test_truncate16(wttest.WiredTigerTestCase):
         session2 = self.conn.open_session()
 
         # Truncate the middle of the table.
-        # 
+        #
         # Prepare the truncate at time 20 and leave it hanging.
         session2.begin_transaction()
         err = self.truncate(session2, ds.uri, ds.key, nrows // 4 + 1, 3 * nrows // 4)

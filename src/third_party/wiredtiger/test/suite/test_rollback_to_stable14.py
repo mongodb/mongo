@@ -114,7 +114,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
-            
+
             # Wait for checkpoint to start before committing.
             ckpt_started = 0
             while not ckpt_started:
@@ -336,7 +336,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
-            
+
             # Wait for checkpoint to start before committing.
             ckpt_started = 0
             while not ckpt_started:

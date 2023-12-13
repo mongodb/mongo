@@ -31,11 +31,11 @@ from wtscenario import make_scenarios
 from wtbound import bound_base
 
 # test_cursor_bound07.py
-# Test column store related scenarios with the bounds API. 
+# Test column store related scenarios with the bounds API.
 class test_cursor_bound07(bound_base):
     file_name = 'test_cursor_bound07'
-    
-    # The start and end key denotes the first and last key in the table. Since 10 is a key itself, 
+
+    # The start and end key denotes the first and last key in the table. Since 10 is a key itself,
     # there are 100 entries between the start and end key.
     start_key = 10
     end_key = 99
@@ -47,7 +47,7 @@ class test_cursor_bound07(bound_base):
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:')),
     ]
-    
+
     evict = [
         ('evict', dict(evict=True)),
         ('no-evict', dict(evict=True)),
@@ -68,7 +68,7 @@ class test_cursor_bound07(bound_base):
 
     def create_session_and_cursor(self):
         uri = self.uri + self.file_name
-        create_params = 'value_format=S,key_format={}'.format(self.key_format)    
+        create_params = 'value_format=S,key_format={}'.format(self.key_format)
         self.session.create(uri, create_params)
 
         cursor = self.session.open_cursor(uri)
@@ -83,7 +83,7 @@ class test_cursor_bound07(bound_base):
             value = "value" + str(i) if not self.records_rle else "value"
             cursor[self.gen_key(i)] = value
         self.session.commit_transaction()
-        
+
         self.session.begin_transaction()
         for i in range(30, 70):
             value = "value" + str(i) if not self.deleted_rle else "value"
@@ -97,13 +97,13 @@ class test_cursor_bound07(bound_base):
             for i in range(self.start_key, self.end_key):
                 evict_cursor.set_key(self.gen_key(i))
                 evict_cursor.search()
-                evict_cursor.reset() 
+                evict_cursor.reset()
             evict_cursor.close()
         return cursor
 
     def test_bound_next_scenario(self):
         cursor = self.create_session_and_cursor()
-    
+
         # Test bound api: Test early exit works with upper bound.
         self.set_bounds(cursor, 15, "upper", self.upper_inclusive)
         self.cursor_traversal_bound(cursor, None, 15, self.next)
@@ -119,7 +119,7 @@ class test_cursor_bound07(bound_base):
         self.set_bounds(cursor, 90, "upper", self.upper_inclusive)
         self.cursor_traversal_bound(cursor, 80, 90, self.next)
         self.assertEqual(cursor.bound("action=clear"), 0)
-       
+
         # Test bound api: Test traversal with lower over deleted records.
         self.set_bounds(cursor, 50, "lower", self.lower_inclusive)
         self.cursor_traversal_bound(cursor, 50, None, self.next, 30)
@@ -147,7 +147,7 @@ class test_cursor_bound07(bound_base):
         self.session.begin_transaction()
         cursor[101] = "value_normal" + str(i)
         self.session.commit_transaction()
-        
+
         self.set_bounds(cursor, 100, "lower", False)
         self.cursor_traversal_bound(cursor, 100, None, self.next, 1)
         self.assertEqual(cursor.bound("action=clear"), 0)
@@ -167,7 +167,7 @@ class test_cursor_bound07(bound_base):
         self.set_bounds(cursor, 101, "upper", False)
         self.cursor_traversal_bound(cursor, None, 101, self.next, 60)
         self.assertEqual(cursor.bound("action=clear"), 0)
-        
+
         cursor.close()
 
 if __name__ == '__main__':

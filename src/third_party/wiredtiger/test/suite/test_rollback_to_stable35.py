@@ -128,7 +128,7 @@ class test_rollback_to_stable35(test_rollback_to_stable_base):
                 ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
                 stat_cursor.close()
                 time.sleep(1)
-            
+
             self.large_updates(uri_1, uri_2, valuec, ds_1, ds_2, nrows)
             self.check(valuec, uri_1, uri_2, nrows)
 

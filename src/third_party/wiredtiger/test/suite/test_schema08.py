@@ -42,7 +42,7 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
     # We want to copy, truncate and run recovery so keep the log
     # file small and don't pre-allocate any. We expect a small log.
     conn_config_string = 'log=(enabled,file_max=100k,prealloc=false,remove=false),'
-    
+
     types = [
         ('file', dict(uri='file:', use_cg=False, use_index=False)),
         ('lsm', dict(uri='lsm:', use_cg=False, use_index=False)),

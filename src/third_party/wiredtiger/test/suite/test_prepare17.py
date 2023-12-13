@@ -69,8 +69,8 @@ class test_prepare17(wttest.WiredTigerTestCase):
         cursor.close()
         time.sleep(1)
 
-        # The prepared update resides on the disk, however, as part of the process to commit the prepared update, 
-        # the page with the update is read back into the cache and the history page will be read in order to fix the stop 
+        # The prepared update resides on the disk, however, as part of the process to commit the prepared update,
+        # the page with the update is read back into the cache and the history page will be read in order to fix the stop
         # timestamp on any existing update in history store.
         # Before the history page is read into the cache, it is checked whether we need to evict a page before bringing in the new page.
         # Since the update already exceeds the 39% eviction threshold, it is possible that a cache stuck may occur.

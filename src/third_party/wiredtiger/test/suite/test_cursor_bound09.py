@@ -60,7 +60,7 @@ class test_cursor_bound09(bound_base):
         ('upper-inclusive-evict', dict(lower_inclusive=False,upper_inclusive=True,evict=True)),
         ('inclusive-no-evict', dict(lower_inclusive=True,upper_inclusive=True,evict=False)),
         ('lower-inclusive-no-evict', dict(lower_inclusive=True,upper_inclusive=False,evict=False)),
-        ('no-inclusive-no-evict', dict(lower_inclusive=False,upper_inclusive=False,evict=False))        
+        ('no-inclusive-no-evict', dict(lower_inclusive=False,upper_inclusive=False,evict=False))
     ]
 
     ignore_prepare = [
@@ -69,14 +69,14 @@ class test_cursor_bound09(bound_base):
     ]
 
     scenarios = make_scenarios(types, key_format_values, config, ignore_prepare)
-    
+
     # Test ignore prepare.
     def test_cursor_bound_prepared(self):
 
         # Test bound api: Prepare conflict on search, search_near and next with key set in middle of bounds.
         cursor = self.create_session_and_cursor()
         session2 = self.conn.open_session()
-        
+
         # Prepare keys 30-35
         self.session.begin_transaction()
         for i in range (30,36):
@@ -107,7 +107,7 @@ class test_cursor_bound09(bound_base):
                     pass
                 else:
                     raise e
-        session2.rollback_transaction()    
+        session2.rollback_transaction()
 
         # Test bound api: Prepare conflict on search, search_near and next with key set on the bounds.
         if (self.ignore_prepare):
@@ -115,7 +115,7 @@ class test_cursor_bound09(bound_base):
         else:
             session2.begin_transaction()
         cursor_ops = [cursor2.search_near, cursor2.search, cursor2.next]
-        
+
         for op in cursor_ops:
             cursor2.reset()
             self.set_bounds(cursor2, 30, "lower", self.lower_inclusive)
@@ -151,7 +151,7 @@ class test_cursor_bound09(bound_base):
             try:
                 if (self.ignore_prepare):
                     ret = cursor2.prev()
-                    if(ret == wiredtiger.WT_NOTFOUND): 
+                    if(ret == wiredtiger.WT_NOTFOUND):
                         break
                 else:
                     cursor2.prev()
@@ -191,7 +191,7 @@ class test_cursor_bound09(bound_base):
                 pass
             else:
                 raise e
-        session2.rollback_transaction() 
+        session2.rollback_transaction()
 
         # Test bound api:Prepare conflict with next with non-inclusive bounds.
         if (self.ignore_prepare):
@@ -201,7 +201,7 @@ class test_cursor_bound09(bound_base):
         cursor2.reset()
         self.set_bounds(cursor2, 30, "lower", inclusive = False)
         self.set_bounds(cursor2, 40, "upper", inclusive = False)
-        
+
         try:
             cursor2.next()
         except WiredTigerError as e:
@@ -210,7 +210,7 @@ class test_cursor_bound09(bound_base):
                 pass
             else:
                 raise e
-        session2.rollback_transaction() 
+        session2.rollback_transaction()
 
 if __name__ == '__main__':
     wttest.run()
