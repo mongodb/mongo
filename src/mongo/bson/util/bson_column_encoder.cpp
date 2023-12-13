@@ -218,7 +218,7 @@ int main(int argc, char* argv[]) {
             // parse first line separately and count fields
             string line;
             getline(inputStream, line);
-            int numFields = std::ranges::count(line, ',') + 1;
+            int numFields = std::count(line.begin(), line.end(), ',') + 1;
             DataView(lenBuf).write<LittleEndian<uint32_t>>(numFields);
             outputStream.write(lenBuf, sizeof(uint32_t));
 
