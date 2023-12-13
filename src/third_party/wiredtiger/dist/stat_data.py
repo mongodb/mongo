@@ -830,19 +830,29 @@ dsrc_stats = [
     ##########################################
     # Compression statistics
     ##########################################
-    CompressStat('compress_hist_ratio_2', 'number of blocks with compress ratio smaller than 2'),
-    CompressStat('compress_hist_ratio_4', 'number of blocks with compress ratio smaller than 4'),
-    CompressStat('compress_hist_ratio_8', 'number of blocks with compress ratio smaller than 8'),
-    CompressStat('compress_hist_ratio_16', 'number of blocks with compress ratio smaller than 16'),
-    CompressStat('compress_hist_ratio_32', 'number of blocks with compress ratio smaller than 32'),
-    CompressStat('compress_hist_ratio_64', 'number of blocks with compress ratio smaller than 64'),
-    CompressStat('compress_hist_ratio_max', 'number of blocks with compress ratio greater than 64'),
     CompressStat('compress_precomp_intl_max_page_size', 'compressed page maximum internal page size prior to compression', 'no_clear,no_scale,size'),
     CompressStat('compress_precomp_leaf_max_page_size', 'compressed page maximum leaf page size prior to compression ', 'no_clear,no_scale,size'),
-    CompressStat('compress_read', 'compressed pages read'),
-    CompressStat('compress_write', 'compressed pages written'),
-    CompressStat('compress_write_fail', 'page written failed to compress'),
-    CompressStat('compress_write_too_small', 'page written was too small to compress'),
+    CompressStat('compress_read', 'pages read from disk'),
+    # dist/stat.py sorts stats by their descriptions and not their names. The following stat descriptions insert an extra 
+    # space before the single digit numbers (2, 4, 8) so stats will be sorted numerically (2, 4, 8, 16, 32) instead of 
+    # alphabetically (16, 2, 32, 4, 8).
+    CompressStat('compress_read_ratio_hist_2', 'pages read from disk with compression ratio smaller than  2'),
+    CompressStat('compress_read_ratio_hist_4', 'pages read from disk with compression ratio smaller than  4'),
+    CompressStat('compress_read_ratio_hist_8', 'pages read from disk with compression ratio smaller than  8'),
+    CompressStat('compress_read_ratio_hist_16', 'pages read from disk with compression ratio smaller than 16'),
+    CompressStat('compress_read_ratio_hist_32', 'pages read from disk with compression ratio smaller than 32'),
+    CompressStat('compress_read_ratio_hist_64', 'pages read from disk with compression ratio smaller than 64'),
+    CompressStat('compress_read_ratio_hist_max', 'pages read from disk with compression ratio greater than 64'),
+    CompressStat('compress_write', 'pages written to disk'),
+    CompressStat('compress_write_ratio_hist_2', 'pages written to disk with compression ratio smaller than  2'),
+    CompressStat('compress_write_ratio_hist_4', 'pages written to disk with compression ratio smaller than  4'),
+    CompressStat('compress_write_ratio_hist_8', 'pages written to disk with compression ratio smaller than  8'),
+    CompressStat('compress_write_ratio_hist_16', 'pages written to disk with compression ratio smaller than 16'),
+    CompressStat('compress_write_ratio_hist_32', 'pages written to disk with compression ratio smaller than 32'),
+    CompressStat('compress_write_ratio_hist_64', 'pages written to disk with compression ratio smaller than 64'),
+    CompressStat('compress_write_ratio_hist_max', 'pages written to disk with compression ratio greater than 64'),
+    CompressStat('compress_write_fail', 'page written to disk failed to compress'),
+    CompressStat('compress_write_too_small', 'page written to disk was too small to compress'),
 
     ##########################################
     # Cursor operations

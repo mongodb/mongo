@@ -25,7 +25,8 @@ cat << UNUSED_STAT_FIELDS
 btree_clean_checkpoint_timer
 checkpoints_total_failed
 checkpoints_total_succeed
-compress_hist_ratio_max
+compress_read_ratio_hist_max
+compress_write_ratio_hist_max
 lock_checkpoint_count
 lock_checkpoint_wait_application
 lock_checkpoint_wait_internal

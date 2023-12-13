@@ -9,9 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * Define a function that increments histogram statistics compression ratios.
+ * Define functions that increment histogram statistics compression ratios for block reads and block
+ * writes.
  */
-WT_STAT_COMPR_RATIO_HIST_INCR_FUNC(ratio)
+WT_STAT_COMPR_RATIO_READ_HIST_INCR_FUNC(ratio)
+WT_STAT_COMPR_RATIO_WRITE_HIST_INCR_FUNC(ratio)
 
 /*
  * __blkcache_read_corrupt --
@@ -194,7 +196,7 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, 
               __blkcache_read_corrupt(session, ret, addr, addr_size, "block decompression failed"));
 
         compression_ratio = result_len / (tmp->size - WT_BLOCK_COMPRESS_SKIP);
-        __wt_stat_compr_ratio_hist_incr(session, compression_ratio);
+        __wt_stat_compr_ratio_read_hist_incr(session, compression_ratio);
 
     } else {
         /*
@@ -242,7 +244,7 @@ __wt_blkcache_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_
     WT_ITEM *ip;
     WT_KEYED_ENCRYPTOR *kencryptor;
     WT_PAGE_HEADER *dsk;
-    size_t dst_len, len, result_len, size, src_len;
+    size_t compression_ratio, dst_len, len, result_len, size, src_len;
     uint64_t time_diff, time_start, time_stop;
     uint8_t *dst, *src;
     int compression_failed; /* Extension API, so not a bool. */
@@ -309,6 +311,9 @@ __wt_blkcache_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_
         } else {
             compressed = true;
             WT_STAT_DATA_INCR(session, compress_write);
+
+            compression_ratio = src_len / (result_len - WT_BLOCK_COMPRESS_SKIP);
+            __wt_stat_compr_ratio_write_hist_incr(session, compression_ratio);
 
             /* Copy in the skipped header bytes and set the final data size. */
             memcpy(ctmp->mem, buf->mem, WT_BLOCK_COMPRESS_SKIP);

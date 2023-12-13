@@ -311,23 +311,44 @@ __wt_stats_clear(void *stats_arg, int slot)
             WT_STAT_CONN_INCR(session, stat##_gt10000);                                           \
     }
 
-#define WT_STAT_COMPR_RATIO_HIST_INCR_FUNC(ratio)                                                \
-    static inline void __wt_stat_compr_ratio_hist_incr(WT_SESSION_IMPL *session, uint64_t ratio) \
-    {                                                                                            \
-        if (ratio < 2)                                                                           \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_2);                                   \
-        else if (ratio < 4)                                                                      \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_4);                                   \
-        else if (ratio < 8)                                                                      \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_8);                                   \
-        else if (ratio < 16)                                                                     \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_16);                                  \
-        else if (ratio < 32)                                                                     \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_32);                                  \
-        else if (ratio < 64)                                                                     \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_64);                                  \
-        else                                                                                     \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_max);                                 \
+#define WT_STAT_COMPR_RATIO_READ_HIST_INCR_FUNC(ratio)                \
+    static inline void __wt_stat_compr_ratio_read_hist_incr(          \
+      WT_SESSION_IMPL *session, uint64_t ratio)                       \
+    {                                                                 \
+        if (ratio < 2)                                                \
+            WT_STAT_DATA_INCR(session, compress_read_ratio_hist_2);   \
+        else if (ratio < 4)                                           \
+            WT_STAT_DATA_INCR(session, compress_read_ratio_hist_4);   \
+        else if (ratio < 8)                                           \
+            WT_STAT_DATA_INCR(session, compress_read_ratio_hist_8);   \
+        else if (ratio < 16)                                          \
+            WT_STAT_DATA_INCR(session, compress_read_ratio_hist_16);  \
+        else if (ratio < 32)                                          \
+            WT_STAT_DATA_INCR(session, compress_read_ratio_hist_32);  \
+        else if (ratio < 64)                                          \
+            WT_STAT_DATA_INCR(session, compress_read_ratio_hist_64);  \
+        else                                                          \
+            WT_STAT_DATA_INCR(session, compress_read_ratio_hist_max); \
+    }
+
+#define WT_STAT_COMPR_RATIO_WRITE_HIST_INCR_FUNC(ratio)                \
+    static inline void __wt_stat_compr_ratio_write_hist_incr(          \
+      WT_SESSION_IMPL *session, uint64_t ratio)                        \
+    {                                                                  \
+        if (ratio < 2)                                                 \
+            WT_STAT_DATA_INCR(session, compress_write_ratio_hist_2);   \
+        else if (ratio < 4)                                            \
+            WT_STAT_DATA_INCR(session, compress_write_ratio_hist_4);   \
+        else if (ratio < 8)                                            \
+            WT_STAT_DATA_INCR(session, compress_write_ratio_hist_8);   \
+        else if (ratio < 16)                                           \
+            WT_STAT_DATA_INCR(session, compress_write_ratio_hist_16);  \
+        else if (ratio < 32)                                           \
+            WT_STAT_DATA_INCR(session, compress_write_ratio_hist_32);  \
+        else if (ratio < 64)                                           \
+            WT_STAT_DATA_INCR(session, compress_write_ratio_hist_64);  \
+        else                                                           \
+            WT_STAT_DATA_INCR(session, compress_write_ratio_hist_max); \
     }
 
 /*
@@ -1150,17 +1171,24 @@ struct __wt_dsrc_stats {
     int64_t checkpoint_obsolete_applied;
     int64_t compress_precomp_intl_max_page_size;
     int64_t compress_precomp_leaf_max_page_size;
-    int64_t compress_read;
-    int64_t compress_write;
-    int64_t compress_hist_ratio_max;
-    int64_t compress_hist_ratio_16;
-    int64_t compress_hist_ratio_2;
-    int64_t compress_hist_ratio_32;
-    int64_t compress_hist_ratio_4;
-    int64_t compress_hist_ratio_64;
-    int64_t compress_hist_ratio_8;
     int64_t compress_write_fail;
     int64_t compress_write_too_small;
+    int64_t compress_read;
+    int64_t compress_read_ratio_hist_max;
+    int64_t compress_read_ratio_hist_2;
+    int64_t compress_read_ratio_hist_4;
+    int64_t compress_read_ratio_hist_8;
+    int64_t compress_read_ratio_hist_16;
+    int64_t compress_read_ratio_hist_32;
+    int64_t compress_read_ratio_hist_64;
+    int64_t compress_write;
+    int64_t compress_write_ratio_hist_max;
+    int64_t compress_write_ratio_hist_2;
+    int64_t compress_write_ratio_hist_4;
+    int64_t compress_write_ratio_hist_8;
+    int64_t compress_write_ratio_hist_16;
+    int64_t compress_write_ratio_hist_32;
+    int64_t compress_write_ratio_hist_64;
     int64_t cursor_next_skip_total;
     int64_t cursor_prev_skip_total;
     int64_t cursor_skip_hs_cur_position;
