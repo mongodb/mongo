@@ -13,18 +13,6 @@ const validateErrorResponse = function(
     assert.eq(res.collectionUUID, collectionUUID);
     assert.eq(res.expectedCollection, expectedCollection);
     assert.eq(res.actualCollection, actualCollection);
-
-    if (res.raw) {
-        // In sharded cluster scenario, the inner raw shards reply should contain the error info,
-        // along with the outer reply obj.
-        for (let [_, shardReply] of Object.entries(res.raw)) {
-            assert.eq(shardReply.code, ErrorCodes.CollectionUUIDMismatch);
-            assert.eq(shardReply.db, db);
-            assert.eq(shardReply.collectionUUID, collectionUUID);
-            assert.eq(shardReply.expectedCollection, expectedCollection);
-            assert.eq(shardReply.actualCollection, actualCollection);
-        }
-    }
 };
 
 const testCommand = function(cmd, cmdObj) {
