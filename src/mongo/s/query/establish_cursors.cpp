@@ -349,6 +349,7 @@ void CursorEstablisher::_handleFailure(const AsyncRequestsSender::Response& resp
                                    boost::none,
                                    boost::none,
                                    boost::none,
+                                   boost::none,
                                    true}});
         return;
     }

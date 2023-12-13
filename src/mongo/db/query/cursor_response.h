@@ -46,6 +46,7 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -242,6 +243,7 @@ public:
                    boost::optional<BSONObj> writeConcernError = boost::none,
                    boost::optional<BSONObj> varsField = boost::none,
                    boost::optional<std::string> cursorType = boost::none,
+                   boost::optional<CursorMetrics> metrics = boost::none,
                    bool partialResultsReturned = false,
                    bool invalidated = false,
                    bool wasStatementExecuted = false);
@@ -285,6 +287,10 @@ public:
         return _varsField;
     }
 
+    auto& getCursorMetrics() const {
+        return _metrics;
+    }
+
     auto getCursorType() const {
         return _cursorType;
     }
@@ -323,6 +329,7 @@ private:
     boost::optional<BSONObj> _writeConcernError;
     boost::optional<BSONObj> _varsField;
     boost::optional<std::string> _cursorType;
+    boost::optional<CursorMetrics> _metrics;
     bool _partialResultsReturned = false;
     bool _invalidated = false;
     bool _wasStatementExecuted = false;

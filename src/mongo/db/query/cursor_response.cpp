@@ -158,6 +158,7 @@ CursorResponse::CursorResponse(NamespaceString nss,
                                boost::optional<BSONObj> writeConcernError,
                                boost::optional<BSONObj> varsField,
                                boost::optional<std::string> cursorType,
+                               boost::optional<CursorMetrics> metrics,
                                bool partialResultsReturned,
                                bool invalidated,
                                bool wasStatementExecuted)
@@ -169,6 +170,7 @@ CursorResponse::CursorResponse(NamespaceString nss,
       _writeConcernError(std::move(writeConcernError)),
       _varsField(std::move(varsField)),
       _cursorType(std::move(cursorType)),
+      _metrics(std::move(metrics)),
       _partialResultsReturned(partialResultsReturned),
       _invalidated(invalidated),
       _wasStatementExecuted(wasStatementExecuted) {}
@@ -247,6 +249,8 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(
         }
     }
 
+    auto metrics = cursor.getMetrics();
+
     auto getOwnedBSONObj = [](const boost::optional<BSONObj>& unownedObj) {
         return unownedObj ? unownedObj->getOwned() : unownedObj;
     };
@@ -259,6 +263,7 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(
              getOwnedBSONObj(response.getWriteConcernError()),
              getOwnedBSONObj(response.getVars()),
              std::move(type),
+             std::move(metrics),
              cursor.getPartialResultsReturned(),
              cursor.getInvalidated(),
              cursor.getWasStatementExecuted()}};

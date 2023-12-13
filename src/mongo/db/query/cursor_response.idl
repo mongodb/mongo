@@ -172,6 +172,29 @@ structs:
                 type: GetMoreResponseCursor
                 stability: stable
 
+    CursorMetrics:
+        description: "A struct representing all of the metrics a cursor response can return."
+        strict: false
+        fields:
+            keysExamined:
+                description: "Number of index keys examined by the query."
+                type: long
+            docsExamined:
+                description: "Number of documents examined by the query."
+                type: long
+            hasSortStage:
+                description: "Boolean value that is true if the query plan involves an in-memory sort."
+                type: bool
+            usedDisk:
+                description: "Boolean value that is if the given query used disk."
+                type: bool
+            fromMultiPlanner:
+                description: "Boolean value that is true if the plan came from the multi-planner."
+                type: bool
+            fromPlanCache:
+                description: "Boolean value that is true if the plan came from the plan cache."
+                type: bool
+
     # This type could be naturally expressed as a variant of InitialResponseCursor and
     # GetMoreResponseCursor, but the IDL parser can't handle multi-struct variants in general.
     # It needs to be able to identify the type of the struct based on the first element of the
@@ -197,6 +220,11 @@ structs:
                 description: "An optional field containing disambiguation information if a reply contains multiple cursors."
                 type: string
                 cpp_name: cursorType
+                optional: true
+                stability: unstable
+            metrics:
+                description: "An optional field containing metrics about the query's execution."
+                type: CursorMetrics
                 optional: true
                 stability: unstable
 
