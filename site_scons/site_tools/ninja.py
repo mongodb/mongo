@@ -529,7 +529,7 @@ class NinjaState:
 
         self.rules = {
             "CMD": {
-                "command": "cmd /c $env$cmd" if sys.platform == "win32" else "$env$cmd",
+                "command": "cmd.exe /c $env$cmd" if sys.platform == "win32" else "$env$cmd",
                 "description": "Built $out",
                 "pool": "local_pool",
             },

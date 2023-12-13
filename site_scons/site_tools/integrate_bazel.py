@@ -101,8 +101,9 @@ def bazel_target_emitter(
         bazel_out_dir = env.get("BAZEL_OUT_DIR")
         bazel_out_target = f'{bazel_out_dir}/{bazel_dir}/{os.path.basename(bazel_path)}'
 
-        Globals.scons2bazel_targets[t.path] = {
-            'bazel_target': convert_scons_node_to_bazel_target(t), 'bazel_output': bazel_out_target
+        Globals.scons2bazel_targets[t.path.replace('\\', '/')] = {
+            'bazel_target': convert_scons_node_to_bazel_target(t),
+            'bazel_output': bazel_out_target.replace('\\', '/')
         }
 
     return (target, source)
@@ -134,8 +135,8 @@ def bazel_builder_action(env: SCons.Environment.Environment, target: List[SCons.
 
         return False
 
-    bazel_output = Globals.scons2bazel_targets[target[0].path]['bazel_output']
-    bazel_target = Globals.scons2bazel_targets[target[0].path]['bazel_target']
+    bazel_output = Globals.scons2bazel_targets[target[0].path.replace('\\', '/')]['bazel_output']
+    bazel_target = Globals.scons2bazel_targets[target[0].path.replace('\\', '/')]['bazel_target']
     bazel_debug(f"Checking if {bazel_output} is done...")
 
     # put the target into the work queue the poll until its
@@ -159,7 +160,7 @@ def bazel_builder_action(env: SCons.Environment.Environment, target: List[SCons.
     # now copy all the targets out to the scons tree, note that target is a
     # list of nodes so we need to stringify it for copyfile
     for t in target:
-        s = Globals.scons2bazel_targets[t.path]['bazel_output']
+        s = Globals.scons2bazel_targets[t.path.replace('\\', '/')]['bazel_output']
         bazel_debug(f"Copying {s} from bazel tree to {t} in the scons tree.")
         shutil.copyfile(s, str(t))
 
@@ -181,18 +182,18 @@ def ninja_bazel_builder(env: SCons.Environment.Environment, _dup_env: SCons.Envi
     """
 
     outs = env.NinjaGetOutputs(node)
-    ins = [Globals.scons2bazel_targets[out]['bazel_output'] for out in outs]
+    ins = [Globals.scons2bazel_targets[out.replace('\\', '/')]['bazel_output'] for out in outs]
 
     # this represents the values the ninja_syntax.py will use to generate to real
     # ninja syntax defined in the ninja manaul: https://ninja-build.org/manual.html#ref_ninja_file
     return {
         "outputs": outs,
         "inputs": ins,
-        "rule": "CMD",
+        "rule": "BAZEL_COPY_RULE",
         "variables": {
             "cmd":
-                ' '.join([
-                    f"$COPY {input_node} {output_node};"
+                ' & '.join([
+                    f"$COPY {input_node.replace('/',os.sep)} {output_node}"
                     for input_node, output_node in zip(ins, outs)
                 ])
         },
@@ -460,6 +461,9 @@ def generate(env: SCons.Environment.Environment) -> None:
                                                   args=(env.Dir("$BUILD_ROOT/scons/bazel").path, ))
             bazel_build_thread.daemon = True
             bazel_build_thread.start()
+        else:
+            env.NinjaRule("BAZEL_COPY_RULE", "$env$cmd", description="Copy from Bazel",
+                          pool="local_pool")
 
         env.AddMethod(generate_bazel_info_for_ninja, "GenerateBazelInfoForNinja")
         env.AddMethod(ninja_bazel_builder, "NinjaBazelBuilder")

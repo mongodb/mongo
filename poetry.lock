@@ -1713,13 +1713,16 @@ test = ["pytest", "pytest-cov"]
 
 [[package]]
 name = "mongo-ninja-python"
-version = "1.11.1.6"
+version = "1.11.1.7"
 description = ""
 optional = false
 python-versions = "*"
 files = [
-    {file = "mongo_ninja_python-1.11.1.6-py2.py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:0be71b6b84aaa8520f90aad6104da41cb88208d1c132080901770ea7b2307eda"},
-    {file = "mongo_ninja_python-1.11.1.6-py2.py3-none-manylinux_2_24_aarch64.whl", hash = "sha256:c74cee08c776e22edaa558c99d144fa5cb1e6783605d9fedbf2a9a3647901f96"},
+    {file = "mongo_ninja_python-1.11.1.7-py2.py3-none-macosx_11_0_arm64.whl", hash = "sha256:0a9999cb54d1898bbfd228fe479e288abf39a2cca275759122db44d4d5bcdd53"},
+    {file = "mongo_ninja_python-1.11.1.7-py2.py3-none-macosx_11_0_x86_64.whl", hash = "sha256:3626cd92b68e1690d250255d337997b17f379750b368af22bf5b3effb5b68d8b"},
+    {file = "mongo_ninja_python-1.11.1.7-py2.py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:094683a0eb2d0572b2d844ca8448c87466dc06adbf530184b9747ead6339df14"},
+    {file = "mongo_ninja_python-1.11.1.7-py2.py3-none-manylinux_2_24_aarch64.whl", hash = "sha256:d10dbee1cc42f081f9f0e01d615e2720784604fe7be5d80f2b6a99345178ef24"},
+    {file = "mongo_ninja_python-1.11.1.7-py2.py3-none-win_amd64.whl", hash = "sha256:afd8de282d86903353a7412855da59b8cb3df9af6bb23d6a924b7a546e17bc76"},
 ]
 
 [package.dependencies]
@@ -4264,4 +4267,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4.0"
-content-hash = "1392e467e860501cdd4e6828ae72fb52c58db41a091d0183a0032b18a896019f"
+content-hash = "eb67d501a9da49623a1c479ffe732c5c5ca5ce75be2f61932bec405ddf67707c"

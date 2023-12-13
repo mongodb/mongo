@@ -60,7 +60,7 @@ ninja_inputs_cmd = ['ninja', '-f', args.ninja_file, '-t', 'inputs'] + ninja_comm
 print_debug(f"NINJA GET INPUTS CMD: {' '.join(ninja_inputs_cmd)}")
 
 ninja_proc = subprocess.run(ninja_inputs_cmd, capture_output=True, text=True, check=True)
-deps = ninja_proc.stdout.split(os.linesep)
+deps = [os.path.abspath(dep).replace("\\", '/') for dep in ninja_proc.stdout.split("\n") if dep]
 print_debug(f"COMMAND LINE DEPS:{os.linesep}{os.linesep.join(deps)}")
 
 # isolate just the raw output files for the list intersection
@@ -84,8 +84,16 @@ if not targets_to_build:
 # ninja will automatically create directories for any outputs, but in this case
 # bazel will be creating a symlink for the bazel-out dir to its cache. We don't want
 # ninja to interfere so delete the dir if it was not a link (made by bazel)
-if not os.path.islink("bazel-out"):
-    shutil.rmtree("bazel-out")
+if sys.platform == "win32":
+    if os.path.exists("bazel-out"):
+        try:
+            os.readlink("bazel-out")
+        except OSError:
+            shutil.rmtree("bazel-out")
+
+else:
+    if not os.path.islink("bazel-out"):
+        shutil.rmtree("bazel-out")
 
 # now we are ready to build all bazel buildable files
 print_debug(f"BAZEL TARGETS TO BUILD:{os.linesep}{os.linesep.join(targets_to_build)}")

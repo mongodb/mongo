@@ -112,10 +112,10 @@ cryptography = [
     { version = "36.0.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
 ]
 mongo-ninja-python = [
-    { version = "1.11.1.6", markers = "sys_platform == 'linux' and platform_machine != 's390x' and platform_machine != 'ppc64le'" },
+    { version = "1.11.1.7", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
 ]
 ninja = [
-    { version = ">=1.10.0", markers = "sys_platform != 'linux' or platform_machine == 's390x' or platform_machine == 'ppc64le'" },
+    { version = ">=1.10.0", markers = "platform_machine == 's390x' or platform_machine == 'ppc64le'" },
 ]
 
 [tool.poetry.group.testing.dependencies]

@@ -9465,11 +9465,13 @@ task_groups:
   tasks:
   - compile_bazel_dist_test_windows
   - run_bazel_program_windows
+  - compile_ninja_bazel
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_macos_TG
   tasks:
   - compile_bazel_dist_test_macos
+  - compile_ninja_bazel
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG
