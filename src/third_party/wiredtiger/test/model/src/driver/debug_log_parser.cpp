@@ -366,14 +366,13 @@ debug_log_parser::metadata_checkpoint_apply(
         else
             snapshot_ids = std::make_shared<std::vector<uint64_t>>();
         snapshot = std::make_shared<kv_transaction_snapshot_wt>(
-          _ckpt_count, write_gen, snapshot_min, snapshot_max, *snapshot_ids);
+          write_gen, snapshot_min, snapshot_max, *snapshot_ids);
     } else
         snapshot = std::make_shared<kv_transaction_snapshot_wt>(
-          _ckpt_count, write_gen, k_txn_max, k_txn_max, std::vector<uint64_t>());
+          write_gen, k_txn_max, k_txn_max, std::vector<uint64_t>());
 
     /* Create the checkpoint. */
     _database.create_checkpoint(name.c_str(), snapshot, stable_timestamp);
-    _ckpt_count++;
 }
 
 /*
@@ -471,7 +470,7 @@ debug_log_parser::begin_transaction(const debug_log_parser::commit_header &op)
         throw model_exception("The base write generation is not set");
 
     kv_transaction_ptr txn = _database.begin_transaction();
-    txn->set_wt_metadata(op.txnid, _base_write_gen, _ckpt_count);
+    txn->set_wt_metadata(op.txnid, _base_write_gen);
     return txn;
 }
 

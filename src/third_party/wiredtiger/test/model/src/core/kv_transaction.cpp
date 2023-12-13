@@ -45,7 +45,7 @@ kv_transaction::add_update(
 {
     std::lock_guard lock_guard(_lock);
 
-    update->set_wt_transaction_metadata(_wt_id, _wt_base_write_gen, _wt_ckpt_seq_number);
+    update->set_wt_transaction_metadata(_wt_id, _wt_base_write_gen);
 
     std::shared_ptr<kv_transaction_update> txn_update =
       std::make_shared<kv_transaction_update>(table.name(), key, update);
