@@ -338,8 +338,12 @@ run_test_backup(void)
 
     /* Parent. */
 
-    /* Wait for the child to die. */
-    testutil_assert(waitpid(pid, &status, 0) > 0);
+    /*
+     * Wait for the child to die. Depending on when the child died and on what operating system the
+     * call may return the child process ID or an error. If we get an error indication check that it
+     * is an interrupt.
+     */
+    testutil_assert(waitpid(pid, &status, 0) > 0 || errno == EINTR);
     printf("-- crash --\n");
 
     /* Save the database directory. */
@@ -397,8 +401,12 @@ run_test_force_stop(void)
 
     /* Parent. */
 
-    /* Wait for the child to die. */
-    testutil_assert(waitpid(pid, &status, 0) > 0);
+    /*
+     * Wait for the child to die. Depending on when the child died and on what operating system the
+     * call may return the child process ID or an error. If we get an error indication check that it
+     * is an interrupt.
+     */
+    testutil_assert(waitpid(pid, &status, 0) > 0 || errno == EINTR);
     printf("-- crash --\n");
 
     /* Save the database directory. */
