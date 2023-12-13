@@ -13,12 +13,28 @@ variables:
   - name: package_new_compile
     variant: amazon2-arm64-compile
 
+- &rhel70_x86_compile_variant_dependency
+  depends_on:
+  - name: schedule_global_auto_tasks
+    variant: task_generation
+  - name: package_new_compile
+    variant: rhel70-x86-compile
+
 - &amazon_linux2_x86_streams_compile_variant_dependency
   depends_on:
   - name: schedule_global_auto_tasks
     variant: task_generation
   - name: package_new_compile
     variant: amazon2-x86-streams-compile
+
+- &amazon_linux2_arm64_compile_variant_dependency
+  depends_on:
+  - name: schedule_global_auto_tasks
+    variant: task_generation
+  - name: package_new_compile
+    variant: amazon2-arm64-compile
+  - name: compile_mongocrypt_shlib
+    variant: amazon2-arm64-mongocrypt-shlib-compile
 
 - &amazon2_x86_expansions
   multiversion_platform: amazon2
@@ -258,11 +274,10 @@ buildvariants:
     - name: column_store_tpch_10_denormalized_unindexed
     - name: ssb_column_store_comparison
 
-# TODO: Fix Atlas variants (SERVER-83171)
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-atlas-M30-real.arm.aws.2023-11
   display_name: PERF M30-Atlas ReplSet ARM AWS 2023-11
-  cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
+  cron: &cron_sunday_thursday "0 0 * * 0,4"
   modules: *perf_modules
   expansions:
     mongodb_setup: atlas
@@ -288,7 +303,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-atlas-M60-real.arm.aws.2023-11
   display_name: PERF M60-Atlas ReplSet ARM AWS 2023-11
-  cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
+  cron: *cron_sunday_thursday
   modules: *perf_modules
   expansions:
     mongodb_setup: atlas
@@ -318,7 +333,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-atlas-M60-shard-real-multi-client.arm.aws.2023-11
   display_name: PERF M60-Shard Atlas Multiple Workload Clients ARM AWS 2023-11
-  cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
+  cron: *cron_sunday_thursday
   modules: *perf_modules
   expansions:
     mongodb_setup: atlas-shard
@@ -337,37 +352,35 @@ buildvariants:
   tasks:
     - name: locust_bulk_insert
 
-# Uncomment after SERVER-83767 is completed
-# - <<: *amazon2_x86_compile_variant_dependency
-#   name: perf-atlas-M60-real.intel.azure.2023-11
-#   display_name: PERF M60-Atlas ReplSet Intel Azure 2023-11
-#   # cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
-#   activate: false
-#   modules: *perf_modules
-#   expansions:
-#     mongodb_setup: atlas
-#     canaries: none
-#     atlas_setup: M60-repl-azure
-#     use_custom_build_azure: true
-#     compile_variant: -rhel70
-#     infrastructure_provisioning: workload_client_intel.2023-11
-#     infrastructure_provisioning_release: 2023-09
-#     workload_setup: 2022-11
-#     platform: linux
-#     project_dir: *perf_project_dir
-#     storageEngine: wiredTiger
-#     compile_variant: amazon2-x86-compile
-#   run_on:
-#     - "rhel70-perf-atlas-large"
-#   tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
-#     - name: schedule_patch_auto_tasks
-#     - name: schedule_variant_auto_tasks
-#     - name: ycsb.2023-09
-#     - name: ycsb_60GB.2023-09
-#     - name: tpcc
-#     - name: tpcc_majority
-#     - name: linkbench
-#     - name: linkbench2
+- <<: *rhel70_x86_compile_variant_dependency
+  name: perf-atlas-M60-real.intel.azure.2023-11
+  display_name: PERF M60-Atlas ReplSet Intel Azure 2023-11
+  cron: *cron_sunday_thursday
+  activate: false
+  modules: *perf_modules
+  expansions:
+    mongodb_setup: atlas
+    canaries: none
+    atlas_setup: M60-repl-azure
+    use_custom_build_azure: true
+    compile_variant: rhel70-x86-compile
+    infrastructure_provisioning: workload_client_intel.2023-11
+    infrastructure_provisioning_release: 2023-09
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    storageEngine: wiredTiger
+  run_on:
+    - "rhel70-perf-atlas-large"
+  tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
+    - name: ycsb.2023-09
+    - name: ycsb_60GB.2023-09
+    - name: tpcc
+    - name: tpcc_majority
+    - name: linkbench
+    - name: linkbench2
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone.arm.aws.2023-11
@@ -966,33 +979,30 @@ buildvariants:
     - name: genny_query_TenMDocCollection_IntId_IdentityView
     - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
-# - name: perf-shard-lite-fle.arm.aws.2023-11
-#   display_name: PERF Shard Lite FLE ARM AWS 2023-11
-# #   # cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
-#   modules: *perf_modules
-#   expansions:
-#     mongodb_setup_release: 2022-11
-#     mongodb_setup: shard-lite-fle
-#     infrastructure_provisioning_release: 2023-09
-#     infrastructure_provisioning: shard-lite
-#     workload_setup: 2022-11
-#     platform: linux
-#     project_dir: *perf_project_dir
-#     authentication: enabled
-#     storageEngine: wiredTiger
-#     compile_variant: amazon2-arm64-compile
-#     requires_mongocrypt_shlib: true
-#   run_on:
-#     - "rhel70-perf-shard-lite"
-#     # TODO: JDB
-#   depends_on: *_compile_amazon_linux2_arm64_with_mongocrypt_shlib
-#   tasks:
-#     - name: schedule_patch_auto_tasks
-#     - name: schedule_variant_auto_tasks
-#     - name: medical_workload_diagnosis_50_50_high_value
-#       # cron: *high-value-workload-cron
-#     - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
-#       # cron: *high-value-workload-cron
+- <<: *amazon_linux2_arm64_compile_variant_dependency
+  name: perf-shard-lite-fle.arm.aws.2023-11
+  display_name: PERF Shard Lite FLE ARM AWS 2023-11
+  cron: *cron_sunday_thursday
+  modules: *perf_modules
+  expansions:
+    mongodb_setup_release: 2022-11
+    mongodb_setup: shard-lite-fle
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: shard-lite
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile_variant: amazon2-arm64-compile
+    requires_mongocrypt_shlib: true
+  run_on:
+    - "rhel70-perf-shard-lite"
+  tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
+    - name: medical_workload_diagnosis_50_50_high_value
+    - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-audit-log-encryption-compression.arm.aws.2023-11
@@ -1014,32 +1024,31 @@ buildvariants:
     - "rhel70-perf-single"
   tasks: *audit-tasks
 
-# - name: perf-1-node-replSet-fle.arm.aws.2023-11
-#   display_name: PERF 1-Node ReplSet FLE ARM AWS 2023-11
-# #   # cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
-#   modules: *perf_modules
-#   expansions:
-#     mongodb_setup_release: 2022-11
-#     mongodb_setup: single-replica-fle
-#     infrastructure_provisioning_release: 2023-09
-#     infrastructure_provisioning: single
-#     workload_setup: 2022-11
-#     platform: linux
-#     project_dir: *perf_project_dir
-#     authentication: enabled
-#     fle: enabled
-#     storageEngine: wiredTiger
-#     compile_variant: amazon2-arm64-compile
-#     requires_mongocrypt_shlib: true
-#   run_on:
-#     - "rhel70-perf-single"
-#     # TODO: JDB
-#   depends_on: *_compile_amazon_linux2_arm64_with_mongocrypt_shlib
-#   tasks:
-#     - name: schedule_patch_auto_tasks
-#     - name: schedule_variant_auto_tasks
-#     - name: ycsb.2023-09
-#     - name: linkbench
+- <<: *amazon_linux2_arm64_compile_variant_dependency
+  name: perf-1-node-replSet-fle.arm.aws.2023-11
+  display_name: PERF 1-Node ReplSet FLE ARM AWS 2023-11
+  cron: *cron_sunday_thursday
+  modules: *perf_modules
+  expansions:
+    mongodb_setup_release: 2022-11
+    mongodb_setup: single-replica-fle
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: single
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    fle: enabled
+    storageEngine: wiredTiger
+    compile_variant: amazon2-arm64-compile
+    requires_mongocrypt_shlib: true
+  run_on:
+    - "rhel70-perf-single"
+  tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
+    - name: ycsb.2023-09
+    - name: linkbench
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-ese-cbc.arm.aws.2023-11
@@ -1122,7 +1131,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-1dayhistory-15gbwtcache.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache ARM AWS 2023-11
-  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: *cron_sunday_thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1262,7 +1271,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-shard-lite-audit.arm.aws.2023-11
   display_name: PERF Shard Lite Cluster Audit ARM AWS 2023-11
-  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: *cron_sunday_thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1284,7 +1293,7 @@ buildvariants:
   <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-shard-lite.arm.aws.2023-11
   display_name: PERF Shard Lite Cluster ARM AWS 2023-11
-  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: *cron_sunday_thursday
   modules: *perf_modules
   expansions: &shard-lite-baseline-expansions
     mongodb_setup_release: 2022-11
@@ -1334,7 +1343,7 @@ buildvariants:
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-shard-lite-intel.intel.aws.2023-11
   display_name: PERF Shard Lite Cluster Intel AWS 2023-11
-  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: *cron_sunday_thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -1841,7 +1850,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-maintenance-events.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet (Maintenance Events) ARM AWS 2023-11
-  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: *cron_sunday_thursday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
