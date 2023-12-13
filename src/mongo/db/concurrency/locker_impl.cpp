@@ -844,7 +844,8 @@ void LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
 
         // We should never have to save and restore metadata locks.
         invariant(RESOURCE_DATABASE == resType || RESOURCE_COLLECTION == resType ||
-                  RESOURCE_TENANT == resType || resId == resourceIdFeatureCompatibilityVersion ||
+                  RESOURCE_TENANT == resType ||
+                  resId == resourceIdMultiDocumentTransactionsBarrier ||
                   resId == resourceIdReplicationStateTransitionLock);
 
         // And, stuff the info into the out parameter.
@@ -870,9 +871,9 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
 
     std::vector<OneLock>::const_iterator it = state.locks.begin();
 
-    // If we locked the FCV lock, it must be locked before the
+    // If we locked the MultiDocumentTransactionsBarrier lock, it must be locked before the
     // resourceIdReplicationStateTransitionLock and resourceIdGlobal resources.
-    if (it != state.locks.end() && it->resourceId == resourceIdFeatureCompatibilityVersion) {
+    if (it != state.locks.end() && it->resourceId == resourceIdMultiDocumentTransactionsBarrier) {
         lock(opCtx, it->resourceId, it->mode);
         it++;
     }

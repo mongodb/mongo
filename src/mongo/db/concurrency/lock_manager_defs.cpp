@@ -42,8 +42,8 @@ const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, DatabaseName:
 const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, DatabaseName::kAdmin);
 const ResourceId resourceIdGlobal =
     ResourceId(RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kGlobal));
-const ResourceId resourceIdFeatureCompatibilityVersion = ResourceId(
-    RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kFeatureCompatibilityVersion));
+const ResourceId resourceIdMultiDocumentTransactionsBarrier = ResourceId(
+    RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kMultiDocumentTransactionsBarrier));
 const ResourceId resourceIdReplicationStateTransitionLock = ResourceId(
     RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kReplicationStateTransitionLock));
 

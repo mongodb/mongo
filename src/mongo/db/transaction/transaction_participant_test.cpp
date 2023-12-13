@@ -6484,12 +6484,19 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     userSession.reset();
 
     // Rollback such that the commit oplog entry and the effects of the transaction are rolled
-    // back.
+    // back. Unset some of the multi-doc transaction state because it's illegal to request the
+    // global lock in strong mode when the operation context has been part of a multi-doc
+    // transaction.
+    const auto lsid = *opCtx->getLogicalSessionId();
+    const auto txnNum = *opCtx->getTxnNumber();
+    opCtx->resetMultiDocumentTransactionState();
     opCtx->getServiceContext()->getStorageEngine()->setStableTimestamp(chosenStableTimestamp);
     {
         Lock::GlobalLock globalLock(opCtx, LockMode::MODE_X);
         ASSERT_OK(opCtx->getServiceContext()->getStorageEngine()->recoverToStableTimestamp(opCtx));
     }
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
 
     // Again, display read values for diagnostics.
     userColl.emplace(opCtx, kNss, LockMode::MODE_IX);

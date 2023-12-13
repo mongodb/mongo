@@ -113,10 +113,6 @@ void JournalFlusher::run() {
         // to skip ticket and flow control.
         shard_role_details::getLocker(_uniqueCtx->get())
             ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
-
-        // The journal flusher should not conflict with the setFCV command.
-        shard_role_details::getLocker(_uniqueCtx->get())
-            ->setShouldConflictWithSetFeatureCompatibilityVersion(false);
     };
 
     setUpOpCtx();

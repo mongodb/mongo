@@ -398,16 +398,6 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
         sessionInfo.setTxnRetryCounter(*txnNumberAndRetryCounter.getTxnRetryCounter());
     }
 
-    // The transaction participant is already holding a global IX lock (and therefore an FCV IX
-    // lock) when we get to this point. Since the setFCV command takes an FCV S lock, we can hit a
-    // deadlock if the setFCV enqueues its lock after the transaction participant has already
-    // acquired its lock, but before we (the transaction coordinator) acquire ours. To remedy this,
-    // we choose to bypass this barrier that setFCV creates. This is safe because the setFCV command
-    // drains any outstanding cross-shard transactions before completing an FCV upgrade/downgrade.
-    // It does so by waiting for the participant portion of the cross-shard transaction to have
-    // released its FCV IX lock.
-    ShouldNotConflictWithSetFeatureCompatibilityVersionBlock noFCVLock{
-        shard_role_details::getLocker(opCtx)};
     DBDirectClient client(opCtx);
 
     // Throws if serializing the request or deserializing the response fails.

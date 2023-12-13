@@ -907,7 +907,8 @@ requested lock on that same resource with the given mode compatible?
 Typically, locks are granted in the order they are queued, but some LockRequest behaviors can be
 specially selected to break this rule. One behavior is _enqueueAtFront_, which allows important lock
 acquisitions to cut to the front of the line, in order to expedite them. Currently, all mode X and S
-locks for the three Global Resources (Global, FCV, RSTL) automatically use this option.
+locks for the three Global Resources (Global, MultiDocumentTransactionsBarrier, RSTL) automatically
+use this option.
 Another behavior is _compatibleFirst_, which allows compatible lock requests to cut ahead of others
 waiting in the queue and be granted immediately; note that this mode might starve queued lock
 requests indefinitely.

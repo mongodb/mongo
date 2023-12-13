@@ -69,17 +69,18 @@ txnThread.start();
 writeDecisionFp.wait();
 
 // Run a setFCV command against shard0 and wait for the setFCV thread to start waiting to acquire
-// the setFCV S lock (i.e. waiting for existing prepared transactions to commit or abort).
+// the MultiDocumentTransactionsBarrier S lock (i.e. waiting for existing prepared transactions to
+// commit or abort).
 const setFCVThread = new Thread(runSetFCV, shard0Primary.host);
 setFCVThread.start();
 assert.soon(() => {
     return shard0Primary.getDB(dbName).currentOp().inprog.find(
         op => op.command && op.command.setFeatureCompatibilityVersion && op.locks &&
-            op.locks.FeatureCompatibilityVersion === "R" && op.waitingForLock === true);
+            op.locks.MultiDocumentTransactionsBarrier === "R" && op.waitingForLock === true);
 });
 
 // Unpause the TransactionCoordinator. The transaction should be able to commit despite the fact
-// that the FCV S lock is enqueued.
+// that the MultiDocumentTransactionsBarrier S lock is enqueued.
 writeDecisionFp.off();
 
 jsTest.log("Waiting for the cross-shard transaction to commit");

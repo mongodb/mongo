@@ -415,7 +415,7 @@ last-continuous:
     ticket: SERVER-78650
   - test_file: jstests/core/sbe_plan_cache_duplicate_or_clauses.js
     ticket: SERVER-78752
-  - test_file: jstests/sharding/fsync_deadlock.js
+  - test_file: jstests/sharding/fsync_with_prepared_transaction.js
     ticket: SERVER-78793
   - test_file: jstests/sharding/analyze_shard_key/query_sampling_server_params.js
     ticket: SERVER-78913
@@ -1010,7 +1010,7 @@ last-lts:
     ticket: SERVER-78786
   - test_file: jstests/sharding/internal_txns/transaction_api_test_command_basic.js
     ticket: SERVER-78786
-  - test_file: jstests/sharding/fsync_deadlock.js
+  - test_file: jstests/sharding/fsync_with_prepared_transaction.js
     ticket: SERVER-78793
   - test_file: jstests/sharding/analyze_shard_key/query_sampling_server_params.js
     ticket: SERVER-78913

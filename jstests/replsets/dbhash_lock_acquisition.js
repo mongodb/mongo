@@ -3,6 +3,7 @@
  * resources when reading a timestamp using the $_internalReadAtClusterTime option.
  *
  * @tags: [
+ *   requires_fcv_73, # Renames FeatureCompatibilityVersion -> MultiDocumentTransactionsBarrier
  *   uses_transactions,
  * ]
  */
@@ -30,7 +31,7 @@ const ops = db.currentOp({"lsid.id": session.getSessionId().id}).inprog;
 assert.eq(
     1, ops.length, () => "Failed to find session in currentOp() output: " + tojson(db.currentOp()));
 assert.eq(ops[0].locks, {
-    FeatureCompatibilityVersion: "w",
+    MultiDocumentTransactionsBarrier: "w",
     ReplicationStateTransition: "w",
     Global: "w",
     Database: "w",
@@ -83,7 +84,6 @@ assert.soon(() => {
         return false;
     }
     assert.eq(ops[0].locks, {
-        FeatureCompatibilityVersion: "r",
         ReplicationStateTransition: "w",
         Global: "r",
         Database: "r",

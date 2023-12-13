@@ -155,9 +155,9 @@ kDowngradingFrom_5_1_To_5_0:
 
 
 2. **Run [`_prepareToUpgrade` or `_prepareToDowngrade`](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L497-L501):** 
-    * First, we do any actions to prepare for upgrade/downgrade that must be taken before the FCV
- full transition lock. For example, we cancel serverless migrations in this step. 
-    * Then, the FCV full transition lock is acquired in shared
+    * First, we do any actions to prepare for upgrade/downgrade that must be taken before the global lock.
+      For example, we cancel serverless migrations in this step.
+    * Then, the global lock is acquired in shared
 mode and then released immediately. This creates a barrier and guarantees safety for operations
 that acquire the global lock either in exclusive or intent exclusive mode. If these operations begin
 and acquire the global lock prior to the FCV change, they will proceed in the context of the old
@@ -227,10 +227,10 @@ old FCV).
     * b. Shard servers transition  to `kUpgradingFrom_X_To_Y` or `kDowngradingFrom_X_To_Y`.
     * c. Shard servers do any [phase-1 tasks](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L460) (for downgrading, this would include stopping new features).
 3. Phase-2 (throughout this phase config and shards are all in the transitional FCV)
-    * a. Config server runs `_prepareToUpgrade` or `_prepareToDowngrade`, takes the full FCV transition lock, 
+    * a. Config server runs `_prepareToUpgrade` or `_prepareToDowngrade`, takes the global lock,
     and verifies user data compatibility for upgrade/downgrade. 
     * b. Config server [sends phase-2 command to shards](https://github.com/mongodb/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L506-L507). 
-    * c. Shard servers run `_prepareToUpgrade` or `_prepareToDowngrade`, takes the full FCV transition lock, 
+    * c. Shard servers run `_prepareToUpgrade` or `_prepareToDowngrade`, takes the global lock,
     and verifies user data compatibility for upgrade/downgrade. 
 4. Phase-3
     * a. Config server runs `_runUpgrade` or `_runDowngrade`. For downgrade, this means the config
@@ -283,13 +283,12 @@ There are three locks used in the setFCV command:
     * Other operations should [take this lock in shared mode](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/feature_compatibility_version.cpp#L594-L599)
     if they want to ensure that the FCV state _does not change at all_ during the operation. 
     See [example](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/s/config/sharding_catalog_manager_collection_operations.cpp#L489-L490)
-* [FCV full transition lock](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/concurrency/lock_manager_defs.h#L326)
-    * The setFCV command [takes this lock in S mode and then releases it immediately](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L515-L525)
+* [Global lock]
+    * The setFCV command [takes this lock in S mode and then releases it immediately](https://github.com/mongodb/mongo/blob/418028cf4dcf416d5ab87552721ed3559bce5507/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L551-L557)
     after we are in the upgrading/downgrading state,
     but before we transition from the upgrading/downgrading state to the fully upgraded/downgraded 
     state.
-    * The lock creates a barrier for operations taking the global IX or X locks, which implicitly 
-    take the FCV full transition lock in IX mode (aside from those which explicitly opt out). 
+    * The lock creates a barrier for operations taking the global IX or X locks.
     * This is to ensure that the FCV does not _fully_ transition between the upgraded and downgraded
     versions (or vice versa) during these other operations. This is because either:
         * The global IX/X locked operation will start after the FCV change, see the 
@@ -300,9 +299,6 @@ There are three locks used in the setFCV command:
     * This also means that in order to make this barrier truly safe, if we want to ensure that the
     FCV does not change during our operation, **you must take the global IX or X lock first, and 
     then check the feature flag/FCV value after that point**
-    * Other operations that take the global IX or X locks already conflict with the FCV full 
-    transition lock by default, unless [_shouldConflictWithSetFeatureCompatibilityVersion](https://github.com/mongodb/mongo/blob/bd8a8d4d880577302c777ff961f359b03435126a/src/mongo/db/concurrency/locker.h#L489-L495)
-    is specifically set to false. This should only be set to false in very special cases.
 
 _Code spelunking starting points:_
 * [The template file used to generate the FCV constants](https://github.com/mongodb/mongo/blob/c4d2ed3292b0e113135dd85185c27a8235ea1814/src/mongo/util/version/releases.h.tpl#L1)
@@ -345,12 +341,12 @@ We do not expect any other feature-specific work to be done in the 'start' phase
 `_prepareToUpgrade`  performs all actions and checks that need to be done before proceeding to make 
 any metadata changes as part of FCV upgrade. Any new feature specific upgrade code should be placed 
 in the helper functions:
-* `_prepareToUpgradeActions`: for any upgrade actions that should be done before taking the FCV full 
-transition lock in S mode. It is required that the code in this helper function is
+* `_prepareToUpgradeActions`: for any upgrade actions that should be done before taking the global
+lock in S mode. It is required that the code in this helper function is
 idempotent and could be done after `_runDowngrade` even if `_runDowngrade` failed at any point.
 * `_userCollectionsWorkForUpgrade`: for any user collections uasserts (with the `CannotUpgrade` error code),
-creations, or deletions that need to happen during the upgrade. This happens after the FCV full
-transition lock.  It is required that the code in this helper function is idempotent and could be
+creations, or deletions that need to happen during the upgrade. This happens after the global lock.
+It is required that the code in this helper function is idempotent and could be
 done after `_runDowngrade` even if `_runDowngrade` failed at any point.
 
 `_runUpgrade`: _runUpgrade performs all the metadata-changing actions of an FCV upgrade. Any new 
@@ -377,8 +373,8 @@ back to the user/client. Therefore, these tasks **must** be idempotent/retryable
 `_prepareToDowngrade` performs all actions and checks that need to be done before proceeding to make 
 any metadata changes as part of FCV downgrade. Any new feature specific downgrade code should be 
 placed in the helper functions:
-* `_prepareToDowngradeActions`: Any downgrade actions that should be done before taking the FCV full 
-transition lock in S mode should go in this function.
+* `_prepareToDowngradeActions`: Any downgrade actions that should be done before taking the global
+lock in S mode should go in this function.
 * `_userCollectionsUassertsForDowngrade`: for any checks on user data or settings that will uassert
 with the `CannotDowngrade` code if users need to manually clean up user data or settings.
 

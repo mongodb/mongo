@@ -1,6 +1,6 @@
 /*
-This test runs a cross-shard transaction where the transaction holds onto the collection locks, then
-runs an fsyncLock which should fail and timeout as the global S lock cannot be taken.
+This test runs a cross-shard transaction where the transaction is in the prepared state, then run
+an fsyncLock which will acquire the global S lock once the prepared transaction commits.
  * @tags: [
  *   requires_sharding,
  *   requires_fsync,
@@ -73,10 +73,7 @@ function runTxn(mongosHost, dbName, collName) {
 
 function runFsyncLock(primaryHost) {
     let primaryConn = new Mongo(primaryHost);
-    let ret = assert.commandFailed(
-        primaryConn.adminCommand({fsync: 1, lock: true, fsyncLockAcquisitionTimeoutMillis: 5000}));
-    let errmsg = "Fsync lock timed out";
-    assert.eq(ret.errmsg.includes(errmsg), true);
+    assert.commandWorked(primaryConn.adminCommand({fsync: 1, lock: true}));
 }
 
 // Run a cross-shard transaction that has shard0 as the coordinator. Make the TransactionCoordinator
@@ -96,10 +93,15 @@ fsyncLockThread.start();
 waitForFsyncLockToWaitForLock(st, 2 /*blocked fsyncLockWorker threads*/);
 
 // Unpause the TransactionCoordinator.
-// The transaction thread can now acquire the IX locks since the blocking fsyncLock request (with an
-// incompatible Global S lock) has been removed from the conflict queue
 writeDecisionFp.off();
 
+// fsyncLock completes, because the prepared transaction has committed.
 fsyncLockThread.join();
+
+// fsyncUnlock to allow the committed prepared transaction to return to the client. Whilst the
+// transaction has committed, majority acknowledgement is still queued behind the global S lock;
+// fsyncUnlock rescinds the global S lock, which in turn allows the transaction to be majority
+// committed and the client to return an OK response.
+assert.commandWorked(st.s.adminCommand({fsyncUnlock: 1}));
 txnThread.join();
 st.stop();

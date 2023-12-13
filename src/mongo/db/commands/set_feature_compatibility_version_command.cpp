@@ -679,9 +679,9 @@ private:
         }
     }
 
-    // This helper function is for any actions that should be done before taking the FCV full
-    // transition lock in S mode. It is required that the code in this helper function is idempotent
-    // and could be done after _runDowngrade even if it failed at any point in the middle of
+    // This helper function is for any actions that should be done before taking the global lock in
+    // S mode. It is required that the code in this helper function is idempotent and could be done
+    // after _runDowngrade even if it failed at any point in the middle of
     // _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
     void _prepareToUpgradeActions(OperationContext* opCtx,
                                   const multiversion::FeatureCompatibilityVersion requestedVersion,
@@ -939,30 +939,29 @@ private:
     // make any metadata changes as part of FCV upgrade. Any new feature specific upgrade code
     // should be placed in the _prepareToUpgrade helper functions:
     //  * _prepareToUpgradeActions: for any upgrade actions that should be done before taking the
-    //  FCV full transition lock in S mode
+    //  global lock in S mode
     //  * _userCollectionsWorkForUpgrade: for any user collections uasserts, creations, or deletions
-    //    that need to happen during the upgrade. This happens after the FCV full transition lock.
+    //    that need to happen during the upgrade. This happens after the global lock.
     // Please read the comments on those helper functions for more details on what should be placed
     // in each function.
     void _prepareToUpgrade(OperationContext* opCtx,
                            const SetFeatureCompatibilityVersion& request,
                            boost::optional<Timestamp> changeTimestamp) {
-        // This helper function is for any actions that should be done before taking the FCV full
-        // transition lock in S mode. It is required that the code in this helper function is
-        // idempotent and could be done after _runDowngrade even if it failed at any point in the
-        // middle of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
+        // This helper function is for any actions that should be done before taking the global
+        // lock in S mode. It is required that the code in this helper function is idempotent and
+        // could be done after _runDowngrade even if it failed at any point in the middle of
+        // _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
         const auto requestedVersion = request.getCommandParameter();
         _prepareToUpgradeActions(opCtx, requestedVersion, changeTimestamp);
 
         {
-            // Take the FCV full transition lock in S mode to create a barrier for operations taking
-            // the global IX or X locks, which implicitly take the FCV full transition lock in IX
-            // mode (aside from those which explicitly opt out). This ensures that either:
+            // Take the global lock in S mode to create a barrier for operations taking the global
+            // IX or X locks. This ensures that either:
             //   - The global IX/X locked operation will start after the FCV change, see the
             //     upgrading to the latest FCV and act accordingly.
             //   - The global IX/X locked operation began prior to the FCV change, is acting on that
             //     assumption and will finish before upgrade procedures begin right after this.
-            Lock::ResourceLock lk(opCtx, resourceIdFeatureCompatibilityVersion, MODE_S);
+            Lock::GlobalLock lk(opCtx, MODE_S);
         }
 
         // This helper function is for any user collections uasserts, creations, or deletions that
@@ -1015,8 +1014,8 @@ private:
         hangWhileUpgrading.pauseWhileSet(opCtx);
     }
 
-    // This helper function is for any actions that should be done before taking the FCV full
-    // transition lock in S mode.
+    // This helper function is for any actions that should be done before taking the global lock in
+    // S mode.
     void _prepareToDowngradeActions(OperationContext* opCtx) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::None) &&
             repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
@@ -1401,7 +1400,7 @@ private:
     // make any metadata changes as part of FCV downgrade. Any new feature specific downgrade code
     // should be placed in the helper functions:
     // * _prepareToDowngradeActions: Any downgrade actions that should be done before taking the FCV
-    // full transition lock in S mode should go in this function.
+    // global lock in S mode should go in this function.
     // * _userCollectionsUassertsForDowngrade: for any checks on user data or settings that will
     // uassert if users need to manually clean up user data or settings.
     // When doing feature flag checking for downgrade, we should check the feature flag is enabled
@@ -1413,19 +1412,18 @@ private:
                              boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
 
-        // Any actions that should be done before taking the FCV full transition lock in S mode
-        // should go in this function.
+        // Any actions that should be done before taking the global lock in S mode should go in
+        // this function.
         _prepareToDowngradeActions(opCtx);
 
         {
-            // Take the FCV full transition lock in S mode to create a barrier for operations taking
-            // the global IX or X locks, which implicitly take the FCV full transition lock in IX
-            // mode (aside from those which explicitly opt out). This ensures that either:
+            // Take the global lock in S mode to create a barrier for operations taking the global
+            // IX or X locks. This ensures that either:
             //   - The global IX/X locked operation will start after the FCV change, see the
             //     upgrading to the latest FCV and act accordingly.
             //   - The global IX/X locked operation began prior to the FCV change, is acting on that
             //     assumption and will finish before upgrade procedures begin right after this.
-            Lock::ResourceLock lk(opCtx, resourceIdFeatureCompatibilityVersion, MODE_S);
+            Lock::GlobalLock lk(opCtx, MODE_S);
         }
 
         uassert(ErrorCodes::Error(549181),

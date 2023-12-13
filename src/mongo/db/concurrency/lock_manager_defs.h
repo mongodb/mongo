@@ -190,7 +190,7 @@ enum ResourceType {
  * IDs for usages of RESOURCE_GLOBAL.
  */
 enum class ResourceGlobalId : uint8_t {
-    kFeatureCompatibilityVersion,
+    kMultiDocumentTransactionsBarrier,
     kReplicationStateTransitionLock,
     kGlobal,
 
@@ -215,7 +215,7 @@ static const char* ResourceTypeNames[] = {"Invalid",
  * Maps the global resource id to a human-readable string.
  */
 static const char* ResourceGlobalIdNames[] = {
-    "FeatureCompatibilityVersion",
+    "MultiDocumentTransactionsBarrier",
     "ReplicationStateTransition",
     "Global",
 };
@@ -353,14 +353,17 @@ extern const ResourceId resourceIdAdminDB;
 // once. See comments in the header file (begin/endTransaction) for more information.
 extern const ResourceId resourceIdGlobal;
 
-// Hardcoded resource id for a full FCV transition from start -> upgrading -> upgraded (or
-// equivalent for downgrading). This lock is used as a barrier to prevent writes from spanning an
-// FCV change. This lock is acquired before the RSTL and resourceIdGlobal.
-extern const ResourceId resourceIdFeatureCompatibilityVersion;
+// Hardcoded resource id for draining prepared transactions and avoiding a deadlock with global lock
+// acquisitions in strong mode. This lock is acquired before the RSTL and resourceIdGlobal. It is
+// acquired by operations processing transaction statements, and by operations acquiring the global
+// lock in non-intent mode; all other requests skip this acquisition. It is acquired in the same
+// mode as the requested global lock mode.
+extern const ResourceId resourceIdMultiDocumentTransactionsBarrier;
 
 // Hardcoded resource id for the ReplicationStateTransitionLock (RSTL). This lock is acquired in
 // mode X for any replication state transition and is acquired by all other reads and writes in mode
-// IX. This lock is acquired after the FCV lock but before the resourceIdGlobal.
+// IX. This lock is acquired after the MultiDocumentTransactionsBarrier lock but before the
+// resourceIdGlobal.
 extern const ResourceId resourceIdReplicationStateTransitionLock;
 
 /**

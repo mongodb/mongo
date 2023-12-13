@@ -5,7 +5,7 @@
 function testBlockTime(blockTimeMillis) {
     // Lock the database, and in parallel start an operation that needs the lock, so it blocks.
     assert.commandWorked(db.fsyncLock());
-    var startStats = db.serverStatus().locks.Global;
+    var startStats = db.serverStatus().locks.MultiDocumentTransactionsBarrier;
     var startTime = new Date();
     var minBlockedMillis = blockTimeMillis;
 
@@ -16,7 +16,7 @@ function testBlockTime(blockTimeMillis) {
 
     // Wait until we see somebody waiting to acquire the lock, defend against unset stats.
     assert.soon((function() {
-        var stats = db.serverStatus().locks.Global;
+        var stats = db.serverStatus().locks.MultiDocumentTransactionsBarrier;
         if (!stats.acquireWaitCount || !stats.acquireWaitCount.W)
             return false;
         if (!stats.timeAcquiringMicros || !stats.timeAcquiringMicros.W)
@@ -34,7 +34,7 @@ function testBlockTime(blockTimeMillis) {
 
     // The fsync command from the shell cannot have possibly been blocked longer than this.
     var maxBlockedMillis = new Date() - startTime;
-    var endStats = db.serverStatus().locks.Global;
+    var endStats = db.serverStatus().locks.MultiDocumentTransactionsBarrier;
 
     //  The server was just started, so initial stats may be missing.
     if (!startStats.acquireWaitCount || !startStats.acquireWaitCount.W) {

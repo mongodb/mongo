@@ -1361,11 +1361,16 @@ prepared transaction, and checking/setting if the node can accept writes or serv
 
 ## Global Lock Acquisition Ordering
 
-Both the FCV lock and RSTL are global resources that must be acquired before the global lock is
-acquired. The node must first acquire the FCV lock in [intent
-shared](https://docs.mongodb.com/manual/reference/glossary/#term-intent-lock) or intent exclusive
-mode. Next, it must acquire the RSTL in intent exclusive mode. Only then can it acquire the global
-lock in its desired mode.
+Both the MultiDocumentTransactionsBarrier lock and RSTL are global resources that are acquired
+before the global lock is acquired.
+
+First, the MultiDocumentTransactionsBarrier lock is only acquired when
+the request is part of a multi-document transaction, or when the global lock is requested in
+[shared](https://www.mongodb.com/docs/manual/reference/glossary/#std-term-read-lock) or
+[exclusive](https://www.mongodb.com/docs/manual/reference/glossary/#std-term-write-lock) mode;
+the lock is acquired in the same mode as the global lock request.
+Next, it must acquire the RSTL in [intent exclusive](https://docs.mongodb.com/manual/reference/glossary/#term-intent-lock)
+mode. Only then can it acquire the global lock in its desired mode.
 
 # Elections
 

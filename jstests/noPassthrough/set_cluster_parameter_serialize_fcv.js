@@ -78,7 +78,7 @@ function runReplSetTest(fixture) {
     hangSetFCVWaiter = fixture.runInParallelShell(true, parallelShellSetFCVFn);
 
     // Assert that FCV downgrade remains hung (Current FCV is still latestFCV) while
-    // setClusterParameter is incomplete. This occurs due to contention for the FCV lock.
+    // setClusterParameter is incomplete. This occurs due to contention for the global lock.
     fixture.assertFCV(latestFCV);
 
     // Turn off the failpoint and allow setClusterParameter to drain successfully.
