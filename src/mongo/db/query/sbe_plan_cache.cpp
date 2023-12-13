@@ -95,7 +95,7 @@ ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
         }
         auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
         globalPlanCache =
-            std::make_unique<sbe::PlanCache>(cappedCacheSize, ProcessInfo::getNumLogicalCores());
+            std::make_unique<sbe::PlanCache>(cappedCacheSize, ProcessInfo::getNumCores());
     }};
 
 }  // namespace
