@@ -1975,6 +1975,14 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
         return (false);
     }
 
+    /*
+     * FIXME-WT-12127 Allow pages on the pre-fetch queue to be considered for eviction once a
+     * satisfactory workaround has been found for ensuring certain eviction flows don't invalidate
+     * refs on the pre-fetch queue.
+     */
+    if (F_ISSET(ref, WT_REF_FLAG_PREFETCH))
+        return (false);
+
     return (true);
 }
 
