@@ -104,13 +104,6 @@ public:
                                   DBClientService& dbClientService)
         : _sps(std::move(serverParameterService)), _dbService(dbClientService) {}
 
-    // TODO SERVER-80534: Remove this overload once it is not used by the enterprise module.
-    bool invoke(OperationContext*,
-                const SetClusterParameter&,
-                boost::optional<Timestamp>,
-                const WriteConcernOptions&,
-                bool skipValidation = false);
-
     bool invoke(OperationContext*,
                 const SetClusterParameter&,
                 boost::optional<Timestamp>,

@@ -70,18 +70,6 @@ MONGO_FAIL_POINT_DEFINE(hangInSetClusterParameter);
 bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                                            const SetClusterParameter& cmd,
                                            boost::optional<Timestamp> clusterParameterTime,
-                                           const WriteConcernOptions& writeConcern,
-                                           bool skipValidation) {
-    return invoke(opCtx,
-                  cmd,
-                  clusterParameterTime,
-                  boost::none /* previousTime */,
-                  writeConcern,
-                  skipValidation);
-}
-bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
-                                           const SetClusterParameter& cmd,
-                                           boost::optional<Timestamp> clusterParameterTime,
                                            boost::optional<LogicalTime> previousTime,
                                            const WriteConcernOptions& writeConcern,
                                            bool skipValidation) {
@@ -100,7 +88,7 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
         tenantId,
         skipValidation || serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer));
 
-    // The failpoint will block the thread unless the 'data' parameter contains a pattern that does
+    // The fail point will block the thread unless the 'data' parameter contains a pattern that does
     // not match the 'update' object.
     if (MONGO_unlikely(
             hangInSetClusterParameter.shouldFail([updateCopy = update](const BSONObj& data) {
