@@ -90,10 +90,14 @@ class test_compact06(wttest.WiredTigerTestCase):
                 self.session.compact(None, f'background=true,{item}'),
                 '/Cannot reconfigure background compaction while it\'s already running/')
 
+        # Wait for background compaction to process the HS.
+        while self.get_bg_compaction_success() == 0:
+            time.sleep(1)
+
         # Disable the background compaction server.
         self.turn_off_bg_compact()
 
-        # The background compaction should have tried to compact the HS.
+        # Background compaction should have tried to compact the HS hence skipped no files.
         assert self.get_bg_compaction_files_skipped() == 0
         assert self.get_bg_compaction_success() == 1
 
