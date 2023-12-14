@@ -209,18 +209,6 @@ struct ValueBlock {
 
     virtual TokenizedBlock tokenize();
 
-    /**
-     * Returns a block where all Nothings are replaced with (fillTag, fillVal) or nullptr if the
-     * block was already dense.
-     */
-    virtual std::unique_ptr<ValueBlock> fillEmpty(TypeTags fillTag, Value fillVal);
-
-    /**
-     * Returns a block of booleans, where non-Nothing values in the block are mapped to true, and
-     * Nothings are mapped to false.
-     */
-    virtual std::unique_ptr<ValueBlock> exists();
-
 protected:
     virtual DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) const = 0;
 
@@ -296,22 +284,6 @@ public:
     }
 
     TokenizedBlock tokenize() override;
-
-    std::unique_ptr<ValueBlock> fillEmpty(TypeTags fillTag, Value fillVal) override {
-        if (*tryDense()) {
-            return nullptr;
-        }
-        return std::make_unique<MonoBlock>(_count, fillTag, fillVal);
-    }
-
-    std::unique_ptr<ValueBlock> exists() override {
-        return std::make_unique<MonoBlock>(
-            _count, TypeTags::Boolean, value::bitcastFrom<bool>(*tryDense()));
-    }
-
-    TypeTags getTag() const {
-        return _tag;
-    }
 
     Value getValue() const {
         return _val;
@@ -421,9 +393,6 @@ private:
     bool _isDense = false;
 };
 
-// For now we just use the out of the box boost dynamic_bitset. DynamicBitset from mongo/util does
-// not store the bit size, and does not have functionality like all(), push_back() which we need
-// here.
 using HomogeneousBlockBitset = boost::dynamic_bitset<size_t>;
 
 template <class T, value::TypeTags TypeTag>
@@ -443,9 +412,10 @@ public:
         o._missingBitset = {};
     }
 
-    HomogeneousBlock(std::vector<T> input) : _vals(std::move(input)) {
+    HomogeneousBlock(const std::vector<T>& input) {
         if constexpr (value::isShallowType(TypeTag)) {
-            _missingBitset.resize(_vals.size(), true);
+            _vals.insert(_vals.end(), input.begin(), input.end());
+            _missingBitset.resize(input.size(), true);
         } else {
             // The !std::is_same<T,T> is always false and will trigger a compile failure if this
             // branch is taken. If this branch is not taken, it will get discarded.
@@ -453,9 +423,11 @@ public:
         }
     }
 
-    HomogeneousBlock(std::vector<T> input, HomogeneousBlockBitset bitset)
-        : _vals(std::move(input)), _missingBitset(bitset) {
-        if constexpr (!value::isShallowType(TypeTag)) {
+    HomogeneousBlock(const std::vector<T>& input, HomogeneousBlockBitset bitset) {
+        if constexpr (value::isShallowType(TypeTag)) {
+            _vals.insert(_vals.end(), input.begin(), input.end());
+            _missingBitset = bitset;
+        } else {
             // The !std::is_same<T,T> is always false and will trigger a compile failure if this
             // branch is taken. If this branch is not taken, it will get discarded.
             static_assert(!std::is_same<T, T>::value, "Not supported for deep types");
@@ -464,7 +436,7 @@ public:
 
     // The constructor that takes in a vector of the corresponding C++ should be used in favor of
     // vector of Value's constructor if possible.
-    HomogeneousBlock(std::vector<Value> input, HomogeneousBlockBitset bitset) {
+    HomogeneousBlock(const std::vector<Value>& input, HomogeneousBlockBitset bitset) {
         if constexpr (value::isShallowType(TypeTag)) {
             _vals.resize(input.size());
             for (size_t i = 0; i < input.size(); ++i) {
@@ -555,24 +527,6 @@ public:
     }
 
     TokenizedBlock tokenize() override;
-
-    std::unique_ptr<ValueBlock> fillEmpty(TypeTags fillTag, Value fillVal) override;
-
-    std::unique_ptr<ValueBlock> exists() override {
-        if (_missingBitset.all()) {
-            return std::make_unique<MonoBlock>(
-                _missingBitset.size(), TypeTags::Boolean, value::bitcastFrom<bool>(true));
-        } else if (_missingBitset.none()) {
-            return std::make_unique<MonoBlock>(
-                _missingBitset.size(), TypeTags::Boolean, value::bitcastFrom<bool>(false));
-        }
-        // This does a copy and could be optimized but for now this doesn't matter.
-        std::vector<bool> vals(_missingBitset.size());
-        for (size_t i = 0; i < _missingBitset.size(); ++i) {
-            vals[i] = _missingBitset[i];
-        }
-        return std::make_unique<HomogeneousBlock<bool, TypeTags::Boolean>>(std::move(vals));
-    }
 
     const std::vector<T>& getVector() const {
         return _vals;
