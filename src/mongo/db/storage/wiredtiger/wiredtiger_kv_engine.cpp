@@ -2800,7 +2800,7 @@ KeyFormat WiredTigerKVEngine::getKeyFormat(OperationContext* opCtx, StringData i
     return wtTableConfig.find("key_format=u") != string::npos ? KeyFormat::String : KeyFormat::Long;
 }
 
-StatusWith<BSONObj> WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(
+BSONObj WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(
     const BSONObj& options) const {
 
     // Skip inMemory storage engine, encryption at rest only applies to storage backed engine.

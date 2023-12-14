@@ -397,7 +397,7 @@ public:
 
     KeyFormat getKeyFormat(OperationContext* opCtx, StringData ident) const override;
 
-    StatusWith<BSONObj> getSanitizedStorageOptionsForSecondaryReplication(
+    BSONObj getSanitizedStorageOptionsForSecondaryReplication(
         const BSONObj& options) const override;
 
 private:
