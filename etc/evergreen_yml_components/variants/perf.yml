@@ -2525,7 +2525,7 @@ buildvariants:
   expansions: &standalone-intel-expansions
     <<: *standalone-arm-expansions
     infrastructure_provisioning: workload_client_mongod_combined_intel.2023-11
-    compile_variant: ""
+    compile_variant: amazon2-x86-compile
   run_on:
   - "rhel70-perf-microbenchmarks"
   tasks:
@@ -2563,10 +2563,11 @@ buildvariants:
   name: perf-mongo-perf-repl.intel.aws.2023-11
   display_name: PERF Mongo-Perf 1-Node ReplSet inMemory Intel AWS 2023-11
   cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  modules: *perf_modules
   expansions: &repl-intel-expansions
     <<: *repl-arm-expansions
     infrastructure_provisioning: workload_client_mongod_combined_intel.2023-11
-    compile_variant: ""
+    compile_variant: amazon2-x86-compile
   run_on:
   - "rhel70-perf-microbenchmarks"
   tasks:
