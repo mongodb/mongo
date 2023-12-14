@@ -58,7 +58,7 @@
 
 namespace mongo {
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch)
+WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64_t cursorEpoch)
     : _epoch(epoch),
       _session(nullptr),
       _cursorGen(0),
@@ -69,7 +69,8 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch)
 
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
                                      WiredTigerSessionCache* cache,
-                                     uint64_t epoch)
+                                     uint64_t epoch,
+                                     uint64_t cursorEpoch)
     : _epoch(epoch),
       _cache(cache),
       _session(nullptr),
@@ -119,11 +120,56 @@ void _openCursor(WT_SESSION* session,
 }
 }  // namespace
 
+WT_CURSOR* WiredTigerSession::getCachedCursor(uint64_t id, const std::string& config) {
+    // Find the most recently used cursor
+    for (CursorCache::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
+        // Ensure that all properties of this cursor are identical to avoid mixing cursor
+        // configurations. Note that this uses an exact string match, so cursor configurations with
+        // parameters in different orders will not be considered equivalent.
+        if (i->_id == id && i->_config == config) {
+            WT_CURSOR* c = i->_cursor;
+            _cursors.erase(i);
+            _cursorsOut++;
+            return c;
+        }
+    }
+    return nullptr;
+}
+
 WT_CURSOR* WiredTigerSession::getNewCursor(const std::string& uri, const char* config) {
     WT_CURSOR* cursor = nullptr;
     _openCursor(_session, uri, config, &cursor);
     _cursorsOut++;
     return cursor;
+}
+
+void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, const std::string& config) {
+    // When releasing the cursor, we would want to check if the session cache is already in shutdown
+    // and prevent the race condition that the shutdown starts after the check.
+    WiredTigerSessionCache::BlockShutdown blockShutdown(_cache);
+
+    // Avoids the cursor already being destroyed during the shutdown.
+    if (_cache->isShuttingDown()) {
+        return;
+    }
+
+    invariant(_session);
+    invariant(cursor);
+    _cursorsOut--;
+
+    invariantWTOK(cursor->reset(cursor), _session);
+
+    // Cursors are pushed to the front of the list and removed from the back
+    _cursors.push_front(WiredTigerCachedCursor(id, _cursorGen++, cursor, config));
+
+    // A negative value for wiredTigercursorCacheSize means to use hybrid caching.
+    std::uint32_t cacheSize = abs(gWiredTigerCursorCacheSize.load());
+
+    while (!_cursors.empty() && _cursorGen - _cursors.back()._gen > cacheSize) {
+        cursor = _cursors.back()._cursor;
+        _cursors.pop_back();
+        invariantWTOK(cursor->close(cursor), _session);
+    }
 }
 
 void WiredTigerSession::closeCursor(WT_CURSOR* cursor) {
@@ -132,6 +178,20 @@ void WiredTigerSession::closeCursor(WT_CURSOR* cursor) {
     _cursorsOut--;
 
     invariantWTOK(cursor->close(cursor), _session);
+}
+
+void WiredTigerSession::closeAllCursors(const std::string& uri) {
+    invariant(_session);
+
+    bool all = (uri == "");
+    for (auto i = _cursors.begin(); i != _cursors.end();) {
+        WT_CURSOR* cursor = i->_cursor;
+        if (cursor && (all || uri == cursor->uri)) {
+            invariantWTOK(cursor->close(cursor), _session);
+            i = _cursors.erase(i);
+        } else
+            ++i;
+    }
 }
 
 namespace {
@@ -297,6 +357,14 @@ void WiredTigerSessionCache::notifyPreparedUnitOfWorkHasCommittedOrAborted() {
     _prepareCommittedOrAbortedCond.notify_all();
 }
 
+
+void WiredTigerSessionCache::closeAllCursors(const std::string& uri) {
+    stdx::lock_guard<Latch> lock(_cacheLock);
+    for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
+        (*i)->closeAllCursors(uri);
+    }
+}
+
 size_t WiredTigerSessionCache::getIdleSessionsCount() {
     stdx::lock_guard<Latch> lock(_cacheLock);
     return _sessions.size();
@@ -400,6 +468,12 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         invariantWTOK(ss->transaction_pinned_range(ss, &range), ss);
         invariant(range == 0);
 
+        // Release resources in the session we're about to cache.
+        // If we are using hybrid caching, then close cursors now and let them
+        // be cached at the WiredTiger level.
+        if (gWiredTigerCursorCacheSize.load() < 0) {
+            session->closeAllCursors("");
+        }
         invariantWTOK(ss->reset(ss), ss);
     }
 
@@ -435,6 +509,10 @@ void WiredTigerSessionCache::setJournalListener(JournalListener* jl) {
     invariant(!_journalListener);
 
     _journalListener = jl;
+}
+
+bool WiredTigerSessionCache::isEngineCachingCursors() {
+    return gWiredTigerCursorCacheSize.load() <= 0;
 }
 
 void WiredTigerSessionCache::WiredTigerSessionDeleter::operator()(

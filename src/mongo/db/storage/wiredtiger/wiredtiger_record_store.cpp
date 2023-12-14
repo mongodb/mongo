@@ -467,6 +467,7 @@ public:
     }
 
     bool restore(bool tolerateCappedRepositioning = true) final {
+        // We can't use the CursorCache since this cursor needs a special config string.
         WT_SESSION* session = WiredTigerRecoveryUnit::get(_opCtx)->getSession()->getSession();
 
         if (!_cursor) {
@@ -905,6 +906,7 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
     // locks that might be held.
     WiredTigerRecoveryUnit* recoveryUnit = (WiredTigerRecoveryUnit*)opCtx->recoveryUnit();
     recoveryUnit->abandonSnapshot();
+    recoveryUnit->beginIdle();
 
     // Wait for an oplog deletion request, or for this record store to have been destroyed.
     oplogTruncateMarkers->awaitHasExcessMarkersOrDead(opCtx);
@@ -1212,10 +1214,10 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
 
     WT_CURSOR* cursor = writeConflictRetry(
         opCtx, "getLatestOplogTimestamp", NamespaceString::kRsOplogNamespace, [&] {
-            auto cachedCursor = session->getNewCursor(_uri, "");
+            auto cachedCursor = session->getCachedCursor(_tableId, "");
             return cachedCursor ? cachedCursor : session->getNewCursor(_uri);
         });
-    ON_BLOCK_EXIT([&] { session->closeCursor(cursor); });
+    ON_BLOCK_EXIT([&] { session->releaseCursor(_tableId, cursor, ""); });
     int ret = cursor->prev(cursor);
     if (ret == WT_NOTFOUND) {
         return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
@@ -1242,10 +1244,10 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
         auto sessRaii = cache->getSession();
         WT_CURSOR* cursor = writeConflictRetry(
             opCtx, "getEarliestOplogTimestamp", NamespaceString::kRsOplogNamespace, [&] {
-                auto cachedCursor = sessRaii->getNewCursor(_uri, "");
+                auto cachedCursor = sessRaii->getCachedCursor(_tableId, "");
                 return cachedCursor ? cachedCursor : sessRaii->getNewCursor(_uri);
             });
-        ON_BLOCK_EXIT([&] { sessRaii->closeCursor(cursor); });
+        ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor, ""); });
         auto ret = cursor->next(cursor);
         if (ret == WT_NOTFOUND) {
             return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");

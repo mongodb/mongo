@@ -295,7 +295,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerRecoveryUnit
     WT_CURSOR* cursor = nullptr;
     try {
         const std::string metadataURI = "metadata:create";
-        cursor = session->getNewCursor(metadataURI, "");
+        cursor = session->getCachedCursor(WiredTigerSession::kMetadataCreateTableId, "");
         if (!cursor) {
             cursor = session->getNewCursor(metadataURI);
         }
@@ -304,7 +304,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerRecoveryUnit
     }
     invariant(cursor);
     ScopeGuard releaser = [&] {
-        session->closeCursor(cursor);
+        session->releaseCursor(WiredTigerSession::kMetadataCreateTableId, cursor, "");
     };
 
     return _getMetadata(cursor, uri);
@@ -324,7 +324,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerRecoveryUnit& ru, 
     WT_CURSOR* cursor = nullptr;
     try {
         const std::string metadataURI = "metadata:";
-        cursor = session->getNewCursor(metadataURI, "");
+        cursor = session->getCachedCursor(WiredTigerSession::kMetadataTableId, "");
         if (!cursor) {
             cursor = session->getNewCursor(metadataURI);
         }
@@ -333,7 +333,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerRecoveryUnit& ru, 
     }
     invariant(cursor);
     ScopeGuard releaser = [&] {
-        session->closeCursor(cursor);
+        session->releaseCursor(WiredTigerSession::kMetadataTableId, cursor, "");
     };
 
     return _getMetadata(cursor, uri);
@@ -901,6 +901,11 @@ int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
                                 std::vector<std::string>* errors) {
     ErrorAccumulator eventHandler(errors);
 
+    // Try to close as much as possible to avoid EBUSY errors.
+    ru.getSession()->closeAllCursors(uri);
+    WiredTigerSessionCache* sessionCache = ru.getSessionCache();
+    sessionCache->closeAllCursors(uri);
+
     // Open a new session with custom error handlers.
     WT_CONNECTION* conn = ru.getSessionCache()->conn();
     WT_SESSION* session;
@@ -998,7 +1003,10 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
 
     const std::string setting = on ? "log=(enabled=true)" : "log=(enabled=false)";
 
+    // Try to close as much as possible to avoid EBUSY errors.
+    ru.getSession()->closeAllCursors(uri);
     WiredTigerSessionCache* sessionCache = ru.getSessionCache();
+    sessionCache->closeAllCursors(uri);
 
     // This method does some "weak" parsing to see if the table is in the expected logging
     // state. Only attempt to alter the table when a change is needed. This avoids grabbing heavy

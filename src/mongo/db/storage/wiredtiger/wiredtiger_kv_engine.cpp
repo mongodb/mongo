@@ -387,6 +387,10 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
     ss << "config_base=false,";
     ss << "statistics=(fast),";
 
+    if (!WiredTigerSessionCache::isEngineCachingCursors()) {
+        ss << "cache_cursors=false,";
+    }
+
     if (_ephemeral) {
         // If we've requested an ephemeral instance we store everything into memory instead of
         // backing it onto disk. Logging is not supported in this instance, thus we also have to
@@ -824,7 +828,10 @@ int64_t WiredTigerKVEngine::getIdentSize(OperationContext* opCtx, StringData ide
 }
 
 Status WiredTigerKVEngine::repairIdent(OperationContext* opCtx, StringData ident) {
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
     string uri = _uri(ident);
+    session->closeAllCursors(uri);
+    _sessionCache->closeAllCursors(uri);
     if (isEphemeral()) {
         return Status::OK();
     }
@@ -1889,6 +1896,10 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
                                      const StorageEngine::DropIdentCallback& onDrop) {
     string uri = _uri(ident);
 
+    WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(ru);
+    wtRu->getSessionNoTxn()->closeAllCursors(uri);
+    _sessionCache->closeAllCursors(uri);
+
     WiredTigerSession session(_conn);
 
     int ret =
@@ -1921,6 +1932,12 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
 }
 
 void WiredTigerKVEngine::dropIdentForImport(OperationContext* opCtx, StringData ident) {
+    const std::string uri = _uri(ident);
+
+    WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
+    wtRu->getSessionNoTxn()->closeAllCursors(uri);
+    _sessionCache->closeAllCursors(uri);
+
     WiredTigerSession session(_conn);
 
     // Don't wait for the global checkpoint lock to be obtained in WiredTiger as it can take a
@@ -1933,7 +1950,6 @@ void WiredTigerKVEngine::dropIdentForImport(OperationContext* opCtx, StringData 
     const std::string config = "checkpoint_wait=false,lock_wait=true,remove_files=false";
     int ret = 0;
     size_t attempt = 0;
-    const std::string uri = _uri(ident);
     do {
         Status status = opCtx->checkForInterruptNoAssert();
         if (status.code() == ErrorCodes::InterruptedAtShutdown) {

@@ -144,6 +144,30 @@ TEST_F(RecoveryUnitTestHarness, CommitAndRollbackChanges) {
     ASSERT_EQUALS(count, 0);
 }
 
+TEST_F(RecoveryUnitTestHarness, CheckIsActiveWithCommit) {
+    Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
+    const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
+    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
+    ru->beginUnitOfWork(opCtx->readOnly());
+    ASSERT_TRUE(ru->isActive());
+    StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
+    ru->commitUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
+    ASSERT_FALSE(ru->isActive());
+}
+
+TEST_F(RecoveryUnitTestHarness, CheckIsActiveWithAbort) {
+    Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
+    const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
+    shard_role_details::getLocker(opCtx.get())->beginWriteUnitOfWork();
+    ru->beginUnitOfWork(opCtx->readOnly());
+    ASSERT_TRUE(ru->isActive());
+    StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
+    ru->abortUnitOfWork();
+    shard_role_details::getLocker(opCtx.get())->endWriteUnitOfWork();
+    ASSERT_FALSE(ru->isActive());
+}
+
 TEST_F(RecoveryUnitTestHarness, BeginningUnitOfWorkDoesNotIncrementSnapshotId) {
     auto snapshotIdBefore = ru->getSnapshotId();
     ru->beginUnitOfWork(opCtx->readOnly());

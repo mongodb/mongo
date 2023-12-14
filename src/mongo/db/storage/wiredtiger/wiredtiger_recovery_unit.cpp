@@ -902,6 +902,13 @@ bool WiredTigerRecoveryUnit::isReadSourcePinned() const {
     return _readSourcePinned;
 }
 
+void WiredTigerRecoveryUnit::beginIdle() {
+    // Close all cursors, we don't want to keep any old cached cursors around.
+    if (_session) {
+        _session->closeAllCursors("");
+    }
+}
+
 std::unique_ptr<StorageStats> WiredTigerRecoveryUnit::computeOperationStatisticsSinceLastCall() {
     if (!_session)
         return nullptr;
