@@ -10,6 +10,7 @@ load(
     "use_wait_for_debugger", 
     "use_disable_ref_track", 
     "use_ocsp_stapling",
+    "use_wiredtiger",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -379,7 +380,7 @@ config_setting(
 )
 
 # --------------------------------------
-# wait-for-debugger options
+# disable-ref-track options
 # --------------------------------------
 
 use_disable_ref_track(
@@ -391,5 +392,21 @@ config_setting(
     name = "use_disable_ref_track_enabled",
     flag_values = {
         "//bazel/config:use_disable_ref_track": "True",
+    },
+)
+
+# --------------------------------------
+# wiredtiger options
+# --------------------------------------
+
+use_wiredtiger(
+    name = "use_wiredtiger",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_wiredtiger_enabled",
+    flag_values = {
+        "//bazel/config:use_wiredtiger": "True",
     },
 )

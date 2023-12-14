@@ -150,3 +150,17 @@ use_disable_ref_track = rule(
     implementation = lambda ctx: use_disable_ref_track_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# wiredtiger
+# =========
+
+use_wiredtiger_provider = provider(
+    doc = """Enable wiredtiger""",
+    fields = ["enabled"],
+)
+
+use_wiredtiger = rule(
+    implementation = lambda ctx: use_wiredtiger_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
