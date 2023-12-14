@@ -4,8 +4,10 @@ selector:
   root: build/benchmarks.txt
   include_files:
   # The trailing asterisk is for handling the .exe extension on Windows.
+  - build/install/bin/op_observer_bm*
   - build/install/bin/oplog_application_bm*
   - build/install/bin/oplog_applier_utils_bm*
+  - build/install/bin/oplog_entry_bm*
 
 executor:
   config: {}
