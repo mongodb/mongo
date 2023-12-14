@@ -469,7 +469,7 @@ public:
      * this node, such as encryption. Might be called for both collection and index options. See
      * SERVER-68122.
      */
-    virtual StatusWith<BSONObj> getSanitizedStorageOptionsForSecondaryReplication(
+    virtual BSONObj getSanitizedStorageOptionsForSecondaryReplication(
         const BSONObj& options) const {
         return options;
     }

@@ -417,7 +417,7 @@ public:
 
     size_t getCacheSizeMB() const override;
 
-    StatusWith<BSONObj> getSanitizedStorageOptionsForSecondaryReplication(
+    BSONObj getSanitizedStorageOptionsForSecondaryReplication(
         const BSONObj& options) const override;
 
     /**
