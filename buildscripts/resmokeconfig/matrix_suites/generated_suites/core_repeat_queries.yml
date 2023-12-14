@@ -20,7 +20,6 @@ executor:
     class: MongoDFixture
     mongod_options:
       set_parameters:
-        enableAutoCompaction: 1
         enableTestCommands: 1
   hooks:
   - class: ValidateCollections
