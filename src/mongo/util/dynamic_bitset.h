@@ -30,6 +30,7 @@
 #pragma once
 
 #include <bit>
+#include <type_traits>
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
@@ -51,7 +52,7 @@ T maskbit(size_t bitIndex) {
  * sizeof(T).
  */
 template <typename T, size_t NumberOfBlocks>
-class DynamicBitset {
+requires std::is_integral_v<T> &&(NumberOfBlocks > static_cast<size_t>(0)) class DynamicBitset {
 public:
     using Storage = InlinedStorage<T, NumberOfBlocks>;
     using BlockType = T;

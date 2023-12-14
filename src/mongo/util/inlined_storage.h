@@ -33,6 +33,7 @@
 #include <climits>
 #include <initializer_list>
 #include <ostream>
+#include <type_traits>
 
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -45,7 +46,7 @@ namespace mongo {
  * then stored in the heap.
  */
 template <typename BT, size_t InlinedCapacity>
-class InlinedStorage {
+requires std::is_trivial_v<BT> &&(InlinedCapacity > static_cast<size_t>(0)) class InlinedStorage {
 public:
     using BlockType = BT;
     static constexpr size_t kBlockSize = sizeof(BlockType) * CHAR_BIT;
