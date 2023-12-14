@@ -215,7 +215,10 @@ TEST_F(PlanSizeTest, GenericIndexScanStage) {
 }
 
 TEST_F(PlanSizeTest, LimitSkip) {
-    auto stage = makeS<LimitSkipStage>(mockS(), 200, 300, kEmptyPlanNodeId);
+    auto stage = makeS<LimitSkipStage>(mockS(),
+                                       makeE<EConstant>(value::TypeTags::NumberInt64, 200),
+                                       makeE<EConstant>(value::TypeTags::NumberInt64, 300),
+                                       kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
 
@@ -286,7 +289,7 @@ TEST_F(PlanSizeTest, Sort) {
                          mockSV(),
                          std::vector<value::SortDirection>{value::SortDirection::Ascending},
                          mockSV(),
-                         std::numeric_limits<std::size_t>::max(),
+                         nullptr /*limit*/,
                          204857600,
                          false,
                          kEmptyPlanNodeId);

@@ -80,4 +80,12 @@ void bindClusteredCollectionBounds(const CanonicalQuery& cq,
                                    const sbe::PlanStage* root,
                                    const stage_builder::PlanStageData* data,
                                    sbe::RuntimeEnvironment* runtimeEnvironment);
+/**
+ * If the plan was cloned from SBE plan cache and limit and/or skip values were parameterized,
+ * this method is called to bind the current query's limit and skip values to corresponding slots.
+ */
+void bindLimitSkipInputSlots(const CanonicalQuery& cq,
+                             const stage_builder::PlanStageData* data,
+                             sbe::RuntimeEnvironment* runtimeEnvironment);
+
 }  // namespace mongo::input_params

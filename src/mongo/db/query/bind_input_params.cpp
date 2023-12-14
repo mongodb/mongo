@@ -524,7 +524,7 @@ void bindClusteredCollectionBounds(const CanonicalQuery& cq,
 
     const CollatorInterface* queryCollator = cq.getCollator();  // current query's desired collator
 
-    for (size_t i = 0; i < clusteredBoundInfos.size(); ++i) {
+    for (const auto& clusteredBoundInfo : clusteredBoundInfos) {
         // The outputs produced by the QueryPlannerAccess APIs below (passed by reference).
         // Scan start/end bounds.
         RecordIdRange recordRange;
@@ -545,20 +545,41 @@ void bindClusteredCollectionBounds(const CanonicalQuery& cq,
         // Bind the scan bounds to input slots.
         const auto& minRecord = recordRange.getMin();
         if (minRecord) {
-            boost::optional<sbe::value::SlotId> minRecordId =
-                data->staticData->clusteredCollBoundsInfos[i].minRecord;
+            boost::optional<sbe::value::SlotId> minRecordId = clusteredBoundInfo.minRecord;
             tassert(7571500, "minRecordId slot missing", minRecordId.has_value());
             auto [tag, val] = sbe::value::makeCopyRecordId(minRecord->recordId());
             runtimeEnvironment->resetSlot(minRecordId.value(), tag, val, true);
         }
         const auto& maxRecord = recordRange.getMax();
         if (maxRecord) {
-            boost::optional<sbe::value::SlotId> maxRecordId =
-                data->staticData->clusteredCollBoundsInfos[i].maxRecord;
+            boost::optional<sbe::value::SlotId> maxRecordId = clusteredBoundInfo.maxRecord;
             tassert(7571501, "maxRecordId slot missing", maxRecordId.has_value());
             auto [tag, val] = sbe::value::makeCopyRecordId(maxRecord->recordId());
             runtimeEnvironment->resetSlot(maxRecordId.value(), tag, val, true);
         }
     }
 }  // bindClusteredCollectionBounds
+
+void bindLimitSkipInputSlots(const CanonicalQuery& cq,
+                             const stage_builder::PlanStageData* data,
+                             sbe::RuntimeEnvironment* runtimeEnvironment) {
+    auto setLimitSkipInputSlot = [&](boost::optional<sbe::value::SlotId> slot,
+                                     boost::optional<int64_t> amount) {
+        if (!slot) {
+            tassert(8349201, "Slot not is present, but amount is present", !amount);
+        } else {
+            tassert(8349202, "Slot is present, but amount is not present", amount);
+            runtimeEnvironment->resetSlot(*slot,
+                                          sbe::value::TypeTags::NumberInt64,
+                                          sbe::value::bitcastFrom<int64_t>(*amount),
+                                          false);
+        }
+    };
+
+    setLimitSkipInputSlot(data->staticData->limitSkipSlots.limit,
+                          cq.getFindCommandRequest().getLimit());
+    setLimitSkipInputSlot(data->staticData->limitSkipSlots.skip,
+                          cq.getFindCommandRequest().getSkip());
+}
+
 }  // namespace mongo::input_params

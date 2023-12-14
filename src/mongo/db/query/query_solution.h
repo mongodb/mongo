@@ -437,7 +437,7 @@ public:
     /**
      * Output a human-readable std::string representing the plan.
      */
-    std::string toString() {
+    std::string toString() const {
         if (!_root) {
             return "empty query solution";
         }
@@ -469,11 +469,6 @@ public:
      * output (e.g. explain).
      */
     void setRoot(std::unique_ptr<QuerySolutionNode> root);
-
-    /**
-     * Extracts the root of the QuerySolutionNode rooted at `_root`.
-     */
-    std::unique_ptr<QuerySolutionNode> extractRoot();
 
     /**
      * Returns a vector containing all of the secondary namespaces referenced by this tree, except
@@ -1265,12 +1260,24 @@ struct SortKeyGeneratorNode : public QuerySolutionNode {
     BSONObj sortSpec;
 };
 
+/**
+ * This enum is used to mark which limit and skip values should be parameterized. Currently we only
+ * support parameterization of limit and skip that are part of find command or became a part of find
+ * command after agg pushdown. Parameterization of limits and skips that remained a part of agg
+ * pipeline is not supported.
+ */
+enum class LimitSkipParameterization : bool { Enabled = true, Disabled = false };
+
 struct SortNode : public QuerySolutionNodeWithSortSet {
-    SortNode() : limit(0) {}
-    SortNode(std::unique_ptr<QuerySolutionNode> child, BSONObj pattern, size_t limit)
+    SortNode(std::unique_ptr<QuerySolutionNode> child,
+             BSONObj pattern,
+             size_t limit,
+             LimitSkipParameterization canBeParameterized)
         : QuerySolutionNodeWithSortSet(std::move(child)),
           pattern(std::move(pattern)),
-          limit(limit) {}
+          limit(limit),
+          canBeParameterized(canBeParameterized) {}
+    SortNode(const SortNode& other);
 
     virtual ~SortNode() {}
 
@@ -1297,6 +1304,9 @@ struct SortNode : public QuerySolutionNodeWithSortSet {
 
     // Sum of both limit and skip count in the parsed query.
     size_t limit;
+    // Enables or disables parameterization of limit value. Must be enabled iff this is a part of
+    // find command (possibly after agg pushdown).
+    LimitSkipParameterization canBeParameterized;
 
     bool addSortKeyMetadata = false;
 
@@ -1350,9 +1360,14 @@ struct SortNodeSimple final : public SortNode {
 };
 
 struct LimitNode : public QuerySolutionNode {
-    LimitNode() {}
-    LimitNode(std::unique_ptr<QuerySolutionNode> child, long long limit)
-        : QuerySolutionNode(std::move(child)), limit(limit) {}
+    LimitNode(std::unique_ptr<QuerySolutionNode> child,
+              long long limit,
+              LimitSkipParameterization canBeParameterized)
+        : QuerySolutionNode(std::move(child)),
+          limit(limit),
+          canBeParameterized(canBeParameterized) {}
+    LimitNode(const LimitNode& other);
+
     virtual ~LimitNode() {}
 
     virtual StageType getType() const {
@@ -1377,12 +1392,18 @@ struct LimitNode : public QuerySolutionNode {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     long long limit;
+    // Enables or disables parameterization of limit value. Must be enabled iff this is a part of
+    // find command (possibly after agg pushdown).
+    LimitSkipParameterization canBeParameterized;
 };
 
 struct SkipNode : public QuerySolutionNode {
-    SkipNode() {}
-    SkipNode(std::unique_ptr<QuerySolutionNode> child, long long skip)
-        : QuerySolutionNode(std::move(child)), skip(skip) {}
+    SkipNode(std::unique_ptr<QuerySolutionNode> child,
+             long long skip,
+             LimitSkipParameterization canBeParameterized)
+        : QuerySolutionNode(std::move(child)), skip(skip), canBeParameterized(canBeParameterized) {}
+    SkipNode(const SkipNode& other);
+
     virtual ~SkipNode() {}
 
     virtual StageType getType() const {
@@ -1406,6 +1427,9 @@ struct SkipNode : public QuerySolutionNode {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     long long skip;
+    // Enables or disables parameterization of limit value. Must be enabled iff this is a part of
+    // find command (possibly after agg pushdown).
+    LimitSkipParameterization canBeParameterized;
 };
 
 struct GeoNear2DNode : public QuerySolutionNodeWithSortSet {

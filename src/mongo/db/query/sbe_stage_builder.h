@@ -1063,6 +1063,13 @@ private:
                                                          PlanStageSlots& outputs,
                                                          bool forFilterStage);
 
+    std::unique_ptr<sbe::EExpression> buildLimitSkipAmountExpression(
+        LimitSkipParameterization canBeParameterized,
+        long long amount,
+        boost::optional<sbe::value::SlotId>& slot);
+    std::unique_ptr<sbe::EExpression> buildLimitSkipSumExpression(
+        LimitSkipParameterization canBeParameterized, long long limitSkipSum);
+
     /**
      * Returns a CollectionPtr corresponding to the collection that we are currently building a
      * plan over. If no current namespace is configured, a CollectionPtr referencing the main

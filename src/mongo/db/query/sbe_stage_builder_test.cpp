@@ -104,9 +104,8 @@ TEST_F(SbeStageBuilderTest, TestLimitOneVirtualScan) {
     // VirtualScanNode.
     auto virtScan =
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, true);
-    auto limitNode = std::make_unique<LimitNode>();
-    limitNode->children.push_back(std::move(virtScan));
-    limitNode->limit = 1;
+    auto limitNode =
+        std::make_unique<LimitNode>(std::move(virtScan), 1, LimitSkipParameterization::Disabled);
 
     // Make a QuerySolution from the root limitNode.
     auto querySolution = makeQuerySolution(std::move(limitNode));

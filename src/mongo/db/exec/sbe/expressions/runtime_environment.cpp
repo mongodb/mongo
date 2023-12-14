@@ -188,4 +188,10 @@ void RuntimeEnvironment::debugString(StringBuilder* builder) const {
     *builder << " }";
 }
 
+std::string RuntimeEnvironment::toDebugString() const {
+    StringBuilder builder;
+    debugString(&builder);
+    return builder.str();
+}
+
 }  // namespace mongo::sbe

@@ -519,7 +519,8 @@ std::pair<SlotId /* resultSlot */, SbStage> buildForeignMatchedArray(
 
     return std::make_pair(
         unionOutputSlot,
-        sbe::makeS<sbe::LimitSkipStage>(std::move(unionStage), 1 /* limit */, boost::none, nodeId));
+        sbe::makeS<sbe::LimitSkipStage>(
+            std::move(unionStage), makeInt64Constant(1) /*limit*/, nullptr /*skip*/, nodeId));
 }
 
 /**

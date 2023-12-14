@@ -419,4 +419,8 @@ bool CanonicalQuery::shouldParameterizeSbe(MatchExpression* matchExpr) const {
     }
     return true;
 }
+
+bool CanonicalQuery::shouldParameterizeLimitSkip() const {
+    return !_disablePlanCache && !_isUncacheableSbe;
+}
 }  // namespace mongo

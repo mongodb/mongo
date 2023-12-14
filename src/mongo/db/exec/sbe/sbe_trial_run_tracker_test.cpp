@@ -98,16 +98,18 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToStreamingStage) {
 }
 
 TEST_F(TrialRunTrackerTest, TrackerAttachesToBlockingStage) {
-    auto sortStage = makeS<SortStage>(
-        makeS<LimitSkipStage>(
-            makeS<CoScanStage>(kEmptyPlanNodeId), 0, boost::none, kEmptyPlanNodeId),
-        makeSV(),
-        std::vector<value::SortDirection>{},
-        makeSV(),
-        std::numeric_limits<std::size_t>::max(),
-        204857600,
-        false,
-        kEmptyPlanNodeId);
+    auto sortStage =
+        makeS<SortStage>(makeS<LimitSkipStage>(makeS<CoScanStage>(kEmptyPlanNodeId),
+                                               makeE<EConstant>(value::TypeTags::NumberInt64, 0),
+                                               nullptr,
+                                               kEmptyPlanNodeId),
+                         makeSV(),
+                         std::vector<value::SortDirection>{},
+                         makeSV(),
+                         nullptr /*limit*/,
+                         204857600,
+                         false,
+                         kEmptyPlanNodeId);
 
     auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0});
     ON_BLOCK_EXIT([&]() { sortStage->detachFromTrialRunTracker(); });
@@ -140,7 +142,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
                                           makeSV(),
                                           std::vector<value::SortDirection>{},
                                           makeSV(),
-                                          std::numeric_limits<std::size_t>::max(),
+                                          nullptr /*limit*/,
                                           204857600,
                                           false,
                                           kEmptyPlanNodeId);
@@ -223,7 +225,7 @@ TEST_F(TrialRunTrackerTest, OnlyDeepestNestedBlockingStageHasTrialRunTracker) {
                              makeSV(scanSlot),
                              std::vector<value::SortDirection>{value::SortDirection::Ascending},
                              makeSV(),
-                             std::numeric_limits<std::size_t>::max(),
+                             nullptr /*limit*/,
                              204857600,
                              false,
                              kEmptyPlanNodeId);
@@ -346,7 +348,7 @@ TEST_F(TrialRunTrackerTest, SiblingBlockingStagesBothGetTrialRunTracker) {
                          makeSV(resultSlot),
                          std::vector<value::SortDirection>{value::SortDirection::Ascending},
                          makeSV(),
-                         std::numeric_limits<std::size_t>::max(),
+                         nullptr /*limit*/,
                          204857600,
                          false,
                          kEmptyPlanNodeId);
@@ -422,7 +424,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForPa
                                           makeSV(),
                                           std::vector<value::SortDirection>{},
                                           makeSV(),
-                                          std::numeric_limits<std::size_t>::max(),
+                                          nullptr /*limit*/,
                                           204857600,
                                           false,
                                           kEmptyPlanNodeId);
@@ -484,7 +486,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
                          makeSV(resultSlot),
                          std::vector<value::SortDirection>{value::SortDirection::Ascending},
                          makeSV(),
-                         std::numeric_limits<std::size_t>::max(),
+                         nullptr /*limit*/,
                          204857600,
                          false,
                          kEmptyPlanNodeId);

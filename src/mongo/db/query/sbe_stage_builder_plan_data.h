@@ -81,6 +81,14 @@ struct ParameterizedClusteredScanSlots {
     boost::optional<sbe::value::SlotId> maxRecord;
 };
 
+/**
+ * Holds the slots for the find command limit skip values.
+ */
+struct ParameterizedLimitSkipSlots {
+    boost::optional<sbe::value::SlotId> limit;
+    boost::optional<sbe::value::SlotId> skip;
+};
+
 using VariableIdToSlotMap = stdx::unordered_map<Variables::Id, sbe::value::SlotId>;
 
 /**
@@ -236,6 +244,12 @@ struct PlanStageStaticData {
     // Stores data to restore collection scan bounds for a cached auto-parameterized SBE plan for
     // every clustered collection scan used by the plan.
     std::vector<ParameterizedClusteredScanSlots> clusteredCollBoundsInfos;
+
+    /**
+     * Stores slot ids for slots holding limit and skip amounts for a cached
+     * auto-parameterized SBE plan.
+     */
+    ParameterizedLimitSkipSlots limitSkipSlots;
 
     // Stores all namespaces involved in the build side of a hash join plan. Needed to check if
     // the plan should be evicted as the size of the foreign namespace changes.

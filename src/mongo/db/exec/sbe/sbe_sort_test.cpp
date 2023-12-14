@@ -68,7 +68,8 @@ TEST_F(SortStageTest, SortNumbersTest) {
                              makeSV(scanSlots[0]),
                              std::vector<value::SortDirection>{value::SortDirection::Ascending},
                              makeSV(scanSlots[1]),
-                             std::numeric_limits<std::size_t>::max(),
+                             makeE<EConstant>(value::TypeTags::NumberInt64,
+                                              value::bitcastFrom<int64_t>(4)) /*limit*/,
                              204857600,
                              false,
                              kEmptyPlanNodeId);

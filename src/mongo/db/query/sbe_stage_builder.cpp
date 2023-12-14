@@ -262,9 +262,8 @@ sbe::value::SlotVector getSlotsToForward(PlanStageStaticData* data,
  * from the current query 'cq' into the plan if it was cloned from the SBE plan cache.
  *   root - root node of the execution tree
  *   data - slot metadata (not actual parameter data!) that goes with the execution tree
- *   preparingFromCache - if true, 'root' and 'data' may have come from the SBE plan cache (though
- *     sometimes the caller says true even for non-cached plans). This means current parameters from
- *     'cq' need to be substituted into the execution plan.
+ *   preparingFromCache - if true, 'root' and 'data' may have come from the SBE plan cache. This
+ *     means current parameters from 'cq' need to be substituted into the execution plan.
  */
 void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     sbe::PlanStage* root,
@@ -348,6 +347,10 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 
     if (preparingFromCache && data->staticData->doSbeClusteredCollectionScan) {
         input_params::bindClusteredCollectionBounds(cq, root, data, env.runtimeEnv);
+    }
+
+    if (preparingFromCache && cq.shouldParameterizeLimitSkip()) {
+        input_params::bindLimitSkipInputSlots(cq, data, env.runtimeEnv);
     }
 
     prepareSearchQueryParameters(data, cq);
@@ -1637,7 +1640,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildLimit(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     const auto ln = static_cast<const LimitNode*>(root);
-    boost::optional<long long> skip;
+    std::unique_ptr<sbe::EExpression> skip;
 
     auto childReqs = reqs.copyForChild();
     childReqs.setHasLimit(true);
@@ -1647,7 +1650,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             // If we have both limit and skip stages and the skip stage is beneath the limit, then
             // we can combine these two stages into one.
             const auto sn = static_cast<const SkipNode*>(ln->children[0].get());
-            skip = sn->skip;
+            skip = buildLimitSkipAmountExpression(
+                sn->canBeParameterized, sn->skip, _data->limitSkipSlots.skip);
             return build(sn->children[0].get(), childReqs);
         } else {
             return build(ln->children[0].get(), childReqs);
@@ -1656,7 +1660,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     if (!reqs.getIsTailableCollScanResumeBranch()) {
         stage = std::make_unique<sbe::LimitSkipStage>(
-            std::move(stage), ln->limit, skip, root->nodeId());
+            std::move(stage),
+            buildLimitSkipAmountExpression(
+                ln->canBeParameterized, ln->limit, _data->limitSkipSlots.limit),
+            std::move(skip),
+            root->nodeId());
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -1669,10 +1677,81 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     if (!reqs.getIsTailableCollScanResumeBranch()) {
         stage = std::make_unique<sbe::LimitSkipStage>(
-            std::move(stage), boost::none, sn->skip, root->nodeId());
+            std::move(stage),
+            nullptr,
+            buildLimitSkipAmountExpression(
+                sn->canBeParameterized, sn->skip, _data->limitSkipSlots.skip),
+            root->nodeId());
     }
 
     return {std::move(stage), std::move(outputs)};
+}
+
+std::unique_ptr<sbe::EExpression> SlotBasedStageBuilder::buildLimitSkipAmountExpression(
+    LimitSkipParameterization canBeParameterized,
+    long long amount,
+    boost::optional<sbe::value::SlotId>& slot) {
+    if (canBeParameterized == LimitSkipParameterization::Disabled) {
+        return makeConstant(sbe::value::TypeTags::NumberInt64,
+                            sbe::value::bitcastFrom<long long>(amount));
+    }
+
+    if (!slot) {
+        slot = _env.runtimeEnv->registerSlot(sbe::value::TypeTags::NumberInt64,
+                                             sbe::value::bitcastFrom<long long>(amount),
+                                             false,
+                                             &_slotIdGenerator);
+    } else {
+        const auto& slotAmount = _env.runtimeEnv->getAccessor(*slot)->getViewOfValue();
+        tassert(8349204,
+                str::stream() << "Inconsistent value in limit or skip slot " << *slot
+                              << ". Value in slot: " << sbe::value::print(slotAmount)
+                              << ". Incoming value: " << amount,
+                slotAmount.first == sbe::value::TypeTags::NumberInt64 &&
+                    sbe::value::bitcastTo<long long>(slotAmount.second) == amount);
+    }
+    return makeVariable(*slot);
+}
+
+std::unique_ptr<sbe::EExpression> SlotBasedStageBuilder::buildLimitSkipSumExpression(
+    LimitSkipParameterization canBeParameterized, long long limitSkipSum) {
+    if (canBeParameterized == LimitSkipParameterization::Disabled) {
+        return makeConstant(sbe::value::TypeTags::NumberInt64,
+                            sbe::value::bitcastFrom<long long>(limitSkipSum));
+    }
+
+    boost::optional<int64_t> limit = _cq.getFindCommandRequest().getLimit();
+    boost::optional<int64_t> skip = _cq.getFindCommandRequest().getSkip();
+    tassert(8349207, "expected limit to be present", limit);
+    int64_t sum = -1;
+    bool hasOverflowed = overflow::add(limit.value_or(0), skip.value_or(0), &sum);
+    tassert(8349208,
+            "expected sum of find command request parameters to be equal to provided value",
+            !hasOverflowed && sum == limitSkipSum);
+    if (!skip) {
+        return buildLimitSkipAmountExpression(
+            canBeParameterized, *limit, _data->limitSkipSlots.limit);
+    }
+
+    auto sumExpr = makeBinaryOp(
+        sbe::EPrimBinary::add,
+        buildLimitSkipAmountExpression(canBeParameterized, *limit, _data->limitSkipSlots.limit),
+        buildLimitSkipAmountExpression(canBeParameterized, *skip, _data->limitSkipSlots.skip));
+
+    // SBE promotes to double on int64 overflow. We need to return int64 max value in that case,
+    // since the SBE sort stage expects the limit to always be a 64-bit integer.
+    return makeLocalBind(
+        &_frameIdGenerator,
+        [](sbe::EVariable sum) {
+            return sbe::makeE<sbe::EIf>(
+                makeFunction(
+                    "typeMatch",
+                    sum.clone(),
+                    makeInt32Constant(MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask())),
+                sum.clone(),
+                makeInt64Constant(std::numeric_limits<int64_t>::max()));
+        },
+        std::move(sumExpr));
 }
 
 namespace {
@@ -2044,15 +2123,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // sorting.
     auto forwardedSlots = getSlotsToForward(_data.get(), forwardingReqs, outputs);
 
-    stage =
-        sbe::makeS<sbe::SortStage>(std::move(stage),
-                                   std::move(orderBy),
-                                   std::move(direction),
-                                   std::move(forwardedSlots),
-                                   sn->limit ? sn->limit : std::numeric_limits<std::size_t>::max(),
-                                   sn->maxMemoryUsageBytes,
-                                   _cq.getExpCtx()->allowDiskUse,
-                                   root->nodeId());
+    stage = sbe::makeS<sbe::SortStage>(
+        std::move(stage),
+        std::move(orderBy),
+        std::move(direction),
+        std::move(forwardedSlots),
+        sn->limit ? buildLimitSkipSumExpression(sn->canBeParameterized, sn->limit) : nullptr,
+        sn->maxMemoryUsageBytes,
+        _cq.getExpCtx()->allowDiskUse,
+        root->nodeId());
 
     if (reqs.getHasLimit()) {
         // Project the fields that the parent requested using kResult
@@ -2152,15 +2231,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // sorting.
     auto forwardedSlots = getSlotsToForward(_data.get(), childReqs, outputs, orderBy);
 
-    stage =
-        sbe::makeS<sbe::SortStage>(std::move(stage),
-                                   std::move(orderBy),
-                                   std::move(direction),
-                                   std::move(forwardedSlots),
-                                   sn->limit ? sn->limit : std::numeric_limits<std::size_t>::max(),
-                                   sn->maxMemoryUsageBytes,
-                                   _cq.getExpCtx()->allowDiskUse,
-                                   root->nodeId());
+    stage = sbe::makeS<sbe::SortStage>(
+        std::move(stage),
+        std::move(orderBy),
+        std::move(direction),
+        std::move(forwardedSlots),
+        sn->limit ? buildLimitSkipSumExpression(sn->canBeParameterized, sn->limit) : nullptr,
+        sn->maxMemoryUsageBytes,
+        _cq.getExpCtx()->allowDiskUse,
+        root->nodeId());
 
     return {std::move(stage), std::move(outputs)};
 }
@@ -4144,7 +4223,8 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
     // resume a collection scan from the resumeRecordId.
     auto& [resumeBranch, __] = inputStagesAndSlots[1];
     resumeBranch = sbe::makeS<sbe::FilterStage<true>>(
-        sbe::makeS<sbe::LimitSkipStage>(std::move(resumeBranch), boost::none, 1, root->nodeId()),
+        sbe::makeS<sbe::LimitSkipStage>(
+            std::move(resumeBranch), nullptr, makeInt64Constant(1), root->nodeId()),
         sbe::makeE<sbe::EFunction>("exists"_sd,
                                    sbe::makeEs(sbe::makeE<sbe::EVariable>(resumeRecordIdSlot))),
         root->nodeId());
@@ -5429,7 +5509,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto stage = sbe::makeS<sbe::LoopJoinStage>(
         std::move(searchCursorStage),
         sbe::makeS<sbe::LimitSkipStage>(
-            std::move(fetchStage), 1, boost::none /* skip */, sn->nodeId()),
+            std::move(fetchStage), makeInt64Constant(1), nullptr /* skip */, sn->nodeId()),
         std::move(outerProjVec),
         sbe::makeSV(idSlot),
         nullptr /* predicate */,

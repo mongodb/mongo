@@ -325,9 +325,16 @@ public:
         return _isUncacheableSbe;
     }
 
-    // Tests whether a 'matchExpr' from this query should be parameterized for the SBE plan cache.
-    // There is no reason to do so if the execution plan will not be cached.
+    /**
+     * Tests whether a 'matchExpr' from this query should be parameterized for the SBE plan cache.
+     */
     bool shouldParameterizeSbe(MatchExpression* matchExpr) const;
+
+    /**
+     * Tests if limit and skip amounts from find command request should be parameterized for the SBE
+     * plan cache.
+     */
+    bool shouldParameterizeLimitSkip() const;
 
     /**
      * Add parameters for match expressions that were pushed down via '_cqPipeline'.

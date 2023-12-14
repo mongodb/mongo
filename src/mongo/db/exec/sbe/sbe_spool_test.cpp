@@ -102,8 +102,10 @@ public:
         std::unique_ptr<PlanStage> spoolProducer = makeS<SpoolEagerProducerStage>(
             std::move(mockScanStage), spoolId, makeSV(mockScanSlot), kEmptyPlanNodeId);
 
-        auto outerBranch =
-            makeS<LimitSkipStage>(std::move(spoolProducer), 1, boost::none, kEmptyPlanNodeId);
+        auto outerBranch = makeS<LimitSkipStage>(std::move(spoolProducer),
+                                                 makeE<EConstant>(value::TypeTags::NumberInt64, 1),
+                                                 nullptr,
+                                                 kEmptyPlanNodeId);
 
         return makeSpoolConsumer<false>(std::move(outerBranch), spoolId);
     }

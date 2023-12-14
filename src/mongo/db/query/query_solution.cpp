@@ -360,10 +360,6 @@ void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {
     assignNodeIds(idGenerator, *_root);
 }
 
-std::unique_ptr<QuerySolutionNode> QuerySolution::extractRoot() {
-    return std::move(_root);
-}
-
 std::vector<NamespaceStringOrUUID> QuerySolution::getAllSecondaryNamespaces(
     const NamespaceString& mainNss) {
     std::set<NamespaceString> secondaryNssSet;
@@ -1474,6 +1470,10 @@ std::unique_ptr<QuerySolutionNode> SortKeyGeneratorNode::clone() const {
 // SortNode
 //
 
+SortNode::SortNode(const SortNode& other) {
+    other.cloneSortData(this);
+}
+
 void SortNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "SORT\n";
@@ -1493,25 +1493,27 @@ void SortNode::cloneSortData(SortNode* copy) const {
     cloneBaseData(copy);
     copy->pattern = this->pattern;
     copy->limit = this->limit;
+    copy->canBeParameterized = this->canBeParameterized;
     copy->addSortKeyMetadata = this->addSortKeyMetadata;
 }
 
 std::unique_ptr<QuerySolutionNode> SortNodeDefault::clone() const {
-    auto copy = std::make_unique<SortNodeDefault>();
-    cloneSortData(copy.get());
-    return copy;
+    return std::make_unique<SortNodeDefault>(*this);
 }
 
 std::unique_ptr<QuerySolutionNode> SortNodeSimple::clone() const {
-    auto copy = std::make_unique<SortNodeSimple>();
-    cloneSortData(copy.get());
-    return copy;
+    return std::make_unique<SortNodeSimple>(*this);
 }
 
 //
 // LimitNode
 //
 
+LimitNode::LimitNode(const LimitNode& other) {
+    other.cloneBaseData(this);
+    limit = other.limit;
+    canBeParameterized = other.canBeParameterized;
+}
 
 void LimitNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
@@ -1526,17 +1528,18 @@ void LimitNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> LimitNode::clone() const {
-    auto copy = std::make_unique<LimitNode>();
-    cloneBaseData(copy.get());
-
-    copy->limit = this->limit;
-
-    return copy;
+    return std::make_unique<LimitNode>(*this);
 }
 
 //
 // SkipNode
 //
+
+SkipNode::SkipNode(const SkipNode& other) {
+    other.cloneBaseData(this);
+    skip = other.skip;
+    canBeParameterized = other.canBeParameterized;
+}
 
 void SkipNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
@@ -1550,12 +1553,7 @@ void SkipNode::appendToString(str::stream* ss, int indent) const {
 }
 
 std::unique_ptr<QuerySolutionNode> SkipNode::clone() const {
-    auto copy = std::make_unique<SkipNode>();
-    cloneBaseData(copy.get());
-
-    copy->skip = this->skip;
-
-    return copy;
+    return std::make_unique<SkipNode>(*this);
 }
 
 //

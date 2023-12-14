@@ -1440,7 +1440,8 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNod
 
 TEST(QuerySolutionTest, GetFirstNodeByTypeFindsFirstNodeWhenNested) {
     auto collScanNode = std::make_unique<CollectionScanNode>();
-    auto limitNode = std::make_unique<LimitNode>(std::move(collScanNode), 10ll);
+    auto limitNode = std::make_unique<LimitNode>(
+        std::move(collScanNode), 10ll, LimitSkipParameterization::Disabled);
 
     QuerySolution qs;
     qs.setRoot(std::move(limitNode));
@@ -1474,12 +1475,15 @@ TEST(QuerySolutionTest, GetFirstNodeByTypeReturnsNullIfNotFound) {
 
 TEST(QuerySolutionTest, GetFirstNodeByTypeFindsFirstAndCountsWhenSeveral) {
     auto collScanNode = std::make_unique<CollectionScanNode>();
-    auto firstLimitNode = std::make_unique<LimitNode>(std::move(collScanNode), 10ll);
+    auto firstLimitNode = std::make_unique<LimitNode>(
+        std::move(collScanNode), 10ll, LimitSkipParameterization::Disabled);
     auto firstLimitNodeLimitValue = firstLimitNode->limit;
-    auto secondLimitNode = std::make_unique<LimitNode>(std::move(firstLimitNode), 8ll);
+    auto secondLimitNode = std::make_unique<LimitNode>(
+        std::move(firstLimitNode), 8ll, LimitSkipParameterization::Disabled);
     // We use its 'limit' value to assert the first one was retrieved below hence cannot be equals
     ASSERT(firstLimitNodeLimitValue != secondLimitNode->limit);
-    auto skipNode = std::make_unique<SkipNode>(std::move(secondLimitNode), 9ll);
+    auto skipNode = std::make_unique<SkipNode>(
+        std::move(secondLimitNode), 9ll, LimitSkipParameterization::Disabled);
 
     QuerySolution qs;
     qs.setRoot(std::move(skipNode));

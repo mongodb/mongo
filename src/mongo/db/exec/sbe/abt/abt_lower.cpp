@@ -667,7 +667,12 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
     auto input = generateInternal(child, slotMap, ridSlot);
 
     return sbe::makeS<sbe::LimitSkipStage>(
-        std::move(input), n.getProperty().getLimit(), n.getProperty().getSkip(), getPlanNodeId(n));
+        std::move(input),
+        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                   sbe::value::bitcastFrom<int64_t>(n.getProperty().getLimit())),
+        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                   sbe::value::bitcastFrom<int64_t>(n.getProperty().getSkip())),
+        getPlanNodeId(n));
 }
 
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
@@ -785,12 +790,14 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
     const auto& nodeProps = _nodeToGroupPropsMap.at(&n);
     const auto& physProps = nodeProps._physicalProps;
 
-    size_t limit = std::numeric_limits<std::size_t>::max();
+    std::unique_ptr<sbe::EExpression> limit = nullptr;
     if (properties::hasProperty<properties::LimitSkipRequirement>(physProps)) {
         const auto& limitSkipReq =
             properties::getPropertyConst<properties::LimitSkipRequirement>(physProps);
         tassert(6624221, "We should not have skip set here", limitSkipReq.getSkip() == 0);
-        limit = limitSkipReq.getLimit();
+        limit =
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                       sbe::value::bitcastFrom<int64_t>(limitSkipReq.getLimit()));
     }
 
     // TODO: obtain defaults for these.
@@ -802,7 +809,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
                                       std::move(orderBySlots),
                                       std::move(directions),
                                       std::move(vals),
-                                      limit,
+                                      std::move(limit),
                                       memoryLimit,
                                       allowDiskUse,
                                       nodeProps._planNodeId);

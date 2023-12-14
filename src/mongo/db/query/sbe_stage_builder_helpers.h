@@ -214,13 +214,6 @@ std::unique_ptr<sbe::EExpression> buildMultiBranchConditionalFromCaseValuePairs(
     std::vector<CaseValuePair> caseValuePairs, std::unique_ptr<sbe::EExpression> defaultValue);
 
 /**
- * Insert a limit stage on top of the 'input' stage.
- */
-std::unique_ptr<sbe::PlanStage> makeLimitTree(std::unique_ptr<sbe::PlanStage> inputStage,
-                                              PlanNodeId planNodeId,
-                                              long long limit = 1);
-
-/**
  * Create tree consisting of coscan stage followed by limit stage.
  */
 std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long long limit = 1);

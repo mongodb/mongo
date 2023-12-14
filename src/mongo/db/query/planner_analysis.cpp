@@ -814,11 +814,7 @@ bool QueryPlannerAnalysis::isEligibleForHashJoin(const SecondaryCollectionInfo& 
 // static
 std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(
     std::unique_ptr<QuerySolution> soln) {
-    auto root = soln->extractRoot();
-
-    removeInclusionProjectionBelowGroupRecursive(root.get());
-
-    soln->setRoot(std::move(root));
+    removeInclusionProjectionBelowGroupRecursive(soln->root());
     return soln;
 }
 
@@ -1284,24 +1280,26 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     }
 
     std::unique_ptr<SortNode> sortNode;
-    if (canUseSimpleSort(*solnRoot, query, params)) {
-        sortNode = std::make_unique<SortNodeSimple>();
-    } else {
-        sortNode = std::make_unique<SortNodeDefault>();
-    }
-    sortNode->pattern = sortObj;
-    sortNode->children.push_back(std::move(solnRoot));
-    sortNode->addSortKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kSortKey];
     // When setting the limit on the sort, we need to consider both
     // the limit N and skip count M. The sort should return an ordered list
     // N + M items so that the skip stage can discard the first M results.
-    if (findCommand.getLimit()) {
-        // The limit can be combined with the SORT stage.
-        sortNode->limit = static_cast<size_t>(*findCommand.getLimit()) +
-            static_cast<size_t>(findCommand.getSkip().value_or(0));
+    size_t sortLimit = findCommand.getLimit() ? static_cast<size_t>(*findCommand.getLimit()) +
+            static_cast<size_t>(findCommand.getSkip().value_or(0))
+                                              : 0;
+    if (canUseSimpleSort(*solnRoot, query, params)) {
+        sortNode = std::make_unique<SortNodeSimple>(
+            std::move(solnRoot),
+            sortObj,
+            sortLimit,
+            LimitSkipParameterization{query.shouldParameterizeLimitSkip()});
     } else {
-        sortNode->limit = 0;
+        sortNode = std::make_unique<SortNodeDefault>(
+            std::move(solnRoot),
+            sortObj,
+            sortLimit,
+            LimitSkipParameterization{query.shouldParameterizeLimitSkip()});
     }
+    sortNode->addSortKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kSortKey];
     solnRoot = std::move(sortNode);
 
     *blockingSortOut = true;
@@ -1384,9 +1382,10 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     soln->hasBlockingStage = hasSortStage || hasAndHashStage;
 
     if (findCommand.getSkip()) {
-        auto skip = std::make_unique<SkipNode>();
-        skip->skip = *findCommand.getSkip();
-        skip->children.push_back(std::move(solnRoot));
+        auto skip = std::make_unique<SkipNode>(
+            std::move(solnRoot),
+            *findCommand.getSkip(),
+            LimitSkipParameterization{query.shouldParameterizeLimitSkip()});
         solnRoot = std::move(skip);
     }
 
@@ -1417,9 +1416,10 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     // sort. Otherwise, we will have to enforce the limit ourselves since it's not handled inside
     // SORT.
     if (!hasSortStage && findCommand.getLimit()) {
-        auto limit = std::make_unique<LimitNode>();
-        limit->limit = *findCommand.getLimit();
-        limit->children.push_back(std::move(solnRoot));
+        auto limit = std::make_unique<LimitNode>(
+            std::move(solnRoot),
+            *findCommand.getLimit(),
+            LimitSkipParameterization{query.shouldParameterizeLimitSkip()});
         solnRoot = std::move(limit);
     }
 
