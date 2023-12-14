@@ -987,18 +987,28 @@ std::vector<const Collection*> CollectionCatalog::establishConsistentCollections
     OperationContext* opCtx,
     const DatabaseName& dbName,
     boost::optional<Timestamp> readTimestamp) const {
-
     std::vector<const Collection*> result;
+    stdx::unordered_set<const Collection*> visitedCollections;
+    auto appendIfUnique = [&result, &visitedCollections](const Collection* col) {
+        auto [_, isNewCollection] = visitedCollections.emplace(col);
+        if (col && isNewCollection) {
+            result.push_back(col);
+        }
+    };
 
     // We iterate both already committed and uncommitted changes and validate them with
     // the storage snapshot
     for (const auto& coll : range(dbName)) {
-        result.push_back(establishConsistentCollection(opCtx, coll->ns(), readTimestamp));
+        const Collection* currentCollection =
+            establishConsistentCollection(opCtx, coll->ns(), readTimestamp);
+        appendIfUnique(currentCollection);
     }
 
     for (auto const& [ns, coll] : _pendingCommitNamespaces) {
         if (ns.dbName() == dbName) {
-            result.push_back(establishConsistentCollection(opCtx, ns, readTimestamp));
+            const Collection* currentCollection =
+                establishConsistentCollection(opCtx, ns, readTimestamp);
+            appendIfUnique(currentCollection);
         }
     }
 
