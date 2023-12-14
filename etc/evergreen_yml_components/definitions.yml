@@ -1016,6 +1016,14 @@ functions:
       args:
       - "./src/evergreen/powercycle_sentinel_run.sh"
 
+  "sign macos dev binaries": &sign_macos_dev_binaries
+    command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/sign_macos_binaries_for_testing.py"
+
   "execute resmoke tests": &execute_resmoke_tests
     command: subprocess.exec
     type: test
@@ -1218,6 +1226,7 @@ functions:
   - *update_task_timeout_expansions
   - *update_task_timeout
   - *f_expansions_write
+  - *sign_macos_dev_binaries
   - command: subprocess.exec
     params:
       binary: bash
@@ -1267,6 +1276,7 @@ functions:
   - *update_resmoke_jobs_expansions
   - *f_expansions_write
   - *configure_evergreen_api_credentials
+  - *sign_macos_dev_binaries
   - command: subprocess.exec
     params:
       binary: bash
@@ -2982,6 +2992,7 @@ tasks:
       - "./etc/evergreen_yml_components/**"
       - "./etc/repo_config.yaml"
       - "./etc/scons/**"
+      - "./etc/macos_dev_entitlements.xml"
       - "docker_compose/**"
       - "buildscripts/**"
       - "jstests/**"
