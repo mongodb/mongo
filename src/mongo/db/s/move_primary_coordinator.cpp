@@ -33,6 +33,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
@@ -591,20 +592,21 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
     // Enable write blocking bypass to allow cleaning of stale data even if writes are disallowed.
     WriteBlockBypass::get(opCtx).set(true);
 
-    DBDirectClient dbClient(opCtx);
     invariant(_doc.getCollectionsToClone());
     for (const auto& nss : *_doc.getCollectionsToClone()) {
-        const auto dropStatus = [&] {
-            BSONObj dropResult;
-            dbClient.runCommand(_dbName, BSON("drop" << nss.coll()), dropResult);
-            return getStatusFromCommandResult(dropResult);
-        }();
-
-        if (!dropStatus.isOK()) {
+        DropReply unusedDropReply;
+        try {
+            uassertStatusOK(
+                dropCollection(opCtx,
+                               nss,
+                               &unusedDropReply,
+                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops,
+                               false /* fromMigrate */));
+        } catch (const DBException& e) {
             LOGV2_WARNING(7120210,
                           "Failed to drop stale collection on donor",
                           logAttrs(nss),
-                          "error"_attr = redact(dropStatus));
+                          "error"_attr = redact(e));
         }
     }
 }
