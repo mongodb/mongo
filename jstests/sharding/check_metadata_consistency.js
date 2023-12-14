@@ -14,6 +14,10 @@
 const st = new ShardingTest({});
 const mongos = st.s;
 
+// Use retryWrites when writing to the configsvr because mongos does not automatically retry those.
+const mongosSession = mongos.startSession({retryWrites: true});
+const configDB = mongosSession.getDatabase("config");
+
 const dbName = "testCheckMetadataConsistencyDB";
 var dbCounter = 0;
 
@@ -278,8 +282,8 @@ function assertNoInconsistencies() {
     st.shardColl(db[kSourceCollName], {skey: 1});
 
     // Insert a RoutingTableRangeOverlap inconsistency
-    const collUuid = st.config.collections.findOne({_id: ns}).uuid;
-    assert.commandWorked(st.config.chunks.updateOne({uuid: collUuid}, {$set: {max: {skey: 10}}}));
+    const collUuid = configDB.collections.findOne({_id: ns}).uuid;
+    assert.commandWorked(configDB.chunks.updateOne({uuid: collUuid}, {$set: {max: {skey: 10}}}));
 
     // Insert a ZonesRangeOverlap inconsistency
     let entry = {
@@ -289,7 +293,7 @@ function assertNoInconsistencies() {
         max: {"skey": 100},
         tag: "a",
     };
-    assert.commandWorked(st.config.tags.insert(entry));
+    assert.commandWorked(configDB.tags.insert(entry));
     entry = {
         _id: {ns: ns, min: {"skey": 50}},
         ns: ns,
@@ -297,7 +301,7 @@ function assertNoInconsistencies() {
         max: {"skey": 150},
         tag: "a",
     };
-    assert.commandWorked(st.config.tags.insert(entry));
+    assert.commandWorked(configDB.tags.insert(entry));
 
     // Database level mode command
     let inconsistencies = db.checkMetadataConsistency().toArray();
