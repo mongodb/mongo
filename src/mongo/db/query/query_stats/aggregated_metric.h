@@ -71,14 +71,7 @@ struct AggregatedMetric {
         sumOfSquares += val * val;
     }
 
-    void appendTo(BSONObjBuilder& builder, const StringData& fieldName) const {
-        BSONObjBuilder metricsBuilder = builder.subobjStart(fieldName);
-        metricsBuilder.append("sum", static_cast<long long>(sum));
-        metricsBuilder.append("max", static_cast<long long>(max));
-        metricsBuilder.append("min", static_cast<long long>(min));
-        metricsBuilder.append("sumOfSquares", static_cast<long long>(sumOfSquares));
-        metricsBuilder.done();
-    }
+    void appendTo(BSONObjBuilder& builder, StringData fieldName) const;
 
     T sum = 0;
     // Default to the _signed_ maximum (which fits in unsigned range) because we cast to
@@ -92,6 +85,9 @@ struct AggregatedMetric {
      */
     T sumOfSquares = 0;
 };
+
+extern template void AggregatedMetric<uint64_t>::appendTo(BSONObjBuilder& builder,
+                                                          StringData fieldName) const;
 
 template <>
 struct AggregatedMetric<double> {
@@ -120,7 +116,7 @@ struct AggregatedMetric<double> {
         sumOfSquares.addDouble(val * val);
     }
 
-    void appendTo(BSONObjBuilder& builder, const StringData& fieldName) const {
+    void appendTo(BSONObjBuilder& builder, StringData fieldName) const {
         BSONObjBuilder metricsBuilder = builder.subobjStart(fieldName);
         metricsBuilder.append("sum", static_cast<double>(sum.getDouble()));
         metricsBuilder.append("max", static_cast<double>(max));
@@ -141,5 +137,28 @@ struct AggregatedMetric<double> {
      */
     DoubleDoubleSummation sumOfSquares;
 };
+
+/**
+ * An aggregated metric that counts frequency of different boolean values.
+ */
+struct AggregatedBool {
+
+    /**
+     * Aggregate an observed value into the metric.
+     */
+    void aggregate(bool val) {
+        if (val) {
+            ++trueCount;
+        } else {
+            ++falseCount;
+        }
+    }
+
+    void appendTo(BSONObjBuilder& builder, StringData fieldName) const;
+
+    uint32_t trueCount{0};
+    uint32_t falseCount{0};
+};
+
 
 }  // namespace mongo::query_stats

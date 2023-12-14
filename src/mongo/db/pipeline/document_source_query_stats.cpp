@@ -229,9 +229,12 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
     const auto& hash = absl::HashOf(key);
     try {
         auto queryStatsKey = computeQueryStatsKey(key, SerializationContext::stateDefault());
-        return Document{{"key", std::move(queryStatsKey)},
-                        {"metrics", queryStatsEntry.toBSON()},
-                        {"asOf", partitionReadTime}};
+        return Document{
+            {"key", std::move(queryStatsKey)},
+            {"metrics",
+             queryStatsEntry.toBSON(feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
+                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))},
+            {"asOf", partitionReadTime}};
     } catch (const DBException& ex) {
         queryStatsHmacApplicationErrors.increment();
         const auto queryShape = key->universalComponents()._queryShape->toBson(

@@ -32,20 +32,27 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/crypto/hash_block.h"
-#include "mongo/crypto/sha256_block.h"
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::query_stats {
 
-BSONObj QueryStatsEntry::toBSON() const {
+BSONObj QueryStatsEntry::toBSON(bool includeDiskUsageMetrics) const {
     BSONObjBuilder builder{sizeof(QueryStatsEntry) + 100};
     builder.append("lastExecutionMicros", (long long)lastExecutionMicros);
     builder.append("execCount", (long long)execCount);
     totalExecMicros.appendTo(builder, "totalExecMicros");
     firstResponseExecMicros.appendTo(builder, "firstResponseExecMicros");
     docsReturned.appendTo(builder, "docsReturned");
+
+    if (includeDiskUsageMetrics) {
+        keysExamined.appendTo(builder, "keysExamined");
+        docsExamined.appendTo(builder, "docsExamined");
+        hasSortStage.appendTo(builder, "hasSortStage");
+        usedDisk.appendTo(builder, "usedDisk");
+        fromMultiPlanner.appendTo(builder, "fromMultiPlanner");
+        fromPlanCache.appendTo(builder, "fromPlanCache");
+    }
+
     builder.append("firstSeenTimestamp", firstSeenTimestamp);
     builder.append("latestSeenTimestamp", latestSeenTimestamp);
     if (supplementalStatsMap) {

@@ -1420,4 +1420,131 @@ TEST_F(QueryStatsStoreTest,
         })",
         shapified);
 }
+
+BSONObj intMetricBson(int64_t sum, int64_t min, int64_t max, int64_t sumOfSquares) {
+    return BSON("sum" << sum << "max" << max << "min" << min << "sumOfSquares" << sumOfSquares);
+}
+
+BSONObj boolMetricBson(int trueCount, int falseCount) {
+    return BSON("true" << trueCount << "false" << falseCount);
+}
+
+BSONObj toBSON(AggregatedBool& ab) {
+    BSONObjBuilder builder;
+    ab.appendTo(builder, "b");
+    return builder.obj();
+}
+
+TEST(AggBool, Basic) {
+
+    AggregatedBool ab;
+
+    ASSERT_BSONOBJ_EQ(toBSON(ab), BSON("b" << boolMetricBson(0, 0)));
+
+    // Test true is counted correctly
+    ab.aggregate(true);
+    ab.aggregate(true);
+
+    ASSERT_BSONOBJ_EQ(toBSON(ab), BSON("b" << boolMetricBson(2, 0)));
+
+    // Test false is counted correctly
+    ab.aggregate(false);
+
+    ASSERT_BSONOBJ_EQ(toBSON(ab), BSON("b" << boolMetricBson(2, 1)));
+}
+
+TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
+    QueryStatsStore queryStatsStore{5000000, 1000};
+
+    auto getMetrics = [&](BSONObj query) {
+        auto key = makeFindKeyFromQuery(query);
+        auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
+        ASSERT_OK(lookupResult);
+        return *lookupResult.getValue();
+    };
+
+    auto collectMetricsBase = [&](BSONObj query) {
+        auto key = makeFindKeyFromQuery(query);
+        auto lookupHash = absl::HashOf(key);
+        auto lookupResult = queryStatsStore.lookup(lookupHash);
+        if (!lookupResult.isOK()) {
+            queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+            lookupResult = queryStatsStore.lookup(lookupHash);
+        }
+
+        return lookupResult.getValue();
+    };
+
+    auto query1 = BSON("query" << 1 << "xEquals" << 42);
+
+    // Collect some metrics
+    {
+        auto metrics = collectMetricsBase(query1);
+        metrics->execCount += 1;
+        metrics->lastExecutionMicros += 123456;
+    }
+
+    // Verify the serialization works correctly
+    {
+        auto qse = getMetrics(query1);
+
+        // Empty
+        ASSERT_BSONOBJ_EQ(qse.toBSON(false),
+                          BSON("lastExecutionMicros"
+                               << 123456LL << "execCount" << 1LL << "totalExecMicros"
+                               << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0)
+                               << "firstResponseExecMicros"
+                               << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0)
+                               << "docsReturned"
+                               << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0)
+                               << "firstSeenTimestamp" << qse.firstSeenTimestamp
+                               << "latestSeenTimestamp" << Date_t()));
+
+        // With Disk Usage
+        ASSERT_BSONOBJ_EQ(
+            qse.toBSON(true),
+            BSON("lastExecutionMicros"
+                 << 123456LL << "execCount" << 1LL << "totalExecMicros"
+                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0)
+                 << "firstResponseExecMicros"
+                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "docsReturned"
+                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "keysExamined"
+                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "docsExamined"
+                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "hasSortStage"
+                 << boolMetricBson(0, 0) << "usedDisk" << boolMetricBson(0, 0) << "fromMultiPlanner"
+                 << boolMetricBson(0, 0) << "fromPlanCache" << boolMetricBson(0, 0)
+                 << "firstSeenTimestamp" << qse.firstSeenTimestamp << "latestSeenTimestamp"
+                 << Date_t()));
+    }
+
+    // Collect some metrics again but with booleans
+    {
+        auto metrics = collectMetricsBase(query1);
+        metrics->execCount += 1;
+        metrics->lastExecutionMicros += 123456;
+        metrics->usedDisk.aggregate(true);
+        metrics->hasSortStage.aggregate(false);
+    }
+
+    // With some boolean metrics
+    {
+        auto qse2 = getMetrics(query1);
+
+        ASSERT_BSONOBJ_EQ(
+            qse2.toBSON(true),
+            BSON("lastExecutionMicros"
+                 << 246912LL << "execCount" << 2LL << "totalExecMicros"
+                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0)
+                 << "firstResponseExecMicros"
+                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "docsReturned"
+                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "keysExamined"
+                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "docsExamined"
+                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "hasSortStage"
+                 << boolMetricBson(0, 1) << "usedDisk" << boolMetricBson(1, 0) << "fromMultiPlanner"
+                 << boolMetricBson(0, 0) << "fromPlanCache" << boolMetricBson(0, 0)
+                 << "firstSeenTimestamp" << qse2.firstSeenTimestamp << "latestSeenTimestamp"
+                 << Date_t()));
+    }
+}
+
 }  // namespace mongo::query_stats
