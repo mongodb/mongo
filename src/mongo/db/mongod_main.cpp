@@ -1774,18 +1774,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         validator->shutDown();
     }
 
-    if (TestingProctor::instance().isEnabled()) {
-        if (auto pool = Grid::get(serviceContext)->getExecutorPool()) {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shut down the executor pool",
-                                                      &shutdownTimeElapsedBuilder);
-            LOGV2_OPTIONS(6773200, {LogComponent::kSharding}, "Shutting down the ExecutorPool");
-            pool->shutdownAndJoin();
-        }
-    }
-
-    // The migrationutil executor must be shut down before shutting down the CatalogCacheLoader.
-    // Otherwise, it may try to schedule work on the CatalogCacheLoader and fail.
+    // The migrationutil executor must be shut down before shutting down the CatalogCacheLoader and
+    // the ExecutorPool. Otherwise, it may try to schedule work on those components and fail.
     LOGV2_OPTIONS(4784921, {LogComponent::kSharding}, "Shutting down the MigrationUtilExecutor");
     auto migrationUtilExecutor = migrationutil::getMigrationUtilExecutor(serviceContext);
     {
@@ -1794,6 +1784,16 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                                   &shutdownTimeElapsedBuilder);
         migrationUtilExecutor->shutdown();
         migrationUtilExecutor->join();
+    }
+
+    if (TestingProctor::instance().isEnabled()) {
+        if (auto pool = Grid::get(serviceContext)->getExecutorPool()) {
+            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                      "Shut down the executor pool",
+                                                      &shutdownTimeElapsedBuilder);
+            LOGV2_OPTIONS(6773200, {LogComponent::kSharding}, "Shutting down the ExecutorPool");
+            pool->shutdownAndJoin();
+        }
     }
 
     if (Grid::get(serviceContext)->isShardingInitialized()) {
