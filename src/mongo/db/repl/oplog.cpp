@@ -726,19 +726,14 @@ NamespaceString extractNsFromUUIDorNs(OperationContext* opCtx,
     return ui ? extractNsFromUUID(opCtx, ui.get()) : extractNs(ns, cmd);
 }
 
-StatusWith<BSONObj> getObjWithSanitizedStorageEngineOptions(OperationContext* opCtx,
-                                                            const BSONObj& cmd) {
+BSONObj getObjWithSanitizedStorageEngineOptions(OperationContext* opCtx, const BSONObj& cmd) {
     if (auto storageEngineElem = cmd[IndexDescriptor::kStorageEngineFieldName]) {
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         auto engineObj = storageEngineElem.embeddedObject();
         auto sanitizedObj =
             storageEngine->getSanitizedStorageOptionsForSecondaryReplication(engineObj);
-        if (!sanitizedObj.isOK()) {
-            return sanitizedObj.getStatus();
-        }
         return cmd.addField(
-            BSON(IndexDescriptor::kStorageEngineFieldName << sanitizedObj.getValue())
-                .firstElement());
+            BSON(IndexDescriptor::kStorageEngineFieldName << sanitizedObj).firstElement());
     }
     return cmd;
 }
@@ -766,12 +761,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& ui = entry.getUuid();
           // Sanitize storage engine options to remove options which might not apply to this node.
           // See SERVER-68122.
-          const auto sanitizedCmdOrStatus =
-              getObjWithSanitizedStorageEngineOptions(opCtx, entry.getObject());
-          if (!sanitizedCmdOrStatus.isOK()) {
-              return sanitizedCmdOrStatus.getStatus();
-          }
-          const auto& cmd = sanitizedCmdOrStatus.getValue();
+          const auto cmd = getObjWithSanitizedStorageEngineOptions(opCtx, entry.getObject());
           const NamespaceString nss(extractNs(entry.getNss(), cmd));
 
           // Mode SECONDARY steady state replication should not allow create collection to rename an
@@ -811,12 +801,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           // Sanitize storage engine options to remove options which might not apply to this node.
           // See SERVER-68122.
-          const auto sanitizedCmdOrStatus =
-              getObjWithSanitizedStorageEngineOptions(opCtx, entry.getObject());
-          if (!sanitizedCmdOrStatus.isOK()) {
-              return sanitizedCmdOrStatus.getStatus();
-          }
-          const auto& cmd = sanitizedCmdOrStatus.getValue();
+          const auto cmd = getObjWithSanitizedStorageEngineOptions(opCtx, entry.getObject());
 
           if (OplogApplication::Mode::kApplyOpsCmd == mode &&
               IndexBuildsCoordinator::supportsTwoPhaseIndexBuild()) {
@@ -860,11 +845,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           // Sanitize storage engine options to remove options which might not apply to this node.
           // See SERVER-68122.
           for (auto& spec : swOplogEntry.getValue().indexSpecs) {
-              auto sanitizedObj = getObjWithSanitizedStorageEngineOptions(opCtx, spec);
-              if (!sanitizedObj.isOK()) {
-                  return swOplogEntry.getStatus();
-              }
-              spec = sanitizedObj.getValue();
+              spec = getObjWithSanitizedStorageEngineOptions(opCtx, spec);
           }
 
           IndexBuildsCoordinator::ApplicationMode applicationMode =

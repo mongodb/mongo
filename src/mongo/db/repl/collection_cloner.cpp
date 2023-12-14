@@ -229,10 +229,9 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
             auto sanitizedStorageEngineOpts =
                 storageEngine->getSanitizedStorageOptionsForSecondaryReplication(
                     storageEngineElem.embeddedObject());
-            fassert(6812200, sanitizedStorageEngineOpts);
-            spec = spec.addField(BSON(IndexDescriptor::kStorageEngineFieldName
-                                      << sanitizedStorageEngineOpts.getValue())
-                                     .firstElement());
+            spec = spec.addField(
+                BSON(IndexDescriptor::kStorageEngineFieldName << sanitizedStorageEngineOpts)
+                    .firstElement());
         }
 
         if (spec.hasField("buildUUID")) {

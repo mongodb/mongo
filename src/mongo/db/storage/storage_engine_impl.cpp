@@ -1132,7 +1132,7 @@ void StorageEngineImpl::setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp
     _engine->setPinnedOplogTimestamp(pinnedTimestamp);
 }
 
-StatusWith<BSONObj> StorageEngineImpl::getSanitizedStorageOptionsForSecondaryReplication(
+BSONObj StorageEngineImpl::getSanitizedStorageOptionsForSecondaryReplication(
     const BSONObj& options) const {
     return _engine->getSanitizedStorageOptionsForSecondaryReplication(options);
 }
