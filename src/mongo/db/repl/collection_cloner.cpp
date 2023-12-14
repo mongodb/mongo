@@ -256,9 +256,8 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
             auto sanitizedStorageEngineOpts =
                 storageEngine->getSanitizedStorageOptionsForSecondaryReplication(
                     storageEngineElem.embeddedObject());
-            fassert(6812200, sanitizedStorageEngineOpts);
-            spec = spec.addFields(BSON(IndexDescriptor::kStorageEngineFieldName
-                                       << sanitizedStorageEngineOpts.getValue()));
+            spec = spec.addFields(
+                BSON(IndexDescriptor::kStorageEngineFieldName << sanitizedStorageEngineOpts));
         }
 
         if (spec.hasField("clustered")) {

@@ -1876,8 +1876,8 @@ void CollectionImpl::sanitizeCollectionOptions(OperationContext* opCtx) {
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
         const auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         const auto& storageEngineOptions = md.options.storageEngine;
-        md.options.storageEngine = uassertStatusOK(
-            storageEngine->getSanitizedStorageOptionsForSecondaryReplication(storageEngineOptions));
+        md.options.storageEngine =
+            storageEngine->getSanitizedStorageOptionsForSecondaryReplication(storageEngineOptions);
     });
 }
 

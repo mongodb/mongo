@@ -125,8 +125,8 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
         // Sanitize storage engine options to remove options which might not apply to this node. See
         // SERVER-68122.
         auto sanitizedStorageOptions =
-            uassertStatusOK(storageEngine->getSanitizedStorageOptionsForSecondaryReplication(
-                result.getOptions().storageEngine));
+            storageEngine->getSanitizedStorageOptionsForSecondaryReplication(
+                result.getOptions().storageEngine);
         result.getOptions().storageEngine = sanitizedStorageOptions;
 
         // While UUID is a member of CollectionOptions, listCollections does not return the
