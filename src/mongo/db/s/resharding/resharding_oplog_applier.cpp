@@ -291,7 +291,8 @@ void ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationContext* 
     store.upsert(
         opCtx,
         BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << _sourceId.toBSON()),
-        builder.obj());
+        builder.obj(),
+        WriteConcerns::kLocalWriteConcern);
 
     _env->applierMetrics()->onOplogEntriesApplied(_currentBatchToApply.size());
 
