@@ -17,9 +17,9 @@
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
-const isSBE = checkSBEEnabled(db);
+const isSBE = checkSbeFullyEnabled(db);
 
 // Create the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.

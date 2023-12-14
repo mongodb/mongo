@@ -6,13 +6,13 @@
  *   assumes_standalone_mongod,
  * ]
  */
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const mongod = MongoRunner.runMongod();
 const dbName = "test";
 const db = mongod.getDB(dbName);
 
-const sbeEnabled = checkSBEEnabled(db);
+const sbeEnabled = checkSbeFullyEnabled(db);
 
 // Create two users, each with different roles.
 assert.commandWorked(

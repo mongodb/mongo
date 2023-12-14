@@ -56,7 +56,7 @@ import {
     ClusteredCollectionUtil
 } from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 // Flag indicating if index filter commands are running through the query settings interface.
 var isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
@@ -370,7 +370,7 @@ assert.commandFailed(
 filters = getFilters();
 assert.eq(0, filters.length, tojson(filters));
 
-if (checkSBEEnabled(db)) {
+if (checkSbeRestrictedOrFullyEnabled(db)) {
     //
     // Test that planCacheSetFilter doesn't apply to the inner side of a $lookup.
     //

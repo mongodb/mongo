@@ -18,7 +18,7 @@
  *   requires_scripting,
  *   # This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
  *   # when SBE is enabled.
- *   requires_sbe,
+ *   featureFlagSbeFull,
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";

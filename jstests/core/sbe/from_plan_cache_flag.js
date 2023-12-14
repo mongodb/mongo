@@ -7,7 +7,7 @@
 //   requires_fcv_63,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_incompatible,
-//   requires_sbe,
+//   featureFlagSbeFull,
 // ]
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 

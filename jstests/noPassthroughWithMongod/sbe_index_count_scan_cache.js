@@ -3,7 +3,7 @@
  *
  * @tags: [
  *    # This test is specifically verifying the behavior of the SBE plan cache.
- *    requires_sbe,
+ *    featureFlagSbeFull,
  * ]
  */
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";

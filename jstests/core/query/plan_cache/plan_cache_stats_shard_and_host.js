@@ -10,7 +10,12 @@
 //   tenant_migration_incompatible,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_experimental_incompatible,
-//   requires_fcv_71,
+//   # When run in a mixed-version cluster, the old binary version and new binary version may choose
+//   # to use different query frameworks (SBE vs. classic). Furthermore, this test assumes that all
+//   # nodes are using the same plan cache key encoding. Since SBE and classic have different plan
+//   # cache key encodings, this means that the test cannot run in mixed version clusters with nodes
+//   # older than 7.3.
+//   requires_fcv_73,
 // ]
 import {getPlanCacheKeyFromExplain} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

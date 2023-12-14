@@ -1,7 +1,7 @@
 /**
  * Test that verifies which query shapes which are eligible for SBE.
  *
- * @tags: [requires_sbe]
+ * @tags: [featureFlagSbeFull]
  */
 
 /**

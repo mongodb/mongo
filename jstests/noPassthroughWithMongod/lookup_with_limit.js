@@ -1,13 +1,11 @@
 /**
  * Tests that the $limit stage is pushed before $lookup stages, except when there is an $unwind.
- *
- * @tags: [requires_sbe]
  */
 import {flattenQueryPlanTree, getWinningPlan} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
-// SERVER-80226: Remove 'featureFlagSbeFull' used by SBE Pushdown, SBE $unwind.
-const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
+const isSbeEnabled = checkSbeFullyEnabled(db);
+const isSbeGroupLookupOnly = checkSbeRestrictedOrFullyEnabled(db);
 
 const coll = db.lookup_with_limit;
 const other = db.lookup_with_limit_other;
@@ -50,8 +48,16 @@ var pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$limit: 5}
 ];
-checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "LIMIT"]);
-checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP"]);
+if (isSbeEnabled) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "LIMIT"]);
+    checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP"]);
+} else if (isSbeGroupLookupOnly) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP"]);
+} else {
+    checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "$lookup"]);
+}
 
 // Check that lookup->addFields->lookup->limit is reordered to limit->lookup->addFields->lookup,
 // with the limit stage pushed down to query system.
@@ -61,9 +67,18 @@ pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "additional"}},
     {$limit: 5}
 ];
-checkResults(
-    pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP", "LIMIT"]);
-checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"]);
+if (isSbeEnabled) {
+    checkResults(
+        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP", "LIMIT"]);
+    checkResults(
+        pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"]);
+} else if (isSbeGroupLookupOnly) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$addFields", "$lookup", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "$addFields", "$lookup"]);
+} else {
+    checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$addFields", "$lookup", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "$lookup", "$addFields", "$lookup"]);
+}
 
 // Check that lookup->unwind->limit is reordered to lookup->limit, with the unwind stage being
 // absorbed into the lookup stage and preventing the limit from swapping before it.
@@ -72,11 +87,13 @@ pipeline = [
     {$unwind: "$from_other"},
     {$limit: 5}
 ];
-// TODO SERVER-80226: Remove 'featureFlagSbeFull' used by SBE $unwind feature.
-if (featureFlagSbeFull) {
+
+if (isSbeEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "UNWIND", "LIMIT"]);
-} else {
+} else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
+} else {
+    checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$unwind", "$limit"]);
 }
 checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$limit"]);
 
@@ -89,10 +106,12 @@ pipeline = [
     {$sort: {x: 1}},
     {$limit: 5}
 ];
-// TODO SERVER-80226: Remove 'featureFlagSbeFull' used by SBE $unwind feature.
-if (featureFlagSbeFull) {
+
+if (isSbeEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "UNWIND", "SORT", "LIMIT"]);
-} else {
+} else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
+} else {
+    checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$unwind", "$sort", "$limit"]);
 }
 checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);

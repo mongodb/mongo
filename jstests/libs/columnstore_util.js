@@ -8,7 +8,7 @@ import {
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 /**
@@ -80,7 +80,7 @@ export function safeToCreateColumnStoreIndexInCluster(nodes) {
  * indexes. Returns true if setup was successful.
  */
 export function setUpServerForColumnStoreIndexTest(db) {
-    if (!checkSBEEnabled(db)) {
+    if (!checkSbeFullyEnabled(db)) {
         jsTestLog("Skipping column store index test since SBE is disabled");
         return false;
     }

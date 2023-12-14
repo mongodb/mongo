@@ -2,7 +2,7 @@
  * Tests that the query engine used is recorded correctly in the logs, system.profile, and
  * serverStatus.
  *
- * @tags: [requires_sbe]
+ * @tags: [featureFlagSbeFull]
  */
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";

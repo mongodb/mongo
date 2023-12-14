@@ -16,7 +16,7 @@
  *   # $planCacheStats is not supported in transactions.
  *   does_not_support_transactions,
  *   # This test assumes that the queries are using the SBE plan cache.
- *   requires_sbe,
+ *   featureFlagSbeFull,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
  * ]

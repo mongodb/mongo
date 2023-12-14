@@ -1,5 +1,5 @@
 /*
- * @tags: [requires_sbe]
+ * @tags: [featureFlagSbeFull]
  */
 
 const st = new ShardingTest({

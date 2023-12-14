@@ -12,15 +12,15 @@
  *   # server parameters are stored in-memory only so are not transferred onto the recipient.
  *   tenant_migration_incompatible,
  *   not_allowed_with_signed_security_token,
- *   # Logic for when a COLUMN_SCAN plan is generated changed slightly as part of enabling more
- *   # queries in SBE in the 7.0 release.
- *   requires_fcv_70,
+ *   # Columnstore indexes never shipped to the customers in older versions, so there is no need to
+ *   # test multiversion suites.
+ *   requires_fcv_73,
  * ]
  */
 import {aggPlanHasStage, planHasStage} from "jstests/libs/analyze_plan.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";  // TODO SERVER-80226: Remove this import
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();
@@ -170,8 +170,7 @@ explain = coll.explain().aggregate([
     {$group: {_id: "$comments.author", total_views: {$sum: "$comments.views"}}}
 ]);
 
-// TODO SERVER-80226: Remove 'featureFlagSbeFull' used by $unwind Pushdown feature.
-if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+if (checkSbeFullyEnabled(db)) {
     // The entire pipeline should be pushed down to SBE.
     assert(planHasStage(db, explain, "GROUP"), explain);
     assert(planHasStage(db, explain, "UNWIND"), explain);

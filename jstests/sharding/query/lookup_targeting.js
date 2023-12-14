@@ -10,7 +10,7 @@
  * ]
  */
 
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {ShardTargetingTest} from "jstests/libs/shard_targeting_util.js";
 
 const kDbName = "lookup_targeting";
@@ -258,7 +258,7 @@ shardTargetingTest.assertShardTargeting({
 // Clean up the view.
 assert(db[kViewName].drop());
 
-if (checkSBEEnabled(db)) {
+if (checkSbeRestrictedOrFullyEnabled(db)) {
     // Both collections are unsplittable and are collocated on the same shard. Test that we can do
     // SBE $lookup pushdown, regardless of which collection is on the inner side.
     expectedResults = [

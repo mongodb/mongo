@@ -5,7 +5,7 @@
  *
  * @tags: [
  *   # This test assumes that SBE is being used for most queries.
- *   requires_sbe,
+ *   featureFlagSbeFull,
  * ]
  */
 const numDocs = 1000;

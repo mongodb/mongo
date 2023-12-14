@@ -21,7 +21,7 @@
 //   multiversion_incompatible,
 // ]
 import {getPlanCacheKeyFromExplain} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 var coll = db.collation_plan_cache;
 coll.drop();
@@ -58,7 +58,7 @@ assert.commandWorked(
 var shapes = coll.aggregate([{$planCacheStats: {}}]).toArray();
 assert.eq(1, shapes.length, 'unexpected cache size after running query');
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 if (!isSbeEnabled) {
     assert.eq(shapes[0].createdFromQuery.query, {a: 'foo', b: 5}, shapes);
     assert.eq(shapes[0].createdFromQuery.sort, {}, shapes);

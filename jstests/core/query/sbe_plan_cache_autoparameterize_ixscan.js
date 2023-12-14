@@ -14,7 +14,7 @@
  *   tenant_migration_incompatible,
  *   # This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
  *   # when SBE is enabled.
- *   requires_sbe,
+ *   featureFlagSbeFull,
  * ]
  */
 import {getPlanCacheKeyFromExplain, getQueryHashFromExplain} from "jstests/libs/analyze_plan.js";

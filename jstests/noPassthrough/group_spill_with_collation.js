@@ -1,7 +1,7 @@
 /**
  * Tests $group execution with increased spilling and a non-simple collation.
  *
- * @tags: [requires_sbe]
+ * @tags: [featureFlagSbeFull]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

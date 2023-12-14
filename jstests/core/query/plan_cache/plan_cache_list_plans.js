@@ -40,12 +40,12 @@ import {
 } from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 let coll = db.jstests_plan_cache_list_plans;
 coll.drop();
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 
 function dumpPlanCacheState() {
     return coll.aggregate([{$planCacheStats: {}}]).toArray();

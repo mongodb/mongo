@@ -16,9 +16,13 @@
  * ]
  */
 import {getAggPlanStage, getEngine} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
-const sbeEnabled = checkSBEEnabled(db, ["featureFlagTimeSeriesInSbe"]);
+// We pushdown unpack when checkSbeRestrictedOrFullyEnabled is true and when
+// featureFlagTimeSeriesInSbe is set.
+const sbeUnpackPushdownEnabled = checkSbeRestrictedOrFullyEnabled(db) &&
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
 
 const coll = db.timeseries_sbe;
 coll.drop();
@@ -30,7 +34,7 @@ assert.commandWorked(coll.insert({t: new Date(), m: 1, a: 42, b: 17}));
 function runTest({pipeline, expectedEngine}) {
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
 
-    if (sbeEnabled) {
+    if (sbeUnpackPushdownEnabled) {
         assert.eq(expectedEngine,
                   getEngine(explain),
                   `SBE enabled. Should run ${tojson(pipeline)} in ${expectedEngine} but ran ${
@@ -70,8 +74,6 @@ runTest({
 // SBE. We'll sanity test a pipeline that should be lowered fully.
 runTest({
     pipeline: [
-        {$project: {_id: 0}},
-        {$sort: {m: 1}},
         {$match: {t: {$lt: new Date()}}},
         {$group: {_id: "$a", n: {$sum: "$b"}}},
     ],

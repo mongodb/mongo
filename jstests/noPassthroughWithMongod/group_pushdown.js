@@ -1,7 +1,7 @@
 /**
  * Tests basic functionality of pushing $group into the find layer.
  *
- * @tags: [requires_sbe]
+ * @tags: [featureFlagSbeFull]
  */
 import {getAggPlanStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
 

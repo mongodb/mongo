@@ -10,7 +10,7 @@
  *   does_not_support_stepdowns,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_experimental_incompatible,
- *   requires_sbe,
+ *   featureFlagSbeFull,
  * ]
  */
 

@@ -2,7 +2,7 @@
  * Test query knobs internalDocumentSourceCursorInitialBatchSize control DocumentSourceCursor batch
  * size, starting from a very small number and grows exponentially.
  */
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -65,7 +65,7 @@ setCursorBatchSize(1);
 {
     // This test is for SBE only, it requires $group and $limit to be pushed down into query
     // executor.
-    if (checkSBEEnabled(db)) {
+    if (checkSbeFullyEnabled(db)) {
         // Case when there are two $limit stages and only first one is pushed down into cqPipeline
         // of CanonicalQuery.
         const pipeline =

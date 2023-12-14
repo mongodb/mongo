@@ -3,7 +3,7 @@
  * the pushed down query with SBE.
  * TODO: Remove this file when all agg expressions are supported by SBE.
  *
- * @tags: [requires_sbe]
+ * @tags: [featureFlagSbeFull]
  */
 
 // Storing the expression we assume is unsupported as a constant, so we can easily change it when we

@@ -16,13 +16,9 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {
-    getAggPlanStage,
-    getEngine,
-    getQueryPlanner,
-    getSingleNodeExplain
-} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js"
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
@@ -136,7 +132,9 @@ TimeseriesTest.run((insert) => {
         {pred: {"topLevelScalar": {$eq: [999, 999]}}, ids: [], usesBlockProcessing: false}
     ];
 
-    const sbeEnabled = checkSBEEnabled(db, ["featureFlagTimeSeriesInSbe"]);
+    // $match pushdown requires sbe to be fully enabled and featureFlagTimeSeriesInSbe to be set.
+    const sbeEnabled = checkSbeFullyEnabled(db) &&
+        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
     for (let testCase of kTestCases) {
         const pipe = [{$match: testCase.pred}, {$project: {_id: 1}}];
 

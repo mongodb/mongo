@@ -8,7 +8,7 @@
  *   requires_replication,
  * ]
  */
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = "test";
@@ -17,9 +17,7 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
-const columnstoreEnabled =
-    checkSBEEnabled(rst.getPrimary().getDB(dbName), ["featureFlagColumnstoreIndexes"], true);
-
+const columnstoreEnabled = setUpServerForColumnStoreIndexTest(rst.getPrimary().getDB(dbName));
 const runTests = function(docs, indexSpecsFlat, sideWrites, collNameSuffix) {
     const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName() + collNameSuffix);
     assert.commandWorked(coll.insert(docs));

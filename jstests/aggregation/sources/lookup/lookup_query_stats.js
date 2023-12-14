@@ -19,9 +19,9 @@ import {
     getQueryInfoAtTopLevelOrFirstStage,
     getSbePlanStages
 } from "jstests/libs/sbe_explain_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
-const isSBELookupEnabled = checkSBEEnabled(db);
+const isSBELookupEnabled = checkSbeRestrictedOrFullyEnabled(db);
 const testDB = db.getSiblingDB("lookup_query_stats");
 testDB.dropDatabase();
 

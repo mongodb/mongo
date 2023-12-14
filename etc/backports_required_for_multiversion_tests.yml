@@ -535,6 +535,16 @@ last-continuous:
     ticket: SERVER-83777
   - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-82814
+  - test_file: jstests/core/command_let_variables.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_list_shapes.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_shell_helpers.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/views/views_aggregation.js
+    ticket: SERVER-83685
+  - test_file: jstests/noPassthroughWithMongod/lookup_with_limit.js
+    ticket: SERVER-83685
   suites: null
 last-lts:
   all:
@@ -1128,4 +1138,14 @@ last-lts:
     ticket: SERVER-83777
   - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-82814
+  - test_file: jstests/core/command_let_variables.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_list_shapes.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_shell_helpers.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/views/views_aggregation.js
+    ticket: SERVER-83685
+  - test_file: jstests/noPassthroughWithMongod/lookup_with_limit.js
+    ticket: SERVER-83685
   suites: null

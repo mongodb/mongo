@@ -12,7 +12,7 @@
  *   expects_explicit_underscore_id_index,
  *   # This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
  *   # when SBE is enabled.
- *   requires_sbe,
+ *   featureFlagSbeFull,
  * ]
  */
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});

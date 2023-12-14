@@ -523,11 +523,7 @@ bool findSbeCompatibleStagesForPushdown(
 
     auto& queryKnob = QueryKnobConfiguration::decoration(cq->getExpCtxRaw()->opCtx);
 
-    // 'trySbeRestricted' allows only $group, $lookup, $_internalUnpackBucket, and search stages to
-    // be pushed down. However, this can be overridden when 'sbeFullEnabled' is true.
-    const bool doFullPushdown = queryKnob.getInternalQueryFrameworkControlForOp() !=
-            QueryFrameworkControlEnum::kTrySbeRestricted ||
-        sbeFullEnabled;
+    const bool doFullPushdown = queryKnob.canPushDownFullyCompatibleStages() || sbeFullEnabled;
 
     CompatiblePipelineStages allowedStages = {
         .group = !queryKnob.getSbeDisableGroupPushdownForOp(),

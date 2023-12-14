@@ -7,7 +7,7 @@
 //
 import {getOptimizer, getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";  // TODO SERVER-80226: Remove this import
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const testDB = db.getSiblingDB("command_let_variables");
 const coll = testDB.command_let_variables;
@@ -93,10 +93,9 @@ let explain = assert.commandWorked(testDB.runCommand({
 
 // TODO SERVER-77719: Extend the testing for unwind operator to CQF optimizer.
 if (!isMongos && getOptimizer(explain) == "classic") {
-    // TODO SERVER-80226: Remove 'featureFlagSbeFull' used by $unwind Pushdown feature.
-    if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    if (checkSbeFullyEnabled(testDB)) {
         // $unwind should be pushed down to SBE.
-        assert(planHasStage(db, explain, "UNWIND"), explain);
+        assert(planHasStage(testDB, explain, "UNWIND"), explain);
     } else {
         assert(explain.hasOwnProperty("stages"), explain);
         assert.neq(explain.stages.length, 0, explain);

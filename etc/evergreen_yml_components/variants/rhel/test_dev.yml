@@ -1045,7 +1045,7 @@ buildvariants:
     max_sub_suites: 3
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-      --excludeWithAnyTags=resource_intensive,requires_sbe
+      --excludeWithAnyTags=resource_intensive
   depends_on:
   - name: archive_dist_test_debug
     variant: *linux_x86_dynamic_compile_variant_name
@@ -1164,7 +1164,7 @@ buildvariants:
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
       --runAllFeatureFlagTests
-      --excludeWithAnyTags=resource_intensive,requires_sbe
+      --excludeWithAnyTags=resource_intensive
   tasks:
   - name: analyze_shard_key_jscore_passthrough_gen
   - name: query_golden_classic

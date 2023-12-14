@@ -1,7 +1,7 @@
 // Test count and distinct on views use with different values of the allowDiskUseByDefault
 // parameter.
 
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
@@ -34,7 +34,7 @@ assert.commandWorked(viewsDB.adminCommand(
     {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: memoryLimitMb * 1024 * 1024}));
 
 // In SBE the $sort will not cause spilling because it's only the integers being sorted on.
-if (!checkSBEEnabled(viewsDB)) {
+if (checkSbeCompletelyDisabled(viewsDB)) {
     testDiskUse({count: "largeView"});
 }
 

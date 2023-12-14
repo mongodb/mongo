@@ -1,7 +1,7 @@
 /**
  * Tests that the lookup metrics are recorded correctly in serverStatus.
  *
- * @tags: [requires_sbe]
+ * @tags: [featureFlagSbeFull]
  */
 
 const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true}});

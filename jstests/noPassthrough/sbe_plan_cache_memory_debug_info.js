@@ -7,7 +7,7 @@
  * @tags: [
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_experimental_incompatible,
- *   requires_sbe
+ *   featureFlagSbeFull
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";

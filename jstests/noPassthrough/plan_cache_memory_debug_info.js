@@ -7,7 +7,7 @@
  * ]
  */
 import {getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 /**
  * Creates two indexes for the given collection. In order for plans to be cached, there need to be
@@ -78,7 +78,7 @@ assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("test");
 const coll = db.plan_cache_memory_debug_info;
 
-if (checkSBEEnabled(db)) {
+if (checkSbeFullyEnabled(db)) {
     jsTest.log("Skipping test because SBE is enabled");
     MongoRunner.stopMongod(conn);
     quit();

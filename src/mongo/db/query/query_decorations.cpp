@@ -79,4 +79,19 @@ size_t QueryKnobConfiguration::getMaxScansToExplodeForOp() {
     return _maxScansToExplodeValue;
 }
 
+bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() {
+    _tryToSetAllValues();
+    switch (_queryFrameworkControlValue) {
+        case QueryFrameworkControlEnum::kForceClassicEngine:
+        case QueryFrameworkControlEnum::kTrySbeRestricted:
+        case QueryFrameworkControlEnum::kTryBonsai:
+        case QueryFrameworkControlEnum::kTryBonsaiExperimental:
+        case QueryFrameworkControlEnum::kForceBonsai:
+            return false;
+        case QueryFrameworkControlEnum::kTrySbeEngine:
+            return true;
+    }
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

@@ -5,7 +5,7 @@
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_experimental_incompatible,
  *   # This test is specifically verifying the behavior of the SBE plan cache.
- *   requires_sbe,
+ *   featureFlagSbeFull,
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";

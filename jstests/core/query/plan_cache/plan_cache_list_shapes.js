@@ -16,9 +16,9 @@
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_experimental_incompatible,
 // ]
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
-if (checkSBEEnabled(db)) {
+if (checkSbeFullyEnabled(db)) {
     jsTest.log("Skipping test because SBE is enabled.");
     quit();
 }

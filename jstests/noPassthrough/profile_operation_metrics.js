@@ -13,7 +13,7 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const dbName = jsTestName();
 const collName = 'coll';
@@ -1203,10 +1203,10 @@ const operations = [
             // TODO SERVER-71684: We currently erroneously account for reads from and writes to
             // temporary record stores used as spill tables. This test accommodates the erroneous
             // behavior. Such accommodation is only necessary for debug builds (where we spill
-            // artificially for test purposes), and when SBE is used. The classic engine spills to
-            // files outside the storage engine rather than to a temporary record store, so it is
-            // not subject to SERVER-71684.
-            if (isDebugBuild(db) && checkSBEEnabled(db)) {
+            // artificially for test purposes), and when SBE $group pushdown is used. The classic
+            // engine spills to files outside the storage engine rather than to a temporary record
+            // store, so it is not subject to SERVER-71684.
+            if (isDebugBuild(db) && checkSbeRestrictedOrFullyEnabled(db)) {
                 assert.gt(profileDoc.docBytesWritten, 0);
                 assert.gt(profileDoc.docUnitsWritten, 0);
                 assert.gt(profileDoc.totalUnitsWritten, 0);

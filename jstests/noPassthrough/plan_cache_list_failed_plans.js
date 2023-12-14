@@ -1,12 +1,12 @@
 // Confirms the $planCacheStats output format includes information about failed plans.
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const testDB = conn.getDB("jstests_plan_cache_list_failed_plans");
 const coll = testDB.test;
 
-if (checkSBEEnabled(testDB)) {
+if (checkSbeFullyEnabled(testDB)) {
     jsTest.log("Skipping test because SBE is enabled");
     MongoRunner.stopMongod(conn);
     quit();

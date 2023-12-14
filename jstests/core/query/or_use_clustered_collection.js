@@ -18,10 +18,12 @@ import {
     getWinningPlan
 } from "jstests/libs/analyze_plan.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.or_use_clustered_collection;
 assertDropCollection(db, coll.getName());
+
+const isSbeGroupEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 // Create a clustered collection and create indexes.
 assert.commandWorked(
@@ -155,7 +157,7 @@ function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWi
         }
 
         // Classic engine doesn't have a GROUP stage like SBE for $group.
-        if (group && !checkSBEEnabled(db)) {
+        if (group && !isSbeGroupEnabled) {
             test.additionalStages["GROUP"] = 0;
         }
 

@@ -10,7 +10,6 @@
  * ]
  */
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = "test";
@@ -20,9 +19,7 @@ const rst = new ReplSetTest(
 rst.startSet();
 rst.initiate();
 
-const columnstoreEnabled =
-    checkSBEEnabled(rst.getPrimary().getDB(dbName), ["featureFlagColumnstoreIndexes"], true) &&
-    setUpServerForColumnStoreIndexTest(rst.getPrimary().getDB(dbName));
+const columnstoreEnabled = setUpServerForColumnStoreIndexTest(rst.getPrimary().getDB(dbName));
 
 // Insert enough data so that the collection scan spills to disk.
 const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName());

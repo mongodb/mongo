@@ -10,7 +10,6 @@
  * ]
  */
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = "test";
@@ -29,9 +28,7 @@ rst.initiate();
 const primary = rst.getPrimary();
 const coll = primary.getDB(dbName).getCollection(jsTestName());
 
-const columnstoreEnabled =
-    checkSBEEnabled(primary.getDB(dbName), ["featureFlagColumnstoreIndexes"], true) &&
-    setUpServerForColumnStoreIndexTest(primary.getDB(dbName));
+const columnstoreEnabled = setUpServerForColumnStoreIndexTest(primary.getDB(dbName));
 
 const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < numDocuments; i++) {

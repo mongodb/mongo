@@ -27,9 +27,10 @@ import {
     planHasStage,
 } from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
-const sbeEnabled = checkSBEEnabled(db);
+const sbeFullyEnabled = checkSbeFullyEnabled(db);
+const sbeRestricted = checkSbeRestrictedOrFullyEnabled(db);
 
 const coll = db.optimize_away_pipeline;
 coll.drop();
@@ -146,10 +147,14 @@ function testGetMore({command = null, expectedResult = null} = {}) {
     assert.sameMembers(documents, expectedResult);
 }
 
-// Calls 'assertPushdownEnabled' if sbeEnabled is 'true'. Otherwise, it calls
+// Calls 'assertPushdownEnabled' if sbeFullyEnabled is 'true' or if pipeline has SBE eligible stages
+// ($group, $lookup, $_internalUnpackBucket, and $search) under sbeRestricted. Otherwise, it calls
 // 'assertPushdownDisabled'.
-function assertPipelineIfSbeEnabled(assertPushdownEnabled, assertPushdownDisabled) {
-    return sbeEnabled ? assertPushdownEnabled() : assertPushdownDisabled();
+function assertPipelineIfSbeEnabled(
+    assertPushdownEnabled, assertPushdownDisabled, hasEligibleRestrictedStage = false) {
+    return sbeFullyEnabled || (sbeRestricted && hasEligibleRestrictedStage)
+        ? assertPushdownEnabled()
+        : assertPushdownDisabled();
 }
 
 // Basic pipelines.
@@ -286,7 +291,8 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
             expectedResult: [{_id: "null", s: 50}],
         });
-    });
+    },
+    true /* hasEligibleRestrictedStage */);
 
 // Test that we can optimize away a pipeline with a $text search predicate.
 assert.commandWorked(coll.createIndex({y: "text"}));
@@ -437,7 +443,8 @@ assertPipelineIfSbeEnabled(
             expectedResult: [{_id: null, s: 30}],
             optimizedAwayStages: ["$sort", "$limit"],
         });
-    });
+    },
+    true /* hasEligibleRestrictedStage */);
 
 // Test that $limit can be pushed down before a group, but it prohibits the DISTINCT_SCAN
 // optimization.
@@ -467,7 +474,8 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["COLLSCAN", "LIMIT"],
             optimizedAwayStages: ["$limit"],
         });
-    });
+    },
+    true /* hasEligibleRestrictedStage */);
 
 pipeline = [{$sort: {x: 1}}, {$limit: 2}, {$group: {_id: "$x"}}];
 assertPipelineIfSbeEnabled(
@@ -483,7 +491,8 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
             optimizedAwayStages: ["$sort", "$limit"],
         });
-    });
+    },
+    true /* hasEligibleRestrictedStage */);
 
 // $limit after a group has no effect on our ability to produce a DISTINCT_SCAN plan.
 assertPipelineUsesAggregation({
@@ -583,7 +592,8 @@ assertPipelineIfSbeEnabled(
             pipeline: pipeline,
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
         });
-    });
+    },
+    true /* hasEligibleRestrictedStage */);
 pipeline = [{$group: {_id: "$a", b: {$sum: "$b"}}}, {$group: {_id: "$c", x: {$sum: "$b"}}}];
 assertPipelineIfSbeEnabled(
     function() {
@@ -600,7 +610,8 @@ assertPipelineIfSbeEnabled(
             pipeline: pipeline,
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
         });
-    });
+    },
+    true /* hasEligibleRestrictedStage */);
 
 function assertTransformByShape(expected, actual, message) {
     assert.eq(Object.keys(expected).sort(), Object.keys(actual).sort(), message);
@@ -624,7 +635,8 @@ assertPipelineIfSbeEnabled(
         let projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
         assert.neq(null, projStage, explain);
         assertTransformByShape({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
-    });
+    },
+    true /* hasEligibleRestrictedStage */);
 
 // Similar as above, but with $addFields stage at the front of the pipeline.
 pipeline = [{$addFields: {z: "abc"}}, {$group: {_id: "$a", b: {$sum: "$b"}}}];
@@ -662,7 +674,8 @@ function assertProjectionCanBeRemovedBeforeGroup(pipeline, projectionType = "PRO
                 pipeline: pipeline,
                 expectedStages: ["COLLSCAN", projectionType, "$group"],
             });
-        });
+        },
+        true /* hasEligibleRestrictedStage */);
 }
 
 // Asserts that a projection stage is not optimized out of a pipeline with a projection and a group
@@ -681,7 +694,8 @@ function assertProjectionIsNotRemoved(pipeline, projectionType = "PROJECTION_SIM
                 pipeline: pipeline,
                 expectedStages: ["COLLSCAN", projectionType, "$group"],
             });
-        });
+        },
+        true /* hasEligibleRestrictedStage */);
 }
 
 // Test that an inclusion projection is optimized away if it is redundant/unnecessary.
@@ -743,7 +757,8 @@ assertPipelineIfSbeEnabled(
             pipeline: pipeline,
             expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT", "$group"],
         });
-    });
+    },
+    true /* hasEligibleRestrictedStage */);
 
 // We generate a projection stage from dependency analysis, even if the pipeline begins with an
 // exclusion projection.

@@ -19,7 +19,6 @@ import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // Doc size was found through logging the size in the SpillableCache. Partition sizes were chosen
@@ -214,18 +213,24 @@ function testUsedDiskAppearsInExplain() {
         {$sort: {_id: 1}}
     ];
 
-    const stageName =
-        checkSBEEnabled(db, ["featureFlagSbeFull"]) ? "window" : "$_internalSetWindowFields";
-    let stages = getAggPlanStages(
-        coll.explain("allPlansExecution").aggregate(explainPipeline, {allowDiskUse: true}),
-        stageName);
+    let explainAllPlansExecution =
+        coll.explain("allPlansExecution").aggregate(explainPipeline, {allowDiskUse: true});
+
+    // If setWindowFields is pushed down to SBE, the stage name in explain will be 'window',
+    // otherwise it will be '$_internalSetWindowFields'.
+    let stages =
+        getAggPlanStages(explainAllPlansExecution, "window")
+            .concat(getAggPlanStages(explainAllPlansExecution, "$_internalSetWindowFields"));
+    assert.gt(stages.length, 0, stages);
     assert(stages[0]["usedDisk"], stages);
 
     // Run an explain query with the default memory limit, so 'usedDisk' should be false.
     changeSpillLimit({mode: 'off', maxDocs: null});
-    stages = getAggPlanStages(
-        coll.explain("allPlansExecution").aggregate(explainPipeline, {allowDiskUse: true}),
-        stageName);
+    explainAllPlansExecution =
+        coll.explain("allPlansExecution").aggregate(explainPipeline, {allowDiskUse: true});
+    stages = getAggPlanStages(explainAllPlansExecution, "window")
+                 .concat(getAggPlanStages(explainAllPlansExecution, "$_internalSetWindowFields"));
+    assert.gt(stages.length, 0, stages);
     assert(!stages[0]["usedDisk"], stages);
 }
 

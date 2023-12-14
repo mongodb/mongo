@@ -4,7 +4,7 @@
  *
  * @tags: [
  *   requires_profiling,
- *   requires_sbe
+ *   featureFlagSbeFull
  * ]
  */
 

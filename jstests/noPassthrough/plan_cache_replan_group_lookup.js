@@ -6,7 +6,7 @@
  */
 import {getAggPlanStages, getCachedPlan, getPlanStage} from "jstests/libs/analyze_plan.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -14,7 +14,7 @@ const coll = db.plan_cache_replan_group_lookup;
 const foreignCollName = "foreign";
 coll.drop();
 
-const sbeEnabled = checkSBEEnabled(db);
+const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 function getPlansForCacheEntry(match) {
     const matchingCacheEntries = coll.getPlanCache().list([{$match: match}]);
@@ -184,9 +184,8 @@ function dropLookupForeignColl() {
     assert(db[foreignCollName].drop());
 }
 
-const lookupPushdownEnabled = checkSBEEnabled(db);
 function verifyCorrectLookupAlgorithmUsed(targetJoinAlgorithm, pipeline, aggOptions = {}) {
-    if (!lookupPushdownEnabled) {
+    if (!sbeEnabled) {
         return;
     }
 
@@ -575,7 +574,7 @@ coll.getPlanCache().clear();
 
 // Verify that $group gets pushed down, provided that SBE is enabled.
 let groupNodes;
-if (checkSBEEnabled(db)) {
+if (sbeEnabled) {
     explain = coll.explain().aggregate(avoidReplanGroupPipeline);
     let groupNodes = getAggPlanStages(explain, "GROUP");
     assert.eq(groupNodes.length, 1);

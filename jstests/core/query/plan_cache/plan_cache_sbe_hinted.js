@@ -13,7 +13,7 @@
  *   assumes_standalone_mongod,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_experimental_incompatible,
- *   requires_sbe,
+ *   featureFlagSbeFull,
  * ]
  */
 const coll = db.plan_cache_sbe;

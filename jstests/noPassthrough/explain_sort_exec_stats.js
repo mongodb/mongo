@@ -3,14 +3,14 @@
  * different verbosities.
  */
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 const coll = db.explain_sort_stage_exec_stats;
 coll.drop();
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 const bigStr = Array(1025).toString();  // 1KB of ','
 const lowMaxMemoryLimit = 5000;
 const nDocs = 1000;

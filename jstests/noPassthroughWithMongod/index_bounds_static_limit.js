@@ -4,7 +4,7 @@
 // @tags: [
 //   # We issue 'setParameter' command which is not compatible with stepdowns.
 //   does_not_support_stepdowns,
-//   requires_sbe,
+//   featureFlagSbeFull,
 // ]
 import {getPlanStage, getPlanStages} from "jstests/libs/analyze_plan.js";
 

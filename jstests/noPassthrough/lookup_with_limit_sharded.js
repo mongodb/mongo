@@ -10,7 +10,7 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   requires_sbe
+ *   featureFlagSbeFull
  * ]
  */
 import {

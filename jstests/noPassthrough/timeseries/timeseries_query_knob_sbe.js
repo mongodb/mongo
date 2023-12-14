@@ -11,14 +11,18 @@
  */
 
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const dbName = jsTestName();
 const db = conn.getDB(dbName);
 
-const sbeEnabled = checkSBEEnabled(db, ["featureFlagTimeSeriesInSbe"]);
+// We pushdown unpack when checkSbeRestrictedOrFullyEnabled is true and when
+// featureFlagTimeSeriesInSbe is set.
+const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db) &&
+    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
 
 const coll = db.timeseries
 coll.drop();

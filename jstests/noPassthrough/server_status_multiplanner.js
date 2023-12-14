@@ -1,7 +1,7 @@
 /**
  * Tests the serverStatus and FTDC metrics for multi planner execution (both classic and SBE).
  *
- * @tags: [requires_sbe]
+ * @tags: [featureFlagSbeFull]
  */
 function sumHistogramBucketCounts(histogram) {
     let sum = 0;

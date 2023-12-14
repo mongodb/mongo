@@ -2,7 +2,7 @@
  * Tests for the $$NOW and $$CLUSTER_TIME system variable.
  */
 import "jstests/libs/sbe_assert_error_override.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db[jsTest.name()];
 const otherColl = db[coll.getName() + "_other"];
@@ -153,7 +153,7 @@ runTestsExpectFailure(baseCollectionClusterTimeAgg);
 runTestsExpectFailure(fromViewWithClusterTime);
 runTestsExpectFailure(withExprClusterTime);
 
-if (checkSBEEnabled(db)) {
+if (checkSbeFullyEnabled(db)) {
     function verifyPlanCacheSize(query) {
         coll.getPlanCache().clear();
 

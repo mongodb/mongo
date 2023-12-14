@@ -5,7 +5,7 @@
 // ]
 // Include helpers for analyzing explain output.
 import {getOptimizer, getWinningPlan, isIdhack} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const t = db.idhack;
 t.drop();
@@ -69,7 +69,7 @@ winningPlan = getWinningPlan(explain.queryPlanner);
 assert(!isIdhack(db, winningPlan), winningPlan);
 
 // Covered query returning _id field only can be handled by ID hack.
-const parentStage = checkSBEEnabled(db) ? "PROJECTION_COVERED" : "FETCH";
+const parentStage = checkSbeFullyEnabled(db) ? "PROJECTION_COVERED" : "FETCH";
 explain = t.find(query, {_id: 1}).explain();
 winningPlan = getWinningPlan(explain.queryPlanner);
 

@@ -14,9 +14,9 @@ import {
     getWinningPlan,
 } from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSbeFullyEnabled(db);
 if (!isSBEEnabled) {
     jsTestLog("Skipping test because SBE is disabled");
     quit();

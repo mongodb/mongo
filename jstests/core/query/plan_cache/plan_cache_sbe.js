@@ -25,11 +25,11 @@
  *   assumes_no_implicit_index_creation,
  * ]
  */
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.plan_cache_sbe;
 coll.drop();
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 

@@ -1,5 +1,5 @@
 /**
- * @tags: [requires_sbe]
+ * @tags: [featureFlagSbeFull]
  */
 const conn = MongoRunner.runMongod({setParameter: {featureFlagCommonQueryFramework: true}});
 assert.neq(null, conn, "mongod was unable to start up");

@@ -24,14 +24,6 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
-const columnstoreEnabled =
-    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */);
-if (!columnstoreEnabled) {
-    jsTestLog("Skipping columnstore index test since the feature flag is not enabled.");
-    quit();
-}
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();

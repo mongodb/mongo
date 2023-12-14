@@ -9,7 +9,7 @@
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const dbName = "test";
 const collName = "sbe_plan_cache_does_not_block_range_deletion";
@@ -20,7 +20,7 @@ const st = new ShardingTest({mongos: 1, config: 1, shards: 2});
 assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
-const isSBEEnabled = checkSBEEnabled(st.s.getDB(dbName));
+const isSBEEnabled = checkSbeFullyEnabled(st.s.getDB(dbName));
 
 const coll = st.s.getDB(dbName)[collName];
 
