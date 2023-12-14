@@ -1,0 +1,181 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target='document_source_search',
+    source=[
+        'document_source_search.cpp',
+        'document_source_search_meta.cpp',
+        'document_source_internal_search_id_lookup.cpp',
+        'document_source_internal_search_mongot_remote.cpp',
+        'document_source_internal_search_mongot_remote.idl',
+        'mongot_cursor.cpp',
+        'plan_sharded_search.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
+        '$BUILD_DIR/mongo/db/query/plan_executor',
+        '$BUILD_DIR/mongo/db/shard_filterer',
+        '$BUILD_DIR/mongo/db/shard_role_api',
+        '$BUILD_DIR/mongo/executor/task_executor_cursor',
+        'mongot_options',
+        'search_task_executors',
+    ],
+)
+
+env.Library(
+    target='document_source_list_search_indexes',
+    source=[
+        'document_source_list_search_indexes.cpp',
+        'document_source_list_search_indexes.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/search_index_commands',
+        'search_index_helpers_interface',
+    ],
+)
+
+env.Library(
+    target='mongot_options',
+    source=[
+        'mongot_options.cpp',
+        'mongot_options.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
+env.Library(
+    target='search_task_executors',
+    source=[
+        'search_task_executors.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/connection_pool_controllers',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+    ],
+    LIBDEPS_PRIVATE=[
+        'mongot_options',
+        'search_index_options',
+    ],
+)
+
+env.CppIntegrationTest(
+    target='search_task_executors_integration_test',
+    source=[
+        'search_task_executors_integration_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/wire_version',
+        '$BUILD_DIR/mongo/executor/network_interface',
+        '$BUILD_DIR/mongo/executor/pinned_connection_task_executor_factory',
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/mongo/util/version_impl',
+        'search_task_executors',
+    ],
+)
+
+env.CppUnitTest(
+    target='auth_search_test',
+    source=[
+        'list_search_indexes_authorization_session_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/auth_checks',
+        '$BUILD_DIR/mongo/db/auth/authorization_session_test_fixture',
+        'document_source_list_search_indexes',
+    ],
+)
+
+env.CppUnitTest(
+    target='db_query_search_test',
+    source=[
+        'document_source_search_test.cpp',
+        'document_source_search_meta_test.cpp',
+        'document_source_internal_search_id_lookup_test.cpp',
+        'document_source_internal_search_mongot_remote_test.cpp',
+        'document_source_list_search_indexes_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util',
+        '$BUILD_DIR/mongo/db/pipeline/document_source_mock',
+        '$BUILD_DIR/mongo/db/service_context_non_d',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'document_source_list_search_indexes',
+        'document_source_search',
+        'mongot_options',
+    ],
+)
+
+env.Library(
+    target='search_index_options',
+    source=[
+        'search_index_options.cpp',
+        'search_index_options.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
+env.Library(
+    target='search_index_helpers_interface',
+    source=[
+        'search_index_helpers.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.Library(
+    target='search_index_helpers_shard',
+    source=[
+        'search_index_helpers_shard.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        'search_index_helpers_interface',
+    ],
+)
+
+env.Library(
+    target='search_index_command_router',
+    source=[
+        'search_index_helpers_router.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
+        'search_index_helpers_interface',
+    ],
+)
+
+env.Library(
+    target='manage_search_index_request',
+    source=[
+        'manage_search_index_request.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)

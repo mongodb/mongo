@@ -877,7 +877,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --use-diagnostic-latches=off
         --allocator=system
-        --enterprise-features=fle,search,vector_search
+        --enterprise-features=fle
         --js-engine=none
         --link-model=dynamic-sdk
         --enable-http-client=off
@@ -929,7 +929,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --use-diagnostic-latches=off
         --allocator=system
-        --enterprise-features=fle,search,vector_search
+        --enterprise-features=fle
         --js-engine=none
         --link-model=dynamic-sdk
         --enable-http-client=off

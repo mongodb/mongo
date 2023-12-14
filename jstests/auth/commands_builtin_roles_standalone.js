@@ -13,7 +13,9 @@ const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles_standalon
 mkdir(dbPath);
 const opts = {
     auth: "",
-    setParameter: "trafficRecordingDirectory=" + dbPath
+    // We have to set the mongotHost parameter for the $search-relatead tests to pass configuration
+    // checks.
+    setParameter: {trafficRecordingDirectory: dbPath, mongotHost: "localhost:27017"}
 };
 
 // run all tests standalone

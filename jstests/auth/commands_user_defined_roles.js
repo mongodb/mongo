@@ -224,7 +224,10 @@ function createUsers(conn) {
 }
 
 const opts = {
-    auth: ""
+    auth: "",
+    // We have to set the mongotHost parameter for the $search-related tests to pass configuration
+    // checks.
+    setParameter: {mongotHost: "localhost:27017"}
 };
 const impls = {
     createUsers: createUsers,
@@ -249,7 +252,9 @@ const impls = {
         mongos: 1,
         config: 1,
         keyFile: "jstests/libs/key1",
-        other: {shardOptions: opts}
+        // We have to set the mongotHost parameter for the $search-related tests to pass
+        // configuration checks.
+        other: {shardOptions: opts, mongosOptions: {setParameter: {mongotHost: "localhost:27017"}}}
     });
     conn.sidechannel = new Mongo(conn.s0.host);
     authCommandsLib.runTests(conn, impls);

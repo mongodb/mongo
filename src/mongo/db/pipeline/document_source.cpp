@@ -299,23 +299,5 @@ std::unique_ptr<LiteParsedDocumentSource> throwOnParseLite(NamespaceString nss,
 MONGO_INITIALIZER_GROUP(BeginDocumentSourceRegistration,
                         ("default"),
                         ("EndDocumentSourceRegistration"))
-// Any remaining work on the parserMap should be done before finishing DocumentSource Registration.
-MONGO_INITIALIZER_WITH_PREREQUISITES(EndDocumentSourceRegistration,
-                                     ("BeginDocumentSourceRegistration"))
-(InitializerContext*) {
-    auto searchStageNames = {
-        "$vectorSearch"_sd, "$search"_sd, "$searchMeta"_sd, "$listSearchIndexes"_sd};
-    for (auto stageName : searchStageNames) {
-        auto searchIt = parserMap.find(stageName);
-        // If the stage has not been registered at this point, register a parser that errors
-        // with a useful error message on parsing a search stage.
-        if (searchIt == parserMap.end()) {
-            LiteParsedDocumentSource::registerParser(stageName.toString(),
-                                                     throwOnParseLite,
-                                                     AllowedWithApiStrict::kAlways,
-                                                     AllowedWithClientType::kAny);
-            DocumentSource::registerParser(stageName.toString(), throwOnParse, boost::none);
-        }
-    }
-}
+MONGO_INITIALIZER_GROUP(EndDocumentSourceRegistration, ("BeginDocumentSourceRegistration"), ())
 }  // namespace mongo

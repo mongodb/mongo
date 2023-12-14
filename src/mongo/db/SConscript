@@ -1664,6 +1664,12 @@ execEnv.Library(
         'query/query_plan_cache',
         'query/query_planner',
         'query/query_settings/query_settings',
+        # TODO SERVER-83717 These search-related document sources are included here for now
+        # to avoid dependency cycles. Move these to libpipeline once the search library
+        # dependencies are cleaned up.
+        'query/search/document_source_list_search_indexes',
+        'query/search/document_source_search',
+        'query/vector_search/document_source_vector_search',
         'session/logical_session_cache',
         'shard_filterer',
         'shard_role',

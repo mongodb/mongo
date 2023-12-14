@@ -18,7 +18,9 @@ env.SConscript(
         'query_settings',
         'query_stats',
         'query_shape',
+        'search',
         'stats',
+        'vector_search',
     ],
     exports=[
         'env',

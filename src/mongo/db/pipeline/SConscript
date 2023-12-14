@@ -267,6 +267,11 @@ env.Library(
         'abt/transformer_visitor.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        # TODO SERVER-83717 Remove these dependencies on search-related document sources once
+        # they're moved into libpipeline.
+        '$BUILD_DIR/mongo/db/query/search/document_source_list_search_indexes',
+        '$BUILD_DIR/mongo/db/query/search/document_source_search',
+        '$BUILD_DIR/mongo/db/query/vector_search/document_source_vector_search',
         'change_stream_pipeline',
         'document_source_internal_apply_oplog_update',
         'pipeline',

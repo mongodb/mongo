@@ -524,6 +524,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_settings/manager',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
+        '$BUILD_DIR/mongo/db/query/search/search_index_helpers_shard',
         '$BUILD_DIR/mongo/db/query/stats/stats',
         '$BUILD_DIR/mongo/db/query/stats/stats_histograms',
         '$BUILD_DIR/mongo/db/query_exec',
@@ -563,6 +564,7 @@ env.Library(
         'list_databases_for_all_tenants_command',
         'lock_info_command',
         'rename_collection_idl',
+        'search_index_commands',
         'test_commands_enabled',
         'validate_db_metadata_command',
     ],
@@ -944,6 +946,27 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/md5',
         '$BUILD_DIR/mongo/util/progress_meter',
+    ],
+)
+
+env.Library(
+    target='search_index_commands',
+    source=[
+        'search_index_commands.idl',
+        'search_index_commands.cpp',
+        'search_test_cmds.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/auth_checks',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/query/search/manage_search_index_request',
+        '$BUILD_DIR/mongo/db/query/search/search_index_helpers_interface',
+        '$BUILD_DIR/mongo/db/query/search/search_index_options',
+        '$BUILD_DIR/mongo/db/query/search/search_task_executors',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 

@@ -1,0 +1,187 @@
+# Copyright (C) 2023-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/auth/access_checks.idl"
+    - "mongo/db/auth/action_type.idl"
+    - "mongo/db/basic_types.idl"
+
+structs:
+    IndexCreated:
+        description: "Information about the just created search index"
+        fields:
+            id:
+                description: "The ID of the just created search index"
+                type: string
+                optional: false
+            name:
+                description: "The name of the just created search index"
+                type: string
+                optional: false
+
+    CreateSearchIndexesReply:
+        description: "Reply to 'createSearchIndexes' command"
+        is_command_reply: true
+        fields:
+            indexesCreated:
+                description: "A list of the indexes just created"
+                type: array<IndexCreated>
+                optional: false
+
+    DropSearchIndexReply:
+        description: "Reply to 'dropSearchIndex' command"
+        is_command_reply: true
+
+    UpdateSearchIndexReply:
+        description: "Reply to 'updateSearchIndex' command"
+        is_command_reply: true
+
+    ListSearchIndexesReply:
+        description: "Reply to 'listSearchIndexes' command"
+        is_command_reply: true
+        fields:
+            cursor:
+                description: "Describes the cursor id (will always be 0), the ns, and firstBatch (the only batch)"
+                type: object
+                optional: false
+
+    IndexDefinition:
+        description: "The complete definition of a search index"
+        fields:
+            name:
+                description: "The name of the search index"
+                type: string
+                optional: true
+            definition:
+                description: "The definition of the search index"
+                type: object_owned
+                optional: false
+            type:
+                description: "The type of the index, whether it is search or vectorSearch. Defaults to search"
+                type: string
+                optional: true
+
+commands:
+    createSearchIndexes:
+        description: "Command to create a search index."
+        command_name: createSearchIndexes
+        cpp_name: CreateSearchIndexesCommand
+        reply_type: CreateSearchIndexesReply
+        namespace: concatenate_with_db
+        api_version: ""
+        access_check:
+            complex:
+                - check: is_authorized_to_parse_namespace_element
+                - privilege:
+                    resource_pattern: exact_namespace
+                    action_type: createSearchIndexes
+        strict: true
+        fields:
+            indexes:
+                description: 'Search indexes to be created'
+                type: array<IndexDefinition>
+                optional: false
+
+    dropSearchIndex:
+        description: "Command to drop a search index."
+        command_name: dropSearchIndex
+        cpp_name: DropSearchIndexCommand
+        reply_type: DropSearchIndexReply
+        namespace: concatenate_with_db
+        api_version: ""
+        access_check:
+            complex:
+                - check: is_authorized_to_parse_namespace_element
+                - privilege:
+                    resource_pattern: exact_namespace
+                    action_type: dropSearchIndex
+        strict: true
+        fields:
+            name:
+                description: "The name of the index to be dropped"
+                type: string
+                optional: true
+            id:
+                description: "The ID of the index to be dropped"
+                type: string
+                optional: true
+
+    updateSearchIndex:
+        description: "Command to update a search index."
+        command_name: updateSearchIndex
+        cpp_name: UpdateSearchIndexCommand
+        reply_type: UpdateSearchIndexReply
+        namespace: concatenate_with_db
+        api_version: ""
+        access_check:
+            complex:
+                - check: is_authorized_to_parse_namespace_element
+                - privilege:
+                    resource_pattern: exact_namespace
+                    action_type: updateSearchIndex
+        strict: true
+        fields:
+            name:
+                description: "The name of the index to be updated"
+                type: string
+                optional: true
+            id:
+                description: "The ID of the index to be updated"
+                type: string
+                optional: true
+            definition:
+                description: "Document describing the new index definition"
+                type: object_owned
+                optional: false
+
+    listSearchIndexes:
+        description: "Command to list search indexes."
+        command_name: listSearchIndexes
+        cpp_name: ListSearchIndexesCommand
+        reply_type: ListSearchIndexesReply
+        namespace: concatenate_with_db
+        api_version: ""
+        access_check:
+            complex:
+                - check: is_authorized_to_parse_namespace_element
+                - privilege:
+                    resource_pattern: exact_namespace
+                    action_type: listSearchIndexes
+        strict: true
+        fields:
+            name:
+                description: "The name of the index to be listed"
+                type: string
+                optional: true
+            id:
+                description: "The ID of the index to be listed"
+                type: string
+                optional: true

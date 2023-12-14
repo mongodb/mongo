@@ -3753,7 +3753,7 @@ tasks:
       targets: archive-mongo-crypt-dev
       task_compile_flags: >-
         --allocator=system
-        --enterprise-features=fle,search,vector_search
+        --enterprise-features=fle
         --js-engine=none
         --link-model=dynamic-sdk
         --enable-http-client=off
@@ -3790,7 +3790,7 @@ tasks:
         --dbg=on
         --opt=off
         --allocator=system
-        --enterprise-features=fle,search,vector_search
+        --enterprise-features=fle
         --js-engine=none
         --link-model=dynamic-sdk
         DESTDIR='$BUILD_ROOT/crypt-lib-$MONGO_VERSION'
@@ -3827,7 +3827,7 @@ tasks:
       compiling_for_test: true
       task_compile_flags: >-
         --allocator=system
-        --enterprise-features=fle,search,vector_search
+        --enterprise-features=fle
         --js-engine=none
         --link-model=static
         DESTDIR='$BUILD_ROOT/crypt-lib-$MONGO_VERSION'

@@ -15,7 +15,9 @@ const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles_sharded/"
 mkdir(dbPath);
 const opts = {
     auth: "",
-    setParameter: "trafficRecordingDirectory=" + dbPath
+    // We have to set the mongotHost parameter for the $search-related tests to pass configuration
+    // checks.
+    setParameter: {trafficRecordingDirectory: dbPath, mongotHost: "localhost:27017"}
 };
 // run all tests sharded
 const conn = new ShardingTest({
@@ -23,8 +25,13 @@ const conn = new ShardingTest({
     mongos: 1,
     config: 1,
     keyFile: "jstests/libs/key1",
-    other:
-        {shardOptions: opts, mongosOptions: {setParameter: "trafficRecordingDirectory=" + dbPath}}
+    other: {
+        shardOptions: opts,
+        // We have to set the mongotHost parameter for the $search-related tests to pass
+        // configuration checks.
+        mongosOptions:
+            {setParameter: {trafficRecordingDirectory: dbPath, mongotHost: "localhost:27017"}}
+    }
 });
 runAllCommandsBuiltinRoles(conn);
 conn.stop();
