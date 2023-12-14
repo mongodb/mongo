@@ -1368,6 +1368,8 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
     return;
 }
 
+// The initial amount of time to sleep between retries.
+const int64_t initialSleepMillis = 100;
 
 void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
     const std::string curOpMessage = "Scanning namespace " +
@@ -1430,6 +1432,9 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
     int64_t totalBytesSeen = 0;
     int64_t totalDocsSeen = 0;
 
+    int64_t numRetries = 0;
+    int64_t sleepMillis = initialSleepMillis;
+
     do {
         auto result = _runBatch(opCtx, start);
 
@@ -1439,78 +1444,75 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
 
 
         if (!result.isOK()) {
-            bool retryable = false;
-            std::unique_ptr<HealthLogEntry> entry;
+            auto retryable = false;
+            auto logError = false;
+            auto msg = "";
 
+            // TODO (SERVER-79850): Catch these errors for the extra key check as well.
             const auto code = result.getStatus().code();
             if (code == ErrorCodes::LockTimeout) {
+                // This is a retryable error.
                 retryable = true;
-                entry = dbCheckWarningHealthLogEntry(
-                    _info.nss,
-                    _info.uuid,
-                    "retrying dbCheck batch after timeout due to lock unavailability",
-                    ScopeEnum::Collection,
-                    OplogEntriesEnum::Batch,
-                    result.getStatus());
+                msg = "abandoning dbCheck batch after timeout due to lock unavailability";
             } else if (code == ErrorCodes::SnapshotUnavailable) {
+                // This is a retryable error.
                 retryable = true;
-                entry = dbCheckWarningHealthLogEntry(
-                    _info.nss,
-                    _info.uuid,
-                    "retrying dbCheck batch after conflict with pending catalog operation",
-                    ScopeEnum::Collection,
-                    OplogEntriesEnum::Batch,
-                    result.getStatus());
+                msg = "abandoning dbCheck batch after conflict with pending catalog operation";
             } else if (code == ErrorCodes::NamespaceNotFound) {
-                entry = dbCheckWarningHealthLogEntry(
-                    _info.nss,
-                    _info.uuid,
-                    "abandoning dbCheck batch because collection no longer exists",
-                    ScopeEnum::Collection,
-                    OplogEntriesEnum::Batch,
-                    result.getStatus());
+                msg = "abandoning dbCheck batch because collection no longer exists";
             } else if (code == ErrorCodes::CommandNotSupportedOnView) {
-                entry = dbCheckWarningHealthLogEntry(_info.nss,
-                                                     _info.uuid,
-                                                     "abandoning dbCheck batch because "
-                                                     "collection no longer exists, but there "
-                                                     "is a view with the identical name",
-                                                     ScopeEnum::Collection,
-                                                     OplogEntriesEnum::Batch,
-                                                     result.getStatus());
+                msg =
+                    "abandoning dbCheck batch because collection no longer exists, but there is a "
+                    "view with the identical name";
             } else if (code == ErrorCodes::IndexNotFound) {
-                entry = dbCheckWarningHealthLogEntry(
-                    _info.nss,
-                    _info.uuid,
-                    "skipping dbCheck on collection because it is missing an _id index",
-                    ScopeEnum::Collection,
-                    OplogEntriesEnum::Batch,
-                    result.getStatus());
+                msg = "skipping dbCheck on collection because it is missing an _id index";
             } else if (ErrorCodes::isA<ErrorCategory::NotPrimaryError>(code)) {
-                entry = dbCheckWarningHealthLogEntry(
-                    _info.nss,
-                    _info.uuid,
-                    "stopping dbCheck because node is no longer primary",
-                    ScopeEnum::Cluster,
-                    OplogEntriesEnum::Batch,
-                    result.getStatus());
+                msg = "stopping dbCheck because node is no longer primary";
+            } else if (code == ErrorCodes::ObjectIsBusy) {
+                // This is a retryable error.
+                retryable = true;
+                msg = "stopping dbCheck because a resource is in use by another process";
+            } else if (code == ErrorCodes::NoSuchKey) {
+                // We failed to parse or find an index key. Log a dbCheck error health log entry.
+                msg = "dbCheck found record with missing and/or mismatched index keys";
+                logError = true;
             } else {
+                // Unexpected error code found. Log a dbCheck error health log entry.
+                msg = "dbCheck batch failed";
+                logError = true;
+            }
+
+            if (retryable && numRetries++ < repl::dbCheckMaxInternalRetries.load()) {
+                // Retryable error. Sleep with increasing backoff.
+                opCtx->sleepFor(Milliseconds(sleepMillis));
+                sleepMillis *= 2;
+
+                LOGV2_DEBUG(8365300,
+                            3,
+                            "Retrying dbCheck internally",
+                            "numRetries"_attr = numRetries,
+                            "status"_attr = result.getStatus());
+                continue;
+            }
+
+            // Cannot retry. Write a health log entry and return from the batch.
+            std::unique_ptr<HealthLogEntry> entry;
+            if (logError) {
                 entry = dbCheckErrorHealthLogEntry(_info.nss,
                                                    _info.uuid,
-                                                   "dbCheck batch failed",
+                                                   msg,
                                                    ScopeEnum::Collection,
                                                    OplogEntriesEnum::Batch,
                                                    result.getStatus());
-                if (code == ErrorCodes::NoSuchKey) {
-                    entry->setScope(ScopeEnum::Index);
-                    entry->setOperation("Index scan");
-                    entry->setMsg("dbCheck found record with missing and/or mismatched index keys");
-                }
+            } else {
+                entry = dbCheckWarningHealthLogEntry(_info.nss,
+                                                     _info.uuid,
+                                                     msg,
+                                                     ScopeEnum::Collection,
+                                                     OplogEntriesEnum::Batch,
+                                                     result.getStatus());
             }
             HealthLogInterface::get(opCtx)->log(*entry);
-            if (retryable) {
-                continue;
-            }
             return;
         }
 
@@ -1560,6 +1562,10 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         bool tooManyDocs = totalDocsSeen >= _info.maxCount;
         bool tooManyBytes = totalBytesSeen >= _info.maxSize;
         reachedEnd = reachedLast || tooManyDocs || tooManyBytes;
+
+        // Reset number of retries attempted so far.
+        numRetries = 0;
+        sleepMillis = initialSleepMillis;
     } while (!reachedEnd);
 
     {

@@ -774,6 +774,16 @@ server_parameters:
         validator:
             gt: 0 
 
+    dbCheckMaxInternalRetries:
+        description: >-
+            The maximum number of internal retries that dbCheck will run on a batch.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: dbCheckMaxInternalRetries
+        default: 5
+        validator:
+            gte: 0
+
     writeConflictRetryLimit:
         description: >-
             The number of retries that be made by writeConflictRetry(). It is used in secondary

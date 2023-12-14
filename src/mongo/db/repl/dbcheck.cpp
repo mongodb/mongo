@@ -602,17 +602,19 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
             opCtx->sleepFor(Milliseconds(sleepMs));
         });
 
+        auto rehydratedObjId = key_string::rehydrateKey(BSON("_id" << 1), currentObjId);
+
         if (!collPtr->getRecordStore()->findRecord(opCtx, currentRecordId, &record)) {
             const auto msg = "Error fetching record from record id";
             const auto status = Status(ErrorCodes::KeyNotFound, msg);
-            const auto logEntry =
-                dbCheckErrorHealthLogEntry(collPtr->ns(),
-                                           collPtr->uuid(),
-                                           msg,
-                                           ScopeEnum::Document,
-                                           OplogEntriesEnum::Batch,
-                                           status,
-                                           BSON("recordID" << currentRecordId.toString()));
+            const auto logEntry = dbCheckErrorHealthLogEntry(
+                collPtr->ns(),
+                collPtr->uuid(),
+                msg,
+                ScopeEnum::Document,
+                OplogEntriesEnum::Batch,
+                status,
+                BSON("recordID" << currentRecordId.toString() << "objId" << rehydratedObjId));
             HealthLogInterface::get(opCtx)->log(*logEntry);
 
             // If we cannot find the record in the record store, continue onto the next recordId.
@@ -643,20 +645,22 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                                                    ScopeEnum::Document,
                                                    OplogEntriesEnum::Batch,
                                                    status,
-                                                   BSON("recordID" << currentRecordId.toString()));
+                                                   BSON("recordID" << currentRecordId.toString()
+                                                                   << "objId" << rehydratedObjId));
                 } else {
                     // If there was a BSON error from kFull/kExtended modes (that is not caught by
                     // kDefault), the error code would be NonConformantBSON. We log a warning
                     // instead because the kExtended/kFull modes were recently added, so users may
                     // have non-conformant documents that exist before the checks.
-                    logEntry = dbCheckWarningHealthLogEntry(
-                        collPtr->ns(),
-                        collPtr->uuid(),
-                        msg,
-                        ScopeEnum::Document,
-                        OplogEntriesEnum::Batch,
-                        status,
-                        BSON("recordID" << currentRecordId.toString()));
+                    logEntry = dbCheckWarningHealthLogEntry(collPtr->ns(),
+                                                            collPtr->uuid(),
+                                                            msg,
+                                                            ScopeEnum::Document,
+                                                            OplogEntriesEnum::Batch,
+                                                            status,
+                                                            BSON("recordID"
+                                                                 << currentRecordId.toString()
+                                                                 << "objId" << rehydratedObjId));
                 }
                 HealthLogInterface::get(opCtx)->log(*logEntry);
             }
@@ -688,19 +692,16 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                     ScopeEnum::Document,
                     OplogEntriesEnum::Batch,
                     status,
-                    BSON("recordID" << currentRecordId.toString() << "missingIndexKeys"
-                                    << _missingIndexKeys));
+                    BSON("recordID" << currentRecordId.toString() << "objId" << rehydratedObjId
+                                    << "missingIndexKeys" << _missingIndexKeys));
                 HealthLogInterface::get(opCtx)->log(*logEntry);
             }
         }
 
-        // Update `last` every time. currentObjId was a BSONObj obtained from the _id index scan
-        // with 1 field in the form {"": _id}. We rehydrate it to add the field names back.
-        //
-        // We use the _id value obtained from the _id index walk so that we can store our last seen
-        // _id and proceed with dbCheck even if the previous record had corruption in its _id
-        // field.
-        _last = key_string::rehydrateKey(BSON("_id" << 1), currentObjId);
+        // Update `last` every time. We use the _id value obtained from the _id index walk so that
+        // we can store our last seen _id and proceed with dbCheck even if the previous record had
+        // corruption in its _id field.
+        _last = rehydratedObjId;
         _countDocsSeen += 1;
         _bytesSeen += currentObj.objsize();
 
