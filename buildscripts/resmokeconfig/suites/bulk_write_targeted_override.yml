@@ -33,15 +33,7 @@ selector:
   - jstests/sharding/update_shard_key_conflicting_writes.js
   - jstests/sharding/move_chunk_update_shard_key_in_retryable_write.js
   - jstests/sharding/resharding_update_shard_key_in_retryable_write.js
-  # End document shard key update tests
   - jstests/sharding/timeseries_update_multi_explain.js
-  # Test behavior of updateOne/deleteOne with _id without shard key.
-  - jstests/sharding/server_status_crud_metrics.js
-  - jstests/sharding/server_status_crud_metrics_delete_one_without_shard_key_with_id.js
-  - jstests/sharding/timeseries_buckets_modification_with_id.js
-  - jstests/sharding/retryable_update_one_by_id_chunk_migration.js
-  - jstests/sharding/updateOne_idempotent_with_move_chunk.js
-  # End updateOne/deleteOne with _id without shard key tests
   exclude_files:
   # Update API version tests should not be run with bulkWrite override.
   - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_stable_api_test.js

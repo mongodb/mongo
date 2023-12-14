@@ -111,9 +111,6 @@ void executeChildBatches(OperationContext* opCtx,
                          BulkWriteOp& bulkWriteOp,
                          stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace,
                          boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
-    // We are starting a new round of execution and so this should have been reset to false.
-    invariant(!bulkWriteOp.shouldStopCurrentRound());
-
     std::vector<AsyncRequestsSender::Request> requests;
     for (auto& childBatch : childBatches) {
         auto request = [&]() {
@@ -175,10 +172,7 @@ void executeChildBatches(OperationContext* opCtx,
     // The BulkWriteOp may be marked finished early if we are in a transaction and encounter an
     // error, which aborts the transaction. In those cases, we do not bother waiting for any
     // outstanding responses from shards.
-    // Additionally, 'shouldStopCurrentRound()' can return true if we have hit some condition
-    // that means we no longer care about the responses for any other requests we are sending
-    // in this round of processing. See 'BulkWriteOp._shouldStopCurrentRound' for more details.
-    while (!ars.done() && !bulkWriteOp.isFinished() && !bulkWriteOp.shouldStopCurrentRound()) {
+    while (!ars.done() && !bulkWriteOp.isFinished()) {
         // Block until a response is available.
         auto response = ars.next();
 
@@ -534,23 +528,6 @@ void executeWriteWithoutShardKey(
     }
 }
 
-void executeNonTargetedSingleWriteWithoutShardKeyWithId(
-    OperationContext* opCtx,
-    const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-    TargetedBatchMap& childBatches,
-    BulkWriteOp& bulkWriteOp,
-    stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace) {
-
-    executeChildBatches(opCtx,
-                        targeters,
-                        childBatches,
-                        bulkWriteOp,
-                        errorsPerNamespace,
-                        /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
-
-    bulkWriteOp.finishExecutingWriteWithoutShardKeyWithId();
-}
-
 BulkWriteReplyInfo execute(OperationContext* opCtx,
                            const std::vector<std::unique_ptr<NSTargeter>>& targeters,
                            const BulkWriteCommandRequest& clientRequest) {
@@ -595,9 +572,6 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
                 executeRetryableTimeseriesUpdate(opCtx, childBatches, bulkWriteOp);
             } else if (targetStatus.getValue() == WriteType::WithoutShardKeyOrId) {
                 executeWriteWithoutShardKey(
-                    opCtx, targeters, childBatches, bulkWriteOp, errorsPerNamespace);
-            } else if (targetStatus.getValue() == WriteType::WithoutShardKeyWithId) {
-                executeNonTargetedSingleWriteWithoutShardKeyWithId(
                     opCtx, targeters, childBatches, bulkWriteOp, errorsPerNamespace);
             } else {
                 // Send the child batches and wait for responses.
@@ -908,8 +882,7 @@ void BulkWriteOp::processChildBatchResponseFromRemote(
         auto bwReply = BulkWriteCommandReply::parse(IDLParserContext("BulkWriteCommandReply"),
                                                     childBatchResponse.data);
         if (bwReply.getWriteConcernError()) {
-            saveWriteConcernError(
-                response.shardId, bwReply.getWriteConcernError().value(), writeBatch);
+            saveWriteConcernError(response.shardId, bwReply.getWriteConcernError().value());
         }
 
         // TODO (SERVER-76958): Iterate through the cursor rather than looking only at the first
@@ -1050,17 +1023,7 @@ void BulkWriteOp::noteChildBatchResponse(
         }
 
         if (reply.getStatus().isOK()) {
-            if (writeOp.getWriteType() == WriteType::WithoutShardKeyWithId) {
-                tassert(8346300,
-                        "bulkWrite success reply item unexpectedly missing N value",
-                        reply.getN() != boost::none);
-                writeOp.noteWriteWithoutShardKeyWithIdResponse(*write, reply.getN().value(), reply);
-                if (writeOp.getWriteState() == WriteOpState_Completed) {
-                    _shouldStopCurrentRound = true;
-                }
-            } else {
-                writeOp.noteWriteComplete(*write, reply);
-            }
+            writeOp.noteWriteComplete(*write, reply);
         } else {
             lastError.emplace(write->writeOpRef.first, reply.getStatus());
             writeOp.noteWriteError(*write, *lastError);
@@ -1308,25 +1271,10 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
     return {std::move(replyItems), summary, generateWriteConcernError(), _retriedStmtIds};
 }
 
-void BulkWriteOp::saveWriteConcernError(ShardId shardId,
-                                        BulkWriteWriteConcernError wcError,
-                                        const TargetedWriteBatch& writeBatch) {
+void BulkWriteOp::saveWriteConcernError(ShardId shardId, BulkWriteWriteConcernError wcError) {
     WriteConcernErrorDetail wce;
     wce.setStatus(Status(ErrorCodes::Error(wcError.getCode()), wcError.getErrmsg()));
-
-    // WriteType::WithoutShardKeyWithId is always in its own batch, and so we only need to
-    // inspect the first write here to determine if the batch is for a write of that type.
-    auto opIdx = writeBatch.getWrites().front()->writeOpRef.first;
-    if (_writeOps[opIdx].getWriteType() == WriteType::WithoutShardKeyWithId) {
-        if (!_deferredWCErrors) {
-            _deferredWCErrors = std::make_pair(opIdx, std::vector{ShardWCError(shardId, wce)});
-        } else {
-            invariant(_deferredWCErrors->first == opIdx);
-            _deferredWCErrors->second.push_back(ShardWCError(shardId, wce));
-        }
-    } else {
-        _wcErrors.push_back(ShardWCError(shardId, wce));
-    }
+    _wcErrors.push_back(ShardWCError(shardId, wce));
 }
 
 void BulkWriteOp::saveWriteConcernError(ShardWCError shardWCError) {
@@ -1389,21 +1337,6 @@ void BulkWriteOp::noteStaleResponses(
             }
         }
     }
-}
-
-void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId() {
-    // See _deferredWCErrors for details.
-    if (_deferredWCErrors) {
-        auto& [opIdx, wcErrors] = _deferredWCErrors.value();
-        auto& op = _writeOps[opIdx];
-        invariant(op.getWriteType() == WriteType::WithoutShardKeyWithId);
-        if (op.getWriteState() >= WriteOpState_Completed) {
-            _wcErrors.insert(_wcErrors.end(), wcErrors.begin(), wcErrors.end());
-        }
-        _deferredWCErrors = boost::none;
-    }
-    // See _shouldStopCurrentRound for details.
-    _shouldStopCurrentRound = false;
 }
 
 int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {
