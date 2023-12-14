@@ -2554,7 +2554,7 @@ std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
     return tmp;
 }
 
-StatusWith<BSONObj> WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(
+BSONObj WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(
     const BSONObj& options) const {
 
     // Skip inMemory storage engine, encryption at rest only applies to storage backed engine.

@@ -364,7 +364,7 @@ public:
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override;
 
-    StatusWith<BSONObj> getSanitizedStorageOptionsForSecondaryReplication(
+    BSONObj getSanitizedStorageOptionsForSecondaryReplication(
         const BSONObj& options) const override;
 
 private:
