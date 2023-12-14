@@ -139,7 +139,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
     FieldRefSet fieldSet;
     std::vector<FieldRef> backingRefs;
 
-    expCtx->sbeWindowCompatibility = SbeCompatibility::flagGuarded;
+    expCtx->sbeWindowCompatibility = SbeCompatibility::fullyCompatible;
     std::vector<WindowFunctionStatement> outputFields;
     const auto& output = spec.getOutput();
     backingRefs.reserve(output.nFields());
@@ -244,7 +244,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     // $set
     if (complexPartitionBy) {
         result.push_back(
-            DocumentSourceAddFields::create(*simplePartitionBy, *complexPartitionBy, expCtx, true));
+            DocumentSourceAddFields::create(*simplePartitionBy, *complexPartitionBy, expCtx));
     }
 
     // $sort
@@ -380,7 +380,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         sortBy.emplace(*sortSpec, expCtx);
     }
 
-    expCtx->sbeWindowCompatibility = SbeCompatibility::flagGuarded;
+    expCtx->sbeWindowCompatibility = SbeCompatibility::fullyCompatible;
     std::vector<WindowFunctionStatement> outputFields;
     for (auto&& elem : spec.getOutput()) {
         outputFields.push_back(WindowFunctionStatement::parse(elem, sortBy, expCtx.get()));

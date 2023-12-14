@@ -287,14 +287,6 @@ bool pushDownPipelineStageIfCompatible(
         return true;
     } else if (auto transformStage =
                    dynamic_cast<DocumentSourceSingleDocumentTransformation*>(stage.get())) {
-        // We do not push to SBE an addFields that has been created as part of a setWindowFields
-        // stage because it causes a performance regression. TODO (SERVER-75103) : Once
-        // setWindowFields has been pushed to SBE, this should be removed.
-        if (transformStage->isCreatedBySetWindowFields() &&
-            SbeCompatibility::flagGuarded < minRequiredCompatibility) {
-            return false;
-        }
-
         if (!allowedStages.transform) {
             return false;
         }
