@@ -46,49 +46,6 @@ using ColumnOpType = value::ColumnOpType;
 
 namespace {
 
-static constexpr auto existsOpType = ColumnOpType{
-    // TODO SERVER-82852 kOutputNonNothingOnMissingInput is already set by ReturnBoolOnMissing{}.
-    ColumnOpType::kOutputNonNothingOnMissingInput | ColumnOpType::kOutputNonNothingOnExistingInput,
-    value::TypeTags::Nothing,
-    value::TypeTags::Boolean,
-    ColumnOpType::ReturnBoolOnMissing{}};
-
-static const auto existsOp =
-    value::makeColumnOp<existsOpType>([](value::TypeTags tag, value::Value val) {
-        return std::pair(value::TypeTags::Boolean,
-                         value::bitcastFrom<bool>(tag != value::TypeTags::Nothing));
-    });
-}  // namespace
-/*
- * Given a ValueBlock as input, returns a ValueBlock of true/false values indicating whether
- * each value in the input was non-Nothing (true) or Nothing (false).
- */
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockExists(ArityType arity) {
-    invariant(arity == 1);
-    auto [inputOwned, inputTag, inputVal] = getFromStack(0);
-
-    invariant(inputTag == value::TypeTags::valueBlock);
-    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
-
-    // Avoid extracting the block if we know every value is non-Nothing.
-    if (valueBlockIn->tryDense().get_value_or(false) && valueBlockIn->tryCount()) {
-        // Block was dense and we could determine the number of the values in the block without
-        // extracting so we can just return a MonoBlock of true.
-        auto out = std::make_unique<value::MonoBlock>(
-            *valueBlockIn->tryCount(), value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
-        return {true,
-                value::TypeTags::valueBlock,
-                value::bitcastFrom<value::ValueBlock*>(out.release())};
-    }
-
-    auto out = valueBlockIn->map(existsOp);
-
-    return {
-        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
-}
-
-namespace {
-
 bool allBools(const value::TypeTags* tag, size_t sz) {
     for (size_t i = 0; i < sz; ++i) {
         if (tag[i] != value::TypeTags::Boolean) {
@@ -102,32 +59,24 @@ bool emptyPositionInfo(const std::vector<char>& positionInfo) {
     return positionInfo.empty() ||
         std::all_of(positionInfo.begin(), positionInfo.end(), [](const char& c) { return c == 1; });
 }
-
-struct FillEmptyFunctor {
-    FillEmptyFunctor(value::TypeTags fillTag, value::Value fillVal)
-        : _fillTag(fillTag), _fillVal(fillVal) {}
-
-    std::pair<value::TypeTags, value::Value> operator()(value::TypeTags tag,
-                                                        value::Value val) const {
-        if (tag == value::TypeTags::Nothing) {
-            return value::copyValue(_fillTag, _fillVal);
-        }
-        return value::copyValue(tag, val);
-    }
-
-    value::TypeTags _fillTag;
-    value::Value _fillVal;
-};
-
-// If the fill value is Nothing, valueBlockFillEmpty will just return the input block unmodified.
-static constexpr auto fillEmptyOpType = ColumnOpType{
-    ColumnOpType::kOutputNonNothingOnMissingInput | ColumnOpType::kOutputNonNothingOnExistingInput,
-    value::TypeTags::Nothing,
-    value::TypeTags::Nothing,
-    ColumnOpType::ReturnNonNothingOnMissing{}};
-
-static const auto fillEmptyOp = value::makeColumnOpWithParams<fillEmptyOpType, FillEmptyFunctor>();
 }  // namespace
+
+/*
+ * Given a ValueBlock as input, returns a BoolBlock indicating whether each value in the input was
+ * non-Nothing (true) or Nothing (false).
+ */
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockExists(ArityType arity) {
+    invariant(arity == 1);
+    auto [inputOwned, inputTag, inputVal] = getFromStack(0);
+
+    invariant(inputTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    auto out = valueBlockIn->exists();
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
+}
 
 /**
  * Implementation of the valueBlockFillEmpty builtin. This instruction takes a block and an
@@ -146,12 +95,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
     invariant(blockTag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(blockVal);
 
-    if (valueBlockIn->tryDense().get_value_or(false)) {
+    auto out = valueBlockIn->fillEmpty(fillTag, fillVal);
+    if (!out) {
         // Input block was dense so we can just return it unmodified.
         return moveFromStack(0);
     }
-
-    auto out = valueBlockIn->map(fillEmptyOp.bindParams(fillTag, fillVal));
 
     return {
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
@@ -176,6 +124,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
 
     auto* fillBlockIn = value::bitcastTo<value::ValueBlock*>(fillVal);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(blockVal);
+
+    if (valueBlockIn->tryDense().get_value_or(false)) {
+        return moveFromStack(0);
+    }
 
     auto extractedFill = fillBlockIn->extract();
     auto extractedValue = valueBlockIn->extract();
@@ -540,8 +492,8 @@ static const auto invokeLambdaOp =
 /**
  * Implementation of the valueBlockApplyLambda instruction. This instruction takes a mask, a block
  * and an SBE lambda f(), and produces a new block with the result of f() applied to each element of
- * the input for which the mask has, in the same position, a 'true' value.
- * A mask value of Nothing is equivalent to a mask full of 'true' values.
+ * the input for which the mask has, in the same position, a 'true' value. A mask value of Nothing
+ * is equivalent to a mask full of 'true' values.
  */
 void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
     auto [lamOwn, lamTag, lamVal] = moveFromStack(0);
