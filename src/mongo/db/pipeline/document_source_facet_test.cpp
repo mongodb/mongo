@@ -198,9 +198,19 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptLegalSpecification) {
     ASSERT_TRUE(facetStage.get());
 }
 
+/*
+ * Override the stub interface to allow full execution in these tests.
+ */
+class ExecutableStubMongoProcessInterface : public StubMongoProcessInterface {
+    bool isExpectedToExecuteQueries() override {
+        return true;
+    }
+};
+
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithinSinglePipeline) {
     auto ctx = getExpCtx();
     ctx->inMongos = true;
+    ctx->mongoProcessInterface = std::make_unique<ExecutableStubMongoProcessInterface>();
 
     auto spec = fromjson(
         "{$facet: {badPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}, "
@@ -214,6 +224,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithi
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsAcrossPipelines) {
     auto ctx = getExpCtx();
     ctx->inMongos = true;
+    ctx->mongoProcessInterface = std::make_unique<ExecutableStubMongoProcessInterface>();
 
     auto spec = fromjson(
         "{$facet: {shardPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}], mongosPipe: "

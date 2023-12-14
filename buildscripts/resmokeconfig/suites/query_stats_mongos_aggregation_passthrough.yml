@@ -21,8 +21,6 @@ selector:
   - jstests/aggregation/expressions/internal_js_emit_with_scope.js
   # Based on SERVER-81917
   - jstests/aggregation/query_limits_test.js
-  # TODO: Remove when SERVER-83912 is fixed
-  - jstests/aggregation/sources/merge/merge_to_referenced_collection.js
   # $unionWith explain output does not check whether the collection is sharded in a sharded
   # cluster.
   - jstests/aggregation/sources/unionWith/unionWith_explain.js
