@@ -45,7 +45,7 @@ template <typename T>
 class Deferred {
 public:
     Deferred(T data) : _data(data) {}
-    Deferred(std::function<T(void)> initializer) : _initializer(initializer) {}
+    Deferred(std::function<T(void)> initializer) : _initializer(std::move(initializer)) {}
 
     /**
      * Returns a pointer to the managed object. Initializes the object if it hasn't done so already.
@@ -63,6 +63,18 @@ public:
      */
     T* operator->() const {
         return get();
+    }
+
+    /**
+     * Returns a referenced to the managed object. Initializes the object if it hasn't done so
+     * already.
+     */
+    const T& operator*() const {
+        return *get();
+    }
+
+    bool isInitialized() const {
+        return _initializer ? false : true;
     }
 
 private:

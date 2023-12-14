@@ -402,8 +402,8 @@ public:
     }
 
     void addResolvedNamespaces(
-        mongo::stdx::unordered_set<mongo::NamespaceString> resolvedNamespaces) {
-        for (auto&& nss : resolvedNamespaces) {
+        const mongo::stdx::unordered_set<mongo::NamespaceString>& resolvedNamespaces) {
+        for (const auto& nss : resolvedNamespaces) {
             _resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
         }
     }

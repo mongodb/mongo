@@ -73,7 +73,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
     LiteParsedPipeline liteParsedPipeline(
         NamespaceString::makeDummyNamespace(expCtx->ns.tenantId()), pipeline);
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
+    for (const auto& nss : liteParsedPipeline.getInvolvedNamespaces()) {
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }
 

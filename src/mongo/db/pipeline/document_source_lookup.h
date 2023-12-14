@@ -118,7 +118,7 @@ public:
          * Lookup from a sharded collection may not be allowed.
          */
         Status checkShardedForeignCollAllowed(
-            NamespaceString nss, bool inMultiDocumentTransaction) const override final {
+            const NamespaceString& nss, bool inMultiDocumentTransaction) const override final {
             if (!inMultiDocumentTransaction) {
                 return Status::OK();
             }

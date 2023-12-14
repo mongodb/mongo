@@ -217,7 +217,7 @@ public:
             _usedExternalDataSources.emplace_back(_aggregationRequest.getNamespace(),
                                                   externalDataSourcesIter->getDataSources());
 
-            for (auto&& involvedNamespace : _liteParsedPipeline.getInvolvedNamespaces()) {
+            for (const auto& involvedNamespace : _liteParsedPipeline.getInvolvedNamespaces()) {
                 externalDataSourcesIter =
                     findCollNameInExternalDataSourceOption(involvedNamespace.coll());
                 uassert(7039004,

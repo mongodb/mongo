@@ -184,7 +184,7 @@ void appendEmptyResultSetWithStatus(OperationContext* opCtx,
 void updateHostsTargetedMetrics(OperationContext* opCtx,
                                 const NamespaceString& executionNss,
                                 const boost::optional<ChunkManager>& cm,
-                                stdx::unordered_set<NamespaceString> involvedNamespaces) {
+                                const stdx::unordered_set<NamespaceString>& involvedNamespaces) {
     if (!cm)
         return;
 
@@ -401,7 +401,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     liteParsedPipeline.verifyIsSupported(
         opCtx, isSharded, request.getExplain(), serverGlobalParams.enableMajorityReadConcern);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
-    auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
+    const auto& involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
     auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);
     auto startsWithQueue = liteParsedPipeline.startsWithQueue();
     auto requiresCollationForParsingUnshardedAggregate =

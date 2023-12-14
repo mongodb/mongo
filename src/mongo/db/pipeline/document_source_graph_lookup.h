@@ -89,7 +89,7 @@ public:
                                                  const BSONElement& spec);
 
 
-        Status checkShardedForeignCollAllowed(NamespaceString nss,
+        Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                               bool inMultiDocumentTransaction) const override {
             if (!inMultiDocumentTransaction || _foreignNss != nss) {
                 return Status::OK();

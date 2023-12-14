@@ -120,6 +120,7 @@
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/util/deferred.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -172,6 +173,7 @@ using std::shared_ptr;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
+using NamespaceStringSet = stdx::unordered_set<NamespaceString>;
 
 CounterMetric allowDiskUseFalseCounter("query.allowDiskUseFalse");
 
@@ -272,6 +274,16 @@ void handleMultipleCursorsForExchange(OperationContext* opCtx,
     bodyBuilder.appendArray("cursors", cursorsBuilder.obj());
 }
 
+/*
+ * We use a Deferred<BSONObj> to accommodate aggregation on views. When aggregating on a
+ * view, we create a new request using the resolved view and call back into _runAggregate(). The new
+ * request (based on the resolved view) warrants a new command object, but this BSONObj is not
+ * actually required unless we need to register a cursor (i.e if results do not fit in a single
+ * batch). In some cases, serializing the command object can consume a significant amount of time
+ * that we can optimize away if the results fit in a single batch.
+ */
+using DeferredCmd = Deferred<BSONObj>;
+
 /**
  * Gets the first batch of documents produced by this pipeline by calling 'getNext()' on the
  * provided PlanExecutor. The provided CursorResponseBuilder will be populated with the batch.
@@ -282,7 +294,7 @@ void handleMultipleCursorsForExchange(OperationContext* opCtx,
 bool getFirstBatch(OperationContext* opCtx,
                    boost::intrusive_ptr<ExpressionContext> expCtx,
                    const AggregateCommandRequest& request,
-                   const BSONObj& cmdObj,
+                   const DeferredCmd& cmdObj,
                    PlanExecutor& exec,
                    CursorResponseBuilder& responseBuilder) {
     long long batchSize =
@@ -326,7 +338,7 @@ bool getFirstBatch(OperationContext* opCtx,
                           "Aggregate command executor error",
                           "error"_attr = exception.toStatus(),
                           "stats"_attr = redact(stats),
-                          "cmd"_attr = cmdObj);
+                          "cmd"_attr = *cmdObj);
 
             exception.addContext("PlanExecutor error during aggregation");
             throw;
@@ -391,7 +403,7 @@ boost::optional<ClientCursorPin> executeUntilFirstBatch(
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const AggregateCommandRequest& request,
-    const BSONObj& cmdObj,
+    const DeferredCmd& cmdObj,
     const PrivilegeVector& privileges,
     const NamespaceString& origNss,
     std::shared_ptr<ExternalDataSourceScopeGuard> extDataSrcGuard,
@@ -415,7 +427,7 @@ boost::optional<ClientCursorPin> executeUntilFirstBatch(
             // Only register a cursor for the pipeline if we have found that we need one for future
             // calls to 'getMore()'.
             auto pinnedCursor = registerCursor(
-                opCtx, expCtx, origNss, cmdObj, privileges, std::move(execs[0]), extDataSrcGuard);
+                opCtx, expCtx, origNss, *cmdObj, privileges, std::move(execs[0]), extDataSrcGuard);
             auto cursor = pinnedCursor.getCursor();
             pinnedCursors.emplace_back(std::move(pinnedCursor));
             cursorId = cursor->cursorid();
@@ -436,7 +448,7 @@ boost::optional<ClientCursorPin> executeUntilFirstBatch(
         // each PlanExecutor.
         for (auto&& exec : execs) {
             auto pinnedCursor = registerCursor(
-                opCtx, expCtx, origNss, cmdObj, privileges, std::move(exec), extDataSrcGuard);
+                opCtx, expCtx, origNss, *cmdObj, privileges, std::move(exec), extDataSrcGuard);
             pinnedCursors.emplace_back(std::move(pinnedCursor));
         }
         handleMultipleCursorsForExchange(opCtx, origNss, pinnedCursors, request, result);
@@ -450,9 +462,9 @@ boost::optional<ClientCursorPin> executeUntilFirstBatch(
 }
 
 StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNamespaces(
-    OperationContext* opCtx, const AggregateCommandRequest& request) {
-    const LiteParsedPipeline liteParsedPipeline(request);
-    const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
+    OperationContext* opCtx,
+    const AggregateCommandRequest& request,
+    const NamespaceStringSet& pipelineInvolvedNamespaces) {
 
     // If there are no involved namespaces, return before attempting to take any locks. This is
     // important for collectionless aggregations, which may be expected to run without locking.
@@ -567,7 +579,7 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
                                       const CollatorInterface* collator,
                                       const LiteParsedPipeline& liteParsedPipeline) {
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto&& potentialViewNs : liteParsedPipeline.getInvolvedNamespaces()) {
+    for (const auto& potentialViewNs : liteParsedPipeline.getInvolvedNamespaces()) {
         if (catalog->lookupCollectionByNamespace(opCtx, potentialViewNs)) {
             continue;
         }
@@ -590,16 +602,17 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     const AggregateCommandRequest& request,
     std::unique_ptr<CollatorInterface> collator,
     boost::optional<UUID> uuid,
-    ExpressionContext::CollationMatchesDefault collationMatchesDefault) {
-    boost::intrusive_ptr<ExpressionContext> expCtx =
-        new ExpressionContext(opCtx,
-                              request,
-                              std::move(collator),
-                              MongoProcessInterface::create(opCtx),
-                              uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
-                              uuid,
-                              CurOp::get(opCtx)->dbProfileLevel() > 0,
-                              allowDiskUseByDefault.load());
+    ExpressionContext::CollationMatchesDefault collationMatchesDefault,
+    const NamespaceStringSet& pipelineInvolvedNamespaces) {
+    auto expCtx = make_intrusive<ExpressionContext>(
+        opCtx,
+        request,
+        std::move(collator),
+        MongoProcessInterface::create(opCtx),
+        uassertStatusOK(resolveInvolvedNamespaces(opCtx, request, pipelineInvolvedNamespaces)),
+        uuid,
+        CurOp::get(opCtx)->dbProfileLevel() > 0,
+        allowDiskUseByDefault.load());
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->collationMatchesDefault = collationMatchesDefault;
     return expCtx;
@@ -645,16 +658,19 @@ void _adjustChangeStreamReadConcern(OperationContext* opCtx) {
  * single vector element.
  */
 std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesIfNeeded(
-    OperationContext* opCtx,
-    boost::intrusive_ptr<ExpressionContext> expCtx,
     const AggregateCommandRequest& request,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    boost::optional<UUID> uuid) {
+    const NamespaceStringSet& pipelineInvolvedNamespaces,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
     std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
 
-    if (request.getExchange() && !expCtx->explain) {
-        boost::intrusive_ptr<Exchange> exchange =
-            new Exchange(request.getExchange().value(), std::move(pipeline));
+    if (request.getExchange() && !pipeline->getContext()->explain) {
+        auto expCtx = pipeline->getContext();
+        // The Exchange constructor deregisters the pipeline from the context. Since we need a valid
+        // opCtx for the makeExpressionContext call below, store the pointer ahead of the Exchange()
+        // call.
+        auto* opCtx = expCtx->opCtx;
+        auto exchange =
+            make_intrusive<Exchange>(request.getExchange().value(), std::move(pipeline));
 
         for (size_t idx = 0; idx < exchange->getConsumers(); ++idx) {
             // For every new pipeline we have create a new ExpressionContext as the context
@@ -665,12 +681,13 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
                                            request,
                                            expCtx->getCollator() ? expCtx->getCollator()->clone()
                                                                  : nullptr,
-                                           uuid,
-                                           expCtx->collationMatchesDefault);
+                                           expCtx->uuid,
+                                           expCtx->collationMatchesDefault,
+                                           pipelineInvolvedNamespaces);
 
             // Create a new pipeline for the consumer consisting of a single
             // DocumentSourceExchange.
-            boost::intrusive_ptr<DocumentSource> consumer = new DocumentSourceExchange(
+            auto consumer = make_intrusive<DocumentSourceExchange>(
                 expCtx,
                 exchange,
                 idx,
@@ -695,31 +712,31 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
  * Takes ownership of the original, passed in, pipeline.
  */
 std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createAdditionalPipelinesIfNeeded(
-    OperationContext* opCtx,
-    boost::intrusive_ptr<ExpressionContext> expCtx,
     const AggregateCommandRequest& request,
+    const LiteParsedPipeline& liteParsedPipeline,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    boost::optional<UUID> collUUID,
     const std::function<void(void)>& resetContextFn) {
 
     std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
+    auto expCtx = pipeline->getContext();
+
     // Exchange is not allowed to be specified if there is a $search stage.
-    if (getSearchHelpers(opCtx->getServiceContext())->isSearchPipeline(pipeline.get())) {
+    if (auto& searchHelpers = getSearchHelpers(expCtx->opCtx->getServiceContext());
+        searchHelpers && searchHelpers->isSearchPipeline(pipeline.get())) {
         // Release locks early, before we generate the search pipeline, so that we don't hold them
         // during network calls to mongot. This is fine for search pipelines since they are not
         // reading any local (lock-protected) data in the main pipeline.
         resetContextFn();
         pipelines.push_back(std::move(pipeline));
 
-        if (auto metadataPipe = getSearchHelpers(opCtx->getServiceContext())
-                                    ->generateMetadataPipelineForSearch(
-                                        opCtx, expCtx, request, pipelines.back().get(), collUUID)) {
+        if (auto metadataPipe = searchHelpers->generateMetadataPipelineForSearch(
+                expCtx->opCtx, expCtx, request, pipelines.back().get(), expCtx->uuid)) {
             pipelines.push_back(std::move(metadataPipe));
         }
     } else {
         // Takes ownership of 'pipeline'.
-        pipelines =
-            createExchangePipelinesIfNeeded(opCtx, expCtx, request, std::move(pipeline), collUUID);
+        pipelines = createExchangePipelinesIfNeeded(
+            request, liteParsedPipeline.getInvolvedNamespaces(), std::move(pipeline));
     }
     return pipelines;
 }
@@ -782,7 +799,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
             collections, attachCallback, std::move(executor), pipeline.get());
 
         auto pipelines = createAdditionalPipelinesIfNeeded(
-            expCtx->opCtx, expCtx, request, std::move(pipeline), expCtx->uuid, resetContextFn);
+            request, liteParsedPipeline, std::move(pipeline), resetContextFn);
         for (auto&& pipelineIt : pipelines) {
             // There are separate ExpressionContexts for each exchange pipeline, so make sure to
             // pass the pipeline's ExpressionContext to the plan executor factory.
@@ -864,6 +881,30 @@ bool canReadUnderlyingCollectionLocally(OperationContext* opCtx, const Collectio
     }
 }
 
+/**
+ * Executes the aggregation 'request' over the specified namespace 'nss' using context 'opCtx'.
+ *
+ * The raw aggregate command parameters should be passed in 'cmdObj', and will be reported as the
+ * originatingCommand in subsequent getMores on the resulting agg cursor.
+ *
+ * 'privileges' contains the privileges that were required to run this aggregation, to be used later
+ * for re-checking privileges for getMore commands.
+ *
+ * If the query over a view that's already been resolved, the resolved view and the original
+ * user-provided request both must be provided.
+ *
+ * On success, fills out 'result' with the command response.
+ */
+Status _runAggregate(OperationContext* opCtx,
+                     AggregateCommandRequest& request,
+                     const LiteParsedPipeline& liteParsedPipeline,
+                     const DeferredCmd& cmdObj,
+                     const PrivilegeVector& privileges,
+                     rpc::ReplyBuilderInterface* result,
+                     ExternalDataSourceScopeGuard externalDataSourceGuard,
+                     boost::optional<const ResolvedView&> resolvedView,
+                     boost::optional<const AggregateCommandRequest&> origRequest);
+
 Status runAggregateOnView(OperationContext* opCtx,
                           const NamespaceString& origNss,
                           const AggregateCommandRequest& request,
@@ -910,13 +951,24 @@ Status runAggregateOnView(OperationContext* opCtx,
 
     // Parse the resolved view into a new aggregation request.
     auto newRequest = resolvedView.asExpandedViewAggregation(request);
-    auto newCmd = aggregation_request_helper::serializeToCommandObj(newRequest);
+
+    DeferredCmd deferredCmd{[&newRequest]() {
+        return aggregation_request_helper::serializeToCommandObj(newRequest);
+    }};
 
     auto status{Status::OK()};
     if (!OperationShardingState::get(opCtx).isComingFromRouter(opCtx)) {
         // Non sharding-aware operation.
         // Run the translated query on the view on this node.
-        status = runAggregate(opCtx, newRequest, newCmd, privileges, result, resolvedView, request);
+        status = _runAggregate(opCtx,
+                               newRequest,
+                               {newRequest},
+                               std::move(deferredCmd),
+                               privileges,
+                               result,
+                               {},
+                               resolvedView,
+                               request);
     } else {
         // Sharding-aware operation.
         sharding::router::CollectionRouter router(opCtx->getServiceContext(),
@@ -946,8 +998,15 @@ Status runAggregateOnView(OperationContext* opCtx,
                 // router.
                 if (readUnderlyingCollectionLocally) {
                     // Run the resolved aggregation locally.
-                    return runAggregate(
-                        opCtx, newRequest, newCmd, privileges, result, resolvedView, request);
+                    return _runAggregate(opCtx,
+                                         newRequest,
+                                         {newRequest},
+                                         std::move(deferredCmd),
+                                         privileges,
+                                         result,
+                                         {},
+                                         resolvedView,
+                                         request);
                 } else {
                     // Cannot execute the resolved aggregation locally. The router must do it.
                     //
@@ -1032,16 +1091,19 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     boost::optional<UUID> uuid,
     ExpressionContext::CollationMatchesDefault collationMatchesDefault,
     const MultipleCollectionAccessor& collections,
-    stdx::unordered_set<NamespaceString> pipelineInvolvedNamespaces,
-    bool hasChangeStream,
+    const LiteParsedPipeline& liteParsedPipeline,
     bool isCollectionless,
     boost::optional<const ResolvedView&> resolvedView,
     boost::optional<const AggregateCommandRequest&> origRequest) {
     // If we're operating over a view, we first parse just the original user-given request
     // for the sake of registering query stats. Then, we'll parse the view pipeline and stitch
     // the two pipelines together below.
-    auto expCtx =
-        makeExpressionContext(opCtx, request, std::move(collator), uuid, collationMatchesDefault);
+    auto expCtx = makeExpressionContext(opCtx,
+                                        request,
+                                        std::move(collator),
+                                        uuid,
+                                        collationMatchesDefault,
+                                        liteParsedPipeline.getInvolvedNamespaces());
     // If any involved collection contains extended-range data, set a flag which individual
     // DocumentSource parsers can check.
     collections.forEach([&](const CollectionPtr& coll) {
@@ -1062,14 +1124,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         // If this is a query over a resolved view, we want to register query stats with the
         // original user-given request and pipeline, rather than the new request generated when
         // resolving the view.
-        auto collectionType =
-            determineCollectionType(ctx, resolvedView, hasChangeStream, isCollectionless);
-
+        auto collectionType = determineCollectionType(
+            ctx, resolvedView, liteParsedPipeline.hasChangeStream(), isCollectionless);
+        NamespaceStringSet pipelineInvolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
         query_stats::registerRequest(opCtx, origNss, [&]() {
             return std::make_unique<query_stats::AggKey>(requestForQueryStats,
                                                          *pipeline,
                                                          expCtx,
-                                                         pipelineInvolvedNamespaces,
+                                                         std::move(pipelineInvolvedNamespaces),
                                                          origNss,
                                                          collectionType);
         });
@@ -1101,36 +1163,25 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     expCtx->setUserRoles();
 
     // Lookup the query settings and attach it to the 'expCtx'.
-    expCtx->setQuerySettings(lookupQuerySettingsForAgg(
-        expCtx, request, *pipeline, pipelineInvolvedNamespaces, request.getNamespace()));
+    expCtx->setQuerySettings(lookupQuerySettingsForAgg(expCtx,
+                                                       request,
+                                                       *pipeline,
+                                                       liteParsedPipeline.getInvolvedNamespaces(),
+                                                       request.getNamespace()));
 
     return pipeline;
 }
-
-}  // namespace
-
-Status runAggregate(OperationContext* opCtx,
-                    AggregateCommandRequest& request,
-                    const BSONObj& cmdObj,
-                    const PrivilegeVector& privileges,
-                    rpc::ReplyBuilderInterface* result,
-                    boost::optional<const ResolvedView&> resolvedView,
-                    boost::optional<const AggregateCommandRequest&> origRequest) {
-    return runAggregate(
-        opCtx, request, {request}, cmdObj, privileges, result, {}, resolvedView, origRequest);
-}
-
 // TODO SERVER-82228 refactor this file to use a class, which should allow removal of resolvedView
 // and origRequest parameters
-Status runAggregate(OperationContext* opCtx,
-                    AggregateCommandRequest& request,
-                    const LiteParsedPipeline& liteParsedPipeline,
-                    const BSONObj& cmdObj,
-                    const PrivilegeVector& privileges,
-                    rpc::ReplyBuilderInterface* result,
-                    ExternalDataSourceScopeGuard externalDataSourceGuard,
-                    boost::optional<const ResolvedView&> resolvedView,
-                    boost::optional<const AggregateCommandRequest&> origRequest) {
+Status _runAggregate(OperationContext* opCtx,
+                     AggregateCommandRequest& request,
+                     const LiteParsedPipeline& liteParsedPipeline,
+                     const DeferredCmd& cmdObj,
+                     const PrivilegeVector& privileges,
+                     rpc::ReplyBuilderInterface* result,
+                     ExternalDataSourceScopeGuard externalDataSourceGuard,
+                     boost::optional<const ResolvedView&> resolvedView,
+                     boost::optional<const AggregateCommandRequest&> origRequest) {
     auto origNss = origRequest.has_value() ? origRequest->getNamespace() : request.getNamespace();
     // Perform some validations on the LiteParsedPipeline and request before continuing with the
     // aggregation command.
@@ -1364,6 +1415,8 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         invariant(collatorToUse);
+
+
         auto pipeline = parsePipelineAndRegisterQueryStats(opCtx,
                                                            origNss,
                                                            request,
@@ -1372,8 +1425,7 @@ Status runAggregate(OperationContext* opCtx,
                                                            uuid,
                                                            collatorToUseMatchesDefault,
                                                            collections,
-                                                           pipelineInvolvedNamespaces,
-                                                           liteParsedPipeline.hasChangeStream(),
+                                                           liteParsedPipeline,
                                                            nss.isCollectionlessAggregateNS(),
                                                            resolvedView,
                                                            origRequest);
@@ -1548,8 +1600,11 @@ Status runAggregate(OperationContext* opCtx,
         auto explainExecutor = execs[0].get();
         auto bodyBuilder = result->getBodyBuilder();
         if (auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(explainExecutor)) {
-            Explain::explainPipeline(
-                pipelineExec, true /* executePipeline */, *(expCtx->explain), cmdObj, &bodyBuilder);
+            Explain::explainPipeline(pipelineExec,
+                                     true /* executePipeline */,
+                                     *(expCtx->explain),
+                                     *cmdObj,
+                                     &bodyBuilder);
         } else {
             invariant(explainExecutor->getOpCtx() == opCtx);
             // The explainStages() function for a non-pipeline executor may need to execute the plan
@@ -1563,7 +1618,7 @@ Status runAggregate(OperationContext* opCtx,
                 *(expCtx->explain),
                 BSON("optimizedPipeline" << true),
                 SerializationContext::stateCommandReply(request.getSerializationContext()),
-                cmdObj,
+                *cmdObj,
                 &bodyBuilder);
         }
         collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsInfo.key));
@@ -1624,4 +1679,39 @@ Status runAggregate(OperationContext* opCtx,
     return Status::OK();
 }
 
+}  // namespace
+
+Status runAggregate(OperationContext* opCtx,
+                    AggregateCommandRequest& request,
+                    const BSONObj& cmdObj,
+                    const PrivilegeVector& privileges,
+                    rpc::ReplyBuilderInterface* result) {
+    return _runAggregate(opCtx,
+                         request,
+                         {request},
+                         DeferredCmd(cmdObj),
+                         privileges,
+                         result,
+                         {},
+                         boost::none,
+                         boost::none);
+}
+
+Status runAggregate(OperationContext* opCtx,
+                    AggregateCommandRequest& request,
+                    const LiteParsedPipeline& liteParsedPipeline,
+                    const BSONObj& cmdObj,
+                    const PrivilegeVector& privileges,
+                    rpc::ReplyBuilderInterface* result,
+                    ExternalDataSourceScopeGuard externalDataSourceGuard) {
+    return _runAggregate(opCtx,
+                         request,
+                         liteParsedPipeline,
+                         DeferredCmd(cmdObj),
+                         privileges,
+                         result,
+                         std::move(externalDataSourceGuard),
+                         boost::none,
+                         boost::none);
+}
 }  // namespace mongo

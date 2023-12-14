@@ -212,7 +212,7 @@ public:
      * is to allow by default. Stages should opt-out if foreign collections are not allowed to be
      * sharded by returning a Status with a message explaining why.
      */
-    virtual Status checkShardedForeignCollAllowed(NamespaceString nss,
+    virtual Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                                   bool inMultiDocumentTransaction) const {
         return Status::OK();
     }
@@ -341,7 +341,7 @@ public:
     virtual void getForeignExecutionNamespaces(
         stdx::unordered_set<NamespaceString>& nssSet) const override;
 
-    Status checkShardedForeignCollAllowed(NamespaceString nss,
+    Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                           bool inMultiDocumentTransaction) const override;
 
     const std::vector<LiteParsedPipeline>& getSubPipelines() const override {

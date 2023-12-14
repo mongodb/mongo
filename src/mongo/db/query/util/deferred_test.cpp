@@ -36,7 +36,9 @@ namespace mongo {
 
 TEST(DeferredTest, EagerInitialization) {
     Deferred<std::string> eager{"someString"};
+    ASSERT_TRUE(eager.isInitialized());
     ASSERT_EQ(*eager.get(), std::string{"someString"});
+    ASSERT_EQ(*eager, std::string{"someString"});
 }
 
 TEST(DeferredTest, DeferredInitialization) {
@@ -45,12 +47,15 @@ TEST(DeferredTest, DeferredInitialization) {
         initializationCount++;
         return "someString";
     }};
+    ASSERT_FALSE(deferred.isInitialized());
 
     // Ensure the deferred object wasn't initialized on creation.
     ASSERT_EQ(initializationCount, 0);
 
     // Ensure that the deferred object is initialized on pointer dereferences.
     ASSERT_FALSE(deferred->empty());
+    ASSERT_TRUE(deferred.isInitialized());
+
     ASSERT_EQ(initializationCount, 1);
 
     // Ensure that the content of the deferred object is equal to its raw counterpart, while also
