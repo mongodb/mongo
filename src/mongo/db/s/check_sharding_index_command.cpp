@@ -94,13 +94,15 @@ public:
             return false;
         }
 
+        std::string tmpErrMsg = "couldn't find valid index for shard key";
         auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
                                                      *collection,
                                                      collection->getIndexCatalog(),
                                                      keyPattern,
-                                                     /*requireSingleKey=*/true);
+                                                     /*requireSingleKey=*/true,
+                                                     &tmpErrMsg);
         if (!shardKeyIdx) {
-            errmsg = "couldn't find valid index for shard key";
+            errmsg = tmpErrMsg;
             return false;
         }
 

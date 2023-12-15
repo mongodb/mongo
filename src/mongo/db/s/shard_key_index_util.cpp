@@ -45,7 +45,8 @@ const IndexDescriptor* _findShardKeyPrefixedIndex(OperationContext* opCtx,
                                                   const IndexCatalog* indexCatalog,
                                                   const boost::optional<std::string>& excludeName,
                                                   const BSONObj& shardKey,
-                                                  bool requireSingleKey) {
+                                                  bool requireSingleKey,
+                                                  std::string* errMsg = nullptr) {
     const IndexDescriptor* best = nullptr;
 
     auto indexIterator =
@@ -58,7 +59,12 @@ const IndexDescriptor* _findShardKeyPrefixedIndex(OperationContext* opCtx,
             continue;
         }
 
-        if (isCompatibleWithShardKey(opCtx, collection, indexEntry, shardKey, requireSingleKey)) {
+        if (indexDescriptor->hidden()) {
+            continue;
+        }
+
+        if (isCompatibleWithShardKey(
+                opCtx, collection, indexEntry, shardKey, requireSingleKey, errMsg)) {
             if (!indexEntry->isMultikey()) {
                 return indexDescriptor;
             }
@@ -76,26 +82,72 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
                               const CollectionPtr& collection,
                               const IndexCatalogEntry* indexEntry,
                               const BSONObj& shardKey,
-                              bool requireSingleKey) {
+                              bool requireSingleKey,
+                              std::string* errMsg) {
+    // Return a descriptive error for each index that shares a prefix with shardKey but
+    // cannot be used for sharding.
+    const int kErrorPartial = 0x01;
+    const int kErrorSparse = 0x02;
+    const int kErrorMultikey = 0x04;
+    const int kErrorCollation = 0x08;
+    const int kErrorNotPrefix = 0x10;
+    int reasons = 0;
+
     auto desc = indexEntry->descriptor();
     bool hasSimpleCollation = desc->collation().isEmpty();
 
-    if (desc->isPartial() || desc->isSparse()) {
-        return false;
+    if (desc->isPartial()) {
+        reasons |= kErrorPartial;
+    }
+
+    if (desc->isSparse()) {
+        reasons |= kErrorSparse;
     }
 
     if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance)) {
-        return false;
+        reasons |= kErrorNotPrefix;
     }
 
-    if (!indexEntry->isMultikey() && hasSimpleCollation) {
-        return true;
+    if (reasons == 0) {  // that is, not partial index, not sparse, and not prefix, then:
+        if (!indexEntry->isMultikey()) {
+            if (hasSimpleCollation) {
+                return true;
+            }
+        } else {
+            reasons |= kErrorMultikey;
+        }
+        if (!requireSingleKey && hasSimpleCollation) {
+            return true;
+        }
     }
 
-    if (!requireSingleKey && hasSimpleCollation) {
-        return true;
+    if (!hasSimpleCollation) {
+        reasons |= kErrorCollation;
     }
 
+    if (errMsg && reasons != 0) {
+        std::string errors = "Index " + indexEntry->descriptor()->indexName() +
+            " cannot be used for sharding because:";
+        if (reasons & kErrorPartial) {
+            errors += " Index key is partial.";
+        }
+        if (reasons & kErrorSparse) {
+            errors += " Index key is sparse.";
+        }
+        if (reasons & kErrorMultikey) {
+            errors += " Index key is multikey.";
+        }
+        if (reasons & kErrorCollation) {
+            errors += " Index has a non-simple collation.";
+        }
+        if (reasons & kErrorNotPrefix) {
+            errors += " Shard key is not a prefix of index key.";
+        }
+        if (!errMsg->empty()) {
+            *errMsg += "\n";
+        }
+        *errMsg += errors;
+    }
     return false;
 }
 
@@ -124,9 +176,10 @@ const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* opCtx,
                                                  const CollectionPtr& collection,
                                                  const IndexCatalog* indexCatalog,
                                                  const BSONObj& shardKey,
-                                                 bool requireSingleKey) {
+                                                 bool requireSingleKey,
+                                                 std::string* errMsg) {
     return _findShardKeyPrefixedIndex(
-        opCtx, collection, indexCatalog, boost::none, shardKey, requireSingleKey);
+        opCtx, collection, indexCatalog, boost::none, shardKey, requireSingleKey, errMsg);
 }
 
 }  // namespace mongo

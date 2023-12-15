@@ -105,7 +105,8 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
                               const ShardKeyPattern& shardKeyPattern,
                               const boost::optional<BSONObj>& defaultCollation,
                               bool requiresUnique,
-                              const ShardKeyValidationBehaviors& behaviors) {
+                              const ShardKeyValidationBehaviors& behaviors,
+                              std::string* errMsg) {
     auto indexes = behaviors.loadIndexes(nss);
 
     // 1.  Verify consistency with existing unique indexes
@@ -122,7 +123,9 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
 
     // 2. Check for a useful index
     bool hasUsefulIndexForKey = false;
+    std::string allReasons;
     for (const auto& idx : indexes) {
+        std::string reasons;
         BSONObj currentKey = idx["key"].embeddedObject();
         // Check 2.i. and 2.ii.
         if (!idx["sparse"].trueValue() && idx["filter"].eoo() && idx["collation"].eoo() &&
@@ -140,6 +143,19 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
                     !shardKeyPattern.isHashedPattern() || idx["seed"].eoo() ||
                         idx["seed"].numberInt() == BSONElementHasher::DEFAULT_HASH_SEED);
             hasUsefulIndexForKey = true;
+        }
+        if (idx["sparse"].trueValue()) {
+            reasons += " Index key is sparse.";
+        }
+        if (idx["filter"].ok()) {
+            reasons += " Index key is partial.";
+        }
+        if (idx["collation"].ok()) {
+            reasons += " Index has a non-simple collation.";
+        }
+        if (!reasons.empty()) {
+            allReasons =
+                " Index " + idx["name"] + " cannot be used for sharding because [" + reasons + " ]";
         }
     }
 
@@ -171,6 +187,10 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
         }
     }
 
+    if (errMsg && !allReasons.empty()) {
+        *errMsg += allReasons;
+    }
+
     if (hasUsefulIndexForKey) {
         // Check 2.iii Make sure that there is a useful, non-multikey index available.
         behaviors.verifyUsefulNonMultiKeyIndex(nss, shardKeyPattern.toBSON());
@@ -186,17 +206,19 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
                                                    bool unique,
                                                    bool enforceUniquenessCheck,
                                                    const ShardKeyValidationBehaviors& behaviors) {
+    std::string errMsg;
     if (validShardKeyIndexExists(opCtx,
                                  nss,
                                  shardKeyPattern,
                                  defaultCollation,
                                  unique && enforceUniquenessCheck,
-                                 behaviors)) {
+                                 behaviors,
+                                 &errMsg)) {
         return false;
     }
 
     // 4. If no useful index, verify we can create one.
-    behaviors.verifyCanCreateShardKeyIndex(nss);
+    behaviors.verifyCanCreateShardKeyIndex(nss, &errMsg);
 
     // 5. If no useful index exists and we can create one, create one on proposedKey. Only need
     //    to call ensureIndex on primary shard, since indexes get copied to receiving shard
@@ -226,12 +248,13 @@ void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(
     uassert(ErrorCodes::InvalidOptions, res["errmsg"].str(), success);
 }
 
-void ValidationBehaviorsShardCollection::verifyCanCreateShardKeyIndex(
-    const NamespaceString& nss) const {
+void ValidationBehaviorsShardCollection::verifyCanCreateShardKeyIndex(const NamespaceString& nss,
+                                                                      std::string* errMsg) const {
     uassert(ErrorCodes::InvalidOptions,
-            "Please create an index that starts with the proposed shard key before "
-            "sharding the collection",
-            _localClient->findOne(nss.ns(), Query()).isEmpty());
+            str::stream() << "Please create an index that starts with the proposed shard key before"
+                             " sharding the collection. "
+                          << *errMsg,
+            _localClient->findOne(nss.ns(), BSONObj{}).isEmpty());
 }
 
 void ValidationBehaviorsShardCollection::createShardKeyIndex(
@@ -289,11 +312,13 @@ void ValidationBehaviorsRefineShardKey::verifyUsefulNonMultiKeyIndex(
     uassertStatusOK(checkShardingIndexRes.commandStatus);
 }
 
-void ValidationBehaviorsRefineShardKey::verifyCanCreateShardKeyIndex(
-    const NamespaceString& nss) const {
-    uasserted(ErrorCodes::InvalidOptions,
-              "Please create an index that starts with the proposed shard key before "
-              "refining the shard key of the collection");
+void ValidationBehaviorsRefineShardKey::verifyCanCreateShardKeyIndex(const NamespaceString& nss,
+                                                                     std::string* errMsg) const {
+    uasserted(
+        ErrorCodes::InvalidOptions,
+        str::stream() << "Please create an index that starts with the proposed shard key before"
+                         " sharding the collection. "
+                      << *errMsg);
 }
 
 void ValidationBehaviorsRefineShardKey::createShardKeyIndex(
