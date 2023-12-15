@@ -273,3 +273,17 @@
                 WT_RET_PANIC(session, v, __VA_ARGS__);        \
         }                                                     \
     } while (0)
+
+/*
+ * WT_PREFETCH_ASSERT --
+ *  Assert an expression for prefetch if in diagnostic mode, or update the relevant statistic if
+ *  not. As pre-fetch is an optional optimisation, we want to avoid crashing the application for
+ *  an error, but instead swallow errors where possible.
+ */
+#define WT_PREFETCH_ASSERT(session, exp, stat) \
+    do {                                       \
+        if (!(exp)) {                          \
+            WT_STAT_CONN_INCR(session, stat);  \
+        }                                      \
+        WT_ASSERT(session, exp);               \
+    } while (0)
