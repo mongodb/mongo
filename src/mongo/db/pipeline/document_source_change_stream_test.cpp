@@ -529,9 +529,12 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfter
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(expCtx->opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(expCtx->opCtx, testUuid(), std::move(collection));
+        });
+    }
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
@@ -551,9 +554,12 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAfterAndResumeAfterOptions) {
 
     // Need to put the collection in the collection catalog so the resume token is validcollection
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(opCtx, testUuid(), std::move(collection));
+        });
+    }
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
@@ -574,9 +580,12 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndStartAfterO
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(opCtx, testUuid(), std::move(collection));
+        });
+    }
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
@@ -596,9 +605,12 @@ TEST_F(ChangeStreamStageTest, ShouldRejectResumeAfterWithResumeTokenMissingUUID)
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(opCtx, testUuid(), std::move(collection));
+        });
+    }
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
@@ -2351,9 +2363,12 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldIncludeShardKeyFromResumeToken) {
     const auto uuid = testUuid();
 
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
+        });
+    }
 
 
     BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
@@ -2399,9 +2414,12 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPres
     const auto uuid = testUuid();
 
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
+        });
+    }
 
     BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
     auto resumeToken = makeResumeToken(ts, uuid, o2);
@@ -2443,9 +2461,12 @@ TEST_F(ChangeStreamStageTest, ResumeAfterFailsIfResumeTokenDoesNotContainUUID) {
     const auto uuid = testUuid();
 
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
+        });
+    }
 
     // Create a resume token from only the timestamp.
     auto resumeToken = makeResumeToken(ts);
@@ -2498,9 +2519,12 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(getExpCtx()->opCtx, testUuid(), std::move(collection));
+        });
+    }
 
     const auto resumeTokenInvalidate =
         makeResumeToken(kDefaultTs,
@@ -3160,9 +3184,12 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldIncludeShardKeyFromResumeToken)
     const auto uuid = testUuid();
 
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
+        });
+    }
 
     BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
     auto resumeToken = makeResumeToken(ts, uuid, o2);
@@ -3198,9 +3225,12 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPr
     const auto uuid = testUuid();
 
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
+        });
+    }
 
     BSONObj o2 = BSON("_id" << 1 << "shardKey" << 2);
     auto resumeToken = makeResumeToken(ts, uuid, o2);
@@ -3237,9 +3267,12 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyIfResumeToken
     const auto uuid = testUuid();
 
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
+        });
+    }
 
     // Create a resume token from only the timestamp.
     auto resumeToken = makeResumeToken(ts);
@@ -3275,9 +3308,12 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
 
     // Need to put the collection in the collection catalog so the resume token is valid.
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, testUuid(), std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(expCtx->opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(getExpCtx()->opCtx, testUuid(), std::move(collection));
+        });
+    }
 
     const auto resumeTokenInvalidate =
         makeResumeToken(kDefaultTs,
@@ -3298,9 +3334,12 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabase) {
     const auto uuid = testUuid();
 
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
+        });
+    }
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.
     auto resumeToken = makeResumeToken(
@@ -3329,9 +3368,12 @@ TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContai
     const auto uuid = testUuid();
 
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
-    });
+    {
+        Lock::GlobalLock lk{getExpCtx()->opCtx, MODE_IX};
+        CollectionCatalog::write(getExpCtx()->opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(getExpCtx()->opCtx, uuid, std::move(collection));
+        });
+    }
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.
     auto resumeToken = makeResumeToken(kDefaultTs);

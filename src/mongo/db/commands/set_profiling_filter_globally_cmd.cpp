@@ -77,6 +77,15 @@ bool SetProfilingFilterGloballyCmd::run(OperationContext* opCtx,
     // explicitly stored for new databases.
     ProfileFilter::setDefault(newDefault);
 
+    // Writing to the CollectionCatalog requires holding the Global lock to avoid concurrent races
+    // with BatchedCollectionCatalogWriter.
+    boost::optional<Lock::GlobalLock> lk;
+    if (!opCtx->lockState()->isNoop()) {
+        // Taking the lock is only meaningful if we're in a mongod. Other mongos do not have a
+        // notion of collections.
+        lk.emplace(opCtx, MODE_IX);
+    }
+
     // Update all existing database settings.
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
         catalog.setAllDatabaseProfileFilters(newDefault);
