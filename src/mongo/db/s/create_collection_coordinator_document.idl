@@ -57,6 +57,7 @@ enums:
             kEnterCriticalSection: "enterCriticalSection"
             kCreateCollectionOnParticipants: "createCollectionOnParticipants"
             kCommitOnShardingCatalog: "commitOnShardingCatalog"
+            kSetPostCommitMetadata: "setPostCommitMetadata"
             kExitCriticalSection: "exitCriticalSection"
 
 structs:
