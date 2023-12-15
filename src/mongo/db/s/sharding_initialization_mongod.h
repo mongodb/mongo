@@ -138,20 +138,10 @@ private:
 };
 
 /**
- * Initialize the sharding components of this server. This can be used on both shard and config
- * servers.
- *
- * NOTE: This does not initialize ShardingState, which should only be done for shard servers.
+ * Initialize the sharding components of this server, if they haven't already been set up. This can
+ * be used on both shard and config servers.
  */
-void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
-                                            const boost::optional<ConnectionString>& configCS);
-
-/**
- * Initialize the sharding components for a config server, if they haven't already been set up.
- */
-void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCtx);
-
-void initializeGlobalShardingStateForEmbeddedRouterIfNeeded(OperationContext* opCtx);
+void initializeGlobalShardingStateForMongoD(OperationContext* opCtx);
 
 /**
  * Helper method to initialize sharding awareness from the shard identity document if it can be

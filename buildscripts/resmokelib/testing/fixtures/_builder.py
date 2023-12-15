@@ -381,25 +381,22 @@ class ShardedClusterBuilder(FixtureBuilder):
 
         config_shard = kwargs["config_shard"]
         config_svr = None
-        # We need to do a weird dance here - if we don't have a config shard, we install the
-        # configsvr before the shards, so that embedded-router shards can know the config-server
-        # connection string when they are created. But if we have a config shard, we install
-        # the shards first, and then find the config shard and install it in the fixture.
-        # We've already confirmed that we don't have a combination of config shard and
-        # embedded router modes in validation.
-        # TODO: SERVER-83135 - Simplify once embedded router mode supports config shards.
+        # We install the configsvr before the shards, so that embedded-router shards can know the
+        # config-server connection string when they are created.
         if config_shard is None:
             config_svr = self._new_configsvr(sharded_cluster, is_multiversion, old_bin_version)
-            sharded_cluster.install_configsvr(config_svr)
+        else:
+            config_svr = self._new_rs_shard(sharded_cluster, mixed_bin_versions, old_bin_version,
+                                            config_shard, kwargs["num_rs_nodes_per_shard"])
+        sharded_cluster.install_configsvr(config_svr)
 
         for rs_shard_index in range(kwargs["num_shards"]):
-            rs_shard = self._new_rs_shard(sharded_cluster, mixed_bin_versions, old_bin_version,
-                                          rs_shard_index, kwargs["num_rs_nodes_per_shard"])
-            sharded_cluster.install_rs_shard(rs_shard)
-
-        if config_shard is not None:
-            config_svr = sharded_cluster.shards[config_shard]
-            sharded_cluster.install_configsvr(config_svr)
+            if rs_shard_index != config_shard:
+                rs_shard = self._new_rs_shard(sharded_cluster, mixed_bin_versions, old_bin_version,
+                                              rs_shard_index, kwargs["num_rs_nodes_per_shard"])
+                sharded_cluster.install_rs_shard(rs_shard)
+            else:
+                sharded_cluster.install_rs_shard(config_svr)
 
         num_routers = kwargs["num_mongos"]
         shardsvrs = sharded_cluster.get_shardsvrs()
@@ -479,7 +476,6 @@ class ShardedClusterBuilder(FixtureBuilder):
         embedded_router_mode = kwargs.get("embedded_router", None)
         num_routers = kwargs["num_mongos"]
         num_shardsvrs = kwargs["num_shards"] * kwargs["num_rs_nodes_per_shard"]
-        config_shard = kwargs["config_shard"]
         if embedded_router_mode:
             if num_routers > num_shardsvrs:
                 raise ValueError(
@@ -487,9 +483,6 @@ class ShardedClusterBuilder(FixtureBuilder):
                 )
             if is_multiversion:
                 raise ValueError("Embedded router mode does not support multiversion testing.")
-            # TODO: SERVER-83135 - Remove once embedded router mode supports config shards.
-            if config_shard is not None:
-                raise ValueError("Embedded router mode does not support config shard.")
 
     @classmethod
     def _get_mongos_assets(cls, kwargs: Dict[str, Any], mixed_bin_versions: Optional[List[str]],

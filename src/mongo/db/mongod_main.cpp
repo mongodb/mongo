@@ -881,49 +881,43 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             logStartup(startupOpCtx.get());
         }
 
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
+            serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
             {
                 TimeElapsedBuilderScopedTimer scopedTimer(
                     serviceContext->getFastClockSource(),
-                    "Initialize the sharding components for a config server",
+                    "Initialize the sharding components for a config server and/or an embedded "
+                    "router",
                     &startupTimeElapsedBuilder);
 
-                initializeGlobalShardingStateForConfigServerIfNeeded(startupOpCtx.get());
+                initializeGlobalShardingStateForMongoD(startupOpCtx.get());
             }
 
-            // TODO: SERVER-82965 We shouldn't need to read the doc multiple times once we are
-            // in sharding only development since config servers can always create it themselves.
+            // TODO: SERVER-82965 We shouldn't need to read the doc multiple times once we are in
+            // sharding only development since config servers can always create it themselves.
             if (auto shardIdentityDoc =
                     ShardingInitializationMongoD::getShardIdentityDoc(startupOpCtx.get())) {
                 // This function will take the global lock.
                 initializeShardingAwarenessAndLoadGlobalSettings(
                     startupOpCtx.get(), *shardIdentityDoc, &startupTimeElapsedBuilder);
-
-                // Sharding is always ready when there is at least one shard at startup (either the
-                // config shard or a dedicated shard server).
-                ShardingReady::get(startupOpCtx.get())->setIsReadyIfShardExists(startupOpCtx.get());
-            }
-        } else if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
-            // TODO SERVER-83135: Replace this 'else if' with an 'if' once we support
-            // config shard + embedded router.
-            initializeGlobalShardingStateForEmbeddedRouterIfNeeded(startupOpCtx.get());
-
-            // Router role should use SEPMongos
-            serviceContext->getService(ClusterRole::RouterServer)
-                ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
-
-            // TODO: SERVER-82965 We shouldn't need to read the doc multiple times
-            if (auto shardIdentityDoc =
-                    ShardingInitializationMongoD::getShardIdentityDoc(startupOpCtx.get())) {
-                // This function will take the global lock.
-                initializeShardingAwarenessAndLoadGlobalSettings(
-                    startupOpCtx.get(), *shardIdentityDoc, nullptr);
             }
         } else {
             // On a dedicated shard server, ShardingReady is always set because there is guaranteed
             // to be at least one shard in the sharded cluster (either the config shard or a
             // dedicated shard server).
             ShardingReady::get(startupOpCtx.get())->setIsReady();
+        }
+
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            // Sharding is always ready when there is at least one shard at startup (either the
+            // config shard or a dedicated shard server).
+            ShardingReady::get(startupOpCtx.get())->setIsReadyIfShardExists(startupOpCtx.get());
+        }
+
+        if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+            // Router role should use SEPMongos
+            serviceContext->getService(ClusterRole::RouterServer)
+                ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
         }
 
         if (replSettings.isReplSet() &&

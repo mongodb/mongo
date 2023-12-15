@@ -168,6 +168,14 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
                                                << logical_sessions::kMaxChunkSizeBytes));
 
         const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+
+        // TODO SERVER-83917: Make a more general API to switch the service used by the client.
+        auto originalService = opCtx->getService();
+        auto shardService = opCtx->getServiceContext()->getService(ClusterRole::ShardServer);
+        opCtx->getClient()->setService(shardService);
+
+        ScopeGuard onScopeExitGuard([&] { opCtx->getClient()->setService(originalService); });
+
         uassertStatusOK(
             catalogClient->updateConfigDocument(opCtx,
                                                 CollectionType::ConfigNS,
