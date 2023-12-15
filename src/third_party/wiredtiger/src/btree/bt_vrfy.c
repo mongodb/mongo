@@ -439,15 +439,8 @@ __verify_tree(
      * utilizing the regular tree walk function. Check for potential pages to pre-fetch here as
      * well.
      */
-    if (__wt_session_prefetch_check(session, ref)) {
-        ret = __wt_btree_prefetch(session, ref);
-        /*
-         * It's okay for pre-fetch to fail to start here. We want to assert on an error to gain
-         * diagnostic information, then continue the rest of verify as normal.
-         */
-        WT_PREFETCH_ASSERT(session, ret != WT_ERROR, block_prefetch_failed_start);
-        ret = 0;
-    }
+    if (__wt_session_prefetch_check(session, ref))
+        WT_RET(__wt_btree_prefetch(session, ref));
 
     __wt_verbose(session, WT_VERB_VERIFY, "%s %s", __verify_addr_string(session, ref, vs->tmp1),
       __wt_page_type_string(page->type));

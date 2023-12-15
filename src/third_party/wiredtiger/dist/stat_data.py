@@ -242,13 +242,8 @@ conn_stats = [
     BlockCacheStat('block_prefetch_attempts', 'pre-fetch triggered by page read'),
     BlockCacheStat('block_prefetch_disk_one', 'pre-fetch not triggered after single disk read'),
     BlockCacheStat('block_prefetch_pages_queued', 'pre-fetch pages queued'),
-    BlockCacheStat('block_prefetch_failed_start', 'number of times pre-fetch failed to start'),
-    BlockCacheStat('block_prefetch_page_not_queued', 'pre-fetch pages failed to queue'),
     BlockCacheStat('block_prefetch_pages_read', 'pre-fetch pages read in background'),
     BlockCacheStat('block_prefetch_skipped', 'pre-fetch not triggered by page read'),
-    BlockCacheStat('block_prefetch_skipped_no_flag_set', 'could not perform pre-fetch on ref without the pre-fetch flag set'),
-    BlockCacheStat('block_prefetch_skipped_internal_page', 'could not perform pre-fetch on internal page'),
-    BlockCacheStat('block_prefetch_skipped_no_valid_dhandle', 'pre-fetch not triggered as there is no valid dhandle'),
     BlockCacheStat('block_prefetch_skipped_special_handle', 'pre-fetch not triggered due to special btree handle'),
     BlockCacheStat('block_prefetch_pages_fail', 'pre-fetch page not on disk when reading'),
 
