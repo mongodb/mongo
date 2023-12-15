@@ -21,7 +21,7 @@ __wt_bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
     WT_CONNECTION_IMPL *conn;
     uint64_t bucket, hash;
 
-    __wt_verbose(session, WT_VERB_BLKCACHE, "close: %s", block->name);
+    __wt_verbose(session, WT_VERB_BLKCACHE, "block close: %s", block->name);
 
     conn = S2C(session);
     __wt_spin_lock(session, &conn->block_lock);

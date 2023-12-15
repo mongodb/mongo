@@ -354,28 +354,28 @@ __wt_ckpt_verbose(WT_SESSION_IMPL *session, WT_BLOCK *block, const char *tag, co
         WT_ERR(__wt_buf_catfmt(session, tmp, ", root=[Empty]"));
     else
         WT_ERR(__wt_buf_catfmt(session, tmp,
-          ", root=[%" PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
+          ", root=[off: %" PRIuMAX "-%" PRIuMAX ", size: %" PRIu32 ", checksum: 0x%" PRIx32 "]",
           (uintmax_t)ci->root_offset, (uintmax_t)(ci->root_offset + ci->root_size), ci->root_size,
           ci->root_checksum));
     if (ci->alloc.offset == WT_BLOCK_INVALID_OFFSET)
         WT_ERR(__wt_buf_catfmt(session, tmp, ", alloc=[Empty]"));
     else
         WT_ERR(__wt_buf_catfmt(session, tmp,
-          ", alloc=[%" PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
+          ", alloc=[off: %" PRIuMAX "-%" PRIuMAX ", size: %" PRIu32 ", checksum: 0x%" PRIx32 "]",
           (uintmax_t)ci->alloc.offset, (uintmax_t)(ci->alloc.offset + ci->alloc.size),
           ci->alloc.size, ci->alloc.checksum));
     if (ci->avail.offset == WT_BLOCK_INVALID_OFFSET)
         WT_ERR(__wt_buf_catfmt(session, tmp, ", avail=[Empty]"));
     else
         WT_ERR(__wt_buf_catfmt(session, tmp,
-          ", avail=[%" PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
+          ", avail=[off: %" PRIuMAX "-%" PRIuMAX ", size: %" PRIu32 ", checksum: 0x%" PRIx32 "]",
           (uintmax_t)ci->avail.offset, (uintmax_t)(ci->avail.offset + ci->avail.size),
           ci->avail.size, ci->avail.checksum));
     if (ci->discard.offset == WT_BLOCK_INVALID_OFFSET)
         WT_ERR(__wt_buf_catfmt(session, tmp, ", discard=[Empty]"));
     else
         WT_ERR(__wt_buf_catfmt(session, tmp,
-          ", discard=[%" PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
+          ", discard=[off: %" PRIuMAX "-%" PRIuMAX ", size: %" PRIu32 ", checksum: 0x%" PRIx32 "]",
           (uintmax_t)ci->discard.offset, (uintmax_t)(ci->discard.offset + ci->discard.size),
           ci->discard.size, ci->discard.checksum));
     WT_ERR(__wt_buf_catfmt(session, tmp, ", file size=%" PRIuMAX, (uintmax_t)ci->file_size));
