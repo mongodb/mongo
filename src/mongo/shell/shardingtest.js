@@ -1187,6 +1187,16 @@ var ShardingTest = function ShardingTest(params) {
     isConfigShardMode =
         isConfigShardMode || jsTestOptions().configShard || useAutoBootstrapProcedure;
 
+    let isEmbeddedRouterMode =
+        otherParams.hasOwnProperty('embeddedRouter') ? otherParams.embeddedRouter : false;
+    isEmbeddedRouterMode = isEmbeddedRouterMode || jsTestOptions().embeddedRouter;
+    if (isEmbeddedRouterMode) {
+        // TODO (SERVER-84239): Make ShardingTest and ReplSetTest fully support embedded routers.
+        assert(numShards == 1 && isConfigShardMode,
+               "The embedded router mode is currently only supported on a single-shard " +
+                   "cluster in the config shard mode");
+    }
+
     if ("shardAsReplicaSet" in otherParams) {
         throw new Error("Use of deprecated option 'shardAsReplicaSet'");
     }
@@ -1425,6 +1435,7 @@ var ShardingTest = function ShardingTest(params) {
                 settings: rsSettings,
                 seedRandomNumberGenerator: !randomSeedAlreadySet,
                 isConfigServer: setIsConfigSvr,
+                isRouterServer: isEmbeddedRouterMode,
                 useAutoBootstrapProcedure: useAutoBootstrapProcedure,
             });
 

@@ -306,37 +306,36 @@ function getReplicaSetRestartOptions(maintenanceMode, setParameterOpts) {
     runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc);
 }
 
-// TODO (SERVER-81968): Re-enable single-shard cluster test cases once config shards support
-// embedded routers.
-// {
-//     jsTest.log("Running tests for a single-shard cluster");
-//     const setParameterOpts = {
-//         featureFlagReplicaSetEndpoint: true,
-//     };
-//     const st = new ShardingTest({
-//         shards: 1,
-//         rs: {
-//             // TODO (SERVER-83433): Make the replica set have secondaries to get test coverage
-//             // for running db hash check while the replica set is fsync locked.
-//             nodes: 1,
-//             setParameter: setParameterOpts
-//         },
-//         configShard: true
-//     });
-//     const getShard0PrimaryFunc = () => {
-//         return st.rs0.getPrimary();
-//     };
-//     const restartFunc = (maintenanceMode) => {
-//         st.rs0.stopSet(null /* signal */, true /*forRestart */);
-//         const restartOpts = getReplicaSetRestartOptions(maintenanceMode, setParameterOpts);
-//         st.rs0.startSet(restartOpts);
-//     };
-//     const tearDownFunc = () => st.stop();
+{
+    jsTest.log("Running tests for a single-shard cluster");
+    const setParameterOpts = {
+        featureFlagReplicaSetEndpoint: true,
+    };
+    const st = new ShardingTest({
+        shards: 1,
+        rs: {
+            // TODO (SERVER-83433): Make the replica set have secondaries to get test coverage
+            // for running db hash check while the replica set is fsync locked.
+            nodes: 1,
+            setParameter: setParameterOpts
+        },
+        configShard: true,
+        embeddedRouter: true,
+    });
+    const getShard0PrimaryFunc = () => {
+        return st.rs0.getPrimary();
+    };
+    const restartFunc = (maintenanceMode) => {
+        st.rs0.stopSet(null /* signal */, true /*forRestart */);
+        const restartOpts = getReplicaSetRestartOptions(maintenanceMode, setParameterOpts);
+        st.rs0.startSet(restartOpts);
+    };
+    const tearDownFunc = () => st.stop();
 
-//     // TODO (SERVER-83371): Allow configsvr mongod to be restarted in maintenance mode. Remove
-//     // the 'skipMaintenanceMode' option and its associated code.
-//     runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, {skipMaintenanceMode: true});
-// }
+    // TODO (SERVER-83371): Allow configsvr mongod to be restarted in maintenance mode. Remove
+    // the 'skipMaintenanceMode' option and its associated code.
+    runTests(getShard0PrimaryFunc, restartFunc, tearDownFunc, {skipMaintenanceMode: true});
+}
 
 {
     jsTest.log("Running tests for a serverless replica set bootstrapped as a single-shard cluster");

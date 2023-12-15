@@ -101,19 +101,18 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     runTests(primary /* shard0Primary */, tearDownFunc);
 }
 
-// TODO (SERVER-81968): Re-enable single-shard cluster test cases once config shards support
-// embedded routers.
-// {
-//     jsTest.log("Running tests for a single-shard cluster");
-//     const st = new ShardingTest({
-//         shards: 1,
-//         rs: {nodes: 2, setParameter: {featureFlagReplicaSetEndpoint: true}},
-//         configShard: true,
-//     });
-//     const tearDownFunc = () => st.stop();
+{
+    jsTest.log("Running tests for a single-shard cluster");
+    const st = new ShardingTest({
+        shards: 1,
+        rs: {nodes: 2, setParameter: {featureFlagReplicaSetEndpoint: true}},
+        configShard: true,
+        embeddedRouter: true,
+    });
+    const tearDownFunc = () => st.stop();
 
-//     runTests(st.rs0.getPrimary() /* shard0Primary */, tearDownFunc);
-// }
+    runTests(st.rs0.getPrimary() /* shard0Primary */, tearDownFunc);
+}
 
 {
     jsTest.log("Running tests for a serverless replica set bootstrapped as a single-shard cluster");
