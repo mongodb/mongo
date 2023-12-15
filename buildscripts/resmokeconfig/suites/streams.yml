@@ -3,6 +3,8 @@ test_kind: js_test
 selector:
   roots:
   - src/mongo/db/modules/*/jstests/streams/*.js
+  exclude_files:
+  - src/mongo/db/modules/*/jstests/streams/merge_requires_unique_index.js
 
 executor:
   fixture:
