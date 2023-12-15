@@ -29,8 +29,8 @@ function killCurrentOpTest() {
     const primary = rst.getPrimary();
     const adminDb = primary.getDB('admin');
 
-    // Prepare a user for testing pass tenant via $tenant.
-    // Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
+    // Prepare an authenticated user for testing.
+    // Must be authenticated as a user with ActionType::useTenant in order to use security token
     assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
     assert(adminDb.auth('admin', 'pwd'));
 
@@ -42,9 +42,10 @@ function killCurrentOpTest() {
     // Create a user for kTenant and its security token.
     const securityToken =
         _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant}, kVTSKey);
+
+    primary._setSecurityToken(_createTenantToken({tenant: kTenant}));
     assert.commandWorked(primary.getDB('$external').runCommand({
         createUser: "userTenant1",
-        '$tenant': kTenant,
         roles:
             [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
@@ -52,12 +53,14 @@ function killCurrentOpTest() {
     // Create a different tenant to test that one tenant can't see or kill other tenant's op.
     const securityTokenOtherTenant =
         _createSecurityToken({user: "userTenant2", db: '$external', tenant: kOtherTenant}, kVTSKey);
+
+    primary._setSecurityToken(_createTenantToken({tenant: kOtherTenant}));
     assert.commandWorked(primary.getDB('$external').runCommand({
         createUser: "userTenant2",
-        '$tenant': kOtherTenant,
         roles:
             [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
+    primary._setSecurityToken(undefined);
 
     const tokenConn = new Mongo(primary.host);
     tokenConn._setSecurityToken(securityToken);

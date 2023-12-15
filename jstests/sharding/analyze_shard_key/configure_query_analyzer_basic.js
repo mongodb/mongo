@@ -206,8 +206,8 @@ if (!TestData.auth) {
     const adminDb = primary.getDB("admin");
     const tenantId = ObjectId();
 
-    // Prepare a user for testing multitenancy via $tenant.
-    // Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
+    // Prepare an authenticated user for testing.
+    // Must be authenticated as a user with ActionType::useTenant in order to use security token
     assert.commandWorked(
         adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["__system"]}));
     assert(adminDb.auth("admin", "pwd"));

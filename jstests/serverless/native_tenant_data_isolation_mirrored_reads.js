@@ -21,8 +21,8 @@ const primary = rst.getPrimary();
 const adminDb = primary.getDB('admin');
 const secondary = rst.getSecondary();
 
-// Prepare a user for testing of passing the tenant using $tenant.
-// Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
+// Prepare an authenticated user for testing.
+// Must be authenticated as a user with ActionType::useTenant in order to use security token
 assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
 assert(adminDb.auth('admin', 'pwd'));
 assert(secondary.getDB('admin').auth('admin', 'pwd'));
@@ -32,6 +32,9 @@ const kOtherTenant = ObjectId();
 const kDbName = 'myDb';
 const kCollName = 'myColl';
 const testDb = primary.getDB(kDbName);
+
+const securityToken = _createTenantToken({tenant: kTenant});
+const otherSecurityToken = _createTenantToken({tenant: kOtherTenant});
 
 function getMirroredReadsStats(node) {
     return node.getDB(kDbName).serverStatus({mirroredReads: 1}).mirroredReads;
@@ -47,12 +50,13 @@ function assertSecondaryStats(initialSecondaryStats, numSentSince) {
 const kTenantDocs = [{w: 0}, {x: 1}, {y: 2}, {z: 3}];
 const kOtherTenantDocs = [{i: 1}, {j: 2}, {k: 3}];
 
-assert.commandWorked(
-    testDb.runCommand({insert: kCollName, documents: kTenantDocs, '$tenant': kTenant}));
-assert.commandWorked(
-    testDb.runCommand({insert: kCollName, documents: kOtherTenantDocs, '$tenant': kOtherTenant}));
+primary._setSecurityToken(securityToken);
+assert.commandWorked(testDb.runCommand({insert: kCollName, documents: kTenantDocs}));
+primary._setSecurityToken(otherSecurityToken);
+assert.commandWorked(testDb.runCommand({insert: kCollName, documents: kOtherTenantDocs}));
 
-function verifyMirroredReadStats(cmd) {
+function verifyMirroredReadStats(cmd, token) {
+    primary._setSecurityToken(token);
     const initialPrimaryStats = getMirroredReadsStats(primary);
     const initialSecondaryStats = getMirroredReadsStats(secondary);
     jsTestLog("Verifying mirrored reads for cmd: " + tojson(cmd));
@@ -74,32 +78,26 @@ function verifyMirroredReadStats(cmd) {
     assertSecondaryStats(initialSecondaryStats, 1);
 }
 
-// Verify that mirrored reads are successful for mirrored operations with '$tenant'.
-verifyMirroredReadStats({find: kCollName, projection: {_id: 0}, '$tenant': kTenant});
-verifyMirroredReadStats({find: kCollName, projection: {_id: 0}, '$tenant': kOtherTenant});
+// Verify that mirrored reads are successful for mirrored operations with security token
+verifyMirroredReadStats({find: kCollName, projection: {_id: 0}}, securityToken);
+verifyMirroredReadStats({find: kCollName, projection: {_id: 0}}, otherSecurityToken);
 
-verifyMirroredReadStats({count: kCollName, query: {x: 1}, '$tenant': kTenant});
-verifyMirroredReadStats({count: kCollName, query: {i: 1}, '$tenant': kOtherTenant});
+verifyMirroredReadStats({count: kCollName, query: {x: 1}}, securityToken);
+verifyMirroredReadStats({count: kCollName, query: {i: 1}}, otherSecurityToken);
 
-verifyMirroredReadStats({distinct: kCollName, key: 'x', '$tenant': kTenant});
-verifyMirroredReadStats({distinct: kCollName, key: 'i', '$tenant': kOtherTenant});
+verifyMirroredReadStats({distinct: kCollName, key: 'x'}, securityToken);
+verifyMirroredReadStats({distinct: kCollName, key: 'i'}, otherSecurityToken);
+
+verifyMirroredReadStats({findAndModify: kCollName, query: {x: 1}, update: {$inc: {x: 10}}},
+                        securityToken);
+verifyMirroredReadStats({findAndModify: kCollName, query: {i: 1}, update: {$inc: {i: 10}}},
+                        otherSecurityToken);
 
 verifyMirroredReadStats(
-    {findAndModify: kCollName, query: {x: 1}, update: {$inc: {x: 10}}, '$tenant': kTenant});
+    {update: kCollName, updates: [{q: {x: 1}, u: {'inc': {x: 1}}}], ordered: false}, securityToken);
 verifyMirroredReadStats(
-    {findAndModify: kCollName, query: {i: 1}, update: {$inc: {i: 10}}, '$tenant': kOtherTenant});
+    {update: kCollName, updates: [{q: {i: 1}, u: {'inc': {i: 1}}}], ordered: false},
+    otherSecurityToken);
 
-verifyMirroredReadStats({
-    update: kCollName,
-    updates: [{q: {x: 1}, u: {'inc': {x: 1}}}],
-    ordered: false,
-    '$tenant': kTenant
-});
-verifyMirroredReadStats({
-    update: kCollName,
-    updates: [{q: {i: 1}, u: {'inc': {i: 1}}}],
-    ordered: false,
-    '$tenant': kOtherTenant
-});
-
+primary._setSecurityToken(undefined);
 rst.stopSet();

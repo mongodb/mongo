@@ -182,9 +182,11 @@ ValidatedTenancyScope::ValidatedTenancyScope(Client* client, StringData security
     if (parsed.signature.empty()) {
         auto* as = AuthorizationSession::get(client);
         uassert(ErrorCodes::Unauthorized,
-                "Use of unsigned security token requires useTenant privilege",
+                "Use of unsigned security token requires either useTenant privilege or a system "
+                "connection",
                 as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(boost::none), ActionType::useTenant));
+                    ResourcePattern::forClusterResource(boost::none), ActionType::useTenant) ||
+                    client->isFromSystemConnection());
         auto jwt = crypto::JWT::parse(ctxt, decodeJSON(parsed.body));
         uassert(ErrorCodes::Unauthorized,
                 "Unsigned security token must contain a tenantId",

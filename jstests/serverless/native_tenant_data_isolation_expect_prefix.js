@@ -1,5 +1,5 @@
 // Test combinations of tenantId sources in a serverless multitenant environment, including from
-// database string prefixes, $tenant, and security token.  Combinations including prefixes will
+// database string prefixes and security token.  Combinations including prefixes will
 // require the use of the expectPrefix field.
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
@@ -67,13 +67,10 @@ function checkExplainCommandPasses(request, targetDb, tenantId) {
 }
 
 function createTenantCommand(request, options) {
-    const {injectDollarTenant = false, expectPrefix = false} = options;
+    const {expectPrefix = false} = options;
 
     if (expectPrefix) {
         request = Object.assign(request, {'expectPrefix': true});
-    }
-    if (injectDollarTenant) {
-        request = Object.assign(request, {'$tenant': kTenant});
     }
     return request;
 }
@@ -123,8 +120,8 @@ function runTestWithSecurityTokenFlag() {
     const primary = rst.getPrimary();
     const adminDb = primary.getDB('admin');
 
-    // Prepare a user for testing pass tenant via $tenant.
-    // Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
+    // Prepare an authenticated user for testing.
+    // Must be authenticated as a user with ActionType::useTenant in order to use security token
     assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
     assert(adminDb.auth('admin', 'pwd'));
     const tokenConn = new Mongo(primary.host);
@@ -135,12 +132,13 @@ function runTestWithSecurityTokenFlag() {
     const prefixedTokenDb = tokenConn.getDB(kTenant + '_' + kTestDb);
 
     // Create a user for kTenant and then set the security token on the connection.
+    primary._setSecurityToken(_createTenantToken({tenant: kTenant}));
     assert.commandWorked(primary.getDB('$external').runCommand({
         createUser: "userTenant1",
-        '$tenant': kTenant,
         roles:
             [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
+    primary._setSecurityToken(undefined);
 
     tokenConn._setSecurityToken(securityToken);
     // Logout the root user to avoid multiple authentication.
@@ -196,12 +194,6 @@ function runTestWithSecurityTokenFlag() {
             kTestDb, kCollName, findRes.cursor.ns, {tenantId: kTenant, prefixed: true});
     }
 
-    // Using both the security token and a $tenant field is not supported by the server.
-    {
-        let request = {find: kCollName, filter: {a: 1}, '$tenant': kTenant};
-        assert.commandFailedWithCode(tokenDb.runCommand(request), 6545800);
-    }
-
     // count prefix DB with security token.
     testCountCommand(prefixedTokenDb, {expectPrefix: true});
 
@@ -210,90 +202,4 @@ function runTestWithSecurityTokenFlag() {
     rst.stopSet();
 }
 
-function runTestWithDollarTenant() {
-    // setup regular replSet
-    const rst = new ReplSetTest({
-        nodes: 2,
-        nodeOptions: {
-            auth: '',
-            setParameter: {multitenancySupport: true, logComponentVerbosity: tojson({command: 3})}
-        }
-    });
-    rst.startSet({keyFile: 'jstests/libs/key1'});
-    rst.initiate();
-
-    let primary = rst.getPrimary();
-    let adminDb = primary.getDB('admin');
-
-    // Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
-    assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
-    assert(adminDb.auth('admin', 'pwd'));
-
-    let testDb = primary.getDB(kTestDb);
-    let prefixedDb = primary.getDB(kTenant + '_' + kTestDb);
-
-    // Create a collection by inserting a document to it.
-    const testDocs = {_id: 0, a: 1, b: 1};
-    assert.commandWorked(prefixedDb.runCommand(
-        {insert: kCollName, documents: [testDocs], '$tenant': kTenant, 'expectPrefix': true}));
-    // Create a view.
-    assert.commandWorked(prefixedDb.runCommand({
-        create: kViewName,
-        viewOn: kCollName,
-        pipeline: [],
-        $tenant: kTenant,
-        expectPrefix: true
-    }));
-
-    // Run a sanity check to locate the collection
-    checkDbStatsCommand(
-        {dbStats: 1, '$tenant': kTenant, 'expectPrefix': true}, prefixedDb, {targetPass: true});
-
-    // find with $tenant using expectPrefix.
-    {
-        // Baseline sanity check.
-        let request = {find: kCollName, filter: {a: 1}, '$tenant': kTenant};
-        checkFindCommandPasses(request, testDb, testDocs);
-
-        request = Object.assign(request, {'expectPrefix': false});
-        checkFindCommandPasses(request, testDb, testDocs);
-        // Expect this to fail since we set 'expectPrefix': true without providing a prefix.
-        request = Object.assign(request, {'expectPrefix': true});
-        assert.commandFailedWithCode(testDb.runCommand(request), 8423386);
-    }
-
-    // find with $tenant and prefixed DB using expectPrefix.
-    {
-        let requestDbStats = {dbStats: 1, '$tenant': kTenant};
-
-        // By supplying both a $tenant field and a prefixed tenantId without specifying an
-        // 'expectPrefix':true field, the tenantId will be applied twice to the namespace or
-        // database name, rendering it unresolvable. In this scenario, dbStats will return no
-        // locatable collections.
-        // Baseline sanity check.
-        checkDbStatsCommand(requestDbStats, prefixedDb, {targetPass: false});
-
-        let request = {find: kCollName, filter: {a: 1}, '$tenant': kTenant};
-        checkFindCommandFails(request, prefixedDb, {prefixed: true});
-
-        request = Object.assign(request, {'expectPrefix': false});
-        checkFindCommandFails(request, prefixedDb, {prefixed: true});
-
-        request = Object.assign(request, {'expectPrefix': true});
-        let findRes = assert.commandWorked(prefixedDb.runCommand(request));
-
-        assert(arrayEq([testDocs], findRes.cursor.firstBatch), tojson(findRes));
-        checkNsSerializedCorrectly(
-            kTestDb, kCollName, findRes.cursor.ns, {tenantId: kTenant, prefixed: true});
-    }
-
-    // count with $tenant and prefixed DB using expectPrefix.
-    testCountCommand(prefixedDb, {injectDollarTenant: true, expectPrefix: true});
-
-    testDistictCommand(prefixedDb, {injectDollarTenant: true, expectPrefix: true});
-
-    rst.stopSet();
-}
-
-runTestWithDollarTenant();
 runTestWithSecurityTokenFlag();

@@ -39,7 +39,7 @@ namespace mongo {
  * Stores metadata of an operation context that needs to be forwarded to other nodes in the cluster.
  *
  * The metadata are captured from the original operation context through the constructor and can be
- * attached to a new operation context by mean of the `attachTo` member function.
+ * attached to a new operation context by mean of the `setOn` member function.
  *
  * example:
  * 		auto opMetadata = ForwardableOperationMetadata(opCtx);

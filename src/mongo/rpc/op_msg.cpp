@@ -217,9 +217,12 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
             }
 
             case Section::kSecurityToken: {
+                // MultitenancyCheck is set on mongod and mongos but not mongobridge. This allows
+                // mongobridge to forward messages with a token without requiring it to enable
+                // multitenancySupport.
                 uassert(ErrorCodes::Unauthorized,
                         "Unsupported Security Token provided",
-                        gMultitenancySupport);
+                        gMultitenancySupport || !MultitenancyCheck::getPtr());
                 securityToken = sectionsBuf.readCStr();
                 break;
             }

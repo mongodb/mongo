@@ -6,12 +6,8 @@ import {Thread} from "jstests/libs/parallelTester.js";
 
 const rst = new ReplSetTest({
     nodes: 3,
-    nodeOptions: {
-        auth: '',
-        setParameter: {
-            multitenancySupport: true,
-        }
-    }
+    nodeOptions:
+        {auth: '', setParameter: {multitenancySupport: true, featureFlagSecurityToken: true}}
 });
 rst.startSet({keyFile: 'jstests/libs/key1'});
 rst.initiate();
@@ -19,8 +15,8 @@ rst.initiate();
 const primary = rst.getPrimary();
 const adminDb = primary.getDB('admin');
 
-// Prepare a user for testing pass tenant via $tenant.
-// Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
+// Prepare an authenticated user for testing.
+// Must be authenticated as a user with ActionType::useTenant in order to use security token
 assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
 assert(adminDb.auth('admin', 'pwd'));
 
@@ -29,6 +25,9 @@ const kOtherTenant = ObjectId();
 const kDbName = 'myDb';
 const kCollName = 'myColl';
 const testDb = primary.getDB(kDbName);
+
+const securityToken = _createTenantToken({tenant: kTenant});
+const otherSecurityToken = _createTenantToken({tenant: kOtherTenant});
 
 /**
  * Configure a failpoint which will block two threads that will be holding locks and check
@@ -39,11 +38,11 @@ function checkConcurrentLockDifferentTenant(
     primary, tenantA, tenantB, fpName, lockCheckName, func, expectedLockMode = "X") {
     let fp = configureFailPoint(primary, fpName);
 
-    let t1 = new Thread(func, primary.host, kCollName, kDbName, tojson(kTenant));
+    let t1 = new Thread(func, primary.host, kCollName, kDbName, securityToken);
     t1.start();
     waitForLock(tenantA.str, lockCheckName, expectedLockMode);
 
-    let t2 = new Thread(func, primary.host, kCollName, kDbName, tojson(kOtherTenant));
+    let t2 = new Thread(func, primary.host, kCollName, kDbName, otherSecurityToken);
     t2.start();
     waitForLock(tenantB.str, lockCheckName, expectedLockMode);
 
@@ -74,34 +73,34 @@ function waitForLock(nss, resource, expectedLockMode) {
 // Check that collmods can run concurrently for two different tenants with the same db name and
 // collection name.
 {
-    function collModThreadFunc(host, collectionName, dbName, tenantId) {
+    function collModThreadFunc(host, collectionName, dbName, token) {
         const db = new Mongo(host);
         const adminDb = db.getDB('admin');
+        db._setSecurityToken(token);
         assert(adminDb.auth('admin', 'pwd'));
-        let res = assert.commandWorked(db.getDB(dbName).runCommand({
-            collMod: collectionName,
-            "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100},
-            '$tenant': eval(tenantId)
-        }));
+        let res = assert.commandWorked(db.getDB(dbName).runCommand(
+            {collMod: collectionName, "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100}}));
         assert.eq(50, res.expireAfterSeconds_old, tojson(res));
         assert.eq(100, res.expireAfterSeconds_new, tojson(res));
     }
 
-    assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kTenant}));
-    assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kOtherTenant}));
+    primary._setSecurityToken(securityToken);
+    assert.commandWorked(testDb.createCollection(kCollName));
+    primary._setSecurityToken(otherSecurityToken);
+    assert.commandWorked(testDb.createCollection(kCollName));
 
     // Create the index used for collMod
+    primary._setSecurityToken(securityToken);
     let res = assert.commandWorked(testDb.runCommand({
         createIndexes: kCollName,
-        indexes: [{key: {c: 1}, name: "indexA", expireAfterSeconds: 50}],
-        '$tenant': kTenant
+        indexes: [{key: {c: 1}, name: "indexA", expireAfterSeconds: 50}]
     }));
     assert.eq(2, res.numIndexesAfter, tojson(res));
 
+    primary._setSecurityToken(otherSecurityToken);
     res = assert.commandWorked(testDb.runCommand({
         createIndexes: kCollName,
-        indexes: [{key: {c: 1}, name: "indexA", expireAfterSeconds: 50}],
-        '$tenant': kOtherTenant
+        indexes: [{key: {c: 1}, name: "indexA", expireAfterSeconds: 50}]
     }));
     assert.eq(2, res.numIndexesAfter, tojson(res));
 
@@ -113,34 +112,34 @@ function waitForLock(nss, resource, expectedLockMode) {
                                        collModThreadFunc,
                                        "X");
 
-    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kTenant}));
-    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kOtherTenant}));
+    primary._setSecurityToken(securityToken);
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
+    primary._setSecurityToken(otherSecurityToken);
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
 }
 
 // Check that drop database can run concurrently for two different tenants with the same db name and
 // collection name.
 {
-    function dropDBThreadFunc(host, collName, dbName, tenantId) {
+    function dropDBThreadFunc(host, collName, dbName, token) {
         const db = new Mongo(host);
         const adminDb = db.getDB('admin');
+        db._setSecurityToken(token);
         assert(adminDb.auth('admin', 'pwd'));
-        assert.commandWorked(
-            db.getDB(dbName).runCommand({dropDatabase: 1, '$tenant': eval(tenantId)}));
+        assert.commandWorked(db.getDB(dbName).runCommand({dropDatabase: 1}));
 
         // Verify we deleted the DB
-        const collsAfterDropDb = assert.commandWorked(db.getDB(dbName).runCommand({
-            listCollections: 1,
-            nameOnly: true,
-            filter: {name: collName},
-            '$tenant': eval(tenantId)
-        }));
+        const collsAfterDropDb = assert.commandWorked(db.getDB(dbName).runCommand(
+            {listCollections: 1, nameOnly: true, filter: {name: collName}}));
         assert.eq(0,
                   collsAfterDropDb.cursor.firstBatch.length,
                   tojson(collsAfterDropDb.cursor.firstBatch));
     }
 
-    assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kTenant}));
-    assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kOtherTenant}));
+    primary._setSecurityToken(securityToken);
+    assert.commandWorked(testDb.createCollection(kCollName));
+    primary._setSecurityToken(otherSecurityToken);
+    assert.commandWorked(testDb.createCollection(kCollName));
 
     checkConcurrentLockDifferentTenant(primary,
                                        kTenant,
@@ -150,34 +149,34 @@ function waitForLock(nss, resource, expectedLockMode) {
                                        dropDBThreadFunc,
                                        "X");
 
-    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kTenant}));
-    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kOtherTenant}));
+    primary._setSecurityToken(securityToken);
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
+    primary._setSecurityToken(otherSecurityToken);
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
 }
 
 // Check that drop collection can run concurrently for two different tenants with the same db name
 // and collection name
 {
-    function dropCollThreadFunc(host, collName, dbName, tenantId) {
+    function dropCollThreadFunc(host, collName, dbName, token) {
         const db = new Mongo(host);
         const adminDb = db.getDB('admin');
+        db._setSecurityToken(token);
         assert(adminDb.auth('admin', 'pwd'));
-        assert.commandWorked(
-            db.getDB(dbName).runCommand({drop: collName, '$tenant': eval(tenantId)}));
+        assert.commandWorked(db.getDB(dbName).runCommand({drop: collName}));
 
         // Verify we deleted the collection.
-        const collsAfterDropCollection = assert.commandWorked(db.getDB(dbName).runCommand({
-            listCollections: 1,
-            nameOnly: true,
-            filter: {name: collName},
-            '$tenant': eval(tenantId)
-        }));
+        const collsAfterDropCollection = assert.commandWorked(db.getDB(dbName).runCommand(
+            {listCollections: 1, nameOnly: true, filter: {name: collName}}));
         assert.eq(0,
                   collsAfterDropCollection.cursor.firstBatch.length,
                   tojson(collsAfterDropCollection.cursor.firstBatch));
     }
 
-    assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kTenant}));
-    assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kOtherTenant}));
+    primary._setSecurityToken(securityToken);
+    assert.commandWorked(testDb.createCollection(kCollName));
+    primary._setSecurityToken(otherSecurityToken);
+    assert.commandWorked(testDb.createCollection(kCollName));
 
     checkConcurrentLockDifferentTenant(primary,
                                        kTenant,
@@ -187,32 +186,34 @@ function waitForLock(nss, resource, expectedLockMode) {
                                        dropCollThreadFunc,
                                        "IX");
 
-    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kTenant}));
-    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kOtherTenant}));
+    primary._setSecurityToken(securityToken);
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
+    primary._setSecurityToken(otherSecurityToken);
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
 }
 
 // Check that create index can run concurrently for two different tenants with the same db name and
 // collection name
 {
-    function createIndexThreadFunc(host, collName, dbName, tenantId) {
+    function createIndexThreadFunc(host, collName, dbName, token) {
         const db = new Mongo(host);
         const adminDb = db.getDB('admin');
+        db._setSecurityToken(token);
         assert(adminDb.auth('admin', 'pwd'));
 
         let res = assert.commandWorked(db.getDB(dbName).runCommand({
             createIndexes: collName,
-            indexes: [{key: {a: 1}, name: "indexA"}, {key: {b: 1}, name: "indexB"}],
-            '$tenant': eval(tenantId)
+            indexes: [{key: {a: 1}, name: "indexA"}, {key: {b: 1}, name: "indexB"}]
         }));
         assert.eq(3, res.numIndexesAfter, tojson(res));
     }
 
-    assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kTenant}));
-    assert.commandWorked(testDb.runCommand(
-        {insert: kCollName, documents: [{_id: 0, a: 1, b: 1}], '$tenant': kTenant}));
-    assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kOtherTenant}));
-    assert.commandWorked(testDb.runCommand(
-        {insert: kCollName, documents: [{_id: 0, a: 1, b: 1}], '$tenant': kOtherTenant}));
+    primary._setSecurityToken(securityToken);
+    assert.commandWorked(testDb.createCollection(kCollName));
+    assert.commandWorked(testDb.runCommand({insert: kCollName, documents: [{_id: 0, a: 1, b: 1}]}));
+    primary._setSecurityToken(otherSecurityToken);
+    assert.commandWorked(testDb.createCollection(kCollName));
+    assert.commandWorked(testDb.runCommand({insert: kCollName, documents: [{_id: 0, a: 1, b: 1}]}));
 
     checkConcurrentLockDifferentTenant(primary,
                                        kTenant,
@@ -222,29 +223,31 @@ function waitForLock(nss, resource, expectedLockMode) {
                                        createIndexThreadFunc,
                                        "IX");
 
-    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kTenant}));
-    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kOtherTenant}));
+    primary._setSecurityToken(securityToken);
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
+    primary._setSecurityToken(otherSecurityToken);
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
 }
 
 // Check that collection validation can run concurrently for two different tenants with the same db
 // name and collection name
 {
-    function collValidateThreadFunc(host, collName, dbName, tenantId) {
+    function collValidateThreadFunc(host, collName, dbName, token) {
         const db = new Mongo(host);
         const adminDb = db.getDB('admin');
+        db._setSecurityToken(token);
         assert(adminDb.auth('admin', 'pwd'));
 
-        const validateRes = assert.commandWorked(
-            db.getDB(dbName).runCommand({validate: collName, '$tenant': eval(tenantId)}));
+        const validateRes = assert.commandWorked(db.getDB(dbName).runCommand({validate: collName}));
         assert(validateRes.valid, tojson(validateRes));
     }
 
-    assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kTenant}));
-    assert.commandWorked(testDb.runCommand(
-        {insert: kCollName, documents: [{_id: 0, a: 1, b: 1}], '$tenant': kTenant}));
-    assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kOtherTenant}));
-    assert.commandWorked(testDb.runCommand(
-        {insert: kCollName, documents: [{_id: 0, a: 1, b: 1}], '$tenant': kOtherTenant}));
+    primary._setSecurityToken(securityToken);
+    assert.commandWorked(testDb.createCollection(kCollName));
+    assert.commandWorked(testDb.runCommand({insert: kCollName, documents: [{_id: 0, a: 1, b: 1}]}));
+    primary._setSecurityToken(otherSecurityToken);
+    assert.commandWorked(testDb.createCollection(kCollName));
+    assert.commandWorked(testDb.runCommand({insert: kCollName, documents: [{_id: 0, a: 1, b: 1}]}));
 
     checkConcurrentLockDifferentTenant(primary,
                                        kTenant,
@@ -254,8 +257,11 @@ function waitForLock(nss, resource, expectedLockMode) {
                                        collValidateThreadFunc,
                                        "X" /*Not a background validation*/);
 
-    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kTenant}));
-    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kOtherTenant}));
+    primary._setSecurityToken(securityToken);
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
+    primary._setSecurityToken(otherSecurityToken);
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
 }
 
+primary._setSecurityToken(undefined);
 rst.stopSet();
