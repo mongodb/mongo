@@ -13,12 +13,17 @@ Diagnostics:
   UnusedIncludes: Strict
   ClangTidy:
     Add: [
-        # modernize-*,
-        cppcoreguidelines-*,
-        performance-*,
         bugprone-*,
+        clang-analyzer-*,
+        concurrency-*,
+        cppcoreguidelines-*,
         google-*,
+        modernize-*,
+        performance-*,
       ]
+    Remove: [
+        modernize-use-trailing-return-type
+    ]
 
 ---
 If:

@@ -36,6 +36,7 @@
 
 #include <cmath>
 #include <type_traits>
+#include <utility>
 
 #include "mongo/base/data_view.h"
 #include "mongo/platform/bits.h"
@@ -322,7 +323,7 @@ string readInvertedCStringWithNuls(BufReader* reader) {
 }
 }  // namespace
 
-void KeyString::resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId) {
+void KeyString::resetToKey(const BSONObj& obj, Ordering ord, const RecordId& recordId) {
     resetToEmpty();
     _appendAllElementsForIndexing(obj, ord, kInclusive);
     appendRecordId(recordId);
@@ -382,7 +383,7 @@ void KeyString::_appendAllElementsForIndexing(const BSONObj& obj,
     _append(kEnd, false);
 }
 
-void KeyString::appendRecordId(RecordId loc) {
+void KeyString::appendRecordId(const RecordId& loc) {
     loc.withFormat([](RecordId::Null n) { invariant(false); },
                    [&](int64_t rid) { _appendRecordIdLong(rid); },
                    [&](const char* str, int size) { _appendRecordIdStr(str, size); });

@@ -173,3 +173,4 @@ out.perf
 perf.txt
 rpc_data/
 core*
+testcase_log.txt

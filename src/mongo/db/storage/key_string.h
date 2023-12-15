@@ -31,6 +31,7 @@
 #pragma once
 
 #include <limits>
+#include <utility>
 
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonmisc.h"
@@ -299,7 +300,7 @@ public:
         this->_typeBits.reset(version);
     }
 
-    KeyString(Version version, const BSONObj& obj, Ordering ord, RecordId recordId)
+    KeyString(Version version, const BSONObj& obj, Ordering ord, const RecordId& recordId)
         : KeyString(version) {
         resetToKey(obj, ord, recordId);
     }
@@ -349,7 +350,7 @@ public:
      */
     static RecordId decodeRecordId(BufReader* reader);
 
-    void appendRecordId(RecordId loc);
+    void appendRecordId(const RecordId& loc);
     void appendTypeBits(const TypeBits& bits);
 
     /**
@@ -361,7 +362,7 @@ public:
         _typeBits.reset();
     }
 
-    void resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId);
+    void resetToKey(const BSONObj& obj, Ordering ord, const RecordId& recordId);
     void resetToKey(const BSONObj& obj, Ordering ord, Discriminator discriminator = kInclusive);
     void resetFromBuffer(const void* buffer, size_t size) {
         _buffer.reset();

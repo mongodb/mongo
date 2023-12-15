@@ -37,6 +37,7 @@
 #include <climits>
 #include <cstddef>
 #include <cstdint>
+#include <iomanip>
 #include <ostream>
 
 #include "mongo/bson/util/builder.h"
@@ -83,8 +84,7 @@ public:
      */
     RecordId() = default;
 
-    explicit RecordId(int64_t repr) {
-        _format = Format::kLong;
+    explicit RecordId(int64_t repr) : _format(Format::kLong) {
         const char* valPtr = reinterpret_cast<const char*>(&repr);
         std::copy(valPtr, valPtr + sizeof(repr), _buffer.begin());
     }
@@ -110,12 +110,13 @@ public:
 
     explicit RecordId(const std::string& str) : RecordId(str.data(), str.size()) {}
     explicit RecordId(std::string_view str) : RecordId(str.data(), str.size()) {}
-    
+
     /**
      * Construct a RecordId from two halves.
      * TODO consider removing.
      */
-    RecordId(int high, int low) : RecordId((uint64_t(high) << 32) | uint32_t(low)) {}
+    RecordId(int high, int low)
+        : RecordId((static_cast<uint64_t>(high) << 32) | static_cast<uint32_t>(low)) {}
 
     void setValue(int64_t val) {
         _format = Format::kLong;
@@ -182,12 +183,23 @@ public:
         }
     }
 
-
     std::string toString() const {
-
         return withFormat([](Null n) { return std::string("null"); },
                           [](int64_t rid) { return std::to_string(rid); },
-                          [](const char* str, int size) { return std::string(str, size); });
+                          [](const char* str, size_t size) {
+                              if (size == 0) {
+                                  return std::string{"NULL"};
+                              }
+
+                              std::stringstream ss;
+                              ss << "0x" << std::hex << std::setfill('0');
+                              for (size_t i = 0; i < size; ++i) {
+                                  ss << std::setw(2)
+                                     << static_cast<unsigned>(static_cast<uint8_t>(*(str + i)));
+                              }
+
+                              return ss.str();
+                          });
     }
 
     bool isNull() const {
@@ -231,7 +243,7 @@ public:
      * Returns the raw value to be used as a key in a RecordStore. Requires that this RecordId was
      * constructed with a binary string value, and invariants otherwise.
      */
-    const std::string_view getStr() const {
+    const std::string_view getStringView() const {
         invariant(isStr());
         if (_format == Format::kSmallStr) {
             return _getSmallStrNoCheck();
@@ -253,7 +265,7 @@ public:
         }
     }
 
-    int compare(RecordId rhs) const {
+    int compare(const RecordId& rhs) const {
         switch (_format) {
             case Format::kNull:
                 return rhs._format == Format::kNull ? 0 : -1;
@@ -268,12 +280,12 @@ public:
                 if (rhs._format == Format::kNull) {
                     return 1;
                 }
-                return _getSmallStrNoCheck().compare(rhs.getStr());
+                return _getSmallStrNoCheck().compare(rhs.getStringView());
             case Format::kBigStr:
                 if (rhs._format == Format::kNull) {
                     return 1;
                 }
-                return _getBigStrNoCheck().compare(rhs.getStr());
+                return _getBigStrNoCheck().compare(rhs.getStringView());
         }
         MONGO_UNREACHABLE;
     }
@@ -302,7 +314,6 @@ public:
     }
     int memUsageForSorter() const {
         return sizeof(RecordId) + _sharedBuffer.capacity();
-        ;
     }
     RecordId getOwned() const {
         return *this;
@@ -320,44 +331,43 @@ private:
         uint8_t size = static_cast<uint8_t>(_buffer[0]);
         invariant(size > 0);
         invariant(size <= kSmallStrMaxSize);
-        return std::string_view(_buffer.data() + sizeof(char), size);
+        return {_buffer.data() + sizeof(char), size};
     }
 
     std::string_view _getBigStrNoCheck() const {
         size_t size = _sharedBuffer.capacity();
         invariant(size > kSmallStrMaxSize);
         invariant(size <= kBigStrMaxSize);
-        return std::string_view(_sharedBuffer.get(), size);
+        return {_sharedBuffer.get(), size};
     }
 
-
     // int64_t _repr;
-    Format _format = Format::kNull;
+    Format _format{Format::kNull};
     std::array<char, kSmallStrMaxSize + 1> _buffer;
     ConstSharedBuffer _sharedBuffer;
 };
 
-inline bool operator==(RecordId lhs, RecordId rhs) {
+inline bool operator==(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs) == 0;
     // return lhs.repr() == rhs.repr();
 }
-inline bool operator!=(RecordId lhs, RecordId rhs) {
+inline bool operator!=(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs);
     // return lhs.repr() != rhs.repr();
 }
-inline bool operator<(RecordId lhs, RecordId rhs) {
+inline bool operator<(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs) < 0;
     // return lhs.repr() < rhs.repr();
 }
-inline bool operator<=(RecordId lhs, RecordId rhs) {
+inline bool operator<=(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs) <= 0;
     // return lhs.repr() <= rhs.repr();
 }
-inline bool operator>(RecordId lhs, RecordId rhs) {
+inline bool operator>(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs) > 0;
     // return lhs.repr() > rhs.repr();
 }
-inline bool operator>=(RecordId lhs, RecordId rhs) {
+inline bool operator>=(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs) >= 0;
     // return lhs.repr() >= rhs.repr();
 }
