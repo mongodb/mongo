@@ -247,15 +247,18 @@ void AllDatabaseCloner::postStage() {
 
             BSONObj cmdObj = BSON("dbStats" << 1);
             BSONObjBuilder b(cmdObj);
+            boost::optional<auth::ValidatedTenancyScope> vts = boost::none;
             if (gMultitenancySupport &&
                 gFeatureFlagRequireTenantID.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                 dbName.tenantId()) {
-                dbName.tenantId()->serializeToBSON("$tenant", &b);
+                vts = auth::ValidatedTenancyScope(
+                    dbName.tenantId().get(),
+                    auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{});
             }
 
             BSONObj res;
-            getClient()->runCommand(dbName, b.obj(), res);
+            getClient()->runCommand(dbName, b.obj(), res, 0, vts);
 
             // It is possible for the call to 'dbStats' to fail if the sync source contains invalid
             // views. We should not fail initial sync in this case due to the situation where the
