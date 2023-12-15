@@ -290,6 +290,16 @@ struct __wt_name_flag {
     } while (0)
 
 /*
+ * Set all flags related to incremental backup in one macro. The flags do get individually cleared
+ * at different times so there is no corresponding macro for clearing.
+ */
+#define WT_CONN_SET_INCR_BACKUP(conn)                        \
+    do {                                                     \
+        F_SET((conn), WT_CONN_INCR_BACKUP);                  \
+        FLD_SET((conn)->log_flags, WT_CONN_LOG_INCR_BACKUP); \
+    } while (0)
+
+/*
  * WT_BACKUP_TARGET --
  *	A target URI entry indicating this URI should be restored during a partial backup.
  */
@@ -599,12 +609,13 @@ struct __wt_connection_impl {
 #define WT_CONN_LOG_ENABLED 0x004u         /* Logging is enabled */
 #define WT_CONN_LOG_EXISTED 0x008u         /* Log files found */
 #define WT_CONN_LOG_FORCE_DOWNGRADE 0x010u /* Force downgrade */
-#define WT_CONN_LOG_RECOVER_DIRTY 0x020u   /* Recovering unclean */
-#define WT_CONN_LOG_RECOVER_DONE 0x040u    /* Recovery completed */
-#define WT_CONN_LOG_RECOVER_ERR 0x080u     /* Error if recovery required */
-#define WT_CONN_LOG_RECOVER_FAILED 0x100u  /* Recovery failed */
-#define WT_CONN_LOG_REMOVE 0x200u          /* Removal is enabled */
-#define WT_CONN_LOG_ZERO_FILL 0x400u       /* Manually zero files */
+#define WT_CONN_LOG_INCR_BACKUP 0x020u     /* Incremental backup log required */
+#define WT_CONN_LOG_RECOVER_DIRTY 0x040u   /* Recovering unclean */
+#define WT_CONN_LOG_RECOVER_DONE 0x080u    /* Recovery completed */
+#define WT_CONN_LOG_RECOVER_ERR 0x100u     /* Error if recovery required */
+#define WT_CONN_LOG_RECOVER_FAILED 0x200u  /* Recovery failed */
+#define WT_CONN_LOG_REMOVE 0x400u          /* Removal is enabled */
+#define WT_CONN_LOG_ZERO_FILL 0x800u       /* Manually zero files */
                                            /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t log_flags;                    /* Global logging configuration */
     WT_CONDVAR *log_cond;                  /* Log server wait mutex */

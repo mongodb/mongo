@@ -67,5 +67,14 @@ class test_debug_info(wttest.WiredTigerTestCase):
             with self.expectedStdoutPattern(pat):
                 self.conn_cursors_special(s)
 
+        # Open an incremental backup cursor and check backup info.
+        # We can close the cursor immediately. We just want to see the information
+        # in the global connection.
+        config = 'incremental=(enabled,granularity=4k,this_id="ID1")'
+        c = self.session.open_cursor('backup:', None, config)
+        c.close()
+        with self.expectedStdoutPattern('ID1'):
+            self.conn.debug_info('backup')
+
 if __name__ == '__main__':
     wttest.run()

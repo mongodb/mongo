@@ -1166,8 +1166,10 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_STAT_CONN_SET(session, checkpoint_scrub_target, 0);
 
     /* Tell logging that we have started a database checkpoint. */
-    if (full && logging)
+    if (full && logging) {
         WT_ERR(__wt_txn_checkpoint_log(session, full, WT_TXN_LOG_CKPT_START, NULL));
+        WT_ERR(__wt_log_system_backup_id(session));
+    }
 
     /* Add a ten second wait to simulate checkpoint slowness. */
     tsp.tv_sec = 10;

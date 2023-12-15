@@ -1539,8 +1539,7 @@ main(int argc, char *argv[])
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
 
-    /* FIXME-WT-11669 Re-enable the test once this issue is fixed. Set the interval to 3. */
-    backup_force_stop_interval = 0;
+    backup_force_stop_interval = 3;
     backup_full_interval = 4;
     backup_granularity_kb = 1024;
     backup_verify_immediately = false;
@@ -1621,6 +1620,13 @@ main(int argc, char *argv[])
      * Among other things, this initializes the random number generators in the option structure.
      */
     testutil_parse_end_opt(opts);
+
+    /*
+     * Don't allow testing backups in the compatibility mode. MongoDB no longer uses it, and the
+     * compatibility mode is inherently incompatible with backup-related fixes that add new log
+     * records. So disallow the test.
+     */
+    testutil_assert(!(opts->compat && use_backups));
 
     testutil_deduce_build_dir(opts);
     testutil_work_dir_from_path(home, sizeof(home), opts->home);
