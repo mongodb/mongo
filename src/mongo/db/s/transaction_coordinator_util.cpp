@@ -203,6 +203,10 @@ Future<repl::OpTime> persistParticipantsList(
         [&scheduler, lsid, txnNumberAndRetryCounter, participants] {
             return scheduler.scheduleWork(
                 [lsid, txnNumberAndRetryCounter, participants](OperationContext* opCtx) {
+                    // Skip ticket acquisition in order to prevent possible deadlock when
+                    // participants are in the prepared state. See SERVER-82883 and SERVER-60682.
+                    ScopedAdmissionPriorityForLock skipTicketAcquisition(
+                        opCtx->lockState(), AdmissionContext::Priority::kImmediate);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx,
                         lsid,

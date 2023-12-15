@@ -47,6 +47,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeTxnCoordinatorOnStepUpWork);
+
 const auto transactionCoordinatorServiceDecoration =
     ServiceContext::declareDecoration<TransactionCoordinatorService>();
 
@@ -197,6 +199,16 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
             .scheduleWorkIn(
                 recoveryDelayForTesting,
                 [catalogAndScheduler = _catalogAndScheduler](OperationContext* opCtx) {
+                    if (MONGO_unlikely(hangBeforeTxnCoordinatorOnStepUpWork.shouldFail())) {
+                        LOGV2(8288301, "Hit hangBeforeTxnCoordinatorOnStepUpWork failpoint");
+                        hangBeforeTxnCoordinatorOnStepUpWork.pauseWhileSet(opCtx);
+                    }
+
+                    // Skip ticket acquisition in order to prevent possible deadlock when
+                    // participants are in the prepared state. See SERVER-82883 and SERVER-60682.
+                    ScopedAdmissionPriorityForLock skipTicketAcquisition(
+                        opCtx->lockState(), AdmissionContext::Priority::kImmediate);
+
                     auto& replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
                     replClientInfo.setLastOpToSystemLastOpTime(opCtx);
 

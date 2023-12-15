@@ -382,6 +382,12 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
             const auto opCtxHolder = tc->makeOperationContext();
             auto* const opCtx = opCtxHolder.get();
 
+            // This code is used by the TransactionCoordinator. As a result, we need to skip ticket
+            // acquisition in order to prevent possible deadlock when participants are in the
+            // prepared state. See SERVER-82883 and SERVER-60682.
+            ScopedAdmissionPriorityForLock skipTicketAcquisition(
+                opCtx->lockState(), AdmissionContext::Priority::kImmediate);
+
             if (mustRecoverDurableTime) {
                 return recoverDirect(opCtx);
             }
