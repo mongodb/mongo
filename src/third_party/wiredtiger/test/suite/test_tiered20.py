@@ -31,7 +31,7 @@
 
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
-import errno, filecmp, os, time, wiredtiger, wttest
+import errno, filecmp, os, time, shutil, wiredtiger, wttest
 
 # Return a boolean string that is acceptable for WT configuration.
 def wt_boolean(b):
@@ -44,15 +44,21 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
     tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources)
 
+    local_retention=1
+    tiered_interval=5
+
     def additional_conn_config(self):
-        # For tiered scenarios, we are asking for a short local retention (local files are removed promptly),
+        # For tiered scenarios, we are asking for a short local retention and interval (local files are removed promptly),
         # and to not fail if we get a flush error.  A failure in this sense would result in an assertion,
         # which crashes the test suite.  Better that we continue, and we can detect that the flush
         # actually failed by other means.
         if self.is_tiered_scenario():
-            return 'tiered_storage=(local_retention=0),debug_mode=(tiered_flush_error_continue=true)'
+            return f'tiered_storage=(local_retention={self.local_retention},interval={self.tiered_interval}),debug_mode=(tiered_flush_error_continue=true)'
         else:
             return ''
+
+    def temp_file_name():
+        return os.path.join(tempfile.gettempdir(), str(uuid.uuid1()))
 
     def create_flush_drop(self, uri, remove_shared):
         self.session.create(uri, "key_format=S,value_format=S")
@@ -69,10 +75,25 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
         else:
             self.session.drop(uri, "force=true")
 
+    # Return True iff the binary file contains the given string.
+    def file_contains(self, fname, match):
+        bmatch = bytes(match, 'ascii')
+        with open(fname, mode='rb') as f:
+            return (f.read().find(bmatch) != -1)
+
     def test_tiered_overwrite(self):
         uri_a = "table:tiereda"
         uri_b = "table:tieredb"
         uri_b_local_file1 = 'tieredb-0000000001.wtobj'
+        # This really only applies to dirstore.
+        if self.is_tiered_scenario() and self.is_local_storage:
+            uri_b_shared_file1 = os.path.join(self.bucket, self.bucket_prefix + uri_b_local_file1)
+        else:
+            uri_b_shared_file1 = None
+
+        # This test uses a second connection, which is housed in a subdirectory.
+        SECOND_DIR = 'SECOND'
+        second_b_local_file1 = os.path.join(SECOND_DIR, uri_b_local_file1)
 
         # We should be able to do this test for any tiered scenario, not just dir_store.
         # Remove this 'if' and comment when FIXME-WT-11004 is finished.
@@ -112,21 +133,23 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
         # but we don't want to rely on that.  Once an object is written to a bucket
         # it should never be overwritten.  It can only be removed (and yes, then
         # the name would be available in the storage)
-        os.mkdir('SECOND')
+        os.mkdir(SECOND_DIR)
         session1 = self.session  # save the first session
-        conn2 = self.setUpConnectionOpen('SECOND')
+        conn2 = self.setUpConnectionOpen(SECOND_DIR)
         session2 = self.setUpSessionOpen(conn2)
 
         if self.is_local_storage:   # dir_store
-            os.rmdir('SECOND/bucket1')
-            os.symlink('../bucket1', 'SECOND/bucket1')
+            second_bucket_dir = os.path.join(SECOND_DIR, 'bucket1')
+            os.rmdir(second_bucket_dir)
+            os.symlink('../bucket1', second_bucket_dir)
 
         # Create URIs on each connection (as if on two systems).
         # This should not conflict, as nothing has been pushed to the shared storage.
         session1.create(uri_b, "key_format=S,value_format=S")
         session2.create(uri_b, "key_format=S,value_format=S")
+        expected_value = "APPLES_IN_THIS_FILE!" * 1000
         c1 = session1.open_cursor(uri_b)
-        c1["a"] = "a"
+        c1["a"] = expected_value
         c1.close()
         c2 = session2.open_cursor(uri_b)
         c2["a"] = "SOMETHING_VERY_DIFFERENT!" * 1000
@@ -137,19 +160,22 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
         # Make sure the file systems in the first connection.
         self.assertTrue(os.path.exists(uri_b_local_file1))
 
+        # Do a checkpoint in both connections to get everything to disk.
+        session1.checkpoint()
+        session2.checkpoint()
+
         # The first flush from the first "system" should succeed
         session1.checkpoint('flush_tier=(enabled,force=true)')
         if self.is_local_storage:   # dir_store
-            uri_b_shared_file1 = os.path.join(self.bucket, self.bucket_prefix + uri_b_local_file1)
-            uri_b_second_file1 = os.path.join('SECOND', uri_b_local_file1)
-
             self.assertTrue(os.path.exists(uri_b_shared_file1))
-            self.assertTrue(filecmp.cmp(uri_b_local_file1, uri_b_shared_file1))
+            self.assertTrue(self.file_contains(uri_b_shared_file1, "APPLES"))
+            self.assertFalse(self.file_contains(uri_b_shared_file1, "DIFFERENT"))
 
         # The second flush from the other "system" should detect the conflict.
         # Normally such a failure would crash Python, but we've changed our
         # configuration such that we continue after the fail to write.
         # We'll check for the error message we expect in the error output.
+        #
         with self.expectedStderrPattern(expected_errno):
             session2.checkpoint('flush_tier=(enabled,force=true)')
 
@@ -158,31 +184,25 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
         # did not overwrite it.
         if self.is_local_storage:   # dir_store
             self.assertTrue(os.path.exists(uri_b_shared_file1))
-            self.assertFalse(filecmp.cmp(uri_b_second_file1, uri_b_shared_file1))
-            self.assertTrue(filecmp.cmp(uri_b_local_file1, uri_b_shared_file1))
+            self.assertTrue(self.file_contains(uri_b_shared_file1, "APPLES"))
+            self.assertFalse(self.file_contains(uri_b_shared_file1, "DIFFERENT"))
 
         # We're done with the second connection.
         session2.close()
         conn2.close()
 
-        # We'd like to enable the following code to make sure the local file gets removed.
-        # Removing the local file guarantees that we'd go to the cloud to get the data.
-        # However, this loop appears to last forever, it seems to keep the
-        # file around because the file handle is in use.  Even inserting a
-        # self.reopen_conn() into the loop does not fix it.  FIXME-WT-10953.
-        #
-        #    # Make sure the local file is removed, so we actually will go to the
-        #    # cloud the next time this URI is accessed.
-        #    while os.path.exists(uri_b_local_file1):
-        #        self.pr('sleeping...')
-        #        time.sleep(1)
-        #    self.pr('{}: file is removed, continuing'.format(uri_b_local_file1))
+        # Make sure the local file is removed, so we actually will go to the
+        # cloud the next time this URI is accessed.
+        while os.path.exists(uri_b_local_file1):
+            self.pr('sleeping...')
+            time.sleep(1)
+        self.pr('{}: file is removed, continuing'.format(uri_b_local_file1))
 
         # Meanwhile, the first system should not have any trouble accessing
         # the data via the cloud.
         self.reopen_conn()
         c1 = self.session.open_cursor(uri_b)
-        self.assertEqual(c1["a"], "a")
+        self.assertEqual(c1["a"], expected_value)
         c1.close()
 
 if __name__ == '__main__':

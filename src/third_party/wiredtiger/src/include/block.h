@@ -207,6 +207,7 @@ struct __wt_bm {
     int (*size)(WT_BM *, WT_SESSION_IMPL *, wt_off_t *);
     int (*stat)(WT_BM *, WT_SESSION_IMPL *, WT_DSRC_STATS *stats);
     int (*switch_object)(WT_BM *, WT_SESSION_IMPL *, uint32_t);
+    int (*switch_object_end)(WT_BM *, WT_SESSION_IMPL *, uint32_t);
     int (*sync)(WT_BM *, WT_SESSION_IMPL *, bool);
     int (*verify_addr)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     int (*verify_end)(WT_BM *, WT_SESSION_IMPL *);
@@ -233,6 +234,7 @@ struct __wt_bm {
     size_t handle_array_allocated; /* Size of handle array */
     WT_RWLOCK handle_array_lock;   /* Lock for block handle array */
     u_int handle_array_next;       /* Next open slot */
+    uint32_t max_flushed_objectid; /* Local objects at or below this id should be closed */
 
     /*
      * There's only a single block manager handle that can be written, all others are checkpoints.
@@ -259,6 +261,7 @@ struct __wt_block {
 
     bool created_during_backup; /* Created during incremental backup */
     bool sync_on_checkpoint;    /* fsync the handle after the next checkpoint */
+    bool remote;                /* Handle references non-local object */
     bool readonly;              /* Underlying file was opened only for reading */
 
     /* Configuration information, set when the file is opened. */
@@ -454,4 +457,15 @@ __wt_block_header(WT_BLOCK *block)
     WT_UNUSED(block);
 
     return ((u_int)WT_BLOCK_HEADER_SIZE);
+}
+
+/*
+ * __wt_block_eligible_for_sweep --
+ *     Return true if the block meets requirements for sweeping. The check that read reference count
+ *     is zero is made elsewhere.
+ */
+static inline bool
+__wt_block_eligible_for_sweep(WT_BM *bm, WT_BLOCK *block)
+{
+    return (!block->remote && block->objectid <= bm->max_flushed_objectid);
 }

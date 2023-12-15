@@ -82,6 +82,7 @@ __wt_blkcache_tiered_open(
         bstorage = tiered->bstorage;
         WT_WITH_BUCKET_STORAGE(bstorage, session,
           ret = __wt_block_open(session, tmp->mem, objectid, cfg, false, true, true, 0, &block));
+        block->remote = true;
         WT_ERR(ret);
     }
 
@@ -122,7 +123,7 @@ __blkcache_find_open_handle(WT_BM *bm, uint32_t objectid, bool reading, WT_BLOCK
             }
 
     if (reading && *blockp != NULL)
-        __wt_atomic_add32(&(*blockp)->read_count, 1);
+        __wt_blkcache_get_read_handle(*blockp);
 }
 
 /*
@@ -168,7 +169,7 @@ __wt_blkcache_get_handle(
           session, &bm->handle_array_allocated, bm->handle_array_next + 1, &bm->handle_array));
 
         if (reading)
-            __wt_atomic_add32(&new_handle->read_count, 1);
+            __wt_blkcache_get_read_handle(new_handle);
 
         bm->handle_array[bm->handle_array_next++] = new_handle;
         *blockp = new_handle;
@@ -185,12 +186,24 @@ err:
 }
 
 /*
+ * __wt_blkcache_get_read_handle --
+ *     Update block handle when a read operation begins.
+ */
+void
+__wt_blkcache_get_read_handle(WT_BLOCK *block)
+{
+    __wt_atomic_add32(&block->read_count, 1);
+}
+
+/*
  * __wt_blkcache_release_handle --
  *     Update block handle when a read operation completes.
  */
 void
-__wt_blkcache_release_handle(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__wt_blkcache_release_handle(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *last_release)
 {
     WT_ASSERT(session, block->read_count > 0);
-    __wt_atomic_sub32(&block->read_count, 1);
+    *last_release = false;
+    if (__wt_atomic_sub32(&block->read_count, 1) == 0)
+        *last_release = true;
 }
