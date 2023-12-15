@@ -64,10 +64,10 @@ export var TimeseriesTest = class {
             compressedBucket,
             ["control"],
             "TimeseriesTest.decompressBucket() should only be called on a bucket document");
-        assert.eq(
-            TimeseriesTest.BucketVersion.kCompressed,
-            compressedBucket.control.version,
-            "TimeseriesTest.decompressBucket() should only be called on a compressed bucket document");
+        if (compressedBucket.control.version == 1) {
+            // Bucket is already decompressed.
+            return;
+        }
 
         for (const column in compressedBucket.data) {
             compressedBucket.data[column] = decompressBSONColumn(compressedBucket.data[column]);

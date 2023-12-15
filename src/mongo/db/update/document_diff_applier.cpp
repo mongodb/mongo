@@ -64,6 +64,9 @@ struct Insert {
     BSONElement newElt;
 };
 struct Delete {};
+struct Binary {
+    BSONElement newElt;
+};
 struct SubDiff {
     DiffType type() const {
         return holds_alternative<DocumentDiffReader>(reader) ? DiffType::kDocument
@@ -76,7 +79,7 @@ struct SubDiff {
 // This struct stores the tables we build from an object diff before applying it.
 struct DocumentDiffTables {
     // Types of modifications that can be done to a field.
-    using FieldModification = std::variant<Delete, Update, Insert, SubDiff>;
+    using FieldModification = std::variant<Binary, Delete, Update, Insert, SubDiff>;
 
     /**
      * Inserts to the table and throws if the key exists already, which would mean that the
@@ -111,6 +114,12 @@ DocumentDiffTables buildObjDiffTables(DocumentDiffReader* reader,
     while ((nextUpdate = reader->nextUpdate())) {
         out.safeInsert(nextUpdate->fieldNameStringData(), Update{*nextUpdate});
         out.fieldsToInsert.push_back(*nextUpdate);
+        out.insertOnly = false;
+    }
+
+    boost::optional<BSONElement> nextBinary;
+    while ((nextBinary = reader->nextBinary())) {
+        out.safeInsert(nextBinary->fieldNameStringData(), Binary{*nextBinary});
         out.insertOnly = false;
     }
 
@@ -278,6 +287,8 @@ int32_t computeDamageOnObject(const BSONObj& preImageRoot,
                       appendDamage(damages, 0, 0, targetOffset, elt.size());
                       diffSize -= elt.size();
                   },
+
+                  [&](const Binary&) { MONGO_UNIMPLEMENTED; },
 
                   [&](const SubDiff& subDiff) {
                       const auto type = subDiff.type();
@@ -536,6 +547,34 @@ public:
 
                       [](const Insert&) {
                           // Skip the pre-image version of the field. We'll add it at the end.
+                      },
+
+                      [this, &path, &builder, &elt, &fieldsToSkipInserting](const Binary& binary) {
+                          // Applies the binary diff to the BSONColumn.
+                          invariant(elt.binDataType() == BinDataType::Column);
+                          invariant(binary.newElt.isABSONObj());
+
+                          const BSONObj diffObj = binary.newElt.Obj();
+                          const int diffOffset = diffObj.getIntField("o");
+
+                          int diffLen = 0;
+                          const char* diffData = diffObj.getField("d").binData(diffLen);
+
+                          int currLen = 0;
+                          const char* currData = elt.binData(currLen);
+                          invariant(currLen >= diffOffset);
+
+                          int newLen = diffOffset + diffLen;
+                          std::vector<char> newData;
+                          newData.reserve(newLen);
+
+                          std::copy(currData, currData + diffOffset, std::back_inserter(newData));
+                          std::copy(diffData, diffData + diffLen, std::back_inserter(newData));
+
+                          BSONBinData postBinData(&newData[0], newLen, BinDataType::Column);
+                          builder->append(binary.newElt.fieldName(), postBinData);
+
+                          fieldsToSkipInserting.insert(elt.fieldNameStringData());
                       },
 
                       [this, &builder, &elt, &path](const SubDiff& subDiff) {

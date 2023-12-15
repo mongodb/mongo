@@ -206,7 +206,8 @@ void buildUpdateDescriptionWithDeltaOplog(
     visit(OverloadedVisitor{
               [&](DocumentDiffReader* reader) {
                   boost::optional<BSONElement> nextMod;
-                  while ((nextMod = reader->nextUpdate()) || (nextMod = reader->nextInsert())) {
+                  while ((nextMod = reader->nextUpdate()) || (nextMod = reader->nextInsert()) ||
+                         (nextMod = reader->nextBinary())) {
                       builder->addToUpdatedFields(nextMod->fieldNameStringData(), Value(*nextMod));
                   }
 
