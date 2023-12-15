@@ -54,6 +54,8 @@ const WriteConcernOptions kMajorityWriteConcernNoTimeout{WriteConcernOptions::kM
                                                          WriteConcernOptions::SyncMode::UNSET,
                                                          WriteConcernOptions::kNoTimeout};
 
+const WriteConcernOptions kLocalWriteConcern;
+
 }  // namespace WriteConcerns
 
 template <typename T>
