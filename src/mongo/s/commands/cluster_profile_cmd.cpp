@@ -54,7 +54,6 @@ protected:
         OperationContext* opCtx,
         const std::string& dbName,
         const ProfileCmdRequest& request) const final {
-        invariant(!opCtx->lockState()->isW());
 
         const auto profilingLevel = request.getCommandParameter();
 
