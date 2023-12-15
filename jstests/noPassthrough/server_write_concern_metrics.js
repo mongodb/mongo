@@ -72,7 +72,7 @@ export function generateCmdsWithNoWCProvided(cmd) {
         cmd,
         // Missing 'w' field will be filled with default write concern.
         Object.assign(Object.assign({}, cmd), {writeConcern: {j: true}}),
-        Object.assign(Object.assign({}, cmd), {writeConcern: {wtimeout: 2000}})
+        Object.assign(Object.assign({}, cmd), {writeConcern: {wtimeout: 15000}})
     ];
 }
 
