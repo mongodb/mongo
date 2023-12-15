@@ -8,7 +8,7 @@ cd ..
 
 # Check Python coding standards: check for tab characters.
 # Ignore generated files.
-egrep '	' `find . -name '*.py' -not -path '*.git/*'` |
+egrep '	' `git ls-files -- '*.py'` |
     sed -e 's/:.*//' \
     -e '/swig_wiredtiger.py/d' \
     -e '/\/wiredtiger.py/d' \
