@@ -208,6 +208,116 @@ write_ops::WriteCommandRequestBase makeTimeseriesWriteOpBase(std::vector<StmtId>
     return base;
 }
 
+// Generates a delta update oplog entry using the before and after compressed bucket documents.
+write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
+    OperationContext* opCtx,
+    std::shared_ptr<bucket_catalog::WriteBatch> batch,
+    const BSONObj& before,
+    const BSONObj& after,
+    const BSONObj& metadata) {
+    BSONObjBuilder updateBuilder;
+    {
+        // Control builder.
+        BSONObjBuilder controlBuilder(updateBuilder.subobjStart(
+            str::stream() << doc_diff::kSubDiffSectionFieldPrefix << kBucketControlFieldName));
+        BSONObj countObj =
+            BSON(kBucketControlCountFieldName << after.getObjectField(kBucketControlFieldName)
+                                                     .getField(kBucketControlCountFieldName)
+                                                     .Int());
+        controlBuilder.append(doc_diff::kUpdateSectionFieldName, countObj);
+
+        if (!batch->min.isEmpty() || !batch->max.isEmpty()) {
+            if (!batch->min.isEmpty()) {
+                controlBuilder.append(str::stream() << doc_diff::kSubDiffSectionFieldPrefix
+                                                    << kBucketControlMinFieldName,
+                                      batch->min);
+            }
+            if (!batch->max.isEmpty()) {
+                controlBuilder.append(str::stream() << doc_diff::kSubDiffSectionFieldPrefix
+                                                    << kBucketControlMaxFieldName,
+                                      batch->max);
+            }
+        }
+    }
+
+    {
+        // Data builder.
+        const BSONObj& beforeData = before.getObjectField(kBucketDataFieldName);
+        const BSONObj& afterData = after.getObjectField(kBucketDataFieldName);
+
+        BSONObjBuilder dataBuilder(updateBuilder.subobjStart("sdata"));
+        BSONObjBuilder newDataFieldsBuilder;
+        BSONObjBuilder updatedDataFieldsBuilder;
+        auto beforeIt = beforeData.begin();
+        auto afterIt = afterData.begin();
+
+        while (beforeIt != beforeData.end()) {
+            invariant(afterIt != afterData.end());
+            invariant(beforeIt->fieldNameStringData() == afterIt->fieldNameStringData());
+
+            if (beforeIt->binaryEqual(*afterIt)) {
+                // Contents are the same, nothing to diff.
+                beforeIt++;
+                afterIt++;
+                continue;
+            }
+
+            // Generate the binary diff.
+            int beforeLen = 0;
+            const char* beforeData = beforeIt->binData(beforeLen);
+
+            int afterLen = 0;
+            const char* afterData = afterIt->binData(afterLen);
+
+            int offset = 0;
+            while (beforeData[offset] == afterData[offset]) {
+                if (offset == beforeLen - 1 || offset == afterLen - 1) {
+                    break;
+                }
+                offset++;
+            }
+
+            BSONObj binaryObj = BSON("o" << offset << "d"
+                                         << BSONBinData(afterData + offset,
+                                                        afterLen - offset,
+                                                        BinDataType::BinDataGeneral));
+            updatedDataFieldsBuilder.append(beforeIt->fieldNameStringData(), binaryObj);
+            beforeIt++;
+            afterIt++;
+        }
+
+        // Finish consuming the after iterator, which should only contain new fields at this point
+        // as we've finished consuming the before iterator.
+        while (afterIt != afterData.end()) {
+            // Newly inserted fields are added as DocDiff inserts using the BSONColumn format.
+            invariant(batch->newFieldNamesToBeInserted.count(afterIt->fieldNameStringData()) == 1);
+            newDataFieldsBuilder.append(*afterIt);
+            afterIt++;
+        }
+
+        auto newDataFields = newDataFieldsBuilder.obj();
+        if (!newDataFields.isEmpty()) {
+            dataBuilder.append(doc_diff::kInsertSectionFieldName, newDataFields);
+        }
+
+        auto updatedDataFields = updatedDataFieldsBuilder.obj();
+        if (!updatedDataFields.isEmpty()) {
+            dataBuilder.append(doc_diff::kBinarySectionFieldName, updatedDataFields);
+        }
+    }
+
+    write_ops::UpdateModification::DiffOptions options;
+    options.mustCheckExistenceForInsertOperations =
+        static_cast<bool>(repl::tenantMigrationInfo(opCtx));
+    write_ops::UpdateModification u(
+        updateBuilder.obj(), write_ops::UpdateModification::DeltaTag{}, options);
+    auto oid = batch->bucketHandle.bucketId.oid;
+    write_ops::UpdateOpEntry update(BSON("_id" << oid), std::move(u));
+    invariant(!update.getMulti(), oid.toString());
+    invariant(!update.getUpsert(), oid.toString());
+    return update;
+}
+
 // Builds the delta update oplog entry from a time-series insert write batch.
 write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
     OperationContext* opCtx,
@@ -548,6 +658,20 @@ write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
     // use compressed buckets feature flag is disabled. When enabled, holds the compressed version
     // of the bucket document mentioned earlier.
     auto after = compressionResult.compressedBucket ? *compressionResult.compressedBucket : updated;
+
+    // Generates a delta update request using the before and after compressed bucket documents.
+    // TODO SERVER-80653: Remove compressed bucket check. The operation should retry if compression
+    // fails before we get here.
+    if (compressionResult.compressedBucket &&
+        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        const auto updateEntry =
+            makeTimeseriesCompressedDiffEntry(opCtx, batch, before, after, metadata);
+
+        write_ops::UpdateCommandRequest op(bucketsNs, {updateEntry});
+        op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
+        return op;
+    }
 
     auto bucketTransformationFunc = [before = std::move(before), after = std::move(after)](
                                         const BSONObj& bucketDoc) -> boost::optional<BSONObj> {

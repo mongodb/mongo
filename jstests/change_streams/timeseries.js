@@ -308,21 +308,18 @@ if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
 
     };
     expectedChanges[5] = {
-        "operationType": "replace",
-        "fullDocument": {
-            "control": {
-                "version": TimeseriesTest.BucketVersion.kCompressed,
-                "min": {"_id": 1, "ts": ISODate("1970-01-01T00:00:00Z")},
-                "max": {"_id": 1, "ts": ISODate("1970-01-01T00:00:01Z")},
-                "count": 2
+        "operationType": "update",
+        "updateDescription": {
+            "updatedFields": {
+                "control.count": 2,
+                "data.ts": {"o": 10, "d": BinData(0, "gA4AAAAAAAAAAA==")},
+                "data._id": {"o": 10, "d": BinData(0, "kA4AAAAAAAAAAA==")}
             },
-            "meta": {"a": 1},
-            "data": {
-                "ts": BinData(7, "CQDoAwAAAAAAAIAOAAAAAAAAAAA="),
-                "_id": BinData(7, "AQAAAAAAAADwP5AOAAAAAAAAAAA=")
-            }
+            "removedFields": [],
+            "truncatedArrays": [],
+            "disambiguatedPaths": {}
         },
-        "ns": {"db": "timeseries", "coll": "system.buckets.timeseries"}
+        "ns": {"db": dbName, "coll": bucketsCollName}
     };
 }
 

@@ -105,6 +105,30 @@ TEST(DiffSerializationTest, InsertSimple) {
     ASSERT(reader.nextSubDiff() == boost::none);
 }
 
+TEST(DiffSerializationTest, BinarySimple) {
+    const BSONObj kDummyObj(BSON(
+        "a" << BSON("o" << 0 << "d" << BSONBinData("abcdef", 6, BinDataType::BinDataGeneral))));
+
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addBinary("b1", kDummyObj["a"]);
+
+    auto out = diffNode.serialize();
+    ASSERT_BSONOBJ_BINARY_EQ(
+        out,
+        BSON("b" << BSON("b1" << BSON("o"
+                                      << 0 << "d"
+                                      << BSONBinData("abcdef", 6, BinDataType::BinDataGeneral)))));
+
+
+    DocumentDiffReader reader(out);
+    ASSERT(reader.nextBinary()->binaryEqual(withFieldName(kDummyObj["a"], "b1")));
+    ASSERT(reader.nextBinary() == boost::none);
+
+    ASSERT(reader.nextDelete() == boost::none);
+    ASSERT(reader.nextUpdate() == boost::none);
+    ASSERT(reader.nextSubDiff() == boost::none);
+}
+
 TEST(DiffSerializationTest, UpdateSimple) {
     const BSONObj kDummyObj(BSON("a" << 1 << "b"
                                      << "foo"));
