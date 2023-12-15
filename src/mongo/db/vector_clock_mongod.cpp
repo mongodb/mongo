@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
@@ -375,6 +376,11 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
 
             const auto opCtxHolder = tc->makeOperationContext();
             auto* const opCtx = opCtxHolder.get();
+
+            // This code is used by the TransactionCoordinator. As a result, we need to skip ticket
+            // acquisition in order to prevent possible deadlock when participants are in the
+            // prepared state. See SERVER-82883 and SERVER-60682.
+            SkipTicketAcquisitionForLock skipTicketAcquisition(opCtx);
 
             if (mustRecoverDurableTime) {
                 return recoverDirect(opCtx);

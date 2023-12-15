@@ -172,7 +172,8 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
                     << "projection"
                     << BSON(OplogEntryBase::kTimestampFieldName
                             << 1 << OplogEntryBase::kTermFieldName << 1)
-                    << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kLocal),
+                    << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kLocal << "term"
+                    << -1),
         [=](const StatusWith<Fetcher::QueryResponse>& response,
             Fetcher::NextAction*,
             BSONObjBuilder*) {

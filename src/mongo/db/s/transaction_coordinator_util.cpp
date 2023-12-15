@@ -204,6 +204,10 @@ Future<repl::OpTime> persistParticipantsList(
             return scheduler.scheduleWork(
                 [lsid, txnNumberAndRetryCounter, participants](OperationContext* opCtx) {
                     FlowControl::Bypass flowControlBypass(opCtx);
+                    // This code is used by the TransactionCoordinator. As a result, we need to skip
+                    // ticket acquisition in order to prevent possible deadlock when participants
+                    // are in the prepared state. See SERVER-82883 and SERVER-60682.
+                    SkipTicketAcquisitionForLock skipTicketAcquisition(opCtx);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx,
                         lsid,

@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticket.h"
@@ -150,7 +151,7 @@ void SemaphoreTicketHolder::release(AdmissionContext* admCtx, Ticket&& ticket) {
 Status SemaphoreTicketHolder::resize(int newSize) {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
-    if (newSize < 5)
+    if (newSize < 5 && !getTestCommandsEnabled())
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Minimum value for semaphore is 5; given " << newSize);
 

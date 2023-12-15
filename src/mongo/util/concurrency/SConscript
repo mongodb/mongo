@@ -29,6 +29,7 @@ env.Library('ticketholder',
             ['ticketholder.cpp'],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/base',
+                '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
                 '$BUILD_DIR/mongo/db/service_context',
                 '$BUILD_DIR/third_party/shim_boost',
             ])
