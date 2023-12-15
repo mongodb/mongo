@@ -56,11 +56,12 @@ public:
     void onDestroyOperationContext(OperationContext* opCtx) final {}
 };
 
+}  // namespace
+
 ServiceContext::ConstructorActionRegisterer transactionResourcesConstructor{
     "TransactionResourcesConstructor", [](ServiceContext* service) {
         service->registerClientObserver(
             std::make_unique<TransactionResourcesNonMongoDClientObserver>());
     }};
 
-}  // namespace
 }  // namespace mongo

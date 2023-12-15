@@ -230,6 +230,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/transaction/transaction',
+        '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         'op_observer_util',
     ],

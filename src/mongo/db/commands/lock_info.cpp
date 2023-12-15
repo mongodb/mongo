@@ -43,6 +43,7 @@
 #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dump_lock_manager_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -96,7 +97,7 @@ public:
                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                 CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(request().getDbName()));
 
-            auto lockToClientMap = LockManager::getLockToClientMap(opCtx->getServiceContext());
+            auto lockToClientMap = getLockerIdToClientMap(opCtx->getServiceContext());
             auto result = reply->getBodyBuilder();
             LockManager::get(opCtx->getServiceContext())->getLockInfoBSON(lockToClientMap, &result);
             const auto& includeStorageEngineDump = request().getIncludeStorageEngineDump();

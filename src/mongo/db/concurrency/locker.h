@@ -71,7 +71,7 @@ class Locker {
 public:
     using LockTimeoutCallback = std::function<void()>;
 
-    virtual ~Locker() = default;
+    virtual ~Locker();
 
     /**
      * State for reporting the number of active and queued reader and writer clients.

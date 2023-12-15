@@ -1390,7 +1390,7 @@ env.Library(
         'write_concern.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
+        'query/query_stats/query_stats',
         'read_write_concern_defaults',
         'repl/read_concern_args',
         'repl/speculative_majority_read_info',
@@ -1399,7 +1399,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'commands/server_status_core',
-        'concurrency/lock_manager',
         'repl/repl_coordinator_interface',
         'repl/repl_server_parameters',
         'repl/repl_settings',
