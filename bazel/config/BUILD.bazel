@@ -11,6 +11,7 @@ load(
     "use_disable_ref_track", 
     "use_ocsp_stapling",
     "use_wiredtiger",
+    "build_grpc",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -408,5 +409,24 @@ config_setting(
     name = "use_wiredtiger_enabled",
     flag_values = {
         "//bazel/config:use_wiredtiger": "True",
+    },
+)
+
+# --------------------------------------
+# grpc options
+# --------------------------------------
+
+build_grpc(
+    name = "build_grpc",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "build_grpc_enabled",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//bazel/config:build_grpc": "True",
     },
 )

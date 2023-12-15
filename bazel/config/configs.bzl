@@ -164,3 +164,17 @@ use_wiredtiger = rule(
     implementation = lambda ctx: use_wiredtiger_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# grpc
+# =========
+
+build_grpc_provider = provider(
+    doc = """Enable building grpc and protobuf compiler. This has no effect on non-linux operating systems.""",
+    fields = ["enabled"],
+)
+
+build_grpc = rule(
+    implementation = lambda ctx: build_grpc_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
