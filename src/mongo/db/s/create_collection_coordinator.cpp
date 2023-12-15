@@ -1019,16 +1019,34 @@ boost::optional<UUID> createCollectionAndIndexes(
     return *sharding_ddl_util::getCollectionUUID(opCtx, nss);
 }
 
-ShardsvrCreateCollectionRequest patchedRequestForChangeStream(
+void generateCommitEventForChangeStreams(
+    OperationContext* opCtx,
+    const NamespaceString& translatedNss,
+    const UUID& collUUID,
     const ShardsvrCreateCollectionRequest& originalRequest,
-    const mongo::TranslatedRequestParams& translatedRequestParams) {
-    auto req = originalRequest;
-    req.setShardKey(translatedRequestParams.getKeyPattern().toBSON());
+    mongo::TranslatedRequestParams& translatedRequestParams,
+    CommitPhase commitPhase,
+    const boost::optional<std::set<ShardId>>& shardsHostingCollection = boost::none) {
+    if (originalRequest.getUnsplittable()) {
+        // Do not generate any event; unsplittable collections cannot appear as sharded ones to
+        // change stream users.
+        return;
+    }
+
+    // Adapt the original user request to the expected format, then generate the event.
+    auto patchedRequest = originalRequest;
+    patchedRequest.setShardKey(translatedRequestParams.getKeyPattern().toBSON());
     // TODO SERVER-83006: remove deprecated numInitialChunks parameter.
-    // numInitialChunks should not be logged by the change stream. The field is no longer used and
-    // it's kept in the request until it can be safely removed in SERVER-83006
-    req.setNumInitialChunks(boost::none);
-    return req;
+    // numInitialChunks should not be logged by the change stream (the field has been deprecated,
+    // but it is still kept in the request until it can be safely removed.
+    patchedRequest.setNumInitialChunks(boost::none);
+
+    notifyChangeStreamsOnShardCollection(opCtx,
+                                         translatedNss,
+                                         collUUID,
+                                         patchedRequest.toBSON(),
+                                         commitPhase,
+                                         shardsHostingCollection);
 }
 
 /**
@@ -1187,13 +1205,12 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                             // but there was a stepdown after the commit.
 
                             // Ensure that the change stream event gets emitted at least once.
-                            notifyChangeStreamsOnShardCollection(
+                            generateCommitEventForChangeStreams(
                                 opCtx,
                                 nss(),
                                 *createCollectionResponseOpt->getCollectionUUID(),
-                                patchedRequestForChangeStream(_request,
-                                                              *_doc.getTranslatedRequestParams())
-                                    .toBSON(),
+                                _request,
+                                *_doc.getTranslatedRequestParams(),
                                 CommitPhase::kSuccessful);
 
                             // The critical section might have been taken by a migration, we force
@@ -1284,17 +1301,14 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                                          std::make_move_iterator(involvedShards.end())},
                     nss());
 
-                const auto patchedRequestBSONObj =
-                    patchedRequestForChangeStream(_request, *_doc.getTranslatedRequestParams())
-                        .toBSON();
-
                 try {
-                    notifyChangeStreamsOnShardCollection(opCtx,
-                                                         nss(),
-                                                         *_collectionUUID,
-                                                         patchedRequestBSONObj,
-                                                         CommitPhase::kPrepare,
-                                                         involvedShards);
+                    generateCommitEventForChangeStreams(opCtx,
+                                                        nss(),
+                                                        *_collectionUUID,
+                                                        _request,
+                                                        *_doc.getTranslatedRequestParams(),
+                                                        CommitPhase::kPrepare,
+                                                        involvedShards);
 
                     commit(opCtx,
                            **executor,
@@ -1306,11 +1320,12 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                            _doc.getTranslatedRequestParams(),
                            [this](OperationContext* opCtx) { return getNewSession(opCtx); });
 
-                    notifyChangeStreamsOnShardCollection(opCtx,
-                                                         nss(),
-                                                         *_collectionUUID,
-                                                         patchedRequestBSONObj,
-                                                         CommitPhase::kSuccessful);
+                    generateCommitEventForChangeStreams(opCtx,
+                                                        nss(),
+                                                        *_collectionUUID,
+                                                        _request,
+                                                        *_doc.getTranslatedRequestParams(),
+                                                        CommitPhase::kSuccessful);
 
                     LOGV2_DEBUG(5277907, 2, "Collection successfully committed", logAttrs(nss()));
 
@@ -1335,11 +1350,12 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                             ->clearFilteringMetadata(opCtx);
                     }
 
-                    notifyChangeStreamsOnShardCollection(opCtx,
-                                                         nss(),
-                                                         *_collectionUUID,
-                                                         patchedRequestBSONObj,
-                                                         CommitPhase::kAborted);
+                    generateCommitEventForChangeStreams(opCtx,
+                                                        nss(),
+                                                        *_collectionUUID,
+                                                        _request,
+                                                        *_doc.getTranslatedRequestParams(),
+                                                        CommitPhase::kAborted);
 
                     throw;
                 }
@@ -1797,11 +1813,13 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
         involvedShards.emplace(chunk.getShard());
     }
 
-    const auto patchedRequestBSONObj =
-        patchedRequestForChangeStream(_request, *_doc.getTranslatedRequestParams()).toBSON();
-
-    notifyChangeStreamsOnShardCollection(
-        opCtx, nss(), *_uuid, patchedRequestBSONObj, CommitPhase::kPrepare, involvedShards);
+    generateCommitEventForChangeStreams(opCtx,
+                                        nss(),
+                                        *_uuid,
+                                        _request,
+                                        *_doc.getTranslatedRequestParams(),
+                                        CommitPhase::kPrepare,
+                                        involvedShards);
 
     commit(opCtx,
            **executor,
@@ -1827,12 +1845,12 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
     }
 
     // Ensure that the change stream event gets emitted at least once.
-    notifyChangeStreamsOnShardCollection(
-        opCtx,
-        nss(),
-        *_uuid,
-        patchedRequestForChangeStream(_request, *_doc.getTranslatedRequestParams()).toBSON(),
-        CommitPhase::kSuccessful);
+    generateCommitEventForChangeStreams(opCtx,
+                                        nss(),
+                                        *_uuid,
+                                        _request,
+                                        *_doc.getTranslatedRequestParams(),
+                                        CommitPhase::kSuccessful);
 
     // Install new filtering metadata or clear it.
     try {
@@ -1879,13 +1897,12 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
                 _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
 
                 // Notify change streams to abort the shard collection.
-                notifyChangeStreamsOnShardCollection(
-                    opCtx,
-                    nss(),
-                    *_uuid,
-                    patchedRequestForChangeStream(_request, *_doc.getTranslatedRequestParams())
-                        .toBSON(),
-                    CommitPhase::kAborted);
+                generateCommitEventForChangeStreams(opCtx,
+                                                    nss(),
+                                                    *_uuid,
+                                                    _request,
+                                                    *_doc.getTranslatedRequestParams(),
+                                                    CommitPhase::kAborted);
             }
 
             if (_doc.getPhase() >= Phase::kEnterCriticalSection) {
