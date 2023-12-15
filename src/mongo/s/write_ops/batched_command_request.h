@@ -183,6 +183,11 @@ public:
     const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const;
     const boost::optional<BSONObj>& getLet() const;
 
+    /**
+     * Utility which handles evaluating and storing any let parameters based on the request type.
+     */
+    void evaluateAndReplaceLetParams(OperationContext* opCtx);
+
     const write_ops::WriteCommandRequestBase& getWriteCommandRequestBase() const;
     void setWriteCommandRequestBase(write_ops::WriteCommandRequestBase writeCommandBase);
 

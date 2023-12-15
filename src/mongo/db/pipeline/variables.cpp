@@ -311,6 +311,14 @@ void Variables::seedVariablesWithLetParameters(ExpressionContext* const expCtx,
         }
     }
 }
+BSONObj Variables::toBSON(const VariablesParseState& vps, const BSONObj& varsToSerialize) const {
+    BSONObjBuilder result;
+    for (BSONElement elem : varsToSerialize) {
+        StringData name = elem.fieldNameStringData();
+        result << name << getUserDefinedValue(vps.getVariable(name));
+    }
+    return result.obj();
+}
 
 LegacyRuntimeConstants Variables::generateRuntimeConstants(OperationContext* opCtx) {
     // On a standalone, the clock may not be running and $$CLUSTER_TIME is unavailable. If the

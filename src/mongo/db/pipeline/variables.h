@@ -190,6 +190,12 @@ public:
      */
     void seedVariablesWithLetParameters(ExpressionContext* expCtx, BSONObj letParameters);
 
+    /**
+     * Serializes this Variables object to a BSONObj, according to the top level field names of
+     * 'varsToSerialize'.
+     */
+    BSONObj toBSON(const VariablesParseState& vps, const BSONObj& varsToSerialize) const;
+
     bool hasValue(Variables::Id id) const {
         return _definitions.find(id) != _definitions.end();
     };

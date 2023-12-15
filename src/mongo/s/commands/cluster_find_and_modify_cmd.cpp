@@ -744,14 +744,35 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         if (isTimeseriesViewRequest) {
             cmdObjForShard = replaceNamespaceByBucketNss(cmdObjForShard, nss);
         }
-        BSONObj query = cmdObjForShard.getObjectField("query");
-        const bool isUpsert = cmdObjForShard.getBoolField("upsert");
-        const BSONObj collation = getCollation(cmdObjForShard);
-        const auto letParams = getLet(cmdObjForShard);
-        const auto runtimeConstants = getLegacyRuntimeConstants(cmdObjForShard);
+
+        auto letParams = getLet(cmdObjForShard);
+        auto runtimeConstants = getLegacyRuntimeConstants(cmdObjForShard);
+        BSONObj collation = getCollation(cmdObjForShard);
         auto expCtx = makeExpressionContextWithDefaultsForTargeter(
             opCtx, nss, cri, collation, boost::none /* verbosity */, letParams, runtimeConstants);
 
+        // If this command has 'let' parameters, then evaluate them once and stash them back on the
+        // original command object. Note that this isn't necessary outside of the case where we have
+        // a routing table because this is intended to prevent evaluating let parameters multiple
+        // times (which can only happen when executing against a sharded cluster).
+        if (letParams) {
+            // Serialize variables before moving 'cmdObjForShard' to avoid invalid access.
+            expCtx->variables.seedVariablesWithLetParameters(expCtx.get(), *letParams);
+            auto letVars = Value(expCtx->variables.toBSON(expCtx->variablesParseState, *letParams));
+
+            MutableDocument cmdDoc(Document(std::move(cmdObjForShard)));
+            cmdDoc[write_ops::FindAndModifyCommandRequest::kLetFieldName] = letVars;
+            cmdObjForShard = cmdDoc.freeze().toBson();
+
+            // Reset the objects set up above as they are now invalid given that 'cmdObjForShard'
+            // has been changed.
+            letParams = getLet(cmdObjForShard);
+            runtimeConstants = getLegacyRuntimeConstants(cmdObjForShard);
+            collation = getCollation(cmdObjForShard);
+        }
+
+        BSONObj query = cmdObjForShard.getObjectField("query");
+        const bool isUpsert = cmdObjForShard.getBoolField("upsert");
 
         if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
                                                          nss,

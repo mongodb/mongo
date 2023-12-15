@@ -39,6 +39,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
@@ -74,6 +75,24 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
             !isTimeseriesNamespace.trueValue());
 
     return batchRequest;
+}
+
+// Utility that parses and evaluates 'let'. It returns the result as a serialized object.
+BSONObj freezeLet(OperationContext* opCtx,
+                  const mongo::BSONObj& let,
+                  const boost::optional<mongo::LegacyRuntimeConstants>& legacyRuntimeConstants,
+                  const NamespaceString& nss) {
+    // Evaluate the let parameters.
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                    nullptr /* collator */,
+                                                    nss,
+                                                    legacyRuntimeConstants,
+                                                    let,
+                                                    false,  // disk use is banned on mongos
+                                                    false,  // mongos has no profile collection
+                                                    boost::none /* verbosity */);
+    expCtx->variables.seedVariablesWithLetParameters(expCtx.get(), let);
+    return expCtx->variables.toBSON(expCtx->variablesParseState, let);
 }
 
 }  // namespace
@@ -181,6 +200,25 @@ const boost::optional<BSONObj>& BatchedCommandRequest::getLet() const {
     };
     return _visit(Visitor{});
 };
+
+void BatchedCommandRequest::evaluateAndReplaceLetParams(OperationContext* opCtx) {
+    switch (_batchType) {
+        case BatchedCommandRequest::BatchType_Insert:
+            break;
+        case BatchedCommandRequest::BatchType_Update:
+            if (auto let = _updateReq->getLet()) {
+                _updateReq->setLet(
+                    freezeLet(opCtx, *let, _updateReq->getLegacyRuntimeConstants(), getNS()));
+            }
+            break;
+        case BatchedCommandRequest::BatchType_Delete:
+            if (auto let = _deleteReq->getLet()) {
+                _deleteReq->setLet(
+                    freezeLet(opCtx, *let, _deleteReq->getLegacyRuntimeConstants(), getNS()));
+            }
+            break;
+    }
+}
 
 const write_ops::WriteCommandRequestBase& BatchedCommandRequest::getWriteCommandRequestBase()
     const {

@@ -612,6 +612,10 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
     BatchWriteExecStats stats;
     BatchedCommandResponse response;
 
+    // If 'batchedRequest' has any let parameters, evaluate them and stash them back on the original
+    // request.
+    batchedRequest.evaluateAndReplaceLetParams(opCtx);
+
     // Append the write concern from the opCtx extracted during command setup.
     batchedRequest.setWriteConcern(opCtx->getWriteConcern().toBSON());
 
