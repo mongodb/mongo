@@ -1164,7 +1164,7 @@ buildvariants:
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
       --runAllFeatureFlagTests
-      --excludeWithAnyTags=resource_intensive
+      --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
   tasks:
   - name: analyze_shard_key_jscore_passthrough_gen
   - name: query_golden_classic
