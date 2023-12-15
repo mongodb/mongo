@@ -4,6 +4,9 @@ test_kind: js_test
 # parity with regular CRUD ops.
 selector:
   roots:
+  - jstests/sharding/collection_uuid_delete.js
+  - jstests/sharding/collection_uuid_insert.js
+  - jstests/sharding/collection_uuid_update.js
   - jstests/sharding/updateOne_without_shard_key/*.js
   - jstests/sharding/analyze_shard_key/read_and_write_distribution.js
   - jstests/sharding/analyze_shard_key/sampling_current_op_and_server_status_rs.js

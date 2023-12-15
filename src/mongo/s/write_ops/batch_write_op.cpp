@@ -166,6 +166,41 @@ void trackErrors(const ShardEndpoint& endpoint,
     }
 }
 
+int getEncryptionInformationSize(const BatchedCommandRequest& req) {
+    if (!req.getWriteCommandRequestBase().getEncryptionInformation()) {
+        return 0;
+    }
+    return req.getWriteCommandRequestBase().getEncryptionInformation().value().toBSON().objsize();
+}
+
+}  // namespace
+
+boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
+    const std::vector<ShardWCError>& wcErrors) {
+    if (!wcErrors.size())
+        return boost::none;
+
+    StringBuilder msg;
+    auto errCode = wcErrors.front().error.toStatus().code();
+    if (wcErrors.size() != 1) {
+        msg << "Multiple errors reported :: ";
+        errCode = ErrorCodes::WriteConcernFailed;
+    }
+
+    for (auto it = wcErrors.begin(); it != wcErrors.end(); ++it) {
+        if (it != wcErrors.begin()) {
+            msg << " :: and :: ";
+        }
+
+        msg << it->error.toString() << " at " << it->shardName;
+    }
+
+    WriteConcernErrorDetail wce;
+    wce.setStatus(Status(errCode, msg.str()));
+
+    return boost::optional<WriteConcernErrorDetail>(wce);
+}
+
 /**
  * Attempts to populate the actualCollection field of a CollectionUUIDMismatch error if it is not
  * populated already, contacting the primary shard if necessary.
@@ -204,41 +239,6 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
             *actualCollection = populatedActualCollection;
         }
     }
-}
-
-int getEncryptionInformationSize(const BatchedCommandRequest& req) {
-    if (!req.getWriteCommandRequestBase().getEncryptionInformation()) {
-        return 0;
-    }
-    return req.getWriteCommandRequestBase().getEncryptionInformation().value().toBSON().objsize();
-}
-
-}  // namespace
-
-boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
-    const std::vector<ShardWCError>& wcErrors) {
-    if (!wcErrors.size())
-        return boost::none;
-
-    StringBuilder msg;
-    auto errCode = wcErrors.front().error.toStatus().code();
-    if (wcErrors.size() != 1) {
-        msg << "Multiple errors reported :: ";
-        errCode = ErrorCodes::WriteConcernFailed;
-    }
-
-    for (auto it = wcErrors.begin(); it != wcErrors.end(); ++it) {
-        if (it != wcErrors.begin()) {
-            msg << " :: and :: ";
-        }
-
-        msg << it->error.toString() << " at " << it->shardName;
-    }
-
-    WriteConcernErrorDetail wce;
-    wce.setStatus(Status(errCode, msg.str()));
-
-    return boost::optional<WriteConcernErrorDetail>(wce);
 }
 
 // 'baseCommandSizeBytes' specifies the base size of a batch command request prior to adding any

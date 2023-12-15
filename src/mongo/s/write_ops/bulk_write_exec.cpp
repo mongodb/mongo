@@ -1253,6 +1253,10 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
     summary.nUpserted = _nUpserted;
     replyItems.reserve(_writeOps.size());
 
+    std::vector<boost::optional<std::string>> actualCollections(_clientRequest.getNsInfo().size(),
+                                                                boost::none);
+    std::deque<bool> hasContactedPrimaryShard(_clientRequest.getNsInfo().size(), false);
+
     const auto ordered = _clientRequest.getOrdered();
     for (auto& writeOp : _writeOps) {
         // If we encountered an error causing us to abort execution we may not have waited for
@@ -1282,8 +1286,22 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
                 replyItems.push_back(writeOp.takeBulkWriteReplyItem());
             }
         } else if (writeOpState == WriteOpState_Error) {
-            replyItems.emplace_back(writeOp.getWriteItem().getItemIndex(),
-                                    writeOp.getOpError().getStatus());
+            auto nsInfoIdx =
+                BulkWriteCRUDOp(_clientRequest.getOps()[writeOp.getWriteItem().getItemIndex()])
+                    .getNsInfoIdx();
+
+            // Need to make a modifyable copy of the error.
+            auto error = writeOp.getOpError();
+
+            // If the error is not a collection UUID error then this function will not modify the
+            // error, so we can call this on every iteration without checks.
+            populateCollectionUUIDMismatch(_opCtx,
+                                           &error,
+                                           &actualCollections[nsInfoIdx],
+                                           &hasContactedPrimaryShard[nsInfoIdx]);
+
+            replyItems.emplace_back(writeOp.getWriteItem().getItemIndex(), error.getStatus());
+
             // TODO SERVER-79510: Remove this. This is necessary right now because the nModified
             //  field is lost in the BulkWriteReplyItem -> WriteError transformation but
             // we want to return nModified for failed updates. However, this does not actually

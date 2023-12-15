@@ -275,6 +275,13 @@ typedef std::function<int(const WriteOp& writeOp)> GetWriteSizeFn;
 boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
     const std::vector<ShardWCError>& wcErrors);
 
+// Utility function to add the actualCollection field into a WriteError if it does not already
+// exist, contacting the primary shard if it needs to.
+void populateCollectionUUIDMismatch(OperationContext* opCtx,
+                                    write_ops::WriteError* error,
+                                    boost::optional<std::string>* actualCollection,
+                                    bool* hasContactedPrimaryShard);
+
 // Helper function to target ready writeOps. See BatchWriteOp::targetBatch for details.
 StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                                      std::vector<WriteOp>& writeOps,
