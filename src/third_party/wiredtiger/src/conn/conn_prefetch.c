@@ -202,7 +202,8 @@ __wt_conn_prefetch_clear_tree(WT_SESSION_IMPL *session, bool all)
             --conn->prefetch_queue_count;
         }
     }
-    WT_ASSERT(session, conn->prefetch_queue_count == 0);
+    if (all)
+        WT_ASSERT(session, conn->prefetch_queue_count == 0);
     __wt_spin_unlock(session, &conn->prefetch_lock);
 
     return (0);
