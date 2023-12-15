@@ -4,6 +4,8 @@ Import("env")
 
 env = env.Clone()
 
+env.SConscript(dirs=['mongotmock'], exports=['env'])
+
 env.Library(
     target='document_source_search',
     source=[
