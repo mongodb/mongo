@@ -28,7 +28,7 @@ export var disconnectSecondaries;
 export var reconnectSecondaries;
 export var createRstArgs;
 export var createRst;
-export var waitAllNodesHaveConfig;
+export var waitUntilAllNodesHavePrimaryConfig;
 
 var count = 0;
 var w = 0;
@@ -897,20 +897,20 @@ createRst = function(rstArgs, retryOnRetryableErrors) {
 };
 
 /**
- * Wait until all the nodes in a replica set have the same config as the input config.
+ * Wait until all the nodes in a replica set have the same config as the primary.  This means
+ * term and version must match as well as content.
  */
-waitAllNodesHaveConfig = function(replSet, config, retryOnConnectionClosedError = false) {
+waitUntilAllNodesHavePrimaryConfig = function(replSet) {
+    let primaryConfig = replSet.getReplSetConfigFromNode();
     replSet.nodes.forEach(function(node) {
         assert.soon(function() {
             try {
                 const nodeConfig = replSet.getReplSetConfigFromNode(node.nodeId);
-                return isSameConfigContent(config, nodeConfig);
+                return tojson(nodeConfig) == tojson(primaryConfig);
             } catch (e) {
-                if (retryOnConnectionClosedError &&
-                    e.toString().includes("network error while attempting to run command")) {
+                if (e.toString().includes("network error while attempting to run command")) {
                     return false;
                 }
-
                 throw e;
             }
         });

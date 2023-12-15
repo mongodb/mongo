@@ -6,7 +6,11 @@
  *   requires_replication,
  * ]
  */
-import {assertSameConfigContent, reconfig, waitAllNodesHaveConfig} from "jstests/replsets/rslib.js";
+import {
+    assertSameConfigContent,
+    reconfig,
+    waitUntilAllNodesHavePrimaryConfig
+} from "jstests/replsets/rslib.js";
 
 // Make secondaries unelectable. Add 7 voting nodes, which is the maximum allowed.
 const replTest = new ReplSetTest({
@@ -78,5 +82,5 @@ config.members = [m0, m1, m2, m3, m4, m5, m6, m7];
 reconfig(replTest, config);
 // There is a chance that some nodes haven't finished reconfig, if we directly call stopSet, those
 // nodes may fail to answer certain commands and fail the test.
-waitAllNodesHaveConfig(replTest, config);
+waitUntilAllNodesHavePrimaryConfig(replTest);
 replTest.stopSet();
