@@ -68,6 +68,8 @@ __wt_backup_set_blkincr(
      * to relax that in the future so we also store it in the blkincr structure.
      */
     WT_ASSERT(session, conn->incr_granularity == 0 || conn->incr_granularity == granularity);
+    /* Free any id already set. */
+    __wt_free(session, blkincr->id_str);
     blkincr->granularity = conn->incr_granularity = granularity;
     WT_RET(__wt_strndup(session, id, id_len, &blkincr->id_str));
     WT_CONN_SET_INCR_BACKUP(conn);
@@ -419,8 +421,6 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
     if (blk->id_str != NULL)
         __wt_verbose_debug2(
           session, WT_VERB_BACKUP, "Freeing and reusing backup slot with old id %s", blk->id_str);
-    /* Free anything that was there. */
-    __wt_free(session, blk->id_str);
 
     /* Set up with the information. */
     WT_ERR(__wt_backup_set_blkincr(session, i, conn->incr_granularity, cval->str, cval->len));
