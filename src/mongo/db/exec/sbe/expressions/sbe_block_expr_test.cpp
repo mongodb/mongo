@@ -136,6 +136,80 @@ TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
     assertBlockOfBool(runTag, runVal, std::vector{true, true, true, false, true});
 }
 
+TEST_F(SBEBlockExpressionTest, BlockExistsMonoHomogeneousTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto existsExpr =
+        sbe::makeE<sbe::EFunction>("valueBlockExists", sbe::makeEs(makeE<EVariable>(blockSlot)));
+    auto compiledExpr = compileExpression(*existsExpr);
+
+    {
+        value::Int32Block block;
+        block.push_back(42);
+        block.push_back(43);
+        block.push_back(44);
+        block.pushNothing();
+        block.push_back(46);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{true, true, true, false, true});
+    }
+
+    {
+        value::Int32Block denseBlock;
+        denseBlock.push_back(1);
+        denseBlock.push_back(2);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&denseBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{true, true});
+    }
+
+    {
+        value::Int32Block sparseBlock;
+        sparseBlock.pushNothing();
+        sparseBlock.pushNothing();
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&sparseBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{false, false});
+    }
+
+    {
+        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
+        value::ValueGuard blockInputGuard(blockTag, blockVal);
+        value::MonoBlock monoBlock(2, blockTag, blockVal);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{true, true});
+    }
+
+    {
+        value::MonoBlock monoBlock(2, value::TypeTags::Nothing, value::Value{0u});
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{false, false});
+    }
+}
+
 TEST_F(SBEBlockExpressionTest, BlockFillEmptyShallowTest) {
     value::OwnedValueAccessor fillAccessor;
     auto fillSlot = bindAccessor(&fillAccessor);
@@ -228,6 +302,89 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyNothingTest) {
         runTag,
         runVal,
         std::vector{makeInt32(42), makeInt32(43), makeInt32(44), makeNothing(), makeInt32(46)});
+}
+
+TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
+    value::OwnedValueAccessor fillAccessor;
+    auto fillSlot = bindAccessor(&fillAccessor);
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto fillEmptyExpr = sbe::makeE<sbe::EFunction>(
+        "valueBlockFillEmpty",
+        sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(fillSlot)));
+    auto compiledExpr = compileExpression(*fillEmptyExpr);
+
+    value::Int32Block block;
+    block.push_back(42);
+    block.push_back(43);
+    block.push_back(44);
+    block.pushNothing();
+    block.push_back(46);
+
+    {
+        // Matching type
+        auto [fillTag, fillVal] = makeInt32(45);
+        fillAccessor.reset(fillTag, fillVal);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockEq(
+            runTag,
+            runVal,
+            std::vector{makeInt32(42), makeInt32(43), makeInt32(44), makeInt32(45), makeInt32(46)});
+    }
+
+    {
+        // Deep replacement value of a different type.
+        auto [fillTag, fillVal] = value::makeNewString("Replacement for missing value"_sd);
+        fillAccessor.reset(true, fillTag, fillVal);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockEq(
+            runTag,
+            runVal,
+            std::vector{
+                makeInt32(42), makeInt32(43), makeInt32(44), {fillTag, fillVal}, makeInt32(46)});
+    }
+
+    {
+        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
+        value::ValueGuard blockInputGuard(blockTag, blockVal);
+        value::MonoBlock monoBlock(2, blockTag, blockVal);
+
+        auto [fillTag, fillVal] = makeInt32(0);
+        fillAccessor.reset(true, fillTag, fillVal);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto extracted = monoBlock.extract();
+        assertBlockEq(runTag, runVal, std::vector{extracted[0], extracted[1]});
+    }
+
+    {
+        value::MonoBlock monoBlock(2, value::TypeTags::Nothing, value::Value{0u});
+
+        auto [fillTag, fillVal] = value::makeNewString("MonoBlock string"_sd);
+        fillAccessor.reset(true, fillTag, fillVal);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockEq(
+            runTag, runVal, std::vector{std::pair(fillTag, fillVal), std::pair(fillTag, fillVal)});
+    }
 }
 
 TEST_F(SBEBlockExpressionTest, BlockFillEmptyBlockTest) {
