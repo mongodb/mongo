@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <fmt/format.h>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -99,15 +98,7 @@ public:
      * satisfies this restriction set.
      */
     Status validate(const RestrictionEnvironment& environment) const override {
-        using namespace fmt::literals;
-
         auto const addr = T::addr(environment);
-        if (addr.getType() == AF_UNSPEC) {
-            // GRPCTransportLayer doesn't know server local address.
-            return {ErrorCodes::AuthenticationRestrictionUnmet,
-                    "{} restriction can not be verified when address is unknown"_format(T::label)};
-        }
-
         if (!addr.isIP()) {
             std::ostringstream s;
             s << T::label << " is not an IP address: " << addr.getAddr();

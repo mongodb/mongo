@@ -64,13 +64,7 @@ namespace mongo::transport::grpc {
 class GRPCSession : public Session {
 public:
     explicit GRPCSession(TransportLayer* tl, HostAndPort remote, boost::optional<UUID> clientId)
-        : _tl(tl), _remote(std::move(remote)), _clientId(std::move(clientId)) {
-        auto remoteAddr = SockAddr::create(_remote.host(), _remote.port(), AF_UNSPEC);
-        // libgrpc does not expose local socket name for us.
-        // This means that any attempt to use a {serverAddress} authentication restriction
-        // with the GRPC protocol will fail to permit login.
-        _restrictionEnvironment = RestrictionEnvironment(std::move(remoteAddr), SockAddr());
-    }
+        : _tl(tl), _remote(std::move(remote)), _clientId(std::move(clientId)) {}
 
     virtual ~GRPCSession() {
         if (_cleanupCallback)
@@ -234,7 +228,7 @@ public:
     }
 
     const RestrictionEnvironment& getAuthEnvironment() const override {
-        return _restrictionEnvironment;
+        MONGO_UNIMPLEMENTED;
     }
 
 protected:
@@ -263,7 +257,6 @@ private:
 
     const HostAndPort _remote;
     const boost::optional<UUID> _clientId;
-    RestrictionEnvironment _restrictionEnvironment;
 
     boost::optional<std::function<void(const GRPCSession&)>> _cleanupCallback;
     synchronized_value<boost::optional<Status>> _terminationStatus;
