@@ -52,8 +52,17 @@ jsTestLog("Current replica set topology: [node0 (Primary)] [node1, node2, node3]
 // This reconfig will not get propagated.
 const parallelShell = startParallelShell(
     funWithArgs(function(config) {
-        const res = db.getMongo().adminCommand({replSetReconfig: config});
-        assert(ErrorCodes.isNotPrimaryError(res.code), "Reconfig C1 should fail" + tojson(res));
+        assert.soon(() => {
+            try {
+                const res = db.getMongo().adminCommand({replSetReconfig: config});
+                return ErrorCodes.isNotPrimaryError(res.code);
+            } catch (e) {
+                if (e.toString().includes("network error while attempting to run command")) {
+                    return false;
+                }
+                throw e;
+            }
+        }, "Reconfig C1 should fail");
     }, C1), node0.port);
 
 assert.commandWorked(node1.adminCommand({replSetStepUp: 1}));
