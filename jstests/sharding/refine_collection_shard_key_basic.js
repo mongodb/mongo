@@ -249,6 +249,8 @@ function validateUnrelatedCollAfterRefine(oldCollArr, oldChunkArr, oldTagsArr) {
 
 jsTestLog('********** SIMPLE TESTS **********');
 
+var result;
+
 // Should fail because arguments 'refineCollectionShardKey' and 'key' are invalid types.
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: {_id: 1}, key: {_id: 1, aKey: 1}}),
@@ -355,36 +357,46 @@ assert.commandFailedWithCode(
 dropAndReshardColl({_id: 1});
 assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}, {sparse: true}));
 
-assert.commandFailedWithCode(
-    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
-    ErrorCodes.InvalidOptions);
+result = mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}});
+assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
+assert(result.errmsg.includes("Index key is sparse."));
+
+// Should fail because index has a non-simple collation.
+dropAndReshardColl({aKey: 1});
+assert.commandWorked(mongos.getCollection(kNsName).createIndex({aKey: 1, bKey: 1}, {
+    collation: {
+        locale: "en",
+    }
+}));
+result = mongos.adminCommand({refineCollectionShardKey: kNsName, key: {aKey: 1, bKey: 1}});
+assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
+assert(result.errmsg.includes("Index has a non-simple collation."));
 
 // Should fail because only a partial index exists for new shard key {_id: 1, aKey: 1}.
 dropAndReshardColl({_id: 1});
 assert.commandWorked(mongos.getCollection(kNsName).createIndex(
     {_id: 1, aKey: 1}, {partialFilterExpression: {aKey: {$gt: 0}}}));
 
-assert.commandFailedWithCode(
-    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
-    ErrorCodes.InvalidOptions);
+result = mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}});
+assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
+assert(result.errmsg.includes("Index key is partial."));
 
 // Should fail because only a multikey index exists for new shard key {_id: 1, aKey: 1}.
 dropAndReshardColl({_id: 1});
 assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}));
 assert.commandWorked(mongos.getCollection(kNsName).insert({aKey: [1, 2, 3, 4, 5]}));
 
-assert.commandFailedWithCode(
-    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
-    ErrorCodes.InvalidOptions);
+result = mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}});
+assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
+assert(result.errmsg.includes("Index key is multikey."));
 
 // Should fail because current shard key {a: 1} is unique, new shard key is {a: 1, b: 1}, and an
 // index only exists on {a: 1, b: 1, c: 1}.
 dropAndReshardCollUnique({a: 1});
 assert.commandWorked(mongos.getCollection(kNsName).createIndex({a: 1, b: 1, c: 1}));
 
-assert.commandFailedWithCode(
-    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {a: 1, b: 1}}),
-    ErrorCodes.InvalidOptions);
+mongos.adminCommand({refineCollectionShardKey: kNsName, key: {a: 1, b: 1}});
+assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
 
 // Should work because current shard key {_id: 1} is not unique, new shard key is {_id: 1, aKey:
 // 1}, and an index exists on {_id: 1, aKey: 1, bKey: 1}.
@@ -458,6 +470,43 @@ assert.commandWorked(mongos.getCollection(kNsName).createIndex({aKey: 1, bKey: 1
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {aKey: 1, bKey: 1}}),
     ErrorCodes.InvalidOptions);
+
+// Should fail because index key is sparse and index has non-simple collation.
+dropAndReshardColl({_id: 1});
+assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}, {
+    sparse: true,
+    collation: {
+        locale: "en",
+    }
+}));
+result = mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}});
+assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
+assert(result.errmsg.includes("Index key is sparse.") &&
+       result.errmsg.includes("Index has a non-simple collation."));
+
+// Should fail because index key is multikey and is partial.
+dropAndReshardColl({_id: 1});
+assert.commandWorked(mongos.getCollection(kNsName).createIndex(
+    {_id: 1, aKey: 1}, {name: "index_1_part", partialFilterExpression: {aKey: {$gt: 0}}}));
+assert.commandWorked(
+    mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}, {name: "index_2"}));
+assert.commandWorked(mongos.getCollection(kNsName).insert({aKey: [1, 2, 3, 4, 5]}));
+
+result = mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}});
+assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
+assert(result.errmsg.includes("Index key is multikey.") &&
+       result.errmsg.includes("Index key is partial."));
+
+// Should fail because both indexes have keys that are incompatible: partial; sparse
+dropAndReshardColl({_id: 1});
+assert.commandWorked(mongos.getCollection(kNsName).createIndex(
+    {_id: 1, aKey: 1}, {name: "index_1_part", partialFilterExpression: {aKey: {$gt: 0}}}));
+assert.commandWorked(mongos.getCollection(kNsName).createIndex(
+    {_id: 1, aKey: 1}, {name: "index_2_sparse", sparse: true}));
+result = mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}});
+assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
+assert(result.errmsg.includes("Index key is partial.") &&
+       result.errmsg.includes("Index key is sparse."));
 
 // Should work because a 'useful' index exists for new shard key {_id: 1, aKey: 1}.
 dropAndReshardColl({_id: 1});

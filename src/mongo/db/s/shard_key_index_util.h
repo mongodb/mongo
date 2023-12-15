@@ -68,12 +68,16 @@ private:
 
 /**
  * Returns true if the given index is compatible with the shard key pattern.
+ *
+ * If return value is false and errMsg is non-null, the reasons that the existing index is
+ * incompatible will be appended to errMsg.
  */
 bool isCompatibleWithShardKey(OperationContext* opCtx,
                               const CollectionPtr& collection,
                               const IndexCatalogEntry* indexEntry,
                               const BSONObj& shardKey,
-                              bool requireSingleKey);
+                              bool requireSingleKey,
+                              std::string* errMsg = nullptr);
 
 /**
  * Returns an index suitable for shard key range scans if it exists.
@@ -91,7 +95,8 @@ const boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext*
                                                                const CollectionPtr& collection,
                                                                const IndexCatalog* indexCatalog,
                                                                const BSONObj& shardKey,
-                                                               bool requireSingleKey);
+                                                               bool requireSingleKey,
+                                                               std::string* errMsg = nullptr);
 
 /**
  * Returns true if the given index exists and it is the last non-hidden index compatible with the

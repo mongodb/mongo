@@ -150,4 +150,69 @@ res = db.runCommand(
     {checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1, z: 1}});
 assert.eq(false, res.ok, "4e " + tojson(res));
 
+// -------------------------
+// Test error messages of checkShardingIndex failing:
+
+// Shard key is not a prefix of index key:
+f.drop();
+f.createIndex({x: 1});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {y: 1}});
+assert.eq(false, res.ok);
+assert(res.errmsg.includes("Shard key is not a prefix of index key."));
+
+// Index key is partial:
+f.drop();
+f.createIndex({x: 1, y: 1}, {partialFilterExpression: {y: {$gt: 0}}});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
+assert.eq(false, res.ok);
+assert(res.errmsg.includes("Index key is partial."));
+
+// Index key is sparse:
+f.drop();
+f.createIndex({x: 1, y: 1}, {sparse: true});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
+assert.eq(false, res.ok);
+assert(res.errmsg.includes("Index key is sparse."));
+
+// Index key is multikey:
+f.drop();
+f.createIndex({x: 1, y: 1});
+f.save({y: [1, 2, 3, 4, 5]});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
+assert.eq(false, res.ok);
+assert(res.errmsg.includes("Index key is multikey."));
+
+// Index key has a non-simple collation:
+f.drop();
+f.createIndex({x: 1, y: 1}, {collation: {locale: "en"}});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
+assert.eq(false, res.ok);
+assert(res.errmsg.includes("Index has a non-simple collation."));
+
+// Index key is sparse and index has non-simple collation:
+f.drop();
+f.createIndex({x: 1, y: 1}, {sparse: true, collation: {locale: "en"}});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
+assert.eq(false, res.ok);
+assert(res.errmsg.includes("Index key is sparse.") &&
+       res.errmsg.includes("Index has a non-simple collation."));
+
+// Multiple incompatible indexes: Index key is multikey and is partial:
+f.drop();
+f.createIndex({x: 1, y: 1}, {name: "index_1_part", partialFilterExpression: {x: {$gt: 0}}});
+f.createIndex({x: 1, y: 1}, {name: "index_2"});
+f.save({y: [1, 2, 3, 4, 5]});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
+assert.eq(false, res.ok);
+assert(res.errmsg.includes("Index key is multikey.") &&
+       res.errmsg.includes("Index key is partial."));
+
+// Multiple incompatible indexes: Index key is partial and sparse:
+f.drop();
+f.createIndex({x: 1, y: 1}, {name: "index_1_part", partialFilterExpression: {x: {$gt: 0}}});
+f.createIndex({x: 1, y: 1}, {name: "index_2_sparse", sparse: true});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
+assert.eq(false, res.ok);
+assert(res.errmsg.includes("Index key is partial.") && res.errmsg.includes("Index key is sparse."));
+
 print("PASSED");
