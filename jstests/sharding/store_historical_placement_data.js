@@ -412,8 +412,11 @@ function testAddShard() {
     }
 
     let res = assert.commandWorked(st.s.adminCommand({removeShard: newShardName}));
-    assert.eq('started', res.state);
-    res = assert.commandWorked(st.s.adminCommand({removeShard: newShardName}));
+    if (res.state === 'started') {
+        // Issue a second removeShard request to sync on the full removal of the targeted RS.
+        res = assert.commandWorked(st.s.adminCommand({removeShard: newShardName}));
+    }
+
     assert.eq('completed', res.state);
     newReplicaSet.stopSet();
 }
