@@ -60,7 +60,11 @@
  * Now, to the actual process.  First, we checkpoint the database: there are
  * potentially many dirty blocks in the cache, and we want to write them out
  * and then discard previous checkpoints so we have as many blocks as possible
- * on the file's "available for reuse" list when we start compaction.
+ * on the file's "available for reuse" list when we start compaction. Note that
+ * this step is skipped for background compaction to limit the number of
+ * generated checkpoints. As this step comes before checking if compaction is
+ * possible, background compaction could potentially generate an unnecessary
+ * checkpoint every time it processes a file.
  *
  * Then, we compact the high-level object.
  *
@@ -294,8 +298,12 @@ __compact_worker(WT_SESSION_IMPL *session)
     for (i = 0; i < session->op_handle_next; ++i)
         session->op_handle[i]->compact_skip = false;
 
-    /* Perform an initial checkpoint (see this file's leading comment for details). */
-    WT_ERR(__compact_checkpoint(session));
+    /*
+     * Perform an initial checkpoint unless this is background compaction. See this file's leading
+     * comment for details.
+     */
+    if (session != S2C(session)->background_compact.session)
+        WT_ERR(__compact_checkpoint(session));
 
     /*
      * We compact 10% of a file on each pass (but the overall size of the file is decreasing each
