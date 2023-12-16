@@ -126,6 +126,21 @@ sbe::value::SlotId StageBuilderState::registerInputParamSlot(
     return slotId;
 }
 
+sbe::value::SlotId StageBuilderState::getNothingSlot() {
+    auto slotId = env->getSlotIfExists(kNothingEnvSlotName);
+
+    if (!slotId) {
+        return env->registerSlot(
+            kNothingEnvSlotName, sbe::value::TypeTags::Nothing, 0, false, slotIdGenerator);
+    }
+
+    return *slotId;
+}
+
+bool StageBuilderState::isNothingSlot(sbe::value::SlotId slot) {
+    return slot == env->getSlotIfExists(kNothingEnvSlotName);
+}
+
 boost::optional<sbe::value::SlotId> StageBuilderState::getTimeZoneDBSlot() {
     auto slotId = env->getSlotIfExists("timeZoneDB"_sd);
 

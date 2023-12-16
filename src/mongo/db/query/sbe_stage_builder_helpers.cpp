@@ -1049,7 +1049,7 @@ ProjectionEffects::ProjectionEffects(const FieldSet& keepFieldSet) {
     }
 }
 
-ProjectionEffects::ProjectionEffects(const FieldSet& nonDroppedFieldSet,
+ProjectionEffects::ProjectionEffects(const FieldSet& allowedFieldSet,
                                      const FieldSet& modifiedOrCreatedFieldSet,
                                      const FieldSet& createdFieldSet,
                                      std::vector<std::string> displayOrder) {
@@ -1057,7 +1057,7 @@ ProjectionEffects::ProjectionEffects(const FieldSet& nonDroppedFieldSet,
             "Expected 'createdFieldSet' to be a closed FieldSet",
             createdFieldSet.getScope() == FieldListScope::kClosed);
 
-    bool ndIsClosed = nonDroppedFieldSet.getScope() == FieldListScope::kClosed;
+    bool ndIsClosed = allowedFieldSet.getScope() == FieldListScope::kClosed;
     bool mocIsClosed = modifiedOrCreatedFieldSet.getScope() == FieldListScope::kClosed;
 
     _defaultEffect = mocIsClosed ? (ndIsClosed ? kDrop : kKeep) : kModify;
@@ -1068,13 +1068,13 @@ ProjectionEffects::ProjectionEffects(const FieldSet& nonDroppedFieldSet,
     }
 
     for (auto&& name : modifiedOrCreatedFieldSet.getList()) {
-        if (!_effects.count(name) && (mocIsClosed || nonDroppedFieldSet.count(name))) {
+        if (!_effects.count(name) && (mocIsClosed || allowedFieldSet.count(name))) {
             _fields.emplace_back(name);
             _effects[name] = mocIsClosed ? kModify : kKeep;
         }
     }
 
-    for (auto&& name : nonDroppedFieldSet.getList()) {
+    for (auto&& name : allowedFieldSet.getList()) {
         if (!_effects.count(name) && !modifiedOrCreatedFieldSet.count(name)) {
             _fields.emplace_back(name);
             _effects[name] = ndIsClosed ? kKeep : kDrop;
@@ -1098,11 +1098,11 @@ ProjectionEffects::ProjectionEffects(const FieldSet& nonDroppedFieldSet,
     }
 }
 
-ProjectionEffects::ProjectionEffects(const FieldSet& nonDroppedFieldSet,
+ProjectionEffects::ProjectionEffects(const FieldSet& allowedFieldSet,
                                      const std::vector<std::string>& modifiedOrCreatedFields,
                                      const std::vector<std::string>& createdFields,
                                      std::vector<std::string> displayOrder) {
-    bool ndIsClosed = nonDroppedFieldSet.getScope() == FieldListScope::kClosed;
+    bool ndIsClosed = allowedFieldSet.getScope() == FieldListScope::kClosed;
 
     _defaultEffect = ndIsClosed ? kDrop : kKeep;
 
@@ -1118,7 +1118,7 @@ ProjectionEffects::ProjectionEffects(const FieldSet& nonDroppedFieldSet,
         }
     }
 
-    for (auto&& name : nonDroppedFieldSet.getList()) {
+    for (auto&& name : allowedFieldSet.getList()) {
         if (!_effects.count(name)) {
             _fields.emplace_back(name);
             _effects[name] = ndIsClosed ? kKeep : kDrop;
@@ -1209,38 +1209,6 @@ ProjectionEffects& ProjectionEffects::compose(const ProjectionEffects& child) {
     return *this;
 }
 
-std::pair<std::vector<std::string>, bool> ProjectionEffects::difference(
-    const ProjectionEffects& other) const {
-    std::vector<std::string> diffFields;
-    bool defaultEffectsDiffer = _defaultEffect != other._defaultEffect;
-
-    // Loop over '_fields'.
-    for (const std::string& field : _fields) {
-        auto it = other._effects.find(field);
-
-        Effect effect = _effects.find(field)->second;
-        Effect otherEffect = it != other._effects.end() ? it->second : other._defaultEffect;
-        if (effect != otherEffect) {
-            diffFields.emplace_back(field);
-        }
-    }
-
-    // Loop over 'other._fields' and only visit fields that are not present in '_fields'.
-    for (size_t i = 0; i < other._fields.size(); ++i) {
-        const std::string& field = other._fields[i];
-
-        if (!_effects.count(field)) {
-            Effect effect = _defaultEffect;
-            Effect otherEffect = other._effects.find(field)->second;
-            if (effect != otherEffect) {
-                diffFields.emplace_back(field);
-            }
-        }
-    }
-
-    return {std::move(diffFields), defaultEffectsDiffer};
-}
-
 void ProjectionEffects::removeRedundantEffects() {
     size_t outIdx = 0;
     for (size_t idx = 0; idx < _fields.size(); ++idx) {
@@ -1261,7 +1229,7 @@ void ProjectionEffects::removeRedundantEffects() {
     }
 }
 
-FieldSet ProjectionEffects::getNonDroppedFieldSet() const {
+FieldSet ProjectionEffects::getAllowedFieldSet() const {
     bool defEffectIsDrop = _defaultEffect == kDrop;
     std::vector<std::string> fields;
 
@@ -1339,26 +1307,44 @@ std::string ProjectionEffects::toString() const {
     return ss.str();
 }
 
-FieldSet makeNonDroppedFieldSet(bool isInclusion,
-                                const std::vector<std::string>& paths,
-                                const std::vector<ProjectNode>& nodes) {
+FieldSet makeAllowedFieldSet(bool isInclusion,
+                             const std::vector<std::string>& paths,
+                             const std::vector<ProjectNode>& nodes) {
     // For inclusion projections, we make a list of the top-level fields referenced by the
     // projection and make a closed FieldSet.
     if (isInclusion) {
-        return FieldSet::makeClosedSet(getTopLevelFields(paths));
+        std::vector<std::string> fields;
+        StringSet fieldSet;
+        for (size_t i = 0; i < paths.size(); ++i) {
+            const auto& path = paths[i];
+            auto field = getTopLevelField(path).toString();
+
+            auto [_, inserted] = fieldSet.insert(field);
+            if (inserted) {
+                fields.emplace_back(field);
+            }
+        }
+
+        return FieldSet::makeClosedSet(std::move(fields));
     }
 
     // For exclusion projections, we build a list of the top-level fields that are dropped by this
     // projection, and then we use that list to make an open FieldSet that represents the set of
     // fields _not_ dropped by this projection.
     std::vector<std::string> fields;
+    StringSet fieldSet;
     for (size_t i = 0; i < nodes.size(); ++i) {
         const auto& node = nodes[i];
         const auto& path = paths[i];
+
         if (node.isBool() && path.find('.') == std::string::npos) {
-            fields.emplace_back(path);
+            auto [_, inserted] = fieldSet.insert(path);
+            if (inserted) {
+                fields.emplace_back(path);
+            }
         }
     }
+
     return FieldSet::makeOpenSet(std::move(fields));
 }
 
@@ -1366,6 +1352,7 @@ FieldSet makeModifiedOrCreatedFieldSet(bool isInclusion,
                                        const std::vector<std::string>& paths,
                                        const std::vector<ProjectNode>& nodes) {
     std::vector<std::string> fields;
+    StringSet fieldSet;
     for (size_t i = 0; i < nodes.size(); ++i) {
         const auto& node = nodes[i];
         const auto& path = paths[i];
@@ -1376,7 +1363,12 @@ FieldSet makeModifiedOrCreatedFieldSet(bool isInclusion,
         }
 
         if (node.isBool() || node.isExpr() || node.isSbExpr() || node.isSlice()) {
-            fields.emplace_back(getTopLevelField(path));
+            auto field = getTopLevelField(path).toString();
+            auto [_, inserted] = fieldSet.insert(field);
+
+            if (inserted) {
+                fields.emplace_back(field);
+            }
         }
     }
 
@@ -1387,11 +1379,18 @@ FieldSet makeCreatedFieldSet(bool isInclusion,
                              const std::vector<std::string>& paths,
                              const std::vector<ProjectNode>& nodes) {
     std::vector<std::string> fields;
+    StringSet fieldSet;
     for (size_t i = 0; i < nodes.size(); ++i) {
         const auto& node = nodes[i];
         const auto& path = paths[i];
+
         if (node.isExpr() || node.isSbExpr()) {
-            fields.emplace_back(getTopLevelField(path));
+            auto field = getTopLevelField(path).toString();
+            auto [_, inserted] = fieldSet.insert(field);
+
+            if (inserted) {
+                fields.emplace_back(field);
+            }
         }
     }
 

@@ -44,6 +44,8 @@ namespace stage_builder {
 struct Environment;
 struct PlanStageStaticData;
 
+static constexpr auto kNothingEnvSlotName = "nothing"_sd;
+
 /**
  * Common parameters to SBE stage builder functions extracted into separate class to simplify
  * argument passing. Also contains a mapping of global variable ids to slot ids.
@@ -93,10 +95,13 @@ struct StageBuilderState {
         return spoolIdGenerator->generate();
     }
 
+    sbe::value::SlotId getNothingSlot();
     boost::optional<sbe::value::SlotId> getTimeZoneDBSlot();
     boost::optional<sbe::value::SlotId> getCollatorSlot();
     boost::optional<sbe::value::SlotId> getOplogTsSlot();
     boost::optional<sbe::value::SlotId> getBuiltinVarSlot(Variables::Id id);
+
+    bool isNothingSlot(sbe::value::SlotId slot);
 
     /**
      * Given a CollatorInterface, returns a copy of the CollatorInterface that is owned by the
