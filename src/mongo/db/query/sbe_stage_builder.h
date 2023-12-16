@@ -141,8 +141,8 @@ struct TypedSlot {
 class PlanStageSlots {
 public:
     // The 'slotNameToIdMap' map is capable of holding different "types" of slots:
-    // 1) kMeta slots are used to hold the current document (kResult), record ID (kRecordId), and
-    //    various pieces of metadata.
+    // 1) kMeta slots are used to hold the current document, record ID, and various pieces of
+    //    metadata.
     // 2) kField slots represent the values of top-level fields, or in some cases of dotted field
     //    paths (when we are getting the dotted field from a non-multikey index and we know no array
     //    traversal is needed). These slots hold the actual values of the fields / field paths (not
@@ -194,7 +194,6 @@ public:
 
     static constexpr UnownedSlotName kResult = {kMeta, "result"_sd};
     static constexpr UnownedSlotName kRecordId = {kMeta, "recordId"_sd};
-    static constexpr UnownedSlotName kResultBase = {kMeta, "resultBase"_sd};
     static constexpr UnownedSlotName kReturnKey = {kMeta, "returnKey"_sd};
     static constexpr UnownedSlotName kSnapshotId = {kMeta, "snapshotId"_sd};
     static constexpr UnownedSlotName kIndexIdent = {kMeta, "indexIdent"_sd};
@@ -210,79 +209,13 @@ public:
         kMeta, "metadataSearchSequenceToken"_sd};
     static constexpr UnownedSlotName kBlockSelectivityBitmap = {kMeta, "bitmap"_sd};
 
-    /**
-     * In addition to holding individual output slots, a PlanStageSlots object can also optionally
-     * contain a single "MakeResultInfo" object. (Likewise, in addition to providing APIs to ask for
-     * individual named slots, PlanStageReqs provides an API to ask for a "MakeResultInfo" object.)
-     *
-     * Some stages, like project, work by returning a modified version of their child's result doc.
-     * If we have a chain of projects (or other stages that behave similarly) and the stage at the
-     * top of the chain receives a kResult req from its parent, ideally when possible we would like
-     * to avoid the scenario where each stage asks its child for kResult and each stage materializes
-     * a new result doc just to potentially add, modify, or drop 1 or 2 fields.
-     *
-     * "MakeResultInfo" provides a means for stages like project to satisfy a kResult req without
-     * having to ask their child for kResult.
-     *
-     * Conceptually, the MakeResultInfo class can be thought of as a "package" that contains (or
-     * points to) all the information that is needed to eventually materialize a result doc,
-     * specifically:
-     * - A kResultBase slot
-     * - 0 or more kField slots
-     *
-     * The requirement to produce a MakeResultInfo is represented by the MakeResultInfoReq class,
-     * which is defined inside PlanStageReqs.
-     *
-     * If a stage receives a kResult req from its parent and it decides it wants to ask its child
-     * for MakeResultInfo, it adds a MakeResultInfoReq to the reqs passed to the child containing a
-     * ProjectionEffects that describes how it plans to materialize the result doc. Specifically,
-     * the ProjectionEffects object inside MakeResultInfoReq indicates which fields from kResultBase
-     * are going to be ignored (i.e. dropped), which fields are going to be preserved as-is without
-     * any modification, and which fields will be updated with a new value.
-     *
-     * When a stage receives a MakeResultInfo req, it can satisfy the req either by producing the
-     * kResult document or by "participating" with the MakeResultInfo scheme. If a stage opts to not
-     * "participate" and returns kResult, the stage builder will create a "default" MakeResultInfo
-     * with kResultBase equal to kResult and an empty "modified fields" list that gets returned to
-     * the parent. If a stage opts to "participate", it will copy the MakeResultInfoReq and update
-     * the ProjectionEffects appropriately, and then it will pass the updated MakeResultInfoReq to
-     * its child. Then it will receive MakeResultInfo object from its child, it will add the
-     * appropriate field names the the MakeResultInfo's "modified fields" list, and then it will
-     * return the MakeResultInfo object to its parent.
-     *
-     * When the stage that received a kResult req and asked for MakeResultInfo eventually receives
-     * a MakeResultInfo object back from its child, it creates the kResult doc by taking the
-     * contents of kResultBase as a starting point, dropping 0 or more fields from the doc, writing
-     * new values (retrieved from kField slots) to 0 or more fields in the doc, and finally making
-     * stage-specific modifications as appropriate to the doc and then materializing it.
-     */
-    class MakeResultInfo {
-    public:
-        static void mergeInfos(StageBuilderState& state,
-                               PlanNodeId nodeId,
-                               std::vector<PlanStageTree>& trees);
-
-        MakeResultInfo() = default;
-
-        explicit MakeResultInfo(ProjectionEffects effects) : effects(std::move(effects)) {}
-
-        void addModifiedAndDroppedFields(const std::vector<std::string>& modifys,
-                                         const std::vector<std::string>& drops) {
-            // Compose 'newEffects' with 'nonMaterializedEffects' and store the result into
-            // 'nonMaterializedEffects'.
-            effects = ProjectionEffects(FieldSet::makeOpenSet(drops), modifys, {}).compose(effects);
-        }
-
-        ProjectionEffects effects;
-    };
-
     struct Data {
         // Slot type-and-name to SlotId map for the output slots produced by this plan stage.
         SlotNameMap slotNameToIdMap;
 
-        // If this PlanStageSlots object has "MakeResultInfo" set, then this field will be point to
-        // a MakeResultInfo object, otherwise this field will be null.
-        boost::optional<MakeResultInfo> makeResultInfo;
+        // If this PlanStageSlots has a ResultInfo then 'resultInfoChanges' will hold the recorded
+        // changes for the ResultInfo, otherwise it will be set to boost::none.
+        boost::optional<ProjectionEffects> resultInfoChanges;
     };
 
     static std::unique_ptr<Data> cloneData(const std::unique_ptr<Data>& other) {
@@ -294,14 +227,20 @@ public:
 
     /**
      * When the build() depth-first traversal backtracks through a merge point in the QSN tree,
-     * if getMRInfo() is non-null for one or more of the PlanStageOutputs objects,
-     * then we need to do a "merge" process in order to produce a single unified non-materialized
-     * result object. The makeMergedPlanStageSlots() method implements this merge process.
+     * this method handles doing the "merge" process.
      */
     static PlanStageSlots makeMergedPlanStageSlots(StageBuilderState& state,
                                                    PlanNodeId nodeId,
                                                    const PlanStageReqs& reqs,
                                                    std::vector<PlanStageTree>& stagesAndSlots);
+
+    /**
+     * This is a helper function used by makeMergedPlanStageSlots() is called that handles the
+     * case where one or more of the PlanStageOutputs objects have a ResultInfo.
+     */
+    static void mergeResultInfos(StageBuilderState& state,
+                                 PlanNodeId nodeId,
+                                 std::vector<PlanStageTree>& trees);
 
     PlanStageSlots() : _data(std::make_unique<Data>()) {}
 
@@ -325,59 +264,62 @@ public:
         return *this;
     }
 
-    bool has(const UnownedSlotName& str) const {
-        return _data->slotNameToIdMap.count(str);
+    // Returns true if this PlanStageSlots has a mapping for 'name'.
+    bool has(const UnownedSlotName& name) const {
+        return _data->slotNameToIdMap.count(name);
     }
 
-    TypedSlot get(const UnownedSlotName& str) const {
-        auto it = _data->slotNameToIdMap.find(str);
+    // Returns the slot corresponding to 'name'. This method will raise a tassert if
+    // this PlanStageSlots does not have a mapping for 'name'.
+    TypedSlot get(const UnownedSlotName& name) const {
+        auto it = _data->slotNameToIdMap.find(name);
         invariant(it != _data->slotNameToIdMap.end());
         return it->second;
     }
 
-    boost::optional<TypedSlot> getIfExists(const UnownedSlotName& str) const {
-        if (auto it = _data->slotNameToIdMap.find(str); it != _data->slotNameToIdMap.end()) {
+    // Returns the slot corresponding to 'name' if this PlanStageSlot has a mapping for 'name',
+    // otherwise returns boost::none.
+    boost::optional<TypedSlot> getIfExists(const UnownedSlotName& name) const {
+        if (auto it = _data->slotNameToIdMap.find(name); it != _data->slotNameToIdMap.end()) {
             return it->second;
         }
         return boost::none;
     }
 
-    boost::optional<sbe::value::SlotId> getSlotIfExists(const UnownedSlotName& str) const {
-        if (auto it = _data->slotNameToIdMap.find(str); it != _data->slotNameToIdMap.end()) {
+    // This method is like getIfExists(), except that it returns 'boost::optional<SlotId>'
+    // instead of 'boost::optional<TypedSlot>'.
+    boost::optional<sbe::value::SlotId> getSlotIfExists(const UnownedSlotName& name) const {
+        if (auto it = _data->slotNameToIdMap.find(name); it != _data->slotNameToIdMap.end()) {
             return it->second.slotId;
         }
         return boost::none;
     }
 
-    void set(const UnownedSlotName& str, sbe::value::SlotId slot) {
-        set(str, TypedSlot{slot, TypeSignature::kAnyScalarType});
+    // Maps 'name' to 'slot' and clears any prior mapping the 'name' may have had.
+    void set(const UnownedSlotName& name, sbe::value::SlotId slot) {
+        set(name, TypedSlot{slot, TypeSignature::kAnyScalarType});
+    }
+    void set(OwnedSlotName name, sbe::value::SlotId slot) {
+        set(std::move(name), TypedSlot{slot, TypeSignature::kAnyScalarType});
+    }
+    void set(const UnownedSlotName& name, TypedSlot slot) {
+        _data->slotNameToIdMap.insert_or_assign(name, slot);
+    }
+    void set(OwnedSlotName name, TypedSlot slot) {
+        _data->slotNameToIdMap.insert_or_assign(std::move(name), slot);
     }
 
-    void set(OwnedSlotName str, sbe::value::SlotId slot) {
-        set(std::move(str), TypedSlot{slot, TypeSignature::kAnyScalarType});
+    // Discards any mapping that this PlanStageSlot may have for 'name'.
+    void clear(const UnownedSlotName& name) {
+        _data->slotNameToIdMap.erase(name);
     }
 
-    void set(const UnownedSlotName& str, TypedSlot slot) {
-        _data->slotNameToIdMap.insert_or_assign(str, slot);
-    }
-
-    void set(OwnedSlotName str, TypedSlot slot) {
-        _data->slotNameToIdMap.insert_or_assign(std::move(str), slot);
-    }
-
-    void clear(const UnownedSlotName& str) {
-        _data->slotNameToIdMap.erase(str);
-    }
-
-    // Clear a single field (SlotType::kField) in 'slotNameToIdMap' by its string name.
+    // Equivalent to 'clear({kField, fieldName})'.
     void clearField(StringData fieldName) {
-        auto it = _data->slotNameToIdMap.find(UnownedSlotName{kField, fieldName});
-        if (it != _data->slotNameToIdMap.end()) {
-            _data->slotNameToIdMap.erase(it);
-        }
+        clear(UnownedSlotName(kField, fieldName));
     }
 
-    // Clear all fields (SlotType::kField) in 'slotNameToIdMap'.
+    // Discards all mappings for names of the form '{kField, name}'.
     void clearAllFields() {
         for (auto it = _data->slotNameToIdMap.begin(); it != _data->slotNameToIdMap.end();) {
             if (it->first.first == kField) {
@@ -388,9 +330,12 @@ public:
         }
     }
 
+    // If 'path' is a dotted path, this method will call 'clearField(path)' and then it will call
+    // clearField() on every prefix of 'path'. If 'path' is not a dotted path, this method will
+    // just call 'clearField(path)' and return.
     void clearFieldAndAllPrefixes(StringData path) {
         for (;;) {
-            clear(std::pair(PlanStageSlots::kField, path));
+            clearField(path);
 
             size_t pos = path.rfind('.');
             if (pos == std::string::npos) {
@@ -401,64 +346,188 @@ public:
         }
     }
 
+    /**
+     * PlanStageSlots implements special behavior for kResult. At any given time a PlanStageSlots
+     * may map kResult to a materialized result object (if hasResultObj() == true), or map kResult
+     * to a base object that is a part of a "ResultInfo" (if hasResultInfo() == true), or not have
+     * a kResult mapping (if hasResultObj() == false and hasResultInfo() == false). (It's impossible
+     * for kResult to map to both a materialized result object and a ResultInfo base object at the
+     * same time, so hasResultObj() and hasResultInfo() can never both be true simultaneously.)
+     *
+     * "ResultInfo" can be thought of as a package containing all the information that's needed to
+     * eventually materialize a result doc, specifically: (1) a "result base object" stored in the
+     * kResult slot; (2) a list of changed kField names ('resultInfoChanges'); and (3) a list of
+     * slots corresponding to the changed kField names.
+     *
+     * If a stage receives a materialized result req from its parent and it decides it wants to ask
+     * its child for ResultInfo, it adds a ResultInfo req to the reqs passed to the child containing
+     * a FieldSet that describes how it plans to materialize the result doc. Specifically, the
+     * FieldSet object indicates which fields from result base object (stored in the kResult slot)
+     * are going to be ignored (i.e. dropped).
+     *
+     * When a stage receives a ResultInfo req, it can satisfy the req either by producing the
+     * materialized result object or by "participating" with the ResultInfo's scheme. If a stage
+     * opts to not "participate" and returns a materialized result object, the stage builder
+     * will create a "default" ResultInfo to the materialized result object and an "all-Keep"
+     * 'resultInfoChanges' that gets returned to the parent. If a stage opts to "participate",
+     * it will copy the ResultInfo req and update the FieldSet appropriately, and then it will
+     * pass the updated ResultInfo req to its child. Then it will receive a ResultInfo base object
+     * (and 0 or more individual kField slots) from its child, it will add the appropriate field
+     * names from 'resultInfoChanges', and then it will return the ResultInfo base object (and 0
+     * or more kField slots) to its parent.
+     *
+     * When the stage that received a materialized result req from its parent and asked its child
+     * for ResultInfo receives the ResultInfo base object back from its child, it creates the
+     * a materialized result object by taking the contents of the ResultInfo base object as a
+     * starting point, dropping 0 or more fields from the doc, writing new values (retrieved from
+     * kField slots) to 0 or more fields in the doc, and finally making stage-specific modifications
+     * to the doc as appropriate and then materializing it.
+     */
+
+    // Returns true if this PlanStageSlots has a mapping for kResult. Note that kResult may map to
+    // a materialized result object -OR- it may map to a "ResultInfo" base object. To distinguish
+    // between these two cases, use the hasResultObj() or hasResultInfo() methods.
     bool hasResult() const {
         return has(kResult);
     }
 
-    // Returns true if the kResult slot is set or if the MakeResultInfo object is set.
-    bool hasResultOrMRInfo() const {
-        return hasResult() || _data->makeResultInfo.has_value();
-    }
-
+    // This method clears any mapping kResult may have had, and it clears any ResultInfo-related
+    // state that may have been set. After this method returns, hasResult() and hasResultObject()
+    // and hasResultInfo() will all be false.
     void clearResult() {
         clear(kResult);
+        _data->resultInfoChanges.reset();
     }
 
-    void clearMRInfo() {
-        _data->makeResultInfo.reset();
-        clear(kResultBase);
+    // Returns true if this PlanStageSlots has kResult and it maps to a materialized result object,
+    // otherwise returns false.
+    bool hasResultObj() const {
+        return has(kResult) && !_data->resultInfoChanges.has_value();
     }
 
-    MakeResultInfo* getMRInfo() {
-        return _data->makeResultInfo ? &(*_data->makeResultInfo) : nullptr;
-    }
-    const MakeResultInfo* getMRInfo() const {
-        return _data->makeResultInfo ? &(*_data->makeResultInfo) : nullptr;
+    // Returns the slot that holds the materialized result object. This method will tassert
+    // if 'hasResultObj()' is false.
+    TypedSlot getResultObj() const {
+        tassert(8428000, "Expected result object to be set", hasResultObj());
+
+        auto it = _data->slotNameToIdMap.find(kResult);
+        invariant(it != _data->slotNameToIdMap.end());
+
+        return it->second;
     }
 
-    // These methods set kResult and also clears MakeResultInfo. In general these methods
-    // should be preferred over calling "set(kResult, slot)".
-    void setResult(TypedSlot slot) {
-        clearMRInfo();
-        return set(kResult, slot);
-    }
-    void setResult(sbe::value::SlotId slot) {
-        setResult(TypedSlot{slot, TypeSignature::kAnyScalarType});
-    }
-
-    // These methods set MakeResultInfo and clears kResult.
-    void setMRInfoWithResultBase(TypedSlot slot) {
-        clear(kResult);
-        set(kResultBase, slot);
-        _data->makeResultInfo.emplace(ProjectionEffects());
-    }
-    void setMRInfoWithResultBase(sbe::value::SlotId slot) {
-        setMRInfoWithResultBase(TypedSlot{slot, TypeSignature::kAnyScalarType});
+    // If 'hasResultObj()' is true this method returns the slot that holds the materialized result
+    // object, otherwise it will return boost::none.
+    boost::optional<TypedSlot> getResultObjIfExists() const {
+        if (hasResultObj()) {
+            return getResultObj();
+        }
+        return boost::none;
     }
 
+    // This method is like getResultObjIfExists(), except that it returns 'boost::optional<SlotId>'
+    // instead of 'boost::optional<TypedSlot>'.
+    boost::optional<sbe::value::SlotId> getResultObjSlotIfExists() const {
+        if (hasResultObj()) {
+            return getResultObj().slotId;
+        }
+        return boost::none;
+    }
+
+    // Maps kResult to 'slot', designates kResult as being a "materialized result object", and
+    // clears any prior mapping or designation that kResult may have had. setResultObj() also
+    // clears any ResultInfo-related state that may have been set.
+    void setResultObj(TypedSlot slot) {
+        set(kResult, slot);
+        _data->resultInfoChanges.reset();
+    }
+    void setResultObj(sbe::value::SlotId slot) {
+        setResultObj(TypedSlot{slot, TypeSignature::kAnyScalarType});
+    }
+
+    // Returns true if this PlanStageSlots has "ResultInfo" (kResult mapped to a base object, a list
+    // of changed fields in 'resultInfoChanges', and changed field slots), otherwise returns false.
+    bool hasResultInfo() const {
+        return _data->resultInfoChanges.has_value();
+    }
+
+    // Returns the slot that holds the ResultInfo base object. This method will tassert if
+    // 'hasResultInfo()' is false.
+    TypedSlot getResultInfoBaseObj() const {
+        tassert(8428001, "Expected ResultInfo to be set", hasResultInfo());
+
+        auto it = _data->slotNameToIdMap.find(kResult);
+        invariant(it != _data->slotNameToIdMap.end());
+
+        return it->second;
+    }
+
+    // If 'hasResultInfo()' is true this method returns the slot that holds the ResultInfo base
+    // object, otherwise it will return boost::none.
+    boost::optional<TypedSlot> getResultInfoBaseObjIfExists() const {
+        if (hasResultInfo()) {
+            return getResultInfoBaseObj();
+        }
+        return boost::none;
+    }
+
+    // Maps kResult to 'slot', designates kResult as being as a "ResultInfo base object", clears
+    // any prior mapping or designation that kResult may have had, and sets 'resultInfoChanges' to
+    // hold an empty list of changed fields.
+    void setResultInfoBaseObj(TypedSlot slot) {
+        set(kResult, slot);
+        _data->resultInfoChanges.emplace();
+    }
+    void setResultInfoBaseObj(sbe::value::SlotId slot) {
+        setResultInfoBaseObj(TypedSlot{slot, TypeSignature::kAnyScalarType});
+    }
+
+    // Returns the list of changed fields stored in 'resultInfoChanges'. This method will tassert
+    // if 'hasResultInfo()' is false.
+    const ProjectionEffects& getResultInfoChanges() const {
+        tassert(8428002, "Expected ResultInfo to be set", hasResultInfo());
+
+        return *_data->resultInfoChanges;
+    }
+
+    // Add the fields specified in 'drops' and 'modifys' to the list of changed fields stored
+    // in 'resultInfoChanges'. This method will tassert if 'hasResultInfo()' is false.
+    void addResultInfoChanges(const std::vector<std::string>& drops,
+                              const std::vector<std::string>& modifys) {
+        tassert(8428003, "Expected ResultInfo to be set", hasResultInfo());
+
+        auto& changes = *_data->resultInfoChanges;
+        changes = ProjectionEffects(FieldSet::makeOpenSet(drops), modifys, {}).compose(changes);
+    }
+
+    // Returns a sorted list of all the names in this PlanStageSlots has that are required by
+    // 'reqs', plus any additional names needed by 'reqs' that this PlanStageSlots does not satisfy.
     std::vector<OwnedSlotName> getRequiredNamesInOrder(const PlanStageReqs& reqs) const;
 
+    // Returns a list of slots that correspond pairwise to the list of names produced by calling
+    // 'getRequiredNamesInOrder(reqs)'.
     std::vector<TypedSlot> getRequiredSlotsInOrder(const PlanStageReqs& reqs) const;
 
+    // This method returns a de-dupped list of all the slots that correspond to the names produced
+    // calling by 'getRequiredNamesInOrder(reqs)'. The list returned by this method is sorted by
+    // slot ID.
     std::vector<TypedSlot> getRequiredSlotsUnique(const PlanStageReqs& reqs) const;
 
+    // Returns a sorted list of all the name->slot mappings in this PlanStageSlots, sorted by
+    // slot name.
+    std::vector<std::pair<UnownedSlotName, TypedSlot>> getAllNameSlotPairsInOrder() const;
+
+    // This method calls getAllNameSlotPairsInOrder() and then returns a list of the slots only,
+    // sorted by slot name.
     std::vector<TypedSlot> getAllSlotsInOrder() const;
 
-    std::vector<std::pair<UnownedSlotName, TypedSlot>> getAllNamedSlotsInOrder() const;
-
+    // This method computes the list of required names 'L = getRequiredNamesInOrder(reqs)', and
+    // then it adds a mapping 'N->NothingSlot' for each name N in list L where 'has(N)' is false.
     void setMissingRequiredNamedSlotsToNothing(StageBuilderState& state, const PlanStageReqs& reqs);
 
-    void clearNonRequiredSlots(const PlanStageReqs& reqs, bool saveResultSlot = true);
+    // Removes all names (and their corresponding mappings) from this PlanStageSlots that do not
+    // appear in list produced by calling 'getRequiredNamesInOrder(reqs)'.
+    void clearNonRequiredSlots(const PlanStageReqs& reqs, bool saveResultObj = true);
 
 private:
     std::unique_ptr<Data> _data;
@@ -480,31 +549,11 @@ public:
     static constexpr SlotType kSortKey = SlotType::kSortKey;
     static constexpr SlotType kPathExpr = SlotType::kPathExpr;
 
-    /**
-     * In addition to providing APIs to ask for individual named slots, PlanStageReqs provides an
-     * API to ask for a "MakeResultInfo" object. The requirement to produce a MakeResultInfo object
-     * is called a "MakeResultInfo req" and is represented using the 'MakeResultInfoReq' class.
-     */
-    class MakeResultInfoReq {
-    public:
-        MakeResultInfoReq() = default;
-
-        explicit MakeResultInfoReq(FieldSet allowedSet) : allowedSet(std::move(allowedSet)) {}
-
-        FieldSet getNeededFieldSet() const {
-            return allowedSet;
-        }
-
-        FieldSet allowedSet;
-    };
-
     struct Data {
         // The set of the type-and-names of the slots required as inputs by this plan stage.
         PlanStageSlots::SlotNameSet slotNameSet;
 
-        // If this PlanStageReqs object has a "MakeResultInfo" req set, then this field will be
-        // point to a MakeResultInfoReq object, otherwise this field will be null.
-        boost::optional<MakeResultInfoReq> makeResultInfoReq;
+        boost::optional<FieldSet> allowedSet;
 
         // When we're in the middle of building a special union sub-tree implementing a tailable
         // cursor collection scan, this flag will be set to true. Otherwise this flag will be false.
@@ -568,31 +617,34 @@ public:
         return copy;
     }
 
-    bool has(const UnownedSlotName& str) const {
-        return _data->slotNameSet.contains(str);
+    // Returns true if this PlanStageReqs has an explicit requirement for 'name'.
+    bool has(const UnownedSlotName& name) const {
+        return _data->slotNameSet.contains(name);
     }
 
-    PlanStageReqs& set(const UnownedSlotName& str) {
-        _data->slotNameSet.emplace(str);
+    // Adds an explicit requirement for 'name'.
+    PlanStageReqs& set(const UnownedSlotName& name) {
+        _data->slotNameSet.emplace(name);
+        return *this;
+    }
+    PlanStageReqs& set(OwnedSlotName name) {
+        _data->slotNameSet.emplace(std::move(name));
         return *this;
     }
 
-    PlanStageReqs& set(OwnedSlotName str) {
-        _data->slotNameSet.emplace(std::move(str));
+    // Adds an explicit requirement for each name in 'names'.
+    PlanStageReqs& set(const std::vector<UnownedSlotName>& names) {
+        _data->slotNameSet.insert(names.begin(), names.end());
+        return *this;
+    }
+    PlanStageReqs& set(std::vector<OwnedSlotName> names) {
+        _data->slotNameSet.insert(std::make_move_iterator(names.begin()),
+                                  std::make_move_iterator(names.end()));
         return *this;
     }
 
-    PlanStageReqs& set(const std::vector<UnownedSlotName>& strs) {
-        _data->slotNameSet.insert(strs.begin(), strs.end());
-        return *this;
-    }
-
-    PlanStageReqs& set(std::vector<OwnedSlotName> strs) {
-        _data->slotNameSet.insert(std::make_move_iterator(strs.begin()),
-                                  std::make_move_iterator(strs.end()));
-        return *this;
-    }
-
+    // This method adds an explicit requirement for 'name' if 'condition' is true, otherwise this
+    // method does nothing.
     PlanStageReqs& setIf(const UnownedSlotName& str, bool condition) {
         if (condition) {
             _data->slotNameSet.emplace(str);
@@ -600,97 +652,84 @@ public:
         return *this;
     }
 
-    PlanStageReqs& setFields(std::vector<std::string> strs) {
-        for (size_t i = 0; i < strs.size(); ++i) {
-            _data->slotNameSet.emplace(kField, std::move(strs[i]));
+    // This method adds an explicit requirement for '{kField, N}' for each string N in 'names'.
+    PlanStageReqs& setFields(std::vector<std::string> names) {
+        for (size_t i = 0; i < names.size(); ++i) {
+            _data->slotNameSet.emplace(kField, std::move(names[i]));
         }
         return *this;
     }
 
-    PlanStageReqs& setSortKeys(std::vector<std::string> strs) {
-        for (size_t i = 0; i < strs.size(); ++i) {
-            _data->slotNameSet.emplace(kSortKey, std::move(strs[i]));
+    // This method adds an explicit requirement for '{kSortKey, N}' for each string N in 'names'.
+    PlanStageReqs& setSortKeys(std::vector<std::string> names) {
+        for (size_t i = 0; i < names.size(); ++i) {
+            _data->slotNameSet.emplace(kSortKey, std::move(names[i]));
         }
         return *this;
     }
 
+    // Removes any explicit requirement for 'name' that this PlanStageReqs may have.
     PlanStageReqs& clear(const UnownedSlotName& str) {
         _data->slotNameSet.erase(str);
         return *this;
     }
 
-    bool hasType(SlotType t) const {
-        return std::any_of(_data->slotNameSet.begin(), _data->slotNameSet.end(), [t](auto& item) {
-            return item.first == t;
-        });
-    }
-
+    // Returns true if this PlanStageReqs has at least one explicit requirement '{kField, N}' for
+    // some string N.
     bool hasFields() const {
         return hasType(kField);
     }
 
+    // Returns true if this PlanStageReqs has at least one explicit requirement '{kSortKey, N}' for
+    // some string N.
     bool hasSortKeys() const {
         return hasType(kSortKey);
     }
 
-    std::vector<std::string> getOfType(SlotType t) const {
-        std::vector<std::string> res;
-        for (const auto& [type, str] : _data->slotNameSet) {
-            if (type == t) {
-                res.push_back(str);
-            }
-        }
-        std::sort(res.begin(), res.end());
-        return res;
-    }
-
-    /**
-     * Returns the list of fields that are explicitly required to be put into individual kField
-     * slots.
-     *
-     * Note that the list returned is not an exhaustive list of every field that might be
-     * needed, nor is it an exhaustive list of all the fields that will ultimately be required
-     * to be put into kField slots (since MakeResultInfo provides a mechanism that allows
-     * the child to "implicitly" require additional fields to be put in kField slots).
-     * For detais, see getNeededFieldSet().
-     */
+    // Returns a list of all strings N where 'has({kField, N})' is true, sorted in lexicographic
+    // order.
+    //
+    // Note that the list returned will only contain explicit '{kField, N}' requirements. To get
+    // a list of all explicit and implicit '{kField, N}' requiremnts, use getNeededFieldSet().
     std::vector<std::string> getFields() const {
         return getOfType(kField);
     }
 
+    // Returns a list of all strings N where 'has({kSortKey, N})' is true, sorted in lexicographic
+    // order.
     std::vector<std::string> getSortKeys() const {
         return getOfType(kSortKey);
     }
 
-    /**
-     * Returns the set of all field names that are potentially needed (either in an individual
-     * kField slots or stored within kResult / kResultBase).
-     *
-     * This method returns a FieldSet. A FieldSet can either be a finite set (if scope == kClosed)
-     * or it can an infinite set that is the complement of some finite set (if scope == kOpen).
-     *
-     * If hasResult() is true, this method always returns the set of all possible fields names.
-     * Otherwise, this method returns getFields() unioned with the set of fields needed by the
-     * MakeResultInfo req (if it is set).
-     */
+    // Returns a FieldSet containing all strings N where 'has({kField, N})' is true plus all
+    // strings M where the value of result field is needed to satisfy this PlanStageReqs's result
+    // object requirement or ResultInfo requirement (if it has either).
+    //
+    // This method returns a FieldSet. A FieldSet can either be a finite set (if scope == kClosed)
+    // or it can an infinite set that is the complement of some finite set (if scope == kOpen).
     FieldSet getNeededFieldSet() const;
 
-    PlanStageReqs& clearAllOfType(SlotType t) {
-        absl::erase_if(_data->slotNameSet, [t](auto& item) { return item.first == t; });
-        return *this;
+    // Equivalent to 'clear({kField, fieldName})'.
+    void clearField(StringData fieldName) {
+        clear(UnownedSlotName(kField, fieldName));
     }
 
+    // Clears any requirements of the form '{kField, name}' that this PlanStageReqs may have.
     PlanStageReqs& clearAllFields() {
         return clearAllOfType(kField);
     }
 
+    // Clears any requirements of the form '{kSortKey, name}' that this PlanStageReqs may have.
     PlanStageReqs& clearAllSortKeys() {
         return clearAllOfType(kSortKey);
     }
 
+    // If 'path' is a dotted path, this method will call 'clearField(path)' and then it will call
+    // clearField() on every prefix of 'path'. If 'path' is not a dotted path, this method will
+    // just call 'clearField(path)' and return.
     PlanStageReqs& clearFieldAndAllPrefixes(StringData path) {
         for (;;) {
-            clear(std::pair(PlanStageSlots::kField, path));
+            clearField(path);
 
             size_t pos = path.rfind('.');
             if (pos == std::string::npos) {
@@ -703,48 +742,60 @@ public:
         return *this;
     }
 
+    // Returns true if this PlanStageReqs has an explicit requirement for a materialized result
+    // object or a ResultInfo. To distinguish between these two cases, use the hasResultObj() or
+    // hasResultInfo() methods.
     bool hasResult() const {
-        return has(PlanStageSlots::kResult);
+        return has(PlanStageSlots::kResult) || _data->allowedSet.has_value();
     }
 
-    // Returns true if the kResult req is set or if the MakeResultInfo req is set.
-    bool hasResultOrMRInfo() const {
-        return hasResult() || _data->makeResultInfoReq.has_value();
-    }
-
+    // This method clears any result object or ResultInfo requirements that this PlanStageReqs may
+    // have had, and it also clears any ResultInfo-related state that may have been set. After this
+    // method returns, hasResult() and hasResultObject() and hasResultInfo() will all be false.
     PlanStageReqs& clearResult() {
-        return clear(PlanStageSlots::kResult);
-    }
-
-    PlanStageReqs& clearMRInfo() {
-        _data->makeResultInfoReq.reset();
-        clear(PlanStageSlots::kResultBase);
+        _data->allowedSet.reset();
+        clear(PlanStageSlots::kResult);
         return *this;
     }
 
-    MakeResultInfoReq* getMRInfo() {
-        return _data->makeResultInfoReq ? &(*_data->makeResultInfoReq) : nullptr;
-    }
-    const MakeResultInfoReq* getMRInfo() const {
-        return _data->makeResultInfoReq ? &(*_data->makeResultInfoReq) : nullptr;
-    }
-
-    // This method sets kResult and also clears MakeResultInfo. In general this method
-    // should be preferred over calling "set(kResult)".
-    PlanStageReqs& setResult() {
-        clearMRInfo();
-        return set(PlanStageSlots::kResult);
+    // Returns true if this PlanStageReqs requires a materialized result object, otherwise returns
+    // false.
+    bool hasResultObj() const {
+        return has(PlanStageSlots::kResult) && !_data->allowedSet.has_value();
     }
 
-    // If 'has(kResult)' is false then this method will set MakeResultInfo, otherwise this
-    // method will do nothing.
+    // Adds a requirement for a materialized result object, and clears any prior requirement for
+    // ResultInfo this PlanStageReqs may have had. This method also clears any ResultInfo-related
+    // state that may have been set.
+    PlanStageReqs& setResultObj() {
+        _data->allowedSet.reset();
+        _data->slotNameSet.emplace(PlanStageSlots::kResult);
+        return *this;
+    }
+
+    // Returns true if this PlanStageReqs requires a ResultInfo, otherwise returns false.
+    bool hasResultInfo() const {
+        return _data->allowedSet.has_value();
+    }
+
+    // Returns a FieldSet containing all strings N where result field N is needed to satisfy this
+    // PlanStageReqs's ResultInfo requirement. This method will tassert if hasResultInfo() is false.
+    const FieldSet& getResultInfoAllowedSet() const {
+        tassert(8428004, "Expected ResultInfo to be set", hasResultInfo());
+        return *_data->allowedSet;
+    }
+
+    // This method will add a ResultInfo requirement with the specified "allowed" set. This method
+    // assumes 'hasResultObj()' is false and will tassert if 'hasResultObj()' is true.
     //
-    // To set MakeResultInfo unconditionally, call clearResult() first before calling this method.
-    PlanStageReqs& setMRInfo(const FieldSet& allowedSet) {
-        if (!has(PlanStageSlots::kResult)) {
-            _data->makeResultInfoReq.emplace(allowedSet);
-            _data->slotNameSet.emplace(PlanStageSlots::kResultBase);
-        }
+    // Note: If a PlanStageReqs requires a materialized result object and you want to change it to
+    // have a ResultInfo requirement instead, call clearResult() first before calling this method.
+    PlanStageReqs& setResultInfo(const FieldSet& allowedSet) {
+        tassert(8428005, "Expected result object requirement to not be set", !hasResultObj());
+
+        _data->allowedSet.emplace(allowedSet);
+        _data->slotNameSet.emplace(PlanStageSlots::kResult);
+
         return *this;
     }
 
@@ -794,6 +845,28 @@ public:
     }
 
 private:
+    bool hasType(SlotType t) const {
+        return std::any_of(_data->slotNameSet.begin(), _data->slotNameSet.end(), [t](auto& item) {
+            return item.first == t;
+        });
+    }
+
+    std::vector<std::string> getOfType(SlotType t) const {
+        std::vector<std::string> res;
+        for (const auto& [type, str] : _data->slotNameSet) {
+            if (type == t) {
+                res.push_back(str);
+            }
+        }
+        std::sort(res.begin(), res.end());
+        return res;
+    }
+
+    PlanStageReqs& clearAllOfType(SlotType t) {
+        absl::erase_if(_data->slotNameSet, [t](auto& item) { return item.first == t; });
+        return *this;
+    }
+
     friend class PlanStageSlots;
 
     std::unique_ptr<Data> _data;
@@ -810,8 +883,8 @@ struct BuildProjectionPlan {
 
     PlanStageReqs childReqs;
     Type type;
-    const PlanStageReqs::MakeResultInfoReq* reqMRInfo;
-    bool produceMaterializedResult;
+    bool reqResultInfo;
+    bool produceResultObj;
     bool isInclusion;
     std::vector<std::string> paths;
     std::vector<ProjectNode> nodes;
@@ -819,8 +892,8 @@ struct BuildProjectionPlan {
     std::vector<std::string> resultPaths;
     std::vector<std::string> updatedPaths;
     StringMap<Expression*> updatedPathsExprMap;
-    std::vector<std::string> mrInfoModifys;
-    std::vector<std::string> mrInfoDrops;
+    std::vector<std::string> resultInfoDrops;
+    std::vector<std::string> resultInfoModifys;
     std::vector<std::string> projNothingInputFields;
     boost::optional<std::vector<std::string>> inputPlanSingleFields;
 };
@@ -848,7 +921,6 @@ public:
 
     static constexpr auto kResult = PlanStageSlots::kResult;
     static constexpr auto kRecordId = PlanStageSlots::kRecordId;
-    static constexpr auto kResultBase = PlanStageSlots::kResultBase;
     static constexpr auto kReturnKey = PlanStageSlots::kReturnKey;
     static constexpr auto kSnapshotId = PlanStageSlots::kSnapshotId;
     static constexpr auto kIndexIdent = PlanStageSlots::kIndexIdent;
@@ -869,7 +941,7 @@ public:
 
     /**
      * This method will build an SBE PlanStage tree for QuerySolutionNode 'root' and its
-     * descendents.
+     * descendants.
      *
      * This method is a wrapper around 'build(const QuerySolutionNode*, const PlanStageReqs&)'.
      */
@@ -902,7 +974,7 @@ private:
 
     /**
      * This method will build an SBE PlanStage tree for QuerySolutionNode 'root' and its
-     * descendents.
+     * descendants.
      *
      * Based on the type of 'root', this method will dispatch to the appropriate buildXXX()
      * method. This method will also handle generating calls to getField() to satisfy kField

@@ -158,11 +158,11 @@ namespace {
  * the slots specified by 'reqs'.
  */
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
-    PlanNodeId nodeId, const PlanStageReqs& reqs, StageBuilderState& state) {
+    StageBuilderState& state, const PlanStageReqs& reqs, PlanNodeId nodeId) {
     // If the parent is asking for a result, then set materialized result on 'forwardingReqs'.
     PlanStageReqs forwardingReqs = reqs.copyForChild();
-    if (reqs.getMRInfo()) {
-        forwardingReqs.setResult();
+    if (reqs.hasResult()) {
+        forwardingReqs.setResultObj();
     }
 
     // Create a new PlanStageSlots and map all the required names to the environment's Nothing slot.
@@ -449,16 +449,16 @@ PlanStageSlots PlanStageSlots::makeMergedPlanStageSlots(StageBuilderState& state
 
     PlanStageSlots outputs;
 
-    if (reqs.getMRInfo()) {
-        // Merge the childeren's MakeResultInfos.
-        MakeResultInfo::mergeInfos(state, nodeId, trees);
+    if (reqs.hasResultInfo()) {
+        // Merge the childeren's result infos.
+        mergeResultInfos(state, nodeId, trees);
     }
 
-    if (reqs.hasResult()) {
-        // If 'reqs' requires kResult, assert that each tree produces a kResult.
+    if (reqs.hasResultObj()) {
+        // Assert each tree produces a materialized result.
         for (auto& tree : trees) {
-            auto& treeOutputs = tree.second;
-            tassert(8378200, "Expected child tree to produce kResult", treeOutputs.hasResult());
+            bool hasResultObject = tree.second.hasResultObj();
+            tassert(8378200, "Expected child tree to produce a result object", hasResultObject);
         }
     }
 
@@ -469,12 +469,14 @@ PlanStageSlots PlanStageSlots::makeMergedPlanStageSlots(StageBuilderState& state
             TypedSlot{state.slotId(), TypeSignature::kAnyScalarType};
     }
 
-    if (reqs.getMRInfo()) {
-        // If 'reqs' requires MakeResultInfo, call setMRInfoWithResultBase() to properly set
-        // a result base object on 'outputs', and then copy over the non-materialized changes
-        // from the first child to the parent.
-        outputs.setMRInfoWithResultBase(outputs.get(kResultBase));
-        outputs._data->makeResultInfo->effects = firstTreeOutputs._data->makeResultInfo->effects;
+    if (reqs.hasResultInfo()) {
+        // If 'reqs' requires ResultInfo, call setResultInfoBaseObj() to properly set a result base
+        // object on 'outputs' and then copy over the ResultInfo changes from the first child to the
+        // parent.
+        outputs.setResultInfoBaseObj(outputs.get(kResult));
+        outputs._data->resultInfoChanges.emplace(*trees[0].second._data->resultInfoChanges);
+    } else if (reqs.hasResultObj()) {
+        tassert(8428006, "Expected result object to be set", outputs.hasResultObj());
     }
 
     return outputs;
@@ -483,31 +485,13 @@ PlanStageSlots PlanStageSlots::makeMergedPlanStageSlots(StageBuilderState& state
 std::vector<PlanStageSlots::OwnedSlotName> PlanStageSlots::getRequiredNamesInOrder(
     const PlanStageReqs& reqs) const {
     // Get the required names from 'reqs' and store them into 'names'.
-    auto names = [&] {
-        auto getNamesFromReqs = [this](const PlanStageReqs& reqs) {
-            return std::vector<OwnedSlotName>(reqs._data->slotNameSet.begin(),
-                                              reqs._data->slotNameSet.end());
-        };
-        // If 'reqs' requires a result object but this PlanStageSlots has MakeResultInfo, or if
-        // 'reqs' has MakeResultInfo but this PlanStageSlots has a result object, then we need to
-        // adjust 'reqs' to make it consistent with this PlanStageSlots.
-        if (reqs.getMRInfo() && has(kResult)) {
-            auto updatedReqs = reqs;
-            updatedReqs.setResult();
-            return getNamesFromReqs(updatedReqs);
-        } else if (reqs.has(kResult) && getMRInfo()) {
-            auto updatedReqs = reqs;
-            updatedReqs.setMRInfo(FieldSet::makeUniverseSet());
-            return getNamesFromReqs(updatedReqs);
-        }
-        // In all other cases, no adjustment to 'reqs' is needed.
-        return getNamesFromReqs(reqs);
-    }();
+    std::vector<OwnedSlotName> names(reqs._data->slotNameSet.begin(),
+                                     reqs._data->slotNameSet.end());
 
-    // If this PlanStageSlots has MakeResultInfo and 'reqs.hasResultOrMRInfo()' is true,
-    // then we need to get the list of changed fields and add them to 'names'.
-    if (reqs.hasResultOrMRInfo() && getMRInfo()) {
-        auto modified = _data->makeResultInfo->effects.getModifiedOrCreatedFieldSet();
+    // If this PlanStageSlots has ResultInfo and 'reqs.hasResult()' is true, then we need
+    // to get the list of changed fields and add them to 'names'.
+    if (reqs.hasResult() && hasResultInfo()) {
+        auto modified = _data->resultInfoChanges->getModifiedOrCreatedFieldSet();
         for (auto&& fieldName : modified.getList()) {
             names.emplace_back(OwnedSlotName(kField, fieldName));
         }
@@ -600,47 +584,41 @@ std::vector<TypedSlot> PlanStageSlots::getRequiredSlotsUnique(const PlanStageReq
     return result;
 }
 
-std::vector<TypedSlot> PlanStageSlots::getAllSlotsInOrder() const {
-    std::vector<std::pair<UnownedSlotName, TypedSlot>> namedSlots;
-    namedSlots.reserve(_data->slotNameToIdMap.size());
+std::vector<std::pair<PlanStageSlots::UnownedSlotName, TypedSlot>>
+PlanStageSlots::getAllNameSlotPairsInOrder() const {
+    std::vector<std::pair<UnownedSlotName, TypedSlot>> nameSlotPairs;
+    nameSlotPairs.reserve(_data->slotNameToIdMap.size());
+
     for (auto& p : _data->slotNameToIdMap) {
-        namedSlots.emplace_back(p.first, p.second);
+        nameSlotPairs.emplace_back(p.first, p.second);
     }
 
-    std::sort(namedSlots.begin(), namedSlots.end(), NameTypedSlotPairLt());
+    std::sort(nameSlotPairs.begin(), nameSlotPairs.end(), NameTypedSlotPairLt());
 
-    // Add all named slots to the list.
+    return nameSlotPairs;
+}
+
+std::vector<TypedSlot> PlanStageSlots::getAllSlotsInOrder() const {
     std::vector<TypedSlot> result;
-    result.reserve(namedSlots.size());
-    for (auto& p : namedSlots) {
+
+    auto nameSlotPairs = getAllNameSlotPairsInOrder();
+
+    result.reserve(nameSlotPairs.size());
+    for (auto& p : nameSlotPairs) {
         result.emplace_back(p.second);
     }
 
     return result;
 }
 
-std::vector<std::pair<PlanStageSlots::UnownedSlotName, TypedSlot>>
-PlanStageSlots::getAllNamedSlotsInOrder() const {
-    std::vector<std::pair<UnownedSlotName, TypedSlot>> namedSlots;
-    namedSlots.reserve(_data->slotNameToIdMap.size());
-    for (auto& p : _data->slotNameToIdMap) {
-        namedSlots.emplace_back(p.first, p.second);
-    }
-
-    std::sort(namedSlots.begin(), namedSlots.end(), NameTypedSlotPairLt());
-
-    return namedSlots;
-}
-
 void PlanStageSlots::setMissingRequiredNamedSlotsToNothing(StageBuilderState& state,
                                                            const PlanStageReqs& reqs) {
     // If 'reqs' requires a result and we don't have a result, or if 'reqs' requires a materialized
-    // result and we don't have a materialized result, then we call set kResult to point to Nothing
-    // in 'outputs'.
-    if ((reqs.hasResultOrMRInfo() && !hasResultOrMRInfo()) ||
-        (reqs.has(kResult) && !has(kResult))) {
+    // result and we don't have a materialized result, then we call setResultObj() to set
+    // a materialized result of Nothing on 'outputs'.
+    if ((reqs.hasResult() && !hasResult()) || (reqs.hasResultObj() && !hasResultObj())) {
         auto nothingSlot = TypedSlot{state.getNothingSlot(), TypeSignature::kAnyScalarType};
-        setResult(nothingSlot);
+        setResultObj(nothingSlot);
     }
 
     auto names = getRequiredNamesInOrder(reqs);
@@ -653,13 +631,19 @@ void PlanStageSlots::setMissingRequiredNamedSlotsToNothing(StageBuilderState& st
     }
 }
 
-void PlanStageSlots::clearNonRequiredSlots(const PlanStageReqs& reqs, bool saveResultSlot) {
+void PlanStageSlots::clearNonRequiredSlots(const PlanStageReqs& reqs, bool saveResultObj) {
+    // If 'reqs' doesn't require a result object or ResultInfo, then clear the ResultInfo from
+    // this PlanStageSlots if it has one.
+    if (!reqs.hasResult() && _data->resultInfoChanges.has_value()) {
+        _data->resultInfoChanges.reset();
+    }
+
     auto requiredNames = getRequiredNamesInOrder(reqs);
     auto requiredNameSet = SlotNameSet(requiredNames.begin(), requiredNames.end());
 
-    // If 'saveResultSlot' is true, then we add kResult to 'requiredNameSet' so that
+    // If 'saveResultObj' is true, then we add kResult to 'requiredNameSet' so that
     // the kResult slot will not get cleared.
-    if (saveResultSlot) {
+    if (saveResultObj) {
         requiredNameSet.emplace(kResult);
     }
 
@@ -673,32 +657,27 @@ void PlanStageSlots::clearNonRequiredSlots(const PlanStageReqs& reqs, bool saveR
             _data->slotNameToIdMap.erase(it++);
         }
     }
-
-    // If 'reqs' doesn't require a result or MakeResultInfo, set 'makeResultInfo' to boost::none.
-    if (!reqs.hasResultOrMRInfo() && _data->makeResultInfo.has_value()) {
-        _data->makeResultInfo.reset();
-    }
 }
 
-void PlanStageSlots::MakeResultInfo::mergeInfos(StageBuilderState& state,
-                                                PlanNodeId nodeId,
-                                                std::vector<PlanStageTree>& trees) {
+void PlanStageSlots::mergeResultInfos(StageBuilderState& state,
+                                      PlanNodeId nodeId,
+                                      std::vector<PlanStageTree>& trees) {
+    // Compute the merged ProjectionEffects.
     boost::optional<ProjectionEffects> mergedEffects;
 
-    // Compute the merged ProjectionEffects.
     for (auto&& tree : trees) {
         auto& treeOutputs = tree.second;
-        // Assert that each tree produces either kResult or MakeResultInfo.
+        // Assert that each tree produces either a materialized result object or a ResultInfo.
         tassert(8378201,
-                "Expected child tree to produce kResult or MakeResultInfo",
-                treeOutputs.hasResultOrMRInfo());
-        // If 'tree' has a kResult, convert it into a MakeResultInfo (to make all the
-        // trees uniform).
+                "Expected child tree to produce a result object or a ResultInfo",
+                treeOutputs.hasResult());
+        // If 'tree' has a materialized result object, convert it into a ResultInfo (to make
+        // all the trees uniform).
         if (treeOutputs.hasResult()) {
-            treeOutputs.setMRInfoWithResultBase(treeOutputs.get(kResult));
+            treeOutputs.setResultInfoBaseObj(treeOutputs.get(kResult));
         }
 
-        const ProjectionEffects& treeEffects = treeOutputs.getMRInfo()->effects;
+        const ProjectionEffects& treeEffects = treeOutputs.getResultInfoChanges();
         if (!mergedEffects) {
             mergedEffects.emplace(treeEffects);
         } else {
@@ -720,14 +699,14 @@ void PlanStageSlots::MakeResultInfo::mergeInfos(StageBuilderState& state,
 
         sbe::SlotExprPairVector projects;
 
-        const ProjectionEffects& treeEffects = treeOutputs.getMRInfo()->effects;
+        const ProjectionEffects& treeEffects = treeOutputs.getResultInfoChanges();
 
         for (auto&& fieldName : mergedModified.getList()) {
             if (!treeOutputs.has(UnownedSlotName(kField, fieldName))) {
                 if (treeEffects.isKeep(fieldName)) {
                     auto getFieldExpr =
                         makeFunction("getField"_sd,
-                                     makeVariable(treeOutputs.get(kResultBase).slotId),
+                                     makeVariable(treeOutputs.getResultInfoBaseObj().slotId),
                                      makeStrConstant(fieldName));
                     auto slot = state.slotId();
 
@@ -744,19 +723,19 @@ void PlanStageSlots::MakeResultInfo::mergeInfos(StageBuilderState& state,
             }
         }
 
-        treeOutputs._data->makeResultInfo->effects = *mergedEffects;
+        treeOutputs._data->resultInfoChanges.emplace(*mergedEffects);
 
         stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
     }
 }
 
 FieldSet PlanStageReqs::getNeededFieldSet() const {
-    if (hasResult()) {
+    if (hasResultObj()) {
         return FieldSet::makeUniverseSet();
     } else {
         auto result = FieldSet::makeClosedSet(getFields());
-        if (auto* makeResultInfoReq = getMRInfo()) {
-            result.setUnion(makeResultInfoReq->getNeededFieldSet());
+        if (_data->allowedSet) {
+            result.setUnion(*_data->allowedSet);
         }
         return result;
     }
@@ -838,7 +817,7 @@ void SlotBasedStageBuilder::analyzeTree(const QuerySolutionNode* root) {
         auto& dfsBack = dfs.back();
         auto node = dfsBack.first;
 
-        // skip if already analyzed this subtree
+        // Skip if already analyzed this subtree.
         if (_analysis.count(node)) {
             dfs.pop_back();
             continue;
@@ -934,7 +913,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // We always produce a 'resultSlot'.
     PlanStageReqs reqs;
-    reqs.set(kResult);
+    reqs.setResultObj();
 
     // We force the root stage to produce a 'recordId' if the iteration can be resumed (via a resume
     // token or a tailable cursor) or if the caller simply expects to be able to read it.
@@ -961,7 +940,7 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
 
     // Assert that we produced a 'resultSlot' and that we produced a 'recordIdSlot' if it was
     // needed.
-    invariant(outputs.has(kResult));
+    invariant(outputs.hasResultObj());
 
     const bool needsRecordIdSlot = _data->shouldUseTailableScan || _data->shouldTrackResumeToken ||
         _cq.getForceGenerateRecordId();
@@ -969,7 +948,7 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
         invariant(outputs.has(kRecordId));
     }
 
-    _data->resultSlot = outputs.getSlotIfExists(stage_builder::PlanStageSlots::kResult);
+    _data->resultSlot = outputs.getResultObjSlotIfExists();
     _data->recordIdSlot = outputs.getSlotIfExists(stage_builder::PlanStageSlots::kRecordId);
 
     return {std::move(stage), PlanStageData(std::move(_env), std::move(_data))};
@@ -1035,8 +1014,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     PlanStageSlots outputs;
 
-    if (reqs.hasResultOrMRInfo() || reqs.hasFields()) {
-        outputs.set(kResult, resultSlot);
+    if (reqs.hasResult() || reqs.hasFields()) {
+        outputs.setResultObj(resultSlot);
     }
     if (reqs.has(kRecordId)) {
         invariant(vsn->hasRecordId);
@@ -1093,12 +1072,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    bool reqResult = reqs.hasResultOrMRInfo() || !additionalFields.empty();
+    bool reqResult = reqs.hasResult() || !additionalFields.empty();
 
     if (reqs.has(kReturnKey) || reqResult) {
-        // If 'reqs' has a kResult or kReturnKey request or if 'additionalFields' is not empty,
-        // then we need to get all parts of the index key so that we can create the inflated
-        // index key.
+        // If 'reqs' requires result or kReturnKey, or if 'additionalFields' is not empty, then we
+        // need to get all parts of the index key so that we can create the inflated index key.
         for (int j = 0; j < ixn->index.keyPattern.nFields(); ++j) {
             fieldBitset.set(j);
         }
@@ -1155,7 +1133,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
 
         auto resultSlot = _slotIdGenerator.generate();
-        outputs.setResult(resultSlot);
+        outputs.setResultObj(resultSlot);
 
         stage = rehydrateIndexKey(
             std::move(stage), ixn->index.keyPattern, ixn->nodeId(), indexKeySlots, resultSlot);
@@ -1233,10 +1211,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             csn->nodeId());
     }
 
-    if (reqs.hasResultOrMRInfo() || reqs.hasFields()) {
-        // COUNT_SCAN stage doesn't produce any output, make an empty obj for kResult.
+    if (reqs.hasResult() || reqs.hasFields()) {
+        // COUNT_SCAN stage doesn't produce any output, make an empty object for the result.
         auto resultSlot = _slotIdGenerator.generate();
-        planStageSlots.setResult(TypedSlot{resultSlot, TypeSignature::kObjectType});
+        planStageSlots.setResultObj(TypedSlot{resultSlot, TypeSignature::kObjectType});
         stage = sbe::makeProjectStage(
             std::move(stage), csn->nodeId(), resultSlot, makeFunction("newObj"));
     }
@@ -1407,7 +1385,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     PlanStageSlots outputs;
 
     auto reconstructedRecordSlot = _slotIdGenerator.generate();
-    outputs.set(kResult, reconstructedRecordSlot);
+    outputs.setResultObj(reconstructedRecordSlot);
 
     boost::optional<sbe::value::SlotId> ridSlot;
 
@@ -1550,7 +1528,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto forwardingReqs = reqs.copyForChild()
                               .clearResult()
-                              .clearMRInfo()
                               .clear(kRecordId)
                               .clearAllFields()
                               .clearAllSortKeys()
@@ -1610,7 +1587,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                  root->nodeId(),
                                  std::move(relevantSlots));
 
-    outputs.setResult(resultSlot);
+    outputs.setResultObj(resultSlot);
 
     // Only propagate kRecordId if requested.
     if (reqs.has(kRecordId)) {
@@ -1947,7 +1924,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto child = sn->children[0].get();
 
     if (auto [ixn, ct] = root->getFirstNodeByType(STAGE_IXSCAN);
-        !sn->fetched() && !reqs.hasResultOrMRInfo() && ixn && ct >= 1) {
+        !sn->fetched() && !reqs.hasResult() && ixn && ct >= 1) {
         return buildSortCovered(root, reqs);
     }
 
@@ -1972,14 +1949,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto forwardingReqs = reqs.copyForChild();
     if (reqs.getHasLimit()) {
-        // When sort is followed by a limit the overhead of tracking the kField slots during sorting
-        // is greater compared to the overhead of retrieving the necessary kFields from the BSON
-        // object (kResult) after the sorting is done.
-        forwardingReqs.clearAllFields().clearMRInfo().setResult();
+        // When sort is followed by a limit the overhead of tracking the kField slots during
+        // sorting is greater compared to the overhead of retrieving the necessary kFields from
+        // the materialized result object after the sorting is done.
+        forwardingReqs.clearAllFields().setResultObj();
     }
 
     if (hasPartsWithCommonPrefix) {
-        forwardingReqs.clearMRInfo().setResult();
+        forwardingReqs.setResultObj();
     }
 
     auto childReqs = forwardingReqs.copyForChild().setFields(fields);
@@ -1993,7 +1970,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     std::vector<sbe::value::SortDirection> direction;
 
     if (!hasPartsWithCommonPrefix) {
-        // Handle the case where we are using kResult and there are no common prefixes.
+        // Handle the case where we are using a materialized result object and there are no common
+        // prefixes.
         orderBy.reserve(sortPattern.size());
 
         // Sorting has a limitation where only one of the sort patterns can involve arrays.
@@ -2102,7 +2080,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // we use a "cheap" sort key: it's cheaper to construct but more expensive to compare. The
         // assumption here is that k << n.
 
-        const sbe::value::SlotId childResultSlotId = outputs.get(kResult).slotId;
+        const sbe::value::SlotId childResultSlotId = outputs.getResultObj().slotId;
 
         StringData sortKeyGenerator = sn->limit ? "generateCheapSortKey" : "generateSortKey";
 
@@ -2175,16 +2153,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         root->nodeId());
 
     if (reqs.getHasLimit()) {
-        // Project the fields that the parent requested using kResult
-        auto kResultSlot = outputs.getIfExists(kResult);
-        tassert(8312200, "kResult slot should be set", kResultSlot);
+        // Project the fields that the parent requested using the result object.
+        auto resultSlot = outputs.getResultObjIfExists();
+        tassert(8312200, "Result object should be set", resultSlot);
         auto fields = reqs.getFields();
         // Clear from outputs everything that is not found in forwardingReqs and project from
-        // kResult every required field not already in outputs.
+        // result object every required field not already in outputs.
         outputs.clearNonRequiredSlots(forwardingReqs);
         auto [outStage, outSlots] = projectFieldsToSlots(std::move(stage),
                                                          fields,
-                                                         kResultSlot->slotId,
+                                                         resultSlot->slotId,
                                                          root->nodeId(),
                                                          &_slotIdGenerator,
                                                          _state,
@@ -2202,8 +2180,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSortCovered(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     tassert(6023404,
-            "buildSortCovered() does not support kResult or MakeResultInfo",
-            !reqs.hasResultOrMRInfo());
+            "buildSortCovered() does not support 'reqs' with a result requirement",
+            !reqs.hasResult());
 
     const auto sn = static_cast<const SortNode*>(root);
     auto sortPattern = SortPattern{sn->pattern, _cq.getExpCtx()};
@@ -2397,18 +2375,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         needChildResultDoc = filterDeps.needWholeDocument;
     }
 
-    // The child must produce all of the slots required by the parent of this MatchNode. Also, if
-    // the filter needs the whole document, the child must produce 'kResult' as well.
+    // The child must produce all of the slots required by the parent of this MatchNode.
     PlanStageReqs childReqs = reqs.copyForChild().setFields(std::move(fields));
 
+    // If the filter needs the whole document, the child must produce a materialized result object
+    // as well.
     if (needChildResultDoc) {
-        childReqs.clearMRInfo().setResult();
+        childReqs.setResultObj();
     }
 
     auto [stage, outputs] = build(mn->children[0].get(), childReqs);
     if (mn->filter) {
         auto childResultSlot =
-            needChildResultDoc ? boost::make_optional(outputs.get(kResult)) : boost::none;
+            needChildResultDoc ? boost::make_optional(outputs.getResultObj()) : boost::none;
 
         SbExpr filterExpr = generateFilter(_state, mn->filter.get(), childResultSlot, &outputs);
 
@@ -2437,11 +2416,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // The child must produce all of the slots required by the parent of this UnwindNode, plus this
     // node needs to produce the result slot.
-    PlanStageReqs childReqs = reqs.copyForChild().clearMRInfo().setResult();
+    PlanStageReqs childReqs = reqs.copyForChild().setResultObj();
     auto [stage, outputs] = build(un->children[0].get(), childReqs);
     // Clear the root of the original field being unwound so later plan stages do not reference it.
     outputs.clearField(fp.getSubpath(0));
-    const TypedSlot childResultSlot = outputs.get(kResult);
+    const TypedSlot childResultSlot = outputs.getResultObj();
 
     //
     // Build a project execution child node to get the field to be unwound. This gets the value of
@@ -2634,7 +2613,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                              resultSlot.slotId,  // output result document
                              std::move(finalProjectExpr.expr));
 
-    outputs.setResult(resultSlot);
+    outputs.setResultObj(resultSlot);
     return {std::move(stage), std::move(outputs)};
 }  // buildUnwind
 
@@ -2650,11 +2629,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     DepsTracker newRootDeps;
     expression::addDependencies(rrn->newRoot.get(), &newRootDeps);
 
-    // The $replaceRoot operation only ever needs 'kResult' if there are operations in the 'newRoot'
-    // expression that need the whole document.
+    // The $replaceRoot operation only ever needs a materialized result object if there are
+    // operations in the 'newRoot' expression that need the whole document.
     PlanStageReqs childReqs = newRootDeps.needWholeDocument
-        ? reqs.copyForChild().clearAllFields().clearMRInfo().setResult()
-        : reqs.copyForChild().clearAllFields().clearResult().clearMRInfo().setFields(
+        ? reqs.copyForChild().clearAllFields().setResultObj()
+        : reqs.copyForChild().clearAllFields().clearResult().setFields(
               getTopLevelFields(newRootDeps.fields));
 
     auto [stage, outputs] = build(rrn->children[0].get(), childReqs);
@@ -2664,7 +2643,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // that fails if it does not evaluate to an object.
     auto newRootVar = getABTLocalVariableName(_state.frameId(), 0);
     auto newRootABT = abt::unwrap(
-        generateExpression(_state, rrn->newRoot.get(), outputs.getIfExists(kResult), &outputs)
+        generateExpression(_state, rrn->newRoot.get(), outputs.getResultObjIfExists(), &outputs)
             .extractABT());
     auto validatedNewRootABT = optimizer::make<optimizer::Let>(
         newRootVar,
@@ -2690,7 +2669,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     stage = makeProjectStage(
         std::move(stage), rrn->nodeId(), resultSlot, std::move(validatedNewRootExpression.expr));
 
-    outputs.setResult({resultSlot, newRootType});
+    outputs.setResultObj({resultSlot, newRootType});
     outputs.clearAllFields();
 
     return {std::move(stage), std::move(outputs)};
@@ -2824,10 +2803,10 @@ NothingPassthruUpdatedAndResultPaths mapRequiredFieldsToProjectionOutputs(
     const FieldSet& childAllowedFields,
     const std::vector<std::string>& paths,
     const std::vector<ProjectNode>& nodes,
-    const std::vector<std::string>& mrInfoModifys,
-    const std::vector<std::string>& mrInfoDrops) {
-    // Fast path for when 'reqFields', 'mrInfoModifys', and 'mrInfoDrops' are all empty.
-    if (reqFields.empty() && mrInfoModifys.empty() && mrInfoDrops.empty()) {
+    const std::vector<std::string>& resultInfoDrops,
+    const std::vector<std::string>& resultInfoModifys) {
+    // Fast path for when 'reqFields', 'resultInfoDrops', and 'resultInfoModifys' are all empty.
+    if (reqFields.empty() && resultInfoDrops.empty() && resultInfoModifys.empty()) {
         return {};
     }
 
@@ -2860,8 +2839,8 @@ NothingPassthruUpdatedAndResultPaths mapRequiredFieldsToProjectionOutputs(
 
     // Scan the required fields and determine post-projection which paths will be Nothing
     // ('nothingPaths'), which paths will be unchanged ('passthruPaths'), which paths are
-    // begin assigned exprs ('updatedPaths'), and which paths will need to be read from
-    // kResult ('resultPaths').
+    // being assigned exprs ('updatedPaths'), and which paths will need to be read from
+    // the result object ('resultPaths').
     std::vector<std::string> nothingPaths;
     std::vector<std::string> passthruPaths;
     std::vector<std::string> updatedPaths;
@@ -2897,10 +2876,10 @@ NothingPassthruUpdatedAndResultPaths mapRequiredFieldsToProjectionOutputs(
         }
     }
 
-    if (!mrInfoModifys.empty() || !mrInfoDrops.empty()) {
+    if (!resultInfoDrops.empty() || !resultInfoModifys.empty()) {
         auto fieldSet = StringSet(reqFields.begin(), reqFields.end());
 
-        for (auto&& field : mrInfoModifys) {
+        for (auto&& field : resultInfoModifys) {
             if (fieldSet.insert(field).second) {
                 if (createdPathSet.count(field)) {
                     updatedPaths.emplace_back(field);
@@ -2910,7 +2889,7 @@ NothingPassthruUpdatedAndResultPaths mapRequiredFieldsToProjectionOutputs(
             }
         }
 
-        for (auto&& field : mrInfoDrops) {
+        for (auto&& field : resultInfoDrops) {
             if (fieldSet.insert(field).second) {
                 nothingPaths.emplace_back(field);
             }
@@ -2929,14 +2908,15 @@ bool canUseCoveredProjection(const QuerySolutionNode* root,
                              const std::vector<ProjectNode>& nodes) {
     // The "covered projection" optimization can be used for this projection if and only if
     // all of the following conditions are met:
+    //   0) 'root' is a projection.
     //   1) 'isInclusion' is true.
     //   2) The 'nodes' vector contains Keep nodes only.
     //   3) The 'root' subtree has at least one unfetched IXSCAN node. (A corollary of this
     //      condition is that 'root->fetched()' must also be false.)
-    //   4) Each pattern from each of the unfetched IXSCANs in the 'root' subtree contains
-    //      all of projection paths that are needed by root's parent.
-    //   5) For each top-level field needed by root's parent, the order of its subfields is
-    //      statically knowable. (This condition is trivially met if there are no common
+    //   4) For each unfetched IXSCAN in the root's subtree, the IXSCAN's pattern contains
+    //      all of the paths needed by the 'root' projection to materialize the result object.
+    //   5) For each top-level field needed by the 'root' projection, the order of its subfields
+    //      is statically determinable. (This condition is trivially met if there are no common
     //      prefixes among the projection paths needed by root's parent.)
     if (root->fetched() || !isInclusion ||
         !std::all_of(nodes.begin(), nodes.end(), [](auto&& n) { return n.isBool(); })) {
@@ -2968,8 +2948,8 @@ bool canUseCoveredProjection(const QuerySolutionNode* root,
     if (projPathsHaveCommonPrefix && hasFetchesOrScans) {
         // If two of more paths needed by root's parent have a common prefix and the 'root' subtree
         // contains one or more FETCHs, then it's not possible to statically determine the subfield
-        // order for all the top-level fields needed by root's parent. In this case, we can use the
-        // "covered projection" optimization because we can't meet condition #4 listed above.
+        // order for all the top-level fields needed by root's parent. In this case, we cannot use
+        // the "covered projection" optimization because we can't meet condition #4 from above.
         return false;
     }
 
@@ -3063,8 +3043,8 @@ boost::optional<std::vector<std::string>> projectionOutputsFieldOrderIsFixed(
         return boost::none;
     }
     // Compute the post-image "allowed" field set. If 'postImageAllowedFields' 2 or more non-"_id"
-    // fields, then we know it's not possible to materialize kResult using a fixed plan with a
-    // resultBase.
+    // fields, then we know it's not possible to produce a materialized result object using a fixed
+    // plan from a result base.
     auto postImageAllowedFields = allowed;
     for (size_t i = 0; i < nodes.size(); ++i) {
         auto& node = nodes[i];
@@ -3165,21 +3145,22 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
 
     // Get the parent's requirements.
     auto reqFields = reqs.getFields();
-    const PlanStageReqs::MakeResultInfoReq* reqMRInfo = reqs.getMRInfo();
-    bool reqResult = reqs.hasResult();
 
-    std::vector<std::string> mrInfoModifys;
-    std::vector<std::string> mrInfoDrops;
+    bool reqResultObj = reqs.hasResultObj();
+    bool reqResultInfo = reqs.hasResultInfo();
+
+    std::vector<std::string> resultInfoDrops;
+    std::vector<std::string> resultInfoModifys;
     boost::optional<FieldSet> updatedAllowedSet;
 
     // Check if this projection can use the "covered projection" optimization.
     bool isCoveredProjection = canUseCoveredProjection(root, isInclusion, paths, nodes);
 
-    if (reqMRInfo) {
-        bool canUseMakeResultInfo = false;
+    if (reqResultInfo) {
+        bool resultInfoReqIsCompatible = false;
 
         if (!isCoveredProjection) {
-            const auto& reqAllowedSet = reqMRInfo->allowedSet;
+            const auto& reqAllowedSet = reqs.getResultInfoAllowedSet();
 
             auto allowedSet = makeAllowedFieldSet(isInclusion, paths, nodes);
             allowedSet.setIntersect(childAllowedFields);
@@ -3192,7 +3173,7 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
 
             if (createdSet.getList().empty() && createdSet.getScope() == FieldListScope::kClosed &&
                 !scopesDiffer) {
-                canUseMakeResultInfo = true;
+                resultInfoReqIsCompatible = true;
 
                 auto effects = ProjectionEffects(isInclusion, paths, nodes);
                 effects.compose(ProjectionEffects(childAllowedFields));
@@ -3210,8 +3191,8 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
                         "Expected effectsAllowedSet scope to be kOpen",
                         effectsAllowedSet.getScope() == FieldListScope::kOpen);
 
-                mrInfoModifys = effectsModifiedSet.getList();
-                mrInfoDrops = effectsAllowedSet.getList();
+                resultInfoDrops = effectsAllowedSet.getList();
+                resultInfoModifys = effectsModifiedSet.getList();
 
                 // Initialized 'updatedAllowedSet'.
                 updatedAllowedSet.emplace(reqAllowedSet);
@@ -3219,16 +3200,21 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
             }
         }
 
-        if (!canUseMakeResultInfo) {
-            reqResult = true;
-            reqMRInfo = nullptr;
+        if (!resultInfoReqIsCompatible) {
+            reqResultObj = true;
+            reqResultInfo = false;
         }
     }
 
     // Map the parent's required fields onto the outputs of this projection.
     auto [nothingPaths, passthruPaths, updatedPaths, resultPaths] =
-        mapRequiredFieldsToProjectionOutputs(
-            reqFields, isInclusion, childAllowedFields, paths, nodes, mrInfoModifys, mrInfoDrops);
+        mapRequiredFieldsToProjectionOutputs(reqFields,
+                                             isInclusion,
+                                             childAllowedFields,
+                                             paths,
+                                             nodes,
+                                             resultInfoDrops,
+                                             resultInfoModifys);
 
     // Eliminate parts of the projection that are known to be no-ops.
     if (!childAllowedFields.getList().empty() ||
@@ -3280,7 +3266,7 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
         auto& path = paths[i];
         if (node.isExpr()) {
             auto f = getTopLevelField(path);
-            if (reqResult || updatedPathSet.count(path) || resultFieldSet.count(f)) {
+            if (reqResultObj || updatedPathSet.count(path) || resultFieldSet.count(f)) {
                 expression::addDependencies(node.getExpr(), &deps);
             }
         }
@@ -3288,14 +3274,14 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
 
     bool childMakeResult = deps.needWholeDocument;
 
-    bool makeResult = reqResult || !resultPaths.empty();
+    bool makeResult = reqResultObj || !resultPaths.empty();
 
     auto allowedSet = makeAllowedFieldSet(isInclusion, paths, nodes);
     allowedSet.setIntersect(childAllowedFields);
 
     // If we don't need to produce a materialized result object, then we can eliminate the parts of
     // the projection that are not in 'resultFieldSet'.
-    if (!reqResult) {
+    if (!reqResultObj) {
         size_t outIdx = 0;
         for (size_t idx = 0; idx < nodes.size(); ++idx) {
             if (resultFieldSet.count(getTopLevelField(paths[idx]))) {
@@ -3315,11 +3301,13 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
 
     // Determine what 'planType' should be set to.
     //
-    // If 'reqMRInfo' is null, we will initialize 'projInputFields' and 'projNothingInputFields'
-    // eagerly when we set 'planType' (except when we set 'planType' to 'kUseChildResultInfo').
+    // If 'reqResultInfo' is false, we will eagerly initialize 'projInputFields' and
+    // 'projNothingInputFields' when we set 'planType' (except when we set 'planType' to
+    // 'kUseChildResultInfo').
     //
-    // If 'reqMRInfo' is not null or if we choose the 'kUseChildResultInfo' plan type, then
-    // we will handle initializing 'projInputFields' and 'projNothingInputFields' later.
+    // If 'reqResultInfo' is true or if we choose the 'kUseChildResultInfo' plan type,
+    // then we will handle initializing 'projInputFields' and 'projNothingInputFields'
+    // later.
     boost::optional<BuildProjectionPlan::Type> planType;
 
     std::vector<std::string> projInputFields;
@@ -3339,13 +3327,13 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
     }
 
     if (!planType && isCoveredProjection) {
-        tassert(8378205, "Expected MakeResultInfo req to not be set", !reqMRInfo);
+        tassert(8378205, "Expected ResultInfo requirement to not be set", !reqResultInfo);
 
         // Materialize the result object (or temporary object) using the "covered projection"
         // technique.
         //
         // For covered projections, we eagerly initialize 'projInputFields' to 'paths'. (We know
-        // that 'reqMRInfo' is always null when 'isCoveredProjection' is true.)
+        // that 'reqResultInfo' is always false when 'isCoveredProjection' is true.)
         planType.emplace(BuildProjectionPlan::kUseCoveredProjection);
 
         auto ixNode = getUnfetchedIxscans(root).first[0];
@@ -3384,11 +3372,11 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
 
     // If our parent doesn't actually need the full materialized result object and we haven't
     // determined 'planType' yet, then we can use a fixed plan without a resultBase.
-    if (!planType && !reqResult) {
+    if (!planType && !reqResultObj) {
         planType.emplace(BuildProjectionPlan::kUseInputPlanWithoutObj);
 
-        // If 'reqMRInfo' is null, initialize 'projInputFields' eagerly.
-        if (!reqMRInfo) {
+        // If 'reqResultInfo' is true, initialize 'projInputFields' eagerly.
+        if (!reqResultInfo) {
             projInputFields = resultFields;
         }
 
@@ -3399,7 +3387,7 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
     // we can prove the materialized result object either will have a single field only or will
     // have "_id" and one other field only, then we can use a fixed plan.
     if (!planType && childAllowedFields.getScope() == FieldListScope::kClosed) {
-        tassert(8378206, "Expected kResult req", reqResult);
+        tassert(8378206, "Expected result object requirement to be set", reqResultObj);
 
         auto fields = projectionOutputsFieldOrderIsFixed(paths, nodes, childAllowedFields.getSet());
         if (fields) {
@@ -3413,12 +3401,11 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
     }
 
     // If our parent needs the full materialized result object and we haven't determined 'planType'
-    // yet, figure out if this projection can ask its descendants for a non-materialized result.
+    // yet, figure out if this projection can ask its descendants for ResultInfo.
     if (!planType) {
-        tassert(8378207, "Expected kResult req", reqResult);
+        tassert(8378207, "Expected result object requirement to be set", reqResultObj);
 
-        bool canUseMakeResultInfo = true;
-        bool descendantCanUseMakeResultInfo = false;
+        bool someDescendantsCanProduceResultInfo = false;
 
         for (auto desc : getProjectionDescendants(root)) {
             // Skip non-projection descendants.
@@ -3438,8 +3425,8 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
             }
             // Compute the the allowed set for the descendant projection.
             auto descAllowedSet = makeAllowedFieldSet(descIsInclusion, descPaths, descNodes);
-            // Check if the descendant would be able to "participate" with a non-materialized
-            // result req from the ancestor projection.
+            // Check if the descendant would be able to "participate" with a ResultInfo req
+            // from the ancestor projection.
             bool scopesDiffer = allowedSet.getScope() == FieldListScope::kOpen &&
                 descAllowedSet.getScope() == FieldListScope::kClosed;
 
@@ -3450,16 +3437,12 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
             // can "participate".
             if (descCreatedSet.getList().empty() &&
                 descCreatedSet.getScope() == FieldListScope::kClosed && !scopesDiffer) {
-                descendantCanUseMakeResultInfo = true;
+                someDescendantsCanProduceResultInfo = true;
             }
         }
-        // If none of the descendants could support a request for MakeResultInfo, then it's not
-        // worth it to ask our child for MakeResultInfo.
-        if (!descendantCanUseMakeResultInfo) {
-            canUseMakeResultInfo = false;
-        }
-
-        if (canUseMakeResultInfo) {
+        // If none of the descendants could participate with ResultInfo req, then we won't bother
+        // trying to ask our child for ResultInfo.
+        if (someDescendantsCanProduceResultInfo) {
             planType.emplace(BuildProjectionPlan::kUseChildResultInfo);
         }
     }
@@ -3467,16 +3450,16 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
     // If our parent needs the full materialized result object and we haven't determined 'planType'
     // yet, then we need to ask our child to produce a materialized result object.
     if (!planType) {
-        tassert(8378208, "Expected kResult req", reqResult);
+        tassert(8378208, "Expected result object requirement to be set", reqResultObj);
 
         childMakeResult = true;
         planType.emplace(BuildProjectionPlan::kUseChildResultObj);
     }
 
-    // If there is a non-materialized req that we are participating with, or if we are using
-    // the 'kUseChildResultInfo' plan type, then we need to populate 'projInputFields' and
+    // If there is a ResultInfo req that we are participating with, or if we are using the
+    // 'kUseChildResultInfo' plan type, then we need to populate 'projInputFields' and
     // 'projNothingInputFields' with the necessary inputs.
-    if (reqMRInfo) {
+    if (reqResultInfo) {
         projInputFields = resultFields;
     } else if (planType == BuildProjectionPlan::kUseChildResultInfo) {
         auto modifiedOrCreated = makeModifiedOrCreatedFieldSet(isInclusion, paths, nodes).getList();
@@ -3491,20 +3474,20 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
     }
 
     // Start preparing the requirements for our child.
-    auto childReqs = reqs.copyForChild().clearResult().clearMRInfo().clearAllFields();
+    auto childReqs = reqs.copyForChild().clearResult().clearAllFields();
 
     if (childMakeResult) {
-        // If 'childMakeResult' is true, add kResult to 'childReqs'.
-        childReqs.setResult();
-    } else if (planType == BuildProjectionPlan::kUseChildResultInfo && reqResult) {
+        // If 'childMakeResult' is true, add a result object requirement to 'childReqs'.
+        childReqs.setResultObj();
+    } else if (planType == BuildProjectionPlan::kUseChildResultInfo && reqResultObj) {
         // If our parent asked for a materialized result and if we've decided to ask our child
-        // for a non-materialized result, then set a non-materialized result req on 'childReqs'.
-        childReqs.setMRInfo(allowedSet);
-    } else if (reqMRInfo) {
-        // Otherwise, if there is a non-materialized result req that we are participating with,
-        // then set non-materialized result req on 'childReqs' with an updated ProjectionEffects
-        // that reflect the effects of this projection.
-        childReqs.setMRInfo(*updatedAllowedSet);
+        // for ResultInfo, then set a ResultInfo req on 'childReqs'.
+        childReqs.setResultInfo(allowedSet);
+    } else if (reqResultInfo) {
+        // Otherwise, if there is a ResultInfo req that we are participating with, then set a
+        // ResultInfo req on 'childReqs' with an updated ProjectionEffects that reflect the
+        // effects of this projection.
+        childReqs.setResultInfo(*updatedAllowedSet);
     }
 
     // Compute the list of fields that we need to request from our child.
@@ -3514,13 +3497,13 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
 
     childReqs.setFields(std::move(fields));
 
-    bool produceMaterializedResult = reqResult;
+    bool produceResultObj = reqResultObj;
 
     return std::make_unique<BuildProjectionPlan>(
         BuildProjectionPlan{std::move(childReqs),
                             *planType,
-                            reqMRInfo,
-                            produceMaterializedResult,
+                            reqResultInfo,
+                            produceResultObj,
                             isInclusion,
                             std::move(paths),
                             std::move(nodes),
@@ -3528,8 +3511,8 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
                             std::move(resultPaths),
                             std::move(updatedPaths),
                             std::move(updatedPathsExprMap),
-                            std::move(mrInfoModifys),
-                            std::move(mrInfoDrops),
+                            std::move(resultInfoDrops),
+                            std::move(resultInfoModifys),
                             std::move(projNothingInputFields),
                             std::move(inputPlanSingleFields)});
 }
@@ -3543,8 +3526,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     PlanStageReqs& childReqs = plan->childReqs;
 
     BuildProjectionPlan::Type planType = plan->type;
-
-    const PlanStageReqs::MakeResultInfoReq*& reqMRInfo = plan->reqMRInfo;
 
     const bool isInclusion = plan->isInclusion;
     std::vector<std::string>& paths = plan->paths;
@@ -3571,7 +3552,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         inputPlan = std::make_unique<sbe::MakeObjInputPlan>(std::move(*plan->inputPlanSingleFields),
                                                             std::move(allowedSet));
     } else if (planType == BuildProjectionPlan::kUseChildResultInfo) {
-        tassert(8378209, "Expected MakeResultInfo to be set", outputs.getMRInfo() != nullptr);
+        tassert(8378209, "Expected ResultInfo requirement to be set", outputs.hasResultInfo());
 
         const auto& childAllowedFields = getAllowedFieldSet(root->children[0].get());
 
@@ -3581,7 +3562,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         effects.compose(ProjectionEffects(childAllowedFields));
 
         // Compose 'effects' with our descendants' collective ProjectionEffects.
-        effects.compose(outputs.getMRInfo()->effects);
+        effects.compose(outputs.getResultInfoChanges());
 
         tassert(8378210,
                 "Expected default effect to be Keep or Drop",
@@ -3598,12 +3579,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 effects.getModifiedOrCreatedFieldSet().getList(), effects.getAllowedFieldSet());
         } else {
             // If there are no Create/Modify effects and either this is an inclusion or
-            // 'effects.defaultEffefts' is not Drop, then we can take kResultBase from our
-            // child and pass it to makeBsonObj() without using a MakeObjInputPlan.
+            // 'effects.defaultEffect' is not Drop, then we can take the result base object
+            // from our child and pass it to makeBsonObj() without using a MakeObjInputPlan.
 
             // If this is an exclusion projection, take all of the fields this projection
-            // promised it would drop (via its MakeResultInfo req) and manually add "drop"
-            // actions to 'paths' / 'nodes' for each of these fields.
+            // promised it would drop (via its ResultInfo req) and manually add "drop" actions
+            // to 'paths' / 'nodes' for each of these fields.
             if (!isInclusion) {
                 auto fields = getTopLevelFields(paths);
                 auto fieldSet = StringSet(fields.begin(), fields.end());
@@ -3661,7 +3642,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     if (!plan->updatedPathsExprMap.empty()) {
         auto projectExpressionToSlot = [&](const Expression* expr) {
-            auto result = generateExpression(_state, expr, outputs.getIfExists(kResult), &outputs);
+            auto result =
+                generateExpression(_state, expr, outputs.getResultObjIfExists(), &outputs);
 
             if (result.hasSlot()) {
                 return *result.getSlot();
@@ -3726,7 +3708,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                           projectType,
                                           std::move(paths),
                                           std::move(nodes),
-                                          outputs.get(kResult).slotId,
+                                          outputs.getResultObj().slotId,
                                           &outputs);
             } else if (planType == BuildProjectionPlan::kUseCoveredProjection) {
                 return generateProjection(_state,
@@ -3744,7 +3726,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                          *inputPlan,
                                                          &outputs);
             } else if (planType == BuildProjectionPlan::kUseChildResultInfo && !inputPlan) {
-                SbExpr resultBase = SbExpr{outputs.get(kResultBase).slotId};
+                SbExpr resultBase = SbExpr{outputs.getResultInfoBaseObj().slotId};
 
                 return generateProjection(_state,
                                           projectType,
@@ -3753,7 +3735,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                           std::move(resultBase),
                                           &outputs);
             } else if (planType == BuildProjectionPlan::kUseChildResultInfo && inputPlan) {
-                SbExpr resultBase = SbExpr{outputs.get(kResultBase).slotId};
+                SbExpr resultBase = SbExpr{outputs.getResultInfoBaseObj().slotId};
 
                 return generateProjectionWithInputFields(_state,
                                                          projectType,
@@ -3794,8 +3776,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     // Set the materialized result on 'outputs' if appropriate.
-    if (plan->produceMaterializedResult) {
-        outputs.setResult(*resultSlot);
+    if (plan->produceResultObj) {
+        outputs.setResultObj(*resultSlot);
     }
 
     // Assign values retrieved from the result object to kField slots as appropriate.
@@ -3820,18 +3802,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    if (reqMRInfo) {
-        // If 'outputs' has a materialized result and 'reqs' was expecting MakeResultInfo,
-        // then convert the materialized result into a non-materialized result base object.
-        if (outputs.has(kResult)) {
-            outputs.setMRInfoWithResultBase(outputs.get(kResult));
+    if (plan->reqResultInfo) {
+        tassert(8378211, "Expected 'outputs' to have a result", outputs.hasResult());
+        // If 'outputs' has a materialized result and 'reqs' was expecting ResultInfo, then
+        // convert the materialized result into a ResultInfo.
+        if (outputs.hasResultObj()) {
+            outputs.setResultInfoBaseObj(outputs.getResultObj());
         }
         // For changes (drops/modifys/creates) from this projection on fields that are not
-        // dropped by 'reqs.getMRInfo()->allowedSet', record the changes in 'outputs'.
-        auto makeResultInfo = outputs.getMRInfo();
-        tassert(8378211, "Expected MakeResultInfo to be set", makeResultInfo != nullptr);
-
-        makeResultInfo->addModifiedAndDroppedFields(plan->mrInfoModifys, plan->mrInfoDrops);
+        // dropped by 'reqs.getResultInfoAllowedSet()', record the changes in 'outputs'.
+        outputs.addResultInfoChanges(plan->resultInfoDrops, plan->resultInfoModifys);
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -3863,8 +3843,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto childReqs = reqs.copyForChild().setIf(kRecordId, orn->dedup).setFields(std::move(fields));
 
     if (needChildResultDoc) {
-        childReqs.clearMRInfo();
-        childReqs.setResult();
+        childReqs.setResultObj();
     }
 
     std::vector<std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>> inputStagesAndSlots;
@@ -3900,7 +3879,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     if (orn->filter) {
-        auto resultSlot = outputs.getIfExists(kResult);
+        auto resultSlot = outputs.getResultObjIfExists();
 
         auto filterExpr = generateFilter(_state, orn->filter.get(), resultSlot, &outputs);
 
@@ -3928,26 +3907,26 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // assumption.
     tassert(5432216, "text match input must be fetched", root->children[0]->fetched());
 
-    auto childReqs = reqs.copyForChild().clearMRInfo().setResult();
+    auto childReqs = reqs.copyForChild().setResultObj();
     auto [stage, outputs] = build(textNode->children[0].get(), childReqs);
-    tassert(5432217, "result slot is not produced by text match sub-plan", outputs.has(kResult));
+    tassert(5432217, "result slot is not produced by text match sub-plan", outputs.hasResultObj());
 
     // Create an FTS 'matcher' to apply 'ftsQuery' to matching documents.
     auto matcher = makeFtsMatcher(
         _opCtx, coll, textNode->index.identifier.catalogName, textNode->ftsQuery.get());
 
-    // Build an 'ftsMatch' expression to match a document stored in the 'kResult' slot using the
-    // 'matcher' instance.
+    // Build an 'ftsMatch' expression to match against the result object using the 'matcher'
+    // instance.
     auto ftsMatch =
         makeFunction("ftsMatch",
                      makeConstant(sbe::value::TypeTags::ftsMatcher,
                                   sbe::value::bitcastFrom<fts::FTSMatcher*>(matcher.release())),
-                     makeVariable(outputs.get(kResult).slotId));
+                     makeVariable(outputs.getResultObj().slotId));
 
     // Wrap the 'ftsMatch' expression into an 'if' expression to ensure that it can be applied only
     // to a document.
     auto filter =
-        sbe::makeE<sbe::EIf>(makeFunction("isObject", makeVariable(outputs.get(kResult).slotId)),
+        sbe::makeE<sbe::EIf>(makeFunction("isObject", makeVariable(outputs.getResultObj().slotId)),
                              std::move(ftsMatch),
                              sbe::makeE<sbe::EFail>(ErrorCodes::Error{4623400},
                                                     "textmatch requires input to be an object"));
@@ -3981,11 +3960,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // for 'resultSlot'. In addition to that, the child must always produce a 'returnKeySlot'.
     // After build() returns, we take the 'returnKeySlot' produced by the child and store it into
     // 'resultSlot' for the parent of this ReturnKeyNode to consume.
-    auto childReqs =
-        reqs.copyForChild().clearResult().clearMRInfo().clearAllFields().set(kReturnKey);
+    auto childReqs = reqs.copyForChild().clearResult().clearAllFields().set(kReturnKey);
     auto [stage, outputs] = build(returnKeyNode->children[0].get(), childReqs);
 
-    outputs.setResult(outputs.get(kReturnKey));
+    outputs.setResultObj(outputs.get(kReturnKey));
     outputs.clear(kReturnKey);
 
     return {std::move(stage), std::move(outputs)};
@@ -3993,7 +3971,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildEof(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    return generateEofPlan(root->nodeId(), reqs, _state);
+    return generateEofPlan(_state, reqs, root->nodeId());
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildAndHash(
@@ -4003,21 +3981,21 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     tassert(6023412, "buildAndHash() does not support kSortKey", !reqs.hasSortKeys());
     tassert(5073711, "need at least two children for AND_HASH", andHashNode->children.size() >= 2);
 
-    auto childReqs = reqs.copyForChild().clearMRInfo().setResult().set(kRecordId).clearAllFields();
+    auto childReqs = reqs.copyForChild().setResultObj().set(kRecordId).clearAllFields();
 
     auto outerChild = andHashNode->children[0].get();
     auto innerChild = andHashNode->children[1].get();
 
     auto [outerStage, outerOutputs] = build(outerChild, childReqs);
     auto outerIdSlot = outerOutputs.get(kRecordId).slotId;
-    auto outerResultSlot = outerOutputs.get(kResult).slotId;
+    auto outerResultSlot = outerOutputs.getResultObj().slotId;
     auto outerCondSlots = sbe::makeSV(outerIdSlot);
     auto outerProjectSlots = sbe::makeSV(outerResultSlot);
 
     auto [innerStage, innerOutputs] = build(innerChild, childReqs);
 
     auto innerIdSlot = innerOutputs.get(kRecordId).slotId;
-    auto innerResultSlot = innerOutputs.get(kResult).slotId;
+    auto innerResultSlot = innerOutputs.getResultObj().slotId;
     auto innerSnapshotIdSlot = innerOutputs.getIfExists(kSnapshotId);
     auto innerIndexIdentSlot = innerOutputs.getIfExists(kIndexIdent);
     auto innerIndexKeySlot = innerOutputs.getIfExists(kIndexKey);
@@ -4031,7 +4009,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Designate outputs.
     PlanStageSlots outputs;
 
-    outputs.set(kResult, innerResultSlot);
+    outputs.setResultObj(innerResultSlot);
 
     if (reqs.has(kRecordId)) {
         outputs.set(kRecordId, innerIdSlot);
@@ -4072,7 +4050,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto [childStage, outputs] = build(andHashNode->children[i].get(), childReqs);
 
         auto idSlot = outputs.get(kRecordId).slotId;
-        auto resultSlot = outputs.get(kResult).slotId;
+        auto resultSlot = outputs.getResultObj().slotId;
         auto condSlots = sbe::makeSV(idSlot);
         auto projectSlots = sbe::makeSV(resultSlot);
 
@@ -4101,7 +4079,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     tassert(
         5073706, "need at least two children for AND_SORTED", andSortedNode->children.size() >= 2);
 
-    auto childReqs = reqs.copyForChild().clearMRInfo().setResult().set(kRecordId).clearAllFields();
+    auto childReqs = reqs.copyForChild().setResultObj().set(kRecordId).clearAllFields();
 
     auto outerChild = andSortedNode->children[0].get();
     auto innerChild = andSortedNode->children[1].get();
@@ -4114,7 +4092,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto [outerStage, outerOutputs] = build(outerChild, outerChildReqs);
 
     auto outerIdSlot = outerOutputs.get(kRecordId).slotId;
-    auto outerResultSlot = outerOutputs.get(kResult).slotId;
+    auto outerResultSlot = outerOutputs.getResultObj().slotId;
 
     auto outerKeySlots = sbe::makeSV(outerIdSlot);
     auto outerProjectSlots = sbe::makeSV(outerResultSlot);
@@ -4122,7 +4100,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto [innerStage, innerOutputs] = build(innerChild, childReqs);
 
     auto innerIdSlot = innerOutputs.get(kRecordId).slotId;
-    auto innerResultSlot = innerOutputs.get(kResult).slotId;
+    auto innerResultSlot = innerOutputs.getResultObj().slotId;
 
     auto innerKeySlots = sbe::makeSV(innerIdSlot);
     auto innerProjectSlots = sbe::makeSV(innerResultSlot);
@@ -4130,7 +4108,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Designate outputs.
     PlanStageSlots outputs;
 
-    outputs.set(kResult, innerResultSlot);
+    outputs.setResultObj(innerResultSlot);
 
     if (reqs.has(kRecordId)) {
         outputs.set(kRecordId, innerIdSlot);
@@ -4174,7 +4152,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto [childStage, outputs] = build(andSortedNode->children[i].get(), childReqs);
 
         auto idSlot = outputs.get(kRecordId).slotId;
-        auto resultSlot = outputs.get(kResult).slotId;
+        auto resultSlot = outputs.getResultObj().slotId;
         auto keySlots = sbe::makeSV(idSlot);
         auto projectSlots = sbe::makeSV(resultSlot);
 
@@ -4362,7 +4340,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         (child->getType() == STAGE_VIRTUAL_SCAN &&
          !static_cast<const VirtualScanNode*>(child)->indexKeyPattern.isEmpty());
 
-    // If we're not required to fill out the 'kResult' slot, then instead we can request a slot from
+    // If we're not required to produce a result object, then instead we can request a slot from
     // the child for each of the fields which constitute the shard key. This allows us to avoid
     // materializing an intermediate object for plans where shard filtering can be performed based
     // on the contents of index keys.
@@ -4370,7 +4348,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // We only apply this optimization in the special case that the child QSN is an IXSCAN, since in
     // this case we can request exactly the fields we need according to their position in the index
     // key pattern.
-    if (!reqs.hasResultOrMRInfo() && childIsIndexScan) {
+    if (!reqs.hasResult() && childIsIndexScan) {
         return buildShardFilterCovered(root, reqs);
     }
 
@@ -4541,11 +4519,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                  [](auto&& f) { return f.find('.') == std::string::npos; });
     }
 
-    // If the parent requires kResult or MakeResultInfo, or if reqs.getFields() contained a dotted
-    // path, or if 'windowNode->outputFields' contains a dotted path P where 'getTopLevelField(P)'
-    // is in 'reqFieldSet', then we need to materialize kResult.
+    // If the parent requires result, or if reqs.getFields() contained a dotted path, or if
+    // 'windowNode->outputFields' contains a dotted path P where 'getTopLevelField(P)' is in
+    // 'reqFieldSet', then we need to materialize the result object.
     bool reqResult = [&] {
-        if (reqs.hasResultOrMRInfo() || reqFieldsHasDottedPaths) {
+        if (reqs.hasResult() || reqFieldsHasDottedPaths) {
             return true;
         }
         auto reqFieldSet = StringDataSet(reqFields.begin(), reqFields.end());
@@ -4555,7 +4533,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 return true;
             }
             if (isTopBottomN(outputField)) {
-                // kResult is required for generating sort-key in $topN/$bottomN
+                // We need the materialized result object to generate sort keys for $topN/$bottomN.
                 return true;
             }
         }
@@ -4563,8 +4541,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }();
 
     auto child = root->children[0].get();
-    auto childReqs = reqResult ? reqs.copyForChild().setResult()
-                               : reqs.copyForChild().clearResult().clearMRInfo();
+    auto childReqs =
+        reqResult ? reqs.copyForChild().setResultObj() : reqs.copyForChild().clearResult();
 
     auto forwardingReqs = childReqs.copyForChild();
 
@@ -4575,7 +4553,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto childStageOutput = build(child, childReqs);
     auto stage = std::move(childStageOutput.first);
     auto outputs = std::move(childStageOutput.second);
-    auto rootSlotOpt = outputs.getIfExists(kResult);
+    auto rootSlotOpt = outputs.getResultObjIfExists();
 
     // Create a tuple of slots for each new slot added.
     sbe::value::SlotVector currSlots = _data->metadataSlots.getSlotVector();
@@ -5303,14 +5281,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         outputs.set(std::make_pair(PlanStageSlots::kField, field), slot);
     }
 
-    // Materialize kResult if needed.
+    // Produce a materialized result object if needed.
     if (reqResult) {
         std::vector<ProjectNode> nodes;
         for (size_t i = 0; i < windowFields.size(); ++i) {
             nodes.emplace_back(SbExpr{windowFinalSlots[i]});
         }
 
-        TypedSlot resultSlot = outputs.get(kResult);
+        TypedSlot resultSlot = outputs.getResultObj();
         auto projType = projection_ast::ProjectType::kAddition;
         auto projectionExpr =
             generateProjection(
@@ -5322,7 +5300,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             std::move(stage), windowNode->nodeId(), outResultSlot, std::move(projectionExpr.expr));
 
         stage = std::move(outStage);
-        outputs.setResult(TypedSlot{outResultSlot, projectionExpr.typeSignature});
+        outputs.setResultObj(TypedSlot{outResultSlot, projectionExpr.typeSignature});
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -5344,7 +5322,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSearchMeta(
             makeLimitCoScanTree(root->nodeId(), 1),
             makeFunction("exists"_sd, makeVariable(*searchMetaSlot)),
             root->nodeId());
-        outputs.setResult(*searchMetaSlot);
+        outputs.setResultObj(*searchMetaSlot);
         return {std::move(stage), std::move(outputs)};
     }
 
@@ -5356,7 +5334,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSearchMeta(
                                                            root->remoteCursorId,
                                                            yieldPolicy,
                                                            root->nodeId());
-    outputs.setResult(searchResultSlot);
+    outputs.setResultObj(searchResultSlot);
     state.data->cursorType = CursorTypeEnum::SearchMetaResult;
 
     return {std::move(stage), std::move(outputs)};
@@ -5395,7 +5373,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     // Search cursor stage output slots
-    auto searchResultSlot = isStoredSource && reqs.hasResultOrMRInfo()
+    auto searchResultSlot = isStoredSource && reqs.hasResult()
         ? boost::make_optional(_slotIdGenerator.generate())
         : boost::none;
     // Register the $$SEARCH_META slot.
@@ -5421,7 +5399,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto collatorSlot = _state.getCollatorSlot();
     if (isStoredSource) {
         if (searchResultSlot) {
-            outputs.set(kResult, searchResultSlot.value());
+            outputs.setResultObj(searchResultSlot.value());
         }
 
         return {sbe::SearchCursorStage::createForStoredSource(expCtx->ns,
@@ -5500,7 +5478,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Slot stores the resulting document.
     auto outputDocSlot = _slotIdGenerator.generate();
-    outputs.set(kResult, outputDocSlot);
+    outputs.setResultObj(outputDocSlot);
     // Slot stores rid if it it found, in our case same as seekRecordIdSlot.
     auto ridSlot = _slotIdGenerator.generate();
 
@@ -5616,13 +5594,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto [stage, slots] = (this->*(kStageBuilders.at(stageType)))(root, reqs);
     auto outputs = std::move(slots);
 
-    auto reqMRInfo = reqs.getMRInfo();
+    bool reqResultInfo = reqs.hasResultInfo();
 
-    if (reqMRInfo) {
+    if (reqResultInfo) {
         tassert(8146611,
                 str::stream() << "Expected build() for " << stageTypeToString(stageType)
-                              << " to produce kResult or MakeResultInfo",
-                outputs.hasResultOrMRInfo());
+                              << " to produce a result object or ResultInfo",
+                outputs.hasResult());
     }
 
     // Check if there are any required kField slots that are missing.
@@ -5636,32 +5614,30 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    bool hasResultSlot = outputs.has(kResult);
-
     // If any required kFields slots are missing, populate them (or throw an error if there is not
-    // a kResult slot or a compatible kResultBase slot to retrieve the field from).
+    // a materialized result object or a compatible result base object to retrieve them from).
     if (!missingFields.empty()) {
-        if (!hasResultSlot) {
+        if (!outputs.hasResultObj()) {
             for (auto&& f : missingFields) {
                 tassert(6023424,
                         str::stream()
                             << "Expected build() for " << stageTypeToString(stageType)
-                            << " to either satisfy all kField reqs, provide a kResult slot,"
-                            << " or provide a compatible kResultBase slot",
-                        outputs.getMRInfo() && reqs.getMRInfo() &&
-                            reqs.getMRInfo()->allowedSet.count(f) &&
-                            outputs.getMRInfo()->effects.isKeep(f));
+                            << " to either satisfy all kField reqs, provide a materialized "
+                            << "result object, or provide a compatible result base object",
+                        reqs.hasResultInfo() && reqs.getResultInfoAllowedSet().count(f) &&
+                            outputs.hasResultInfo() && outputs.getResultInfoChanges().isKeep(f));
             }
         }
 
-        auto resultSlotName = hasResultSlot ? PlanStageSlots::kResult : PlanStageSlots::kResultBase;
-        auto [outStage, outSlots] = projectFieldsToSlots(std::move(stage),
-                                                         missingFields,
-                                                         outputs.get(resultSlotName).slotId,
-                                                         root->nodeId(),
-                                                         &_slotIdGenerator,
-                                                         _state,
-                                                         &outputs);
+        auto [outStage, outSlots] =
+            projectFieldsToSlots(std::move(stage),
+                                 missingFields,
+                                 outputs.get(PlanStageSlots::kResult).slotId,
+                                 root->nodeId(),
+                                 &_slotIdGenerator,
+                                 _state,
+                                 &outputs);
+
         stage = std::move(outStage);
 
         for (size_t i = 0; i < missingFields.size(); ++i) {
@@ -5670,11 +5646,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    if (reqMRInfo) {
-        // If 'outputs' has a materialized result and 'reqs' was expecting MakeResultInfo,
-        // then convert the materialized result into a non-materialized result base object.
-        if (!outputs.getMRInfo()) {
-            outputs.setMRInfoWithResultBase(outputs.get(kResult));
+    if (reqResultInfo) {
+        // If 'outputs' has a materialized result and 'reqs' was expecting ResultInfo,
+        // then convert the materialized result into a ResultInfo.
+        if (!outputs.hasResultInfo()) {
+            outputs.setResultInfoBaseObj(outputs.getResultObj());
         }
     }
 
@@ -5684,7 +5660,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     // Clear non-required slots (excluding ~10 stages to preserve legacy behavior for now),
-    // and also clear MakeResultInfo if it's not required.
+    // and also clear ResultInfo if it's not required.
     bool clearSlots = stageType != STAGE_VIRTUAL_SCAN && stageType != STAGE_COLUMN_SCAN &&
         stageType != STAGE_LIMIT && stageType != STAGE_SKIP && stageType != STAGE_TEXT_MATCH &&
         stageType != STAGE_RETURN_KEY && stageType != STAGE_AND_HASH &&
@@ -5692,12 +5668,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         stageType != STAGE_UNPACK_TS_BUCKET;
 
     if (clearSlots) {
-        // To preserve legacy behavior, in some cases we unconditionally retain the kResult slot.
-        bool saveResultSlot = stageType != STAGE_SORT_SIMPLE && stageType != STAGE_SORT_DEFAULT &&
+        // To preserve legacy behavior, in some cases we unconditionally retain the result object.
+        bool saveResultObj = stageType != STAGE_SORT_SIMPLE && stageType != STAGE_SORT_DEFAULT &&
             stageType != STAGE_PROJECTION_SIMPLE && stageType != STAGE_PROJECTION_COVERED &&
             stageType != STAGE_PROJECTION_DEFAULT;
 
-        outputs.clearNonRequiredSlots(reqs, saveResultSlot);
+        outputs.clearNonRequiredSlots(reqs, saveResultObj);
     }
 
     return {std::move(stage), std::move(outputs)};

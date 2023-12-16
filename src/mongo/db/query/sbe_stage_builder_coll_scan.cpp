@@ -378,7 +378,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     }
 
     PlanStageSlots outputs;
-    outputs.set(PlanStageSlots::kResult, resultSlot);
+    outputs.setResultObj(resultSlot);
     outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
     for (size_t i = 0; i < scanFieldNames.size(); ++i) {
         outputs.set(std::make_pair(PlanStageSlots::kField, scanFieldNames[i]), scanFieldSlots[i]);
@@ -475,7 +475,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     }
 
     PlanStageSlots outputs;
-    outputs.set(PlanStageSlots::kResult, resultSlot);
+    outputs.setResultObj(resultSlot);
     outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
     for (size_t i = 0; i < fields.size(); ++i) {
         outputs.set(std::make_pair(PlanStageSlots::kField, fields[i]), fieldSlots[i]);

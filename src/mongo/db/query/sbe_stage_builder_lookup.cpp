@@ -1194,9 +1194,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         _state.data->foreignHashJoinCollections.emplace(eqLookupNode->foreignCollection);
     }
 
-    auto localReqs = reqs.copyForChild().clearMRInfo().setResult();
+    auto localReqs = reqs.copyForChild().setResultObj();
     auto [localStage, localOutputs] = build(eqLookupNode->children[0].get(), localReqs);
-    SlotId localDocumentSlot = localOutputs.get(PlanStageSlots::kResult).slotId;
+    SlotId localDocumentSlot = localOutputs.getResultObj().slotId;
 
     auto [matchedDocumentsSlot, foreignStage] = [&, localStage = std::move(localStage)]() mutable
         -> std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> {
@@ -1287,7 +1287,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                              eqLookupNode->shouldProduceBson);
 
     PlanStageSlots outputs;
-    outputs.set(kResult, resultSlot);
+    outputs.setResultObj(resultSlot);
     return {std::move(resultStage), std::move(outputs)};
 }
 

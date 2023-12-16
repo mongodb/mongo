@@ -89,7 +89,7 @@ void walkAndActOnFieldPaths(Expression* expr, const F& fn) {
 // the group-by key ("_id") and the accumulators.
 MONGO_COMPILER_NOINLINE
 PlanStageReqs computeChildReqsForGroup(const PlanStageReqs& reqs, const GroupNode& groupNode) {
-    auto childReqs = reqs.copyForChild().clearMRInfo().setResult().clearAllFields();
+    auto childReqs = reqs.copyForChild().setResultObj().clearAllFields();
 
     // If the group node references any top level fields, we take all of them and add them to
     // 'childReqs'. Note that this happens regardless of whether we need the whole document because
@@ -100,7 +100,7 @@ PlanStageReqs computeChildReqsForGroup(const PlanStageReqs& reqs, const GroupNod
     }
 
     if (!groupNode.needWholeDocument) {
-        // Tracks whether we need to request kResult.
+        // Tracks whether we need to require our child to produce a materialized result object.
         bool rootDocIsNeeded = false;
         bool sortKeyIsNeeded = false;
         auto referencesRoot = [&](const ExpressionFieldPath* fieldExpr) {
@@ -116,15 +116,16 @@ PlanStageReqs computeChildReqsForGroup(const PlanStageReqs& reqs, const GroupNod
             }
         }
 
-        // If any accumulator requires generating sort key, we cannot clear the kResult.
+        // If any accumulator requires generating sort key, we cannot clear the result requirement
+        // from 'childReqs'.
         if (!sortKeyIsNeeded) {
             const auto& childNode = *groupNode.children[0];
 
             // If the group node doesn't have any dependency (e.g. $count) or if the dependency can
-            // be satisfied by the child node (e.g. covered index scan), we can clear the kResult
+            // be satisfied by the child node (e.g. covered index scan), we can clear the result
             // requirement for the child.
             if (groupNode.requiredFields.empty() || !rootDocIsNeeded) {
-                childReqs.clearResult().clearMRInfo();
+                childReqs.clearResult();
             } else if (childNode.getType() == StageType::STAGE_PROJECTION_COVERED) {
                 auto& childPn = static_cast<const ProjectionNodeCovered&>(childNode);
                 std::set<std::string> providedFieldSet;
@@ -134,7 +135,7 @@ PlanStageReqs computeChildReqsForGroup(const PlanStageReqs& reqs, const GroupNod
                 if (std::all_of(groupNode.requiredFields.begin(),
                                 groupNode.requiredFields.end(),
                                 [&](const std::string& f) { return providedFieldSet.count(f); })) {
-                    childReqs.clearResult().clearMRInfo();
+                    childReqs.clearResult();
                 }
             }
         }
@@ -196,7 +197,7 @@ SbStage projectPathTraversalsForGroupBy(
         // slot.
         TypedSlot slot;
         auto result = stage_builder::generateExpression(
-            state, fp.second, childOutputs.getIfExists(PlanStageSlots::kResult), &childOutputs);
+            state, fp.second, childOutputs.getResultObjIfExists(), &childOutputs);
 
         if (result.hasSlot()) {
             slot = TypedSlot{*result.getSlot(), TypeSignature::kAnyScalarType};
@@ -223,7 +224,7 @@ generateGroupByObjKey(StageBuilderState& state,
                       const PlanStageSlots& outputs,
                       SbStage stage,
                       PlanNodeId nodeId) {
-    auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
+    auto rootSlot = outputs.getResultObjIfExists();
 
     VariableTypes varTypes = buildVariableTypes(outputs);
     sbe::value::SlotVector slots;
@@ -273,7 +274,7 @@ generateGroupBySingleKey(StageBuilderState& state,
                          const PlanStageSlots& outputs,
                          SbStage stage,
                          PlanNodeId nodeId) {
-    auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
+    auto rootSlot = outputs.getResultObjIfExists();
     // The group-by field may end up being 'Nothing' and in that case _id: null will be
     // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
     SbExprBuilder b(state);
@@ -329,7 +330,7 @@ sbe::value::SlotVector generateAccumulator(StageBuilderState& state,
                                            sbe::value::SlotIdGenerator* slotIdGenerator,
                                            sbe::AggExprVector& aggSlotExprs,
                                            boost::optional<TypedSlot> initializerRootSlot) {
-    auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
+    auto rootSlot = outputs.getResultObjIfExists();
     auto collatorSlot = state.getCollatorSlot();
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
@@ -761,10 +762,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Builds the child and gets the child result slot. If we don't need the full result object, we
     // can process block values.
-    auto [childStage, childOutputs] =
-        build(childNode,
-              computeChildReqsForGroup(reqs, *groupNode)
-                  .setCanProcessBlockValues(!reqs.has(PlanStageSlots::kResult)));
+    auto [childStage, childOutputs] = build(
+        childNode,
+        computeChildReqsForGroup(reqs, *groupNode).setCanProcessBlockValues(!reqs.hasResultObj()));
 
     // Build the group stage in a separate helper method, so that the variables that are not needed
     // to setup the recursive call to build() don't consume precious stack.
@@ -817,14 +817,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             // The group-by field may end up being 'Nothing' and in that case _id: null will be
             // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
             SbExprBuilder b(_state);
-            auto groupByBlockExpr =
-                buildVectorizedExpr(b.makeFillEmptyNull(generateExpression(
-                                        _state,
-                                        idExpr.get(),
-                                        childOutputs.getIfExists(PlanStageSlots::kResult),
-                                        &childOutputs)),
-                                    childOutputs,
-                                    false);
+            auto groupByBlockExpr = buildVectorizedExpr(
+                b.makeFillEmptyNull(generateExpression(
+                    _state, idExpr.get(), childOutputs.getResultObjIfExists(), &childOutputs)),
+                childOutputs,
+                false);
             if (groupByBlockExpr.has_value() &&
                 TypeSignature::kBlockType.isSubset(groupByBlockExpr->typeSignature)) {
 
@@ -896,9 +893,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Builds a stage to create a result object out of a group-by slot and gathered accumulator
     // result slots if the parent node requests so.
-    if (reqs.hasResultOrMRInfo() || !additionalFields.empty()) {
+    if (reqs.hasResult() || !additionalFields.empty()) {
         auto resultSlot = _slotIdGenerator.generate();
-        outputs.set(kResult, TypedSlot{resultSlot, TypeSignature::kObjectType});
+        outputs.setResultObj(TypedSlot{resultSlot, TypeSignature::kObjectType});
         // This mkbson stage combines 'finalSlots' into a bsonObject result slot which has
         // 'fieldNames' fields.
         if (groupNode->shouldProduceBson) {

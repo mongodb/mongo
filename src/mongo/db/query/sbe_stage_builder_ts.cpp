@@ -160,7 +160,7 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildBlockToRow(
     sbe::value::SlotVector blockSlots;
     std::vector<PlanStageSlots::UnownedSlotName> blockSlotNames, outputsToRemove;
     outputsToRemove.push_back(PlanStageSlots::kBlockSelectivityBitmap);
-    for (const auto& slot : outputs.getAllNamedSlotsInOrder()) {
+    for (const auto& slot : outputs.getAllNameSlotPairsInOrder()) {
         if (slot.first.first == PlanStageSlots::kField &&
             (TypeSignature::kBlockType.isSubset(slot.second.typeSignature) ||
              TypeSignature::kCellType.isSubset(slot.second.typeSignature))) {
@@ -254,9 +254,9 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                                            const PlanStageReqs& reqs) {
     const auto unpackNode = static_cast<const UnpackTsBucketNode*>(root);
 
-    // Setup the request for the child stage that should place the bucket to be unpacked into the
-    // kResult slot.
-    PlanStageReqs childReqs = reqs.copyForChild().clearAllFields().clearMRInfo().setResult();
+    // Setup the request for the child stage that should place the bucket to be unpacked into a
+    // materialized result object.
+    PlanStageReqs childReqs = reqs.copyForChild().clearAllFields().setResultObj();
     // Computing fields from 'meta' should have been pushed below unpacking as projection stages
     // over the buckets collection, so the child stage must be able to publish the slots.
     for (const auto& fieldName : unpackNode->bucketSpec.computedMetaProjFields()) {
@@ -280,7 +280,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     // The set of the fields visible to the parent stage is ultimately defined by the 'unpackNode'.
     // However, the parent stage might requests field that are not published (e.g. field "b" in
     // pipeline like [{$project: {c: 1}},{$replaceRoot: {newRoot: {z: "$b"}}}]). We'll have to deal
-    // with this if we are not producing a 'kResult' (see later in this function).
+    // with this if we are not producing a materialized result object (see later in this function).
     PlanStageSlots outputs;
 
     // Propagate the 'meta' and fields computed from 'meta' into the 'outputs'.
@@ -294,7 +294,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         outputs.set(std::pair(PlanStageSlots::kField, fieldName),
                     childOutputs.get(std::pair(PlanStageSlots::kField, fieldName)));
     }
-    auto bucketSlot = childOutputs.get(kResult);
+    auto bucketSlot = childOutputs.getResultObj();
 
     // The 'TsBucketToCellBlockStage' and 'BlockToRowStage' together transform a single bucket into
     // a sequence of "rows" with fields, extracted from the bucket's data. The stages between these
@@ -422,7 +422,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     // - we have a filter that we could not vectorize
     // - we are supposed to return a BSON result
     // - the caller doesn't support working on block values
-    if (eventFilter || reqs.hasResultOrMRInfo() || !reqs.getCanProcessBlockValues()) {
+    if (eventFilter || reqs.hasResult() || !reqs.getCanProcessBlockValues()) {
         stage = buildBlockToRow(std::move(stage), outputs);
     }
 
@@ -437,8 +437,9 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         }
     }
 
-    // If the parent wants us to materialize kResult, create an object with all published fields.
-    if (reqs.hasResultOrMRInfo()) {
+    // If the parent wants us to produce a result objectt, create an object with all published
+    // fields.
+    if (reqs.hasResult()) {
         std::vector<std::string> fieldNames;
         sbe::value::SlotVector fieldSlots;
 
@@ -448,7 +449,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                 std::make_pair(PlanStageSlots::kField, unpackNode->bucketSpec.timeField()));
         }
 
-        for (auto&& p : outputs.getAllNamedSlotsInOrder()) {
+        for (auto&& p : outputs.getAllNameSlotPairsInOrder()) {
             auto& name = p.first;
             auto& slot = p.second;
             if (name.first == PlanStageSlots::kField) {
@@ -458,7 +459,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         }
 
         auto resultSlot = _slotIdGenerator.generate();
-        outputs.setResult(resultSlot);
+        outputs.setResultObj(resultSlot);
 
         stage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(stage),
                                                   resultSlot,                  // objSlot
@@ -472,11 +473,11 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                                                   unpackNode->nodeId());
     } else {
         // As we are not producing a result record, we must fulfill all reqs in a way that would be
-        // equivalent to fetching the same fields from 'kResult', that is, we'll map the fields to
-        // the environtment's 'Nothing' slot.
-        auto reqsWithResult = reqs.copyForChild().setResult();
+        // equivalent to fetching the same fields from the result object, that is, we'll map the
+        // fields to the environtment's 'Nothing' slot.
+        auto reqsWithResultObj = reqs.copyForChild().setResultObj();
 
-        outputs.setMissingRequiredNamedSlotsToNothing(_state, reqsWithResult);
+        outputs.setMissingRequiredNamedSlotsToNothing(_state, reqsWithResultObj);
     }
 
     return {std::move(stage), std::move(outputs)};
