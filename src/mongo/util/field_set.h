@@ -116,6 +116,10 @@ public:
         constexpr bool doUnion = false;
         setUnionOrIntersectImpl(other, doUnion);
     }
+    inline void setComplement() {
+        bool scopeIsClosed = _scope == FieldListScope::kClosed;
+        _scope = scopeIsClosed ? FieldListScope::kOpen : FieldListScope::kClosed;
+    }
 
     std::string toString() const;
 

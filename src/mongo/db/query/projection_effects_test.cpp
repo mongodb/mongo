@@ -201,7 +201,7 @@ TEST(ProjectionEffectsTest, BasicTest) {
     vec.push_back(mergedACBD);
 
     for (auto&& pe : vec) {
-        auto roundTrip = ProjectionEffects(pe.getNonDroppedFieldSet(),
+        auto roundTrip = ProjectionEffects(pe.getAllowedFieldSet(),
                                            pe.getModifiedOrCreatedFieldSet(),
                                            pe.getCreatedFieldSet(),
                                            pe.getFieldList());
