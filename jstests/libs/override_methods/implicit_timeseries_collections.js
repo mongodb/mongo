@@ -9,7 +9,6 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 
 // Save a reference to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
-const originalGetCollection = DB.prototype.getCollection;
 const originalDBCommandCursorNext = DBCommandCursor.prototype.next;
 const originalAssertEq = assert.eq;
 
@@ -24,22 +23,7 @@ const dollarOperatorsSet = [
     "$addFields",
 ];
 
-const denylistedNamespaces = [
-    /^admin\./,
-    /^config\./,
-    /\.system\./,
-];
-
 const timeValue = ISODate("2023-11-28T22:14:20.298Z");
-
-/**
- * Creates the collection as time-series if it doesn't exist yet.
- */
-DB.prototype.getCollection = function() {
-    const collection = originalGetCollection.apply(this, arguments);
-    createCollectionImplicitly(this, collection.getFullName(), collection.getName());
-    return collection;
-};
 
 /**
  * Removes the timestamp field from the result of calling next on the cursor.
@@ -60,8 +44,6 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     switch (cmdName.toLowerCase()) {
         // Add the timestamp property to every document in the insert.
         case "insert": {
-            createCollectionImplicitly(
-                conn.getDB(dbName), `${dbName}.${cmdObj[cmdName]}`, cmdObj[cmdName]);
             for (let idx in cmdObj["documents"]) {
                 cmdObj["documents"][idx][timeFieldName] = timeValue;
             }
@@ -149,27 +131,6 @@ assert.eq = function(a, b, message) {
 };
 
 // ------------------------------ Helper Methods --------------------------------------
-
-function createCollectionImplicitly(db, collFullName, collName) {
-    for (const ns of denylistedNamespaces) {
-        if (collFullName.match(ns)) {
-            return;
-        }
-    }
-
-    const collectionsList =
-        new DBCommandCursor(
-            db, db.runCommand({'listCollections': 1, nameOnly: true, filter: {name: collName}}))
-            .toArray();
-
-    if (collectionsList.length !== 0) {
-        // Collection already exists.
-        return;
-    }
-
-    db.runCommand(
-        {create: collName, timeseries: {timeField: timeFieldName, metaField: metaFieldName}});
-}
 
 /**
  * Helper method to remove instances of the timestamp field name from the cursor returned
