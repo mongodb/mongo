@@ -73,7 +73,6 @@ constexpr StringData kArrayHeader = "a"_sd;
 constexpr StringData kDeleteSectionFieldName = "d"_sd;
 constexpr StringData kInsertSectionFieldName = "i"_sd;
 constexpr StringData kUpdateSectionFieldName = "u"_sd;
-constexpr StringData kBinarySectionFieldName = "b"_sd;
 constexpr char kSubDiffSectionFieldPrefix = 's';
 // 'l' for length.
 constexpr StringData kResizeSectionFieldName = "l"_sd;
@@ -133,7 +132,6 @@ public:
     boost::optional<StringData> nextDelete();
     boost::optional<BSONElement> nextUpdate();
     boost::optional<BSONElement> nextInsert();
-    boost::optional<BSONElement> nextBinary();
     boost::optional<std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>>
     nextSubDiff();
 
@@ -143,7 +141,6 @@ private:
     boost::optional<BSONObjIterator> _deletes;
     boost::optional<BSONObjIterator> _inserts;
     boost::optional<BSONObjIterator> _updates;
-    boost::optional<BSONObjIterator> _binaries;
     boost::optional<BSONObjIterator> _subDiffs;
 };
 }  // namespace doc_diff
@@ -156,15 +153,7 @@ namespace diff_tree {
  *
  * When the update is complete, the diff tree is converted into a $v: 2 oplog entry.
  */
-enum class NodeType {
-    kDocumentSubDiff,
-    kDocumentInsert,
-    kArray,
-    kDelete,
-    kUpdate,
-    kInsert,
-    kBinary
-};
+enum class NodeType { kDocumentSubDiff, kDocumentInsert, kArray, kDelete, kUpdate, kInsert };
 
 /**
  * Base class to represents a node in the diff tree.
@@ -209,19 +198,6 @@ struct DeleteNode : public Node {
     NodeType type() const override {
         return NodeType::kDelete;
     }
-};
-
-/**
- * Structure to represent a field binary node.
- */
-struct BinaryNode : public Node {
-    BinaryNode(mutablebson::Element el) : elt(el) {}
-    BinaryNode(BSONElement el) : elt(el) {}
-
-    NodeType type() const override {
-        return NodeType::kBinary;
-    }
-    std::variant<mutablebson::Element, BSONElement> elt;
 };
 
 /**
@@ -293,9 +269,6 @@ public:
     void addDelete(StringData fieldName) {
         addChild(fieldName, std::make_unique<DeleteNode>());
     }
-    void addBinary(StringData fieldName, BSONElement value) {
-        addChild(fieldName, std::make_unique<BinaryNode>(value));
-    }
     NodeType type() const override {
         return NodeType::kDocumentSubDiff;
     }
@@ -307,9 +280,6 @@ public:
     }
     const ModificationEntries<DeleteNode*>& getDeletes() const {
         return deletes;
-    }
-    const ModificationEntries<BinaryNode*>& getBinaries() const {
-        return binaries;
     }
     const ModificationEntries<Node*>& getInserts() const {
         return inserts;
@@ -330,7 +300,6 @@ private:
     // map, where they are owned.
     ModificationEntries<UpdateNode*> updates;
     ModificationEntries<DeleteNode*> deletes;
-    ModificationEntries<BinaryNode*> binaries;
     ModificationEntries<Node*> inserts;
     ModificationEntries<InternalNode*> subDiffs;
 

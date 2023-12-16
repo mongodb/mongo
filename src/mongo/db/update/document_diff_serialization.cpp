@@ -83,13 +83,6 @@ void InternalNode::ApproxBSONSizeTracker::addEntry(size_t fieldSize, const Node*
             _size += 1 /* boolean value */;
             break;
         }
-        case (NodeType::kBinary): {
-            if (const auto* elem =
-                    get_if<BSONElement>(&checked_cast<const BinaryNode*>(node)->elt)) {
-                _size += elem->valuesize();
-            }
-            break;
-        }
     }
 }
 
@@ -132,13 +125,6 @@ Node* DocumentSubDiffNode::addChild(StringData fieldName, std::unique_ptr<Node> 
                 sizeTracker.addSizeForWrapping();
             }
             updates.push_back({storedFieldName, checked_cast<UpdateNode*>(nodePtr)});
-            return nodePtr;
-        }
-        case (NodeType::kBinary): {
-            if (binaries.empty()) {
-                sizeTracker.addSizeForWrapping();
-            }
-            binaries.push_back({storedFieldName, checked_cast<BinaryNode*>(nodePtr)});
             return nodePtr;
         }
     }
@@ -262,25 +248,6 @@ public:
             _insertBob = boost::none;
         }
 
-        const auto& binaries = _node.getBinaries();
-        for (; _binaryIdx < binaries.size(); ++_binaryIdx) {
-            if (!_binaryBob) {
-                _binaryBob.emplace(_bob.subobjStart(doc_diff::kBinarySectionFieldName));
-            }
-
-            auto&& [fieldName, child] = binaries[_binaryIdx];
-
-            invariant(child->type() == NodeType::kBinary);
-            appendElementToBuilder(
-                checked_cast<BinaryNode*>(child)->elt, fieldName, _binaryBob.get_ptr());
-        }
-
-        if (_binaryBob) {
-            // All binaries have been written so we destroy the binary builder now.
-            _binaryBob = boost::none;
-        }
-
-
         if (_subDiffIdx != _node.getSubDiffs().size()) {
             auto&& [fieldName, child] = _node.getSubDiffs()[_subDiffIdx];
 
@@ -307,11 +274,9 @@ private:
 
     // Keeps track of which insertion or subDiff is being serialized.
     size_t _insertIdx = 0;
-    size_t _binaryIdx = 0;
     size_t _subDiffIdx = 0;
 
     boost::optional<BSONObjBuilder> _insertBob;
-    boost::optional<BSONObjBuilder> _binaryBob;
 };
 
 // Stack frame used to maintain state while serializing ArrayNodes.
@@ -358,14 +323,6 @@ public:
                 }
                 case (NodeType::kInsert): {
                     const auto& valueNode = checked_cast<const InsertNode&>(*child);
-                    appendElementToBuilder(
-                        valueNode.elt,
-                        formatFieldName(doc_diff::kUpdateSectionFieldName[0], idx),
-                        &_bob);
-                    break;
-                }
-                case (NodeType::kBinary): {
-                    const auto& valueNode = checked_cast<const BinaryNode&>(*child);
                     appendElementToBuilder(
                         valueNode.elt,
                         formatFieldName(doc_diff::kUpdateSectionFieldName[0], idx),
@@ -569,19 +526,17 @@ DocumentDiffReader::DocumentDiffReader(const Diff& diff) : _diff(diff) {
     static_assert(kDeleteSectionFieldName.size() == 1);
     static_assert(kInsertSectionFieldName.size() == 1);
     static_assert(kUpdateSectionFieldName.size() == 1);
-    static_assert(kBinarySectionFieldName.size() == 1);
 
     // Create a map only using stack memory for this temporary helper map. Make sure to update the
     // size for the 'static_vector' if changes are made to the number of elements we hold.
     const boost::container::flat_map<char,
                                      Section,
                                      std::less<char>,
-                                     boost::container::static_vector<std::pair<char, Section>, 5>>
+                                     boost::container::static_vector<std::pair<char, Section>, 4>>
         sections{{kDeleteSectionFieldName[0], Section{&_deletes, 1}},
                  {kUpdateSectionFieldName[0], Section{&_updates, 2}},
                  {kInsertSectionFieldName[0], Section{&_inserts, 3}},
-                 {kBinarySectionFieldName[0], Section{&_binaries, 4}},
-                 {kSubDiffSectionFieldPrefix, Section{&_subDiffs, 5}}};
+                 {kSubDiffSectionFieldPrefix, Section{&_subDiffs, 4}}};
 
     char prev = 0;
     bool hasSubDiffSections = false;
@@ -637,13 +592,6 @@ boost::optional<BSONElement> DocumentDiffReader::nextInsert() {
         return {};
     }
     return _inserts->next();
-}
-
-boost::optional<BSONElement> DocumentDiffReader::nextBinary() {
-    if (!_binaries || !_binaries->more()) {
-        return {};
-    }
-    return _binaries->next();
 }
 
 boost::optional<std::pair<StringData, std::variant<DocumentDiffReader, ArrayDiffReader>>>

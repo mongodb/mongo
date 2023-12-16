@@ -90,56 +90,6 @@ TEST(DiffApplierTest, InsertSimple) {
     checkDiff(preImage, BSON("foo" << 2 << "f2" << 3 << "f1" << 1 << "newField" << 2), diff);
 }
 
-TEST(DiffApplierTest, BinaryAppendSimple) {
-    // Appends "def" to "abc" for BSONColumn.
-    const BSONObj preImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::Column)));
-
-    const BSONObj storage(
-        BSON("a" << BSON("o" << 3 << "d" << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
-
-    diff_tree::DocumentSubDiffNode diffNode;
-    diffNode.addBinary("b1", storage["a"]);
-
-    auto diff = diffNode.serialize();
-    checkDiff(preImage, BSON("b1" << BSONBinData("abcdef", 6, BinDataType::Column)), diff);
-}
-
-TEST(DiffApplierTest, BinaryOverwriteSimple) {
-    // Replaces "abc" with "abdef".
-    const BSONObj preImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::Column)));
-
-    const BSONObj storage(
-        BSON("a" << BSON("o" << 2 << "d" << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
-
-    diff_tree::DocumentSubDiffNode diffNode;
-    diffNode.addBinary("b1", storage["a"]);
-
-    auto diff = diffNode.serialize();
-    checkDiff(preImage, BSON("b1" << BSONBinData("abdef", 5, BinDataType::Column)), diff);
-}
-
-TEST(DiffApplierTest, BinaryIsIdempotent) {
-    // Applies "def" to "abc" twice using the same diff. The final result is expected to be
-    // "abcdef".
-    auto applyDiffToImage = [&](BSONObj preImage) -> BSONObj {
-        const BSONObj storage(BSON(
-            "a" << BSON("o" << 3 << "d" << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
-
-        diff_tree::DocumentSubDiffNode diffNode;
-        diffNode.addBinary("b1", storage["a"]);
-
-        return diffNode.serialize();
-    };
-
-    const BSONObj firstImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::Column)));
-
-    auto secondImage = applyDiffToImage(firstImage);
-    checkDiff(firstImage, BSON("b1" << BSONBinData("abcdef", 6, BinDataType::Column)), secondImage);
-
-    auto thirdImage = applyDiffToImage(secondImage);
-    checkDiff(firstImage, BSON("b1" << BSONBinData("abcdef", 6, BinDataType::Column)), thirdImage);
-}
-
 TEST(DiffApplierTest, UpdateSimple) {
     const BSONObj preImage(BSON("f1" << 0 << "foo" << 2 << "f2" << 3));
 

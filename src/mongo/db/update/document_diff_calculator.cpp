@@ -290,9 +290,6 @@ void serializeInlineDiff(diff_tree::DocumentSubDiffNode const* node, BSONObjBuil
                                   bob);
                 break;
             }
-            case diff_tree::NodeType::kBinary: {
-                MONGO_UNIMPLEMENTED;
-            }
             case diff_tree::NodeType::kDelete: {
                 bob->append(fieldName, doc_diff::kDeleteSectionFieldName);
                 break;
