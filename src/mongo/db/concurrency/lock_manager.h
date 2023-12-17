@@ -69,6 +69,12 @@ public:
     static LockManager* get(ServiceContext& service);
 
     /**
+     * Gets a mapping of lock to client info.
+     * Used by dump() and the lockInfo command.
+     */
+    static std::map<LockerId, BSONObj> getLockToClientMap(ServiceContext* serviceContext);
+
+    /**
      * Default constructors are meant for unit tests only. The lock manager should generally be
      * accessed as a decorator on the ServiceContext.
      */

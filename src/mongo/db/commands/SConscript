@@ -848,7 +848,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/shard_role_api',
     ],
 )
 
