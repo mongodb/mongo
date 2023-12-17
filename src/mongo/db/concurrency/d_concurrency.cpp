@@ -29,7 +29,6 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include <string>
 
 #include <boost/move/utility_core.hpp>
@@ -38,6 +37,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"

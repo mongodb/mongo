@@ -264,6 +264,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/storage/backup_cursor_hooks',
         '$BUILD_DIR/mongo/util/background_job',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         'fsync_locked',
     ],
 )
@@ -848,6 +849,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/shard_role_api',
     ],
 )
 

@@ -27,12 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker.h"
+#pragma once
+
+#include <map>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 
-Locker::Locker() = default;
-
-Locker::~Locker() = default;
+/**
+ * Diagnostics function which obtains a mapping of lock to client info. Used by the lockInfo command
+ * and any other code which needs to generate a global view of what operations hold what resources.
+ */
+std::map<LockerId, BSONObj> getLockerIdToClientMap(ServiceContext* serviceContext);
 
 }  // namespace mongo

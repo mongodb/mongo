@@ -37,6 +37,7 @@
 
 #include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
+#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/concurrency/locker.h"
@@ -90,7 +91,7 @@ public:
     LockResult wait(OperationContext* opCtx, Milliseconds timeout);
 
 private:
-    virtual void notify(ResourceId resId, LockResult result);
+    void notify(ResourceId resId, LockResult result) override;
 
     // These two go together to implement the conditional variable pattern.
     Mutex _mutex = MONGO_MAKE_LATCH("CondVarLockGrantNotification::_mutex");
@@ -120,9 +121,9 @@ public:
 
     virtual ~LockerImpl();
 
-    virtual ClientState getClientState() const;
+    ClientState getClientState() const override;
 
-    virtual LockerId getId() const {
+    LockerId getId() const override {
         return _id;
     }
 
@@ -150,24 +151,24 @@ public:
     /**
      * Acquires the ticket within the deadline (or _maxLockTimeout) and tries to grab the lock.
      */
-    virtual void lockGlobal(OperationContext* opCtx,
-                            LockMode mode,
-                            Date_t deadline = Date_t::max());
+    void lockGlobal(OperationContext* opCtx,
+                    LockMode mode,
+                    Date_t deadline = Date_t::max()) override;
 
-    virtual bool unlockGlobal();
+    bool unlockGlobal() override;
 
-    virtual LockResult lockRSTLBegin(OperationContext* opCtx, LockMode mode);
-    virtual void lockRSTLComplete(OperationContext* opCtx,
-                                  LockMode mode,
-                                  Date_t deadline,
-                                  const LockTimeoutCallback& onTimeout);
+    LockResult lockRSTLBegin(OperationContext* opCtx, LockMode mode) override;
+    void lockRSTLComplete(OperationContext* opCtx,
+                          LockMode mode,
+                          Date_t deadline,
+                          const LockTimeoutCallback& onTimeout) override;
 
-    virtual bool unlockRSTLforPrepare();
+    bool unlockRSTLforPrepare() override;
 
-    virtual void beginWriteUnitOfWork() override;
-    virtual void endWriteUnitOfWork() override;
+    void beginWriteUnitOfWork() override;
+    void endWriteUnitOfWork() override;
 
-    virtual bool inAWriteUnitOfWork() const {
+    bool inAWriteUnitOfWork() const override {
         return _wuowNestingLevel > 0;
     }
 
@@ -185,30 +186,30 @@ public:
      * the lock acquisition. A lock operation would otherwise wait until a timeout or the lock is
      * granted.
      */
-    virtual void lock(OperationContext* opCtx,
-                      ResourceId resId,
-                      LockMode mode,
-                      Date_t deadline = Date_t::max());
+    void lock(OperationContext* opCtx,
+              ResourceId resId,
+              LockMode mode,
+              Date_t deadline = Date_t::max()) override;
 
-    virtual void downgrade(ResourceId resId, LockMode newMode);
+    void downgrade(ResourceId resId, LockMode newMode) override;
 
-    virtual bool unlock(ResourceId resId);
+    bool unlock(ResourceId resId) override;
 
-    virtual LockMode getLockMode(ResourceId resId) const;
-    virtual bool isLockHeldForMode(ResourceId resId, LockMode mode) const;
-    virtual bool isDbLockedForMode(const DatabaseName& dbName, LockMode mode) const;
-    virtual bool isCollectionLockedForMode(const NamespaceString& nss, LockMode mode) const;
+    LockMode getLockMode(ResourceId resId) const override;
+    bool isLockHeldForMode(ResourceId resId, LockMode mode) const override;
+    bool isDbLockedForMode(const DatabaseName& dbName, LockMode mode) const override;
+    bool isCollectionLockedForMode(const NamespaceString& nss, LockMode mode) const override;
 
-    virtual ResourceId getWaitingResource() const;
+    ResourceId getWaitingResource() const override;
 
-    virtual void getLockerInfo(LockerInfo* lockerInfo,
-                               boost::optional<SingleThreadedLockStats> lockStatsBase) const;
-    virtual boost::optional<LockerInfo> getLockerInfo(
-        boost::optional<SingleThreadedLockStats> lockStatsBase) const final;
+    void getLockerInfo(LockerInfo* lockerInfo,
+                       boost::optional<SingleThreadedLockStats> lockStatsBase) const override;
+    boost::optional<LockerInfo> getLockerInfo(
+        boost::optional<SingleThreadedLockStats> lockStatsBase) const override;
 
-    virtual void saveLockStateAndUnlock(LockSnapshot* stateOut);
+    void saveLockStateAndUnlock(LockSnapshot* stateOut) override;
 
-    virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore);
+    void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) override;
 
     void releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) override;
     void restoreWriteUnitOfWorkAndLock(OperationContext* opCtx,
@@ -217,8 +218,23 @@ public:
     void releaseWriteUnitOfWork(WUOWLockSnapshot* stateOut) override;
     void restoreWriteUnitOfWork(const WUOWLockSnapshot& stateToRestore) override;
 
-    virtual void releaseTicket();
-    virtual void reacquireTicket(OperationContext* opCtx);
+    void releaseTicket() override;
+    void reacquireTicket(OperationContext* opCtx) override;
+
+    void dump() const override;
+
+    bool isW() const override;
+    bool isR() const override;
+
+    bool isLocked() const override;
+    bool isWriteLocked() const override;
+    bool isReadLocked() const override;
+
+    bool isRSTLExclusive() const override;
+    bool isRSTLLocked() const override;
+
+    bool isGlobalLockedRecursively() override;
+    bool canSaveLockState() override;
 
     bool hasReadTicket() const override {
         return _modeForTicket == MODE_IS || _modeForTicket == MODE_S;
@@ -362,6 +378,15 @@ private:
     // Used to disambiguate different lockers
     const LockerId _id;
 
+    // Track the thread that currently owns the lock, for debugging purposes
+    stdx::thread::id _threadId;
+
+    // The global lock manager of the service context.
+    LockManager* const _lockManager;
+
+    // The global ticketholders of the service context.
+    TicketHolderManager* const _ticketHolderManager;
+
     // The only reason we have this spin lock here is for the diagnostic tools, which could
     // iterate through the LockRequestsMap on a separate thread and need it to be stable.
     // Apart from that, all accesses to the LockerImpl are always from a single thread.
@@ -384,16 +409,13 @@ private:
 
     // Delays release of exclusive/intent-exclusive locked resources until the write unit of
     // work completes. Value of 0 means we are not inside a write unit of work.
-    int _wuowNestingLevel;
+    int _wuowNestingLevel{0};
 
     // Mode for which the Locker acquired a ticket, or MODE_NONE if no ticket was acquired.
     LockMode _modeForTicket = MODE_NONE;
 
     // Indicates whether the client is active reader/writer or is queued.
     AtomicWord<ClientState> _clientState{kInactive};
-
-    // Track the thread who owns the lock for debugging purposes
-    stdx::thread::id _threadId;
 
     // If true, shared locks will participate in two-phase locking.
     bool _sharedLocksShouldTwoPhaseLock = false;
@@ -406,9 +428,6 @@ private:
 
     // A structure for accumulating time spent getting flow control tickets.
     FlowControlTicketholder::CurOp _flowControlStats;
-
-    // The global ticketholders of the service context.
-    TicketHolderManager* _ticketHolderManager;
 
     // This will only be valid when holding a ticket.
     boost::optional<Ticket> _ticket;
@@ -423,32 +442,6 @@ private:
     // If isValid(), the ResourceId of the resource currently waiting for the lock. If not valid,
     // there is no resource currently waiting.
     ResourceId _waitingResource;
-
-    //////////////////////////////////////////////////////////////////////////////////////////
-    //
-    // Methods merged from LockState, which should eventually be removed or changed to methods
-    // on the LockerImpl interface.
-    //
-
-public:
-    virtual void dump() const;
-
-    virtual bool isW() const;
-    virtual bool isR() const;
-
-    virtual bool isLocked() const;
-    virtual bool isWriteLocked() const;
-    virtual bool isReadLocked() const;
-
-    virtual bool isRSTLExclusive() const;
-    virtual bool isRSTLLocked() const;
-
-    bool isGlobalLockedRecursively() override;
-    bool canSaveLockState() override;
-
-    virtual bool hasLockPending() const {
-        return getWaitingResource().isValid();
-    }
 };
 
 }  // namespace mongo

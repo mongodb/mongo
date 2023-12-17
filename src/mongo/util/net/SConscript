@@ -10,13 +10,13 @@ env = env.Clone()
 env.Library(
     target='network',
     source=[
-        "cidr.cpp",
-        "hostandport.cpp",
-        "hostname_canonicalization.cpp",
-        "sockaddr.cpp",
-        "socket_exception.cpp",
-        "socket_utils.cpp",
+        'cidr.cpp',
+        'hostandport.cpp',
         'hostandport.idl',
+        'hostname_canonicalization.cpp',
+        'sockaddr.cpp',
+        'socket_exception.cpp',
+        'socket_utils.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
@@ -161,8 +161,8 @@ else:
     env.Library(
         target='ssl_manager',
         source=[
-            "sock.cpp",
-            "ssl_manager_none.cpp",
+            'sock.cpp',
+            'ssl_manager_none.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',

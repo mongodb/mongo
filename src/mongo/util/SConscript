@@ -176,16 +176,16 @@ env.Library(
 )
 
 env.Library(
-    target="processinfo",
+    target='processinfo',
     source=[
-        "processinfo.cpp",
-        "processinfo_${TARGET_OS}.cpp",
+        'processinfo.cpp',
+        'processinfo_${TARGET_OS}.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/procparser" if env.TargetOSIs('linux') else [],
+        'procparser' if env.TargetOSIs('linux') else [],
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
         'pcre_wrapper',
     ],
 )
@@ -196,7 +196,7 @@ env.Library(
         'fail_point.cpp',
         'fail_point_server_parameter.idl',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/server_base',
     ],
@@ -213,13 +213,13 @@ env.Benchmark(
 )
 
 env.Library(
-    target="testing_options",
+    target='testing_options',
     source=[
-        "testing_options.cpp",
+        'testing_options.cpp',
         'testing_options.idl',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -252,29 +252,32 @@ env.CppUnitTest(
         'concurrent_shared_values_map_test.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
 env.Library(
-    target="periodic_runner",
+    target='periodic_runner',
     source=[
-        "periodic_runner.cpp",
+        'periodic_runner.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
 env.Library(
-    target="periodic_runner_impl",
+    target='periodic_runner_impl',
     source=[
-        "periodic_runner_impl.cpp",
+        'periodic_runner_impl.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "periodic_runner",
+        'periodic_runner',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        'concurrency/spin_lock',
     ],
 )
 
@@ -283,21 +286,23 @@ env.Library(
     source=[
         'periodic_runner_factory.cpp',
     ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context",
-        'periodic_runner',
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
         'periodic_runner_impl',
     ],
 )
 
 env.Library(
-    target="mock_periodic_runner",
+    target='mock_periodic_runner',
     source=[
-        "mock_periodic_runner.cpp",
+        'mock_periodic_runner.cpp',
+    ],
+    LIBDEPS=[
+        'periodic_runner',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/periodic_runner",
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -306,7 +311,7 @@ env.Library(
     source=[
         'background.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         'concurrency/spin_lock',
     ],
@@ -320,6 +325,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
+        'concurrency/spin_lock',
     ],
 )
 
@@ -432,9 +438,10 @@ if get_option('use-diagnostic-latches') == 'on':
         source=[
             'diagnostic_info.cpp',
         ],
-        LIBDEPS=[
+        LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base',
-            "$BUILD_DIR/mongo/db/service_context",
+            '$BUILD_DIR/mongo/db/service_context',
+            'concurrency/spin_lock',
         ],
     )
 
@@ -503,15 +510,15 @@ env.Library(
 )
 
 env.Library(
-    target="signal_handlers",
+    target='signal_handlers',
     source=[
-        "signal_handlers.cpp",
-        "signal_win32.cpp" if env.TargetOSIs('windows') else [],
+        'signal_handlers.cpp',
+        'signal_win32.cpp' if env.TargetOSIs('windows') else [],
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/log_process_details",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/log_process_details',
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 
@@ -606,9 +613,6 @@ if env.TargetOSIs('linux'):
             'pin_code_segments.cpp',
             'pin_code_segments_params.idl',
         ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-        ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/db/server_base',
         ],
@@ -674,10 +678,8 @@ if env.TargetOSIs('linux'):
         source=[
             "procparser.cpp",
         ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-        ],
         LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/base',
             'pcre_wrapper',
         ],
     )

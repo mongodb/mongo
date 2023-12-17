@@ -125,6 +125,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/session/logical_session_cache',
         '$BUILD_DIR/mongo/db/session/logical_session_id',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+    ],
 )
 
 env.Library(
