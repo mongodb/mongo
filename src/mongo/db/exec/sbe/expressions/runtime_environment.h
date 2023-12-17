@@ -159,8 +159,6 @@ public:
      */
     void resetSlot(value::SlotId slot, value::TypeTags tag, value::Value val, bool owned);
 
-    bool isSlotRegistered(value::SlotId slot) const;
-
     /**
      * Returns a SlotAccessor for the given SlotId which must be previously registered within this
      * Environment by invoking 'registerSlot' method.

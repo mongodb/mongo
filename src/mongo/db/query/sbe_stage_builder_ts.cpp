@@ -358,7 +358,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             const auto& name =
                 std::pair(PlanStageSlots::kField, FieldPath(eventFilterPath).front().toString());
             if (!outputs.has(name)) {
-                outputs.set(name, _state.getNothingSlot());
+                outputs.set(name, _state.env->getSlot(kNothingEnvSlotName));
             }
         }
     }
@@ -458,7 +458,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         }
 
         auto resultSlot = _slotIdGenerator.generate();
-        outputs.setResult(resultSlot);
+        outputs.set(kResult, resultSlot);
 
         stage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(stage),
                                                   resultSlot,                  // objSlot
@@ -474,9 +474,11 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         // As we are not producing a result record, we must fulfill all reqs in a way that would be
         // equivalent to fetching the same fields from 'kResult', that is, we'll map the fields to
         // the environtment's 'Nothing' slot.
-        auto reqsWithResult = reqs.copyForChild().setResult();
+        auto nothingSlot =
+            TypedSlot{_state.env->getSlot(kNothingEnvSlotName), TypeSignature::kAnyScalarType};
 
-        outputs.setMissingRequiredNamedSlotsToNothing(_state, reqsWithResult);
+        auto reqsWithoutMakeResultInfo = reqs.copyForChild().clearMRInfo().setResult();
+        outputs.setMissingRequiredNamedSlots(reqsWithoutMakeResultInfo, nothingSlot);
     }
 
     return {std::move(stage), std::move(outputs)};
