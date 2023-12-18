@@ -74,18 +74,42 @@ class test_import_base(wttest.WiredTigerTestCase):
             else:
                 self.check_record(uri, keys[i], values[i])
 
-    # The ID and checkpoint information can be different between configs, remove it. Everything else
-    # should be the same.
+    # Compare two given configurations, excluding unique data.
     def config_compare(self, aconf, bconf):
-        a = re.sub('id=\d+,?', '', aconf)
-        a = (re.sub('\w+=\(.*?\)+,?', '', a).strip(',').split(',') +
-             re.findall('\w+=\(.*?\)+', a))
-        b = re.sub('id=\d+,?', '', bconf)
-        b = (re.sub('\w+=\(.*?\)+,?', '', b).strip(',').split(',') +
-             re.findall('\w+=\(.*?\)+', b))
-        a = [x for x in a if not x.startswith("checkpoint=")]
-        b = [x for x in b if not x.startswith("checkpoint=")]
-        self.assertTrue(sorted(a) == sorted(b))
+        # Retrieve the data that can be compared.
+        stripped_aconf = self.strip_subconfig(aconf)
+        stripped_bconf = self.strip_subconfig(bconf)
+
+        self.assertTrue(sorted(stripped_aconf) == sorted(stripped_bconf))
+
+    # Remove information related to the ID and checkpoints from a config.
+    def strip_subconfig(self, conf):
+        subconfigs = []
+        curr_subconfig = ''
+        depth = 0
+
+        for char in conf:
+            if char == '(':
+                depth += 1
+            elif char == ')':
+                depth -= 1
+
+           # If end of one subconfig, append it to subconfigs list.
+            if char == ',' and depth == 0:
+                subconfigs.append(curr_subconfig)
+                curr_subconfig = ''
+            else:
+                # Append the character to the current subconfiguration.
+                curr_subconfig += char
+
+        # Append any subconfig left.
+        if curr_subconfig:
+            subconfigs.append(curr_subconfig)
+
+        # The ID and checkpoint information can be different between configs, remove it.
+        stripped_subconfigs = [con for con in subconfigs if not con.startswith("id=") and not con.startswith("checkpoint")]
+
+        return stripped_subconfigs
 
     # Populate a database with N tables, each having M rows.
     def populate(self, ntables, nrows):
@@ -169,6 +193,10 @@ class test_import01(test_import_base):
 
         # Import the file.
         self.session.create(self.uri, import_config)
+
+        # Create a named checkpoint so it appears in the configuration of the imported table.
+        # This should not be relevant when comparing the original configuration and the new one.
+        self.session.checkpoint("name=abc")
 
         # Verify object.
         self.verifyUntilSuccess(self.session, self.uri, None)
