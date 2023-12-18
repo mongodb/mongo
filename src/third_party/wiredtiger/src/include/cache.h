@@ -178,8 +178,8 @@ struct __wt_cache {
 #define WT_EVICT_SCORE_MAX 100
     /*
      * Score of how aggressive eviction should be about selecting eviction candidates. If eviction
-     * is struggling to make progress, this score rises (up to a maximum of 100), at which point the
-     * cache is "stuck" and transactions will be rolled back.
+     * is struggling to make progress, this score rises (up to a maximum of WT_EVICT_SCORE_MAX), at
+     * which point the cache is "stuck" and transactions will be rolled back.
      */
     uint32_t evict_aggressive_score;
 

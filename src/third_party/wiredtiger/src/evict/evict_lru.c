@@ -785,11 +785,11 @@ __evict_pass(WT_SESSION_IMPL *session)
          */
         if (eviction_progress == cache->eviction_progress) {
             if (WT_CLOCKDIFF_MS(time_now, time_prev) >= 20 && F_ISSET(cache, WT_CACHE_EVICT_HARD)) {
-                if (cache->evict_aggressive_score < 100)
+                if (cache->evict_aggressive_score < WT_EVICT_SCORE_MAX)
                     ++cache->evict_aggressive_score;
                 oldest_id = txn_global->oldest_id;
                 if (prev_oldest_id == oldest_id && txn_global->current != oldest_id &&
-                  cache->evict_aggressive_score < 100)
+                  cache->evict_aggressive_score < WT_EVICT_SCORE_MAX)
                     ++cache->evict_aggressive_score;
                 time_prev = time_now;
                 prev_oldest_id = oldest_id;
@@ -799,7 +799,7 @@ __evict_pass(WT_SESSION_IMPL *session)
              * Keep trying for long enough that we should be able to evict a page if the server
              * isn't interfering.
              */
-            if (loop < 100 || cache->evict_aggressive_score < 100) {
+            if (loop < 100 || cache->evict_aggressive_score < WT_EVICT_SCORE_MAX) {
                 /*
                  * Back off if we aren't making progress: walks hold the handle list lock, blocking
                  * other operations that can free space in cache, such as LSM discarding handles.
@@ -2455,7 +2455,8 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
         if (!F_ISSET(conn, WT_CONN_RECOVERING) && __wt_cache_stuck(session)) {
             ret = __wt_txn_is_blocking(session);
             if (ret == WT_ROLLBACK) {
-                --cache->evict_aggressive_score;
+                if (cache->evict_aggressive_score > 0)
+                    --cache->evict_aggressive_score;
                 WT_STAT_CONN_INCR(session, txn_rollback_oldest_pinned);
                 __wt_verbose_debug1(
                   session, WT_VERB_TRANSACTION, "%s", session->txn->rollback_reason);
@@ -2529,7 +2530,8 @@ err:
          */
         if (ret == 0 && cache_max_wait_us != 0 && session->cache_wait_us > cache_max_wait_us) {
             ret = __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW);
-            --cache->evict_aggressive_score;
+            if (cache->evict_aggressive_score > 0)
+                --cache->evict_aggressive_score;
             WT_STAT_CONN_INCR(session, cache_timed_out_ops);
             __wt_verbose_notice(session, WT_VERB_TRANSACTION, "%s", session->txn->rollback_reason);
         }
