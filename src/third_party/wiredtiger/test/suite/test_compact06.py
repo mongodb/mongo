@@ -64,6 +64,10 @@ class test_compact06(wttest.WiredTigerTestCase):
             time.sleep(1)
 
     def test_background_compact_api(self):
+        # FIXME-WT-11399
+        if self.runningHook('tiered'):
+            self.skipTest("Compaction isn't supported on tiered tables")
+
         # We cannot trigger the background compaction on a specific API. Note that the URI is
         # not relevant here, the corresponding table does not need to exist for this check.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
