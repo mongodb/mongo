@@ -108,7 +108,7 @@ public:
     /**
      * Get the number of (logical) CPUs
      */
-    static unsigned getNumCores() {
+    static unsigned getNumLogicalCores() {
         return sysInfo().numCores;
     }
 
@@ -131,7 +131,14 @@ public:
      * If that information is not available, get the total number of CPUs.
      */
     static unsigned long getNumAvailableCores() {
-        return ProcessInfo::getNumCoresForProcess().value_or(ProcessInfo::getNumCores());
+        return ProcessInfo::getNumCoresForProcess().value_or(ProcessInfo::getNumLogicalCores());
+    }
+
+    /**
+     * Get the number of cores available for process or return the errorValue.
+     */
+    static long getNumCoresAvailableToProcess(long errorValue = -1) {
+        return ProcessInfo::getNumCoresForProcess().value_or(errorValue);
     }
 
     /**

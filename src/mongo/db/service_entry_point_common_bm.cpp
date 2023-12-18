@@ -260,7 +260,7 @@ BENCHMARK_DEFINE_F(ServiceEntryPointCommonBenchmarkFixture, BM_SEP_PING)(benchma
 const auto kMaxThreads = 1;
 #else
 /** 2x to benchmark the case of more threads than cores for curiosity's sake. */
-const auto kMaxThreads = 2 * ProcessInfo::getNumCores();
+const auto kMaxThreads = 2 * ProcessInfo::getNumLogicalCores();
 #endif
 
 BENCHMARK_REGISTER_F(ServiceEntryPointCommonBenchmarkFixture, BM_SEP_PING)
