@@ -88,12 +88,14 @@ __wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH_QUEUE_ENTRY *pe)
 
     WT_STAT_CONN_INCR(session, block_prefetch_pages_read);
 
+    WT_ENTER_GENERATION(session, WT_GEN_SPLIT);
     if (__wt_ref_addr_copy(session, pe->ref, &addr)) {
         WT_ERR(__wt_page_in(session, pe->ref, WT_READ_PREFETCH));
         WT_ERR(__wt_page_release(session, pe->ref, 0));
     } else
-        return (WT_ERROR);
+        ret = (WT_ERROR);
 
 err:
+    WT_LEAVE_GENERATION(session, WT_GEN_SPLIT);
     return (ret);
 }
