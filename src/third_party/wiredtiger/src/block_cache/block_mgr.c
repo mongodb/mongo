@@ -948,7 +948,7 @@ __bm_method_set(WT_BM *bm, bool readonly)
         bm->salvage_start = __bm_salvage_start_readonly;
         bm->salvage_valid = __bm_salvage_valid_readonly;
         bm->switch_object = __bm_switch_object_readonly;
-        bm->switch_object = __bm_switch_object_end_readonly;
+        bm->switch_object_end = __bm_switch_object_end_readonly;
         bm->sync = __bm_sync_readonly;
         bm->write = __bm_write_readonly;
         bm->write_size = __bm_write_size_readonly;
