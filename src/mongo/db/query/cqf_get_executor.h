@@ -101,7 +101,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     const MultipleCollectionAccessor& collections,
     optimizer::QueryHints queryHints,
     const boost::optional<BSONObj>& indexHint,
-    const Pipeline* pipeline,
+    Pipeline* pipeline,
     const CanonicalQuery* = nullptr);
 
 /**

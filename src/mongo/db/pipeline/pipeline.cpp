@@ -481,6 +481,17 @@ BSONObj Pipeline::getInitialQuery() const {
     return BSONObj{};
 }
 
+void Pipeline::parameterize() {
+    if (_sources.empty()) {
+        return;
+    }
+
+    auto firstStage = _sources.front().get();
+    if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(firstStage)) {
+        MatchExpression::parameterize(matchStage->getMatchExpression());
+    }
+}
+
 bool Pipeline::needsPrimaryShardMerger() const {
     return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
         return stage->constraints(SplitState::kSplitForMerge).hostRequirement ==

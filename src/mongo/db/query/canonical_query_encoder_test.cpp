@@ -81,8 +81,14 @@ static const NamespaceString foreignNss =
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query"};
 
 std::vector<boost::intrusive_ptr<DocumentSource>> parsePipeline(
-    const boost::intrusive_ptr<ExpressionContext> expCtx, const std::vector<BSONObj>& rawPipeline) {
+    const boost::intrusive_ptr<ExpressionContext> expCtx,
+    const std::vector<BSONObj>& rawPipeline,
+    bool shouldParameterize = false) {
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+
+    if (shouldParameterize) {
+        pipeline->parameterize();
+    }
 
     std::vector<boost::intrusive_ptr<DocumentSource>> stages;
     for (auto&& source : pipeline->getSources()) {
@@ -204,6 +210,30 @@ protected:
                                                    needsMerge));
         cq->setSbeCompatible(true);
         const auto key = canonical_query_encoder::encodeSBE(*cq);
+        gctx.outStream() << key << std::endl;
+    }
+
+    void testComputeKeyForPipeline(unittest::GoldenTestContext& gctx,
+                                   StringData matchStr,
+                                   StringData projStr) {
+        auto& stream = gctx.outStream();
+        stream << "==== VARIATION: bonsai + sbe, " << matchStr << ", " << projStr;
+        stream << std::endl;
+
+        auto pipelineObj = [](StringData matchStr, StringData projStr) -> std::vector<BSONObj> {
+            auto matchObj = fromjson(matchStr);
+            if (projStr == "{}") {
+                return {matchObj};
+            }
+
+            auto projObj = fromjson(projStr);
+            return {matchObj, projObj};
+        };
+
+        const auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx(), nss);
+        auto pipeline = parsePipeline(expCtx, pipelineObj(matchStr, projStr), true);
+
+        const auto key = canonical_query_encoder::encodePipeline(expCtx.get(), pipeline);
         gctx.outStream() << key << std::endl;
     }
 };
@@ -636,5 +666,26 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyWithNeedsMerge) {
                       true /* needsMerge */);
 }
 
+TEST_F(CanonicalQueryEncoderTest, ComputeKeyForPipeline) {
+    unittest::GoldenTestContext gctx(&goldenTestConfig);
+    // SBE must be enabled in order to generate SBE plan cache keys.
+    // Bonsai plan cache
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "trySbeEngine");
+
+    testComputeKeyForPipeline(gctx, "{$match: {a: 1}}", "{}");
+    testComputeKeyForPipeline(gctx, "{$match: {a: 2}}", "{}");
+    testComputeKeyForPipeline(gctx, "{$match: {b: 1}}", "{}");
+    testComputeKeyForPipeline(gctx, "{$match: {$and: [{a: 1}, {b: 1}]}}", "{}");
+    testComputeKeyForPipeline(gctx, "{$match: {$or: [{a: 1}, {b: 1}]}}", "{}");
+
+    // with projection
+    testComputeKeyForPipeline(gctx, "{$match: {a: 1}}", "{$project: {a: 1}}");
+    testComputeKeyForPipeline(gctx, "{$match: {b: 1}}", "{$project: {b: 1}}");
+    testComputeKeyForPipeline(
+        gctx, "{$match: {$and: [{a: 1}, {b: 1}]}}", "{$project: {a: 1, b: 1}}");
+    testComputeKeyForPipeline(
+        gctx, "{$match: {$or: [{a: 1}, {b: 1}]}}", "{$project: {a: 1, b: 1}}");
+}
 }  // namespace
 }  // namespace mongo

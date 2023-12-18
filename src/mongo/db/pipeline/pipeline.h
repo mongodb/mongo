@@ -298,6 +298,11 @@ public:
     BSONObj getInitialQuery() const;
 
     /**
+     * Convenience wrapper that parameterizes a pipeline's match stage, if present.
+     */
+    void parameterize();
+
+    /**
      * Returns 'true' if the pipeline must merge on the primary shard.
      */
     bool needsPrimaryShardMerger() const;

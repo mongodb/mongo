@@ -167,10 +167,9 @@ sbe::PlanCacheKey make(const CanonicalQuery& query,
 }  // namespace plan_cache_detail
 
 namespace plan_cache_key_factory {
-sbe::PlanCacheKey make(const CanonicalQuery& query,
-                       const MultipleCollectionAccessor& collections,
-                       const bool requiresSbeCompatibility) {
-    OperationContext* opCtx = query.getOpCtx();
+
+std::tuple<sbe::PlanCacheKeyCollectionState, std::vector<sbe::PlanCacheKeyCollectionState>>
+getCollectionState(OperationContext* opCtx, const MultipleCollectionAccessor& collections) {
     auto mainCollectionState = plan_cache_detail::computeCollectionState(
         opCtx, collections.getMainCollection(), false /* isSecondaryColl */);
     std::vector<sbe::PlanCacheKeyCollectionState> secondaryCollectionStates;
@@ -184,11 +183,41 @@ sbe::PlanCacheKey make(const CanonicalQuery& query,
         }
     }
     secondaryCollectionStates.shrink_to_fit();
+    return {mainCollectionState, secondaryCollectionStates};
+}
+
+sbe::PlanCacheKey make(const CanonicalQuery& query,
+                       const MultipleCollectionAccessor& collections,
+                       const bool requiresSbeCompatibility) {
+    OperationContext* opCtx = query.getOpCtx();
+    auto [mainCollectionState, secondaryCollectionStates] = getCollectionState(opCtx, collections);
     auto shapeString = canonical_query_encoder::encodeSBE(query, requiresSbeCompatibility);
     return {plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString),
                                                     query.getPrimaryMatchExpression(),
                                                     collections.getMainCollection(),
                                                     query.getExpCtx()->getQuerySettings()),
+            std::move(mainCollectionState),
+            std::move(secondaryCollectionStates)};
+}
+
+sbe::PlanCacheKey make(const Pipeline& query, const MultipleCollectionAccessor& collections) {
+    OperationContext* opCtx = query.getContext()->opCtx;
+    auto [mainCollectionState, secondaryCollectionStates] = getCollectionState(opCtx, collections);
+
+    std::vector<boost::intrusive_ptr<DocumentSource>> stages;
+    for (auto&& source : query.getSources()) {
+        stages.emplace_back(source);
+    }
+
+    tassert(8180900, "makePlanCacheKey expects pipeline is non-empty", !stages.empty());
+
+    auto matchStage = dynamic_cast<DocumentSourceMatch*>(stages.front().get());
+
+    auto shapeString = canonical_query_encoder::encodePipeline(query.getContext().get(), stages);
+    return {plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString),
+                                                    matchStage->getMatchExpression(),
+                                                    collections.getMainCollection(),
+                                                    query.getContext()->getQuerySettings()),
             std::move(mainCollectionState),
             std::move(secondaryCollectionStates)};
 }

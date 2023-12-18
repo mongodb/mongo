@@ -76,13 +76,17 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/analyze_regex.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/projection.h"
+#include "mongo/db/query/projection_ast.h"
+#include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/tree_walker.h"
@@ -638,6 +642,21 @@ void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* key
     }
 }
 
+void encodeKeyForPipelineStage(DocumentSource* docSource,
+                               std::vector<Value>& serializedArray,
+                               BufBuilder* bufBuilder) {
+    bufBuilder->appendChar(kEncodeSectionDelimiter);
+    serializedArray.clear();
+    docSource->serializeToArray(serializedArray);
+
+    for (const auto& value : serializedArray) {
+        tassert(
+            6443201, "Expected pipeline stage to serialize to objects", value.getType() == Object);
+        const BSONObj bson = value.getDocument().toBson();
+        bufBuilder->appendBuf(bson.objdata(), bson.objsize());
+    }
+}
+
 /**
  * Approximate the number of documents to be processed into a small, medium or large category. Best
  * plans for limit: 10 and limit: 1000 may be different. This allows us to cache different plans for
@@ -1131,8 +1150,13 @@ void encodeKeyForAutoParameterizedMatchSBE(OperationContext* opCtx,
     tree_walker::walk<true, MatchExpression>(matchExpr, &walker);
 }
 
+}  // namespace
+
+namespace canonical_query_encoder {
+
 /**
  * Encode the stages pushed down to SBE via CanonicalQuery::cqPipeline.
+ * Also encodes pipelines that are eligible for the Bonsai plan cache.
  */
 void encodePipeline(const ExpressionContext* expCtx,
                     const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline,
@@ -1146,22 +1170,20 @@ void encodePipeline(const ExpressionContext* expCtx,
             encodeKeyForAutoParameterizedMatchSBE(
                 expCtx->opCtx, matchStage->getMatchExpression(), bufBuilder);
         } else if (!search_helpers::encodeSearchForSbeCache(expCtx, documentSource, bufBuilder)) {
-            serializedArray.clear();
-            documentSource->serializeToArray(serializedArray);
-
-            for (const auto& value : serializedArray) {
-                tassert(6443201,
-                        "Expected pipeline stage to serialize to objects",
-                        value.getType() == Object);
-                const BSONObj bson = value.getDocument().toBson();
-                bufBuilder->appendBuf(bson.objdata(), bson.objsize());
-            }
+            encodeKeyForPipelineStage(documentSource, serializedArray, bufBuilder);
         }
     }  // for each stage in 'cqPipeline'
 }
-}  // namespace
 
-namespace canonical_query_encoder {
+CanonicalQuery::QueryShapeString encodePipeline(
+    const ExpressionContext* expCtx,
+    const std::vector<boost::intrusive_ptr<DocumentSource>>& pipelineStages) {
+    static constexpr size_t bufferSize = 200;
+    BufBuilder bufBuilder(bufferSize);
+
+    canonical_query_encoder::encodePipeline(expCtx, pipelineStages, &bufBuilder);
+    return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
+}
 
 CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
     StringBuilder keyBuilder;
@@ -1252,6 +1274,27 @@ CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const CanonicalQue
     }
 
     return keyBuilder.str();
+}
+
+CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const Pipeline& pipeline) {
+    static constexpr size_t bufferSize = 200;
+    BufBuilder bufBuilder(bufferSize);
+
+    std::vector<Value> serializedArray;
+    for (auto& stage : pipeline.getSources()) {
+        auto documentSource = stage.get();
+        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(documentSource)) {
+            StringBuilder keyBuilder;
+            encodeKeyForMatch(matchStage->getMatchExpression(), &keyBuilder);
+            bufBuilder.appendStr(keyBuilder.stringData());
+        } else if (!search_helpers::encodeSearchForSbeCache(
+                       pipeline.getContext().get(), documentSource, &bufBuilder)) {
+            encodeKeyForPipelineStage(documentSource, serializedArray, &bufBuilder);
+        }
+    }  // for each stage in 'pipeline'
+
+    std::string key(bufBuilder.buf(), bufBuilder.len());
+    return key;
 }
 
 uint32_t computeHash(StringData key) {

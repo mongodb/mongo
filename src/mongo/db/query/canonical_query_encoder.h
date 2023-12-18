@@ -79,6 +79,14 @@ bool isQueryNegatingEqualToNull(const mongo::MatchExpression* tree);
 
 
 namespace canonical_query_encoder {
+
+/**
+ * Wrapper that encodes pipelines that are eligible for the Bonsai plan cache.
+ */
+CanonicalQuery::QueryShapeString encodePipeline(
+    const ExpressionContext* expCtx,
+    const std::vector<boost::intrusive_ptr<DocumentSource>>& pipelineStages);
+
 /**
  * Encode the given CanonicalQuery into a string representation which represents the shape of the
  * query specifically for the classic plan cache. This is done by encoding the match, projection and
@@ -104,6 +112,14 @@ CanonicalQuery::QueryShapeString encodeSBE(const CanonicalQuery& cq,
  * sort and user-specified collation.
  */
 CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const CanonicalQuery& cq);
+
+/**
+ * Encode the given MatchExpression and, optionally, projection ast from a pipeline into a string
+ * representation which represents the shape of the query for matching the query used with plan
+ * cache commands (planCacheClear, planCacheClearFilter, planCacheListFilters, and
+ * planCacheSetFilter).
+ */
+CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const Pipeline& pipeline);
 
 /**
  * Returns a hash of the given key (produced from either a QueryShapeString or a PlanCacheKey).
