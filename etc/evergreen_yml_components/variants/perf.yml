@@ -27,7 +27,7 @@ variables:
   - name: package_new_compile
     variant: amazon2-x86-streams-compile
 
-- &amazon_linux2_arm64_compile_variant_dependency
+- &amazon_linux2_arm64_mongocrypt_compile_variant_dependency
   depends_on:
   - name: schedule_global_auto_tasks
     variant: task_generation
@@ -35,6 +35,13 @@ variables:
     variant: amazon2-arm64-compile
   - name: compile_mongocrypt_shlib
     variant: amazon2-arm64-mongocrypt-shlib-compile
+
+- &al2023_arm64_compile_variant_dependency
+  depends_on:
+  - name: schedule_global_auto_tasks
+    variant: task_generation
+  - name: package_new_compile
+    variant: al2023-arm64-compile
 
 - &amazon2_x86_expansions
   multiversion_platform: amazon2
@@ -273,6 +280,78 @@ buildvariants:
     - name: column_store_tpch_10_denormalized
     - name: column_store_tpch_10_denormalized_unindexed
     - name: ssb_column_store_comparison
+
+- <<: *al2023_arm64_compile_variant_dependency
+  name: atlas-like-replica.2023-09
+  display_name: PERF M60-like-replica.2023-09 3-Node ReplSet
+  # TODO SERVER-74399 Reduce frequency back to baseline.
+  # cron: &atlas-like-repl-cron "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: &atlas-like-repl-cron "0 0 * * *" # Every day at 00:00
+  modules: *perf_modules
+  expansions:
+    mongodb_setup: atlas-like-replica.2023-09
+    mongodb_setup_release: 2022-11
+    infrastructure_provisioning: M60-like-replica.2023-09
+    infrastructure_provisioning_release: 2023-09
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile_variant: al2023-arm64-compile
+  run_on:
+    - "rhel70-perf-M60-like"
+  tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
+    - name: industry_benchmarks
+    - name: ycsb_60GB
+    - name: tpcc
+    - name: tpcc_majority
+    - name: linkbench
+    - name: linkbench2
+    # TODO DEVPROD-3247 Renable once Genny supports AL2023
+    #- name: genny_query_TenMDocCollection_IntId
+    #- name: genny_query_TenMDocCollection_ObjectId
+    #- name: genny_query_TenMDocCollection_SubDocId
+    #- name: genny_query_TenMDocCollection_IntId_Agg
+    #- name: genny_query_TenMDocCollection_IntId_IdentityView
+    #- name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
+
+- <<: *al2023_arm64_compile_variant_dependency
+  name: atlas-like-replica-query-stats.2023-09
+  display_name: PERF M60-like-replica.2023-09 3-Node ReplSet (QueryStats)
+  cron: *atlas-like-repl-cron
+  modules: *perf_modules
+  expansions:
+    mongodb_setup: atlas-like-replica-query-stats.2023-09
+    mongodb_setup_release: 2022-11
+    infrastructure_provisioning: M60-like-replica.2023-09
+    infrastructure_provisioning_release: 2023-09
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile_variant: al2023-arm64-compile
+  run_on:
+    - "rhel70-perf-M60-like"
+  tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
+    - name: industry_benchmarks
+    - name: ycsb_60GB
+    - name: tpcc
+    - name: tpcc_majority
+    - name: linkbench
+    - name: linkbench2
+    # TODO DEVPROD-3247 Renable once Genny supports AL2023
+    #- name: genny_query_TenMDocCollection_IntId
+    #- name: genny_query_TenMDocCollection_ObjectId
+    #- name: genny_query_TenMDocCollection_SubDocId
+    #- name: genny_query_TenMDocCollection_IntId_Agg
+    #- name: genny_query_TenMDocCollection_IntId_IdentityView
+    #- name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-atlas-M30-real.arm.aws.2023-11
@@ -979,7 +1058,7 @@ buildvariants:
     - name: genny_query_TenMDocCollection_IntId_IdentityView
     - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
-- <<: *amazon_linux2_arm64_compile_variant_dependency
+- <<: *amazon_linux2_arm64_mongocrypt_compile_variant_dependency
   name: perf-shard-lite-fle.arm.aws.2023-11
   display_name: PERF Shard Lite FLE ARM AWS 2023-11
   cron: *cron_sunday_thursday
@@ -1024,7 +1103,7 @@ buildvariants:
     - "rhel70-perf-single"
   tasks: *audit-tasks
 
-- <<: *amazon_linux2_arm64_compile_variant_dependency
+- <<: *amazon_linux2_arm64_mongocrypt_compile_variant_dependency
   name: perf-1-node-replSet-fle.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet FLE ARM AWS 2023-11
   cron: *cron_sunday_thursday

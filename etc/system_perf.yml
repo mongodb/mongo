@@ -1073,6 +1073,30 @@ buildvariants:
         depends_on:
           - name: archive_dist_test
             variant: amazon2-x86-streams-compile
+
+  - name: al2023-arm64-compile
+    display_name: Compile for Al2023 arm64 NEW
+    modules: *modules
+    expansions:
+      platform: linux
+      project_dir: *project_dir
+      compile_variant: al2023-arm64-compile
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=rhel82
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    run_on:
+      - amazon2023.0-arm64-large
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+      - name: package_new_compile
+        depends_on:
+          - name: archive_dist_test
+            variant: al2023-arm64-compile
   ###
 
   - name: linux-intel-standalone-classic-query-engine
