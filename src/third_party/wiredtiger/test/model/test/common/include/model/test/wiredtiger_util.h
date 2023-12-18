@@ -62,6 +62,13 @@ int wt_remove(WT_SESSION *session, const char *uri, const model::data_value &key
   model::timestamp_t timestamp = 0);
 
 /*
+ * wt_truncate --
+ *     Truncate a key range in WiredTiger.
+ */
+int wt_truncate(WT_SESSION *session, const char *uri, const model::data_value &start,
+  const model::data_value &stop, model::timestamp_t timestamp = 0);
+
+/*
  * wt_update --
  *     Update a key in WiredTiger.
  */
@@ -191,6 +198,14 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
 #define wt_model_remove_both(table, uri, key, ...) \
     testutil_assert(                               \
       table->remove(key, ##__VA_ARGS__) == wt_remove(session, uri, key, ##__VA_ARGS__));
+
+/*
+ * wt_model_truncate_both --
+ *     Truncate in both from the model and from the database.
+ */
+#define wt_model_truncate_both(table, uri, start, ...) \
+    testutil_assert(                                   \
+      table->truncate(start, ##__VA_ARGS__) == wt_truncate(session, uri, start, ##__VA_ARGS__));
 
 /*
  * wt_model_update_both --

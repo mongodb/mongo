@@ -167,6 +167,53 @@ wt_remove(
 }
 
 /*
+ * wt_truncate --
+ *     Truncate a key range in WiredTiger.
+ */
+int
+wt_truncate(WT_SESSION *session, const char *uri, const model::data_value &start,
+  const model::data_value &stop, model::timestamp_t timestamp)
+{
+    WT_DECL_RET;
+    char cfg[64];
+
+    testutil_check(session->begin_transaction(session, nullptr));
+
+    WT_CURSOR *cursor_start = nullptr;
+    if (start != model::NONE) {
+        testutil_check(session->open_cursor(session, uri, nullptr, nullptr, &cursor_start));
+        model::set_wt_cursor_key(cursor_start, start);
+    }
+
+    WT_CURSOR *cursor_stop = nullptr;
+    if (stop != model::NONE) {
+        testutil_check(session->open_cursor(session, uri, nullptr, nullptr, &cursor_stop));
+        model::set_wt_cursor_key(cursor_stop, stop);
+    }
+
+    ret =
+      session->truncate(session, cursor_start == nullptr && cursor_stop == nullptr ? uri : nullptr,
+        cursor_start, cursor_stop, nullptr);
+    if (ret != WT_ROLLBACK)
+        testutil_check(ret);
+
+    if (cursor_start != nullptr)
+        testutil_check(cursor_start->close(cursor_start));
+    if (cursor_stop != nullptr)
+        testutil_check(cursor_stop->close(cursor_stop));
+
+    cfg[0] = '\0';
+    if (timestamp != model::k_timestamp_none)
+        testutil_snprintf(cfg, sizeof(cfg), "commit_timestamp=%" PRIx64, timestamp);
+    if (ret == WT_ROLLBACK)
+        testutil_check(session->rollback_transaction(session, nullptr));
+    else
+        testutil_check(session->commit_transaction(session, cfg));
+
+    return ret;
+}
+
+/*
  * wt_update --
  *     Update a key in WiredTiger.
  */
