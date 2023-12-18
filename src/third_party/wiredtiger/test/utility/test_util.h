@@ -48,7 +48,8 @@
 /* Default file and subdirectory names to use for LazyFS in the tests. */
 #define LAZYFS_BASE_DIR "base"
 #define LAZYFS_CONFIG_FILE "lazyfs-config.toml"
-#define LAZYFS_CONTROL_FILE "lazyfs-control.fifo"
+#define LAZYFS_CONTROL_FILE_SUFFIX ".fifo"
+#define LAZYFS_CONTROL_FILE_TEMPLATE "lazyfs-control-XXXXXX" LAZYFS_CONTROL_FILE_SUFFIX
 #define LAZYFS_LOG_FILE "lazyfs.log"
 
 #ifdef _WIN32

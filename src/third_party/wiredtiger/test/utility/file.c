@@ -261,6 +261,10 @@ copy_on_file(const char *path, const file_info_t *info, void *user_data)
 
     d = (struct copy_data *)user_data;
 
+    /* Don't copy special files, such as pipes. For now, we'll just silently ignore them. */
+    if ((info->stat.st_mode & S_IFMT) != S_IFREG)
+        return;
+
     /* Get path to the new file. If the relative path is NULL, it means we are copying a file. */
     if (info->rel_path == NULL) {
         if (d->dest_is_dir) {

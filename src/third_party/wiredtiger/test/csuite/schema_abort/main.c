@@ -94,6 +94,7 @@ typedef struct {
 static volatile THREAD_TS th_ts[MAX_TH];
 
 static TEST_OPTS *opts, _opts;
+static WT_LAZY_FS lazyfs;
 
 #define ENV_CONFIG_DEF                                                                             \
     "create,"                                                                                      \
@@ -1043,9 +1044,12 @@ sig_handler(int sig)
 
     WT_UNUSED(sig);
     pid = wait(NULL);
-    /*
-     * The core file will indicate why the child exited. Choose EINVAL here.
-     */
+
+    /* Clean up LazyFS. */
+    if (use_lazyfs)
+        testutil_lazyfs_cleanup(&lazyfs);
+
+    /* The core file will indicate why the child exited. Choose EINVAL here. */
     testutil_die(EINVAL, "Child process %" PRIu64 " abnormally exited", (uint64_t)pid);
 }
 
@@ -1062,7 +1066,6 @@ main(int argc, char *argv[])
     WT_CONNECTION *conn;
     WT_CURSOR *cur_coll, *cur_local, *cur_oplog;
     WT_DECL_RET;
-    WT_LAZY_FS lazyfs;
     WT_SESSION *session;
     pid_t pid;
     uint64_t absent_coll, absent_local, absent_oplog, count, key, last_key;

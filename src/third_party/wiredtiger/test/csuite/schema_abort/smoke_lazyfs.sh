@@ -15,7 +15,7 @@ else
     # copy of the script that lives under the build directory. Otherwise
     # passing the binary path is required.
     binary_dir=${binary_dir:-`dirname $0`}
-    test_bin=$binary_dir/test_schema_abort_lazyfs
+    test_bin=$binary_dir/test_schema_abort
 fi
 
 $TEST_WRAPPER $test_bin -l -t 20 -T 5

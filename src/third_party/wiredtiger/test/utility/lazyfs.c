@@ -294,6 +294,7 @@ testutil_lazyfs_setup(WT_LAZY_FS *lazyfs, const char *home)
 #else
     char home_canonical[PATH_MAX];
     char *str;
+    int fd;
 
     memset(lazyfs, 0, sizeof(*lazyfs));
 
@@ -309,9 +310,23 @@ testutil_lazyfs_setup(WT_LAZY_FS *lazyfs, const char *home)
     testutil_snprintf(lazyfs->base, sizeof(lazyfs->base), "%s/%s", home_canonical, LAZYFS_BASE_DIR);
     testutil_recreate_dir(lazyfs->base);
 
-    /* Set up the relevant LazyFS files. */
+    /*
+     * Create the control file in the /tmp directory, so that if we fail, Evergreen would not
+     * attempt to include the file in the archive. Having a FIFO file in the archive would cause the
+     * task to hang.
+     *
+     * We only really need just the file name, but all functions that create just the file name are
+     * considered insecure, which will result in errors and warnings. We don't need to worry about
+     * them at all in our case, but we would still like to avoid the errors.
+     */
     testutil_snprintf(
-      lazyfs->control, sizeof(lazyfs->control), "%s/%s", home_canonical, LAZYFS_CONTROL_FILE);
+      lazyfs->control, sizeof(lazyfs->control), "/tmp/%s", LAZYFS_CONTROL_FILE_TEMPLATE);
+    fd = mkstemps(lazyfs->control, strlen(LAZYFS_CONTROL_FILE_SUFFIX));
+    testutil_assert_errno(fd > 0);
+    testutil_check(close(fd));
+    testutil_remove(lazyfs->control);
+
+    /* Set up the relevant LazyFS files. */
     testutil_snprintf(
       lazyfs->config, sizeof(lazyfs->config), "%s/%s", home_canonical, LAZYFS_CONFIG_FILE);
     testutil_snprintf(
@@ -347,9 +362,14 @@ testutil_lazyfs_cleanup(WT_LAZY_FS *lazyfs)
     WT_UNUSED(lazyfs);
     testutil_die(ENOENT, "LazyFS is not available on this platform.");
 #else
+    /* If this is called with uninitialized LazyFS (e.g., in error handling), we are done. */
+    if (lazyfs->mountpoint[0] == '\0')
+        return;
+
     lazyfs_unmount(lazyfs->mountpoint, lazyfs->pid);
     lazyfs->pid = 0;
 
+    testutil_remove(lazyfs->control);
     testutil_remove(lazyfs->mountpoint);
 #endif
 }
