@@ -19,6 +19,9 @@
  *   requires_timeseries,
  *   # Test uses parallel shell to wait on fail point.
  *   uses_parallel_shell,
+ *   # Multi clients cannot share global fail points. When one client turns off a fail point, other
+ *   # clients waiting on the fail point will get failed.
+ *   multi_clients_incompatible,
  * ]
  */
 

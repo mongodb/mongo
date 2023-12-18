@@ -403,6 +403,7 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.MRLOG = config.pop("mrlog")
     _config.NO_JOURNAL = config.pop("no_journal")
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("num_clients_per_fixture")
+    _config.USE_TENANT_CLIENT = config.pop("use_tenant_client")
     _config.NUM_REPLSET_NODES = config.pop("num_replset_nodes")
     _config.NUM_SHARDS = config.pop("num_shards")
     _config.CONFIG_SHARD = utils.pick_catalog_shard_node(

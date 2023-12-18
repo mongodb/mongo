@@ -8,6 +8,8 @@
 //  assumes_read_concern_unchanged,
 //  assumes_against_mongod_not_mongos,
 //  does_not_support_repeated_reads,
+//  # Multi clients run concurrently and may modify the serverStatus metrices read in this test.
+//  multi_clients_incompatible,
 // ]
 
 const testDB = db.getSiblingDB("facet_stats");

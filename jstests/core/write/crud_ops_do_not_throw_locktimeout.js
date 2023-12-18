@@ -7,6 +7,9 @@
  *   assumes_write_concern_unchanged,
  *   uses_parallel_shell,
  *   no_selinux,
+ *   # Multi clients cannot share global fail points. When one client turns off a fail point, other
+ *   # clients waiting on the fail point will get failed.
+ *   multi_clients_incompatible,
  * ]
  */
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";

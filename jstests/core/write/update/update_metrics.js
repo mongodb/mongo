@@ -13,6 +13,8 @@
  *   # This test contains assertions on the number of executed operations, and tenant migrations
  *   # passthrough suites automatically retry operations on TenantMigrationAborted errors.
  *   tenant_migration_incompatible,
+ *   # Multi clients may modify the serverStatus metrices read in this test.
+ *   multi_clients_incompatible,
  * ]
  */
 const testDB = db.getSiblingDB(jsTestName());

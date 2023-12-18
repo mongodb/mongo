@@ -251,9 +251,10 @@ def new_test_logger(test_shortname, test_basename, command, parent, job_num, tes
     return (logger, url)
 
 
-def new_test_thread_logger(parent, test_kind, thread_id):
+def new_test_thread_logger(parent, test_kind, thread_id, tenant_id=None):
     """Create a new test thread logger that will be the child of the given parent."""
-    name = "%s:%s" % (test_kind, thread_id)
+    name = "%s:%s:%s" % (test_kind, thread_id, tenant_id) if tenant_id else "%s:%s" % (test_kind,
+                                                                                       thread_id)
     logger = logging.Logger(name)
     logger.parent = parent
     return logger

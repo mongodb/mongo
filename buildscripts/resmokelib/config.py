@@ -84,6 +84,7 @@ DEFAULTS = {
     "mrlog": None,
     "no_journal": False,
     "num_clients_per_fixture": 1,
+    "use_tenant_client": False,
     "origin_suite": None,
     "perf_report_file": None,
     "cedar_report_file": None,
@@ -457,6 +458,9 @@ NO_JOURNAL = None
 
 # If set, then each fixture runs tests with the specified number of clients.
 NUM_CLIENTS_PER_FIXTURE = None
+
+# If set, each client will be constructed with a generated tenant id.
+USE_TENANT_CLIENT = False
 
 # Indicates the name of the test suite prior to the suite being split up by uite generation
 ORIGIN_SUITE = None

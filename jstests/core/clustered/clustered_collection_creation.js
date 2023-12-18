@@ -10,6 +10,8 @@
  *   assumes_against_mongod_not_mongos,
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
+ *   # Write and read on "local" db with multi clients cannot match the expected response.
+ *   multi_clients_incompatible,
  * ]
  */
 import {

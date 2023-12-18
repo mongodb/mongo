@@ -1,6 +1,11 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.  Also, the primary node cannot change because we use the local database in this test.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, does_not_support_stepdowns]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   does_not_support_stepdowns,
+//   # Write and read on "local" db with multi clients cannot match the expected response.
+//   multi_clients_incompatible,
+// ]
 
 let t = db.jstests_index9;
 

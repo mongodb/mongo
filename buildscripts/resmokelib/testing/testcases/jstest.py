@@ -8,6 +8,7 @@ import sys
 import shutil
 import threading
 import uuid
+from bson.objectid import ObjectId
 
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import core
@@ -133,13 +134,15 @@ class JSTestCaseBuilder(interface.TestCaseFactory):
         # This function should only be called by interface.py's as_command().
         return self.test_case_template._make_process()  # pylint: disable=protected-access
 
-    def _get_shell_options_for_thread(self, num_clients, thread_id):
+    def _get_shell_options_for_thread(self, num_clients, thread_id, tenant_id=None):
         """Get shell_options with an initialized TestData object for given thread."""
 
         # We give each _SingleJSTestCase its own copy of the shell_options.
         shell_options = self.test_case_template.shell_options.copy()
         global_vars = shell_options["global_vars"].copy()
         test_data = global_vars["TestData"].copy()
+        if tenant_id:
+            test_data["tenantId"] = tenant_id
 
         # We set a property on TestData to mark the main test when multiple clients are going to run
         # concurrently in case there is logic within the test that must execute only once. We also
@@ -154,10 +157,11 @@ class JSTestCaseBuilder(interface.TestCaseFactory):
 
         return shell_options
 
-    def create_test_case_for_thread(self, logger, num_clients=1, thread_id=0) -> _SingleJSTestCase:
+    def create_test_case_for_thread(self, logger, num_clients=1, thread_id=0,
+                                    tenant_id=None) -> _SingleJSTestCase:
         """Create and configure a _SingleJSTestCase to be run in a separate thread."""
 
-        shell_options = self._get_shell_options_for_thread(num_clients, thread_id)
+        shell_options = self._get_shell_options_for_thread(num_clients, thread_id, tenant_id)
         test_case = self.create_test_case(logger, self.test_case_template.js_filename,
                                           self.test_case_template._id,
                                           self.test_case_template.shell_executable, shell_options)
@@ -192,13 +196,16 @@ class MultiClientsTestCase(interface.TestCase, interface.UndoDBUtilsMixin):
         super().__init__(logger, test_kind, test_name)
         self._id = test_id
         self.num_clients = MultiClientsTestCase.DEFAULT_CLIENT_NUM
+        self.use_tenant_client = False
         self._factory = factory
 
     def configure(  # pylint: disable=arguments-differ,keyword-arg-before-vararg
-            self, fixture, num_clients=DEFAULT_CLIENT_NUM, *args, **kwargs):
+            self, fixture, num_clients=DEFAULT_CLIENT_NUM, use_tenant_client=False, *args,
+            **kwargs):
         """Configure the test case and its factory."""
         super().configure(fixture, *args, **kwargs)
         self.num_clients = num_clients
+        self.use_tenant_client = use_tenant_client
         self._factory.configure(fixture, *args, **kwargs)
 
     def _make_process(self):
@@ -206,7 +213,10 @@ class MultiClientsTestCase(interface.TestCase, interface.UndoDBUtilsMixin):
         return self._factory._make_process()  # pylint: disable=protected-access
 
     def _run_single_copy(self):
-        test_case = self._factory.create_test_case_for_thread(self.logger)
+        tenant_id = str(ObjectId()) if self.use_tenant_client else None
+        test_case = self._factory.create_test_case_for_thread(self.logger, num_clients=1,
+                                                              thread_id=0, tenant_id=tenant_id)
+
         try:
             test_case.run_test()
             # If there was an exception, it will be logged in test_case's run_test function.
@@ -220,10 +230,11 @@ class MultiClientsTestCase(interface.TestCase, interface.UndoDBUtilsMixin):
         try:
             # If there are multiple clients, make a new thread for each client.
             for thread_id in range(self.num_clients):
+                tenant_id = str(ObjectId()) if self.use_tenant_client else None
                 logger = logging.loggers.new_test_thread_logger(self.logger, self.test_kind,
-                                                                str(thread_id))
+                                                                str(thread_id), tenant_id)
                 test_case = self._factory.create_test_case_for_thread(
-                    logger, num_clients=self.num_clients, thread_id=thread_id)
+                    logger, num_clients=self.num_clients, thread_id=thread_id, tenant_id=tenant_id)
                 test_cases.append(test_case)
 
                 thread = self.ThreadWithException(target=test_case.run_test)

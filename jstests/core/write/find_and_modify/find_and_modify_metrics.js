@@ -13,6 +13,8 @@
  *   # The config fuzzer may run logical session cache refreshes in the background, which modifies
  *   # some serverStatus metrics read in this test.
  *   does_not_support_config_fuzzer,
+ *   # Multi clients run concurrently and may modify the serverStatus metrices read in this test.
+ *   multi_clients_incompatible,
  * ]
  */
 const testDB = db.getSiblingDB(jsTestName());

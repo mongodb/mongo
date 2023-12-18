@@ -948,6 +948,11 @@ class RunPlugin(PluginInterface):
                             help="Number of clients running tests per fixture.")
 
         parser.add_argument(
+            "--useTenantClient", default=False, dest="use_tenant_client", action="store_true", help=
+            "Use tenant client. If set, each client will be constructed with a generated tenant id."
+        )
+
+        parser.add_argument(
             "--shellConnString", dest="shell_conn_string", metavar="CONN_STRING",
             help="Overrides the default fixture and connects with a mongodb:// connection"
             " string to an existing MongoDB cluster instead. This is useful for"

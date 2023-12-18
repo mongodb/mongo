@@ -6894,6 +6894,16 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
+  name: concurrency_multitenancy_with_atlas_proxy_jscore_passthrough_gen
+  tags: ["serverless"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      suite: multitenancy_with_atlas_proxy_jscore_passthrough
+      resmoke_args: "--numClientsPerFixture=2 --useTenantClient --excludeWithAnyTags=multi_clients_incompatible"
+
+- <<: *gen_task_template
   name: concurrency_multitenancy_replication_with_atlas_proxy_gen
   tags: ["serverless"]
   commands:

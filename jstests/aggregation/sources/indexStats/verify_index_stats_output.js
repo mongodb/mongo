@@ -9,6 +9,9 @@
  *   # $indexStats aggregation stage cannot be used with $facet.
  *   do_not_wrap_aggregations_in_facets,
  *   uses_parallel_shell,
+ *   # Multi clients cannot share global fail points. When one client turns off a fail point, other
+ *   # clients waiting on the fail point will get failed.
+ *   multi_clients_incompatible,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
