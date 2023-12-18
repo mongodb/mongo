@@ -367,6 +367,28 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
+    if (options.originalCollectionOptions) {
+        // Check target collection options match expected.
+        const BSONObj collectionOptions =
+            targetColl ? targetColl->getCollectionOptions().toBSON() : BSONObj();
+        status = checkTargetCollectionOptionsMatch(
+            target, options.originalCollectionOptions.get(), collectionOptions);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    if (options.originalIndexes) {
+        // Check target collection indexes match expected.
+        const auto currentIndexes =
+            listIndexesEmptyListIfMissing(opCtx, target, ListIndexesInclude::Nothing);
+        status = checkTargetCollectionIndexesMatch(
+            target, options.originalIndexes.get(), currentIndexes);
+
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     AutoStatsTracker statsTracker(
         opCtx,
         source,
@@ -798,56 +820,45 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
 void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                     const NamespaceString& sourceNs,
                                                     const NamespaceString& targetNs,
-                                                    const RenameCollectionOptions& options,
-                                                    std::list<BSONObj> originalIndexes,
-                                                    BSONObj originalCollectionOptions) {
-    AutoGetDb dbLock(opCtx, targetNs.dbName(), MODE_X);
-
-    // Check target collection options match expected.
-    auto collection = dbLock.getDb()
-        ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, targetNs)
-        : nullptr;
-    const BSONObj collectionOptions =
-        collection ? collection->getCollectionOptions().toBSON() : BSONObj();
-    checkTargetCollectionOptionsMatch(targetNs, originalCollectionOptions, collectionOptions);
-
-    // Check target collection indexes match expected.
-    const auto currentIndexes =
-        listIndexesEmptyListIfMissing(opCtx, targetNs, ListIndexesInclude::Nothing);
-    checkTargetCollectionIndexesMatch(targetNs, originalIndexes, currentIndexes);
-
+                                                    const RenameCollectionOptions& options) {
+    // Pass in originalIndexes and originalCollectionOptions to be evaluated later,
+    // under a collection lock in renameCollectionWithinDB.
     validateAndRunRenameCollection(opCtx, sourceNs, targetNs, options);
 }
 
-void checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
-                                       const BSONObj& expectedOptions,
-                                       const BSONObj& currentOptions) {
+Status checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
+                                         const BSONObj& expectedOptions,
+                                         const BSONObj& currentOptions) {
     // We do not include the UUID field in the options comparison. It is ok if the target collection
     // was dropped and recreated, as long as the new target collection has the same options and
     // indexes as the original one did. This is mainly to support concurrent $out to the same
     // collection.
-    uassert(ErrorCodes::CommandFailed,
-            str::stream() << "collection options of target collection "
-                          << targetNss.toStringForErrorMsg()
-                          << " changed during processing. Original options: " << expectedOptions
-                          << ", new options: " << currentOptions,
-            SimpleBSONObjComparator::kInstance.evaluate(expectedOptions.removeField("uuid") ==
-                                                        currentOptions.removeField("uuid")));
+    if (SimpleBSONObjComparator::kInstance.evaluate(expectedOptions.removeField("uuid") !=
+                                                    currentOptions.removeField("uuid"))) {
+        return Status(ErrorCodes::CommandFailed,
+                      str::stream() << "collection options of target collection "
+                                    << targetNss.toStringForErrorMsg()
+                                    << " changed during processing. Original options: "
+                                    << expectedOptions << ", new options: " << currentOptions);
+    };
+    return Status::OK();
 }
 
-void checkTargetCollectionIndexesMatch(const NamespaceString& targetNss,
-                                       const std::list<BSONObj>& expectedIndexes,
-                                       const std::list<BSONObj>& currentIndexes) {
+Status checkTargetCollectionIndexesMatch(const NamespaceString& targetNss,
+                                         const std::list<BSONObj>& expectedIndexes,
+                                         const std::list<BSONObj>& currentIndexes) {
     UnorderedFieldsBSONObjComparator comparator;
-    uassert(
-        ErrorCodes::CommandFailed,
-        str::stream() << "indexes of target collection " << targetNss.toStringForErrorMsg()
-                      << " changed during processing.",
-        expectedIndexes.size() == currentIndexes.size() &&
-            std::equal(expectedIndexes.begin(),
-                       expectedIndexes.end(),
-                       currentIndexes.begin(),
-                       [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) == 0; }));
+    if (expectedIndexes.size() != currentIndexes.size() ||
+        !(std::equal(expectedIndexes.begin(),
+                     expectedIndexes.end(),
+                     currentIndexes.begin(),
+                     [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) == 0; }))) {
+        return Status(ErrorCodes::CommandFailed,
+                      str::stream()
+                          << "indexes of target collection " << targetNss.toStringForErrorMsg()
+                          << " changed during processing.");
+    }
+    return Status::OK();
 }
 
 void validateNamespacesForRenameCollection(OperationContext* opCtx,

@@ -533,6 +533,8 @@ last-continuous:
     ticket: SERVER-81277
   - test_file: jstests/core/query/explode_for_sort_plan_cache.js
     ticket: SERVER-83777
+  - test_file: jstests/core/txns/out_not_blocked_by_txn.js
+    ticket: SERVER-72703
   - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-82814
   - test_file: jstests/core/index/hidden_index.js
@@ -1138,6 +1140,8 @@ last-lts:
     ticket: SERVER-81277
   - test_file: jstests/core/query/explode_for_sort_plan_cache.js
     ticket: SERVER-83777
+  - test_file: jstests/core/txns/out_not_blocked_by_txn.js
+    ticket: SERVER-72703
   - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-82814
   - test_file: jstests/core/index/hidden_index.js

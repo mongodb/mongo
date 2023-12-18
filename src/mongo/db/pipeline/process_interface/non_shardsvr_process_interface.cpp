@@ -236,9 +236,10 @@ void NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     RenameCollectionOptions options;
     options.dropTarget = dropTarget;
     options.stayTemp = stayTemp;
+    options.originalCollectionOptions = originalCollectionOptions;
+    options.originalIndexes = originalIndexes;
     // skip sharding validation on non sharded servers
-    doLocalRenameIfOptionsAndIndexesHaveNotChanged(
-        opCtx, sourceNs, targetNs, options, originalIndexes, originalCollectionOptions);
+    doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx, sourceNs, targetNs, options);
 }
 
 void NonShardServerProcessInterface::createTimeseriesView(OperationContext* opCtx,
