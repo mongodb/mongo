@@ -52,7 +52,7 @@ kv_database::create_table(const char *name, const kv_table_config &config)
     if (i != _tables.end())
         throw model_exception("Table already exists: " + s);
 
-    kv_table_ptr table = std::make_shared<kv_table>(name, config);
+    kv_table_ptr table = std::make_shared<kv_table>(*this, name, config);
     _tables[s] = table;
     return table;
 }

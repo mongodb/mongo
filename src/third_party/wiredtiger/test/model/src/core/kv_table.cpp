@@ -29,7 +29,10 @@
 #include <algorithm>
 #include <iostream>
 
+#include "model/kv_database.h"
 #include "model/kv_table.h"
+#include "model/kv_transaction.h"
+#include "model/util.h"
 #include "wiredtiger.h"
 
 namespace model {
@@ -161,13 +164,8 @@ int
 kv_table::insert(
   const data_value &key, const data_value &value, timestamp_t timestamp, bool overwrite)
 {
-    try {
-        item(key).add_update(
-          std::move(kv_update(value, fix_timestamp(timestamp))), false, !overwrite);
-        return 0;
-    } catch (wiredtiger_exception &e) {
-        return e.error();
-    }
+    return with_transaction(
+      [&](auto txn) { return insert(txn, key, value, overwrite); }, timestamp);
 }
 
 /*
@@ -195,15 +193,7 @@ kv_table::insert(
 int
 kv_table::remove(const data_value &key, timestamp_t timestamp)
 {
-    kv_table_item *item = item_if_exists(key);
-    if (item == nullptr)
-        return WT_NOTFOUND;
-    try {
-        item->add_update(std::move(kv_update(NONE, fix_timestamp(timestamp))), true, false);
-        return 0;
-    } catch (wiredtiger_exception &e) {
-        return e.error();
-    }
+    return with_transaction([&](auto txn) { return remove(txn, key); }, timestamp);
 }
 
 /*
@@ -234,22 +224,7 @@ kv_table::remove(kv_transaction_ptr txn, const data_value &key)
 int
 kv_table::truncate(const data_value &start, const data_value &stop, timestamp_t timestamp)
 {
-    std::lock_guard lock_guard(_lock);
-    if (start != model::NONE && stop != model::NONE && start > stop)
-        throw model_exception("The start and the stop key are not in the right order");
-
-    auto start_iter = start == model::NONE ? _data.begin() : _data.lower_bound(start);
-    auto stop_iter = stop == model::NONE ? _data.end() : _data.upper_bound(stop);
-
-    try {
-        for (auto i = start_iter; i != stop_iter; i++)
-            i->second.add_update(
-              std::move(kv_update(NONE, fix_timestamp(timestamp))), false, false);
-    } catch (wiredtiger_exception &e) {
-        return e.error();
-    }
-
-    return 0;
+    return with_transaction([&](auto txn) { return truncate(txn, start, stop); }, timestamp);
 }
 
 /*
@@ -288,13 +263,8 @@ int
 kv_table::update(
   const data_value &key, const data_value &value, timestamp_t timestamp, bool overwrite)
 {
-    try {
-        item(key).add_update(
-          std::move(kv_update(value, fix_timestamp(timestamp))), !overwrite, false);
-        return 0;
-    } catch (wiredtiger_exception &e) {
-        return e.error();
-    }
+    return with_transaction(
+      [&](auto txn) { return update(txn, key, value, overwrite); }, timestamp);
 }
 
 /*
@@ -375,6 +345,20 @@ kv_table_verify_cursor
 kv_table::verify_cursor()
 {
     return std::move(kv_table_verify_cursor(_data));
+}
+
+/*
+ * kv_table::with_transaction --
+ *     Run the following function within a transaction and clean up afterwards, committing the
+ *     transaction if possible, and rolling it back if not.
+ */
+int
+kv_table::with_transaction(std::function<int(kv_transaction_ptr)> fn, timestamp_t commit_timestamp)
+{
+    kv_transaction_ptr txn = _database.begin_transaction();
+    kv_transaction_guard txn_guard(txn, commit_timestamp);
+
+    return fn(txn);
 }
 
 } /* namespace model */

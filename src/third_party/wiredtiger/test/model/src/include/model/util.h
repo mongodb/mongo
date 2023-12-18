@@ -41,6 +41,7 @@
 #include <vector>
 #include "model/core.h"
 #include "model/data_value.h"
+#include "model/kv_transaction.h"
 #include "wiredtiger.h"
 
 namespace model {
@@ -127,6 +128,43 @@ public:
 
 private:
     WT_SESSION *_session;
+};
+
+/*
+ * kv_transaction_guard --
+ *     Automatically commit a model transaction at the end of the function block, or roll it back if
+ *     need be.
+ */
+class kv_transaction_guard {
+
+public:
+    /*
+     * kv_transaction_guard::kv_transaction_guard --
+     *     Create a new instance of the guard.
+     */
+    inline kv_transaction_guard(kv_transaction_ptr txn,
+      timestamp_t commit_timestamp = k_timestamp_none,
+      timestamp_t durable_timestamp = k_timestamp_none) noexcept
+        : _txn(txn), _commit_timestamp(commit_timestamp), _durable_timestamp(durable_timestamp){};
+
+    /*
+     * kv_transaction_guard::~kv_transaction_guard --
+     *     Destroy the guard.
+     */
+    inline ~kv_transaction_guard()
+    {
+        if (!_txn)
+            return;
+        if (_txn->failed())
+            _txn->rollback();
+        else
+            _txn->commit(_commit_timestamp, _durable_timestamp);
+    }
+
+private:
+    kv_transaction_ptr _txn;
+    timestamp_t _commit_timestamp;
+    timestamp_t _durable_timestamp;
 };
 
 /*
