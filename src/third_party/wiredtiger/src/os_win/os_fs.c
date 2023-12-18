@@ -519,11 +519,11 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
         f |= FILE_FLAG_SEQUENTIAL_SCAN;
 
     win_fh->filehandle = CreateFileW(name_wide->data, win_fh->desired_access,
-      FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, dwCreationDisposition, f, NULL);
+      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, dwCreationDisposition, f, NULL);
     if (win_fh->filehandle == INVALID_HANDLE_VALUE) {
         if (LF_ISSET(WT_FS_OPEN_CREATE) && GetLastError() == ERROR_FILE_EXISTS)
             win_fh->filehandle = CreateFileW(name_wide->data, win_fh->desired_access,
-              FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, f, NULL);
+              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, f, NULL);
         if (win_fh->filehandle == INVALID_HANDLE_VALUE) {
             windows_error = __wt_getlasterror();
             ret = __wt_map_windows_error(windows_error);
@@ -543,7 +543,7 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
      */
     if (!LF_ISSET(WT_FS_OPEN_READONLY)) {
         win_fh->filehandle_secondary = CreateFileW(name_wide->data, win_fh->desired_access,
-          FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, f, NULL);
+          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, f, NULL);
         if (win_fh->filehandle_secondary == INVALID_HANDLE_VALUE) {
             windows_error = __wt_getlasterror();
             ret = __wt_map_windows_error(windows_error);
