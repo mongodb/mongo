@@ -513,6 +513,8 @@ last-continuous:
     ticket: SERVER-78066
   - test_file: jstests/core/query/explode_for_sort_plan_cache.js
     ticket: SERVER-83777
+  - test_file: jstests/core/txns/out_not_blocked_by_txn.js
+    ticket: SERVER-72703
   suites: null
 last-lts:
   all:
@@ -1084,4 +1086,6 @@ last-lts:
     ticket: SERVER-79848
   - test_file: jstests/core/query/explode_for_sort_plan_cache.js
     ticket: SERVER-83777
+  - test_file: jstests/core/txns/out_not_blocked_by_txn.js
+    ticket: SERVER-72703
   suites: null

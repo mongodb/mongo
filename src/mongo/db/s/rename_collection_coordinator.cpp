@@ -605,7 +605,8 @@ void checkExpectedTargetCollectionOptionsMatch(OperationContext* opCtx,
         return coll ? coll->getCollectionOptions().toBSON() : BSONObj();
     }();
 
-    checkTargetCollectionOptionsMatch(targetNss, expectedOptions, collectionOptions);
+    uassertStatusOK(
+        checkTargetCollectionOptionsMatch(targetNss, expectedOptions, collectionOptions));
 }
 
 void checkExpectedTargetIndexesMatch(OperationContext* opCtx,
@@ -624,11 +625,10 @@ void checkExpectedTargetIndexesMatch(OperationContext* opCtx,
                          }
                          return uassertStatusOK(response).docs;
                      });
-
-    checkTargetCollectionIndexesMatch(
+    uassertStatusOK(checkTargetCollectionIndexesMatch(
         targetNss,
         std::list<BSONObj>{expectedIndexes.begin(), expectedIndexes.end()},
-        std::list<BSONObj>{currentIndexes.begin(), currentIndexes.end()});
+        std::list<BSONObj>{currentIndexes.begin(), currentIndexes.end()}));
 }
 }  // namespace
 
