@@ -135,12 +135,6 @@ buildvariants:
     - name: tpch_1_denormalized
     - name: tpch_10_normalized
     - name: tpch_10_denormalized
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-standalone-classic-query-engine.intel.aws.2023-11
@@ -464,9 +458,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone.arm.aws.2023-11
   display_name: PERF Standalone ARM AWS 2023-11
-  # TODO SERVER-74399 Reduce frequency back to baseline.
-  # cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
-  cron: &linux-standalone-cron "0 0 * * *"  # Everyday at 00:00
+  cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -558,12 +550,6 @@ buildvariants:
     - name: column_store_tpch_10_denormalized
     - name: column_store_tpch_10_denormalized_unindexed
     - name: ssb_column_store_comparison
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
 - <<: *amazon_linux2_x86_streams_compile_variant_dependency
   name: perf-streams-single.intel.aws.2023-10
@@ -837,73 +823,6 @@ buildvariants:
   tasks: *classic_engine_1nodereplset_tasks
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
-  name: perf-standalone-query-stats.arm.aws.2023-11
-  display_name: PERF Standalone (QueryStats) ARM AWS 2023-11
-  # Match the baseline non-query-stats cron
-  cron: *linux-standalone-cron
-  modules: *perf_modules
-  expansions:
-    mongodb_setup_release: 2022-11
-    mongodb_setup: standalone-query-stats
-    infrastructure_provisioning_release: 2023-09
-    infrastructure_provisioning: single
-    workload_setup: 2022-11
-    platform: linux
-    project_dir: *perf_project_dir
-    authentication: enabled
-    storageEngine: wiredTiger
-    compile_variant: amazon2-arm64-compile
-  run_on:
-    - "rhel70-perf-single"
-  tasks:
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
-    - name: ycsb.2023-09
-    - name: ycsb_60GB.2023-09
-    - name: ycsb_60GB.long.2023-09
-    - name: crud_workloads_majority
-    - name: tpcc
-    - name: tpch_1_normalized
-    - name: tpch_1_denormalized
-    - name: tpch_10_normalized
-    - name: tpch_10_denormalized
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
-
-- <<: *amazon_linux2_arm64_compile_variant_dependency
-  name: perf-standalone-limited-query-stats.arm.aws.2023-11
-  display_name: PERF Standalone (Rate Limited QueryStats) ARM AWS 2023-11
-  # Match the baseline non-query-stats cron
-  cron: *linux-standalone-cron
-  modules: *perf_modules
-  expansions:
-    mongodb_setup_release: 2022-11
-    mongodb_setup: standalone-query-stats-small-rate-limit
-    infrastructure_provisioning_release: 2023-09
-    infrastructure_provisioning: single
-    workload_setup: 2022-11
-    platform: linux
-    project_dir: *perf_project_dir
-    authentication: enabled
-    storageEngine: wiredTiger
-    compile_variant: amazon2-arm64-compile
-  run_on:
-    - "rhel70-perf-single"
-  tasks:
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
-
-- <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-all-feature-flags.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet (all feature flags) ARM AWS 2023-11
   cron: *linux-1-node-repl-cron
@@ -1016,49 +935,6 @@ buildvariants:
   tasks: *audit-tasks
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
-  name: perf-1-node-replSet-query-stats.arm.aws.2023-11
-  display_name: PERF 1-Node ReplSet (QueryStats) ARM AWS 2023-11
-  cron: *linux-1-node-repl-cron
-  modules: *perf_modules
-  expansions:
-    mongodb_setup_release: 2022-11
-    mongodb_setup: single-replica-query-stats
-    infrastructure_provisioning_release: 2023-09
-    infrastructure_provisioning: single
-    workload_setup: 2022-11
-    platform: linux
-    project_dir: *perf_project_dir
-    authentication: enabled
-    storageEngine: wiredTiger
-    compile_variant: amazon2-arm64-compile
-  run_on:
-    - "rhel70-perf-single"
-  tasks:
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
-    - name: ycsb.2023-09
-    - name: ycsb_60GB.2023-09
-    - name: ycsb_60GB.long.2023-09
-    - name: crud_workloads_majority
-    - name: tpcc
-    - name: linkbench
-    - name: linkbench2
-    - name: tpch_1_normalized
-    - name: tpch_1_denormalized
-    - name: tpch_10_normalized
-    - name: tpch_10_denormalized
-    - name: tsbs_query
-    - name: tsbs_query_finance
-    - name: tsbs_query_manual_bucketing
-    - name: tsbs_query_fixed_bucketing
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
-
-- <<: *amazon_linux2_arm64_mongocrypt_compile_variant_dependency
   name: perf-shard-lite-fle.arm.aws.2023-11
   display_name: PERF Shard Lite FLE ARM AWS 2023-11
   cron: *cron_sunday_thursday
@@ -1282,46 +1158,6 @@ buildvariants:
       # cron: *high-value-workload-cron
     - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
       # cron: *high-value-workload-cron
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
-
-# A variant of 3-shard with $queryStats activated (unlimited).
-- <<: *shard-baseline
-  name: perf-3-shard-query-stats.arm.aws.2023-11
-  display_name: PERF 3-Shard Cluster (QueryStats) ARM AWS 2023-11
-  cron: *linux-3-shard-cron
-  modules: *perf_modules
-  expansions:
-    <<: *shard-baseline-expansions
-    mongodb_setup: shard-query-stats
-  tasks: &sharded-query-stats-tasks
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
-    - name: ycsb.2023-09
-    - name: mongos_workloads
-    - name: tsbs_query_sharded
-    - name: tsbs_query_finance_sharded
-    - name: tsbs_query_sharded_balancer
-    - name: tsbs_query_finance_sharded_balancer
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
-
-# A variant of 3-shard with $queryStats activated but with a rate limit.
-- <<: *shard-baseline
-  name: perf-3-shard-limited-query-stats.arm.aws.2023-11
-  display_name: PERF 3-Shard Cluster (Limited QueryStats) ARM AWS 2023-11
-  expansions:
-    <<: *shard-baseline-expansions
-    mongodb_setup: shard-limited-query-stats
-  tasks: *sharded-query-stats-tasks
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-shard-heuristic-bonsai.arm.aws.2023-11
@@ -1412,12 +1248,6 @@ buildvariants:
     - name: tsbs_query_finance_sharded
     - name: tsbs_query_sharded_balancer
     - name: tsbs_query_finance_sharded_balancer
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-shard-lite-intel.intel.aws.2023-11
@@ -1497,40 +1327,6 @@ buildvariants:
     - name: tsbs_query_finance_sharded
     - name: tsbs_query_sharded_balancer
     - name: tsbs_query_finance_sharded_balancer
-
-# A variant of shard-lite with $queryStats enabled (unlimited).
-- <<: *shard-lite-baseline
-  name: perf-shard-lite-query-stats.arm.aws.2023-11
-  display_name: PERF Shard Lite (QueryStats) ARM AWS 2023-11
-  expansions:
-    <<: *shard-lite-baseline-expansions
-    mongodb_setup: shard-lite-query-stats
-  tasks: &shard-lite-query-stats-tasks
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
-    - name: bestbuy_query
-    - name: ycsb.2023-09
-    - name: linkbench
-    - name: mongos_workloads
-    - name: tsbs_query_sharded
-    - name: tsbs_query_finance_sharded
-    - name: tsbs_query_sharded_balancer
-    - name: tsbs_query_finance_sharded_balancer
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
-
-# A variant of shard-lite with $queryStats enabled with a rate limit.
-- <<: *shard-lite-baseline
-  name: perf-shard-lite-limited-query-stats.arm.aws.2023-11
-  display_name: PERF Shard Lite (Limited QueryStats) ARM AWS 2023-11
-  expansions:
-    <<: *shard-lite-baseline-expansions
-    mongodb_setup: shard-lite-limited-query-stats
-  tasks: *shard-lite-query-stats-tasks
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-shard-single.arm.aws.2023-11
@@ -1636,12 +1432,6 @@ buildvariants:
       cron: *high-value-workload-cron
     - name: time_series_sort_high_value
       cron: *high-value-workload-cron
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-3-node-replSet-intel.intel.aws.2023-11
@@ -1698,26 +1488,6 @@ buildvariants:
       cron: *high-value-workload-cron
     - name: time_series_sort_high_value
       cron: *high-value-workload-cron
-
-- <<: *amazon2_x86_compile_variant_dependency
-  name: perf-3-node-replSet-intel-query-stats.intel.aws.2023-11
-  display_name: PERF 3-Node ReplSet (QueryStats) Intel AWS 2023-11
-  cron: *linux-3-node-cron
-  modules: *perf_modules
-  expansions:
-    mongodb_setup_release: 2022-11
-    mongodb_setup: replica-query-stats
-    infrastructure_provisioning_release: 2023-09
-    infrastructure_provisioning: replica-intel.2023-11
-    workload_setup: 2022-11
-    platform: linux
-    project_dir: *perf_project_dir
-    authentication: enabled
-    storageEngine: wiredTiger
-    compile_variant: amazon2-x86-compile
-  run_on:
-    - "rhel70-perf-replset"
-  tasks: *3node-intel-tasks
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-last-continuous-fcv.arm.aws.2023-11
@@ -2104,71 +1874,6 @@ buildvariants:
     - name: schedule_variant_auto_tasks
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
-  name: perf-3-node-replSet-query-stats.arm.aws.2023-11
-  display_name: PERF 3-Node ReplSet (QueryStats) ARM AWS 2023-11
-  cron: *linux-3-node-cron
-  modules: *perf_modules
-  expansions:
-    mongodb_setup_release: 2022-11
-    mongodb_setup: replica-query-stats
-    infrastructure_provisioning_release: 2023-09
-    infrastructure_provisioning: replica
-    workload_setup: 2022-11
-    platform: linux
-    project_dir: *perf_project_dir
-    authentication: enabled
-    storageEngine: wiredTiger
-    compile_variant: amazon2-arm64-compile
-  run_on:
-    - "rhel70-perf-replset"
-  tasks:
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
-    - name: ycsb.2023-09
-      cron: *high-value-workload-cron
-    - name: ycsb_60GB.2023-09
-    - name: ycsb_60GB.long.2023-09
-      cron: *high-value-workload-cron
-    - name: crud_workloads_majority
-    - name: crud_workloads_w1
-    - name: tpcc
-    - name: tpcc_majority
-      cron: *high-value-workload-cron
-    - name: linkbench
-    - name: linkbench2
-      cron: *high-value-workload-cron
-    - name: mixed_workloads_genny_rate_limited_high_value
-      cron: *high-value-workload-cron
-    - name: majority_reads10_k_threads_high_value
-      cron: *high-value-workload-cron
-    - name: bestbuy_agg
-      cron: *high-value-workload-cron
-    - name: large_indexed_ins_high_value
-      cron: *high-value-workload-cron
-    - name: expressive_queries_high_value
-      cron: *high-value-workload-cron
-    - name: tpch_1_normalized
-    - name: tpch_1_denormalized
-    # TODO: Enable in SERVER-66572.
-    # - name: tpch_10_normalized
-    # - name: tpch_10_denormalized
-    - name: tsbs_load
-      cron: *only-run-in-patch-cron
-    - name: tsbs_query
-      cron: *high-value-workload-cron
-    - name: tsbs_query_finance
-    - name: tsbs_query_manual_bucketing
-    - name: tsbs_query_fixed_bucketing
-    - name: load_test_high_value
-      cron: *only-run-in-patch-cron
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
-
-- <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-250mbwtcache.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet 250 MB WiredTiger Cache ARM AWS 2023-11
   cron: *linux-3-node-cron
@@ -2195,9 +1900,7 @@ buildvariants:
   <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-mongo-perf-standalone-template.arm.aws.2023-11
   display_name: PERF Mongo-Perf Standalone Template (Don't Use)
-  # TODO SERVER-74399 Reduce frequency back to baseline.
-  # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
-  cron: &linux-mongo-perf-cron "0 0 * * *"  # Everyday at 00:00
+  cron: &linux-mongo-perf-cron "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   modules: *perf_modules
   expansions: &standalone-arm-expansions
     mongodb_setup_release: 2022-11
@@ -2257,135 +1960,6 @@ buildvariants:
     - name: aggregation_read_commands_large_dataset
     - name: agg-query-comparison_read_commands
       cron: *high-value-workload-cron
-    - name: query_read_commands
-    - name: query_read_commands_large_dataset
-    - name: views-aggregation
-    - name: views-query
-    - name: where_read_commands
-    - name: update_read_commands
-    - name: insert_read_commands
-    - name: wildcard-index-read_read_commands
-    - name: wildcard-index-write_read_commands
-    - name: geo_read_commands
-    - name: misc_read_commands
-    - name: misc_custom_filter_default_read_commands
-    - name: misc_custom_filter_slow_or_sample_read_commands
-    - name: misc_custom_filter_complex_read_commands
-    - name: misc_custom_filter_whole_doc_read_commands
-    - name: misc_slowms_everything_read_commands
-    - name: singleThreaded_read_commands
-    - name: pipeline-updates
-    - name: javascript
-    - name: compound_wildcard_index_write_commands
-    - name: compound_wildcard_index_read_commands
-    - name: tie-breaking-heuristics
-
-# Specialized Temporary Variants to understand the impact of query stats better.
-- <<: *linux-mongo-perf-standalone-arm
-  name: perf-fast-query-mongo-perf-baseline.2023-11
-  display_name: PERF Fast Query Monog-Perf (Baseline) ARM AWS 2023-11
-  # TODO SERVER-78295 Fold these tasks in to the regular variants on the normal schedule.
-  cron: &fast-query-cron 0 */4 * * * # Every 4 hours, temporarily.
-  tasks:
-  - name: fast_running_queries
-  - name: fast_running_queries_large_dataset
-  - name: genny_query_TenMDocCollection_IntId
-  - name: genny_query_TenMDocCollection_ObjectId
-  - name: genny_query_TenMDocCollection_SubDocId
-  - name: views-aggregation
-  - name: views-query
-
-- <<: *linux-mongo-perf-standalone-arm
-  name: perf-fast-query-mongo-perf-query-stats.arm.aws.2023-11
-  display_name: PERF Fast Query Mongo-Perf (QueryStats) ARM AWS 2023-11
-  cron: *fast-query-cron
-  tasks:
-    - name: fast_running_queries
-    - name: fast_running_queries_large_dataset
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
-    - name: views-aggregation
-    - name: views-query
-  expansions:
-    <<: *standalone-arm-expansions
-    mongodb_setup: mongo-perf-standalone-query-stats
-
-- <<: *linux-mongo-perf-standalone-arm
-  name: perf-fast-query-mongo-perf-limited-query-stats.arm.aws.2023-11
-  display_name: PERF Fast Query Mongo-Perf (Limited QueryStats) ARM AWS 2023-11
-  cron: *fast-query-cron
-  tasks:
-    - name: fast_running_queries
-    - name: fast_running_queries_large_dataset
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
-    - name: views-aggregation
-    - name: views-query
-  expansions:
-    <<: *standalone-arm-expansions
-    mongodb_setup: mongo-perf-standalone-query-stats-small-rate-limit
-
-# Variant: Mongo-Perf with QueryStats
-- <<: *linux-mongo-perf-standalone-arm
-  name: perf-mongo-perf-standalone-query-stats.arm.aws.2023-11
-  display_name: PERF Mongo-Perf Standalone inMemory (QueryStats) ARM AWS 2023-11
-  expansions:
-    <<: *standalone-arm-expansions
-    mongodb_setup: mongo-perf-standalone-query-stats
-  tasks:
-    - name: big_collection
-    - name: genny_scale_InsertRemove
-    - name: genny_execution_UserAcquisition
-    - name: aggregation_read_commands
-    - name: aggregation_read_commands_large_dataset
-    - name: agg-query-comparison_read_commands
-      cron: &linux-microbench-cron "0 0 * * *" # Everyday at 00:00
-    - name: query_read_commands
-    - name: query_read_commands_large_dataset
-    - name: views-aggregation
-    - name: views-query
-    - name: where_read_commands
-    - name: update_read_commands
-    - name: insert_read_commands
-    - name: wildcard-index-read_read_commands
-    - name: wildcard-index-write_read_commands
-    - name: geo_read_commands
-    - name: misc_read_commands
-    - name: misc_custom_filter_default_read_commands
-    - name: misc_custom_filter_slow_or_sample_read_commands
-    - name: misc_custom_filter_complex_read_commands
-    - name: misc_custom_filter_whole_doc_read_commands
-    - name: misc_slowms_everything_read_commands
-    - name: singleThreaded_read_commands
-    - name: pipeline-updates
-    - name: javascript
-    - name: compound_wildcard_index_write_commands
-    - name: compound_wildcard_index_read_commands
-    - name: tie-breaking-heuristics
-
-# Variant: Microbenchmarks with rate limited QueryStats
-- <<: *linux-mongo-perf-standalone-arm
-  name: perf-mongo-perf-standalone-limited-query-stats.arm.aws.2023-11
-  display_name: PERF Mongo-Perf (Rate Limitied QueryStats) ARM AWS 2023-11
-  expansions:
-    <<: *standalone-arm-expansions
-    mongodb_setup: mongo-perf-standalone-query-stats-small-rate-limit
-  tasks:
-    - name: big_collection
-    - name: genny_scale_InsertRemove
-    - name: genny_execution_UserAcquisition
-    - name: aggregation_read_commands
-    - name: aggregation_read_commands_large_dataset
-    - name: agg-query-comparison_read_commands
-      cron: *linux-microbench-cron # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. Resetting to correct cron
     - name: query_read_commands
     - name: query_read_commands_large_dataset
     - name: views-aggregation

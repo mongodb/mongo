@@ -930,27 +930,6 @@ tasks:
           test_control: auto_genny_workload
           auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/InsertRemove.yml
 
-  - name: genny_query_TenMDocCollection_IntId
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: auto_genny_workload
-          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TenMDocCollection_IntId.yml
-
-  - name: genny_query_TenMDocCollection_ObjectId
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: auto_genny_workload
-          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TenMDocCollection_ObjectId.yml
-
-  - name: genny_query_TenMDocCollection_SubDocId
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: auto_genny_workload
-          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TenMDocCollection_SubDocId.yml
-
   - name: genny_resharding_withIndexes
     exec_timeout_secs: 172800 # 2 days
     commands:
@@ -981,35 +960,6 @@ tasks:
              include_filter_2: regression,
              exclude_filter: none,
              threads: "1 4",
-             read_cmd: 'true',
-             share_dataset: 'true'}
-
-  - name: fast_running_queries
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: mongo-perf.2023-02
-          # We can see tests start to peak throughput around 4 threads, but we go much higher to
-          # purposefully stress out the system. We can see that we can get pretty high concurrency
-          # levels and maintain throughput, so we want to test this still holds on experimental
-          # variants like those testing query shape stats.
-          test_control_params: |
-            {include_filter_1: fast_running_query,
-             include_filter_2: core regression,
-             exclude_filter: single_threaded,
-             threads: "128",
-             read_cmd: 'true'}
-
-  - name: fast_running_queries_large_dataset
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: mongo-perf.2023-02
-          test_control_params: |
-            {include_filter_1: fast_running_query,
-             include_filter_2: query_large_dataset,
-             exclude_filter: none,
-             threads: "128",
              read_cmd: 'true',
              share_dataset: 'true'}
 
