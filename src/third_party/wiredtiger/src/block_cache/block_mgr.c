@@ -142,7 +142,7 @@ __bm_sync_tiered_handles(WT_BM *bm, WT_SESSION_IMPL *session)
             block->sync_on_checkpoint = false;
 
             /* See if we should try to remove this handle. */
-            if (last_release && fsync_ret == 0 && __wt_block_eligible_for_sweep(bm, block))
+            if (last_release && __wt_block_eligible_for_sweep(bm, block))
                 need_sweep = true;
         }
     } while (found);
