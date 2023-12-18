@@ -325,7 +325,7 @@ private:
 const auto kMaxThreads = 1;
 #else
 /** 2x to benchmark the case of more threads than cores for curiosity's sake. */
-const auto kMaxThreads = 2 * ProcessInfo::getNumCores();
+const auto kMaxThreads = 2 * ProcessInfo::getNumLogicalCores();
 #endif
 
 BENCHMARK_DEFINE_F(SessionWorkflowBm, Loop)(benchmark::State& state) {
