@@ -25,15 +25,8 @@ __wt_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
     conn = S2C(session);
     block_preload = 0;
 
-    /*
-     * FIXME-WT-11759 Consider whether we should have these asserts here or swallow up the errors
-     * instead.
-     */
-    WT_ASSERT_ALWAYS(session, F_ISSET(ref, WT_REF_FLAG_LEAF),
-      "Pre-fetch starts with a leaf page and reviews the parent");
-
-    WT_ASSERT_ALWAYS(session, __wt_session_gen(session, WT_GEN_SPLIT) != 0,
-      "Pre-fetch requires a split generation to traverse internal page(s)");
+    if (!(F_ISSET(ref, WT_REF_FLAG_LEAF)) || (__wt_session_gen(session, WT_GEN_SPLIT) == 0))
+        return (WT_ERROR);
 
     session->pf.prefetch_prev_ref = ref;
     /* Load and decompress a set of pages into the block cache. */
@@ -60,7 +53,7 @@ __wt_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
             if (ret == 0)
                 ++block_preload;
             else if (ret != EBUSY)
-                WT_RET(ret);
+                WT_STAT_CONN_INCR(session, block_prefetch_page_not_queued);
         }
     }
     WT_INTL_FOREACH_END;
@@ -84,13 +77,9 @@ __wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH_QUEUE_ENTRY *pe)
         __wt_verbose(
           session, WT_VERB_PREFETCH, "The home changed while queued for pre-fetch %s", "");
 
-    /*
-     * FIXME-WT-11759 Consider whether we should have these asserts here or swallow up the errors
-     * instead.
-     */
-    WT_ASSERT_ALWAYS(session, pe->dhandle != NULL, "Pre-fetch needs to save a valid dhandle");
-    WT_ASSERT_ALWAYS(
-      session, !F_ISSET(pe->ref, WT_REF_FLAG_INTERNAL), "Pre-fetch should only see leaf pages");
+    WT_PREFETCH_ASSERT(session, pe->dhandle != NULL, block_prefetch_skipped_no_valid_dhandle);
+    WT_PREFETCH_ASSERT(
+      session, F_ISSET(pe->ref, WT_REF_FLAG_INTERNAL), block_prefetch_skipped_internal_page);
 
     if (pe->ref->state != WT_REF_DISK) {
         WT_STAT_CONN_INCR(session, block_prefetch_pages_fail);
