@@ -26,11 +26,11 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");  // For checkSbeFullyEnabled.
 
 const coll = db.plan_cache_sbe;
 coll.drop();
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 

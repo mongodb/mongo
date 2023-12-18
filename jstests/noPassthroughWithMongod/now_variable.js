@@ -4,7 +4,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");                   // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");                   // For checkSbeFullyEnabled.
 load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 const coll = db[jsTest.name()];
@@ -156,7 +156,7 @@ runTestsExpectFailure(baseCollectionClusterTimeAgg);
 runTestsExpectFailure(fromViewWithClusterTime);
 runTestsExpectFailure(withExprClusterTime);
 
-if (checkSBEEnabled(db)) {
+if (checkSbeFullyEnabled(db)) {
     function verifyPlanCacheSize(query) {
         coll.getPlanCache().clear();
 

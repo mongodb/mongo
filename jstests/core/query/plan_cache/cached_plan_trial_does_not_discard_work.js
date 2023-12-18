@@ -19,17 +19,12 @@
 //   tenant_migration_incompatible,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_incompatible,
+//   featureFlagSbeFull,
 // ]
 (function() {
 'use strict';
 
 load("jstests/libs/profiler.js");  // getLatestProfileEntry.
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is disabled");
-    return;
-}
 
 const testDb = db.getSiblingDB('cached_plan_trial_does_not_discard_work');
 assert.commandWorked(testDb.dropDatabase());

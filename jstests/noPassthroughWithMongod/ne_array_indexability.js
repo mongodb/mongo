@@ -3,7 +3,7 @@
  */
 (function() {
 load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");      // For checkSbeFullyEnabled.
 
 const coll = db.ne_array_indexability;
 coll.drop();
@@ -31,7 +31,7 @@ function runTest(queryToCache, queryToRunAfterCaching) {
     // a different planCacheKey. The SBE plan cache, on the other hand, does not auto-parameterize
     // $in or $eq involving a constant of type array, and therefore will consider the two queries to
     // have different shapes.
-    if (checkSBEEnabled(db)) {
+    if (checkSbeFullyEnabled(db)) {
         assert.neq(explain.queryPlanner.queryHash, cacheEntries[0].queryHash);
     } else {
         assert.eq(explain.queryPlanner.queryHash, cacheEntries[0].queryHash);

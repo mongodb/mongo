@@ -8,7 +8,7 @@
  */
 (function() {
 "use strict";
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");  // For checkSbeFullyEnabled.
 
 /**
  * Creates two indexes for the given collection. In order for plans to be cached, there need to be
@@ -83,7 +83,7 @@ assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("test");
 const coll = db.plan_cache_memory_debug_info;
 
-if (checkSBEEnabled(db)) {
+if (checkSbeFullyEnabled(db)) {
     jsTest.log("Skipping test because SBE is enabled");
     MongoRunner.stopMongod(conn);
     return;

@@ -13,18 +13,13 @@
 //   tenant_migration_incompatible,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_incompatible,
+//   featureFlagSbeFull,
 // ]
 
 (function() {
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
-
-if (!checkSBEEnabled(db)) {
-    jsTest.log("Skip running the test because SBE is not enabled");
-    return;
-}
 
 function getPlanCacheEntries(query, collection, db) {
     const planCacheKey = getPlanCacheKeyFromShape({query, collection, db});

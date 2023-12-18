@@ -24,7 +24,7 @@ const st = new ShardingTest({mongos: 1, config: 1, shards: 2});
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
-const isSBEEnabled = checkSBEEnabled(st.s.getDB(dbName));
+const isSBEEnabled = checkSbeFullyEnabled(st.s.getDB(dbName));
 
 const coll = st.s.getDB(dbName)[collName];
 

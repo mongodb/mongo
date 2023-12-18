@@ -10,21 +10,14 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
+ *   featureFlagSbeFull
  * ]
  */
 (function() {
 load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
 const st = new ShardingTest({shards: 2, config: 1});
 const db = st.s.getDB("test");
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE $lookup is not enabled.");
-    st.stop();
-    return;
-}
-
 const coll = db.lookup_with_limit;
 const other = db.lookup_with_limit_other;
 coll.drop();

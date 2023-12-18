@@ -1,18 +1,15 @@
 // Validate that generic index scan is used in SBE once max limit for statically generated intervals
 // is reached.
 //
-// We issue 'setParameter' command which is not compatible with stepdowns.
-// @tags: [does_not_support_stepdowns]
+// @tags: [
+//   # We issue 'setParameter' command which is not compatible with stepdowns.
+//   does_not_support_stepdowns,
+//   featureFlagSbeFull,
+// ]
 (function() {
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For explain helpers.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
-
-if (!checkSBEEnabled(db)) {
-    jsTest.log("Skipping test because SBE is not enabled");
-    return;
-}
 
 const coll = db.index_bounds_static_limit;
 coll.drop();

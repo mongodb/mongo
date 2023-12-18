@@ -13,20 +13,15 @@
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
  *   cqf_incompatible,
+ *   # This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
+ *   # when SBE is enabled.
+ *   featureFlagSbeFull,
  * ]
  */
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");      // For 'checkSBEEnabled'.
 load("jstests/libs/analyze_plan.js");  // For 'getQueryHashFromExplain'.
-
-// This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
-// when SBE is enabled.
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    return;
-}
 
 const coll = db[jsTestName()];
 coll.drop();

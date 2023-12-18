@@ -24,7 +24,7 @@ assert.commandWorked(db.createCollection(collCapped.getName(), {capped: true, si
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(collCapped.insert({a: 1}));
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 
 /**
  * Retrieves the "hits" and "misses" serverStatus metrics for the given 'planCacheType' (sbe or

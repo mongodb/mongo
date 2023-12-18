@@ -437,6 +437,16 @@ last-continuous:
     ticket: SERVER-78066
   - test_file: jstests/sharding/coordinate_txn_recover_on_stepup_with_tickets_exhausted.js
     ticket: SERVER-82883
+  - test_file: jstests/core/command_let_variables.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_list_shapes.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_shell_helpers.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/views/views_aggregation.js
+    ticket: SERVER-83685
+  - test_file: jstests/noPassthroughWithMongod/lookup_with_limit.js
+    ticket: SERVER-83685
   suites: null
 last-lts:
   all:
@@ -916,4 +926,14 @@ last-lts:
     ticket: SERVER-82883
   - test_file: jstests/core/query/explode_for_sort_plan_cache.js
     ticket: SERVER-83777
+  - test_file: jstests/core/command_let_variables.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_list_shapes.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_shell_helpers.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/views/views_aggregation.js
+    ticket: SERVER-83685
+  - test_file: jstests/noPassthroughWithMongod/lookup_with_limit.js
+    ticket: SERVER-83685
   suites: null

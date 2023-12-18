@@ -11,7 +11,6 @@
 load("jstests/aggregation/extras/utils.js");  // arrayEq, documentEq
 load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
 load("jstests/libs/analyze_plan.js");         // For getAggPlanStage.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;

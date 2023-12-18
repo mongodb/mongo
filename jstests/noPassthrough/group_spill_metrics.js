@@ -11,7 +11,7 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For getAggPlanStage().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");      // For checkSbeRestrictedOrFullyEnabled.
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB('test');
@@ -22,7 +22,7 @@ const bigStr = Array(1025).toString();  // 1KB of ','
 const maxMemoryLimitForGroupStage = 1024 * 300;
 const nDocs = 1000;
 const nGroups = 50;
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 1; i <= nDocs; i++) {

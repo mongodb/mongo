@@ -6,7 +6,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");      // For 'checkSBEEnabled()'.
+load("jstests/libs/sbe_util.js");      // For 'checkSbeRestrictedOrFullyEnabled()'.
 load("jstests/libs/analyze_plan.js");  // For 'getAggPlanStages' and other explain helpers.
 
 const JoinAlgorithm = {
@@ -112,7 +112,8 @@ function runTest(coll,
 }
 
 let db = conn.getDB(name);
-const sbeEnabled = checkSBEEnabled(db);
+const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
+
 if (!sbeEnabled) {
     jsTestLog("Skipping test because SBE is disabled");
     MongoRunner.stopMongod(conn);
@@ -663,13 +664,9 @@ function setLookupPushdownDisabled(value) {
 // Test which verifies that the right side of a classic $lookup is never lowered into SBE, even if
 // the queries for the right side are eligible on their own to run in SBE.
 (function verifyThatClassicLookupRightSideIsNeverLoweredIntoSBE() {
-    // Confirm that our candidate subpipeline is SBE compatible on its own.
     const subPipeline = [{$match: {b: 2}}];
-    const subPipelineExplain = foreignColl.explain().aggregate(subPipeline);
-    assert(subPipelineExplain.hasOwnProperty("explainVersion"), subPipelineExplain);
-    assert.eq(subPipelineExplain["explainVersion"], "2", subPipelineExplain);
 
-    // Now, run a lookup and force it to run in the classic engine by prefixing it with
+    // Run a lookup and force it to run in the classic engine by prefixing it with
     // '$_internalInhibitOptimization'.
     const pipeline = [
         {$_internalInhibitOptimization: {}},

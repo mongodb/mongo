@@ -28,7 +28,7 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSbeFullyEnabled(db);
 const coll = db.explode_for_sort_plan_cache;
 coll.drop();
 

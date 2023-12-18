@@ -1,20 +1,15 @@
 /**
  * Tests $group execution with increased spilling and a non-simple collation.
+ * @tags: [featureFlagSbeFull]
  */
 
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
-load('jstests/libs/sbe_util.js');             // For checkSBEEnabled
 
 (function() {
 "use strict";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB('test');
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 
 const coll = db.group_pushdown_with_collation;
 coll.drop();

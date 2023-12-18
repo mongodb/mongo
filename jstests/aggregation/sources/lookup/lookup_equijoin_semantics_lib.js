@@ -16,7 +16,7 @@
 
 load("jstests/aggregation/extras/utils.js");
 load("jstests/libs/analyze_plan.js");  // For 'getAggPlanStages()'
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");      // For checkSbeRestrictedOrFullyEnabled.
 
 const JoinAlgorithm = {
     HJ: {name: "HJ", strategy: "HashJoin"},
@@ -47,7 +47,7 @@ function setupCollections(testConfig, localRecords, foreignRecords, foreignField
 function checkJoinConfiguration(testConfig, explain) {
     const {currentJoinAlgorithm} = testConfig;
     const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
-    if (checkSBEEnabled(db)) {
+    if (checkSbeRestrictedOrFullyEnabled(db)) {
         if (eqLookupNodes.length > 0) {
             // The $lookup stage has been lowered. Check that it's using the expected join strategy.
             assert.eq(currentJoinAlgorithm.strategy, eqLookupNodes[0].strategy, "Join strategy");
@@ -264,7 +264,9 @@ function runTests(testConfig) {
             {_id: 11, a: [[null, 1], 2]},
         ];
 
-        if (checkSBEEnabled(db)) {
+        // $lookup is allowed to run with sbe when internalQueryFrameworkControl is set to
+        // 'trySbeRestricted'.
+        if (checkSbeRestrictedOrFullyEnabled(db)) {
             // When lowered to SBE, "undefined" should only match "undefined".
             runTest_SingleForeignRecord(testConfig, {
                 testDescription: "Undefined in foreign, top-level field in local",

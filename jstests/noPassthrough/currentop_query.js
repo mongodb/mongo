@@ -9,7 +9,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
+load("jstests/libs/sbe_util.js");  // For 'checkSbeFullyEnabled()'.
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
@@ -79,7 +79,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
     const isLocalMongosCurOp = (FixtureHelpers.isMongos(testDB) && localOps);
     const isRemoteShardCurOp = (FixtureHelpers.isMongos(testDB) && !localOps);
 
-    const sbeEnabled = checkSBEEnabled(testDB);
+    const sbeEnabled = checkSbeFullyEnabled(testDB);
 
     // If 'truncatedOps' is true, run only the subset of tests designed to validate the
     // truncation behaviour. Otherwise, run the standard set of tests which assume that

@@ -10,24 +10,18 @@
  *   does_not_support_stepdowns,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_incompatible,
+ *   featureFlagSbeFull,
  * ]
  */
 
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");      // For 'checkSBEEnabled()'.
 load("jstests/libs/analyze_plan.js");  // For 'getQueryHashFromExplain()'.
 
 const conn = MongoRunner.runMongod();
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("sbe_plan_cache_size_metric");
-
-if (!checkSBEEnabled(db)) {
-    jsTest.log("Skipping test because SBE is not enabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 function getCacheEntriesByQueryHashKey(coll, queryHash) {
     return coll.aggregate([{$planCacheStats: {}}, {$match: {queryHash}}]).toArray();

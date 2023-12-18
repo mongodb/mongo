@@ -18,22 +18,14 @@
  *   does_not_support_stepdowns,
  *   # $planCacheStats is not supported in transactions.
  *   does_not_support_transactions,
- *   # This test assumes SBE is enabled, but SBE was not enabled by default until 6.3.
- *   requires_fcv_63,
+ *   # This test assumes that the queries are using the SBE plan cache.
+ *   featureFlagSbeFull,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
  * ]
  */
 (function() {
 "use strict";
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
-
-// This test assumes that the queries are using the SBE plan cache.
-if (!checkSBEEnabled(db, [], true /*checkAllNodes*/)) {
-    jsTestLog("Skipping test because SBE is disabled");
-    return;
-}
 
 const coll = db.sbe_plan_cache_duplicate_or_clauses;
 coll.drop();

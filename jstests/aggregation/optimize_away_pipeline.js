@@ -20,7 +20,7 @@
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isWiredTiger.
 load("jstests/libs/analyze_plan.js");     // For 'aggPlanHasStage' and other explain helpers.
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
-load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");         // For checkSbeRestrictedOrFullyEnabled.
 
 const coll = db.optimize_away_pipeline;
 coll.drop();
@@ -137,7 +137,7 @@ function testGetMore({command = null, expectedResult = null} = {}) {
     assert.sameMembers(documents, expectedResult);
 }
 
-const groupPushdownEnabled = checkSBEEnabled(db);
+const groupPushdownEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 // Calls 'assertPushdownEnabled' if groupPushdownEnabled is 'true'. Otherwise, it calls
 // 'assertPushdownDisabled'.

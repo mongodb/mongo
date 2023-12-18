@@ -13,7 +13,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");  // For checkSbeRestrictedOrFullyEnabled.
 
 const memoryLimitMb = 1;
 const memoryLimitBytes = 1 * 1024 * 1024;
@@ -108,7 +108,7 @@ function runTest(conn, allowDiskUseByDefault) {
 
     // In SBE $sort and $count will not cause spilling, because the largeStr is not saved in memory.
     // Otherwise, the 'count' command exceeding the memory limit must fail.
-    if (!checkSBEEnabled(testDb)) {
+    if (!checkSbeRestrictedOrFullyEnabled(testDb)) {
         assertFailed({count: view.getName()});
     }
 

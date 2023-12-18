@@ -18,7 +18,7 @@
 (function() {
 'use strict';
 load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromExplain.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");      // For checkSbeFullyEnabled.
 
 var coll = db.collation_plan_cache;
 coll.drop();
@@ -54,7 +54,7 @@ assert.commandWorked(
 var shapes = coll.aggregate([{$planCacheStats: {}}]).toArray();
 assert.eq(1, shapes.length, 'unexpected cache size after running query');
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 if (!isSbeEnabled) {
     assert.eq(shapes[0].createdFromQuery.query, {a: 'foo', b: 5}, shapes);
     assert.eq(shapes[0].createdFromQuery.sort, {}, shapes);

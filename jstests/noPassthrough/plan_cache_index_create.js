@@ -11,7 +11,7 @@
 "use strict";
 
 load('jstests/libs/analyze_plan.js');  // For getCachedPlan().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");      // For checkSbeFullyEnabled.
 
 const dbName = "test";
 const collName = "coll";
@@ -180,7 +180,7 @@ rst.initiate();
 const primaryDB = rst.getPrimary().getDB(dbName);
 const secondaryDB = rst.getSecondary().getDB(dbName);
 
-if (checkSBEEnabled(primaryDB)) {
+if (checkSbeFullyEnabled(primaryDB)) {
     jsTest.log("Skipping test because SBE is enabled");
     rst.stopSet();
     return;

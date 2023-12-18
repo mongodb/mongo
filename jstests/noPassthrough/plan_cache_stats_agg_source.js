@@ -9,14 +9,14 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");      // For checkSbeFullyEnabled.
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start up");
 
 const testDb = conn.getDB("test");
 const coll = testDb.plan_cache_stats_agg_source;
-const isSBEEnabled = checkSBEEnabled(testDb);
+const isSBEEnabled = checkSbeFullyEnabled(testDb);
 
 function makeMatchForFilteringByShape(query) {
     const keyHash = getPlanCacheKeyFromShape({query: query, collection: coll, db: testDb});

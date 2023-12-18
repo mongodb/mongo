@@ -13,7 +13,7 @@ load("jstests/libs/sbe_util.js");
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("test");
 
-if (checkSBEEnabled(testDB)) {
+if (checkSbeFullyEnabled(testDB)) {
     jsTestLog("Skipping test as SBE is not resilient to WCEs");
     MongoRunner.stopMongod(conn);
     return;

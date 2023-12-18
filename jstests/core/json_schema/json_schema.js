@@ -11,9 +11,9 @@
 "use strict";
 
 load("jstests/libs/assert_schema_match.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");  // For checkSbeFullyEnabled.
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSbeFullyEnabled(db);
 
 let coll = db.jstests_json_schema;
 coll.drop();

@@ -11,9 +11,9 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");  // For checkSbeRestrictedOrFullyEnabled.
 
-const sbeEnabled = checkSBEEnabled(db);
+const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 var viewsDB = db.getSiblingDB("views_count");
 assert.commandWorked(viewsDB.dropDatabase());

@@ -43,6 +43,12 @@ public:
     bool getSbeDisableLookupPushdownForOp();
     size_t getMaxScansToExplodeForOp();
 
+    /**
+     * Returns whether we can push down fully compatible stages to SBE. This is only true when the
+     * query knob is 'trySbeEngine'.
+     */
+    bool canPushDownFullyCompatibleStages();
+
 private:
     void _tryToSetAllValues();
 

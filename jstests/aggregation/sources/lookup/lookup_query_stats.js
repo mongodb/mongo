@@ -18,11 +18,11 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");         // For 'getAggPlanStages'
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");             // For checkSbeRestrictedOrFullyEnabled.
 load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages and
                                               // getQueryInfoAtTopLevelOrFirstStage.
 
-const isSBELookupEnabled = checkSBEEnabled(db);
+const isSBELookupEnabled = checkSbeRestrictedOrFullyEnabled(db);
 const testDB = db.getSiblingDB("lookup_query_stats");
 testDB.dropDatabase();
 

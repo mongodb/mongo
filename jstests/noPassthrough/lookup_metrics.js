@@ -1,24 +1,18 @@
 /**
  * Tests that the lookup metrics are recorded correctly in serverStatus.
+ *
+ * @tags: [featureFlagSbeFull]
  */
 
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");      // For 'checkSBEEnabled()'.
 load("jstests/libs/analyze_plan.js");  // For 'getAggPlanStages' and other explain helpers.
 
 const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true}});
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB(jsTestName());
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because either the sbe lookup pushdown feature flag is disabled or" +
-              " sbe itself is disabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 assert.commandWorked(db.dropDatabase());
 

@@ -17,7 +17,7 @@
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 load("jstests/libs/fixture_helpers.js");             // For isReplSet().
 load("jstests/libs/os_helpers.js");                  // For isLinux().
-load("jstests/libs/sbe_util.js");                    // For checkSBEEnabled().
+load("jstests/libs/sbe_util.js");                    // For checkSbeRestrictedOrFullyEnabled().
 
 const dbName = jsTestName();
 const collName = 'coll';
@@ -1201,7 +1201,7 @@ const operations = [
             //
             // The classic engine spills to files outside the storage engine rather than to a
             // temporary record store, so it is not subject to SERVER-71684.
-            if (isDebugBuild(db) && checkSBEEnabled(db)) {
+            if (isDebugBuild(db) && checkSbeRestrictedOrFullyEnabled(db)) {
                 // For $group, we incorporate the number of items spilled into "keysSorted" and the
                 // number of individual spill events into "sorterSpills".
                 assert.gt(profileDoc.keysSorted, 0);
@@ -1243,7 +1243,7 @@ const operations = [
         },
         profileFilter: {op: 'command', 'command.aggregate': collName},
         profileAssert: (db, profileDoc) => {
-            if (isDebugBuild(db) && !checkSBEEnabled(db)) {
+            if (isDebugBuild(db) && !checkSbeRestrictedOrFullyEnabled(db)) {
                 // In debug builds, the classic engine does some special spilling for test purposes
                 // when disk use is disabled. We spill for each of the first 20 documents, spilling
                 // less often after we reach that limit. This 26 is the sum of 20 spills of

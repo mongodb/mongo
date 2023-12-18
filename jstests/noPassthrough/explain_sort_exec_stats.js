@@ -6,14 +6,14 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");      // For checkSbeFullyEnabled.
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 const coll = db.explain_sort_stage_exec_stats;
 coll.drop();
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 const bigStr = Array(1025).toString();  // 1KB of ','
 const lowMaxMemoryLimit = 5000;
 const nDocs = 1000;

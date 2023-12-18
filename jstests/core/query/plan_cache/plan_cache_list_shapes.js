@@ -18,9 +18,9 @@
 // ]
 (function() {
 'use strict';
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");  // For checkSbeFullyEnabled.
 
-if (checkSBEEnabled(db)) {
+if (checkSbeFullyEnabled(db)) {
     jsTest.log("Skipping test because SBE is enabled.");
     return;
 }

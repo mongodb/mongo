@@ -4,7 +4,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");  // For checkSbeCompletelyDisabled.
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
@@ -37,7 +37,7 @@ assert.commandWorked(viewsDB.adminCommand(
     {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: memoryLimitMb * 1024 * 1024}));
 
 // In SBE the $sort will not cause spilling because it's only the integers being sorted on.
-if (!checkSBEEnabled(viewsDB)) {
+if (checkSbeCompletelyDisabled(viewsDB)) {
     testDiskUse({count: "largeView"});
 }
 

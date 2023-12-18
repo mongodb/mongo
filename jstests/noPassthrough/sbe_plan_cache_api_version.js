@@ -19,7 +19,7 @@ const db = conn.getDB("plan_cache_api_version");
 const coll = db.coll;
 coll.drop();
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSbeFullyEnabled(db);
 
 assert.commandWorked(coll.insert([{a: 1, b: 1}, {a: 2, b: 2}]));
 

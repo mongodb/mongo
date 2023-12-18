@@ -8,9 +8,9 @@
 
 load('jstests/libs/analyze_plan.js');              // For getPlanStage().
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");                  // For checkSbeFullyEnabled.
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 
 let coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
 

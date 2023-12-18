@@ -1,18 +1,14 @@
+/**
+ * @tags: [featureFlagSbeFull]
+ */
+
 (function() {
 "use strict";
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const conn = MongoRunner.runMongod({setParameter: {featureFlagCommonQueryFramework: true}});
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB(jsTestName());
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));

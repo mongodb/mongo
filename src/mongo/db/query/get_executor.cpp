@@ -1454,10 +1454,9 @@ bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq) {
             "Unexpected SBE compatibility value",
             sbeCompatLevel != SbeCompatibility::notCompatible);
 
-    // If we can't push down any agg stages when internalQueryFrameworkControl is set to
-    // "trySbeRestricted", we return false.
-    if (QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp() ==
-            QueryFrameworkControlEnum::kTrySbeRestricted &&
+    // When featureFlagSbeFull is not enabled, we cannot use SBE unless 'trySbeEngine' is enabled or
+    // if 'trySbeRestricted' is enabled, and we have eligible pushed down stages in the cq pipeline.
+    if (!QueryKnobConfiguration::decoration(opCtx).canPushDownFullyCompatibleStages() &&
         cq.pipeline().empty()) {
         return false;
     }

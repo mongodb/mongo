@@ -9,7 +9,7 @@
 
 // For profilerHasSingleMatchingEntryOrThrow.
 load("jstests/libs/profiler.js");
-// For checkSBEEnabled.
+// For checkSbeFullyEnabled.
 load("jstests/libs/sbe_util.js");
 // For areAllCollectionsClustered.
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
@@ -120,7 +120,7 @@ assert.eq(5, view.count({a: {$lte: 8}}));
 // validate the explain results when the classic engine is enabled, but doing so is complicated for
 // multiversion scenarios (e.g. in the multiversion passthrough on the classic engine build variant
 // only some shards have SBE enabled, so the expected results differ across shards).
-if (checkSBEEnabled(db, [], true /*checkAllNodes*/)) {
+if (checkSbeFullyEnabled(db, [], true /*checkAllNodes*/)) {
     result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}});
     // Allow success whether or not the pipeline is optimized away, as it differs based on test
     // environment and execution engine used.

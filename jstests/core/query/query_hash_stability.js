@@ -12,12 +12,15 @@
  *   # cache key is allowed to change between versions. Therefore, this test cannot run in
  *   # passthroughs that do upgrade/downgrade.
  *   cannot_run_during_upgrade_downgrade,
+ *   # This test expects stable query plans, creating unanticipated indexes can lead to variations
+ *   # in the plans.
+ *   assumes_no_implicit_index_creation,
  * ]
  */
 (function() {
 "use strict";
 load('jstests/libs/fixture_helpers.js');  // For and isMongos().
-load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");         // For checkSbeFullyEnabled.
 
 const collName = "query_hash_stability";
 const coll = db[collName];
@@ -116,7 +119,7 @@ assertPlanCacheField({
 
 // SBE's planCacheKey encoding encodes "collection version" which will be increased after dropping
 // an index.
-if (!checkSBEEnabled(db)) {
+if (!checkSbeFullyEnabled(db)) {
     // The 'planCacheKey' should be the same as what it was before we dropped the index.
     assertPlanCacheField({
         firstExplain: initialExplain,

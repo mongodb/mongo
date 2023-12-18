@@ -10,9 +10,9 @@
 
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/collection_drop_recreate.js");
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled'.
+load("jstests/libs/sbe_util.js");  // For 'checkSbeFullyEnabled'.
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSbeFullyEnabled(db);
 if (!isSBEEnabled) {
     jsTestLog("Skipping test because SBE is disabled");
     return;

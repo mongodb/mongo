@@ -12,7 +12,6 @@
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/libs/sbe_util.js");          // For checkSBEEnabled.
 load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 
 const dbName = "test";
@@ -21,9 +20,7 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
-const columnstoreEnabled =
-    checkSBEEnabled(rst.getPrimary().getDB(dbName), ["featureFlagColumnstoreIndexes"], true) &&
-    setUpServerForColumnStoreIndexTest(rst.getPrimary().getDB(dbName));
+const columnstoreEnabled = setUpServerForColumnStoreIndexTest(rst.getPrimary().getDB(dbName));
 
 const runTests = function(docs, indexSpecsFlat, collNameSuffix) {
     const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName() + collNameSuffix);

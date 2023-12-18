@@ -9,13 +9,13 @@
  */
 (function() {
 "use strict";
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");  // For checkSbeFullyEnabled.
 
 const mongod = MongoRunner.runMongod();
 const dbName = "test";
 const db = mongod.getDB(dbName);
 
-const sbeEnabled = checkSBEEnabled(db);
+const sbeEnabled = checkSbeFullyEnabled(db);
 
 // Create two users, each with different roles.
 assert.commandWorked(

@@ -10,24 +10,16 @@
  *   multiversion_incompatible,
  *   # This test uses the _id index
  *   expects_explicit_underscore_id_index,
+ *   # This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
+ *   # when SBE is enabled.
+ *   featureFlagSbeFull,
  * ]
  */
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled'.
-
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 const mongosDB = st.s.getDB(jsTestName());
-
-// This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
-// when SBE is enabled.
-if (!checkSBEEnabled(mongosDB)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    st.stop();
-    return;
-}
-
 const collName = jsTestName();
 const coll = mongosDB[collName];
 

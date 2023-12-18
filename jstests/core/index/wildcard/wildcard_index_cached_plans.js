@@ -27,7 +27,7 @@ load('jstests/libs/analyze_plan.js');              // For getPlanStage().
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/feature_flag_util.js");         // For "FeatureFlagUtil"
 load('jstests/libs/fixture_helpers.js');  // For getPrimaryForNodeHostingDatabase and isMongos.
-load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");         // For checkSbeFullyEnabled.
 
 const coll = db.wildcard_cached_plans;
 
@@ -51,7 +51,7 @@ function getCacheEntryForQuery(query) {
     return null;
 }
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 
 for (const indexSpec of wildcardIndexes) {
     if (!allowCompoundWildcardIndexes && indexSpec.keyPattern.other) {

@@ -5,7 +5,7 @@
 // ]
 
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");             // For checkSbeRestrictedOrFullyEnabled.
 
 (function() {
 "use strict";
@@ -92,7 +92,8 @@ const standalone = MongoRunner.runMongod(
 const db = standalone.getDB("test");
 
 db.lookUp.drop();
-const expectedErrorCode = checkSBEEnabled(db) ? ErrorCodes.ExceededMemoryLimit : 4568;
+const expectedErrorCode =
+    checkSbeRestrictedOrFullyEnabled(db) ? ErrorCodes.ExceededMemoryLimit : 4568;
 runTest(db.lookUp, db.from, expectedErrorCode);
 
 MongoRunner.stopMongod(standalone);

@@ -18,18 +18,21 @@
 //   tenant_migration_incompatible,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_incompatible,
+//   # This tests perform queries and expect a particular number of candidate plans to be evaluated,
+//   # creating unanticipated indexes can lead to a different number of candidate plans.
+//   assumes_no_implicit_index_creation,
 // ]
 
 (function() {
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");      // For checkSbeFullyEnabled.
 
 let coll = db.jstests_plan_cache_list_plans;
 coll.drop();
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 
 function dumpPlanCacheState() {
     return coll.aggregate([{$planCacheStats: {}}]).toArray();

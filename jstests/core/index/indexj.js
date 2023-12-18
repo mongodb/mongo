@@ -15,7 +15,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled'.
+load("jstests/libs/sbe_util.js");  // For 'checkSbeFullyEnabled'.
 const t = db[jsTestName()];
 t.drop();
 
@@ -59,7 +59,7 @@ assert.commandWorked(t.insert({a: 2, b: 2}));
 // SBE or the classic engine. This is because the classic engine will use a multi-interval index
 // scan whereas SBE will decompose the intervals into a set of single-interval bounds and will end
 // up examining 0 keys.
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSbeFullyEnabled(db);
 let expectedKeys = isSBEEnabled ? 0 : 3;
 let errMsg = function(actualNumKeys) {
     return "Chosen plan examined " + actualNumKeys + " keys";

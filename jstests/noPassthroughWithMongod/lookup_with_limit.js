@@ -5,9 +5,9 @@
 "use strict";
 
 load('jstests/libs/analyze_plan.js');  // For getWinningPlan().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");      // For checkSbeRestrictedOrFullyEnabled.
 
-if (!checkSBEEnabled(db)) {
+if (!checkSbeRestrictedOrFullyEnabled(db)) {
     jsTestLog("Skipping test because SBE $lookup is not enabled.");
     return;
 }

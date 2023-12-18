@@ -25,17 +25,9 @@
 "use strict";
 
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 // For areAllCollectionsClustered.
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
-
-const columnstoreEnabled =
-    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */);
-if (!columnstoreEnabled) {
-    jsTestLog("Skipping columnstore index test since the feature flag is not enabled.");
-    return;
-}
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     return;

@@ -8,7 +8,7 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");  // For checkSbeFullyEnabled.
 
 const coll = db.expr_index_use;
 coll.drop();
@@ -53,7 +53,7 @@ assert.commandWorked(coll.insert({w: {z: 2}}));
 assert.commandWorked(coll.createIndex({w: 1}));
 assert.commandWorked(coll.createIndex({"w.z": 1}));
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSbeFullyEnabled(db);
 
 /**
  * Executes the expression 'expr' as both a find and an aggregate. Then confirms

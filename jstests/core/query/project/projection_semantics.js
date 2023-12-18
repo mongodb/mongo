@@ -12,18 +12,13 @@
  *   # server parameters are stored in-memory only so are not transferred onto the recipient.
  *   tenant_migration_incompatible,
  *   not_allowed_with_security_token,
+ *   featureFlagSbeFull,
  * ]
  */
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");          // For checkSBEEnabled.
 load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
-
-if (!checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"])) {
-    jsTestLog("Skipping test since columnstore Indexes are not enabled");
-    return;
-}
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     return;

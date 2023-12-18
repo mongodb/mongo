@@ -4,13 +4,14 @@
  * @tags: [
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_incompatible,
+ *   # This test is specifically verifying the behavior of the SBE plan cache.
+ *   featureFlagSbeFull,
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");
 
 // Lists the names of the setParameters which should result in the SBE plan cache being cleared when
 // the parameter is modified. Along with each parameter, includes a valid new value of the parameter
@@ -55,13 +56,6 @@ assert.neq(conn, null, "mongod failed to start up");
 
 const dbName = jsTestName();
 const db = conn.getDB(dbName);
-
-// This test is specifically verifying the behavior of the SBE plan cache.
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 assert.commandWorked(db.dropDatabase());
 

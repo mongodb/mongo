@@ -11,7 +11,7 @@
 "use strict";
 
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");                  // For checkSbeFullyEnabled.
 
 const clustered = db.clusteredColl;
 const nonClustered = db.normalColl;
@@ -25,7 +25,7 @@ db.createCollection(clusteredName, {clusteredIndex: {key: {_id: 1}, unique: true
 db.createCollection(nonClusteredName);
 
 // TODO: SERVER-78103 remove check.
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSbeFullyEnabled(db);
 
 // Insert some documents.
 const docs = [{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 3}];

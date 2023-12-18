@@ -5,6 +5,9 @@
  *  @tags: [
  *   # The SBE plan cache was enabled by default in 6.3.
  *   requires_fcv_63,
+ *  # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   cqf_incompatible,
+ *   featureFlagSbeFull,
  * ]
  */
 
@@ -13,7 +16,6 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 (function() {
 'use strict';
-load("jstests/libs/sbe_util.js");
 
 const criticalSectionTimeoutMS = 24 * 60 * 60 * 1000;  // 1 day
 const st = new ShardingTest({
@@ -32,12 +34,6 @@ const dbName = "invalidate_on_coll_generation_change_db";
 const db = st.getDB(dbName);
 const collA = db["collA"];
 const collB = db["collB"];
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("********** Skip the test because SBE is disabled **********");
-    st.stop();
-    return;
-}
 
 function assertPlanCacheSizeForColl(nss, expectedEntriesCount) {
     // Using assert.soon since the sharded metadata cleanup function is executed asynchronously.

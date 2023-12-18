@@ -42,7 +42,7 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
-load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");         // For checkSbeRestrictedOrFullyEnabled.
 
 const coll = db.jstests_index_filter_commands;
 
@@ -345,7 +345,7 @@ assert.commandFailed(
 filters = getFilters();
 assert.eq(0, filters.length, tojson(filters));
 
-if (checkSBEEnabled(db)) {
+if (checkSbeRestrictedOrFullyEnabled(db)) {
     //
     // Test that planCacheSetFilter doesn't apply to the inner side of a $lookup.
     //

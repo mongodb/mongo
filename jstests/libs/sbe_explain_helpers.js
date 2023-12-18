@@ -4,7 +4,6 @@
 
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");
 
 function isIdIndexScan(db, root, expectedParentStageForIxScan) {
     const parentStage = getPlanStage(root, expectedParentStageForIxScan);

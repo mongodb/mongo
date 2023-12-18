@@ -7,23 +7,17 @@
  * @tags: [
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_incompatible,
+ *   featureFlagSbeFull
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("sbe_plan_cache_memory_debug_info");
-
-if (!checkSBEEnabled(db)) {
-    jsTest.log("Skipping test because SBE is not enabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 function createTestCollection(collectionName) {
     const coll = db[collectionName];

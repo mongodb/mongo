@@ -3,7 +3,8 @@
  * 'planCacheKey' values across a variety of commands and outputs.
  *
  * @tags: [
- *   requires_profiling
+ *   requires_profiling,
+ *   featureFlagSbeFull
  * ]
  */
 
@@ -13,18 +14,11 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/log.js");
 load("jstests/libs/profiler.js");
-load("jstests/libs/sbe_util.js");
 
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("plan_cache_key_reporting");
 const coll = db.coll;
-
-if (!checkSBEEnabled(db)) {
-    jsTest.log("Skipping test because SBE is not enabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 assert.commandWorked(db.createCollection(coll.getName()));
 

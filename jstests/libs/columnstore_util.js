@@ -6,7 +6,7 @@ load("jstests/libs/discover_topology.js");  // For findNonConfigNodes.
 // For areAllCollectionsClustered.
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/sbe_util.js");                                // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");                                // For checkSbeFullyEnabled.
 
 /**
  * Updates server parameters to disable column scan query planning heuristics so that column scan
@@ -80,7 +80,7 @@ function safeToCreateColumnStoreIndexInCluster(nodes) {
  * indexes. Returns true if setup was successful.
  */
 function setUpServerForColumnStoreIndexTest(db) {
-    if (!checkSBEEnabled(db)) {
+    if (!checkSbeFullyEnabled(db)) {
         jsTestLog("Skipping column store index test since SBE is disabled");
         return false;
     }

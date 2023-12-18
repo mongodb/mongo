@@ -7,18 +7,14 @@
 //   requires_fcv_63,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_incompatible,
+//   featureFlagSbeFull,
 // ]
 (function() {
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
 
-if (!checkSBEEnabled(db)) {
-    jsTest.log("Skip running the test because SBE is not enabled");
-    return;
-}
 const testDB = db.getSiblingDB("from_plan_cache_flag");
 assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.getCollection("test");

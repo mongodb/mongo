@@ -3,24 +3,18 @@
  * @tags: [
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_incompatible,
+ *   featureFlagSbeFull
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 const coll = db.plan_cache_pipeline;
 const foreignColl = db.plan_cache_pipeline_foreign;
-
-if (!checkSBEEnabled(db)) {
-    jsTest.log("Skipping test because SBE is not enabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.createIndex({a: 1, a1: 1}));

@@ -22,12 +22,9 @@ load("jstests/libs/analyze_plan.js");              // For getPlanStages.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 load("jstests/libs/index_catalog_helpers.js");     // For IndexCatalogHelpers.findByName.
-load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
 load("jstests/libs/columnstore_util.js");          // For setUpServerForColumnStoreIndexTest.
 
-const columnstoreEnabled =
-    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */) &&
-    setUpServerForColumnStoreIndexTest(db);
+const columnstoreEnabled = setUpServerForColumnStoreIndexTest(db);
 
 const collName = "hidden_index";
 let coll = assertDropAndRecreateCollection(db, collName);

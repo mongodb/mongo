@@ -1,7 +1,9 @@
+/*
+ * @tags: [featureFlagSbeFull]
+ */
+
 (function() {
 "use strict";
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const st = new ShardingTest({
     shards: 2,
@@ -13,13 +15,6 @@ const st = new ShardingTest({
 });
 
 const db = st.getDB("test");
-
-if (!checkSBEEnabled(db)) {
-    jsTestLog("Skipping test because SBE is not enabled");
-    st.stop();
-    return;
-}
-
 const coll = db.analyze_coll;
 coll.drop();
 

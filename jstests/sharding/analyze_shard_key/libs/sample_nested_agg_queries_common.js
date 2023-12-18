@@ -3,7 +3,7 @@
  * $lookup, $graphLookup, $unionWith) on a sharded cluster.
  */
 
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");  // For checkSbeRestrictedOrFullyEnabled.
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
@@ -37,7 +37,7 @@ const outerAggTestCases = [
             const isClusteredColl =
                 listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
             const isEligibleForSBELookupPushdown =
-                checkSBEEnabled(db) && !isShardedColl && !isClusteredColl;
+                checkSbeRestrictedOrFullyEnabled(db) && !isShardedColl && !isClusteredColl;
             return !isEligibleForSBELookupPushdown;
         }
     },
