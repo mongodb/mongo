@@ -48,9 +48,9 @@ struct OptionsList {
     OptionsList(const OptionsList &other);
     ~OptionsList() = default;
 
-    void add_int(const std::string& name, int default_value, const std::string& desc);
     void add_bool(const std::string& name, bool default_value, const std::string& desc);
     void add_double(const std::string& name, double default_value, const std::string& desc);
+    void add_int(const std::string& name, int default_value, const std::string& desc);
     void add_string(const std::string& name, const std::string &default_value,
       const std::string& desc);
 
@@ -86,18 +86,18 @@ struct Track {
     // Threads maintain the total thread operation and total latency they've
     // experienced.
 
+    uint64_t bucket_ops;                // Computed for percentile_latency
+    uint64_t latency;                   // Total latency
+    uint64_t latency_ops;               // Total ops sampled for latency
     uint64_t ops_in_progress;           // Total operations not completed
     uint64_t ops;                       // Total operations completed
     uint64_t rollbacks;                 // Total operations rolled back
-    uint64_t latency_ops;               // Total ops sampled for latency
-    uint64_t latency;                   // Total latency
-    uint64_t bucket_ops;                // Computed for percentile_latency
 
     // Minimum/maximum latency, shared with the monitor thread, that is, the
     // monitor thread clears it so it's recalculated again for each period.
 
-    uint32_t min_latency;                // Minimum latency (uS)
     uint32_t max_latency;                // Maximum latency (uS)
+    uint32_t min_latency;                // Minimum latency (uS)
 
     Track(bool latency_tracking = false);
     Track(const Track &other);
@@ -135,8 +135,8 @@ struct Stats {
     Track read;
     Track remove;
     Track rts;
-    Track update;
     Track truncate;
+    Track update;
 
     Stats(bool latency = false);
     Stats(const Stats &other);
@@ -179,10 +179,10 @@ struct Context {
 // properties are prevented, only existing properties can be set.
 struct TableOptions {
     uint_t key_size;
-    uint_t value_size;
-    uint_t value_compressibility;
     bool random_value;
     uint_t range;
+    uint_t value_size;
+    uint_t value_compressibility;
 
     TableOptions();
     TableOptions(const TableOptions &other);
@@ -294,18 +294,18 @@ struct Operation {
     OpType _optype;
     OperationInternal *_internal;
 
-    Table _table;
-    Key _key;
-    Value _value;
     std::string _config;
-    Transaction *transaction;
-    std::vector<Operation> *_group;
-    int _repeatgroup;
+    Key _key;
+    Table _table;
+    // Maintain the random table being used by each thread running the operation.
+    std::vector<std::string> _tables;
     double _timed;
     // Indicates whether a table is selected randomly to be worked on.
     bool _random_table;
-    // Maintain the random table being used by each thread running the operation.
-    std::vector<std::string> _tables;
+    int _repeatgroup;
+    Value _value;
+    Transaction *transaction;
+    std::vector<Operation> *_group;
 
     Operation();
     Operation(OpType optype, Table table, Key key, Value value);
@@ -323,15 +323,15 @@ struct Operation {
     bool combinable() const;
     void describe(std::ostream &os) const;
 #ifndef SWIG
-    Operation& operator=(const Operation &other);
-    void init_internal(OperationInternal *other);
     void create_all();
-    void get_static_counts(Stats &stats, int multiplier);
+    void init_internal(OperationInternal *other);
     bool is_table_op() const;
+    void get_static_counts(Stats &stats, int multiplier);
     void kv_compute_max(bool iskey, bool has_random);
     void kv_gen(ThreadRunner *runner, bool iskey, uint64_t compressibility,
        uint64_t n, char *result) const;
     void kv_size_buffer(bool iskey, size_t &size) const;
+    Operation& operator=(const Operation &other);
     void size_check() const;
     void synchronized_check() const;
 #endif
@@ -382,8 +382,8 @@ struct ThreadListWrapper {
     ThreadListWrapper(const ThreadListWrapper &other) :
 	_threads(other._threads) {}
     ThreadListWrapper(const std::vector<Thread> &threads) : _threads(threads) {}
-    void extend(const ThreadListWrapper &);
     void append(const Thread &);
+    void extend(const ThreadListWrapper &);
     void multiply(const int);
 };
 
@@ -400,12 +400,12 @@ struct Thread {
 };
 
 struct Transaction {
-    bool _rollback;
+    double read_timestamp_lag;
     bool use_commit_timestamp;
     bool use_prepare_timestamp;
     std::string _begin_config;
     std::string _commit_config;
-    double read_timestamp_lag;
+    bool _rollback;
 
     Transaction() : _rollback(false), use_commit_timestamp(false),
       use_prepare_timestamp(false), _begin_config(""), _commit_config(), read_timestamp_lag(0.0)
@@ -437,22 +437,9 @@ struct Transaction {
 // To prevent silent errors, this class is set up in Python so that new
 // properties are prevented, only existing properties can be set.
 struct WorkloadOptions {
-    int max_latency;
-    bool report_enabled;
-    std::string report_file;
-    int report_interval;
-    int run_time;
-    int sample_interval_ms;
-    int sample_rate;
-    int max_idle_table_cycle;
-    std::string sample_file;
-    int warmup;
-    double oldest_timestamp_lag;
-    double stable_timestamp_lag;
-    double timestamp_advance;
-    bool max_idle_table_cycle_fatal;
-    /* Dynamic create/drop options */
+    int background_compact;
     int create_count;
+    /* Dynamic create/drop options */
     int create_interval;
     std::string create_prefix;
     int create_target;
@@ -461,10 +448,23 @@ struct WorkloadOptions {
     int drop_interval;
     int drop_target;
     int drop_trigger;
-    bool random_table_values;
-    bool mirror_tables;
+    int max_idle_table_cycle;
+    bool max_idle_table_cycle_fatal;
+    int max_latency;
     std::string mirror_suffix;
-    int background_compact;
+    bool mirror_tables;
+    double oldest_timestamp_lag;
+    bool random_table_values;
+    bool report_enabled;
+    std::string report_file;
+    int report_interval;
+    int run_time;
+    int sample_interval_ms;
+    std::string sample_file;
+    int sample_rate;
+    double stable_timestamp_lag;
+    double timestamp_advance;
+    int warmup;
 
     WorkloadOptions();
     WorkloadOptions(const WorkloadOptions &other);
