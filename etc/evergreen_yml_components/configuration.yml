@@ -43,6 +43,23 @@ parameters:
   value: "0 4 * * 0" # Every week starting 0400 UTC Sunday
   description: "Cron schedule for nightly variants"
 
+## Patch Aliases
+patch_aliases:
+- alias: aggfuzzer
+  variant: '^(linux-64)$'
+  task: '^(aggregation_multiversion_fuzzer.*)$'
+- alias: embedded
+  variant: '.*'
+  task: 'embedded_.*'
+- alias: query
+  variant: '^(.*query-patch-only|linux-x86-dynamic-compile-required)$'
+  task: '.*'
+- alias: required
+  variant: '^(.*-required$|linux-64-debug|enterprise-amazon-linux2-arm64-all-feature-flags|amazon-linux2-arm64-dynamic-compile|amazon-linux2-arm64-compile|amazon-linux2-arm64-crypt-compile|run-all-affected-jstests)$'
+  task: '.*'
+- alias: security
+  variant: '^(.*security-patch-only|linux-x86-dynamic-compile|windows-compile-required)$'
+  task: '.*'
 
 #######################################
 #               Modules               #
