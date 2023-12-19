@@ -211,8 +211,11 @@ env.Library(
         'abstract_async_component.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 
@@ -654,6 +657,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         'repl_coordinator_interface',
         'repl_server_parameters',
     ],
@@ -733,9 +737,11 @@ env.Library(
         'split_horizon.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
-        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 
@@ -2072,8 +2078,9 @@ env.Library(
         'topology_version_observer.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         'repl_coordinator_interface',
         'replica_set_messages',
     ],
@@ -2103,10 +2110,13 @@ wait_for_majority_service_env.Library(
         'wait_for_majority_service.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/future_util',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 
@@ -2132,6 +2142,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/network_interface_tl',
         '$BUILD_DIR/mongo/executor/scoped_task_executor',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'repl_coordinator_interface',
         'repl_server_parameters',

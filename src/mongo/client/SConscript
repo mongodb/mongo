@@ -308,7 +308,7 @@ env.Library(
         'remote_command_targeter_mock.cpp',
         'remote_command_targeter_factory_mock.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/net/network',
     ],
@@ -332,12 +332,12 @@ env.Library(
         'fetcher.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/rpc/command_status',
         'remote_command_retry_scheduler',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )

@@ -86,6 +86,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/pcre_wrapper',
         'message',
@@ -116,7 +117,6 @@ env.Library(
         'topology_version.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/auth/security_token',
@@ -129,7 +129,9 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/multitenancy',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/vector_clock',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 
@@ -162,9 +164,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
         '$BUILD_DIR/mongo/util/net/network',
         "$BUILD_DIR/mongo/util/processinfo",
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 
