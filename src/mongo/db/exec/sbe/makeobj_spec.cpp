@@ -141,19 +141,19 @@ StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names,
         if (pos != StringListSet::npos) {
             auto& action = actions[pos];
 
-            if (isClosed ? action.isKeep() : action.isDrop()) {
+            if (isClosed ? !action.isDrop() : !action.isKeep()) {
                 displayOrderSet.emplace(pos);
                 displayOrder.push_back(pos);
             }
         }
     }
 
-    for (size_t i = 0; i < actions.size(); ++i) {
-        if (!displayOrderSet.count(i)) {
-            auto& action = actions[i];
+    for (size_t pos = 0; pos < actions.size(); ++pos) {
+        if (!displayOrderSet.count(pos)) {
+            auto& action = actions[pos];
 
-            if (isClosed ? action.isKeep() : action.isDrop()) {
-                displayOrder.push_back(i);
+            if (isClosed ? !action.isDrop() : !action.isKeep()) {
+                displayOrder.push_back(pos);
             }
         }
     }
