@@ -71,7 +71,7 @@ class Locker {
 public:
     using LockTimeoutCallback = std::function<void()>;
 
-    virtual ~Locker();
+    virtual ~Locker() = default;
 
     /**
      * State for reporting the number of active and queued reader and writer clients.
@@ -481,9 +481,7 @@ public:
     /**
      * Pending means we are currently trying to get a lock.
      */
-    bool hasLockPending() const {
-        return getWaitingResource().isValid();
-    }
+    virtual bool hasLockPending() const = 0;
 
     /**
      * Returns a vector with the lock information from the given resource lock holders.

@@ -5,17 +5,18 @@ Import('env')
 env = env.Clone()
 
 env.Library(
-    target='mongocryptd_core',
+    target="mongocryptd_core",
     source=[
-        'cryptd_main.cpp',
-        'cryptd_options.cpp',
-        'cryptd_options_init.cpp',
-        'cryptd_service_entry_point.cpp',
-        'cryptd_watchdog.cpp',
+        "cryptd_main.cpp",
+        "cryptd_options.cpp",
+        "cryptd_options_init.cpp",
+        "cryptd_service_entry_point.cpp",
+        "cryptd_watchdog.cpp",
         'cryptd_options.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/db/initialize_api_parameters',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
@@ -33,7 +34,6 @@ env.Library(
         '$BUILD_DIR/mongo/transport/session_manager',
         '$BUILD_DIR/mongo/transport/transport_layer',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/ntservice',

@@ -343,6 +343,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/update/update_common',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/util/caching',
@@ -350,10 +351,6 @@ env.Library(
         'client/shard_interface',
         'common_s',
         'query/cluster_cursor_manager',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 

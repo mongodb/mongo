@@ -26,13 +26,10 @@ ftdcEnv.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/bson_validate',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/third_party/s2/s2',  # For VarInt
         '$BUILD_DIR/third_party/shim_zlib',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 

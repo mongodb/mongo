@@ -88,7 +88,6 @@ iamEnv.Library(
         '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/progress_meter',
         '$BUILD_DIR/third_party/s2/s2',
         '$BUILD_DIR/third_party/shim_snappy',

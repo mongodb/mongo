@@ -40,7 +40,6 @@
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_request_list.h"
-#include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
@@ -49,6 +48,8 @@
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
+
+class ServiceContext;
 
 /**
  * Entry point for the lock manager scheduling functionality. Don't use it directly, but
@@ -66,6 +67,12 @@ public:
      */
     static LockManager* get(ServiceContext* service);
     static LockManager* get(ServiceContext& service);
+
+    /**
+     * Gets a mapping of lock to client info.
+     * Used by dump() and the lockInfo command.
+     */
+    static std::map<LockerId, BSONObj> getLockToClientMap(ServiceContext* serviceContext);
 
     /**
      * Default constructors are meant for unit tests only. The lock manager should generally be
@@ -141,6 +148,23 @@ public:
      * request. Note that the returned value may be immediately stale.
      */
     bool hasConflictingRequests(ResourceId resId, const LockRequest* request) const;
+
+    /**
+     * Dumps the contents of all locks into a BSON object
+     * to be used in lockInfo command in the shell.
+     * Adds a "lockInfo" element to the `result` object:
+     *     "lockInfo": [
+     *         // object for each lock in the LockManager (in any bucket),
+     *         {
+     *             "resourceId": <string>,
+     *             "granted": [ {...}, ... ],  // array of lock requests
+     *             "pending": [ {...}, ... ],  // array of lock requests
+     *         },
+     *         ...
+     *     ]
+     */
+    void getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
+                         BSONObjBuilder* result);
 
     /**
      * The backend of `dump` and `getLockInfoBSON`.

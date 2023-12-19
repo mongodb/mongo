@@ -21,6 +21,7 @@ env.Library(
         'test_health_observer.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/executor/network_interface',
@@ -31,7 +32,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/s/grid',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
     ],
 )
@@ -45,7 +45,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/s/grid',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         'fault_manager',
     ],
     LIBDEPS_DEPENDENTS=[

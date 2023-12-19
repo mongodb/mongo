@@ -15,11 +15,9 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/jwt_types',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/server_feature_flags',
-        '$BUILD_DIR/mongo/db/service_context',
-        'authprivilege',
+        '$BUILD_DIR/mongo/db/auth/auth', '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/server_feature_flags', '$BUILD_DIR/mongo/db/service_context',
+        'authprivilege'
     ],
 )
 
@@ -107,6 +105,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/shard_role',
+        'auth_types',
     ],
 )
 
@@ -185,12 +184,11 @@ env.Library(
 env.Library(
     target='auth_impl_internal',
     source=[
-        'auth_types.idl',
         'authorization_manager_impl.cpp',
-        'authorization_manager_impl_parameters.idl',
         'authorization_session_impl.cpp',
         'authz_manager_external_state.cpp',
         'authz_session_external_state.cpp',
+        'authorization_manager_impl_parameters.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/secure_allocator',
@@ -219,7 +217,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/util/caching',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+        'auth_types',
         'auth_umc',
     ],
 )
@@ -268,16 +266,28 @@ env.Library(
 )
 
 env.Library(
+    target='auth_types',
+    source=[
+        'auth_types.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'auth',
+        'authprivilege',
+    ],
+)
+
+env.Library(
     target='auth_umc',
     source=[
         'impersonation_session.cpp',
         'user_management_commands_parser.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
         'address_restriction',
         'auth',
@@ -474,6 +484,7 @@ env.Library(
         'authz_session_external_state_mock.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/update/update_driver',

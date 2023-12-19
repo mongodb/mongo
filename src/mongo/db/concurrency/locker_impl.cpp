@@ -159,6 +159,12 @@ PartitionedInstanceWideLockStats globalStats;
 
 }  // namespace
 
+LockManager* getGlobalLockManager() {
+    auto serviceContext = getGlobalServiceContext();
+    invariant(serviceContext);
+    return LockManager::get(serviceContext);
+}
+
 bool LockerImpl::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
     switch (resId.getType()) {
         case RESOURCE_MUTEX:
@@ -313,8 +319,8 @@ void CondVarLockGrantNotification::notify(ResourceId resId, LockResult result) {
 
 LockerImpl::LockerImpl(ServiceContext* serviceCtx)
     : _id(idCounter.addAndFetch(1)),
+      _wuowNestingLevel(0),
       _threadId(stdx::this_thread::get_id()),
-      _lockManager(LockManager::get(serviceCtx)),
       _ticketHolderManager(TicketHolderManager::get(serviceCtx)) {}
 
 stdx::thread::id LockerImpl::getThreadId() const {
@@ -391,7 +397,7 @@ void LockerImpl::reacquireTicket(OperationContext* opCtx) {
                                 "conflict for resource {}",
                                 _modeForTicket,
                                 it.key().toString()),
-                    !_lockManager->hasConflictingRequests(it.key(), it.objAddr()));
+                    !getGlobalLockManager()->hasConflictingRequests(it.key(), it.objAddr()));
         }
     } while (!_acquireTicket(opCtx, _modeForTicket, Date_t::now() + Milliseconds{100}));
 }
@@ -598,7 +604,7 @@ void LockerImpl::lock(OperationContext* opCtx, ResourceId resId, LockMode mode, 
 
 void LockerImpl::downgrade(ResourceId resId, LockMode newMode) {
     LockRequestsMap::Iterator it = _requests.find(resId);
-    _lockManager->downgrade(it.objAddr(), newMode);
+    getGlobalLockManager()->downgrade(it.objAddr(), newMode);
 }
 
 bool LockerImpl::unlock(ResourceId resId) {
@@ -958,8 +964,8 @@ LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, Loc
     // otherwise we might reset state if the lock becomes granted very fast.
     _notify.clear();
 
-    LockResult result = isNew ? _lockManager->lock(resId, request, mode)
-                              : _lockManager->convert(resId, request, mode);
+    LockResult result = isNew ? getGlobalLockManager()->lock(resId, request, mode)
+                              : getGlobalLockManager()->convert(resId, request, mode);
 
     if (result == LOCK_WAITING) {
         globalStats.recordWait(_id, resId, mode);
@@ -1112,7 +1118,7 @@ void LockerImpl::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode
 }
 
 std::vector<LogDegugInfo> LockerImpl::getLockInfoFromResourceHolders(ResourceId resId) {
-    return _lockManager->getLockInfoFromResourceHolders(resId);
+    return getGlobalLockManager()->getLockInfoFromResourceHolders(resId);
 }
 
 LockResult LockerImpl::lockRSTLBegin(OperationContext* opCtx, LockMode mode) {
@@ -1144,7 +1150,7 @@ void LockerImpl::_releaseTicket() {
 }
 
 bool LockerImpl::_unlockImpl(LockRequestsMap::Iterator* it) {
-    if (_lockManager->unlock(it->objAddr())) {
+    if (getGlobalLockManager()->unlock(it->objAddr())) {
         if (it->key() == resourceIdGlobal) {
             invariant(_modeForTicket != MODE_NONE);
 
@@ -1238,9 +1244,7 @@ public:
 
     void taskDoWork() {
         LOGV2_DEBUG(20524, 2, "cleaning up unused lock buckets of the global lock manager");
-        auto serviceContext = getGlobalServiceContext();
-        invariant(serviceContext);
-        LockManager::get(serviceContext)->cleanupUnusedLocks();
+        getGlobalLockManager()->cleanupUnusedLocks();
     }
 } unusedLockCleaner;
 }  // namespace

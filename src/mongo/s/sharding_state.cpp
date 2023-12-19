@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/s/sharding_state.h"
 
 #include <boost/none.hpp>
 #include <mutex>
@@ -41,6 +40,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"
 

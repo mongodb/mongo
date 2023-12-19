@@ -14,7 +14,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/s/grid',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 
@@ -313,7 +312,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/write_block_bypass',
         '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 

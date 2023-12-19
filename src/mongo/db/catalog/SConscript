@@ -259,9 +259,9 @@ env.Library(
         'multi_index_block.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/index/index_access_method',
-        '$BUILD_DIR/mongo/db/multi_key_path_tracker',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
@@ -292,7 +292,7 @@ env.Library(
         'views_for_database.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/shard_role_api_stor_ex',
+        '$BUILD_DIR/mongo/db/shard_role_api',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
@@ -489,7 +489,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/fail_point',
         'validate_idl',
     ],

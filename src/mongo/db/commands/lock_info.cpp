@@ -43,32 +43,12 @@
 #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dump_lock_manager_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
 namespace {
-
-/**
- * Dumps the contents of all locks into a BSON object
- * to be used in lockInfo command in the shell.
- * Adds a "lockInfo" element to the `result` object:
- *     "lockInfo": [
- *         // object for each lock in the LockManager (in any bucket),
- *         {
- *             "resourceId": <string>,
- *             "granted": [ {...}, ... ],  // array of lock requests
- *             "pending": [ {...}, ... ],  // array of lock requests
- *         },
- *         ...
- *     ]
- */
-void getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap, BSONObjBuilder* result) {
-
-    ;
-}
 
 class CmdLockInfo : public TypedCommand<CmdLockInfo> {
 public:
@@ -116,12 +96,9 @@ public:
                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                 CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(request().getDbName()));
 
-            auto lockToClientMap = getLockerIdToClientMap(opCtx->getServiceContext());
-
-            auto lockManager = LockManager::get(opCtx->getServiceContext());
+            auto lockToClientMap = LockManager::getLockToClientMap(opCtx->getServiceContext());
             auto result = reply->getBodyBuilder();
-            auto lockInfoArr = BSONArrayBuilder(result.subarrayStart("lockInfo"));
-            lockManager->getLockInfoArray(lockToClientMap, false, lockManager, &lockInfoArr);
+            LockManager::get(opCtx->getServiceContext())->getLockInfoBSON(lockToClientMap, &result);
             const auto& includeStorageEngineDump = request().getIncludeStorageEngineDump();
             if (includeStorageEngineDump) {
                 opCtx->getServiceContext()->getStorageEngine()->dump();

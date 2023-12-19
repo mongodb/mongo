@@ -29,14 +29,10 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-#include "mongo/db/dump_lock_manager_impl.h"
+#include "mongo/db/dump_lock_manager.h"
 
 #include "mongo/base/shim.h"
-#include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager.h"
-#include "mongo/db/dump_lock_manager.h"
-#include "mongo/db/locker_api.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 
@@ -57,7 +53,7 @@ void dumpLockManagerImpl() {
     auto lockManager = LockManager::get(service);
 
     BSONArrayBuilder locks;
-    lockManager->getLockInfoArray(getLockerIdToClientMap(service), true, nullptr, &locks);
+    lockManager->getLockInfoArray(LockManager::getLockToClientMap(service), true, nullptr, &locks);
     LOGV2_OPTIONS(20521,
                   logv2::LogTruncation::Disabled,
                   "lock manager dump",
@@ -67,32 +63,5 @@ void dumpLockManagerImpl() {
 
 auto dumpLockManagerRegistration =
     MONGO_WEAK_FUNCTION_REGISTRATION(dumpLockManager, dumpLockManagerImpl);
-
 }  // namespace
-
-std::map<LockerId, BSONObj> getLockerIdToClientMap(ServiceContext* serviceContext) {
-    std::map<LockerId, BSONObj> lockToClientMap;
-
-    for (ServiceContext::LockedClientsCursor cursor(serviceContext);
-         Client* client = cursor.next();) {
-        invariant(client);
-
-        stdx::lock_guard<Client> lk(*client);
-        const OperationContext* clientOpCtx = client->getOperationContext();
-
-        // Operation context specific information
-        if (clientOpCtx) {
-            BSONObjBuilder infoBuilder;
-            // The client information
-            client->reportState(infoBuilder);
-
-            infoBuilder.append("opid", static_cast<int>(clientOpCtx->getOpID()));
-            LockerId lockerId = shard_role_details::getLocker(clientOpCtx)->getId();
-            lockToClientMap.insert({lockerId, infoBuilder.obj()});
-        }
-    }
-
-    return lockToClientMap;
-}
-
 }  // namespace mongo

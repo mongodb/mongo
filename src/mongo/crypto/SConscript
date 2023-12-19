@@ -134,10 +134,8 @@ env.Library(
         'fle_fields_util.cpp',
     ],
     LIBDEPS=[
-        'encrypted_field_config',
-    ],
-    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
+        'encrypted_field_config',
     ],
 )
 
