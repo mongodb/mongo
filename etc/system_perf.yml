@@ -2488,6 +2488,7 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: time_series_sort_high_value
         cron: *high-value-workload-cron
+      - name: tsbs-expression-query
 
   # Variant which runs a single shard cluster with a config
   # shard and mongos processes processes co-located on the
@@ -2865,6 +2866,7 @@ buildvariants:
       - name: tsbs-query-genny
       - name: tsbs-query-optimizations
       - name: dbcheck
+      - name: tsbs-expression-query
 
   - name: linux-3-node-replSet-notls.2022-11
     display_name: Linux 3-Node ReplSet (No TLS) 2022-11

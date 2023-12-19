@@ -410,6 +410,16 @@ tasks:
             {task_name: tsbs_query_optimizations,
              config_filename: ./src/genny/dist/etc/genny/workloads/query/TimeseriesTsbsOptimizations.yml}
 
+  - name: tsbs-expression-query
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_genny"
+          test_control_params: |
+            {task_name: tsbs_expression_query,
+             config_filename: ./src/genny/dist/etc/genny/workloads/query/TimeseriesTsbsExpressionQuery.yml}
+
   - name: tpcc
     priority: 5
     commands:
