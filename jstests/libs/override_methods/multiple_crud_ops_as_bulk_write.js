@@ -13,6 +13,10 @@ let normalClusterRunCommand = TestData.preOverrideRunCommand;
 jsTestLog("Normal Cluster: " + normalCluster);
 jsTestLog("BulkWrite Cluster: " + bulkWriteCluster);
 
+const errorsOnly = Math.random() < 0.75;
+
+jsTestLog("Running bulkWrite override with `errorsOnly:" + errorsOnly + "`");
+
 const normalSession = normalCluster.getDB("admin")._session;
 const normalSessionId = normalSession._serverSession.handle.getId();
 
@@ -171,7 +175,7 @@ function validateClusterConsistency(originalRunCommand, makeRunCommandArgs) {
     Mongo.prototype.runCommand = newRunCommand;
 }
 
-function flushBatch(originalRunCommand, makeRunCommandArgs, additionalParams) {
+function flushBatch(originalRunCommand, makeRunCommandArgs) {
     if (BulkWriteUtils.getCurrentBatchSize() === 0) {
         return;
     }
@@ -180,7 +184,7 @@ function flushBatch(originalRunCommand, makeRunCommandArgs, additionalParams) {
                                                   bulkSessionId,
                                                   originalRunCommand,
                                                   makeRunCommandArgs,
-                                                  additionalParams);
+                                                  {"errorsOnly": errorsOnly});
 
         validateClusterConsistency(originalRunCommand, makeRunCommandArgs);
         BulkWriteUtils.resetBulkWriteBatch();

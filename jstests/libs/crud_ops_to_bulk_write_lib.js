@@ -89,21 +89,56 @@ export const BulkWriteUtils = (function() {
 
         let expectedResponseLength = numOpsPerResponse.length;
 
-        // Retry on ordered:true failures by re-running subset of original bulkWrite command.
-        while (finalResponse.length != expectedResponseLength) {
-            // Need to figure out how many ops we need to subset out. Every entry in
-            // numOpsPerResponse represents a number of bulkWrite ops that correspond to an initial
-            // CRUD op. We need to make sure we split at a CRUD op boundary in the bulkWrite.
-            for (let i = 0; i < response.length; i++) {
-                let target = numOpsPerResponse.shift();
-                for (let j = 0; j < target; j++) {
-                    bufferedOps.shift();
+        // The following blocks are only relevant for batching multiple commands together
+        // to ensure that every separate command is run even if previous commands fail.
+        // The way we do this is by removing all ops that were executed from `ops`, and also
+        // remove any ops that came from the same command. For example if we made a batch of
+        // bulkWrite = insert1 + insert2 where insert1 = [{a:1},{b:1},{c:1}], and insert2 = [{d:1}]
+        // and the op at index 1 failed we would re-run the bulkWrite with just `{d:1}` since we
+        // need to achive the result of running both insert1 + insert2.
+        if (bulkWriteCmd.errorsOnly == true) {
+            // For errorsOnly we will only ever have items in the response cursor if an operation
+            // failed. We also always run batched bulkWrites as ordered:true so only one command can
+            // fail. Once we get a bulkWrite with no errors then we have executed all ops.
+            while ((resp.cursor == null) || (resp.cursor.firstBatch.length != 0)) {
+                let idx = resp.cursor ? resp.cursor.firstBatch[0].idx : 0;
+                let i = 0;
+                while (i <= idx) {
+                    let numOpsToShift = numOpsPerResponse.shift();
+                    for (let j = 0; j < numOpsToShift; j++) {
+                        bufferedOps.shift();
+                        i++;
+                    }
                 }
+
+                // Can't execute a bulkWrite with no ops remaining.
+                if (bufferedOps.length == 0) {
+                    break;
+                }
+
+                bulkWriteCmd.ops = bufferedOps;
+                resp = originalRunCommand.apply(conn, makeRunCommandArgs(bulkWriteCmd, "admin"));
+                response = convertBulkWriteResponse(bulkWriteCmd, resp);
+                finalResponse = finalResponse.concat(response);
             }
-            bulkWriteCmd.ops = bufferedOps;
-            resp = originalRunCommand.apply(conn, makeRunCommandArgs(bulkWriteCmd, "admin"));
-            response = convertBulkWriteResponse(bulkWriteCmd, resp);
-            finalResponse = finalResponse.concat(response);
+        } else {
+            // Retry on ordered:true failures by re-running subset of original bulkWrite command.
+            while (finalResponse.length != expectedResponseLength) {
+                // Need to figure out how many ops we need to subset out. Every entry in
+                // numOpsPerResponse represents a number of bulkWrite ops that correspond to an
+                // initial CRUD op. We need to make sure we split at a CRUD op boundary in the
+                // bulkWrite.
+                for (let i = 0; i < response.length; i++) {
+                    let target = numOpsPerResponse.shift();
+                    for (let j = 0; j < target; j++) {
+                        bufferedOps.shift();
+                    }
+                }
+                bulkWriteCmd.ops = bufferedOps;
+                resp = originalRunCommand.apply(conn, makeRunCommandArgs(bulkWriteCmd, "admin"));
+                response = convertBulkWriteResponse(bulkWriteCmd, resp);
+                finalResponse = finalResponse.concat(response);
+            }
         }
 
         return finalResponse;
