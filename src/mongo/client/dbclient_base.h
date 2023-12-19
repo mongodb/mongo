@@ -705,6 +705,10 @@ public:
         return _alwaysAppendDollarTenant;
     }
 
+    void setShouldThrowOnStaleConfigError(bool value) {
+        _shouldThrowOnStaleConfigError = value;
+    }
+
 protected:
     /**
      * Returns true if the result of a command is ok.
@@ -751,6 +755,11 @@ private:
                                    BSONObj legacyCmdObj,
                                    int queryFlags = 0,
                                    boost::optional<auth::ValidatedTenancyScope> vts = boost::none);
+
+    // Unless explicitly opted out, a DBClientBase should throw on a StaleConfig error so that the
+    // error can be handled internally if applicable rather than propagated to the external client
+    // right away.
+    bool _shouldThrowOnStaleConfigError = true;
 
     bool _alwaysAppendDollarTenant = false;
 

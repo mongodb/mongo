@@ -754,6 +754,11 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     if (!conn.get()) {
         uasserted(ErrorCodes::InternalError, errmsg);
     }
+    // Make the DBClientBase not throw on a StaleConfig error since the shell cannot handle this
+    // error and for transactions throwing this error from inside DBClientBase makes the error lose
+    // the TransientTransactionError label, which would mislead the external client to not retry the
+    // transaction when it should.
+    conn->setShouldThrowOnStaleConfigError(false);
 
     ScriptEngine::runConnectCallback(*conn, host);
 

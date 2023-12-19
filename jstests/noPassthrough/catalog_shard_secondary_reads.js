@@ -100,8 +100,8 @@ findCmd = {
     shardVersion: shardVersion,
     readConcern: {level: 'local'}
 };
-assert.throwsWithCode(() => configConn.getDB('sharded').runCommand(findCmd),
-                      ErrorCodes.StaleConfig);
+assert.commandFailedWithCode(configConn.getDB('sharded').runCommand(findCmd),
+                             ErrorCodes.StaleConfig);
 
 version = assert.commandWorked(
     configConn.adminCommand({getShardVersion: 'sharded.user', fullMetadata: true}));
