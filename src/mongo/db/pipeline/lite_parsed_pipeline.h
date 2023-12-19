@@ -74,29 +74,11 @@ public:
         }
     }
 
-    /*
-     * LiteParsedPipeline has a vector<unique_ptr<LiteParsedDocumentSource>>. Given that unique_ptr
-     * is move-only, and LiteParsedDocumentSource has virtual methods (and doesn't provide a copy
-     * interface), here we also make LiteParsedPipeline move-only.
-     */
-    LiteParsedPipeline(const LiteParsedPipeline& other) = delete;
-    LiteParsedPipeline& operator=(const LiteParsedPipeline& other) = delete;
-
-    LiteParsedPipeline(LiteParsedPipeline&& other) : _stageSpecs(std::move(other._stageSpecs)) {
-        _initializeDeferredMembersFromSource(std::move(other));
-    }
-
-    LiteParsedPipeline& operator=(LiteParsedPipeline&& other) {
-        _stageSpecs = std::move(other._stageSpecs);
-        _initializeDeferredMembersFromSource(std::move(other));
-        return *this;
-    }
-
     /**
      * Returns all foreign namespaces referenced by stages within this pipeline, if any.
      */
     const stdx::unordered_set<NamespaceString>& getInvolvedNamespaces() const {
-        return *_involvedNamespaces;
+        return _involvedNamespaces.get(_stageSpecs);
     }
 
     /**
@@ -156,7 +138,7 @@ public:
      * Returns true if the pipeline has a $changeStream stage.
      */
     bool hasChangeStream() const {
-        return *_hasChangeStream;
+        return _hasChangeStream.get(_stageSpecs);
     }
 
     /**
@@ -250,35 +232,19 @@ public:
     void validate(const OperationContext* opCtx, bool performApiVersionChecks = true) const;
 
 private:
-    /*
-     * The Deferred<T> members of LiteParsedPipeline depend on an initializer that captures the
-     * "this" pointer. Unfortunately, this means that when we move from a Deferred
-     * member that has not yet been initialized, the captured "this" still refers to the source
-     * LiteParsedPipeline which may go out of scope by the time we call the initializer. To
-     * overcome this, we rely on the default initialization of the Deferred members, and only
-     * move from the source member if it was already initialized.
-     */
-    void _initializeDeferredMembersFromSource(LiteParsedPipeline&& other) {
-        if (other._hasChangeStream.isInitialized()) {
-            _hasChangeStream = std::move(other._hasChangeStream);
-        }
-
-        if (other._involvedNamespaces.isInitialized()) {
-            _involvedNamespaces = std::move(other._involvedNamespaces);
-        }
-    }
-
+    // This is logically const - any changes to _stageSpecs will invalidate cached copies of
+    // "_hasChangeStream" and "_involvedNamespaces" below.
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
-    Deferred<bool> _hasChangeStream{[this]() {
-        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
+    Deferred<bool, const decltype(_stageSpecs)&> _hasChangeStream{[](const auto& stageSpecs) {
+        return std::any_of(stageSpecs.begin(), stageSpecs.end(), [](auto&& spec) {
             return spec->isChangeStream();
         });
     }};
 
-    Deferred<stdx::unordered_set<NamespaceString>> _involvedNamespaces{
-        [this]() -> stdx::unordered_set<NamespaceString> {
+    Deferred<stdx::unordered_set<NamespaceString>, const decltype(_stageSpecs)&>
+        _involvedNamespaces{[](const auto& stageSpecs) -> stdx::unordered_set<NamespaceString> {
             stdx::unordered_set<NamespaceString> involvedNamespaces;
-            for (const auto& spec : _stageSpecs) {
+            for (const auto& spec : stageSpecs) {
                 auto stagesInvolvedNamespaces = spec->getInvolvedNamespaces();
                 involvedNamespaces.insert(stagesInvolvedNamespaces.begin(),
                                           stagesInvolvedNamespaces.end());

@@ -30,8 +30,19 @@
 #include "mongo/db/query/query_stats/key.h"
 
 #include "mongo/db/query/query_stats/query_stats_helpers.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 
 namespace mongo::query_stats {
+
+namespace {
+BSONObj scrubHighCardinalityFields(const ClientMetadata* clientMetadata) {
+    if (!clientMetadata) {
+        return BSONObj();
+    }
+    return clientMetadata->documentWithoutMongosInfo();
+}
+
+}  // namespace
 
 UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shape> queryShape,
                                                const ClientMetadata* clientMetadata,
@@ -44,7 +55,7 @@ UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shap
                                                query_shape::CollectionType collectionType,
                                                bool maxTimeMS)
     : _queryShape(std::move(queryShape)),
-      _clientMetaData(clientMetadata ? clientMetadata->getDocument().getOwned() : BSONObj()),
+      _clientMetaData(scrubHighCardinalityFields(clientMetadata)),
       _commentObj(commentObj.value_or(BSONObj()).getOwned()),
       _hintObj(hint.value_or(BSONObj()).getOwned()),
       _readPreference(readPreference.value_or(BSONObj()).getOwned()),
@@ -53,7 +64,8 @@ UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shap
       _apiParams(std::move(apiParams)),
       _comment(commentObj ? _commentObj.firstElement() : BSONElement()),
       _collectionType(collectionType),
-      _clientMetaDataHash(clientMetadata ? clientMetadata->getHash() : simpleHash(BSONObj())),
+      _clientMetaDataHash(clientMetadata ? clientMetadata->hashWithoutMongosInfo()
+                                         : simpleHash(BSONObj())),
       _hasField{.clientMetaData = bool(clientMetadata),
                 .comment = bool(commentObj),
                 .hint = bool(hint),

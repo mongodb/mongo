@@ -39,6 +39,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/query/util/deferred.h"
 
 namespace mongo {
 
@@ -290,12 +292,19 @@ public:
     const BSONObj& getDocument() const;
 
     /**
-     * Get the simple hash of the client metadata document.
+     * A lazily computed (and subsequently cached) copy of the metadata with the mongos info
+     * removed. This is useful for collecting query stats where we want to scrub out this
+     * high-cardinality field, and we don't want to re-do this computation over and over again.
+     */
+    const BSONObj& documentWithoutMongosInfo() const;
+
+    /**
+     * Get the simple hash of the client metadata document (simple meaning no collation).
      *
      * The hash is generated on the first call to this method. Future calls will return the cached
      * hash rather than recomputing.
      */
-    unsigned long getHash() const;
+    unsigned long hashWithoutMongosInfo() const;
 
     /**
      * Log client and client metadata information to disk.
@@ -349,9 +358,16 @@ private:
     // May be empty
     StringData _appName;
 
-    // Simple hash of the Client Metadata document.
-    // Generated lazily on the first call to getHash().
-    mutable boost::optional<unsigned long> _hash = boost::none;
+    // See documentWithoutMongosInfo().
+    Deferred<BSONObj, const BSONObj&> _documentWithoutMongosInfo{[](const BSONObj& fullDocument) {
+        return fullDocument.removeField("mongos");
+    }};
+
+    // See hashWithoutMongosInfo().
+    Deferred<unsigned long, const BSONObj&> _hashWithoutMongos{
+        [](const BSONObj& documentWithoutMongosInfo) {
+            return simpleHash(documentWithoutMongosInfo);
+        }};
 };
 
 }  // namespace mongo

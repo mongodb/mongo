@@ -33,19 +33,22 @@
 #include "mongo/unittest/framework.h"
 
 namespace mongo {
+using std::string;
+using namespace std::string_literals;
+
 
 TEST(DeferredTest, EagerInitialization) {
-    Deferred<std::string> eager{"someString"};
+    Deferred<string> eager{"someString"};
     ASSERT_TRUE(eager.isInitialized());
-    ASSERT_EQ(*eager.get(), std::string{"someString"});
-    ASSERT_EQ(*eager, std::string{"someString"});
+    ASSERT_EQ(eager.get(), "someString"s);
+    ASSERT_EQ(*eager, "someString"s);
 }
 
 TEST(DeferredTest, DeferredInitialization) {
     size_t initializationCount = 0;
-    Deferred<std::string> deferred{[&]() {
+    Deferred<string> deferred{[&]() {
         initializationCount++;
-        return "someString";
+        return "someString"s;
     }};
     ASSERT_FALSE(deferred.isInitialized());
 
@@ -60,7 +63,39 @@ TEST(DeferredTest, DeferredInitialization) {
 
     // Ensure that the content of the deferred object is equal to its raw counterpart, while also
     // verifing that it is initialized at most once.
-    ASSERT_EQ(*deferred.get(), std::string{"someString"});
+    ASSERT_EQ(deferred.get(), "someString"s);
     ASSERT_EQ(initializationCount, 1);
+}
+
+TEST(DeferredTest, DeferredInitializationWithOneArgument) {
+    size_t initializationCount = 0;
+    Deferred<string, const string&> deferred{[&](const string& input) {
+        initializationCount++;
+        return "{" + input + "}";
+    }};
+
+    // Ensure the deferred object wasn't initialized on creation.
+    ASSERT_EQ(initializationCount, 0);
+
+    // Ensure that the content of the deferred object is equal to its raw counterpart, while also
+    // verifing that it is initialized at most once.
+    ASSERT_EQ(deferred.get("more curlies"), "{more curlies}"s);
+    ASSERT_EQ(initializationCount, 1);
+
+    // Note that the value is cached, so it's not really valid to call it with a different argument.
+    ASSERT_EQ(deferred.get("merganser"), "{more curlies}"s);
+    ASSERT_EQ(initializationCount, 1);
+}
+
+TEST(DeferredTest, DeferredInitializationWithTwoArgs) {
+    Deferred<string, const string&, const string&> deferred{
+        [&](const auto& input, const auto& prefix) {
+            return prefix + input;
+        }};
+
+    ASSERT_EQ(deferred.get("cowbell", "more "), "more cowbell"s);
+    ASSERT_EQ(deferred.get("cowbell", "more "), "more cowbell"s);
+    ASSERT_EQ(deferred.get("cowbell", "less?"), "more cowbell"s);
+    ASSERT_EQ(deferred.get("tests", "better"), "more cowbell"s);
 }
 }  // namespace mongo

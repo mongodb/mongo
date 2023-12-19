@@ -3,14 +3,18 @@
  * and none are missing.
  * @tags: [requires_fcv_72]
  */
-import {runCommandAndValidateQueryStats} from "jstests/libs/query_stats_utils.js";
+import {
+    runCommandAndValidateQueryStats,
+    withQueryStatsEnabled
+} from "jstests/libs/query_stats_utils.js";
 
-let aggregateCommandObj = {
-    aggregate: jsTestName(),
+const collName = jsTestName();
+const aggregateCommandObj = {
+    aggregate: collName,
     pipeline: [{"$out": "collOut"}],
     allowDiskUse: false,
     cursor: {batchSize: 2},
-    maxTimeMS: 500,
+    maxTimeMS: 50 * 1000,
     bypassDocumentValidation: false,
     readConcern: {level: "local"},
     writeConcern: {w: 1},
@@ -45,9 +49,15 @@ const queryStatsAggregateKeyFields = [
     "cursor.batchSize",
 ];
 
-runCommandAndValidateQueryStats({
-    commandName: "aggregate",
-    commandObj: aggregateCommandObj,
-    shapeFields: queryShapeAggregateFields,
-    keyFields: queryStatsAggregateKeyFields
+withQueryStatsEnabled(collName, (coll) => {
+    // Have to create an index for hint not to fail.
+    assert.commandWorked(coll.createIndex({v: 1}));
+
+    runCommandAndValidateQueryStats({
+        coll: coll,
+        commandName: "aggregate",
+        commandObj: aggregateCommandObj,
+        shapeFields: queryShapeAggregateFields,
+        keyFields: queryStatsAggregateKeyFields
+    });
 });

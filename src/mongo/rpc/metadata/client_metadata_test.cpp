@@ -309,16 +309,17 @@ TEST(ClientMetadataTest, TestMongoSAppend) {
     auto obj = builder.obj();
     auto swParseStatus = ClientMetadata::parse(obj[kMetadataDoc]);
     ASSERT_OK(swParseStatus.getStatus());
-    ASSERT_EQUALS("g", swParseStatus.getValue().value().getApplicationName());
+    auto metaObj = swParseStatus.getValue().value();
+    ASSERT_EQUALS("g", metaObj.getApplicationName());
+    auto docBeforeMongos = obj[kMetadataDoc].Obj();
+    ASSERT_BSONOBJ_EQ(metaObj.getDocument(), docBeforeMongos);
 
-    swParseStatus.getValue().value().setMongoSMetadata("h", "i", "j");
-    ASSERT_EQUALS("g", swParseStatus.getValue().value().getApplicationName());
+    metaObj.setMongoSMetadata("h", "i", "j");
+    ASSERT_BSONOBJ_NE(metaObj.getDocument(), docBeforeMongos);
+    ASSERT_EQUALS("g", metaObj.getApplicationName());
 
-    auto doc = swParseStatus.getValue().value().getDocument();
-
-    constexpr auto kMongos = "mongos"_sd;
-    constexpr auto kClient = "client"_sd;
-    constexpr auto kHost = "host"_sd;
+    auto docWithMongosInfo = metaObj.getDocument();
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(), docBeforeMongos);
 
     auto pid = ProcessId::getCurrent().toString();
 
@@ -343,7 +344,60 @@ TEST(ClientMetadataTest, TestMongoSAppend) {
             .append(kMongos,
                     BOB{}.append(kHost, "h").append(kClient, "i").append(kVersion, "j").obj())
             .obj();
-    ASSERT_BSONOBJ_EQ(doc, outDoc);
+    ASSERT_BSONOBJ_EQ(docWithMongosInfo, outDoc);
+}
+
+// Test that if mongos information is present from the beginning, we can still request the document
+// without the mongos info.
+TEST(ClientMetadataTest, MongosMetaCanBeRemoved) {
+    BSONObjBuilder realBuilder;
+    BSONObjBuilder tmpBuilder;
+    ASSERT_OK(ClientMetadata::serializePrivate("a", "b", "c", "d", "e", "f", "g", &tmpBuilder));
+    auto objWithoutMongosMeta = tmpBuilder.obj();
+    const auto metaBsonNoMongosInfo = objWithoutMongosMeta[kMetadataDoc].Obj();
+    {
+        BSONObjBuilder metaBuilder = realBuilder.subobjStart(kMetadataDoc);
+        metaBuilder.appendElements(metaBsonNoMongosInfo);
+        metaBuilder.append("mongos", BSON(kHost << "h" << kClient << "i" << kVersion << "j"));
+        metaBuilder.doneFast();
+    }
+
+    const auto wrappingMetaBson = realBuilder.obj();
+    const auto metaElt = wrappingMetaBson[kMetadataDoc];
+    // Add this mongos info without calling 'setMongoSMetadata().'
+    ASSERT_BSONOBJ_NE(metaElt.Obj(), metaBsonNoMongosInfo);
+
+    auto swParseStatus = ClientMetadata::parse(metaElt);
+    ASSERT_OK(swParseStatus.getStatus());
+    const auto& metaObj = swParseStatus.getValue().value();
+    // Test the various copy/move constructors.
+    ClientMetadata copyConstructed(metaObj);
+    auto tmpThirdCopy = metaObj;
+    ClientMetadata moveConstructed(std::move(tmpThirdCopy));
+
+    auto tmpFourthCopy = metaObj;
+    auto moveAssigned = metaObj;  // copy for now, until next line.
+    moveAssigned = std::move(tmpFourthCopy);
+
+    const auto tmpFifthCopy = metaObj;
+    auto copyAssigned = metaObj;  // copy construct.
+    copyAssigned = tmpFifthCopy;  // copy assign.
+
+    ASSERT_BSONOBJ_EQ(metaObj.getDocument(), metaElt.Obj());
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(), metaBsonNoMongosInfo);
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(),
+                      copyConstructed.documentWithoutMongosInfo());
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(),
+                      moveConstructed.documentWithoutMongosInfo());
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(),
+                      copyAssigned.documentWithoutMongosInfo());
+    ASSERT_BSONOBJ_EQ(metaObj.documentWithoutMongosInfo(),
+                      moveAssigned.documentWithoutMongosInfo());
+
+    ASSERT_EQ(metaObj.hashWithoutMongosInfo(), copyConstructed.hashWithoutMongosInfo());
+    ASSERT_EQ(metaObj.hashWithoutMongosInfo(), moveConstructed.hashWithoutMongosInfo());
+    ASSERT_EQ(metaObj.hashWithoutMongosInfo(), copyAssigned.hashWithoutMongosInfo());
+    ASSERT_EQ(metaObj.hashWithoutMongosInfo(), moveAssigned.hashWithoutMongosInfo());
 }
 
 TEST(ClientMetadataTest, TestInvalidDocWhileSettingOpCtxMetadata) {

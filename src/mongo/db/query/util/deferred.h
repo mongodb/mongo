@@ -35,42 +35,75 @@ namespace mongo {
 
 /**
  * A template class that provides a way to defer the initialization of an object until its value is
- * actually required. This is also commonly referred to as lazy initialization. This implementation
- * is currently not thread safe, and it shouldn't be used in multi-threaded fashion.
+ * actually required. This is also commonly referred to as lazy initialization.
+ *
+ * Dangers:
+ * - This implementation is currently not thread safe, and it shouldn't be used in multi-threaded
+ *   fashion.
+ * - Be careful about using this for lazy initialization of data members and capturing the 'this'
+ *   variable. Code like this will result in buggy/unsafe move constructors, which would have a
+ *   dangling reference to the moved-from type:
+ *
+ *   class MyType {
+ *       int x;
+ *       // !!! Dangling 'this' when moved !!!
+ *       Deferred<int> xSquared{[this]() { return this->x * this-> x; };
+ *   };
+ *   Instead, it is better to do something like this:
+ *   class MyType {
+ *       int xSquared() const {
+ *          return *_xSquared.get(_x);
+ *       }
+ *
+ *       int _x;
+ *       Deferred<int, int> _xSquared{[](int x) { return x * x; };
+ *   };
+ * - As a similar danger, the value is only computed once. if you initialize it with arguments like
+ *   the above 'xSquared()' implementation, then be cogniscent that the value will never change. If
+ *   '_x' changes, '_xSquared' will not.
  *
  * A Deferred class can be constructed with either an initial value (eager initialization) or a
  * function that will generate the value when needed.
- **/
-template <typename T>
+ */
+template <typename T, typename... Args>
 class Deferred {
 public:
+    /**
+     * Instantiates a Deffered<T> with the given data - no callbacks or lazy initialization.
+     */
     Deferred(T data) : _data(data) {}
-    Deferred(std::function<T(void)> initializer) : _initializer(std::move(initializer)) {}
+
+    /**
+     * Stores a function to compute a T later. Please note the warnings described in this class
+     * comment.
+     */
+    Deferred(std::function<T(Args&&...)> initializer) : _initializer(std::move(initializer)) {}
 
     /**
      * Returns a pointer to the managed object. Initializes the object if it hasn't done so already.
      */
-    T* get() const {
+    T& get(Args&&... args) const {
         if (_initializer) {
-            _data = _initializer();
+            _data = _initializer(std::forward<Args>(args)...);
             _initializer = nullptr;
         }
-        return &_data;
+        return _data;
     }
 
     /**
-     * Dereferences the pointer to the managed object.
+     * Dereferences the pointer to the managed object. Note this is only a valid shortcut if there
+     * are no arguments to '_initializer'.
      */
     T* operator->() const {
-        return get();
+        return &get();
     }
 
     /**
      * Returns a referenced to the managed object. Initializes the object if it hasn't done so
-     * already.
+     * already. Note this is only a valid shortcut if there are no arguments to '_initializer'.
      */
     const T& operator*() const {
-        return *get();
+        return get();
     }
 
     bool isInitialized() const {
@@ -79,6 +112,7 @@ public:
 
 private:
     mutable T _data;
-    mutable std::function<T(void)> _initializer;
+    mutable std::function<T(Args&&...)> _initializer;
 };
+
 }  // namespace mongo

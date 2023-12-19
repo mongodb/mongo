@@ -104,7 +104,7 @@ Value DocumentSourceQueue::serialize(const SerializationOptions& opts) const {
     // Initialize the deferred queue if needed, and serialize its documents as one literal in the
     // context of redaction.
     ValueArrayStream vals;
-    for (const auto& elem : (*_queue.get())) {
+    for (const auto& elem : _queue.get()) {
         vals << elem.getDocument().getOwned();
     }
     return Value(DOC(kStageName << opts.serializeLiteral(vals.done())));
