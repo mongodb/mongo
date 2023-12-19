@@ -2040,6 +2040,7 @@ buildvariants:
       - name: tsbs_query_manual_bucketing
       - name: tsbs-query-genny
       - name: tsbs-query-optimizations
+      - name: tsbs-expression-query
       - name: big_update_10k
       - name: mixed_workloads_genny_rate_limited_high_value
         cron: *high-value-workload-cron
@@ -2083,6 +2084,7 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: mixed_workloads_genny_rate_limited_high_value
         cron: *high-value-workload-cron
+      - name: tsbs-expression-query
 
 # On PERF-730 we changed the initial sync tests to use two nodes instead of three. To avoid
 # losing history, the name remains unchanged, but the display_name reflects the change to 2-Node.
