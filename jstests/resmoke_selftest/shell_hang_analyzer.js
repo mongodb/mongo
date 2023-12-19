@@ -29,13 +29,12 @@ if (TestData && TestData.inEvergreen) {
     }, undefined, undefined, undefined, {runHangAnalyzer: false});
 
     const lines = rawMongoProgramOutput().split('\n');
-    if (_isAddressSanitizerActive()) {
+    if (_isAddressSanitizerActive() || _isThreadSanitizerActive()) {
         assert.soon(() => {
-            // On ASAN builds, we never dump the core during hang analyzer runs,
-            // nor should the output be empty (empty means it didn't run).
-            // If you're trying to debug why this test is failing, confirm that the
-            // hang_analyzer_dump_core expansion has not been set to true.
-            return !anyLineMatches(lines, /Dumping core/) && lines.length != 0;
+            // On ASAN/TSAN builds, the processes have a lot of shadow memory that gdb
+            // likes to include in the core dumps. We send a SIGQUIT to the processes
+            // on these builds because the kernel knows how to get rid of the shadow memory.
+            return anyLineMatches(lines, /Sending SIGQUIT/);
         });
     } else {
         assert.soon(() => {

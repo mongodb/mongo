@@ -15,6 +15,7 @@ import platform
 import re
 import signal
 import sys
+import time
 import traceback
 import getpass
 
@@ -116,7 +117,7 @@ class HangAnalyzer(Subcommand):
                 pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)
             ]
             if (os.getenv('ASAN_OPTIONS') or os.getenv('TSAN_OPTIONS')):
-                quit_processes = []
+                quit_processes: list[psutil.Process] = []
                 for pinfo in take_core_processes:
                     for pid in pinfo.pidv:
                         # The mongo signal processing thread needs to be resumed to handle the SIGQUIT.
@@ -131,10 +132,31 @@ class HangAnalyzer(Subcommand):
                         quit_processes.append(quit_process)
                 self.root_logger.info("Waiting for all processes to end after SIGQUIT")
                 assert isinstance(dumpers.dbg, dumper.GDBDumper)
-                _, alive = psutil.wait_procs(quit_processes, timeout=dumpers.dbg.get_timeout_secs())
-                if alive:
-                    raise RuntimeError(
-                        f"The following processes took too long to end after SIGQUIT: {alive}")
+                timeout = dumpers.dbg.get_timeout_secs()
+                start_time = time.time()
+                # Wait until all processes successfully end
+                while True:
+                    alive_processes = []
+                    # This loop filters out processes that have ended or become a zombie
+                    for quit_process in quit_processes:
+                        if quit_process.is_running(
+                        ) and quit_process.status() != psutil.STATUS_ZOMBIE:
+                            alive_processes.append(quit_process)
+
+                    # Update the quit_processes list with only the ones left alive
+                    quit_processes = alive_processes
+
+                    # All the processes have ended
+                    if not alive_processes:
+                        break
+
+                    if time.time() - start_time > timeout:
+                        raise RuntimeError(
+                            f"The following processes took too long to end after SIGQUIT: {alive_processes}"
+                        )
+
+                    time.sleep(.1)
+                self.root_logger.info("Finished waiting for all processes to end.")
             else:
                 for pinfo in take_core_processes:
                     if self._check_enough_free_space():
