@@ -39,12 +39,22 @@ __wt_blkcache_tiered_open(
      * in the local database for awhile. If we're passed a name to open, then by definition it's a
      * local file.
      *
-     * FIXME-WT-7590 we will need some kind of locking while we're looking at the tiered structure.
-     * This can be called at any time, because we are opening the objects lazily.
+     * It is possible for another thread to race with us and increment the current ID field. But
+     * this can't happen in the cases we care about.
      */
     if (uri != NULL)
         objectid = tiered->current_id;
     if (objectid == tiered->current_id) {
+        /*
+         * Assert that we are safe from racing with another thread changing the current ID.
+         *
+         * We only open the newest local file when we are in the process of opening a tiered table,
+         * or if we are opening a new file during a tiered switch. In the latter case we hold the
+         * checkpoint lock, preventing other threads from incrementing the current ID.
+         */
+        WT_ASSERT(session,
+          !F_ISSET(session->dhandle, WT_DHANDLE_OPEN) ||
+            __wt_spin_owned(session, &S2C(session)->checkpoint_lock));
         local_only = true;
         object_uri = tiered->tiers[WT_TIERED_INDEX_LOCAL].name;
         object_name = object_uri;
