@@ -107,7 +107,7 @@ public:
      * in parallel with replication rollback due to concurrent recoverToStableTimestamp(). But
      * untimestamped writes will be retained.
      */
-    void waitForJournalFlush(Interruptible* interruptible = Interruptible::notInterruptible());
+    void waitForJournalFlush();
 
     /**
      * Interrupts the journal flusher thread via its operation context with an
@@ -129,7 +129,7 @@ private:
      * Will throw ErrorCodes::isShutdownError if the flusher thread is being stopped.
      * Will throw InterruptedDueToReplStateChange if a flusher round is interrupted by stepdown.
      */
-    void _waitForJournalFlushNoRetry(Interruptible* interruptible);
+    void _waitForJournalFlushNoRetry();
 
     // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
     mutable Mutex _opCtxMutex = MONGO_MAKE_LATCH("JournalFlusherOpCtxMutex");
