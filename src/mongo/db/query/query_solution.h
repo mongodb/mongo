@@ -1616,7 +1616,10 @@ struct CountScanNode : public QuerySolutionNodeWithSortSet {
 };
 
 struct EofNode : public QuerySolutionNodeWithSortSet {
-    EofNode() {}
+    EofNode() {
+        // We do not generate cache entries for EOF plans.
+        eligibleForPlanCache = false;
+    }
 
     virtual StageType getType() const {
         return STAGE_EOF;
