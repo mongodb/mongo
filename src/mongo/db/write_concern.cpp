@@ -304,13 +304,13 @@ Status waitForWriteConcern(OperationContext* opCtx,
                     result->fsyncFiles = 1;
                 } else {
                     // We only need to commit the journal if we're durable
-                    JournalFlusher::get(opCtx)->waitForJournalFlush(opCtx);
+                    JournalFlusher::get(opCtx)->waitForJournalFlush();
                 }
                 break;
             }
             case WriteConcernOptions::SyncMode::JOURNAL:
                 waitForNoOplogHolesIfNeeded(opCtx);
-                JournalFlusher::get(opCtx)->waitForJournalFlush(opCtx);
+                JournalFlusher::get(opCtx)->waitForJournalFlush();
                 break;
         }
     } catch (const DBException& ex) {
