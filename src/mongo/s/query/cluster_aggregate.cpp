@@ -90,6 +90,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/s/query/cluster_aggregation_planner.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/stdx/unordered_set.h"
@@ -178,6 +179,7 @@ void appendEmptyResultSetWithStatus(OperationContext* opCtx,
     if (status == ErrorCodes::ShardNotFound) {
         status = {ErrorCodes::NamespaceNotFound, status.reason()};
     }
+    collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
     appendEmptyResultSet(opCtx, *result, status, nss);
 }
 
@@ -454,7 +456,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     shouldDoFLERewrite,
                     requiresCollationForParsingUnshardedAggregate);
                 pipeline->validateCommon(false);
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+                LOGV2_DEBUG(8396400,
+                            4,
+                            "Skipping query stats due to NamespaceNotFound",
+                            "status"_attr = ex.toStatus());
                 // ignore redundant NamespaceNotFound errors.
             }
 

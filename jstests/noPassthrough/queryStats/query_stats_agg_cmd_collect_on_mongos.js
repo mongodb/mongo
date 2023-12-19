@@ -5,38 +5,32 @@
 
 import {
     assertExpectedResults,
+    getLatestQueryStatsEntry,
     getQueryStats,
     getQueryStatsAggCmd
 } from "jstests/libs/query_stats_utils.js";
 
-const setup = () => {
-    const st = new ShardingTest({
-        mongos: 1,
-        shards: 1,
-        config: 1,
-        rs: {nodes: 1},
-        mongosOptions: {
-            setParameter: {
-                internalQueryStatsRateLimit: -1,
-                'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
-            }
-        },
-    });
-    const mongos = st.s;
-    const db = mongos.getDB("test");
-    const coll = db.coll;
-    coll.insert({v: 1});
-    coll.insert({v: 4});
-    return st;
-};
+const st = new ShardingTest({
+    mongos: 1,
+    shards: 1,
+    config: 1,
+    rs: {nodes: 1},
+    mongosOptions: {
+        setParameter: {
+            internalQueryStatsRateLimit: -1,
+            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
+        }
+    },
+});
+const mongos = st.s;
+const db = mongos.getDB("test");
 
 // Assert that, for agg queries, no query stats results are written until a cursor has reached
 // exhaustion; ensure accurate results once they're written.
 {
-    const st = setup();
-    const db = st.s.getDB("test");
     const coll = db.coll;
-
+    coll.insert({v: 1});
+    coll.insert({v: 4});
     const queryStatsKey = {
         queryShape: {
             cmdNs: {db: "test", coll: "coll"},
@@ -105,20 +99,18 @@ const setup = () => {
                           /* expectedDocsReturnedMin */ 0,
                           /* expectedDocsReturnedSumOfSq */ 9,
                           /* getMores */ true);
-
-    st.stop();
 }
 
 // Assert on batchSize-limited agg queries that killCursors will write metrics with partial results
 // to the query stats store.
 {
-    const st = setup();
-    const db = st.s.getDB("test");
-    const coll = db.coll;
+    const coll = db.coll2;
+    coll.insert({v: 1});
+    coll.insert({v: 4});
 
     const queryStatsKey = {
         queryShape: {
-            cmdNs: {db: "test", coll: "coll"},
+            cmdNs: {db: "test", coll: "coll2"},
             command: "aggregate",
             pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}]
         },
@@ -139,9 +131,8 @@ const setup = () => {
 
     assert.commandWorked(
         db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
-    const queryStats = getQueryStats(db);
-    assert.eq(1, queryStats.length);
-    assertExpectedResults(queryStats[0],
+    const queryStats = getLatestQueryStatsEntry(db, {collName: coll.getName()});
+    assertExpectedResults(queryStats,
                           queryStatsKey,
                           /* expectedExecCount */ 2,
                           /* expectedDocsReturnedSum */ 2,
@@ -149,5 +140,13 @@ const setup = () => {
                           /* expectedDocsReturnedMin */ 1,
                           /* expectedDocsReturnedSumOfSq */ 2,
                           /* getMores */ false);
-    st.stop();
 }
+
+// SERVER-83964 Test that query stats are collected if the database doesn't exist.
+{
+    const nonExistentDB = db.getSiblingDB("newDB");
+    assert.eq([], nonExistentDB.anything.aggregate([]).toArray());
+    const entry = getLatestQueryStatsEntry(db, {collName: "anything"});
+    assert.neq(null, entry);
+}
+st.stop();

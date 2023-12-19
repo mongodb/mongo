@@ -29,6 +29,7 @@
 
 #include "mongo/s/query/cluster_find.h"
 
+#include "mongo/db/query/query_stats/query_stats.h"
 #include <algorithm>
 #include <boost/optional.hpp>
 #include <chrono>
@@ -630,6 +631,19 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
     return Status::OK();
 }
 
+CursorId earlyExitWithNoResults(OperationContext* opCtx,
+                                const auto& query,
+                                const auto& findCommand) {
+    uassert(CollectionUUIDMismatchInfo(query.nss().dbName(),
+                                       *findCommand.getCollectionUUID(),
+                                       query.nss().coll().toString(),
+                                       boost::none),
+            "Database does not exist",
+            !findCommand.getCollectionUUID());
+    collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+
+    return CursorId(0);
+}
 }  // namespace
 
 const size_t ClusterFind::kMaxRetries = 10;
@@ -680,16 +694,9 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     for (size_t retries = 1; retries <= kMaxRetries; ++retries) {
         auto swCri = getCollectionRoutingInfoForTxnCmd(opCtx, query.nss());
         if (swCri == ErrorCodes::NamespaceNotFound) {
-            uassert(CollectionUUIDMismatchInfo(query.nss().dbName(),
-                                               *findCommand.getCollectionUUID(),
-                                               query.nss().coll().toString(),
-                                               boost::none),
-                    "Database does not exist",
-                    !findCommand.getCollectionUUID());
-
             // If the database doesn't exist, we successfully return an empty result set without
             // creating a cursor.
-            return CursorId(0);
+            return earlyExitWithNoResults(opCtx, query, findCommand);
         }
 
         const auto cri = uassertStatusOK(std::move(swCri));
