@@ -294,10 +294,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
-                      fromjson("{$or: [ {'control.min.a': {$_internalExprLt: 1}},"
-                               "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
-                               "{$type: [ \"$control.max.a\" ]} ]}} ]}"));
+    ASSERT_FALSE(predicate.loosePredicate);
     ASSERT_FALSE(predicate.tightPredicate);
 }
 
@@ -321,10 +318,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
-                      fromjson("{$or: [ {'control.min.a': {$_internalExprLte: 1}},"
-                               "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
-                               "{$type: [ \"$control.max.a\" ]} ]}} ]}"));
+    ASSERT_FALSE(predicate.loosePredicate);
     ASSERT_FALSE(predicate.tightPredicate);
 }
 
