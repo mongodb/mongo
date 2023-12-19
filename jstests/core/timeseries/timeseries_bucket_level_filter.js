@@ -11,6 +11,7 @@
  *   directly_against_shardsvrs_incompatible,
  * ]
  */
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStage, getEngine} from "jstests/libs/analyze_plan.js";
 import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
 
@@ -111,5 +112,41 @@ assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: 42, b: 17}));
         assert.eq(0,
                   fetchStage.nReturned,
                   () => "Expected fetch stage to return 0 rows " + tojson(explain));
+    }
+})();
+
+// Test that filters over data with missing fields yield correct results (this probably means that
+// the bucket-level filters couldn't be applied, but we don't care to check the plan as long as the
+// results are correct).
+(function testWithMissingField() {
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+
+    // These two events will be inserted into the same bucket.
+    const event = {_id: 0, t: new Date(), m: 0, x: "abc"};
+    const event_with_missing = {_id: 0, t: new Date(), m: 0};
+    coll.insertMany([event, event_with_missing]);
+
+    const testCases = [
+        // Explicit comparison for null should find missing.
+        {pipeline: [{$match: {x: null}}], expectedResult: [event_with_missing]},
+
+        // Type-bracketing comparison.
+        {pipeline: [{$match: {x: {$lt: "aaa"}}}], expectedResult: []},
+        {pipeline: [{$match: {x: {$lte: 10}}}], expectedResult: []},
+
+        // In non-type-bracketing comparison (inside $expr): missing == null < number < string
+        {pipeline: [{$match: {$expr: {$lt: ["$x", "aaa"]}}}], expectedResult: [event_with_missing]},
+        {pipeline: [{$match: {$expr: {$lte: ["$x", 10]}}}], expectedResult: [event_with_missing]},
+    ];
+
+    for (const test of testCases) {
+        assertArrayEq({
+            expected: test.expectedResult,
+            actual: coll.aggregate(test.pipeline).toArray(),
+            extraErrorMsg: ` result of $match over data with missing field. Explain: ${
+                tojson(coll.explain().aggregate(test.pipeline))}`
+        });
     }
 })();

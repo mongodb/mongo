@@ -549,6 +549,8 @@ last-continuous:
     ticket: SERVER-83685
   - test_file: jstests/noPassthroughWithMongod/lookup_with_limit.js
     ticket: SERVER-83685
+  - test_file: jstests/core/timeseries/timeseries_bucket_level_filter.js
+    ticket: SERVER-84130
   suites: null
 last-lts:
   all:
@@ -1156,4 +1158,6 @@ last-lts:
     ticket: SERVER-83685
   - test_file: jstests/noPassthroughWithMongod/lookup_with_limit.js
     ticket: SERVER-83685
+  - test_file: jstests/core/timeseries/timeseries_bucket_level_filter.js
+    ticket: SERVER-84130
   suites: null
