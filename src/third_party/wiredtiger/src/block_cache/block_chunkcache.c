@@ -235,7 +235,6 @@ __name_in_pinned_list(WT_SESSION_IMPL *session, const char *name)
     bool found;
 
     chunkcache = &S2C(session)->chunkcache;
-    found = false;
 
     __wt_readlock(session, &chunkcache->pinned_objects.array_lock);
     WT_BINARY_SEARCH_STRING(
@@ -1078,6 +1077,8 @@ __wt_chunkcache_reconfig(WT_SESSION_IMPL *session, const char **cfg)
     if ((ret = __wt_config_gets(session, cfg + 1, "chunk_cache", &cval)) == WT_NOTFOUND)
         return (0);
 
+    WT_RET(ret);
+
     if (!F_ISSET(chunkcache, WT_CHUNKCACHE_CONFIGURED))
         WT_RET_MSG(
           session, EINVAL, "chunk cache reconfigure requested, but cache has not been configured");
@@ -1140,6 +1141,7 @@ __wt_chunkcache_create_from_metadata(WT_SESSION_IMPL *session, const char *name,
     uint64_t bucket_id;
 
     chunkcache = &S2C(session)->chunkcache;
+    newchunk = NULL;
 
     if (!F_ISSET(chunkcache, WT_CHUNKCACHE_CONFIGURED))
         return (0);
