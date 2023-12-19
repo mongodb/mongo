@@ -83,7 +83,79 @@ struct ScanCallbacks {
 };
 
 /**
- * Retrieves documents from the collection with the given 'collectionUuid' using the storage API.
+ * Contains static state info that can be shared across all cloned copies of a ScanStage.
+ */
+class ScanStageState {
+public:
+    ScanStageState(UUID inCollUuid,
+                   boost::optional<value::SlotId> inRecordSlot,
+                   boost::optional<value::SlotId> inRecordIdSlot,
+                   boost::optional<value::SlotId> inSnapshotIdSlot,
+                   boost::optional<value::SlotId> inIndexIdentSlot,
+                   boost::optional<value::SlotId> inIndexKeySlot,
+                   boost::optional<value::SlotId> inIndexKeyPatternSlot,
+                   boost::optional<value::SlotId> inOplogTsSlot,
+                   std::vector<std::string> inScanFieldNames,
+                   value::SlotVector inScanFieldSlots,
+                   boost::optional<value::SlotId> inSeekRecordIdSlot,
+                   boost::optional<value::SlotId> inMinRecordIdSlot,
+                   boost::optional<value::SlotId> inMaxRecordIdSlot,
+                   bool inForward,
+                   ScanCallbacks inScanCallbacks,
+                   bool inUseRandomCursor)
+        : collUuid(inCollUuid),
+          recordSlot(inRecordSlot),
+          recordIdSlot(inRecordIdSlot),
+          snapshotIdSlot(inSnapshotIdSlot),
+          indexIdentSlot(inIndexIdentSlot),
+          indexKeySlot(inIndexKeySlot),
+          indexKeyPatternSlot(inIndexKeyPatternSlot),
+          oplogTsSlot(inOplogTsSlot),
+          scanFieldNames(inScanFieldNames),
+          scanFieldSlots(inScanFieldSlots),
+          seekRecordIdSlot(inSeekRecordIdSlot),
+          minRecordIdSlot(inMinRecordIdSlot),
+          maxRecordIdSlot(inMaxRecordIdSlot),
+          forward(inForward),
+          scanCallbacks(inScanCallbacks),
+          useRandomCursor(inUseRandomCursor) {
+        invariant(scanFieldNames.size() == scanFieldSlots.size());
+    }
+
+    inline size_t getNumScanFields() {
+        return scanFieldNames.size();
+    }
+
+    const UUID collUuid;
+
+    const boost::optional<value::SlotId> recordSlot;
+    const boost::optional<value::SlotId> recordIdSlot;
+    const boost::optional<value::SlotId> snapshotIdSlot;
+    const boost::optional<value::SlotId> indexIdentSlot;
+    const boost::optional<value::SlotId> indexKeySlot;
+    const boost::optional<value::SlotId> indexKeyPatternSlot;
+    const boost::optional<value::SlotId> oplogTsSlot;
+
+    // 'scanFieldNames' - names of the fields being scanned from the doc
+    // 'scanFieldSlots' - slot IDs for the fields being scanned from the doc
+    const StringListSet scanFieldNames;
+    const value::SlotVector scanFieldSlots;
+
+    const boost::optional<value::SlotId> seekRecordIdSlot;
+    const boost::optional<value::SlotId> minRecordIdSlot;
+    const boost::optional<value::SlotId> maxRecordIdSlot;
+
+    // Tells if this is a forward (as opposed to reverse) scan.
+    const bool forward;
+
+    const ScanCallbacks scanCallbacks;
+
+    // Used to return a random sample of the collection.
+    const bool useRandomCursor;
+};  // class ScanStageState
+
+/**
+ * Retrieves documents from the collection with the given 'collUuid' using the storage API.
  *
  * Iff resuming a prior scan, this stage is given a 'seekRecordIdSlot' from which to read a
  * 'RecordId'. We seek to this 'RecordId' before resuming the scan. 'stageType' is set to "seek"
@@ -117,15 +189,18 @@ struct ScanCallbacks {
  *
  *  scan recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
  *       indexKeyPatternSlot? minRecordIdSlot? maxRecordIdSlot? [slot1 = fieldName1, ...
- *       slot_n = fieldName_n] collectionUuid forward needOplogSlotForTs
+ *       slot_n = fieldName_n] collUuid forward needOplogSlotForTs
  *
  *  seek seekKeySlot recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
  *       indexKeyPatternSlot? minRecordIdSlot? maxRecordIdSlot? [slot1 = fieldName1, ...
- *       slot_n = fieldName_n] collectionUuid forward needOplogSlotForTs
+ *       slot_n = fieldName_n] collUuid forward needOplogSlotForTs
  */
 class ScanStage final : public PlanStage {
 public:
-    ScanStage(UUID collectionUuid,
+    /**
+     * Regular constructor. Initializes static '_state' managed by a shared_ptr.
+     */
+    ScanStage(UUID collUuid,
               boost::optional<value::SlotId> recordSlot,
               boost::optional<value::SlotId> recordIdSlot,
               boost::optional<value::SlotId> snapshotIdSlot,
@@ -142,11 +217,23 @@ public:
               PlanYieldPolicy* yieldPolicy,
               PlanNodeId nodeId,
               ScanCallbacks scanCallbacks,
+              // Optional arguments:
               bool lowPriority = false,
               bool useRandomCursor = false,
               bool participateInTrialRunTracking = true,
               bool includeScanStartRecordId = true,
               bool includeScanEndRecordId = true);
+
+    /**
+     * Constructor for clone(). Copies '_state' shared_ptr.
+     */
+    ScanStage(const std::shared_ptr<ScanStageState>& state,
+              PlanYieldPolicy* yieldPolicy,
+              PlanNodeId nodeId,
+              bool lowPriority,
+              bool participateInTrialRunTracking,
+              bool includeScanStartRecordId,
+              bool includeScanEndRecordId);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -193,38 +280,14 @@ private:
 
     MONGO_COMPILER_ALWAYS_INLINE
     value::OwnedValueAccessor* getFieldAccessor(StringData name) {
-        if (size_t pos = _scanFieldNames.findPos(name); pos != StringListSet::npos) {
+        if (size_t pos = _state->scanFieldNames.findPos(name); pos != StringListSet::npos) {
             return &_scanFieldAccessors[pos];
         }
         return nullptr;
     }
 
-    const boost::optional<value::SlotId> _recordSlot;
-    const boost::optional<value::SlotId> _recordIdSlot;
-    const boost::optional<value::SlotId> _snapshotIdSlot;
-    const boost::optional<value::SlotId> _indexIdentSlot;
-    const boost::optional<value::SlotId> _indexKeySlot;
-    const boost::optional<value::SlotId> _indexKeyPatternSlot;
-    const boost::optional<value::SlotId> _oplogTsSlot;
-
-    // '_scanFieldNames' - names of the fields being scanned from the doc
-    // '_scanFieldSlots' - slot IDs corresponding, by index, to _scanFieldAccessors
-    const StringListSet _scanFieldNames;
-    const value::SlotVector _scanFieldSlots;
-
-    const boost::optional<value::SlotId> _seekRecordIdSlot;
-    const boost::optional<value::SlotId> _minRecordIdSlot;
-    const boost::optional<value::SlotId> _maxRecordIdSlot;
-
-    // Tells if this is a forward (as opposed to reverse) scan.
-    const bool _forward;
-
-    // Used to return a random sample of the collection.
-    const bool _useRandomCursor;
-
-    const UUID _collUuid;
-
-    const ScanCallbacks _scanCallbacks;
+    // Contains unchanging state that will be shared across clones instead of copied.
+    const std::shared_ptr<ScanStageState> _state;
 
     // Holds the current record.
     value::OwnedValueAccessor _recordAccessor;
@@ -248,7 +311,7 @@ private:
     value::SlotAccessor* _tsFieldAccessor{nullptr};
 
     // These members hold info about the target fields being scanned from the record.
-    //     '_scanFieldAccessors' - slot accessors corresponding, by index, to _scanFieldNames
+    //     '_scanFieldAccessors' - slot accessors corresponding, by index, to _state->scanFieldNames
     //     '_scanFieldAccessorsMap' - a map from vector index to pointer to the corresponding
     //         accessor in '_scanFieldAccessors'
     absl::InlinedVector<value::OwnedValueAccessor, 4> _scanFieldAccessors;
@@ -311,7 +374,7 @@ private:
     // saves/restores this is used to check that the storage cursor has not changed position.
     std::vector<char> _lastReturned;
 #endif
-};
+};  // class ScanStage
 
 class ParallelScanStage final : public PlanStage {
     struct Range {
@@ -325,7 +388,7 @@ class ParallelScanStage final : public PlanStage {
     };
 
 public:
-    ParallelScanStage(UUID collectionUuid,
+    ParallelScanStage(UUID collUuid,
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       boost::optional<value::SlotId> snapshotIdSlot,
@@ -337,10 +400,11 @@ public:
                       PlanYieldPolicy* yieldPolicy,
                       PlanNodeId nodeId,
                       ScanCallbacks callbacks,
+                      // Optional arguments:
                       bool participateInTrialRunTracking = true);
 
     ParallelScanStage(const std::shared_ptr<ParallelState>& state,
-                      const UUID& collectionUuid,
+                      UUID collUuid,
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       boost::optional<value::SlotId> snapshotIdSlot,
@@ -352,6 +416,7 @@ public:
                       PlanYieldPolicy* yieldPolicy,
                       PlanNodeId nodeId,
                       ScanCallbacks callbacks,
+                      // Optional arguments:
                       bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -384,6 +449,10 @@ private:
 
     value::OwnedValueAccessor* getFieldAccessor(StringData name);
 
+    const std::shared_ptr<ParallelState> _state;
+
+    const UUID _collUuid;
+
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;
@@ -395,8 +464,6 @@ private:
     // '_scanFieldSlots' - slot IDs corresponding, by index, to _scanFieldAccessors
     const StringListSet _scanFieldNames;
     const value::SlotVector _scanFieldSlots;
-
-    const UUID _collUuid;
 
     const ScanCallbacks _scanCallbacks;
 
@@ -421,8 +488,6 @@ private:
 
     CollectionRef _coll;
 
-    std::shared_ptr<ParallelState> _state;
-
     size_t _currentRange{std::numeric_limits<std::size_t>::max()};
     Range _range;
 
@@ -437,6 +502,6 @@ private:
     // saves/restores this is used to check that the storage cursor has not changed position.
     std::vector<char> _lastReturned;
 #endif
-};
+};  // class ParallelScanStage
 }  // namespace sbe
 }  // namespace mongo
