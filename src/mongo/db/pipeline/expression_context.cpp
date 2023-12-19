@@ -423,8 +423,21 @@ void ExpressionContext::throwIfFeatureFlagIsNotEnabledOnFCV(
         return;
     }
 
-    const auto version = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-    auto versionToCheck = maxFeatureCompatibilityVersion ? maxFeatureCompatibilityVersion : version;
+    // If the FCV is not initialized yet, we check whether the feature flag is enabled on the last
+    // LTS FCV, which is the lowest FCV we can have on this server. If the FCV is set, then we
+    // should check if the flag is enabled on maxFeatureCompatibilityVersion or the current FCV. If
+    // both the FCV is uninitialized and maxFeatureCompatibilityVersion is set, to be safe, we
+    // should check the lowest FCV. We are guaranteed that maxFeatureCompatibilityVersion will
+    // always be greater than or equal to the last LTS. So we will check the last LTS.
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    mongo::multiversion::FeatureCompatibilityVersion versionToCheck = fcv.getVersion();
+    if (!fcv.isVersionInitialized()) {
+        // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+        versionToCheck = multiversion::GenericFCV::kLastLTS;
+    } else if (maxFeatureCompatibilityVersion) {
+        versionToCheck = *maxFeatureCompatibilityVersion;
+    }
+
     uassert(ErrorCodes::QueryFeatureNotAllowed,
             // We would like to include the current version and the required minimum version in this
             // error message, but using FeatureCompatibilityVersion::toString() would introduce a
@@ -433,7 +446,7 @@ void ExpressionContext::throwIfFeatureFlagIsNotEnabledOnFCV(
                           << " is not allowed in the current feature compatibility version. See "
                           << feature_compatibility_version_documentation::kCompatibilityLink
                           << " for more information.",
-            flag->isEnabledOnVersion(*versionToCheck));
+            flag->isEnabledOnVersion(versionToCheck));
 }
 
 }  // namespace mongo

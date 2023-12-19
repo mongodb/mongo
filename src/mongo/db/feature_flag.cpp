@@ -128,6 +128,10 @@ bool FeatureFlag::isEnabledAndIgnoreFCVUnsafe() const {
 }
 
 bool FeatureFlag::isEnabledOnVersion(multiversion::FeatureCompatibilityVersion targetFCV) const {
+    if (!_shouldBeFCVGated) {
+        return _enabled;
+    }
+
     if (!_enabled) {
         return false;
     }
