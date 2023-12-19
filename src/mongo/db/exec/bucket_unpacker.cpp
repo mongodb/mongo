@@ -219,8 +219,10 @@ std::unique_ptr<MatchExpression> createTypeEqualityPredicate(
     return makeOr(std::move(typeEqualityPredicates));
 }
 
-boost::optional<StringData> checkComparisonPredicateErrors(
-    const MatchExpression* matchExpr,
+// Checks for the situations when it's not possible to create a bucket-level predicate (against the
+// computed control values) for the given event-level predicate ('matchExpr').
+boost::optional<StringData> checkComparisonPredicateEligibility(
+    const ComparisonMatchExpressionBase* matchExpr,
     const StringData matchExprPath,
     const BSONElement& matchExprData,
     const BucketSpec& bucketSpec,
@@ -232,12 +234,27 @@ boost::optional<StringData> checkComparisonPredicateErrors(
     if (matchExprData.type() == BSONType::Object || matchExprData.type() == BSONType::Array)
         return "operand can't be an object or array"_sd;
 
-    // MatchExpressions have special comparison semantics regarding null, in that {$eq: null} will
-    // match all documents where the field is either null or missing. Because this is different
-    // from both the comparison semantics that InternalExprComparison expressions and the control's
-    // min and max fields use, we will not perform this optimization on queries with null operands.
+    const auto isTimeField = (matchExprPath == bucketSpec.timeField());
+
+    // A bucket might contain events with the missing fields. These events aren't taken in account
+    // when computing the control values for those fields. This design has two repercussions:
+    // 1. MatchExpressions have special comparison semantics regarding null, in that {$eq: null}
+    //    will match all documents where the field is either null or missing. This semantics cannot
+    //    be represented in terms of comparisons against the min/max control values.
+    // 2. Non-type-bracketing predicates, such as {$expr: {$lt(e): ['$x', 42]}} should evaluate to
+    //    "true" if "x" is missing, which also cannot be represented as a bucket-level predicate.
+    //    1) time field cannot be empty.
+    //    2) the only type less than null is MinKey, which is internal, so we don't need to guard
+    //       GT and GTE.
+    //    3) for the buckets that might have mixed schema data, we'll compare the types of min and
+    //       max when _creating_ the bucket-level predicate (that check won't help with missing).
     if (matchExprData.type() == BSONType::jstNULL)
-        return "can't handle {$eq: null}"_sd;
+        return "can't handle comparison to null"_sd;
+    if (!isTimeField &&
+        (matchExpr->matchType() == MatchExpression::INTERNAL_EXPR_LTE ||
+         matchExpr->matchType() == MatchExpression::INTERNAL_EXPR_LT)) {
+        return "can't handle a non-type-bracketing LT or LTE comparisons"_sd;
+    }
 
     // The control field's min and max are chosen based on the collation of the collection. If the
     // query's collation does not match the collection's collation and the query operand is a
@@ -267,11 +284,11 @@ boost::optional<StringData> checkComparisonPredicateErrors(
         return "can't handle a field removed by projection"_sd;
     }
 
-    const auto isTimeField = (matchExprPath == bucketSpec.timeField());
     if (isTimeField && matchExprData.type() != BSONType::Date) {
-        // Users are not allowed to insert non-date measurements into time field. So this query
-        // would not match anything. We do not need to optimize for this case.
-        return "This predicate will never be true, because the time field always contains a Date"_sd;
+        // TODO SERVER-84207: right now we will end up unpacking everything and applying the event
+        // filter, which indeed would be either trivially true or trivially false but it won't be
+        // optimized away.
+        return "can't handle comparison of time field to a non-Date type"_sd;
     }
 
     return boost::none;
@@ -291,7 +308,7 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
     const auto matchExprPath = matchExpr->path();
     const auto matchExprData = matchExpr->getData();
 
-    const auto error = checkComparisonPredicateErrors(
+    const auto error = checkComparisonPredicateEligibility(
         matchExpr, matchExprPath, matchExprData, bucketSpec, collationMatchesDefault);
     if (error) {
         return handleIneligible(policy, matchExpr, *error).loosePredicate;
@@ -563,7 +580,7 @@ std::unique_ptr<MatchExpression> createTightComparisonPredicate(
     const auto matchExprPath = matchExpr->path();
     const auto matchExprData = matchExpr->getData();
 
-    const auto error = checkComparisonPredicateErrors(
+    const auto error = checkComparisonPredicateEligibility(
         matchExpr, matchExprPath, matchExprData, bucketSpec, collationMatchesDefault);
     if (error) {
         return handleIneligible(BucketSpec::IneligiblePredicatePolicy::kIgnore, matchExpr, *error)
