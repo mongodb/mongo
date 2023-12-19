@@ -124,6 +124,9 @@ selector:
   - jstests/core/txns/create_indexes_parallel.js
   - jstests/core/txns/commands_in_txns_read_concern.js
 
+  # Will fail all commands including those needed to forward command to initial sync node.
+  - jstests/core/failcommand_failpoint.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos

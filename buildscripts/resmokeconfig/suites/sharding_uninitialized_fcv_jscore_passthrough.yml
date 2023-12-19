@@ -86,6 +86,9 @@ selector:
   # Uses hangAfterCollectionInserts failpoint not available on mongos.
   - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 
+  # Will fail all commands including those needed to forward command to initial sync node.
+  - jstests/core/failcommand_failpoint.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos

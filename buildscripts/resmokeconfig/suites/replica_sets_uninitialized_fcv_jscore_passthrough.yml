@@ -39,6 +39,9 @@ selector:
   # Change stream pre-images are not cloned during initial sync.
   - jstests/core/**/write_change_stream_pit_preimage.js
 
+  # Will fail all commands including those needed to forward command to initial sync node.
+  - jstests/core/failcommand_failpoint.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
 

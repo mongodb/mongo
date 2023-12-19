@@ -10,7 +10,7 @@ function getConn(connStr) {
         return new Mongo(connStr);
     } catch (exp) {
         jsTest.log('Unable to connect to ' + connStr + ": " + tojson(exp));
-        return null;
+        throw exp;
     }
 }
 
@@ -28,10 +28,11 @@ function sendCommandToInitialSyncNodeInReplSet(
                     jsTestLog("Attempting to forward command to " + rsType +
                               " initial sync node: " + _commandName);
                     func.apply(initialSyncConn, makeFuncArgs(commandObj));
-                    initialSyncConn.close();
                 } catch (exp) {
                     jsTest.log("Unable to apply command " + _commandName + ": " +
                                tojson(commandObj) + " on initial sync node: " + tojson(exp));
+                } finally {
+                    initialSyncConn.close();
                 }
             }
         }
@@ -60,13 +61,7 @@ function maybeSendCommandToInitialSyncNodes(
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
-    let topology;
-    try {
-        topology = DiscoverTopology.findConnectedNodes(conn);
-    } catch (exp) {
-        jsTestLog("Unable to run findConnectedNodes: " + tojson(exp))
-        return func.apply(conn, makeFuncArgs(commandObj));
-    }
+    const topology = DiscoverTopology.findConnectedNodes(conn);
 
     // Find initial sync nodes to send command to.
     if (topology.type == Topology.kReplicaSet) {
@@ -76,16 +71,38 @@ function maybeSendCommandToInitialSyncNodes(
         for (let [shardName, shard] of Object.entries(topology.shards)) {
             if (shard.type == Topology.kReplicaSet) {
                 const shardPrimaryConn = getConn(shard.primary);
-                sendCommandToInitialSyncNodeInReplSet(
-                    shardPrimaryConn, _commandName, commandObj, func, makeFuncArgs, shardName);
-                shardPrimaryConn.close();
+                if (shardPrimaryConn != null) {
+                    try {
+                        sendCommandToInitialSyncNodeInReplSet(shardPrimaryConn,
+                                                              _commandName,
+                                                              commandObj,
+                                                              func,
+                                                              makeFuncArgs,
+                                                              shardName);
+                    } catch (exp) {
+                        jsTest.log("Unable to apply command " + _commandName + ": " +
+                                   tojson(commandObj) + " on " + shardName +
+                                   " initial sync node: " + tojson(exp));
+                    } finally {
+                        shardPrimaryConn.close();
+                    }
+                }
             }
         }
         if (topology.configsvr.type == Topology.kReplicaSet) {
             const configConn = getConn(topology.configsvr.primary);
-            sendCommandToInitialSyncNodeInReplSet(
-                configConn, _commandName, commandObj, func, makeFuncArgs, "config server");
-            configConn.close();
+            if (configConn != null) {
+                try {
+                    sendCommandToInitialSyncNodeInReplSet(
+                        configConn, _commandName, commandObj, func, makeFuncArgs, "config server");
+                } catch (exp) {
+                    jsTest.log("Unable to apply command " + _commandName + ": " +
+                               tojson(commandObj) + " on config initial sync node: " + tojson(exp));
+
+                } finally {
+                    configConn.close();
+                }
+            }
         }
     }
 
