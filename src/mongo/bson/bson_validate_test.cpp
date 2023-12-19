@@ -977,6 +977,24 @@ TEST(BSONValidateColumn, BSONColumnMissingEOO) {
               ErrorCodes::InvalidBSON);
 }
 
+TEST(BSONValidateColumn, BSONColumnFieldnameNotEmpty) {
+    BSONColumnBuilder cb;
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    BSONBinData columnData = cb.finalize();
+    ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+
+    char buf[1024];
+    buf[0] = ((const char*)columnData.data)[0];
+    buf[1] = 'f';
+    buf[2] = 'o';
+    buf[3] = 'o';
+    memcpy(buf + 4, ((const char*)columnData.data) + 1, columnData.length - 1);
+
+    ASSERT_EQ(validateBSONColumn(buf, columnData.length + 3).code(), ErrorCodes::NonConformantBSON);
+}
+
 TEST(BSONValidateColumn, BSONColumnNoOverflowMissingAllEOOInColumn) {
     BSONColumnBuilder cb;
     cb.append(BSON("a"

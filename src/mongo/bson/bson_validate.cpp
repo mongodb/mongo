@@ -436,13 +436,18 @@ public:
 
     /* Assumes the root level is a single literal element (which may contain nested objects).
      * Only validates up to the termination of that first literal, more data is permitted to
-       remain in the buffer after that and is not validated. Throws exception on invalid data*/
+     * remain in the buffer after that and is not validated. Throws exception on invalid data.
+     * Confirm field names for literals in BSONColumn have empty field names.
+     */
     int validateAndMeasureElem() {
         setupValidation();
         uassert(InvalidBSON,
                 "BSON literal is not followed by fieldname",
                 _maxLength > 1);  // must at least have a 0-terminator after control
-        size_t fieldNameSize = strnlen(_data + 1 /* skip type */, _maxLength - 1) + 1;
+        // Confirm fieldName is just a null terminator
+        uassert(NonConformantBSON,
+                "BSON literal content does not have an empty fieldname",
+                _maxLength > 1 && _data[1] == 0);
 
         // Handle one element without using iterative loop, and without expecting
         // multiple instances or an EOO.  Only resume with the iterative loop if
@@ -450,15 +455,13 @@ public:
 
         // Save pointer to currFrame->end so we can fill it in once we know the size
         const char** preEnd = &(_currFrame->end);
-        const char* ptr =
-            _validateElem(Cursor{_data + 1 + fieldNameSize, _data + _maxLength}, *_data);
-        _validator.checkNonConformantElem(_data, 1 + fieldNameSize, *_data);
+        const char* ptr = _validateElem(Cursor{_data + 2, _data + _maxLength}, *_data);
+        _validator.checkNonConformantElem(_data, 2, *_data);
 
         if (_currFrame != _frames.begin()) {
             // We know that type was kObject or kArray, so size is fieldname, type,
             // and a stored int
-            int size = 1 + fieldNameSize +
-                ConstDataView(_data + fieldNameSize + 1).read<LittleEndian<int32_t>>();
+            int size = 2 + ConstDataView(_data + 2).read<LittleEndian<int32_t>>();
             uassert(InvalidBSON,
                     "BSON literal content exceeds buffer size",
                     (size_t)size <= _maxLength);
