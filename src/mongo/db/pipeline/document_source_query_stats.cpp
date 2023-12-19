@@ -226,7 +226,6 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
 boost::optional<Document> DocumentSourceQueryStats::toDocument(
     const Date_t& partitionReadTime, const QueryStatsEntry& queryStatsEntry) const {
     const auto& key = queryStatsEntry.key;
-    const auto& hash = absl::HashOf(key);
     try {
         auto queryStatsKey = computeQueryStatsKey(key, SerializationContext::stateDefault());
         return Document{
@@ -237,6 +236,7 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
             {"asOf", partitionReadTime}};
     } catch (const DBException& ex) {
         queryStatsHmacApplicationErrors.increment();
+        const auto& hash = absl::HashOf(key);
         const auto queryShape = key->universalComponents()._queryShape->toBson(
             pExpCtx->opCtx,
             SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
