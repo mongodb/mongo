@@ -747,6 +747,11 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
         return false;
     }
 
+    if (toSize >= idealDataSizePerShardForZone) {
+        // Do not use a shard if it already has more data than the ideal per-shard size
+        return false;
+    }
+
     if (fromSize - toSize < 3 * collDataSizeInfo.maxChunkSizeBytes) {
         // Do not balance if the collection's size differs too few between the chosen shards
         return false;

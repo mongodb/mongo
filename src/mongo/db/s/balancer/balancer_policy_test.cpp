@@ -337,11 +337,15 @@ TEST(BalancerPolicy, ParallelBalancing) {
     ASSERT_BSONOBJ_EQ(cluster.second[getShardId(1)][0].getMin(), migrations[1].minKey);
 }
 
-TEST(BalancerPolicy, ParallelBalancingDoesNotScheduleMigrationsOnShardsAboveTheThreshold) {
+TEST(BalancerPolicy, ParallelBalancingDoesNotScheduleMigrationsOnShardsAboveIdealDataSize) {
+    // TotalDataSize = (360 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes)
+    // NumShards = 6
+    // IdealDataSize = TotalDataSize / NumShards = 60
+    // No migration must be scheduled for shards owning am amount greater or equal than 60
     auto [cluster, cm] = generateCluster({{100, 100 * kDefaultMaxChunkSizeBytes},
                                           {90, 90 * kDefaultMaxChunkSizeBytes},
                                           {90, 90 * kDefaultMaxChunkSizeBytes},
-                                          {89, 89 * kDefaultMaxChunkSizeBytes},
+                                          {80, 80 * kDefaultMaxChunkSizeBytes},
                                           {0, 0 * kDefaultMaxChunkSizeBytes},
                                           {0, 0 * kDefaultMaxChunkSizeBytes}});
 
