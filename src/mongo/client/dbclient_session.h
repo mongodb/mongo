@@ -83,12 +83,12 @@ struct RemoteCommandResponse;
 class DBClientCursor;
 
 /**
- *  A handle to a remote database server backed by an individual transport::Session.
- *  This is the main entry point for talking to a simple Mongo setup.
+ * A handle to a remote database server backed by an individual transport::Session.
+ * This is the main entry point for talking to a simple Mongo setup.
  *
- *  In general, this type is only allowed to be used from one thread at a time. As a special
- *  exception, it is legal to call shutdownAndDisallowReconnect() from any thread as a way to
- *  interrupt the owning thread.
+ * In general, this type is only allowed to be used from one thread at a time. As a special
+ * exception, it is legal to call shutdown() or shutdownAndDisallowReconnect() from any thread as a
+ * way to interrupt the owning thread.
  */
 class DBClientSession : public DBClientBase {
 public:
@@ -156,8 +156,6 @@ public:
     /**
      * Causes an error to be reported the next time the client is used. Will interrupt
      * operations if they are currently blocked waiting for the network.
-     *
-     * This is the only method that is allowed to be called from other threads.
      */
     virtual void shutdownAndDisallowReconnect();
 
@@ -255,22 +253,16 @@ protected:
         kSetFlag,
 
         /**
-         * End the session after marking the client failed.
-         */
-        kEndSession,
-
-        /**
          * Release ownership of the session, possibly triggering its destruction.
          * This will acquire the session lock.
          */
         kReleaseSession,
 
         /**
-         * Shut the session down.
-         * This potentially differs from simply ending the session, since it may involve cleanup
-         * specific to the type of session being shut down.
+         * Mark the client failed and terminate the session, interrupting any in-progress reads or
+         * writes.
          */
-        kShutdownSession
+        kKillSession
     };
     void _markFailed(FailAction action);
 
@@ -306,7 +298,7 @@ private:
         Milliseconds timeout,
         boost::optional<TransientSSLParams> transientSSLParams = boost::none) = 0;
     virtual void _ensureSession() = 0;
-    virtual void _shutdownSession() = 0;
+    virtual void _killSession() = 0;
 
     // Hook that is run on every call to connect()
     HandshakeValidationHook _hook;

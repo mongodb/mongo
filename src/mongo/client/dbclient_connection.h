@@ -142,7 +142,7 @@ private:
         Milliseconds timeout,
         boost::optional<TransientSSLParams> transientSSLParams = boost::none) override;
     void _ensureSession() override;
-    void _shutdownSession() override;
+    void _killSession() override;
 
     /**
      * Inspects the contents of 'replyBody' and informs the replica set monitor that the host 'this'

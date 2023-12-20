@@ -87,14 +87,14 @@ transport::grpc::EgressSession* DBClientGRPCStream::_getSession() {
     return egressSession;
 }
 
-void DBClientGRPCStream::_shutdownSession() {
+void DBClientGRPCStream::_killSession() {
     transport::grpc::EgressSession* session = _getSession();
     if (!session) {
         return;
     }
 
     session->cancel(Status(ErrorCodes::CallbackCanceled,
-                           "Client is disconnecting, shutting down the underlying session."));
+                           "Client is disconnecting, cancelling the outstanding RPC"));
 }
 
 int DBClientGRPCStream::getMinWireVersion() {

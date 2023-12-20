@@ -92,7 +92,6 @@ TEST_F(GRPCClientTest, GRPCClientConnect) {
             for (auto& addr : server->getListeningAddresses()) {
                 auto session =
                     client->connect(addr, CommandServiceTestFixtures::kDefaultConnectTimeout, {});
-                ON_BLOCK_EXIT([&] { session->end(); });
                 ASSERT_TRUE(session->isConnected());
 
                 OpMsg msg;
@@ -104,6 +103,7 @@ TEST_F(GRPCClientTest, GRPCClientConnect) {
                 ASSERT_OK(serverResponse) << "could not read response from " << addr.toString()
                                           << ": " << session->finish().toString();
                 ASSERT_EQ_MSG(serverResponse.getValue(), serialized);
+                ASSERT_OK(session->finish());
             }
         }
     };
@@ -204,7 +204,10 @@ TEST_F(GRPCClientTest, GRPCClientShutdown) {
     Notification<void> rpcsFinished;
 
     auto serverHandler = [&](std::shared_ptr<IngressSession> session) {
-        ASSERT_EQ(session->sourceMessage().getStatus().code(), ErrorCodes::StreamTerminated);
+        const auto status = session->sourceMessage().getStatus().code();
+        ASSERT_EQ(status, ErrorCodes::CallbackCanceled);
+        ASSERT_TRUE(session->terminationStatus().has_value());
+        ASSERT_EQ(*session->terminationStatus(), status);
         ASSERT_FALSE(session->isConnected());
 
         if (numRpcsRemaining.subtractAndFetch(1) == 0) {

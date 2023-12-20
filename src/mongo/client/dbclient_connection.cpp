@@ -184,7 +184,7 @@ rpc::UniqueReply DBClientConnection::parseCommandReplyMessage(const std::string&
         return DBClientBase::parseCommandReplyMessage(host, replyMsg);
     } catch (const DBException& ex) {
         if (ErrorCodes::isConnectionFatalMessageParseError(ex.code())) {
-            _markFailed(kEndSession);
+            _markFailed(kKillSession);
         }
         throw;
     }
@@ -231,7 +231,7 @@ void DBClientConnection::_ensureSession() {
     }
 }
 
-void DBClientConnection::_shutdownSession() {
+void DBClientConnection::_killSession() {
     if (!_session) {
         return;
     }

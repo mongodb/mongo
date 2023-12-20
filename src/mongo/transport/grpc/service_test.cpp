@@ -232,29 +232,21 @@ private:
 };
 
 TEST_F(CommandServiceTest, Echo) {
-    CommandService::RPCHandler echoHandler = [](auto session) {
-        while (true) {
-            try {
-                auto msg = uassertStatusOK(session->sourceMessage());
-                ASSERT_OK(session->sinkMessage(std::move(msg)));
-            } catch (ExceptionFor<ErrorCodes::StreamTerminated>&) {
-                // Continues to serve the echo commands until the stream is terminated.
-                return;
-            }
-        }
-    };
+    runTestWithBothMethods(CommandServiceTestFixtures::makeEchoHandler(),
+                           [&](auto&, auto stub, auto streamFactory, auto&) {
+                               ::grpc::ClientContext ctx;
+                               CommandServiceTestFixtures::addAllClientMetadata(ctx);
 
-    runTestWithBothMethods(echoHandler, [&](auto&, auto stub, auto streamFactory, auto&) {
-        ::grpc::ClientContext ctx;
-        CommandServiceTestFixtures::addAllClientMetadata(ctx);
-
-        auto stream = streamFactory(ctx, stub);
-        auto toWrite = makeUniqueMessage();
-        ASSERT_TRUE(stream->Write(toWrite.sharedBuffer()));
-        SharedBuffer toRead;
-        ASSERT_TRUE(stream->Read(&toRead)) << stream->Finish().error_message();
-        ASSERT_EQ_MSG(Message{toRead}, toWrite);
-    });
+                               auto stream = streamFactory(ctx, stub);
+                               auto toWrite = makeUniqueMessage();
+                               ASSERT_TRUE(stream->Write(toWrite.sharedBuffer()));
+                               SharedBuffer toRead;
+                               ASSERT_TRUE(stream->Read(&toRead))
+                                   << stream->Finish().error_message();
+                               ASSERT_EQ_MSG(Message{toRead}, toWrite);
+                               ASSERT_TRUE(stream->WritesDone());
+                               ASSERT_EQ(stream->Finish().error_code(), ::grpc::OK);
+                           });
 }
 
 TEST_F(CommandServiceTest, CancelSession) {
@@ -267,20 +259,59 @@ TEST_F(CommandServiceTest, CancelSession) {
 
 TEST_F(CommandServiceTest, TerminateSessionWithShutdownError) {
     Status shutdownError(ErrorCodes::ShutdownInProgress, "shutdown error");
-    runTerminationTest([&](auto& session) { session.terminate(shutdownError); },
+    runTerminationTest([&](auto& session) { session.setTerminationStatus(shutdownError); },
                        util::errorToStatusCode(shutdownError.code()),
                        shutdownError.reason());
 }
 
 TEST_F(CommandServiceTest, TerminateSessionWithCancellationError) {
     Status cancellationError(ErrorCodes::CallbackCanceled, "cancelled");
-    runTerminationTest([&](auto& session) { session.terminate(cancellationError); },
+    runTerminationTest([&](auto& session) { session.setTerminationStatus(cancellationError); },
                        util::errorToStatusCode(cancellationError.code()),
                        cancellationError.reason());
 }
 
 TEST_F(CommandServiceTest, EndSession) {
-    runTerminationTest([](auto& session) { session.end(); }, ::grpc::OK);
+    runTerminationTest([](auto& session) { session.end(); }, ::grpc::CANCELLED);
+}
+
+TEST_F(CommandServiceTest, TerminateSession) {
+    runTerminationTest([](auto& session) { session.setTerminationStatus(Status::OK()); },
+                       ::grpc::OK);
+}
+
+TEST_F(CommandServiceTest, ClientCancellation) {
+    std::unique_ptr<Notification<void>> serverCbDone;
+
+    auto serverCb = [&serverCbDone](auto session) {
+        ON_BLOCK_EXIT([&] { serverCbDone->set(); });
+        ASSERT_OK(session->sourceMessage());
+        ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
+
+        auto swMsg = session->sourceMessage();
+        ASSERT_EQ(swMsg.getStatus().code(), ErrorCodes::CallbackCanceled);
+        ASSERT_TRUE(session->terminationStatus().has_value());
+        ASSERT_EQ(session->terminationStatus()->code(), ErrorCodes::CallbackCanceled);
+    };
+
+    runTestWithBothMethods(serverCb, [&](auto&, auto stub, auto streamFactory, auto&) {
+        serverCbDone = std::make_unique<Notification<void>>();
+
+        ::grpc::ClientContext ctx;
+        CommandServiceTestFixtures::addAllClientMetadata(ctx);
+
+        auto stream = streamFactory(ctx, stub);
+        auto toWrite = makeUniqueMessage();
+        ASSERT_TRUE(stream->Write(toWrite.sharedBuffer()));
+        SharedBuffer toRead;
+        ASSERT_TRUE(stream->Read(&toRead)) << stream->Finish().error_message();
+
+        ctx.TryCancel();
+        ASSERT_EQ(stream->Finish().error_code(), ::grpc::CANCELLED);
+
+        // Wait for server to receive cancellation before exiting.
+        serverCbDone->get();
+    });
 }
 
 TEST_F(CommandServiceTest, TooLowWireVersionIsRejected) {
@@ -395,15 +426,13 @@ TEST_F(CommandServiceTest, NoLogsForMissingMetadataDocument) {
 TEST_F(CommandServiceTest, ClientSendsMultipleMessages) {
     CommandService::RPCHandler serverHandler = [](auto session) {
         int nReceived = 0;
-        try {
-            while (true) {
-                uassertStatusOK(session->sourceMessage());
-                nReceived++;
+        while (true) {
+            auto msg = uassertStatusOK(session->sourceMessage());
+            nReceived++;
+            if (!OpMsg::isFlagSet(msg, OpMsg::kMoreToCome)) {
+                break;
             }
-        } catch (ExceptionFor<ErrorCodes::StreamTerminated>&) {
-            // Continue to receive client messages until the stream is terminated.
         }
-
         OpMsg response;
         response.body = BSON("nReceived" << nReceived);
         ASSERT_OK(session->sinkMessage(response.serialize()));
@@ -417,9 +446,11 @@ TEST_F(CommandServiceTest, ClientSendsMultipleMessages) {
         const int kMessages = 13;
         for (auto i = 0; i < kMessages; i++) {
             auto msg = makeUniqueMessage();
+            if (i < kMessages - 1) {
+                OpMsg::setFlag(&msg, OpMsg::kMoreToCome);
+            }
             ASSERT_TRUE(stream->Write(msg.sharedBuffer()));
         }
-        ASSERT_TRUE(stream->WritesDone());
 
         SharedBuffer serverResponse;
         ASSERT_TRUE(stream->Read(&serverResponse));
@@ -427,6 +458,8 @@ TEST_F(CommandServiceTest, ClientSendsMultipleMessages) {
         auto responseMsg = OpMsg::parse(Message{serverResponse});
         int32_t nReceived = responseMsg.body.getIntField("nReceived");
         ASSERT_EQ(nReceived, kMessages);
+
+        ASSERT_EQ(stream->Finish().error_code(), ::grpc::OK);
     };
 
     runTestWithBothMethods(serverHandler, clientCallback);
@@ -541,6 +574,9 @@ TEST_F(CommandServiceTest, ServerProvidesClusterMaxWireVersion) {
         auto it = serverMetadata.find(util::constants::kClusterMaxWireVersionKey);
         ASSERT_NE(it, serverMetadata.end());
         ASSERT_EQ(it->second, std::to_string(wireVersionProvider().getClusterMaxWireVersion()));
+
+        ASSERT_TRUE(stream->WritesDone());
+        ASSERT_EQ(stream->Finish().error_code(), ::grpc::OK);
     };
 
     runTestWithBothMethods(CommandServiceTestFixtures::makeEchoHandler(), clientCallback);
@@ -586,6 +622,9 @@ TEST_F(CommandServiceTest, ServerHandlesMultipleClients) {
                 auto response = OpMsg::parse(Message{receivedMsg});
                 ASSERT_EQ(response.body.getIntField("thread"), i);
                 ASSERT_EQ(response.body.getStringField(util::constants::kClientIdKey), clientId);
+
+                ASSERT_TRUE(stream->WritesDone());
+                ASSERT_EQ(stream->Finish().error_code(), ::grpc::OK);
             }));
         }
 

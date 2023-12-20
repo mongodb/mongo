@@ -113,7 +113,7 @@ private:
         Milliseconds timeout,
         boost::optional<TransientSSLParams> transientSSLParams = boost::none) override;
     void _ensureSession() override;
-    void _shutdownSession() override;
+    void _killSession() override;
     transport::grpc::EgressSession* _getSession();
 
     boost::optional<std::string> _authToken;

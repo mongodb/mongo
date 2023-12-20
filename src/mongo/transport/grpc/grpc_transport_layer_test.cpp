@@ -113,7 +113,7 @@ public:
 
     static CommandService::RPCHandler makeNoopRPCHandler() {
         return [](auto session) {
-            session->end();
+            session->setTerminationStatus(Status::OK());
         };
     }
 
@@ -457,70 +457,37 @@ TEST_F(GRPCTransportLayerTest, Unary) {
 }
 
 TEST_F(GRPCTransportLayerTest, Exhaust) {
+    // In this test, the client side stops reading after kMessageCount exhaust replies and then
+    // cancels the RPC. The server will verify that it was able to successfully transmit at least
+    // kMessageCount messages before it observed the RPC being cancelled.
     constexpr auto kMessageCount = 5;
 
-    auto streamingHandler = [](std::shared_ptr<IngressSession> session) {
-        auto swMsg = session->sourceMessage();
-        ASSERT_OK(swMsg);
+    Notification<void> serverHandlerDone;
 
-        for (auto i = 0; i < kMessageCount; i++) {
-            OpMsg response;
-            response.body = BSON("i" << i);
-
-            auto serialized = response.serialize();
-            if (i < kMessageCount - 1) {
-                OpMsg::setFlag(&serialized, OpMsg::kMoreToCome);
-            }
-            ASSERT_OK(session->sinkMessage(serialized));
-        }
-        session->end();
-    };
-
-    runWithTL(
-        streamingHandler,
-        [&](auto& tl) {
-            auto session = makeEgressSession(tl, tl.getListeningAddresses().at(0));
-            ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
-            for (auto i = 0;; i++) {
-                auto swMsg = session->sourceMessage();
-                ASSERT_OK(swMsg);
-
-                auto responseMsg = OpMsg::parse(swMsg.getValue());
-                int iReceived = responseMsg.body.getIntField("i");
-                ASSERT_EQ(iReceived, i);
-
-                if (!OpMsg::isFlagSet(swMsg.getValue(), OpMsg::kMoreToCome)) {
-                    break;
-                }
-            }
-            ASSERT_OK(session->finish());
-        },
-        CommandServiceTestFixtures::makeTLOptions());
-}
-
-TEST_F(GRPCTransportLayerTest, Awaitable) {
-    auto streamingHandler = [](std::shared_ptr<IngressSession> session) {
+    auto streamingHandler = [&](std::shared_ptr<IngressSession> session) {
+        ON_BLOCK_EXIT([&] { serverHandlerDone.set(); });
         auto swMsg = session->sourceMessage();
         ASSERT_OK(swMsg);
 
         for (auto i = 0;; i++) {
             OpMsg response;
             response.body = BSON("i" << i);
+
             auto serialized = response.serialize();
             OpMsg::setFlag(&serialized, OpMsg::kMoreToCome);
 
-            try {
-                uassertStatusOK(session->sinkMessage(serialized));
-            } catch (ExceptionFor<ErrorCodes::StreamTerminated>&) {
-                session->end();
-                return;
+            if (auto sinkStatus = session->sinkMessage(serialized); !sinkStatus.isOK()) {
+                ASSERT_EQ(sinkStatus.code(), ErrorCodes::CallbackCanceled);
+                ASSERT_GTE(i, kMessageCount);
+                break;
             }
 
             sleepFor(Microseconds(500));
         }
+        ASSERT_FALSE(session->isConnected());
+        ASSERT_EQ(session->terminationStatus()->code(), ErrorCodes::CallbackCanceled);
     };
 
-    constexpr auto kMessageCount = 5;
     runWithTL(
         streamingHandler,
         [&](auto& tl) {
@@ -535,6 +502,10 @@ TEST_F(GRPCTransportLayerTest, Awaitable) {
                 ASSERT_EQ(iReceived, i);
             }
             session->end();
+
+            // Wait here before exiting to ensure that server handler has a chance to receive the
+            // cancellation.
+            serverHandlerDone.get();
         },
         CommandServiceTestFixtures::makeTLOptions());
 }

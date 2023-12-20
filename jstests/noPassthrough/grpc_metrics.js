@@ -106,10 +106,10 @@ function runTest(conn) {
     expectSuccess();
     checkGRPCStats(conn, expect);
 
-    // The stream terminates successfully, but since the operation(s) fail,
-    // we stop trying to execute further operations.
+    // The server fails to send its response via the stream, so it cancels the RPC,
+    // thus not marking it as successful.
     runCmd(failureURI, 'admin', {ping: 1}, false);
-    expectPartialSuccess(1);
+    expectFailed(1);
     checkGRPCStats(conn, expect);
 
     // Killing the client while it's processing should cause a stream failure on the server.

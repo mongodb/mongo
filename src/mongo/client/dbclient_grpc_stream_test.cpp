@@ -139,7 +139,7 @@ private:
 
 TEST_F(DBClientGRPCTest, BasicConnect) {
     auto serverCb = [&](auto session) {
-        ON_BLOCK_EXIT([&] { session->end(); });
+        ON_BLOCK_EXIT([&] { session->setTerminationStatus(Status::OK()); });
 
         confirmHelloAndRespond(session);
     };
@@ -155,7 +155,7 @@ TEST_F(DBClientGRPCTest, BasicConnect) {
 
 TEST_F(DBClientGRPCTest, BasicRunCommand) {
     auto serverCb = [&](auto session) {
-        ON_BLOCK_EXIT([&] { session->end(); });
+        ON_BLOCK_EXIT([&] { session->setTerminationStatus(Status::OK()); });
 
         confirmHelloAndRespond(session);
         confirmPingAndRespondPong(session);
@@ -173,7 +173,7 @@ TEST_F(DBClientGRPCTest, BasicRunCommand) {
 
 TEST_F(DBClientGRPCTest, BasicConnectNoHelloWithCommand) {
     auto serverCb = [&](auto session) {
-        ON_BLOCK_EXIT([&] { session->end(); });
+        ON_BLOCK_EXIT([&] { session->setTerminationStatus(Status::OK()); });
 
         // We should only get a ping.
         confirmPingAndRespondPong(session);
@@ -199,7 +199,7 @@ TEST_F(DBClientGRPCTest, GetMaxWireVersionCallsClusterMaxWireVersion) {
     wvProvider->setClusterMaxWireVersion(kNewMaxWireVersion);
 
     auto serverCb = [&](auto session) {
-        ON_BLOCK_EXIT([&] { session->end(); });
+        ON_BLOCK_EXIT([&] { session->setTerminationStatus(Status::OK()); });
         confirmHelloAndRespond(session);
     };
 
@@ -222,15 +222,14 @@ TEST_F(DBClientGRPCTest, GetMaxWireVersionCallsClusterMaxWireVersion) {
 TEST_F(DBClientGRPCTest, AutoReconnectionSucceeds) {
     AtomicWord<bool> hasBeenCancelledOnce(false);
     auto serverCb = [&](auto session) {
-        ON_BLOCK_EXIT([&] { session->end(); });
-
         // Cancel the first RPC.
         if (!hasBeenCancelledOnce.load()) {
-            session->terminate(Status(ErrorCodes::CallbackCanceled, "test"));
+            session->setTerminationStatus(Status(ErrorCodes::CallbackCanceled, "test"));
             hasBeenCancelledOnce.store(true);
             return;
         }
 
+        ON_BLOCK_EXIT([&] { session->setTerminationStatus(Status::OK()); });
         // Respond hello to the second connection request, and then respond to the ping.
         confirmHelloAndRespond(session);
         confirmPingAndRespondPong(session);
@@ -253,7 +252,7 @@ TEST_F(DBClientGRPCTest, AutoReconnectionSucceeds) {
 TEST_F(DBClientGRPCTest, ShutdownBehavior) {
     AtomicWord<bool> firstRun(true);
     auto serverCb = [&](auto session) {
-        ON_BLOCK_EXIT([&] { session->end(); });
+        ON_BLOCK_EXIT([&] { session->setTerminationStatus(Status::OK()); });
 
         confirmHelloAndRespond(session);
 
@@ -261,7 +260,7 @@ TEST_F(DBClientGRPCTest, ShutdownBehavior) {
             // Cannot read from the stream after shutdown.
             auto ping = session->sourceMessage();
             ASSERT_NOT_OK(ping.getStatus());
-            ASSERT_EQ(ping.getStatus().code(), ErrorCodes::StreamTerminated);
+            ASSERT_EQ(ping.getStatus().code(), ErrorCodes::CallbackCanceled);
             return;
         }
 
@@ -286,7 +285,7 @@ TEST_F(DBClientGRPCTest, ShutdownBehavior) {
 
 TEST_F(DBClientGRPCTest, ShutdownDisallowReconnectBehavior) {
     auto serverCb = [&](auto session) {
-        ON_BLOCK_EXIT([&] { session->end(); });
+        ON_BLOCK_EXIT([&] { session->setTerminationStatus(Status::OK()); });
         confirmHelloAndRespond(session);
     };
 

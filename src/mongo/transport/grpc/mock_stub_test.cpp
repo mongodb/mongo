@@ -67,7 +67,7 @@ public:
                     ASSERT_EQ(session->remote().toString(), MockStubTestFixtures::kClientAddress);
                     auto msg = uassertStatusOK(session->sourceMessage());
                     ASSERT_OK(session->sinkMessage(msg));
-                    session->end();
+                    session->setTerminationStatus(Status::OK());
                 },
                 std::make_shared<WireVersionProvider>());
 
@@ -89,6 +89,7 @@ public:
                     auto serverResponse = stream->read();
                     ASSERT_TRUE(serverResponse);
                     ASSERT_EQ_MSG(Message{*serverResponse}, clientMessage);
+                    ASSERT_EQ(stream->finish().error_code(), ::grpc::OK);
                 }));
             }
 

@@ -267,7 +267,7 @@ CommandService::CommandService(TransportLayer* tl,
         stdx::lock_guard lk{_mutex};
 
         if (_shutdown || !_acceptNewRequests) {
-            session->terminate(makeShutdownTerminationStatus());
+            session->setTerminationStatus(makeShutdownTerminationStatus());
             return util::convertStatus(*session->terminationStatus());
         }
         it = _sessions.insert(_sessions.begin(), session);

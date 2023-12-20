@@ -385,15 +385,13 @@ void DBClientSession::connectNoHello(const HostAndPort& serverAddress,
 void DBClientSession::_markFailed(FailAction action) {
     _failed.store(true);
     if (_session) {
-        if (action == kEndSession) {
-            _session->end();
+        if (action == kKillSession) {
+            _killSession();
         } else if (action == kReleaseSession) {
             std::shared_ptr<transport::Session> destroyedOutsideMutex;
 
             stdx::lock_guard<Latch> lk(_sessionMutex);
             _session.swap(destroyedOutsideMutex);
-        } else if (action == kShutdownSession) {
-            _shutdownSession();
         }
     }
 }
@@ -436,13 +434,13 @@ bool DBClientSession::isStillConnected() {
 
 void DBClientSession::shutdown() {
     stdx::lock_guard<Latch> lk(_sessionMutex);
-    _markFailed(kShutdownSession);
+    _markFailed(kKillSession);
 }
 
 void DBClientSession::shutdownAndDisallowReconnect() {
     stdx::lock_guard<Latch> lk(_sessionMutex);
     _stayFailed.store(true);
-    _markFailed(kShutdownSession);
+    _markFailed(kKillSession);
 }
 
 void DBClientSession::setSoTimeout(double timeout) {
@@ -480,7 +478,7 @@ DBClientSession::DBClientSession(bool autoReconnect,
 
 void DBClientSession::say(Message& toSend, bool isRetry, string* actualServer) {
     ensureConnection();
-    ScopeGuard killSessionOnError([this] { _markFailed(kEndSession); });
+    ScopeGuard killSessionOnError([this] { _markFailed(kKillSession); });
 
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
@@ -499,7 +497,7 @@ void DBClientSession::say(Message& toSend, bool isRetry, string* actualServer) {
 }
 
 Message DBClientSession::recv(int lastRequestId) {
-    ScopeGuard killSessionOnError([this] { _markFailed(kEndSession); });
+    ScopeGuard killSessionOnError([this] { _markFailed(kKillSession); });
     auto m = uassertStatusOK(_session->sourceMessage());
 
     uassert(40570,
@@ -516,7 +514,7 @@ Message DBClientSession::recv(int lastRequestId) {
 
 Message DBClientSession::_call(Message& toSend, string* actualServer) {
     ensureConnection();
-    ScopeGuard killSessionOnError([this] { _markFailed(kEndSession); });
+    ScopeGuard killSessionOnError([this] { _markFailed(kKillSession); });
 
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);

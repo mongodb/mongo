@@ -192,7 +192,13 @@ private:
 TEST_F(AsioGRPCTransportLayerManagerTest, IngressAsioGRPC) {
     runTest([&](auto& monitor) {
         setServerCallback([](Session& session) {
-            ON_BLOCK_EXIT([&] { session.end(); });
+            ON_BLOCK_EXIT([&] {
+                if (auto grpcSession = dynamic_cast<grpc::IngressSession*>(&session)) {
+                    grpcSession->setTerminationStatus(Status::OK());
+                } else {
+                    session.end();
+                }
+            });
             auto swMsg = session.sourceMessage();
             ASSERT_OK(swMsg);
             ASSERT_OK(session.sinkMessage(swMsg.getValue()));
@@ -341,7 +347,13 @@ public:
         AsioGRPCTransportLayerManagerTest::setUp();
 
         setServerCallback([](Session& session) {
-            ON_BLOCK_EXIT([&] { session.end(); });
+            ON_BLOCK_EXIT([&] {
+                if (auto grpcSession = dynamic_cast<grpc::IngressSession*>(&session)) {
+                    grpcSession->setTerminationStatus(Status::OK());
+                } else {
+                    session.end();
+                }
+            });
             auto asioSession = dynamic_cast<AsioSession*>(&session);
             if (asioSession) {
                 auto swMsg = session.sourceMessage();

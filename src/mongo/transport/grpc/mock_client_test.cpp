@@ -135,7 +135,10 @@ TEST_F(MockClientTest, MockClientShutdown) {
     Notification<void> rpcsFinished;
 
     auto serverHandler = [&](HostAndPort local, std::shared_ptr<IngressSession> session) {
-        ASSERT_EQ(session->sourceMessage().getStatus().code(), ErrorCodes::StreamTerminated);
+        const auto status = session->sourceMessage().getStatus();
+        ASSERT_EQ(status, ErrorCodes::CallbackCanceled);
+        ASSERT_TRUE(session->terminationStatus().has_value());
+        ASSERT_EQ(*session->terminationStatus(), status);
         ASSERT_FALSE(session->isConnected());
 
         if (numRpcsRemaining.subtractAndFetch(1) == 0) {

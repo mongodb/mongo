@@ -307,7 +307,7 @@ public:
 
             for (auto& options : serverOptions) {
                 auto handler = [rpcHandler, &options, &monitor](auto session) {
-                    ON_BLOCK_EXIT([&] { session->end(); });
+                    ON_BLOCK_EXIT([&] { session->setTerminationStatus(Status::OK()); });
                     monitor.spawn([&]() { ASSERT_DOES_NOT_THROW(rpcHandler(options, session)); })
                         .join();
                 };
@@ -356,7 +356,7 @@ public:
                 server->start(
                     monitor,
                     [address, rpcHandler](std::shared_ptr<IngressSession> session) {
-                        ON_BLOCK_EXIT([&]() { session->end(); });
+                        ON_BLOCK_EXIT([&]() { session->setTerminationStatus(Status::OK()); });
                         rpcHandler(address, session);
                     },
                     wvProvider);
@@ -395,10 +395,17 @@ public:
     }
 
     static CommandService::RPCHandler makeEchoHandler() {
-        return [](std::shared_ptr<IngressSession> session) {
-            auto msg = uassertStatusOK(session->sourceMessage());
-            uassertStatusOK(session->sinkMessage(std::move(msg)));
-            session->end();
+        return [](auto session) {
+            while (true) {
+                try {
+                    auto msg = uassertStatusOK(session->sourceMessage());
+                    ASSERT_OK(session->sinkMessage(std::move(msg)));
+                } catch (ExceptionFor<ErrorCodes::StreamTerminated>&) {
+                    // Continues to serve the echo commands until the stream is terminated
+                    // gracefully.
+                    return;
+                }
+            }
         };
     }
 

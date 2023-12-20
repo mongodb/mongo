@@ -60,6 +60,31 @@ namespace mongo::transport::grpc {
 
 /**
  * Captures the common semantics for ingress and egress gRPC sessions.
+ *
+ * Each GRPCSession corresponds to a single bidirectional gRPC stream, and each stream is created
+ * by an invocation of a gRPC method (a gRPC "call" or RPC). Each gRPC call ultimately terminates
+ * with a status, typically returned by the server-side if the call completes normally, which is a
+ * tuple of a gRPC status code and optionally a message if the status code is not OK. `GRPCSession`
+ * has a notion of a "termination status", which maps to this final status of the call, and it can
+ * be set in a few different ways depending on whether the session is an ingress or egress session.
+ *
+ * At any time, the call associated with the session may be cancelled, in which case the termination
+ * status will be set to a status that reflects this cancelled state.
+ *
+ * Invoking `GRPCSession::end()` will cancel the call, interrupting any in-progress reads and
+ * writes, unless a termination status had already been set, in which case `GRPCSession::end()` will
+ * have no effect. If a session does not have a termination status when it is destructed,
+ * `GRPCSession::end()` will be invoked in the destructor.
+ *
+ * If a session has been terminated, attempting to sink or source a message will return that
+ * termination status. If the session was terminated with an OK status, then
+ * `ErrorCodes::StreamTerminated` will be returned.
+ *
+ * See the documentation for `IngressSession` and `EgressSession` for more information on the
+ * termination semantics of each type of session.
+ *
+ * For more information on the lifecycle of gRPC calls, see
+ * https://grpc.io/docs/what-is-grpc/core-concepts/#bidirectional-streaming-rpc.
  */
 class GRPCSession : public Session {
 public:
@@ -102,6 +127,30 @@ public:
         return _remote;
     }
 
+    StatusWith<Message> sourceMessage() noexcept override {
+        if (auto s = _verifyNotTerminated(); !s.isOK()) {
+            return s.withContext("Could not read from gRPC stream");
+        }
+
+        return _readFromStream();
+    }
+
+    Status sinkMessage(Message m) noexcept override {
+        if (auto s = _verifyNotTerminated(); !s.isOK()) {
+            return s.withContext("Could not write to gRPC stream");
+        }
+
+        return _writeToStream(std::move(m));
+    }
+
+    /**
+     * Cancels the RPC associated with this session's stream.
+     * If the session had already been terminated, this has no effect.
+     */
+    void end() override {
+        cancel(Status(ErrorCodes::CallbackCanceled, "gRPC call was cancelled"));
+    }
+
     /**
      * Cancels the RPC associated with the underlying gRPC stream and updates the termination status
      * of the session to include the provided reason.
@@ -123,46 +172,19 @@ public:
     }
 
     /**
-     * Mark the session as gracefully terminated.
-     *
-     * In-progress reads and writes to this session will not be interrupted, but future ones will
-     * fail with an error.
-     *
-     * If this session is already terminated, this has no effect.
-     */
-    void end() final {
-        _setTerminationStatus(Status::OK());
-    }
-
-    StatusWith<Message> sourceMessage() noexcept override {
-        if (MONGO_likely(isConnected())) {
-            if (auto maybeBuffer = _readFromStream()) {
-                return Message(std::move(*maybeBuffer));
-            }
-        }
-        return Status(ErrorCodes::StreamTerminated, "Unable to read from gRPC stream");
-    }
-
-    Status sinkMessage(Message message) noexcept override {
-        if (MONGO_likely(isConnected() && _writeToStream(message.sharedBuffer()))) {
-            return Status::OK();
-        }
-        return Status(ErrorCodes::StreamTerminated, "Unable to write to gRPC stream");
-    }
-
-    /**
-     * Returns the reason for which this stream was terminated, if any. "Termination" includes
+     * Returns the reason for which this session was terminated, if any. "Termination" includes
      * cancellation events (e.g. network interruption, explicit cancellation, or
-     * exceeding the deadline) as well as graceful closing of the session via end().
+     * exceeding the deadline) as well as explicit setting of the status via setTerminationStatus().
      *
      * Remains unset until termination.
      */
     boost::optional<Status> terminationStatus() const {
+        auto cancelled = _isCancelled();
         auto status = _terminationStatus.synchronize();
-        // If the RPC was cancelled, return a status reflecting that, including in the case where
-        // the RPC was cancelled after the session was already locally ended (i.e. after the
-        // termination status was set to OK).
-        if (_isCancelled() && (!status->has_value() || (*status)->isOK())) {
+        // If the RPC was cancelled, return a status reflecting that, including in the case
+        // where the RPC was cancelled after the session was already locally ended (i.e. after
+        // the termination status was set to OK).
+        if (cancelled && (!status->has_value() || (*status)->isOK())) {
             return Status(ErrorCodes::CallbackCanceled,
                           "gRPC session was terminated due to the associated RPC being cancelled");
         }
@@ -264,14 +286,39 @@ protected:
         return true;
     }
 
+    synchronized_value<boost::optional<Status>> _terminationStatus;
+
 private:
     virtual void _tryCancel() = 0;
 
     virtual bool _isCancelled() const = 0;
 
-    virtual boost::optional<SharedBuffer> _readFromStream() = 0;
+    virtual StatusWith<Message> _readFromStream() = 0;
 
-    virtual bool _writeToStream(ConstSharedBuffer msg) = 0;
+    virtual Status _writeToStream(Message m) = 0;
+
+    /**
+     * Perform all the pre-read/write checks on the underlying stream, returning a status that the
+     * read/write should fail with if the session had already been terminated.
+     *
+     * Note that this does not check to see if the call had been externally cancelled when
+     * determining whether to return OK or not, since doing so on every read/write would be
+     * expensive. If a termination status had been set locally, this method will check for
+     * cancellation before returning that status, however.
+     */
+    Status _verifyNotTerminated() const {
+        // Check the cached _terminationStatus directly rather than invoking terminationStatus() to
+        // avoid the overhead of checking if the RPC has been cancelled. If it has been cancelled
+        // then reading from or writing to the stream will fail anyways.
+        if (_terminationStatus->has_value()) {
+            if (auto ts = terminationStatus(); !ts->isOK()) {
+                return *ts;
+            }
+            return Status(ErrorCodes::StreamTerminated, "gRPC stream is terminated");
+        }
+
+        return Status::OK();
+    }
 
     TransportLayer* const _tl;
 
@@ -280,7 +327,6 @@ private:
     RestrictionEnvironment _restrictionEnvironment;
 
     boost::optional<std::function<void(const GRPCSession&)>> _cleanupCallback;
-    synchronized_value<boost::optional<Status>> _terminationStatus;
 };
 
 /**
@@ -289,6 +335,43 @@ private:
  * Calling sinkMessage() or sourceMessage() is only allowed from the thread that owns the underlying
  * gRPC stream. This is necessary to ensure accessing _ctx and _stream does not result in
  * use-after-free.
+ *
+ * If reading from a non-terminated session fails but the associated gRPC call was not cancelled, it
+ * indicates that the client side of the stream stopped writing gracefully, and that the call can
+ * terminate cleanly. In such cases, the termination status of the session will be set to OK.
+ *
+ * If writing to a non-terminated session fails for any reason, it indicates that the client side
+ * will not be able to consume the response of the call or its final status, and thus the
+ * termination status will be set to CANCELLED.
+ *
+ * The termination status may also be set to a specific status manually (e.g. when an improperly
+ * formatted metadata entry has been received) via `IngressSession::setTerminationStatus`. This will
+ * prevent any future reads or writes from being performed, but it will not interrupt any
+ * in-progress reads or writes. If the stream had already been terminated, this will have no effect.
+ *
+ * If, at any time, the call is cancelled (e.g. explicitly by the client, via a network
+ * event, or by a server thread), the termination status will be set to CANCELLED, regardless of
+ * whether it had been set to some other value via setTerminationStatus.
+ *
+ * The following state diagram is an overview of the various ways an ingress session's termination
+ * status can be set.
+ *
+ *                +----------------------------------------------------------
+ *                |                                                         |
+ *       Read fails, client                           +------------------+  |
+ *         done writing                        +----->|Other termination |  |
+ *                +                            |      |     status       |  |
+ *                |                            |      +------------------+  |
+ *   +------------------------+                |              +----+        |
+ *   | Non-terminated session | ---- setTerminationStatus---> | OK | <------+
+ *   +------------------------+                |              +----+
+ *      |                 |                    |        +---------+
+ * Write fails      cancellation               +------> |CANCELLED|
+ *      |               event                           +---------+
+ *      |                 |                                ^   ^
+ *      |                 |                                |   |
+ *      |                 +---------------------------------   |
+ *      +-------------------------------------------------------
  */
 class IngressSession final : public GRPCSession {
 public:
@@ -308,14 +391,44 @@ public:
     }
 
     ~IngressSession() {
-        auto ts = terminationStatus();
-        tassert(
-            7401491, "gRPC sessions must be terminated before being destructed", ts.has_value());
+        end();
         LOGV2_DEBUG(7401402,
                     2,
                     "Finished cleaning up a gRPC ingress session",
                     "session"_attr = toBSON(),
-                    "status"_attr = *ts);
+                    "status"_attr = terminationStatus());
+    }
+
+    StatusWith<Message> _readFromStream() noexcept override {
+        if (auto maybeBuffer = _stream->read()) {
+            return Message(std::move(*maybeBuffer));
+        }
+
+        if (auto ts = terminationStatus()) {
+            return *ts;
+        } else {
+            // If the client gracefully terminated, set the RPC's final status to OK.
+            _setTerminationStatus(Status::OK());
+            return Status(ErrorCodes::StreamTerminated,
+                          "Could not read from gRPC server stream: remote done writing");
+        }
+    }
+
+    Status _writeToStream(Message message) noexcept override {
+        if (_stream->write(message.sharedBuffer())) {
+            return Status::OK();
+        }
+
+        if (auto ts = terminationStatus()) {
+            return *ts;
+        } else {
+            // If the client closed the stream before we had a chance to return our response, mark
+            // the RPC as cancelled.
+            auto status = Status(ErrorCodes::CallbackCanceled,
+                                 "Could not write to gRPC server stream: remote done reading");
+            _setTerminationStatus(status);
+            return status;
+        }
     }
 
     /**
@@ -323,9 +436,9 @@ public:
      * writes to this session will not be interrupted, but future attempts to read or write to this
      * session will fail.
      *
-     * This has no effect if the stream is already terminated.
+     * This has no effect if the session is already terminated.
      */
-    void terminate(Status status) {
+    void setTerminationStatus(Status status) {
         _setTerminationStatus(std::move(status));
     }
 
@@ -374,14 +487,6 @@ private:
         return _ctx->isCancelled();
     }
 
-    boost::optional<SharedBuffer> _readFromStream() override {
-        return _stream->read();
-    }
-
-    bool _writeToStream(ConstSharedBuffer msg) override {
-        return _stream->write(msg);
-    }
-
     // _stream is only valid while the RPC handler is still running. It should not be
     // accessed after the stream has been terminated.
     ServerContext* const _ctx;
@@ -394,6 +499,34 @@ private:
 
 /**
  * Represents the client side of a gRPC stream.
+ *
+ * If reading from or writing to a non-terminated session fails, it indicates that the call has been
+ * terminated and that the final termination status can be retrieved (most likely as determined by
+ * the server-side). In such cases, the session will retrieve this status, set its termination
+ * status to that value, and then return it from the read/write method that failed.
+ *
+ * If, at any time, the call is cancelled (e.g. explicitly by the server, via a network
+ * event, or explicitly by a client thread), the termination status will be set to CANCELLED.
+ *
+ * A caller may explicitly indicate that no more client writes are forthcoming and block until the
+ * a final termination status has been determined by calling EgressSession::finish(). Note that this
+ * will block until any outstanding messages sent by the server have been read, if any.
+ *
+ * The following state diagram is an overview of the various ways an egress session's termination
+ * status can be set.
+ *
+ *             +-------------  read/write fails
+ *             |                      |
+ * +------------------------+         V              +------------------+
+ * | Non-terminated session | ----- finish() ------> |   RPC's final    |
+ * +------------------------+                        |termination status|
+ *    |         |                                    +------------------+
+ *    |         +---- external cancellation event
+ *    |                              |
+ *    |                              V
+ *    |                           +---------+
+ *    +--- cancel(), end() -----> |CANCELLED|
+ *          ~GRPCSession          +---------+
  */
 class EgressSession final : public GRPCSession {
 public:
@@ -419,14 +552,33 @@ public:
     }
 
     ~EgressSession() {
-        auto ts = terminationStatus();
-        tassert(
-            7401411, "gRPC sessions must be terminated before being destructed", ts.has_value());
+        end();
         LOGV2_DEBUG(7401403,
                     2,
                     "Finished cleaning up a gRPC egress session",
                     "session"_attr = toBSON(),
-                    "status"_attr = *ts);
+                    "status"_attr = terminationStatus());
+    }
+
+    StatusWith<Message> _readFromStream() noexcept override {
+        if (auto maybeBuffer = _stream->read()) {
+            _updateWireVersion();
+            return Message(std::move(*maybeBuffer));
+        }
+
+        // If _stream->read() fails, then the server has no more messages to send and a final RPC
+        // status should be available. Set the termination status to that and return it here.
+        return finish();
+    }
+
+    Status _writeToStream(Message message) noexcept override {
+        if (_stream->write(message.sharedBuffer())) {
+            return Status::OK();
+        }
+
+        // If _stream->write() fails, then the RPC has been terminated and a final RPC
+        // status should be available. Set the termination status to that and return it here.
+        return finish();
     }
 
     /**
@@ -446,13 +598,15 @@ public:
      *
      * Returns the termination status.
      *
-     * This method should only be called once.
      * This method should be used instead of end() in most cases, since it retrieves the server's
      * return status for the RPC.
      */
     Status finish() {
-        _setTerminationStatus(util::convertStatus(_stream->finish()));
-        return *terminationStatus();
+        auto status = _terminationStatus.synchronize();
+        if (!status->has_value()) {
+            *status = util::convertStatus(_stream->finish());
+        }
+        return **status;
     }
 
 private:
@@ -504,18 +658,6 @@ private:
         if (_sharedState->clusterMaxWireVersion.load() != wireVersion) {
             _sharedState->clusterMaxWireVersion.store(wireVersion);
         }
-    }
-
-    boost::optional<SharedBuffer> _readFromStream() override {
-        if (auto msg = _stream->read()) {
-            _updateWireVersion();
-            return msg;
-        }
-        return boost::none;
-    }
-
-    bool _writeToStream(ConstSharedBuffer msg) override {
-        return _stream->write(msg);
     }
 
     AtomicWord<bool> _checkedWireVersion;

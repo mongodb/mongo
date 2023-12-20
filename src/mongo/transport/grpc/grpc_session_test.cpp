@@ -206,8 +206,8 @@ TEST_F(GRPCSessionTest, End) {
         session.end();
         ASSERT_FALSE(session.isConnected());
         ASSERT_TRUE(session.terminationStatus());
-        ASSERT_OK(session.terminationStatus());
-        ASSERT_FALSE(rpc.serverCtx->isCancelled());
+        ASSERT_EQ(session.terminationStatus()->code(), ErrorCodes::CallbackCanceled);
+        ASSERT_TRUE(rpc.serverCtx->isCancelled());
     });
 }
 
@@ -218,8 +218,8 @@ TEST_F(GRPCSessionTest, CancelWithReason) {
         ASSERT_FALSE(session.isConnected());
         ASSERT_TRUE(session.terminationStatus());
         ASSERT_EQ(session.terminationStatus(), kExpectedReason);
-        ASSERT_EQ(session.sourceMessage().getStatus(), ErrorCodes::StreamTerminated);
-        ASSERT_EQ(session.sinkMessage(makeUniqueMessage()), ErrorCodes::StreamTerminated);
+        ASSERT_EQ(session.sourceMessage().getStatus(), kExpectedReason.code());
+        ASSERT_EQ(session.sinkMessage(makeUniqueMessage()), kExpectedReason.code());
         ASSERT_TRUE(rpc.serverCtx->isCancelled());
     });
 }
@@ -243,7 +243,7 @@ TEST_F(GRPCSessionTest, TerminationStatusIsNotOverridden) {
             ASSERT_EQ(finishStatus, kExpectedReason);
         } else if (auto ingressSession = dynamic_cast<IngressSession*>(&session)) {
             // Recording the status should not overwrite the prior cancellation status.
-            ingressSession->terminate(Status::OK());
+            ingressSession->setTerminationStatus(Status::OK());
             ASSERT_EQ(session.terminationStatus(), kExpectedReason);
         }
     });
@@ -282,7 +282,7 @@ TEST_F(GRPCSessionTest, ReadAndWriteFromClosedStream) {
     for (auto op : {Operation::kSink, Operation::kSource}) {
         runWithBoth([&](auto&, auto& session) {
             session.end();
-            ASSERT_EQ(runDummyOperationOnSession(session, op), ErrorCodes::StreamTerminated);
+            ASSERT_EQ(runDummyOperationOnSession(session, op), ErrorCodes::CallbackCanceled);
         });
     }
 }
@@ -291,11 +291,13 @@ TEST_F(GRPCSessionTest, ReadAndWriteTimesOut) {
     for (auto op : {Operation::kSink, Operation::kSource}) {
         runWithBoth([&](auto&, auto& session) {
             clockSource().advance(2 * kStreamTimeout);
-            ASSERT_EQ(runDummyOperationOnSession(session, op), ErrorCodes::StreamTerminated);
 
             if (auto egressSession = dynamic_cast<EgressSession*>(&session)) {
                 // Verify that the right `ErrorCode` is delivered on the client-side.
+                ASSERT_EQ(runDummyOperationOnSession(session, op), ErrorCodes::ExceededTimeLimit);
                 ASSERT_TRUE(ErrorCodes::isExceededTimeLimitError(egressSession->finish()));
+            } else {
+                ASSERT_EQ(runDummyOperationOnSession(session, op), ErrorCodes::CallbackCanceled);
             }
         });
     }
