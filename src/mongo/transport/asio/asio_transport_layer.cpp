@@ -1147,7 +1147,15 @@ void AsioTransportLayer::_runListener() noexcept {
     setThreadName("listener");
 
     stdx::unique_lock lk(_mutex);
-    if (_isShutdown) {
+    ON_BLOCK_EXIT([&] {
+        if (!lk.owns_lock()) {
+            lk.lock();
+        }
+        _listener.state = Listener::State::kShutdown;
+        _listener.cv.notify_all();
+    });
+
+    if (_isShutdown || _listener.state == Listener::State::kShuttingDown) {
         return;
     }
 
@@ -1175,11 +1183,6 @@ void AsioTransportLayer::_runListener() noexcept {
 
     _listener.state = Listener::State::kActive;
     _listener.cv.notify_all();
-    ON_BLOCK_EXIT([&] {
-        _listener.state = Listener::State::kShutdown;
-        _listener.cv.notify_all();
-    });
-
     while (!_isShutdown && (_listener.state == Listener::State::kActive)) {
         lk.unlock();
         _acceptorReactor->run();
@@ -1216,7 +1219,7 @@ Status AsioTransportLayer::start() {
         uassertStatusOK(_sessionManager->start());
     }
 
-    if (_listenerOptions.isIngress()) {
+    if (_listenerOptions.isIngress() && _listener.state == Listener::State::kNew) {
         invariant(_sessionManager);
         _listener.thread = stdx::thread([this] { _runListener(); });
         _listener.cv.wait(lk, [&] { return _listener.state != Listener::State::kNew; });
@@ -1253,20 +1256,21 @@ void AsioTransportLayer::stopAcceptingSessionsWithLock(stdx::unique_lock<Mutex> 
         return;
     }
 
+    if (auto oldState = _listener.state; oldState != Listener::State::kShutdown) {
+        _listener.state = Listener::State::kShuttingDown;
+        if (oldState == Listener::State::kActive) {
+            while (_listener.state != Listener::State::kShutdown) {
+                lk.unlock();
+                _acceptorReactor->stop();
+                lk.lock();
+            }
+        }
+    }
+
     auto thread = std::exchange(_listener.thread, {});
     if (!thread.joinable()) {
         // If the listener never started, then we can return now
         return;
-    }
-
-    if (_listener.state == Listener::State::kActive) {
-        // Spam stop() on the reactor, it interrupts run()
-        _listener.state = Listener::State::kShuttingDown;
-        while (_listener.state != Listener::State::kShutdown) {
-            lk.unlock();
-            _acceptorReactor->stop();
-            lk.lock();
-        }
     }
 
     // Release the lock and wait for the thread to die
