@@ -781,7 +781,8 @@ protected:
 private:
     // Instantiates an ExpressionContext which does not increment expression counters and does not
     // enforce FCV restrictions. It is used for implementing the `makeBlankExpressionContext()`
-    // factory method.
+    // factory method. Please also note that the runtime constants are not given real/accurate
+    // values of '$$NOW' and '$$CLUSTER_TIME', in the name of efficiency.
     ExpressionContext(OperationContext* opCtx,
                       const NamespaceString& ns,
                       const boost::optional<BSONObj>& letParameters = boost::none);

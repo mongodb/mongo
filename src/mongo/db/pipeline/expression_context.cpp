@@ -265,7 +265,9 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
       _collator(nullptr),
       _documentComparator(_collator.getCollator()),
       _valueComparator(_collator.getCollator()) {
-    variables.setDefaultRuntimeConstants(opCtx);
+    // This is a shortcut to avoid reading the clock and the vector clock, since we don't actually
+    // care about their values for this 'blank' ExpressionContext codepath.
+    variables.setLegacyRuntimeConstants({Date_t::min(), Timestamp()});
     // Expression counters are reported in serverStatus to indicate how often clients use certain
     // expressions/stages, so it's a side effect tied to parsing. We must stop expression counters
     // before re-parsing to avoid adding to the counters more than once per a given query.
@@ -280,7 +282,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::makeBlankExpressionCo
     boost::optional<BSONObj> shapifiedLet) {
     const auto nss = nssOrUUID.isNamespaceString() ? nssOrUUID.nss() : NamespaceString{};
     // This constructor is private, so we can't use `boost::make_instrusive()`.
-    return boost::intrusive_ptr<ExpressionContext>{new ExpressionContext(opCtx, nss, shapifiedLet)};
+    return new ExpressionContext(opCtx, nss, shapifiedLet);
 }
 
 void ExpressionContext::checkForInterruptSlow() {
