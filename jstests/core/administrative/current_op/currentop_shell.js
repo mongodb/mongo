@@ -100,8 +100,8 @@ if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
     // Assert currentOp truncation behavior for each shard in the cluster.
     assert(res.inprog.length >= 1, res);
     res.inprog.forEach((result) => {
-        assert.eq(result.op, "getmore", result);
-        assert(result.cursor.originatingCommand.hasOwnProperty("$truncated"), result);
+        assert.eq(result.op, "getmore", res);
+        assert(result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
     });
 } else {
     // Assert currentOp truncation behavior for unsharded collections.
@@ -126,8 +126,8 @@ res = db.currentOp({"ns": "test.currentOp_cursor", "command.comment": "currentOp
 if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
     assert(res.inprog.length >= 1, res);
     res.inprog.forEach((result) => {
-        assert.eq(result.op, "getmore", result);
-        assert(!result.cursor.originatingCommand.hasOwnProperty("$truncated"), result);
+        assert.eq(result.op, "getmore", res);
+        assert(!result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
     });
 } else {
     assert.eq(res.inprog.length, 1, res);
