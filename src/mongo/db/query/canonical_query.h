@@ -48,7 +48,7 @@ public:
     using UPtr = std::unique_ptr<CanonicalQuery, ObjectPool<CanonicalQuery>::Deleter>;
 
     // You must go through canonicalize to create a CanonicalQuery.
-    CanonicalQuery() {}
+    CanonicalQuery() = default;
 
     void reset();
 

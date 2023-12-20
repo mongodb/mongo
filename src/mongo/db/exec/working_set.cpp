@@ -50,8 +50,14 @@ WorkingSet::~WorkingSet() {
     }
 }
 
-void WorkingSet::reset(){
-    // 
+void WorkingSet::reset() {
+    for (auto& i : _data) {
+        delete i.member;
+    }
+    _data.clear();
+    _freeList = INVALID_ID;
+    _flagged.clear();
+    _yieldSensitiveIds.clear();
 }
 
 WorkingSetID WorkingSet::allocate() {

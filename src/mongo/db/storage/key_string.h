@@ -398,7 +398,7 @@ public:
 
 private:
     void _appendRecordIdLong(int64_t val);
-    void _appendRecordIdStr(const char* str, int size);
+    void _appendRecordIdStr(const char* str, size_t size);
 
     void _appendAllElementsForIndexing(const BSONObj& obj,
                                        Ordering ord,

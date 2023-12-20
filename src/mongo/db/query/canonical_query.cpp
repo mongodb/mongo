@@ -109,8 +109,13 @@ bool parsingCanProduceNoopMatchNodes(const ExtensionsCallback& extensionsCallbac
 
 }  // namespace
 
-
-void CanonicalQuery::reset() {}
+void CanonicalQuery::reset() {
+    _qr.reset();
+    _root.reset();
+    _proj.reset();
+    _collator.reset();
+    _canHaveNoopMatchNodes = false;
+}
 
 // static
 StatusWith<CanonicalQuery::UPtr> CanonicalQuery::canonicalize(

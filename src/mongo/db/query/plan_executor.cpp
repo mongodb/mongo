@@ -258,26 +258,6 @@ PlanExecutor::PlanExecutor(OperationContext* opCtx,
     }
 }
 
-// void PlanExecutor::reset() {
-//     _opCtx = nullptr;
-
-//     _cq->reset();
-//     _workingSet->reset();
-//     _qs.reset();
-//     _root.reset();
-
-//     _killStatus = Status::OK();
-
-//     // _nss;
-
-//     _stash = {};
-
-//     _currentState = kUsable;
-//     _registrationToken = boost::none;
-
-//     _everDetachedFromOperationContext = false;
-// }
-
 void PlanExecutor::reset(OperationContext* opCtx,
                          WorkingSet::UPtr ws,
                          std::unique_ptr<PlanStage> rt,
@@ -296,8 +276,7 @@ void PlanExecutor::reset(OperationContext* opCtx,
     _killStatus = Status::OK();
     _stash = {};
     _currentState = kUsable;
-    _registrationToken = boost::none;
-
+    _registrationToken.reset();
     _everDetachedFromOperationContext = false;
 
     // There's no point in yielding if the collection doesn't exist.

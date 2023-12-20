@@ -93,6 +93,11 @@ public:
      * Constructs an empty NamespaceString.
      */
     NamespaceString() : _ns(), _dotIndex(std::string::npos) {}
+    
+    void reset() {
+        _ns.clear();
+        _dotIndex = std::string::npos;
+    }
 
     /**
      * Constructs a NamespaceString from the fully qualified namespace named in "ns".
@@ -110,9 +115,7 @@ public:
                 _ns.find('\0') == std::string::npos);
     }
 
-    explicit NamespaceString(const char* data) : NamespaceString(StringData(data)) {
-        //
-    }
+    explicit NamespaceString(const char* data) : NamespaceString(StringData(data)) {}
 
     /**
      * Constructs a NamespaceString for the given database and collection names.

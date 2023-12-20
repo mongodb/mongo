@@ -26,6 +26,7 @@
  *    then also delete it in the license file.
  */
 
+#include <utility>
 
 #include "mongo/platform/basic.h"
 
@@ -45,7 +46,6 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
-#include <utility>
 
 namespace mongo {
 
@@ -113,19 +113,65 @@ const char kNaturalSortField[] = "$natural";
 const char QueryRequest::kFindCommandName[] = "find";
 const char QueryRequest::kShardVersionField[] = "shardVersion";
 
-QueryRequest::QueryRequest(NamespaceString nss) : _nss(std::move(nss)) {}
-// QueryRequest& QueryRequest::operator=(const QueryRequest& rhs){
 
-// }
-QueryRequest::QueryRequest(CollectionUUID uuid) : _uuid(uuid) {}
-void QueryRequest::reset(NamespaceString nss) {
-    _nss = std::move(nss);
+QueryRequest::QueryRequest(NamespaceString&& nss) : _nss{std::move(nss)} {}
+QueryRequest::QueryRequest(CollectionUUID uuid) : _uuid{uuid} {}
+QueryRequest::QueryRequest(const NamespaceString& nss) : _nss{nss} {}
+
+void QueryRequest::resetEmpty() {
+    // NamespaceString _nss;
+    // OptionalCollectionUUID _uuid;
+
+    _filter.reset();
+    _proj.reset();
+    _sort.reset();
+    _hint.reset();
+    _readConcern.reset();
+    _collation.reset();
+    _unwrappedReadPref.reset();
+    _wantMore = true;
+    _skip.reset();
+    _limit.reset();
+    _batchSize.reset();
+    _ntoreturn.reset();
+    _explain = false;
+    _comment.clear();
+    _maxScan = 0;
+    _maxTimeMS = 0;
+    _min.reset();
+    _max.reset();
+    _returnKey = false;
+    _showRecordId = false;
+    _hasReadPref = false;
+    _tailableMode = TailableModeEnum::kNormal;
+    _slaveOk = false;
+    _oplogReplay = false;
+    _noCursorTimeout = false;
+    _exhaust = false;
+    _allowPartialResults = false;
+    _replicationTerm.reset();
 }
+
+void QueryRequest::reset(NamespaceString&& nss) {
+    resetEmpty();
+    _nss = std::move(nss);
+    _uuid.reset();
+}
+
 void QueryRequest::reset(CollectionUUID uuid) {
+    resetEmpty();
+    _nss.reset();
     _uuid = uuid;
 }
-void QueryRequest::reset(const QueryRequest& other) {
-    *this = other;
+
+void QueryRequest::reset(const NamespaceString& nss) {
+    resetEmpty();
+    _nss = nss;
+    _uuid.reset();
+}
+
+void QueryRequest:: reset(const QueryRequest& qr){
+    *this = qr;
 }
 
 void QueryRequest::refreshNSS(OperationContext* opCtx) {
@@ -409,7 +455,7 @@ StatusWith<QueryRequest::UPtr> QueryRequest::parseFromFindCommand(QueryRequest::
         return validateStatus;
     }
 
-    return std::move(qr);
+    return qr;
 }
 
 StatusWith<QueryRequest::UPtr> QueryRequest::makeFromFindCommand(NamespaceString&& nss,
@@ -423,7 +469,7 @@ StatusWith<QueryRequest::UPtr> QueryRequest::makeFromFindCommand(NamespaceString
         return parseFromFindCommand(std::move(qr), cmdObj, isExplain);
     } else {
         // auto qr = stdx::make_unique<QueryRequest>(nss);
-        auto qr = ObjectPool<QueryRequest>::newObject(nss);
+        auto qr = ObjectPool<QueryRequest>::newObject(std::move(nss));
         return parseFromFindCommand(std::move(qr), cmdObj, isExplain);
     }
 }

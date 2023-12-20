@@ -178,7 +178,7 @@ public:
         bool _dismissed = false;
     };
 
-    using UPtr = std::unique_ptr<PlanExecutor, Deleter>;
+    // using UPtr = std::unique_ptr<PlanExecutor, Deleter>;
 
 
     /**

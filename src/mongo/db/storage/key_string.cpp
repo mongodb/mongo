@@ -28,6 +28,7 @@
  *    it in the license file.
  */
 
+#include <string_view>
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
@@ -386,7 +387,7 @@ void KeyString::_appendAllElementsForIndexing(const BSONObj& obj,
 void KeyString::appendRecordId(const RecordId& loc) {
     loc.withFormat([](RecordId::Null n) { invariant(false); },
                    [&](int64_t rid) { _appendRecordIdLong(rid); },
-                   [&](const char* str, int size) { _appendRecordIdStr(str, size); });
+                   [&](std::string_view sv) { _appendRecordIdStr(sv.data(), sv.size()); });
 }
 
 void KeyString::_appendRecordIdLong(int64_t val) {
@@ -434,7 +435,8 @@ void KeyString::_appendRecordIdLong(int64_t val) {
     }
     _append(lastByte, false);
 }
-void KeyString::_appendRecordIdStr(const char* str, int size) {
+
+void KeyString::_appendRecordIdStr(const char* str, size_t size) {
     // Append the RecordId binary string as-is, then append the encoded binary string size.
     // The binary string size is encoded in 7-bit increments over one or more size bytes.
     // The 8th bit of a size byte is a continuation bit that is set on all size bytes except

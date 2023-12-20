@@ -58,17 +58,16 @@ public:
     static const char kFindCommandName[];
     static const char kShardVersionField[];
 
-    QueryRequest() = default;
-    ~QueryRequest() = default;
-    QueryRequest(const QueryRequest&) = default;
-    QueryRequest(QueryRequest&&) = default;
-    QueryRequest& operator=(const QueryRequest&) = default;
+    explicit QueryRequest() = default;
 
-    explicit QueryRequest(NamespaceString nss);
+    explicit QueryRequest(NamespaceString&& nss);
     explicit QueryRequest(CollectionUUID uuid);
+    explicit QueryRequest(const NamespaceString& nss);
 
-    void reset(NamespaceString nss);
+    void resetEmpty();
+    void reset(NamespaceString&& nss);
     void reset(CollectionUUID uuid);
+    void reset(const NamespaceString& nss);
     void reset(const QueryRequest&);
 
     /**

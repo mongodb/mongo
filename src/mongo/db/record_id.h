@@ -28,23 +28,24 @@
 
 #pragma once
 
-#include "mongo/util/assert_util.h"
-#include "mongo/util/shared_buffer.h"
 #include <algorithm>
 #include <array>
-#include <boost/functional/hash.hpp>
-#include <boost/optional.hpp>
 #include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <iomanip>
 #include <ostream>
+#include <string>
+#include <string_view>
+
+#include <boost/optional.hpp>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/logger/logstream_builder.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
-#include "mongo/util/hex.h"
-#include <string_view>
+#include "mongo/util/shared_buffer.h"
+
 
 namespace mongo {
 enum class Format : int8_t {
@@ -171,33 +172,40 @@ public:
             case Format::kLong:
                 return onLong(_getLongNoCheck());
             case Format::kSmallStr: {
-                auto str = _getSmallStrNoCheck();
-                return onStr(str.data(), str.size());
+                auto sv = _getSmallStrNoCheck();
+                return onStr(sv);
             }
             case Format::kBigStr: {
-                auto str = _getBigStrNoCheck();
-                return onStr(str.data(), str.size());
+                auto sv = _getBigStrNoCheck();
+                return onStr(sv);
             }
             default:
                 MONGO_UNREACHABLE;
         }
     }
 
+    size_t hash() const {
+        size_t hashValue = 0;
+        withFormat([](Null n) {},
+                   [&](int64_t rid) { hashValue = std::hash<int64_t>{}(rid); },
+                   [&](std::string_view sv) { hashValue = std::hash<std::string_view>{}(sv); });
+        return hashValue;
+    }
+
     std::string toString() const {
         return withFormat([](Null n) { return std::string("null"); },
                           [](int64_t rid) { return std::to_string(rid); },
-                          [](const char* str, size_t size) {
-                              if (size == 0) {
+                          [](std::string_view sv) {
+                              if (sv.empty()) {
                                   return std::string{"NULL"};
                               }
 
                               std::stringstream ss;
                               ss << "0x" << std::hex << std::setfill('0');
-                              for (size_t i = 0; i < size; ++i) {
+                              for (auto ch : sv) {
                                   ss << std::setw(2)
-                                     << static_cast<unsigned>(static_cast<uint8_t>(*(str + i)));
+                                     << static_cast<unsigned>(static_cast<uint8_t>(ch));
                               }
-
                               return ss.str();
                           });
     }
@@ -243,7 +251,7 @@ public:
      * Returns the raw value to be used as a key in a RecordStore. Requires that this RecordId was
      * constructed with a binary string value, and invariants otherwise.
      */
-    const std::string_view getStringView() const {
+    std::string_view getStringView() const {
         invariant(isStr());
         if (_format == Format::kSmallStr) {
             return _getSmallStrNoCheck();
@@ -295,11 +303,8 @@ public:
      * may differ across platforms. Hash values should not be persisted.
      */
     struct Hasher {
-        size_t operator()(RecordId rid) const {
-            size_t hash = 0;
-            // TODO consider better hashes
-            boost::hash_combine(hash, rid.repr());
-            return hash;
+        size_t operator()(const RecordId& rid) const {
+            return rid.hash();
         }
     };
 
@@ -343,7 +348,7 @@ private:
 
     // int64_t _repr;
     Format _format{Format::kNull};
-    std::array<char, kSmallStrMaxSize + 1> _buffer;
+    std::array<char, kSmallStrMaxSize + 1> _buffer{};
     ConstSharedBuffer _sharedBuffer;
 };
 
