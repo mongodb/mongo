@@ -294,13 +294,25 @@ void Simple8bBuilder<T>::flush() {
 
     // Always reset _lastValueInPrevWord. We may only start RLE after flush on 0 value.
     _lastValueInPrevWord = {};
+    _lastValidExtensionType = 0;
 }
 
 template <typename T>
-bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
+void Simple8bBuilder<T>::setLastForRLE(boost::optional<T> val) {
+    if (!val) {
+        _lastValueInPrevWord = {boost::none, {0, 0, 0, 0}, {0, 0, 0, 0}};
+        return;
+    }
+
+    _lastValueInPrevWord = *_calculatePendingValue(*val);
+}
+
+template <typename T>
+boost::optional<typename Simple8bBuilder<T>::PendingValue>
+Simple8bBuilder<T>::_calculatePendingValue(T value) {
     // Early exit if we try to store max value. They are not handled when counting zeros.
     if (value == std::numeric_limits<T>::max())
-        return false;
+        return boost::none;
 
     uint8_t trailingZerosCount = _countTrailingZerosWithZero(value);
     // Initially set every selector as invalid.
@@ -359,21 +371,30 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
          kDataBits[kEightSelectorSmall]) &&
         (meaningfulValueBitsStoredWithEightLarge + kTrailingZeroBitSize[kEightSelectorLarge] >
          kDataBits[kEightSelectorLarge])) {
+        return boost::none;
+    }
+
+    return PendingValue{value,
+                        {bitCountWithoutLeadingZeros,
+                         meaningfulValueBitsStoredWithSeven,
+                         meaningfulValueBitsStoredWithEightSmall,
+                         meaningfulValueBitsStoredWithEightLarge},
+                        zeroCount};
+}
+
+template <typename T>
+bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
+    auto pendingValue = _calculatePendingValue(value);
+    if (!pendingValue) {
         return false;
     }
 
-    PendingValue pendingValue(value,
-                              {bitCountWithoutLeadingZeros,
-                               meaningfulValueBitsStoredWithSeven,
-                               meaningfulValueBitsStoredWithEightSmall,
-                               meaningfulValueBitsStoredWithEightLarge},
-                              zeroCount);
     // Check if we have a valid selector for the current word. This method update the global
     // isSelectorValid to avoid redundant computation.
-    if (_doesIntegerFitInCurrentWord(pendingValue)) {
+    if (_doesIntegerFitInCurrentWord(*pendingValue)) {
         // If the integer fits in the current word, add it.
-        _pendingValues.push_back(pendingValue);
-        _updateSimple8bCurrentState(pendingValue);
+        _pendingValues.push_back(*pendingValue);
+        _updateSimple8bCurrentState(*pendingValue);
     } else {
         // If the integer does not fit in the current word, convert the integers into simple8b
         // word(s) with no unused buckets until the new value can be added to _pendingValues. Then
@@ -384,7 +405,7 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
         do {
             uint64_t simple8bWord = _encodeLargestPossibleWord(_lastValidExtensionType);
             _writeFn(simple8bWord);
-        } while (!(_doesIntegerFitInCurrentWord(pendingValue)));
+        } while (!(_doesIntegerFitInCurrentWord(*pendingValue)));
 
         if (tryRle && _pendingValues.empty() && lastPendingValue.val == value) {
             // There are no more words in _pendingValues and the last element of the last Simple8b
@@ -392,8 +413,8 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
             _rleCount = 1;
             _lastValueInPrevWord = lastPendingValue;
         } else {
-            _pendingValues.push_back(pendingValue);
-            _updateSimple8bCurrentState(pendingValue);
+            _pendingValues.push_back(*pendingValue);
+            _updateSimple8bCurrentState(*pendingValue);
         }
     }
     return true;
@@ -599,6 +620,22 @@ std::reverse_iterator<typename Simple8bBuilder<T>::PendingIterator> Simple8bBuil
 template <typename T>
 void Simple8bBuilder<T>::setWriteCallback(Simple8bWriteFn writer) {
     _writeFn = std::move(writer);
+}
+
+template <typename T>
+void Simple8bBuilder<T>::assertInternalStateIdentical_forTest(
+    const Simple8bBuilder<T>& other) const {
+    // Verifies the pending values
+    invariant(std::equal(begin(), end(), other.begin(), other.end()));
+    invariant(_rleCount == other._rleCount);
+    invariant(_lastValueInPrevWord.val == other._lastValueInPrevWord.val);
+    invariant(_lastValueInPrevWord.bitCount == other._lastValueInPrevWord.bitCount);
+    invariant(_lastValueInPrevWord.trailingZerosCount ==
+              other._lastValueInPrevWord.trailingZerosCount);
+    invariant(_currMaxBitLen == other._currMaxBitLen);
+    invariant(_currTrailingZerosCount == other._currTrailingZerosCount);
+    invariant(_lastValidExtensionType == other._lastValidExtensionType);
+    invariant(isSelectorPossible == other.isSelectorPossible);
 }
 
 template class Simple8bBuilder<uint64_t>;

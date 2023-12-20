@@ -67,27 +67,6 @@ constexpr int kMaxCapacity = BSONObjMaxUserSize;
 // Memory offset to get to BSONElement value when field name is an empty string.
 constexpr int kElementValueOffset = 2;
 
-// Lookup table to go from Control byte (high 4 bits) to scale index.
-constexpr uint8_t kInvalidScaleIndex = 0xFF;
-constexpr std::array<uint8_t, 16> kControlToScaleIndex = {
-    kInvalidScaleIndex,
-    kInvalidScaleIndex,
-    kInvalidScaleIndex,
-    kInvalidScaleIndex,
-    kInvalidScaleIndex,
-    kInvalidScaleIndex,
-    kInvalidScaleIndex,
-    kInvalidScaleIndex,
-    Simple8bTypeUtil::kMemoryAsInteger,  // 0b1000
-    0,                                   // 0b1001
-    1,                                   // 0b1010
-    2,                                   // 0b1011
-    3,                                   // 0b1100
-    4,                                   // 0b1101
-    kInvalidScaleIndex,
-    kInvalidScaleIndex};
-
-
 /**
  * Helper class to perform recursion over a BSONObj. Two functions are provided:
  *
@@ -376,7 +355,7 @@ void BSONColumn::Iterator::_incrementRegular(Regular& regular) {
     }
 
     // Load new control byte
-    if (_isInterleavedStart(*_control)) {
+    if (bsoncolumn::isInterleavedStartControlByte(*_control)) {
         _initializeInterleaving();
         return;
     }
@@ -507,20 +486,6 @@ void BSONColumn::Iterator::_handleEOO() {
     _decompressed = {};
 }
 
-bool BSONColumn::Iterator::_isLiteral(char control) {
-    return (control & 0xE0) == 0;
-}
-
-bool BSONColumn::Iterator::_isInterleavedStart(char control) {
-    return control == bsoncolumn::kInterleavedStartControlByteLegacy ||
-        control == bsoncolumn::kInterleavedStartControlByte ||
-        control == bsoncolumn::kInterleavedStartArrayRootControlByte;
-}
-
-uint8_t BSONColumn::Iterator::_numSimple8bBlocks(char control) {
-    return (control & 0x0F) + 1;
-}
-
 void BSONColumn::Iterator::DecodingState::loadUncompressed(const BSONElement& elem) {
     BSONType type = elem.type();
     if (uses128bit(type)) {
@@ -583,7 +548,7 @@ BSONColumn::Iterator::DecodingState::loadControl(ElementStorage& allocator,
                                                  const char* end) {
     // Load current control byte, it can be either a literal or Simple-8b deltas
     uint8_t control = *buffer;
-    if (_isLiteral(control)) {
+    if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
         // Load BSONElement from the literal and set last encoded in case we need to calculate
         // deltas from this literal
         BSONElement literalElem(buffer, 1, -1);
@@ -592,7 +557,7 @@ BSONColumn::Iterator::DecodingState::loadControl(ElementStorage& allocator,
     }
 
     // Setup decoder for this range of Simple-8b blocks
-    uint8_t blocks = _numSimple8bBlocks(control);
+    uint8_t blocks = bsoncolumn::numSimple8bBlocksForControlByte(control);
     int size = sizeof(uint64_t) * blocks;
     uassert(6067608, "Invalid BSON Column encoding", buffer + size + 1 < end);
 
@@ -602,10 +567,10 @@ BSONColumn::Iterator::DecodingState::loadControl(ElementStorage& allocator,
     visit(OverloadedVisitor{
               [&](DecodingState::Decoder64& d64) {
                   // Simple-8b delta block, load its scale factor and validate for sanity
-                  d64.scaleIndex = kControlToScaleIndex[(control & 0xF0) >> 4];
+                  d64.scaleIndex = bsoncolumn::scaleIndexForControlByte(control);
                   uassert(6067606,
                           "Invalid control byte in BSON Column",
-                          d64.scaleIndex != kInvalidScaleIndex);
+                          d64.scaleIndex != bsoncolumn::kInvalidScaleIndex);
 
                   // If Double, scale last value according to this scale factor
                   auto type = lastValue.type();
@@ -657,22 +622,50 @@ BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& alloc
 
     // Decoder state is now setup, materialize new value. We allocate a new BSONElement that fits
     // same value size as previous
-    BSONType type = lastValue.type();
-    ElementStorage::Element elem =
-        allocator.allocate(type, lastValue.fieldNameStringData(), lastValue.valuesize());
+    lastValue = d64.materialize(allocator, lastValue, lastValue.fieldNameStringData());
+    return lastValue;
+}
+
+BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& allocator,
+                                                           Decoder128& d128) {
+    const auto& delta = *d128.pos;
+    // boost::none represent skip, just append EOO BSONElement.
+    if (!delta) {
+        return BSONElement();
+    }
+
+    // If we have a zero delta no need to allocate a new Element, we can just use previous.
+    if (*delta == 0) {
+        return lastValue;
+    }
+
+    // Expand delta as last encoded.
+    d128.lastEncodedValue =
+        expandDelta(d128.lastEncodedValue, Simple8bTypeUtil::decodeInt128(*delta));
+
+    // Decoder state is now setup, write value depending on type
+    lastValue = d128.materialize(allocator, lastValue, lastValue.fieldNameStringData());
+    return lastValue;
+}
+
+BSONElement BSONColumn::Iterator::DecodingState::Decoder64::materialize(
+    ElementStorage& allocator, BSONElement last, StringData fieldName) const {
+    // Decoder state is now setup, materialize new value. We allocate a new BSONElement that fits
+    // same value size as previous
+    BSONType type = last.type();
+    ElementStorage::Element elem = allocator.allocate(type, fieldName, last.valuesize());
 
     // Write value depending on type
-    int64_t valueToWrite =
-        d64.deltaOfDelta ? d64.lastEncodedValueForDeltaOfDelta : d64.lastEncodedValue;
+    int64_t valueToWrite = deltaOfDelta ? lastEncodedValueForDeltaOfDelta : lastEncodedValue;
     switch (type) {
         case NumberDouble:
             DataView(elem.value())
                 .write<LittleEndian<double>>(
-                    Simple8bTypeUtil::decodeDouble(valueToWrite, d64.scaleIndex));
+                    Simple8bTypeUtil::decodeDouble(valueToWrite, scaleIndex));
             break;
         case jstOID: {
             Simple8bTypeUtil::decodeObjectIdInto(
-                elem.value(), valueToWrite, lastValue.__oid().getInstanceUnique());
+                elem.value(), valueToWrite, last.__oid().getInstanceUnique());
         } break;
         case Date:
         case NumberLong:
@@ -700,38 +693,21 @@ BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& alloc
             MONGO_UNREACHABLE;
     }
 
-    lastValue = elem.element();
-    return lastValue;
+    return elem.element();
 }
 
-BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& allocator,
-                                                           Decoder128& d128) {
-    const auto& delta = *d128.pos;
-    // boost::none represent skip, just append EOO BSONElement.
-    if (!delta) {
-        return BSONElement();
-    }
-
-    // If we have a zero delta no need to allocate a new Element, we can just use previous.
-    if (*delta == 0) {
-        return lastValue;
-    }
-
-    // Expand delta as last encoded.
-    d128.lastEncodedValue =
-        expandDelta(d128.lastEncodedValue, Simple8bTypeUtil::decodeInt128(*delta));
-
+BSONElement BSONColumn::Iterator::DecodingState::Decoder128::materialize(
+    ElementStorage& allocator, BSONElement last, StringData fieldName) const {
     // Decoder state is now setup, write value depending on type
-    auto elemFn = [&]() -> ElementStorage::Element {
-        BSONType type = lastValue.type();
+    return [&]() -> ElementStorage::Element {
+        BSONType type = last.type();
         switch (type) {
             case String:
             case Code: {
-                Simple8bTypeUtil::SmallString ss =
-                    Simple8bTypeUtil::decodeString(d128.lastEncodedValue);
+                Simple8bTypeUtil::SmallString ss = Simple8bTypeUtil::decodeString(lastEncodedValue);
                 // Add 5 bytes to size, strings begin with a 4 byte count and ends with a null
                 // terminator
-                auto elem = allocator.allocate(type, lastValue.fieldNameStringData(), ss.size + 5);
+                auto elem = allocator.allocate(type, fieldName, ss.size + 5);
                 // Write count, size includes null terminator
                 DataView(elem.value()).write<LittleEndian<int32_t>>(ss.size + 1);
                 // Write string value
@@ -741,18 +717,16 @@ BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& alloc
                 return elem;
             }
             case BinData: {
-                auto elem = allocator.allocate(
-                    type, lastValue.fieldNameStringData(), lastValue.valuesize());
+                auto elem = allocator.allocate(type, fieldName, last.valuesize());
                 // The first 5 bytes in binData is a count and subType, copy them from previous
-                memcpy(elem.value(), lastValue.value(), 5);
+                memcpy(elem.value(), last.value(), 5);
                 Simple8bTypeUtil::decodeBinary(
-                    d128.lastEncodedValue, elem.value() + 5, lastValue.valuestrsize());
+                    lastEncodedValue, elem.value() + 5, last.valuestrsize());
                 return elem;
             }
             case NumberDecimal: {
-                auto elem = allocator.allocate(
-                    type, lastValue.fieldNameStringData(), lastValue.valuesize());
-                Decimal128 dec128 = Simple8bTypeUtil::decodeDecimal128(d128.lastEncodedValue);
+                auto elem = allocator.allocate(type, fieldName, last.valuesize());
+                Decimal128 dec128 = Simple8bTypeUtil::decodeDecimal128(lastEncodedValue);
                 Decimal128::Value dec128Val = dec128.getValue();
                 DataView(elem.value()).write<LittleEndian<long long>>(dec128Val.low64);
                 DataView(elem.value() + sizeof(long long))
@@ -763,11 +737,10 @@ BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& alloc
                 // No other types should use int128
                 MONGO_UNREACHABLE;
         }
-    }();
-
-    lastValue = elemFn.element();
-    return lastValue;
+    }()
+                        .element();
 }
+
 
 BSONColumn::Iterator::Interleaved::Interleaved(BSONObj refObj,
                                                BSONType referenceObjType,
@@ -832,7 +805,7 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
     uint8_t control;
     while (byteIter != columnEnd) {
         control = static_cast<uint8_t>(*byteIter);
-        if (Iterator::_isLiteral(control)) {
+        if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
             BSONElement literalElem(byteIter, 1, -1);
             if (control == elementType) {
                 return true;
@@ -843,13 +816,13 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
             }
 
             byteIter += literalElem.size();
-        } else if (Iterator::_isInterleavedStart(*byteIter)) {
+        } else if (bsoncolumn::isInterleavedStartControlByte(*byteIter)) {
 
             // TODO SERVER-74926 add interleaved support
             uasserted(6580401,
                       "Interleaved mode not yet supported for BSONColumn::contains_forTest.");
         } else { /* Simple-8b Delta Block */
-            uint8_t numBlocks = Iterator::_numSimple8bBlocks(control);
+            uint8_t numBlocks = bsoncolumn::numSimple8bBlocksForControlByte(control);
             int simple8bBlockSize = sizeof(uint64_t) * numBlocks;
             uassert(
                 6580400, "Invalid BSON Column encoding", byteIter + simple8bBlockSize < columnEnd);

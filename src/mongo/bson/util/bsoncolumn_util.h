@@ -36,13 +36,40 @@ namespace mongo::bsoncolumn {
 static constexpr char kInterleavedStartControlByteLegacy = (char)0xF0;
 static constexpr char kInterleavedStartControlByte = (char)0xF1;
 static constexpr char kInterleavedStartArrayRootControlByte = (char)0xF2;
+static constexpr uint8_t kInvalidScaleIndex = 0xFF;
 
-inline bool isLiteralControlByte(char control) {
+inline bool isUncompressedLiteralControlByte(uint8_t control) {
     return (control & 0xE0) == 0;
 }
 
-inline uint8_t numSimple8bBlocksForControlByte(char control) {
+inline bool isInterleavedStartControlByte(char control) {
+    return control == kInterleavedStartControlByteLegacy ||
+        control == kInterleavedStartControlByte || control == kInterleavedStartArrayRootControlByte;
+}
+
+inline uint8_t numSimple8bBlocksForControlByte(uint8_t control) {
     return (control & 0x0F) + 1;
+}
+
+inline uint8_t scaleIndexForControlByte(uint8_t control) {
+    static constexpr std::array<uint8_t, 16> kControlToScaleIndex = {kInvalidScaleIndex,
+                                                                     kInvalidScaleIndex,
+                                                                     kInvalidScaleIndex,
+                                                                     kInvalidScaleIndex,
+                                                                     kInvalidScaleIndex,
+                                                                     kInvalidScaleIndex,
+                                                                     kInvalidScaleIndex,
+                                                                     kInvalidScaleIndex,
+                                                                     5,  // 0b1000
+                                                                     0,  // 0b1001
+                                                                     1,  // 0b1010
+                                                                     2,  // 0b1011
+                                                                     3,  // 0b1100
+                                                                     4,  // 0b1101
+                                                                     kInvalidScaleIndex,
+                                                                     kInvalidScaleIndex};
+
+    return kControlToScaleIndex[(control & 0xF0) >> 4];
 }
 
 bool usesDeltaOfDelta(BSONType type);

@@ -60,6 +60,13 @@ public:
     explicit BSONColumnBuilder(BufBuilder builder);
 
     /**
+     * Initializes this BSONColumnBuilder from a BSONColumn binary. Leaves the BSONColumnBuilder in
+     * a state as-if the contents of the BSONColumn have been appended to it without calling
+     * finalize(). This allows for efficient appending of new data to this BSONColumn.
+     */
+    BSONColumnBuilder(const char* binary, int size);
+
+    /**
      * Appends a BSONElement to this BSONColumnBuilder.
      *
      * Value will be stored delta compressed if possible and uncompressed otherwise.
@@ -118,6 +125,12 @@ public:
      * Returns the number of interleaved start control bytes this BSONColumnBuilder has written.
      */
     int numInterleavedStartWritten() const;
+
+    /**
+     * Validates that the internal state of this BSONColumnBuilder is identical to the provided one.
+     * This guarantees that appending more data to either of them would produce the same binary.
+     */
+    void assertInternalStateIdentical_forTest(const BSONColumnBuilder& other) const;
 
 private:
     using ControlBlockWriteFn = std::function<void(const char*, size_t)>;
@@ -272,6 +285,9 @@ private:
         // Helper to flatten Object to compress to match _subobjStates
         std::vector<BSONElement> flattenedAppendedObj;
     };
+
+    // Internal helper to perform reopen/initialization of this class from a BSONColumn binary.
+    class BinaryReopen;
 
     // Append helper for appending a BSONObj
     BSONColumnBuilder& _appendObj(Element elem);

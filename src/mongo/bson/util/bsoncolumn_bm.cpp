@@ -232,6 +232,42 @@ void benchmarkCompression(benchmark::State& state,
                     100.0 * (1 - ((double)compressedElement.valuesize() / uncompressedSize))));
 }
 
+void benchmarkReopen(benchmark::State& state, const BSONElement& compressedElement, int skipSize) {
+    int size;
+    const char* binary = compressedElement.binData(size);
+
+    auto reopen = [&]() {
+        BSONColumnBuilder cb(binary, size);
+        return true;
+    };
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(reopen());
+    }
+}
+
+void benchmarkReopenNaive(benchmark::State& state,
+                          const BSONElement& compressedElement,
+                          int skipSize) {
+    int size;
+    const char* binary = compressedElement.binData(size);
+
+    auto reopen = [&]() {
+        BSONColumnBuilder cb;
+        BSONColumn col(binary, size);
+        for (auto&& decompressed : col) {
+            cb.append(decompressed);
+        }
+        return true;
+    };
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(reopen());
+    }
+}
+
 }  // namespace
 
 void BM_decompressIntegers(benchmark::State& state, int skipPercentage) {
@@ -286,10 +322,21 @@ void BM_compressObjectIds(benchmark::State& state, int skipPercentage) {
     benchmarkCompression(state, compressed.firstElement(), sizeof(OID));
 }
 
+void BM_reopenIntegers(benchmark::State& state, int skipPercentage, int num) {
+    BSONObj compressed = buildCompressed(generateIntegers(num, skipPercentage));
+    benchmarkReopen(state, compressed.firstElement(), sizeof(int32_t));
+}
+
+void BM_reopenNaiveIntegers(benchmark::State& state, int skipPercentage, int num) {
+    BSONObj compressed = buildCompressed(generateIntegers(num, skipPercentage));
+    benchmarkReopenNaive(state, compressed.firstElement(), sizeof(int32_t));
+}
+
 void BM_compressFTDC(benchmark::State& state) {
     BSONObj compressed = getCompressedFTDC();
     benchmarkCompression(state, compressed.firstElement(), 0);
 }
+
 
 BENCHMARK_CAPTURE(BM_decompressIntegers, Skip = 0 %, 0);
 BENCHMARK_CAPTURE(BM_decompressIntegers, Skip = 10 %, 10);
@@ -360,6 +407,38 @@ BENCHMARK_CAPTURE(BM_compressTimestamps, Mean = 5 / Stddev = 2 / Skip = 90 %, 0,
 BENCHMARK_CAPTURE(BM_compressObjectIds, Skip = 0 %, 0);
 BENCHMARK_CAPTURE(BM_compressObjectIds, Skip = 10 %, 10);
 BENCHMARK_CAPTURE(BM_compressObjectIds, Skip = 90 %, 90);
+
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 0 % / Num = 10, 0, 10);
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 50 % / Num = 10, 50, 10);
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 99 % / Num = 10, 99, 10);
+
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 0 % / Num = 100, 0, 100);
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 50 % / Num = 100, 50, 100);
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 99 % / Num = 100, 99, 100);
+
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 0 % / Num = 1000, 0, 1000);
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 50 % / Num = 1000, 50, 1000);
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 99 % / Num = 1000, 99, 1000);
+
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 0 % / Num = 10000, 0, 10000);
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 50 % / Num = 10000, 50, 10000);
+BENCHMARK_CAPTURE(BM_reopenIntegers, Skip = 99 % / Num = 10000, 99, 10000);
+
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 0 % / Num = 10, 0, 10);
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 50 % / Num = 10, 50, 10);
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 99 % / Num = 10, 99, 10);
+
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 0 % / Num = 100, 0, 100);
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 50 % / Num = 100, 50, 100);
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 99 % / Num = 100, 99, 100);
+
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 0 % / Num = 1000, 0, 1000);
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 50 % / Num = 1000, 50, 1000);
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 99 % / Num = 1000, 99, 1000);
+
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 0 % / Num = 10000, 0, 10000);
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 50 % / Num = 10000, 50, 10000);
+BENCHMARK_CAPTURE(BM_reopenNaiveIntegers, Skip = 99 % / Num = 10000, 99, 10000);
 
 // The large literal emits this on Visual Studio: Fatal error C1091: compiler limit: string exceeds
 // 65535 bytes in length

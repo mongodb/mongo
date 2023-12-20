@@ -139,6 +139,8 @@ public:
         }
 
     private:
+        friend class BSONColumnBuilder;
+
         // Constructs a begin iterator
         Iterator(boost::intrusive_ptr<ElementStorage> allocator, const char* pos, const char* end);
 
@@ -148,15 +150,6 @@ public:
 
         // Handles EOO when in regular mode. Iterator is set to end.
         void _handleEOO();
-
-        // Checks if control byte is literal
-        static bool _isLiteral(char control);
-
-        // Checks if control byte is interleaved mode start
-        static bool _isInterleavedStart(char control);
-
-        // Returns number of Simple-8b blocks from control byte
-        static uint8_t _numSimple8bBlocks(char control);
 
         // Sentinel to represent end iterator
         static constexpr uint32_t kEndIndex = 0xFFFFFFFF;
@@ -190,6 +183,10 @@ public:
             struct Decoder64 {
                 Decoder64();
 
+                BSONElement materialize(ElementStorage& allocator,
+                                        BSONElement last,
+                                        StringData fieldName) const;
+
                 Simple8b<uint64_t>::Iterator pos;
                 int64_t lastEncodedValue = 0;
                 int64_t lastEncodedValueForDeltaOfDelta = 0;
@@ -201,6 +198,11 @@ public:
              * Internal decoding state for types using 128bit aritmetic
              */
             struct Decoder128 {
+                BSONElement materialize(ElementStorage& allocator,
+                                        BSONElement last,
+                                        StringData fieldName) const;
+
+
                 Simple8b<uint128_t>::Iterator pos;
                 int128_t lastEncodedValue = 0;
             };

@@ -147,6 +147,27 @@ public:
      */
     void setWriteCallback(Simple8bWriteFn writer);
 
+    /**
+     * Forcibly set last value so future append/skip calls may use this to construct RLE. This
+     * should not be called in normal operation.
+     */
+    void setLastForRLE(boost::optional<T> val);
+
+    /**
+     * Reset RLE state on the last value, if needed. This should not be called in normal operation.
+     */
+    void resetLastForRLEIfNeeded() {
+        if (!_rlePossible()) {
+            _lastValueInPrevWord = {};
+        }
+    }
+
+    /**
+     * Validates that the internal state of this Simple8bBuilder is identical to the provided one.
+     * This guarantees that appending more data to either of them would produce the same binary.
+     */
+    void assertInternalStateIdentical_forTest(const Simple8bBuilder<T>& other) const;
+
 private:
     // Number of different type of selectors and their extensions available
     static constexpr uint8_t kNumOfSelectorTypes = 4;
@@ -195,6 +216,14 @@ private:
 
     struct EightSelectorSmallEncodeFunctor;
     struct EightSelectorLargeEncodeFunctor;
+
+    /**
+     * Helper function to calculate PendingValue from user input. Pending value contain number of
+     * significant bits and trailing zeros required to store the value in the different selector
+     * types. If the value is not possible to store in a Simple8b block boost::none will be
+     * returned.
+     */
+    static boost::optional<PendingValue> _calculatePendingValue(T val);
 
     /**
      * Appends a value to the Simple8b chain of words.
