@@ -160,6 +160,9 @@ private:
 
 class ChunkHistory : public ChunkHistoryBase {
 public:
+    using ChunkHistoryBase::serialize;
+    using ChunkHistoryBase::toBSON;
+
     ChunkHistory() : ChunkHistoryBase() {}
     ChunkHistory(mongo::Timestamp ts, mongo::ShardId shard) : ChunkHistoryBase() {
         setValidAfter(std::move(ts));

@@ -773,6 +773,23 @@ public:
             shardKey);
     }
 
+    template <typename Callable>
+    void forEachOverlappingChunk(const BSONObj& min,
+                                 const BSONObj& max,
+                                 bool isMaxInclusive,
+                                 Callable&& handler) const {
+        _rt->optRt->forEachOverlappingChunk(
+            min,
+            max,
+            isMaxInclusive,
+            [this, handler = std::forward<Callable>(handler)](const auto& chunkInfo) mutable {
+                if (!handler(Chunk{*chunkInfo, _clusterTime})) {
+                    return false;
+                }
+                return true;
+            });
+    }
+
     /**
      * Returns true if a document with the given "shardKey" is owned by the shard with the given
      * "shardId" in this routing table. If "shardKey" is empty returns false. If "shardKey" is not a

@@ -139,7 +139,7 @@ ShardId selectBestShard(const ChunkDistributionMap& chunkMap,
                         const ZoneInfo& zoneInfo,
                         const ZoneShardMap& zoneToShards,
                         const ChunkRange& chunkRange) {
-    auto zone = zoneInfo.getZoneForChunk(chunkRange);
+    auto zone = zoneInfo.getZoneForRange(chunkRange);
     auto iter = zoneToShards.find(zone);
 
     uassert(4952605,
@@ -1098,7 +1098,7 @@ void ShardDistributionSplitPolicy::_checkShardsMatchZones(
     }
 
     for (const auto& chunk : chunks) {
-        auto zoneFromCmdParameter = zoneInfo.getZoneForChunk({chunk.getMin(), chunk.getMax()});
+        auto zoneFromCmdParameter = zoneInfo.getZoneForRange({chunk.getMin(), chunk.getMax()});
         auto iter = shardIdToTags.find(chunk.getShard());
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "Specified zones and shardDistribution are conflicting with the "

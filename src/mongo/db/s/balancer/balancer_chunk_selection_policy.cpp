@@ -114,37 +114,14 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
     const NamespaceString& nss,
     const ShardStatisticsVector& allShards,
     const ChunkManager& chunkMgr) {
-    ShardToChunksMap shardToChunksMap;
 
-    // Makes sure there is an entry in shardToChunksMap for every shard, so empty shards will also
-    // be accounted for
-    for (const auto& stat : allShards) {
-        shardToChunksMap[stat.shardId];
-    }
-
-    chunkMgr.forEachChunk([&](const auto& chunkEntry) {
-        ChunkType chunk;
-        chunk.setCollectionUUID(chunkMgr.getUUID());
-        chunk.setMin(chunkEntry.getMin());
-        chunk.setMax(chunkEntry.getMax());
-        chunk.setJumbo(chunkEntry.isJumbo());
-        chunk.setShard(chunkEntry.getShardId());
-        chunk.setVersion(chunkEntry.getLastmod());
-
-        shardToChunksMap[chunkEntry.getShardId()].push_back(chunk);
-
-        return true;
-    });
-
-    const auto& keyPattern = chunkMgr.getShardKeyPattern().getKeyPattern();
-
-    // Cache the collection zones
-    auto swZoneInfo = ZoneInfo::getZonesForCollection(opCtx, nss, keyPattern);
+    auto swZoneInfo =
+        ZoneInfo::getZonesForCollection(opCtx, nss, chunkMgr.getShardKeyPattern().getKeyPattern());
     if (!swZoneInfo.isOK()) {
         return swZoneInfo.getStatus();
     }
 
-    return {DistributionStatus{nss, std::move(shardToChunksMap), std::move(swZoneInfo.getValue())}};
+    return {DistributionStatus{nss, std::move(swZoneInfo.getValue()), chunkMgr}};
 }
 
 stdx::unordered_map<NamespaceString, CollectionDataSizeInfoForBalancing>
@@ -680,7 +657,7 @@ StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicy::_getMigrateCand
 
     const DistributionStatus& distribution = collInfoStatus.getValue();
 
-    for (const auto& zoneRangeEntry : distribution.zoneRanges()) {
+    for (const auto& zoneRangeEntry : distribution.getZoneInfo().zoneRanges()) {
         const auto& zoneRange = zoneRangeEntry.second;
 
         const auto chunkAtZoneMin = cm.findIntersectingChunkWithSimpleCollation(zoneRange.min);
