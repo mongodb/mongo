@@ -61,6 +61,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(waitForDatabaseToBeDropped);
+
 enum CompareResult { CompareResult_Unknown, CompareResult_GTE, CompareResult_LT };
 
 constexpr auto kIdFieldName = "_id"_sd;
@@ -179,6 +181,8 @@ bool isMetadataDifferent(const CollectionRoutingInfo& managerA,
 
 }  // namespace
 
+const size_t CollectionRoutingInfoTargeter::kMaxDatabaseCreationAttempts = 3;
+
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(OperationContext* opCtx,
                                                              const NamespaceString& nss,
                                                              boost::optional<OID> targetEpoch)
@@ -195,13 +199,41 @@ CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const CollectionRou
  * user request is on the view namespace, we implicity tranform the request to the buckets namepace.
  */
 CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opCtx, bool refresh) {
-    cluster::createDatabase(opCtx, _nss.db());
+    auto [cm, sii] = [&] {
+        size_t attempts = 1;
+        while (true) {
+            try {
+                cluster::createDatabase(opCtx, _nss.db());
 
-    if (refresh) {
-        uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
-    }
-    auto [cm, sii] = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+                if (refresh) {
+                    uassertStatusOK(
+                        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
+                            opCtx, _nss));
+                }
+
+                if (MONGO_unlikely(waitForDatabaseToBeDropped.shouldFail())) {
+                    LOGV2(8314600, "Hanging due to waitForDatabaseToBeDropped fail point");
+                    waitForDatabaseToBeDropped.pauseWhileSet(opCtx);
+                }
+
+                return uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                LOGV2_INFO(8314601,
+                           "Failed initialization of routing info because the database has been "
+                           "concurrently dropped",
+                           "db"_attr = _nss.db(),
+                           "attemptNumber"_attr = attempts,
+                           "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
+
+                if (attempts++ >= kMaxDatabaseCreationAttempts) {
+                    // The maximum number of attempts has been reached, so the procedure fails as it
+                    // could be a logical error. At this point, it is unlikely that the error is
+                    // caused by concurrent drop database operations.
+                    throw;
+                }
+            }
+        }
+    }();
 
     // For a sharded time-series collection, only the underlying buckets collection is stored on the
     // config servers. If the user operation is on the time-series view namespace, we should check
