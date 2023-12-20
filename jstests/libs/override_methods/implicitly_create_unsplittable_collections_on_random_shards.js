@@ -160,12 +160,19 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, runCommandOriginal, m
         return runCommandOriginal.apply(conn, makeFuncArgs(cmdObj));
     }
 
-    let options = Object.merge({}, cmdObj);
-    delete options['create'];
-
     // Call original create method if the given options are not supported by
     // createUnsplittableCollection
     let unsupportedOption = false;
+
+    let options = Object.merge({}, cmdObj);
+    let nss = options['create'];
+    // TODO SERVER-79248 or SERVER-79254 remove this entire check once both cleanup
+    // and compaction coordinator work on unsplittable collection
+    if (nss.endsWith(".ecoc") || nss.endsWith(".esc") || nss.endsWith(".ecc") ||
+        nss.startsWith("enxcol_.")) {
+        unsupportedOption = true
+    }
+    delete options['create'];
 
     const optNames = Object.keys(options);
     optNames.forEach((optName) => {

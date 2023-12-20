@@ -130,7 +130,7 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
     }
 
     auto response = uassertStatusOK(
-        executeCommandAgainstDatabasePrimary(
+        executeDDLCoordinatorCommandAgainstDatabasePrimary(
             opCtx,
             nss.dbName(),
             dbInfo,

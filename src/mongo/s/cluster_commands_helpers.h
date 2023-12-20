@@ -299,8 +299,22 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
     Shard::RetryPolicy retryPolicy);
 
 /**
- * Utility for dispatching commands against the shard with the MinKey chunk for the namespace and
- * attaching the appropriate shard version.
+ * Utility for dispatching ddl coordinators commands against the primary of a database and attaching
+ * the appropriate database version.
+ * NOTE: It only attaches the database version which is what is required by the DDL coordinators to
+ * ensure they are running on the current DB primary.
+ */
+AsyncRequestsSender::Response executeDDLCoordinatorCommandAgainstDatabasePrimary(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const CachedDatabaseInfo& dbInfo,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy);
+
+/**
+ * Utility for dispatching commands against the shard with the MinKey chunk for the namespace
+ * and attaching the appropriate shard version.
  *
  * Does not retry on StaleConfig errors.
  */

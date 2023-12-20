@@ -569,6 +569,26 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
     return std::move(responses.front());
 }
 
+AsyncRequestsSender::Response executeDDLCoordinatorCommandAgainstDatabasePrimary(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const CachedDatabaseInfo& dbInfo,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy) {
+    // Attach only dbVersion
+    const auto cmdObjWithDbVersion = appendDbVersionIfPresent(cmdObj, dbInfo);
+
+    auto responses =
+        gatherResponses(opCtx,
+                        dbName,
+                        readPref,
+                        retryPolicy,
+                        std::vector<AsyncRequestsSender::Request>{AsyncRequestsSender::Request(
+                            dbInfo->getPrimary(), cmdObjWithDbVersion)});
+    return std::move(responses.front());
+}
+
 AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     OperationContext* opCtx,
     const NamespaceString& nss,

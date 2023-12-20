@@ -21,9 +21,6 @@ selector:
   - jstests/core/**/where_system_js.js
   - jstests/core/loadserverscripts.js
   - jstests/core/storefunc.js
-  # TODO: SERVER-83399 Enable after fix
-  - src/mongo/db/modules/enterprise/jstests/fle2/cleanup_collection.js
-  - src/mongo/db/modules/enterprise/jstests/fle2/compact_collection.js
   # TODO: SERVER-83349 Enable once dataShard is randomized through a fail point
   - jstests/core/timeseries/timeseries_create.js
   - jstests/core/timeseries/timeseries_create_collection.js
