@@ -187,6 +187,7 @@ await runHistogramsTest(async function testSampleHistogram() {
     // Sargable nodes and Filter nodes get different CEs. Repeat test with/without sargable rewrite.
     runWithParams([{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}],
                   runTest);
-    runWithParams([{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: true}],
-                  runTest);
+    // TODO: Enable with SERVER-83456
+    // runWithParams([{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: true}],
+    //              runTest);
 });

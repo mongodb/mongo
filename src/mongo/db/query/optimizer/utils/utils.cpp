@@ -62,47 +62,6 @@
 
 namespace mongo::optimizer {
 
-void handleScanNodeRemoveOrphansRequirement(const IndexCollationSpec& shardKey,
-                                            PhysPlanBuilder& builder,
-                                            FieldProjectionMap& fieldProjectionMap,
-                                            const IndexReqTarget indexReqTarget,
-                                            const CEType groupCE,
-                                            PrefixId& prefixId) {
-    // Seek nodes are created with a Limit of 1, so the CE will be 1.
-    const auto calculatedCE = indexReqTarget == IndexReqTarget::Seek ? CEType{1.0} : groupCE;
-    // Use EvaluationNodes to get the projections needed to perform shard filtering. Note that
-    // the appropriate top-level projection is used as the input.
-    ABTVector shardKeyComponentProjections;
-    for (auto& e : shardKey) {
-        const PathGet* pathGet = e._path.cast<PathGet>();
-        const auto& fieldName = FieldNameType{pathGet->name().value().toString()};
-        // The caller ensures that the top level path element of each component of the shard key is
-        // pushed down as a projection produced by the PhysicalScan/Seek.
-        auto projName = fieldProjectionMap._fieldProjections.at(fieldName);
-
-        // If the path is dotted, get the needed information
-        if (pathGet->getPath().is<PathGet>()) {
-            auto parentProjName = projName;
-            projName = prefixId.getNextId("shardKey");
-            builder.make<EvaluationNode>(
-                calculatedCE,
-                projName,
-                make<EvalPath>(pathGet->getPath(), make<Variable>(parentProjName)),
-                std::move(builder._node));
-        }
-        ABT shardKeyComponentProj = make<Variable>(std::move(projName));
-        if (e._op == CollationOp::Clustered) {
-            shardKeyComponentProj =
-                make<FunctionCall>("shardHash", makeSeq(std::move(shardKeyComponentProj)));
-        }
-        shardKeyComponentProjections.push_back(std::move(shardKeyComponentProj));
-    }
-    // Make the FunctionCall and FilterNode.
-    auto functionCallNode =
-        make<FunctionCall>("shardFilter", std::move(shardKeyComponentProjections));
-    builder.make<FilterNode>(calculatedCE, std::move(functionCallNode), std::move(builder._node));
-}
-
 ABT makeBalancedBooleanOpTree(Operations logicOp, std::vector<ABT> leaves) {
     auto builder = [=](ABT lhs, ABT rhs) {
         return make<BinaryOp>(logicOp, std::move(lhs), std::move(rhs));

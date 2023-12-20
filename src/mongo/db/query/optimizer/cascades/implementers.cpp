@@ -29,8 +29,13 @@
 
 #include "mongo/db/query/optimizer/cascades/implementers.h"
 
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
+#include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -40,6 +45,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -163,6 +169,49 @@ static bool addShardKeyProjectionsToIndexScan(const IndexCollationSpec& index,
         }
     }
     return true;
+}
+
+/**
+ * Builds the evaluation nodes necessary to retrieve all non-top-level fields from each shard key
+ * path, and the filter node needed to perform shard filtering. Determines the CE of the nodes
+ * according to the indexReqTarget.
+ */
+void handleScanNodeRemoveOrphansRequirement(const IndexCollationSpec& shardKey,
+                                            PhysPlanBuilder& builder,
+                                            FieldProjectionMap& fieldProjectionMap,
+                                            const CEType calculatedCE,
+                                            PrefixId& prefixId) {
+    // Use EvaluationNodes to get the projections needed to perform shard filtering. Note that
+    // the appropriate top-level projection is used as the input.
+    ABTVector shardKeyComponentProjections;
+    for (auto& e : shardKey) {
+        const PathGet* pathGet = e._path.cast<PathGet>();
+        const auto& fieldName = FieldNameType{pathGet->name().value().toString()};
+        // The caller ensures that the top level path element of each component of the shard key is
+        // pushed down as a projection produced by the PhysicalScan/Seek.
+        auto projName = fieldProjectionMap._fieldProjections.at(fieldName);
+
+        // If the path is dotted, get the needed information
+        if (pathGet->getPath().is<PathGet>()) {
+            auto parentProjName = projName;
+            projName = prefixId.getNextId("shardKey");
+            builder.make<EvaluationNode>(
+                calculatedCE,
+                projName,
+                make<EvalPath>(pathGet->getPath(), make<Variable>(parentProjName)),
+                std::move(builder._node));
+        }
+        ABT shardKeyComponentProj = make<Variable>(std::move(projName));
+        if (e._op == CollationOp::Clustered) {
+            shardKeyComponentProj =
+                make<FunctionCall>("shardHash", makeSeq(std::move(shardKeyComponentProj)));
+        }
+        shardKeyComponentProjections.push_back(std::move(shardKeyComponentProj));
+    }
+    // Make the FunctionCall and FilterNode.
+    auto functionCallNode =
+        make<FunctionCall>("shardFilter", std::move(shardKeyComponentProjections));
+    builder.make<FilterNode>(calculatedCE, std::move(functionCallNode), std::move(builder._node));
 }
 
 // Builds filter node required to perform shard filtering on top of IndexScan. The function assumes
@@ -301,40 +350,38 @@ public:
         const bool mustRemoveOrphans =
             getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove();
         if (mustRemoveOrphans) {
-            const auto& topLevelFieldNames = _metadata._scanDefs.at(node.getScanDefName())
-                                                 .shardingMetadata()
-                                                 .topLevelShardKeyFieldNames();
-            for (auto& fieldName : topLevelFieldNames) {
-                if (!fieldProjectionMap._fieldProjections.contains(fieldName)) {
-                    auto projName = _prefixId.getNextId("shardKey");
-                    fieldProjectionMap._fieldProjections.insert({fieldName, projName});
-                }
-            }
+            addTopLevelShardKeyFields(_metadata._scanDefs.at(node.getScanDefName())
+                                          .shardingMetadata()
+                                          .topLevelShardKeyFieldNames(),
+                                      fieldProjectionMap);
         }
+
         PhysPlanBuilder builder;
+        CEType groupCE{0.0};
         // Construct the Seek or Scan Node
         if (indexReqTarget == IndexReqTarget::Seek) {
             // If optimizing a Seek, override CE to 1.0.
-            builder.make<SeekNode>(
-                CEType{1.0}, ridProjName, fieldProjectionMap, node.getScanDefName());
+            groupCE = {1.0};
+            builder.make<SeekNode>(groupCE, ridProjName, fieldProjectionMap, node.getScanDefName());
             builder.make<LimitSkipNode>(
-                CEType{1.0}, LimitSkipRequirement{1, 0}, std::move(builder._node));
+                groupCE, LimitSkipRequirement{1, 0}, std::move(builder._node));
         } else {
+            groupCE = getPropertyConst<CardinalityEstimate>(_logicalProps).getEstimate();
             builder.make<PhysicalScanNode>(
-                getPropertyConst<CardinalityEstimate>(_logicalProps).getEstimate(),
+                groupCE,
                 fieldProjectionMap,
                 node.getScanDefName(),
                 canUseParallelScan,
                 _metadata._scanDefs.at(node.getScanDefName()).getScanOrder());
         }
+
         // If needed, add EvaluationNodes to collect the shard key from dotted paths.
         if (mustRemoveOrphans) {
             handleScanNodeRemoveOrphansRequirement(
                 _metadata._scanDefs.at(node.getScanDefName()).shardingMetadata().shardKey(),
                 builder,
                 fieldProjectionMap,
-                indexReqTarget,
-                getPropertyConst<CardinalityEstimate>(_logicalProps).getEstimate(),
+                groupCE,
                 _prefixId);
         }
 
@@ -449,6 +496,7 @@ public:
                   "Must not have logical delegator nodes in the list of the logical nodes");
     }
 
+
     void operator()(const ABT::reference_type n, const FilterNode& node) {
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // We cannot satisfy here.
@@ -462,12 +510,84 @@ public:
             return;
         }
 
+        bool canUseParallelScan = false;
+        // Find a ScanNode that is suitable for pushing down projections to.
+        if (auto scanNodeInfo = getPushdownScanNodeInfo(node)) {
+            auto [scanNode, scanGroupId, GroupIdType] = *scanNodeInfo;
+            boost::optional<ABT> newFilter;
+            FieldProjectionMap fieldProjectionMap;
+
+            // Extract top-level fields from all paths.
+            newFilter = FieldPushdown::pushFields(
+                node, fieldProjectionMap, _prefixId, scanNode->getProjectionName());
+
+            if (newFilter) {
+                const auto& scanDefName = scanNode->getScanDefName();
+                // There is similar logic in ScanNode's implementer, however ScanNode requires
+                // that all requiredProjections are either the root or the rid projection, while
+                // here we allow other projections that will be pushed to the PhysicalScanNode.
+                const auto& requiredProjections =
+                    getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
+                const ProjectionName& ridProjName = _ridProjections.at(scanDefName);
+                if (requiredProjections.find(scanNode->getProjectionName())) {
+                    fieldProjectionMap._rootProjection = scanNode->getProjectionName();
+                }
+                if (requiredProjections.find(ridProjName)) {
+                    fieldProjectionMap._ridProjection = ridProjName;
+                }
+
+                // If shard filtering is necessary, do up-front prep to push top-level fields down
+                // into the scan.
+                const bool mustRemoveOrphans =
+                    getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove();
+                if (mustRemoveOrphans) {
+                    addTopLevelShardKeyFields(_metadata._scanDefs.at(scanDefName)
+                                                  .shardingMetadata()
+                                                  .topLevelShardKeyFieldNames(),
+                                              fieldProjectionMap);
+                }
+
+                // Create a PhysicalScanNode as a child of a physical FilterNode.
+                PhysPlanBuilder builder;
+                const LogicalProps& scanLogicalProps = _memo.getLogicalProps(scanGroupId);
+                const CEType scanGroupCE =
+                    getPropertyConst<CardinalityEstimate>(scanLogicalProps).getEstimate();
+                builder.make<PhysicalScanNode>(scanGroupCE,
+                                               fieldProjectionMap,
+                                               scanDefName,
+                                               canUseParallelScan,
+                                               _metadata._scanDefs.at(scanDefName).getScanOrder());
+
+                const CEType filterCE =
+                    getPropertyConst<CardinalityEstimate>(_logicalProps).getEstimate();
+                builder.make<FilterNode>(filterCE, *newFilter, std::move(builder._node));
+
+                // If needed, add EvaluationNodes to collect the shard key from dotted paths.
+                if (mustRemoveOrphans) {
+                    handleScanNodeRemoveOrphansRequirement(
+                        _metadata._scanDefs.at(scanDefName).shardingMetadata().shardKey(),
+                        builder,
+                        fieldProjectionMap,
+                        filterCE,
+                        _prefixId);
+                }
+
+                optimizeChildrenNoAssert(_queue,
+                                         kDefaultPriority,
+                                         PhysicalRewriteType::FilterWithPhysicalScan,
+                                         std::move(builder._node),
+                                         {} /*childProps*/,
+                                         std::move(builder._nodeCEMap));
+                return;
+            }
+        }
+
+        // For whatever reason no field pushdown happened. Create just a physical FilterNode.
+        ABT physicalFilter{n};
         PhysProps newProps = _physProps;
         // Add projections we depend on to the requirement.
         addProjectionsToProperties(newProps, references);
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(true);
-
-        ABT physicalFilter{n};
         optimizeChild<FilterNode, PhysicalRewriteType::Filter>(
             _queue, kDefaultPriority, std::move(physicalFilter), std::move(newProps));
     }
@@ -907,16 +1027,8 @@ public:
             }
 
             if (getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove()) {
-                // Add top level fields of the shard key to the fieldProjectionMap used to create
-                // the PhysicalScan.
-                const auto& topLevelFieldNames =
-                    scanDef.shardingMetadata().topLevelShardKeyFieldNames();
-                for (auto&& fieldName : topLevelFieldNames) {
-                    if (!fieldProjectionMap._fieldProjections.contains(fieldName)) {
-                        fieldProjectionMap._fieldProjections.insert(
-                            {fieldName, _prefixId.getNextId("evalTemp")});
-                    }
-                }
+                addTopLevelShardKeyFields(scanDef.shardingMetadata().topLevelShardKeyFieldNames(),
+                                          fieldProjectionMap);
             }
 
             PhysPlanBuilder builder;
@@ -934,6 +1046,7 @@ public:
                                                _metadata._scanDefs.at(scanDefName).getScanOrder());
                 rule = PhysicalRewriteType::SargableToPhysicalScan;
             } else {
+                // indexReqTarget == IndexReqTarget::Seek
                 baseCE = {1.0};
 
                 // Try Seek with Limit 1.
@@ -960,7 +1073,6 @@ public:
                 handleScanNodeRemoveOrphansRequirement(scanDef.shardingMetadata().shardKey(),
                                                        builder,
                                                        fieldProjectionMap,
-                                                       indexReqTarget,
                                                        currentGroupCE,
                                                        _prefixId);
             }
@@ -969,7 +1081,7 @@ public:
                                      kDefaultPriority,
                                      rule,
                                      std::move(builder._node),
-                                     {},
+                                     {} /*childProps*/,
                                      std::move(builder._nodeCEMap));
         }
     }
@@ -1714,6 +1826,18 @@ private:
             _queue, kDefaultPriority, node.getChild(), std::move(newProps));
     }
 
+    // Add top level fields of the shard key to the fieldProjectionMap used to create
+    // the PhysicalScan.
+    void addTopLevelShardKeyFields(const std::vector<FieldNameType>& topLevelFieldNames,
+                                   FieldProjectionMap& fieldProjectionMap) {
+        for (auto&& fieldName : topLevelFieldNames) {
+            if (!fieldProjectionMap._fieldProjections.contains(fieldName)) {
+                fieldProjectionMap._fieldProjections.insert(
+                    {fieldName, _prefixId.getNextId("shardKey")});
+            }
+        }
+    }
+
     struct IndexAvailableDirections {
         // For each equality prefix, keep track if we can match against forward or backward
         // direction.
@@ -2188,6 +2312,139 @@ private:
                                    rightPhysPropsLocal,
                                    leftChild,
                                    rightChild);
+    }
+
+    /**
+     * Analyze a path expression for the presence of top-level PathGet operations,
+     * collect the top-level fields extracted by these operations, and remove the
+     * corresponding PathGet operations. The unique extracted fields are mapped to
+     * projection names which can be pushed by the caller into a PhysicalCollectionScan.
+     */
+    class FieldPushdown {
+    public:
+        FieldPushdown(FieldProjectionMap& fieldProjectionMap,
+                      PrefixId& prefixId,
+                      const ProjectionName& scanProjName)
+            : _fieldProjectionMap(fieldProjectionMap),
+              _prefixId(prefixId),
+              _scanProjName(scanProjName){};
+
+        boost::optional<ABT> operator()(const ABT& n, const PathGet& pathGet) {
+            const FieldNameType& fieldName = pathGet.name();
+            // Create the projection that replaces the top-level pathGet field, and add it to
+            // _fieldProjectionMap which contains the projections pushed to the physical scan.
+            // This projection also becomes the input to the newly created EvalFilter below.
+            const ProjectionName& pushedProjection =
+                getExistingOrTempProjForFieldName(_prefixId, fieldName, _fieldProjectionMap);
+
+            // Skip the top-level field.
+            ABT subPath(pathGet.getPath());
+            ABT evalFilter = make<EvalFilter>(std::move(subPath), make<Variable>(pushedProjection));
+            return evalFilter;
+        }
+
+        boost::optional<ABT> operator()(const ABT& n, const EvalFilter& evalFilter) {
+            const Variable* input = evalFilter.getInput().cast<Variable>();
+            const ABT& filterPath = evalFilter.getPath();
+            if (input && input->name() == _scanProjName) {
+                return filterPath.visit(*this);
+            }
+            // Nothing to push down, return a copy of the original
+            return n;
+        }
+
+        boost::optional<ABT> operator()(const ABT& n, const BinaryOp& boolOp) {
+            // Notice that this function will process any BinaryOp, not just Boolean ones.
+            auto child1 = boolOp.getLeftChild().visit(*this);
+            auto child2 = boolOp.getRightChild().visit(*this);
+            if (child1 && child2) {
+                return make<BinaryOp>(boolOp.op(), std::move(*child1), std::move(*child2));
+            } else {
+                return {};
+            }
+        }
+
+        boost::optional<ABT> operator()(const ABT& n, const PathComposeM& composeM) {
+            return handleComposition<PathComposeM>(composeM, Operations::And);
+        }
+
+        boost::optional<ABT> operator()(const ABT& n, const PathComposeA& composeA) {
+            return handleComposition<PathComposeA>(composeA, Operations::Or);
+        }
+
+        template <typename T>
+        boost::optional<ABT> operator()(const ABT& n, const T& /*nodeSubclass*/) {
+            return {};
+        }
+
+        static boost::optional<ABT> pushFields(const FilterNode& node,
+                                               FieldProjectionMap& fieldProjectionMap,
+                                               PrefixId& prefixId,
+                                               const ProjectionName& scanProjName) {
+            const FilterType& filter = node.getFilter();
+            FieldPushdown instance(fieldProjectionMap, prefixId, scanProjName);
+            boost::optional<ABT> pushedDownFilter = filter.visit(instance);
+            if (pushedDownFilter && fieldProjectionMap._fieldProjections.size() > 0) {
+                return pushedDownFilter;
+            } else {
+                return {};
+            }
+        }
+
+    private:
+        template <class ComposeType>
+        boost::optional<ABT> handleComposition(ComposeType composeOp, Operations boolOp) {
+            auto child1 = composeOp.getPath1().visit(*this);
+            auto child2 = composeOp.getPath2().visit(*this);
+            if (child1 && child2) {
+                return make<BinaryOp>(boolOp, std::move(*child1), std::move(*child2));
+            } else {
+                return {};
+            }
+        }
+
+        FieldProjectionMap& _fieldProjectionMap;
+        PrefixId& _prefixId;
+        const ProjectionName& _scanProjName;
+    };
+
+    /**
+     * Check if the input FilterNode is a direct parent of a ScanNode, and if the ScanNode is
+     * suitable for pushing top-level PathGets as projections of a PhysicalScanNode.
+     */
+    boost::optional<std::tuple<const ScanNode*, GroupIdType, bool>> getPushdownScanNodeInfo(
+        const FilterNode& node) {
+        GroupIdType scanGroupId;
+        bool canUseParallelScan;
+        // Check first if the immediate child of this FilterNode is a ScanNode.
+        scanGroupId = node.getChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+        const ScanNode* scanNode = _memo.getLogicalNodes(scanGroupId).front().cast<ScanNode>();
+        if (!scanNode) {
+            return {};
+        }
+
+        // Check if the child ScanNode is suitable for pushing fields into.
+        const IndexReqTarget indexReqTarget =
+            getPropertyConst<IndexingRequirement>(_physProps).getIndexReqTarget();
+        tassert(8344101,
+                "Filter with a Scan child must have Complete target.",
+                indexReqTarget == IndexReqTarget::Complete);
+        if (_hints._disableScan) {
+            return {};  // Cannot use a PhysicalScan
+        }
+
+        canUseParallelScan = false;
+        if (!distributionsCompatible(
+                indexReqTarget,
+                _metadata._scanDefs.at(scanNode->getScanDefName()).getDistributionAndPaths(),
+                scanNode->getProjectionName(),
+                _logicalProps,
+                psr::makeNoOp(),
+                canUseParallelScan)) {
+            return {};
+        }
+
+        return std::make_tuple(scanNode, scanGroupId, canUseParallelScan);
     }
 
     // We don't own any of those:

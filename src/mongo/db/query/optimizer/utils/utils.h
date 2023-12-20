@@ -486,20 +486,18 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
 bool hasProperIntervals(const PSRExpr::Node& reqs);
 
 /**
- * Builds the evaluation nodes necessary to retrieve all non-top-level fields from each shard key
- * path, and the filter node needed to perform shard filtering. Determines the CE of the nodes
- * according to the indexReqTarget.
- */
-void handleScanNodeRemoveOrphansRequirement(const IndexCollationSpec& shardKey,
-                                            PhysPlanBuilder& builder,
-                                            FieldProjectionMap& fieldProjectionMap,
-                                            IndexReqTarget indexReqTarget,
-                                            CEType groupCE,
-                                            PrefixId& prefixId);
-
-/**
  * Computes the number of plan elements present in the tree.
  */
 size_t countElements(const ABT& node);
+
+/**
+ * If the map {FieldNameType -> ProjectionName} doesn't contain the input fieldName, create a new
+ * temporary projection name, and add the new pair {FieldName -> tempProjectionName} to
+ * 'fieldProjMap'. This function is used when pushing fields down to an operator (a scan) so that
+ * the resulting field value is available through the temp projection to consumer operators.
+ */
+const ProjectionName& getExistingOrTempProjForFieldName(PrefixId& prefixId,
+                                                        const FieldNameType& fieldName,
+                                                        FieldProjectionMap& fieldProjMap);
 
 }  // namespace mongo::optimizer

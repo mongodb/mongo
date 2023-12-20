@@ -109,6 +109,7 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(LogicalRewriteType, LOGICALREWRITER_NAMES)
     F(Exchange)                   \
     F(NLJ)                        \
     F(Filter)                     \
+    F(FilterWithPhysicalScan)     \
     F(RenameProjection)           \
     F(EvaluationPassthrough)      \
     F(SargableIxScanConvert)      \

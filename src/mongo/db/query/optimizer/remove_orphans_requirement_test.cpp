@@ -387,14 +387,14 @@ TEST(PhysRewriter, RemoveOrphansSargableNodeComplete) {
         "Root [{root}]\n"
         "Filter []\n"
         "|   FunctionCall [shardFilter]\n"
-        "|   |   Variable [evalTemp_1]\n"
+        "|   |   Variable [shardKey_2]\n"
         "|   Variable [evalTemp_0]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_0]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
-        "PhysicalScan [{'<root>': root, 'a': evalTemp_0, 'b': evalTemp_1}, c1]\n",
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0, 'b': shardKey_2}, c1]\n",
         optimized);
 }
 
@@ -824,14 +824,14 @@ TEST(PhysRewriter, RemoveOrphanNoEqualityOnCompoundShardKey) {
         "Root [{root}]\n"
         "Filter []\n"
         "|   FunctionCall [shardFilter]\n"
-        "|   |   Variable [evalTemp_1]\n"
+        "|   |   Variable [shardKey_2]\n"
         "|   Variable [evalTemp_0]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_0]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
-        "PhysicalScan [{'<root>': root, 'a': evalTemp_0, 'b': evalTemp_1}, c1]\n",
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0, 'b': shardKey_2}, c1]\n",
         optimized);
     ;
 }

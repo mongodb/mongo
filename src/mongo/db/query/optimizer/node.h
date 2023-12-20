@@ -119,6 +119,7 @@ public:
     const std::string& getScanDefName() const;
 
 private:
+    // Typically the name of the accessed collection and UUID: <coll_name>_<uuid>
     const std::string _scanDefName;
 };
 
