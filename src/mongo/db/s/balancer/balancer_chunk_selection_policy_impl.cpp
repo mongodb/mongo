@@ -46,6 +46,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/get_stats_for_balancing_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
@@ -69,27 +70,6 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
     const NamespaceString& nss,
     const ShardStatisticsVector& allShards,
     const ChunkManager& chunkMgr) {
-    ShardToChunksMap shardToChunksMap;
-
-    // Makes sure there is an entry in shardToChunksMap for every shard, so empty shards will also
-    // be accounted for
-    for (const auto& stat : allShards) {
-        shardToChunksMap[stat.shardId];
-    }
-
-    chunkMgr.forEachChunk([&](const auto& chunkEntry) {
-        ChunkType chunk;
-        chunk.setCollectionUUID(chunkMgr.getUUID());
-        chunk.setMin(chunkEntry.getMin());
-        chunk.setMax(chunkEntry.getMax());
-        chunk.setJumbo(chunkEntry.isJumbo());
-        chunk.setShard(chunkEntry.getShardId());
-        chunk.setVersion(chunkEntry.getLastmod());
-
-        shardToChunksMap[chunkEntry.getShardId()].push_back(chunk);
-
-        return true;
-    });
 
     auto swZoneInfo =
         createCollectionZoneInfo(opCtx, nss, chunkMgr.getShardKeyPattern().getKeyPattern());
@@ -97,7 +77,7 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         return swZoneInfo.getStatus();
     }
 
-    return {DistributionStatus{nss, std::move(shardToChunksMap), std::move(swZoneInfo.getValue())}};
+    return {DistributionStatus{nss, std::move(swZoneInfo.getValue()), chunkMgr}};
 }
 
 stdx::unordered_map<NamespaceString, CollectionDataSizeInfoForBalancing>
@@ -582,54 +562,6 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* op
     return BalancerPolicy::balanceSingleChunk(chunk, shardStats, distribution, dataSizeInfo);
 }
 
-Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* opCtx,
-                                                          const ChunkType& chunk,
-                                                          const ShardId& newShardId) {
-    auto shardStatsStatus = _clusterStats->getStats(opCtx);
-    if (!shardStatsStatus.isOK()) {
-        return shardStatsStatus.getStatus();
-    }
-
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    const CollectionType collection = catalogClient->getCollection(
-        opCtx, chunk.getCollectionUUID(), repl::ReadConcernLevel::kLocalReadConcern);
-    const auto& nss = collection.getNss();
-
-
-    auto shardStats = std::move(shardStatsStatus.getValue());
-
-    auto routingInfoStatus =
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                              nss);
-    if (!routingInfoStatus.isOK()) {
-        return routingInfoStatus.getStatus();
-    }
-
-    const auto& [cm, _] = routingInfoStatus.getValue();
-
-    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, nss, shardStats, cm);
-    if (!collInfoStatus.isOK()) {
-        return collInfoStatus.getStatus();
-    }
-
-    const DistributionStatus& distribution = collInfoStatus.getValue();
-
-    auto newShardIterator =
-        std::find_if(shardStats.begin(),
-                     shardStats.end(),
-                     [&newShardId](const ClusterStatistics::ShardStatistics& stat) {
-                         return stat.shardId == newShardId;
-                     });
-    if (newShardIterator == shardStats.end()) {
-        return {ErrorCodes::ShardNotFound,
-                str::stream() << "Unable to find constraints information for shard " << newShardId
-                              << ". Move to this shard will be disallowed."};
-    }
-
-    return BalancerPolicy::isShardSuitableReceiver(*newShardIterator,
-                                                   distribution.getZoneForChunk(chunk));
-}
-
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidatesForCollection(
     OperationContext* opCtx, const NamespaceString& nss, const ShardStatisticsVector& shardStats) {
     auto routingInfoStatus =
@@ -688,7 +620,7 @@ BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
 
     const DistributionStatus& distribution = collInfoStatus.getValue();
 
-    for (const auto& zoneRangeEntry : distribution.zoneRanges()) {
+    for (const auto& zoneRangeEntry : distribution.getZoneInfo().zoneRanges()) {
         const auto& zoneRange = zoneRangeEntry.second;
 
         const auto chunkAtZoneMin = cm.findIntersectingChunkWithSimpleCollation(zoneRange.min);

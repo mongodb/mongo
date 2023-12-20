@@ -57,10 +57,6 @@ public:
     StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
         OperationContext* opCtx, const NamespaceString& nss, const ChunkType& chunk) override;
 
-    Status checkMoveAllowed(OperationContext* opCtx,
-                            const ChunkType& chunk,
-                            const ShardId& newShardId) override;
-
 private:
     /**
      * Synchronous method, which iterates the collection's chunks and uses the zones information to
