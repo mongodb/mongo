@@ -89,7 +89,13 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                 std::unique_ptr<DBClientSession> c;
 #ifdef MONGO_CONFIG_GRPC
                 if (newURI.isGRPC()) {
-                    c = std::make_unique<DBClientGRPCStream>();
+                    c = std::make_unique<DBClientGRPCStream>(
+                        /* authToken */ boost::none,
+                        /* autoReconnect */ true,
+                        /* socket timeout */ 0,
+                        newURI,
+                        DBClientGRPCStream::HandshakeValidationHook(),
+                        apiParameters);
                 } else
 #endif
                 {

@@ -61,11 +61,7 @@ public:
         : DBClientSession(_autoReconnect, so_timeout, uri, hook, apiParameters),
           _authToken{std::move(authToken)} {}
 
-    ~DBClientGRPCStream() {
-        if (auto session = _getSession(); session && session->isConnected()) {
-            uassertStatusOK(session->finish());
-        }
-    }
+    ~DBClientGRPCStream();
 
     /**
      * Logout is not implemented for gRPC, throws an exception.
@@ -112,7 +108,7 @@ private:
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
         boost::optional<TransientSSLParams> transientSSLParams = boost::none) override;
-    void _ensureSession() override;
+    void _reconnectSession() override;
     void _killSession() override;
     transport::grpc::EgressSession* _getSession();
 

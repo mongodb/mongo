@@ -61,22 +61,30 @@ public:
         ServiceContextWithClockSourceMockTest::tearDown();
     }
 
+    std::unique_ptr<IngressSession> makeIngressSession(boost::optional<UUID> remoteClientId) {
+        return std::make_unique<IngressSession>(nullptr,
+                                                _streamFixtures->rpc->serverCtx.get(),
+                                                _streamFixtures->rpc->serverStream.get(),
+                                                std::move(remoteClientId),
+                                                /* auth token */ boost::none,
+                                                /* client metadata */ boost::none);
+    }
+
+    std::unique_ptr<EgressSession> makeEgressSession(UUID clientId) {
+        return std::make_unique<EgressSession>(nullptr,
+                                               _streamFixtures->clientCtx,
+                                               _streamFixtures->clientStream,
+                                               std::move(clientId),
+                                               /* shared state */ nullptr);
+    }
+
     template <class SessionType>
-    auto makeSession(boost::optional<UUID> clientId) {
+    auto makeSession(UUID clientId) {
         if constexpr (std::is_same<SessionType, IngressSession>::value) {
-            return std::make_unique<IngressSession>(nullptr,
-                                                    _streamFixtures->rpc->serverCtx.get(),
-                                                    _streamFixtures->rpc->serverStream.get(),
-                                                    std::move(clientId),
-                                                    /* auth token */ boost::none,
-                                                    /* client metadata */ boost::none);
+            return makeIngressSession(clientId);
         } else {
             static_assert(std::is_same<SessionType, EgressSession>::value == true);
-            return std::make_unique<EgressSession>(nullptr,
-                                                   _streamFixtures->clientCtx,
-                                                   _streamFixtures->clientStream,
-                                                   std::move(clientId),
-                                                   /* shared state */ nullptr);
+            return makeEgressSession(clientId);
         }
     }
 
@@ -160,24 +168,22 @@ private:
 };
 
 TEST_F(GRPCSessionTest, NoClientId) {
-    {
-        auto session = makeSession<IngressSession>(boost::none);
-        ASSERT_FALSE(session->clientId());
-        session->end();
-    }
-
-    {
-        auto session = makeSession<EgressSession>(boost::none);
-        ASSERT_FALSE(session->clientId());
-        session->end();
-    }
+    auto session = makeIngressSession(boost::none);
+    ASSERT_FALSE(session->getRemoteClientId());
+    session->end();
 }
 
 TEST_F(GRPCSessionTest, GetClientId) {
-    runWithBoth([&](auto&, auto& session) {
-        ASSERT_TRUE(session.clientId());
-        ASSERT_EQ(session.clientId()->toString(), kClientId);
-    });
+    {
+        auto session = makeSession<IngressSession>();
+        ASSERT_TRUE(session->getRemoteClientId());
+        ASSERT_EQ(session->getRemoteClientId()->toString(), kClientId);
+    }
+
+    {
+        auto session = makeSession<EgressSession>();
+        ASSERT_EQ(session->getClientId().toString(), kClientId);
+    }
 }
 
 TEST_F(GRPCSessionTest, GetRemote) {

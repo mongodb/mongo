@@ -39,6 +39,18 @@
 
 namespace mongo {
 
+DBClientGRPCStream::~DBClientGRPCStream() {
+    if (auto session = _getSession()) {
+        if (auto status = session->finish(); !status.isOK()) {
+            LOGV2(8393201,
+                  "RPC associated with DBClientGRPCStream did not terminate successfully",
+                  "clientId"_attr = session->getClientId(),
+                  "remote"_attr = getServerHostAndPort(),
+                  "terminationStatus"_attr = status);
+        }
+    }
+}
+
 StatusWith<std::shared_ptr<transport::Session>> DBClientGRPCStream::_makeSession(
     const HostAndPort& host,
     transport::ConnectSSLMode sslMode,
@@ -53,11 +65,19 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientGRPCStream::_makeSession
     return tl->connectWithAuthToken(host, std::move(timeout), _authToken);
 }
 
-void DBClientGRPCStream::_ensureSession() {
-    LOGV2_DEBUG(8057001,
-                _logLevel.toInt(),
-                "Trying to re-establish gRPC stream",
-                "connString"_attr = toString());
+void DBClientGRPCStream::_reconnectSession() {
+    if (auto oldSession = _getSession()) {
+        auto status = oldSession->finish();
+        LOGV2(8393202,
+              "Trying to re-establish gRPC stream",
+              "remote"_attr = getServerHostAndPort(),
+              "priorStreamTerminationStatus"_attr = status);
+    } else {
+        LOGV2_DEBUG(8057001,
+                    _logLevel.toInt(),
+                    "Trying to re-establish gRPC stream",
+                    "remote"_attr = getServerHostAndPort());
+    }
 
     try {
         connect(_serverAddress, _applicationName, _transientSSLParams);
@@ -66,7 +86,7 @@ void DBClientGRPCStream::_ensureSession() {
         LOGV2_DEBUG(8057002,
                     _logLevel.toInt(),
                     "gRPC stream re-establishment failed",
-                    "connString"_attr = toString(),
+                    "remote"_attr = getServerHostAndPort(),
                     "error"_attr = e.toStatus());
         throw;
     }
@@ -74,7 +94,7 @@ void DBClientGRPCStream::_ensureSession() {
     LOGV2_DEBUG(8057003,
                 _logLevel.toInt(),
                 "Successfully re-established gRPC stream",
-                "connString"_attr = toString());
+                "remote"_attr = getServerHostAndPort());
 }
 
 transport::grpc::EgressSession* DBClientGRPCStream::_getSession() {

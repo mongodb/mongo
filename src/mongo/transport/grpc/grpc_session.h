@@ -88,8 +88,8 @@ namespace mongo::transport::grpc {
  */
 class GRPCSession : public Session {
 public:
-    explicit GRPCSession(TransportLayer* tl, HostAndPort remote, boost::optional<UUID> clientId)
-        : _tl(tl), _remote(std::move(remote)), _clientId(std::move(clientId)) {
+    explicit GRPCSession(TransportLayer* tl, HostAndPort remote)
+        : _tl(tl), _remote(std::move(remote)) {
         SockAddr remoteAddr;
         try {
             remoteAddr = SockAddr::create(_remote.host(), _remote.port(), AF_UNSPEC);
@@ -115,13 +115,6 @@ public:
         if (_cleanupCallback)
             (*_cleanupCallback)(*this);
     }
-
-    /**
-     * Returns the unique identifier used for the underlying gRPC stream.
-     */
-    boost::optional<UUID> clientId() const {
-        return _clientId;
-    };
 
     const HostAndPort& remote() const {
         return _remote;
@@ -212,10 +205,6 @@ public:
         return false;
     }
 
-    std::string clientIdStr() const {
-        return _clientId ? _clientId->toString() : "N/A";
-    }
-
     /**
      * Runs the provided callback when destroying the session.
      * Not synchronized, thus not safe to call once the session is visible to other threads.
@@ -256,13 +245,6 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 #endif
-
-    void appendToBSON(BSONObjBuilder& bb) const override {
-        // No uint64_t BSON type
-        bb.append("id", static_cast<long>(id()));
-        bb.append("clientId", clientIdStr());
-        bb.append("remote", remote().toString());
-    }
 
     bool shouldOverrideMaxConns(
         const std::vector<std::variant<CIDR, std::string>>& exemptions) const override {
@@ -323,7 +305,6 @@ private:
     TransportLayer* const _tl;
 
     const HostAndPort _remote;
-    const boost::optional<UUID> _clientId;
     RestrictionEnvironment _restrictionEnvironment;
 
     boost::optional<std::function<void(const GRPCSession&)>> _cleanupCallback;
@@ -381,10 +362,11 @@ public:
                    boost::optional<UUID> clientId,
                    boost::optional<std::string> authToken,
                    boost::optional<StringData> encodedClientMetadata)
-        : GRPCSession(tl, ctx->getRemote(), std::move(clientId)),
+        : GRPCSession(tl, ctx->getRemote()),
           _ctx(ctx),
           _stream(stream),
           _authToken(std::move(authToken)),
+          _remoteClientId(clientId),
           _encodedClientMetadata(std::move(encodedClientMetadata)) {
         LOGV2_DEBUG(
             7401101, 2, "Constructed a new gRPC ingress session", "session"_attr = toBSON());
@@ -429,6 +411,14 @@ public:
             _setTerminationStatus(status);
             return status;
         }
+    }
+
+    boost::optional<UUID> getRemoteClientId() const {
+        return _remoteClientId;
+    }
+
+    std::string remoteClientIdToString() const {
+        return _remoteClientId ? _remoteClientId->toString() : "N/A";
     }
 
     /**
@@ -478,6 +468,13 @@ public:
         return **decoded;
     }
 
+    void appendToBSON(BSONObjBuilder& bb) const override {
+        // No uint64_t BSON type
+        bb.append("id", static_cast<long>(id()));
+        bb.append("remoteClientId", remoteClientIdToString());
+        bb.append("remote", remote().toString());
+    }
+
 private:
     void _tryCancel() override {
         _ctx->tryCancel();
@@ -493,6 +490,7 @@ private:
     ServerStream* const _stream;
 
     boost::optional<std::string> _authToken;
+    boost::optional<UUID> _remoteClientId;
     boost::optional<StringData> _encodedClientMetadata;
     mutable synchronized_value<boost::optional<ClientMetadata>> _decodedClientMetadata;
 };
@@ -542,11 +540,12 @@ public:
     EgressSession(TransportLayer* tl,
                   std::shared_ptr<ClientContext> ctx,
                   std::shared_ptr<ClientStream> stream,
-                  boost::optional<UUID> clientId,
+                  UUID clientId,
                   std::shared_ptr<SharedState> sharedState)
-        : GRPCSession(tl, ctx->getRemote(), std::move(clientId)),
+        : GRPCSession(tl, ctx->getRemote()),
           _ctx(std::move(ctx)),
           _stream(std::move(stream)),
+          _clientId(clientId),
           _sharedState(std::move(sharedState)) {
         LOGV2_DEBUG(7401401, 2, "Constructed a new gRPC egress session", "session"_attr = toBSON());
     }
@@ -609,6 +608,17 @@ public:
         return **status;
     }
 
+    UUID getClientId() const {
+        return _clientId;
+    }
+
+    void appendToBSON(BSONObjBuilder& bb) const override {
+        // No uint64_t BSON type
+        bb.append("id", static_cast<long>(id()));
+        bb.append("clientId", _clientId.toString());
+        bb.append("remote", remote().toString());
+    }
+
 private:
     void _tryCancel() override {
         _ctx->tryCancel();
@@ -663,6 +673,7 @@ private:
     AtomicWord<bool> _checkedWireVersion;
     const std::shared_ptr<ClientContext> _ctx;
     const std::shared_ptr<ClientStream> _stream;
+    UUID _clientId;
     std::shared_ptr<SharedState> _sharedState;
 };
 

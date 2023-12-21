@@ -86,11 +86,11 @@ GRPCSessionManager* getSessionManager(Client* client) {
 
 std::string GRPCSessionManager::getClientThreadName(const Session& session) const {
     using namespace fmt::literals;
-    const auto* s = checked_cast<const GRPCSession*>(&session);
-    if (auto id = s->clientId()) {
-        return "grpc{}-{}"_format(id->toString(), session.id());
+    const auto* s = checked_cast<const IngressSession*>(&session);
+    if (auto id = s->getRemoteClientId()) {
+        return "grpc-{}-{}"_format(id->toString(), session.id());
     } else {
-        return "grpc{}"_format(session.id());
+        return "grpc-{}"_format(session.id());
     }
 }
 

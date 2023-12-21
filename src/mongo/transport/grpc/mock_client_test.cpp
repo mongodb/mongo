@@ -190,8 +190,8 @@ TEST_F(MockClientTest, MockClientMetadata) {
     auto serverHandler = [&](HostAndPort local, std::shared_ptr<IngressSession> session) {
         ASSERT_TRUE(session->getClientMetadata());
         ASSERT_BSONOBJ_EQ(session->getClientMetadata()->getDocument(), metadataDoc);
-        ASSERT_TRUE(session->clientId());
-        ASSERT_EQ(session->clientId(), clientId.get());
+        ASSERT_TRUE(session->getRemoteClientId());
+        ASSERT_EQ(session->getRemoteClientId(), clientId.get());
     };
 
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {

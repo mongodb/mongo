@@ -214,7 +214,7 @@ public:
             if (!_autoReconnect) {
                 throwSocketError(SocketErrorKind::FAILED_STATE, toString());
             }
-            _ensureSession();
+            _reconnectSession();
         }
     }
 
@@ -297,7 +297,7 @@ private:
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
         boost::optional<TransientSSLParams> transientSSLParams = boost::none) = 0;
-    virtual void _ensureSession() = 0;
+    virtual void _reconnectSession() = 0;
     virtual void _killSession() = 0;
 
     // Hook that is run on every call to connect()

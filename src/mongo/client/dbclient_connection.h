@@ -141,7 +141,7 @@ private:
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
         boost::optional<TransientSSLParams> transientSSLParams = boost::none) override;
-    void _ensureSession() override;
+    void _reconnectSession() override;
     void _killSession() override;
 
     /**

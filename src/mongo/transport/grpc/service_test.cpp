@@ -588,8 +588,8 @@ TEST_F(CommandServiceTest, ServerHandlesMultipleClients) {
             try {
                 auto msg = uassertStatusOK(session->sourceMessage());
                 auto response = OpMsg::parseOwned(msg);
-                response.body = response.body.addFields(
-                    BSON(util::constants::kClientIdKey << session->clientId()->toString()));
+                response.body = response.body.addFields(BSON(
+                    util::constants::kClientIdKey << session->getRemoteClientId()->toString()));
                 ASSERT_OK(session->sinkMessage(response.serialize()));
             } catch (ExceptionFor<ErrorCodes::StreamTerminated>&) {
                 // Continues to serve the echo commands until the stream is terminated.

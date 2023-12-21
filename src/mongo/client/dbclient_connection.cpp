@@ -190,7 +190,7 @@ rpc::UniqueReply DBClientConnection::parseCommandReplyMessage(const std::string&
     }
 }
 
-void DBClientConnection::_ensureSession() {
+void DBClientConnection::_reconnectSession() {
     // Don't hammer reconnects, backoff if needed
     sleepFor(_autoReconnectBackoff.nextSleep());
 
