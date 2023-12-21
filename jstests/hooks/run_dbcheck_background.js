@@ -74,7 +74,10 @@ const exceptionFilteredBackgroundDbCheck = function(hosts) {
 
         dbNames.forEach((dbName) => {
             jsTestLog("dbCheck is starting on database " + dbName + " for RS: " + rst.getURL());
-            runDbCheckForDatabase(rst, primary.getDB(dbName), true /*awaitCompletion*/);
+            runDbCheckForDatabase(rst,
+                                  primary.getDB(dbName),
+                                  true /*awaitCompletion*/,
+                                  20 * 60 * 1000 /*awaitCompletionTimeoutMs*/);
             jsTestLog("dbCheck is done on database " + dbName + " for RS: " + rst.getURL());
         });
 

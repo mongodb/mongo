@@ -110,4 +110,5 @@ profilerHasSingleMatchingEntryOrThrow(
 jsTest.log("Both writes should succeed");
 assert.docEq({_id: "doc", good: 2}, sessionColl.findOne());
 
+assert.commandWorked(sessionDb.runCommand({profile: 0}));
 session.endSession();

@@ -38,24 +38,28 @@ export const dbCheckCompleted = (db) => {
 };
 
 // Wait for dbCheck to complete (on both primaries and secondaries).
-export const awaitDbCheckCompletion = (replSet, db, waitForHealthLogDbCheckStop = true) => {
-    assert.soon(() => dbCheckCompleted(db),
-                "dbCheck timed out for database: " + db.getName() + " for RS: " + replSet.getURL());
-    replSet.awaitSecondaryNodes();
-    replSet.awaitReplication();
+export const awaitDbCheckCompletion =
+    (replSet, db, waitForHealthLogDbCheckStop = true, awaitCompletionTimeoutMs = null) => {
+        assert.soon(
+            () => dbCheckCompleted(db),
+            "dbCheck timed out for database: " + db.getName() + " for RS: " + replSet.getURL(),
+            awaitCompletionTimeoutMs);
 
-    if (waitForHealthLogDbCheckStop) {
-        forEachNonArbiterNode(replSet, function(node) {
-            const healthlog = node.getDB('local').system.healthlog;
-            assert.soon(
-                function() {
-                    return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
-                },
-                "dbCheck command didn't complete for database: " + db.getName() +
-                    " for RS: " + replSet.getURL());
-        });
-    }
-};
+        replSet.awaitSecondaryNodes();
+        replSet.awaitReplication();
+
+        if (waitForHealthLogDbCheckStop) {
+            forEachNonArbiterNode(replSet, function(node) {
+                const healthlog = node.getDB('local').system.healthlog;
+                assert.soon(
+                    function() {
+                        return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
+                    },
+                    "dbCheck command didn't complete for database: " + db.getName() +
+                        " for RS: " + replSet.getURL());
+            });
+        }
+    };
 
 // Clear health log and insert nDocs documents.
 export const resetAndInsert = (replSet, db, collName, nDocs, docSuffix = null) => {
@@ -158,65 +162,68 @@ function getIndexNames(db, collName, allowedErrorCodes) {
 
 // Run dbCheck for all collections in the database with given parameters and potentially wait for
 // completion.
-export const runDbCheckForDatabase = (replSet, db, awaitCompletion = false) => {
-    const secondaryIndexCheckEnabled =
-        checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(replSet.getPrimary());
-    let collDbCheckParameters = {};
-    if (secondaryIndexCheckEnabled) {
-        collDbCheckParameters = {validateMode: "dataConsistencyAndMissingIndexKeysCheck"};
-    }
-
-    const allowedErrorCodes = [
-        ErrorCodes.NamespaceNotFound /* collection got dropped. */,
-        ErrorCodes.CommandNotSupportedOnView /* collection got dropped and a view
-                                                got created with the same name. */
-        ,
-        40619 /* collection is not replicated error. */,
-        // Some tests adds an invalid view, resulting in a failure of the 'dbcheck'
-        // operation with an 'InvalidViewDefinition' error.
-        ErrorCodes.InvalidViewDefinition
-    ];
-
-    listCollectionsWithoutViews(db).map(c => c.name).forEach(collName => {
-        jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is starting on ns: " +
-                  db.getName() + "." + collName + " for RS: " + replSet.getURL());
-        runDbCheck(replSet,
-                   db,
-                   collName,
-                   collDbCheckParameters /* parameters */,
-                   false /* awaitCompletion */,
-                   false /* waitForHealthLogDbCheckStop */,
-                   allowedErrorCodes);
-        jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is done on ns: " + db.getName() +
-                  "." + collName + " for RS: " + replSet.getURL());
-
-        if (!secondaryIndexCheckEnabled) {
-            return;
+export const runDbCheckForDatabase =
+    (replSet, db, awaitCompletion = false, awaitCompletionTimeoutMs = null) => {
+        const secondaryIndexCheckEnabled =
+            checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(replSet.getPrimary());
+        let collDbCheckParameters = {};
+        if (secondaryIndexCheckEnabled) {
+            collDbCheckParameters = {validateMode: "dataConsistencyAndMissingIndexKeysCheck"};
         }
 
-        getIndexNames(db, collName, allowedErrorCodes).forEach(indexName => {
-            let extraIndexDbCheckParameters = {
-                validateMode: "extraIndexKeysCheck",
-                secondaryIndex: indexName
-            };
-            jsTestLog("dbCheck (" + tojson(extraIndexDbCheckParameters) + ") is starting on ns: " +
+        const allowedErrorCodes = [
+            ErrorCodes.NamespaceNotFound /* collection got dropped. */,
+            ErrorCodes.CommandNotSupportedOnView /* collection got dropped and a view
+                                                    got created with the same name. */
+            ,
+            40619 /* collection is not replicated error. */,
+            // Some tests adds an invalid view, resulting in a failure of the 'dbcheck'
+            // operation with an 'InvalidViewDefinition' error.
+            ErrorCodes.InvalidViewDefinition
+        ];
+
+        listCollectionsWithoutViews(db).map(c => c.name).forEach(collName => {
+            jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is starting on ns: " +
                       db.getName() + "." + collName + " for RS: " + replSet.getURL());
             runDbCheck(replSet,
                        db,
                        collName,
-                       extraIndexDbCheckParameters /* parameters */,
+                       collDbCheckParameters /* parameters */,
                        false /* awaitCompletion */,
                        false /* waitForHealthLogDbCheckStop */,
                        allowedErrorCodes);
-            jsTestLog("dbCheck (" + tojson(extraIndexDbCheckParameters) + ") is done on ns: " +
+            jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is done on ns: " +
                       db.getName() + "." + collName + " for RS: " + replSet.getURL());
-        });
-    });
 
-    if (awaitCompletion) {
-        awaitDbCheckCompletion(replSet, db, false /*waitForHealthLogDbCheckStop*/);
-    }
-};
+            if (!secondaryIndexCheckEnabled) {
+                return;
+            }
+
+            getIndexNames(db, collName, allowedErrorCodes).forEach(indexName => {
+                let extraIndexDbCheckParameters = {
+                    validateMode: "extraIndexKeysCheck",
+                    secondaryIndex: indexName
+                };
+                jsTestLog("dbCheck (" + tojson(extraIndexDbCheckParameters) +
+                          ") is starting on ns: " + db.getName() + "." + collName +
+                          " for RS: " + replSet.getURL());
+                runDbCheck(replSet,
+                           db,
+                           collName,
+                           extraIndexDbCheckParameters /* parameters */,
+                           false /* awaitCompletion */,
+                           false /* waitForHealthLogDbCheckStop */,
+                           allowedErrorCodes);
+                jsTestLog("dbCheck (" + tojson(extraIndexDbCheckParameters) + ") is done on ns: " +
+                          db.getName() + "." + collName + " for RS: " + replSet.getURL());
+            });
+        });
+
+        if (awaitCompletion) {
+            awaitDbCheckCompletion(
+                replSet, db, false /*waitForHealthLogDbCheckStop*/, awaitCompletionTimeoutMs);
+        }
+    };
 
 // Assert no errors/warnings (i.e., found inconsistencies). Tolerate
 // SnapshotTooOld errors, as they can occur if the primary is slow enough processing a
