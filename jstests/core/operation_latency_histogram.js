@@ -27,12 +27,16 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {assertHistogramDiffEq, getHistogramStats} from "jstests/libs/stats.js";
 
-var name = "operationalLatencyHistogramTest";
+const dbName = "operationalLatencyHistogramTest";
+const collName = dbName + "coll";
 
-var testDB = db.getSiblingDB(name);
-var testColl = testDB[name + "coll"];
+var testDB = db.getSiblingDB(dbName);
+var testColl = testDB[collName];
 
 testColl.drop();
+// TODO (SERVER-75859): Unify behavior between mongod and mongos when running $collStats on a
+// nonexistent database.
+assert.commandWorked(testDB.createCollection(collName));
 
 // Test aggregation command output format.
 var commandResult = testDB.runCommand(

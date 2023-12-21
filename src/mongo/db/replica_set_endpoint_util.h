@@ -36,28 +36,39 @@ namespace replica_set_endpoint {
 
 // The set of commands that need to run on the mongod it arrives on (i.e. must not go through the
 // router code paths).
-const std::set<StringData> kTargetedCmdNames = {"clearLog",
-                                                "configureFailPoint",
-                                                "connectionStatus",
-                                                "currentOp",
-                                                "fsync",
-                                                "fsyncUnlock",
-                                                "getLog",
-                                                "getParameter",
-                                                "getShardVersion",
-                                                "hello",
-                                                "isMaster",
-                                                "ismaster",
-                                                "logout",
-                                                "ping",
-                                                "profile",
-                                                "refreshLogicalSessionCacheNow",
-                                                "replSetGetStatus",
-                                                "saslStart",
-                                                "saslContinue",
-                                                "setParameter",
-                                                "serverStatus",
-                                                "_flushRoutingTableCacheUpdates"};
+const StringDataSet kTargetedCmdNames = {
+    "buildinfo",
+    "clearLog",
+    "compact",  // The command also exists on a router but all it does is throwing
+                // CommandNotSupported.
+    "configureFailPoint",
+    "connectionStatus",
+    "currentOp",
+    "fsync",
+    "fsyncUnlock",
+    "getDiagnosticData",  // TODO (SERVER-79353): Support role-aware serverStatus on mongod with
+                          // router role. Evaluate this command should go through the router code
+                          // paths.
+    "getLog",
+    "getParameter",
+    "getShardVersion",
+    "hello",
+    "isMaster",
+    "ismaster",
+    "logout",
+    "ping",
+    "profile",
+    "refreshLogicalSessionCacheNow",
+    "replSetGetStatus",
+    "saslStart",
+    "saslContinue",
+    "setParameter",
+    "serverStatus",  // TODO (SERVER-79353): Support role-aware serverStatus on mongod with
+                     // router role. Evaluate this command should go through the router code
+                     // paths.
+    "splitVector",   // TODO (SERVER-84090): Investigate whether to change or deprecate router's
+                     // splitVector command.
+    "_flushRoutingTableCacheUpdates"};
 
 /**
  * RAII type for making the OperationContext it is instantiated with use the router service util it

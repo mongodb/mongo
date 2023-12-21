@@ -61,7 +61,7 @@ sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
 assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
 
 // This test cause a StaleConfig error on sharding so no command will succeed.
-if (!session.getClient().isMongos()) {
+if (!session.getClient().isMongos() && !TestData.testingReplicaSetEndpoint) {
     // We can perform reads on the dropped collection as it existed when we started the transaction.
     assert.commandWorked(sessionDB2.runCommand({find: sessionCollB.getName()}));
 

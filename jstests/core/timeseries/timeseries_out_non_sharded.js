@@ -115,12 +115,13 @@ const destDB = testDB.getSiblingDB("outDifferentDB");
 assert.commandWorked(destDB.dropDatabase());
 timeseriesPipeline =
     TimeseriesAggTests.generateOutPipeline(targetCollName, destDB.getName(), {timeField: "time"});
-// TODO SERVER-75856 remove this conditional.
-if (FixtureHelpers.isMongos(testDB)) {  // this is not supported in mongos.
-    assert.throwsWithCode(() => inColl.aggregate(timeseriesPipeline), ErrorCodes.NamespaceNotFound);
-} else {
+// TODO (SERVER-75856): Support implicit database creation for $merge and $out when running
+// aggregate on a mongos.
+try {
     inColl.aggregate(timeseriesPipeline);
     assert.eq(300, destDB[targetCollName].find().itcount());
+} catch (e) {
+    assert.eq(e.code, ErrorCodes.NamespaceNotFound, e);
 }
 
 // Tests that an error is raised when trying to create a time-series collection from a non

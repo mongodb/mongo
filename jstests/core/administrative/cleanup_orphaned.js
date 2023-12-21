@@ -4,6 +4,7 @@
 //  requires_non_retryable_commands,
 //  # This test expects to be run against a non-shardsvr.
 //  directly_against_shardsvrs_incompatible,
+//  assumes_standalone_mongod,
 // ]
 
 // Test that cleanupOrphaned cannot be run on stand alone mongod.

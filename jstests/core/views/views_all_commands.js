@@ -467,7 +467,9 @@ let viewsCommandTests = {
     getShardMap: {skip: isUnrelated},
     getShardVersion: {
         command: {getShardVersion: "test.view"},
-        expectFailure: true,
+        // This command is only expected to fail with the errors below when it is run against
+        // a standalone replica set mongod.
+        expectFailure: !TestData.testingReplicaSetEndpoint,
         expectedErrorCode:
             [ErrorCodes.ShardingStateNotInitialized, ErrorCodes.NoShardingEnabled_OBSOLETE],
         isAdminCommand: true,

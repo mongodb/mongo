@@ -38,7 +38,11 @@ function runTest(sessionDB) {
                                  ErrorCodes.NoSuchTransaction);
 }
 
-runTest(session.getDatabase("config"));
+if (!TestData.testingReplicaSetEndpoint) {
+    // This test drops a collection the config database, which is not allowed via a router on a
+    // sharded cluster.
+    runTest(session.getDatabase("config"));
+}
 runTest(session.getDatabase("local"));
 
 session.endSession();

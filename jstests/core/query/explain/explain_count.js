@@ -61,7 +61,7 @@ function checkIndexedCountWithPred(db, explain, keyName, bounds) {
 
 // TODO SERVER-82095 remove creation of database once
 // explain behavior will be equal in both standalone and sharded cluster
-if (FixtureHelpers.isMongos(db)) {
+if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Create database
     assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
 }

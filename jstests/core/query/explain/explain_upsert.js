@@ -13,7 +13,13 @@ var explain;
 // Explained upsert against an empty collection should succeed and be a no-op.
 explain = db.runCommand(
     {explain: {update: t.getName(), updates: [{q: {a: 1}, u: {a: 1}, upsert: true}]}});
-assert.commandWorked(explain);
+if (TestData.testingReplicaSetEndpoint) {
+    // TODO (SERVER-75857): Unify behavior between mongod and mongos when running explain on a
+    // nonexistent database.
+    assert.commandWorkedOrFailedWithCode(explain, ErrorCodes.NamespaceNotFound);
+} else {
+    assert.commandWorked(explain);
+}
 
 // Collection should still not exist.
 assert.eq(0, t.count());

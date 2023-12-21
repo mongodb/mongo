@@ -27,7 +27,7 @@ export var {
      * unnecessary
      */
     function withTxnAndAutoRetryOnMongos(session, func, txnOptions) {
-        if (session.getClient().isMongos()) {
+        if (session.getClient().isMongos() || TestData.testingReplicaSetEndpoint) {
             withTxnAndAutoRetry(session, func, {txnOptions});
         } else {
             session.startTransaction(txnOptions);
@@ -46,7 +46,7 @@ export var {
      * unnecessary
      */
     function retryOnceOnTransientOnMongos(session, func) {
-        if (session.getClient().isMongos()) {
+        if (session.getClient().isMongos() || TestData.testingReplicaSetEndpoint) {
             try {
                 func();
             } catch (e) {
@@ -73,7 +73,7 @@ export var {
      * unnecessary
      */
     function retryOnceOnTransientAndRestartTxnOnMongos(session, func, txnOptions) {
-        if (session.getClient().isMongos()) {
+        if (session.getClient().isMongos() || TestData.testingReplicaSetEndpoint) {
             try {
                 func();
             } catch (e) {

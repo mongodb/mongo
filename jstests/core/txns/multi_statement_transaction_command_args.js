@@ -181,8 +181,9 @@ assert.commandFailedWithCode(sessionDb.runCommand({
 }),
                              ErrorCodes.InvalidOptions);
 
-// Mongos has special handling for commitTransaction to support commit recovery.
-if (!FixtureHelpers.isMongos(sessionDb)) {
+// The command above was run with autocommit: true, and commit recovery on a router requires
+// "recoveryToken".
+if (!FixtureHelpers.isMongos(sessionDb) && !TestData.testingReplicaSetEndpoint) {
     // Committing the transaction should fail.
     assert.commandFailedWithCode(sessionDb.adminCommand({
         commitTransaction: 1,

@@ -76,7 +76,8 @@ bool isCurrentOpAggregateCommandRequest(const OpMsgRequest& opMsgReq) {
     if (opMsgReq.getDbName().isAdminDB() && opMsgReq.getCommandName() == "aggregate") {
         auto aggRequest = AggregateCommandRequest::parse(
             IDLParserContext("ServiceEntryPointMongod::isCurrentOp"), opMsgReq.body);
-        return aggRequest.getPipeline()[0].firstElementFieldNameStringData() == "$currentOp";
+        return !aggRequest.getPipeline().empty() &&
+            aggRequest.getPipeline()[0].firstElementFieldNameStringData() == "$currentOp";
     }
     return false;
 }

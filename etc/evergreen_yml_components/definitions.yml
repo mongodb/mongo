@@ -6523,6 +6523,12 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
+  name: replica_sets_jscore_passthrough_with_auto_bootstrap_and_replica_set_endpoint_gen
+  tags: []
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
   name: sharding_jscore_passthrough_with_auto_bootstrap_gen
   tags: ["sharding", "jscore", "common"]
   commands:
