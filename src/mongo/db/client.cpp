@@ -89,9 +89,7 @@ int64_t generateSeed(const std::string& desc) {
 }
 
 bool checkIfRouterClient(const std::shared_ptr<transport::Session>& session) {
-    return serverGlobalParams.clusterRole.has(ClusterRole::RouterServer) &&
-        serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) && session &&
-        session->isFromRouterPort();
+    return session && session->isFromRouterPort();
 }
 }  // namespace
 
