@@ -1844,9 +1844,15 @@ void BSONColumnBuilder::assertInternalStateIdentical_forTest(const BSONColumnBui
     invariant(_is.regular._controlByteOffset == other._is.regular._controlByteOffset);
     invariant(_is.regular._scaleIndex == other._is.regular._scaleIndex);
 
+    // Our mac toolchain does not have std::bit_cast yet.
+    auto bit_cast = [](double from) {
+        uint64_t to;
+        memcpy(&to, &from, sizeof(uint64_t));
+        return to;
+    };
     // NaN does not compare equal to itself, so we bit cast and perform this comparison as interger
-    invariant(std::bit_cast<uint64_t>(_is.regular._lastValueInPrevBlock) ==
-              std::bit_cast<uint64_t>(other._is.regular._lastValueInPrevBlock));
+    invariant(bit_cast(_is.regular._lastValueInPrevBlock) ==
+              bit_cast(other._is.regular._lastValueInPrevBlock));
     invariant(_is.regular._prevDelta == other._is.regular._prevDelta);
     invariant(_is.regular._prevEncoded64 == other._is.regular._prevEncoded64);
     invariant(_is.regular._prevEncoded128 == other._is.regular._prevEncoded128);
