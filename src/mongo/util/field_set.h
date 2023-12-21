@@ -109,13 +109,32 @@ public:
         return _scope;
     }
 
+    bool isEmptySet() const {
+        return _list.empty() && _scope == FieldListScope::kClosed;
+    }
+    bool isUniverseSet() const {
+        return _list.empty() && _scope == FieldListScope::kOpen;
+    }
+
     inline void setUnion(const FieldSet& other) {
         constexpr bool doUnion = true;
-        setUnionOrIntersectImpl(other, doUnion);
+        constexpr bool complementOther = false;
+        unionOrIntersect(other, doUnion, complementOther);
+    }
+    inline void setUnionWithComplementOf(const FieldSet& other) {
+        constexpr bool doUnion = true;
+        constexpr bool complementOther = true;
+        unionOrIntersect(other, doUnion, complementOther);
     }
     inline void setIntersect(const FieldSet& other) {
         constexpr bool doUnion = false;
-        setUnionOrIntersectImpl(other, doUnion);
+        constexpr bool complementOther = false;
+        unionOrIntersect(other, doUnion, complementOther);
+    }
+    inline void setDifference(const FieldSet& other) {
+        constexpr bool doUnion = false;
+        constexpr bool complementOther = true;
+        unionOrIntersect(other, doUnion, complementOther);
     }
     inline void setComplement() {
         bool scopeIsClosed = _scope == FieldListScope::kClosed;
@@ -125,7 +144,16 @@ public:
     std::string toString() const;
 
 private:
-    void setUnionOrIntersectImpl(const FieldSet& other, bool doUnion);
+    /**
+     * Given LHS ('*this') and RHS ('other'), this method computes one of the following
+     * expressions (depending on 'isUnion' and 'complementOther') and stores the result
+     * into 'this':
+     *   LHS intersect RHS (if isUnion == false and complementOther == false)
+     *   LHS intersect ~RHS (if isUnion == false and complementOther == true)
+     *   LHS union RHS (if isUnion == true and complementOther == false)
+     *   LHS union ~RHS (if isUnion == true and complementOther == true)
+     */
+    void unionOrIntersect(const FieldSet& other, bool isUnion, bool complementOther);
 
     std::vector<std::string> _list;
     StringSet _set;
