@@ -8,6 +8,8 @@
  *   uses_transactions,
  *   uses_multi_shard_transaction,
  *   uses_prepare_transaction,
+ *   # The hangBeforeWritingDecision failpoint does not exist on older versions of mongodb.
+ *   multiversion_incompatible,
  * ]
  */
 
