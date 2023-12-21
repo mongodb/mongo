@@ -369,10 +369,8 @@ void RollbackImplTest::setUp() {
                                                       _coordinator,
                                                       _listener.get());
 
-    serverGlobalParams.clusterRole = ClusterRole::None;
-    // Creating the oplog ends up reading the cluster role, so we need to create the oplog after
-    // setting the cluster role to avoid a race.
     createOplog(_opCtx.get());
+    serverGlobalParams.clusterRole = ClusterRole::None;
 }
 
 void RollbackImplTest::tearDown() {
@@ -1932,26 +1930,6 @@ TEST_F(RollbackImplTest, RollbackDoesNotRestoreTxnsTableWhenNoRetryableWritesEnt
  */
 class RollbackImplObserverInfoTest : public RollbackImplTest {
 public:
-    void setUp() override {
-        // We don't call RollbackImplTest's setUp function so that we can fix a data race for tests
-        // that set cluster role.
-        RollbackTest::setUp();  // NOLINT (bugprone-parent-virtual-call)
-
-        _localOplog = std::make_unique<OplogInterfaceLocal>(_opCtx.get());
-        _remoteOplog = std::make_unique<OplogInterfaceMock>();
-        _listener = std::make_unique<Listener>(this);
-        _rollback = std::make_unique<RollbackImplForTest>(_localOplog.get(),
-                                                          _remoteOplog.get(),
-                                                          _storageInterface,
-                                                          _replicationProcess.get(),
-                                                          _coordinator,
-                                                          _listener.get());
-
-        // Some tests set the cluster role, which can race with creating the oplog, so each test
-        // case has to create the oplog itself.
-        serverGlobalParams.clusterRole = ClusterRole::None;
-    }
-
     /**
      * Simulates the rollback of a given sequence of operations. Returns the status of the rollback
      * process.
@@ -2013,7 +1991,6 @@ protected:
 };
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfInsertOplogEntry) {
-    createOplog(_opCtx.get());
     auto insertNss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto ts = Timestamp(2, 2);
     auto insertOp = makeCRUDOp(OpTypeEnum::kInsert,
@@ -2031,7 +2008,6 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfInsertOp
 }
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfUpdateOplogEntry) {
-    createOplog(_opCtx.get());
     auto updateNss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto ts = Timestamp(2, 2);
     auto o = BSON("$set" << BSON("x" << 2));
@@ -2045,7 +2021,6 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfUpdateOp
 }
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDeleteOplogEntry) {
-    createOplog(_opCtx.get());
     auto deleteNss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto ts = Timestamp(2, 2);
     auto deleteOp = makeCRUDOp(OpTypeEnum::kDelete,
@@ -2063,7 +2038,6 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDeleteOp
 }
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsIgnoresNamespaceOfNoopOplogEntry) {
-    createOplog(_opCtx.get());
     auto noopNss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto ts = Timestamp(2, 2);
     auto noop = makeCRUDOp(
@@ -2077,7 +2051,6 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsIgnoresNamespaceOfNoopOplog
 
 TEST_F(RollbackImplObserverInfoTest,
        NamespacesForOpsExtractsNamespaceOfCreateCollectionOplogEntry) {
-    createOplog(_opCtx.get());
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto cmdOp = makeCommandOp(
         Timestamp(2, 2), UUID::gen(), nss.getCommandNS(), BSON("create" << nss.coll()), 2);
@@ -2088,7 +2061,6 @@ TEST_F(RollbackImplObserverInfoTest,
 }
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDropCollectionOplogEntry) {
-    createOplog(_opCtx.get());
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto cmdOp = makeCommandOp(
         Timestamp(2, 2), UUID::gen(), nss.getCommandNS(), BSON("drop" << nss.coll()), 2);
@@ -2100,7 +2072,6 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDropColl
 }
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfCreateIndexOplogEntry) {
-    createOplog(_opCtx.get());
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto indexObj =
         BSON("createIndexes" << nss.coll() << "v"
@@ -2117,7 +2088,6 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfCreateIn
 }
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDropIndexOplogEntry) {
-    createOplog(_opCtx.get());
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto cmdOp = makeCommandOp(Timestamp(2, 2),
                                UUID::gen(),
@@ -2133,7 +2103,6 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDropInde
 
 TEST_F(RollbackImplObserverInfoTest,
        NamespacesForOpsExtractsNamespacesOfRenameCollectionOplogEntry) {
-    createOplog(_opCtx.get());
     auto fromNss = NamespaceString::createNamespaceString_forTest("test", "source");
     auto toNss = NamespaceString::createNamespaceString_forTest("test", "dest");
 
@@ -2148,7 +2117,6 @@ TEST_F(RollbackImplObserverInfoTest,
 
 TEST_F(RollbackImplObserverInfoTest,
        NamespacesForOpsExtractsNamespacesOfRenameCollectionOplogEntryWithMultitenancy) {
-    createOplog(_opCtx.get());
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     boost::optional<TenantId> tid(OID::gen());
@@ -2171,7 +2139,6 @@ TEST_F(RollbackImplObserverInfoTest,
 
 TEST_F(RollbackImplObserverInfoTest,
        NamespacesForOpsExtractsNamespacesOfRenameCollectionOplogEntryRequiresTenantId) {
-    createOplog(_opCtx.get());
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
@@ -2193,7 +2160,6 @@ TEST_F(RollbackImplObserverInfoTest,
 }
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsIgnoresNamespaceOfDropDatabaseOplogEntry) {
-    createOplog(_opCtx.get());
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto cmdObj = BSON("dropDatabase" << 1);
     auto cmdOp = makeCommandOp(Timestamp(2, 2), boost::none, nss.getCommandNS(), cmdObj, 2);
@@ -2205,7 +2171,6 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsIgnoresNamespaceOfDropDatab
 }
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespacesOfCollModOplogEntry) {
-    createOplog(_opCtx.get());
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto cmdObj = BSON("collMod" << nss.coll() << "validationLevel"
                                  << "off");
@@ -2218,8 +2183,6 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespacesOfCollMod
 }
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsFailsOnUnsupportedOplogEntry) {
-    createOplog(_opCtx.get());
-
     // 'emptycapped' is not supported in rollback.
     auto emptycappedOp =
         makeCommandOp(Timestamp(2, 2),
@@ -2235,8 +2198,6 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsFailsOnUnsupportedOplogEntr
 DEATH_TEST_F(RollbackImplObserverInfoTest,
              NamespacesForOpsInvariantsOnApplyOpsOplogEntry,
              "_namespacesForOp does not handle 'applyOps' oplog entries.") {
-    createOplog(_opCtx.get());
-
     // Add one sub-op.
     auto createNss = NamespaceString::createNamespaceString_forTest("test", "createColl");
     auto createOp = makeCommandOp(Timestamp(2, 2),
@@ -2263,7 +2224,6 @@ DEATH_TEST_F(RollbackImplObserverInfoTest,
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespacesOfApplyOpsOplogEntry) {
-    createOplog(_opCtx.get());
 
     // Add a few different sub-ops from different namespaces to make sure they all get recorded.
     auto createNss = NamespaceString::createNamespaceString_forTest("test", "createColl");
@@ -2304,8 +2264,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespacesOfApplyOpsOplogEnt
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackFailsOnMalformedApplyOpsOplogEntry) {
-    createOplog(_opCtx.get());
-
     // Make the argument to the 'applyOps' command an object instead of an array. This should cause
     // rollback to fail, since applyOps expects an array of ops.
     auto applyOpsCmdOp =
@@ -2321,8 +2279,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackFailsOnMalformedApplyOpsOplogEntry)
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespaceOfSingleOplogEntry) {
-    createOplog(_opCtx.get());
-
     const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
@@ -2334,8 +2290,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespaceOfSingleOplogEntry)
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleNamespacesOfOplogEntries) {
-    createOplog(_opCtx.get());
-
     const auto makeInsertOp = [&](UUID uuid, NamespaceString nss, Timestamp ts, int recordId) {
         return _insertDocAndReturnOplogEntry(BSON("_id" << 1), uuid, nss, recordId);
     };
@@ -2362,8 +2316,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleNamespacesOfOplogEnt
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackFailsOnUnknownOplogEntryCommandType) {
-    createOplog(_opCtx.get());
-
     // Create a command of an unknown type.
     auto unknownCmdOp =
         makeCommandOp(Timestamp(2, 2),
@@ -2384,8 +2336,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackFailsOnUnknownOplogEntryCommandType
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsSessionIdFromOplogEntry) {
-    createOplog(_opCtx.get());
-
     const auto collId = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), collId, nss);
     auto sessionId = UUID::gen();
@@ -2400,8 +2350,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsSessionIdFromOplogEntry) {
 
 TEST_F(RollbackImplObserverInfoTest,
        RollbackDoesntRecordSessionIdFromOplogEntryWithoutSessionInfo) {
-    createOplog(_opCtx.get());
-
     const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
@@ -2413,8 +2361,6 @@ TEST_F(RollbackImplObserverInfoTest,
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsShardIdentityRollback) {
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-    createOplog(_opCtx.get());
-
     const auto uuid = UUID::gen();
     const auto nss = NamespaceString::kServerConfigurationNamespace;
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
@@ -2427,8 +2373,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsShardIdentityRollback) {
 
 TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordShardIdentityRollbackForNormalDocument) {
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-    createOplog(_opCtx.get());
-
     const auto nss = NamespaceString::kServerConfigurationNamespace;
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
@@ -2446,8 +2390,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordShardIdentityRollbackFo
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsConfigVersionRollback) {
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
-    createOplog(_opCtx.get());
-
     const auto uuid = UUID::gen();
     const auto nss = VersionType::ConfigNS;
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
@@ -2466,8 +2408,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsConfigVersionRollback) {
 
 TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackForShardServer) {
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-    createOplog(_opCtx.get());
-
     const auto uuid = UUID::gen();
     const auto nss = VersionType::ConfigNS;
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
@@ -2485,8 +2425,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackFo
 
 TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackForNonInsert) {
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
-    createOplog(_opCtx.get());
-
     const auto uuid = UUID::gen();
     const auto nss = VersionType::ConfigNS;
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
@@ -2503,7 +2441,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackFo
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsInsertOpsInUUIDToIdMap) {
-    createOplog(_opCtx.get());
     const auto nss1 = NamespaceString::createNamespaceString_forTest("db.people");
     const auto uuid1 = UUID::gen();
     const auto coll1 = _initializeCollection(_opCtx.get(), uuid1, nss1);
@@ -2526,7 +2463,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsInsertOpsInUUIDToIdMap) {
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsUpdateOpsInUUIDToIdMap) {
-    createOplog(_opCtx.get());
     const auto nss1 = NamespaceString::createNamespaceString_forTest("db.coll1");
     const auto uuid1 = UUID::gen();
     const auto coll1 = _initializeCollection(_opCtx.get(), uuid1, nss1);
@@ -2559,7 +2495,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsUpdateOpsInUUIDToIdMap) {
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleInsertOpsForSameNamespace) {
-    createOplog(_opCtx.get());
     const auto nss = NamespaceString::createNamespaceString_forTest("db.coll");
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
@@ -2578,7 +2513,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleInsertOpsForSameName
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleUpdateOpsForSameNamespace) {
-    createOplog(_opCtx.get());
     const auto nss = NamespaceString::createNamespaceString_forTest("db.coll");
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
