@@ -59,6 +59,7 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/agg_key.h"
+#include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -1455,6 +1456,7 @@ TEST(AggBool, Basic) {
 
 TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
     QueryStatsStore queryStatsStore{5000000, 1000};
+    const BSONObj emptyIntMetric = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
 
     auto getMetrics = [&](BSONObj query) {
         auto key = makeFindKeyFromQuery(query);
@@ -1490,31 +1492,33 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
 
         // Empty
         ASSERT_BSONOBJ_EQ(qse.toBSON(false),
-                          BSON("lastExecutionMicros"
-                               << 123456LL << "execCount" << 1LL << "totalExecMicros"
-                               << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0)
-                               << "firstResponseExecMicros"
-                               << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0)
-                               << "docsReturned"
-                               << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0)
-                               << "firstSeenTimestamp" << qse.firstSeenTimestamp
-                               << "latestSeenTimestamp" << Date_t()));
+                          BSONObjBuilder{}
+                              .append("lastExecutionMicros", 123456LL)
+                              .append("execCount", 1LL)
+                              .append("totalExecMicros", emptyIntMetric)
+                              .append("firstResponseExecMicros", emptyIntMetric)
+                              .append("docsReturned", emptyIntMetric)
+                              .append("firstSeenTimestamp", qse.firstSeenTimestamp)
+                              .append("latestSeenTimestamp", Date_t())
+                              .obj());
 
         // With Disk Usage
-        ASSERT_BSONOBJ_EQ(
-            qse.toBSON(true),
-            BSON("lastExecutionMicros"
-                 << 123456LL << "execCount" << 1LL << "totalExecMicros"
-                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0)
-                 << "firstResponseExecMicros"
-                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "docsReturned"
-                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "keysExamined"
-                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "docsExamined"
-                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "hasSortStage"
-                 << boolMetricBson(0, 0) << "usedDisk" << boolMetricBson(0, 0) << "fromMultiPlanner"
-                 << boolMetricBson(0, 0) << "fromPlanCache" << boolMetricBson(0, 0)
-                 << "firstSeenTimestamp" << qse.firstSeenTimestamp << "latestSeenTimestamp"
-                 << Date_t()));
+        ASSERT_BSONOBJ_EQ(qse.toBSON(true),
+                          BSONObjBuilder{}
+                              .append("lastExecutionMicros", 123456LL)
+                              .append("execCount", 1LL)
+                              .append("totalExecMicros", emptyIntMetric)
+                              .append("firstResponseExecMicros", emptyIntMetric)
+                              .append("docsReturned", emptyIntMetric)
+                              .append("keysExamined", emptyIntMetric)
+                              .append("docsExamined", emptyIntMetric)
+                              .append("hasSortStage", boolMetricBson(0, 0))
+                              .append("usedDisk", boolMetricBson(0, 0))
+                              .append("fromMultiPlanner", boolMetricBson(0, 0))
+                              .append("fromPlanCache", boolMetricBson(0, 0))
+                              .append("firstSeenTimestamp", qse.firstSeenTimestamp)
+                              .append("latestSeenTimestamp", Date_t())
+                              .obj());
     }
 
     // Collect some metrics again but with booleans
@@ -1530,21 +1534,48 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
     {
         auto qse2 = getMetrics(query1);
 
-        ASSERT_BSONOBJ_EQ(
-            qse2.toBSON(true),
-            BSON("lastExecutionMicros"
-                 << 246912LL << "execCount" << 2LL << "totalExecMicros"
-                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0)
-                 << "firstResponseExecMicros"
-                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "docsReturned"
-                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "keysExamined"
-                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "docsExamined"
-                 << intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0) << "hasSortStage"
-                 << boolMetricBson(0, 1) << "usedDisk" << boolMetricBson(1, 0) << "fromMultiPlanner"
-                 << boolMetricBson(0, 0) << "fromPlanCache" << boolMetricBson(0, 0)
-                 << "firstSeenTimestamp" << qse2.firstSeenTimestamp << "latestSeenTimestamp"
-                 << Date_t()));
+        ASSERT_BSONOBJ_EQ(qse2.toBSON(true),
+                          BSONObjBuilder{}
+                              .append("lastExecutionMicros", 246912LL)
+                              .append("execCount", 2LL)
+                              .append("totalExecMicros", emptyIntMetric)
+                              .append("firstResponseExecMicros", emptyIntMetric)
+                              .append("docsReturned", emptyIntMetric)
+                              .append("keysExamined", emptyIntMetric)
+                              .append("docsExamined", emptyIntMetric)
+                              .append("hasSortStage", boolMetricBson(0, 1))
+                              .append("usedDisk", boolMetricBson(1, 0))
+                              .append("fromMultiPlanner", boolMetricBson(0, 0))
+                              .append("fromPlanCache", boolMetricBson(0, 0))
+                              .append("firstSeenTimestamp", qse2.firstSeenTimestamp)
+                              .append("latestSeenTimestamp", Date_t())
+                              .obj());
     }
+}
+
+class AggregatedMetricTest : public unittest::Test {
+public:
+    template <typename T>
+    BSONObj toBSON(StringData name, const AggregatedMetric<T>& m) {
+        BSONObjBuilder bob;
+        m.appendTo(bob, name);
+        return bob.obj();
+    }
+
+    template <typename T>
+    void doAggregateTest() {
+        AggregatedMetric<T> m{};
+        for (T x : {1, 2, 5})
+            m.aggregate(x);
+        ASSERT_BSONOBJ_EQ(toBSON("m", m), BSON("m" << intMetricBson(8, 1, 5, 30)));
+    }
+};
+
+TEST_F(AggregatedMetricTest, WorksWithVariousIntegerTypes) {
+    doAggregateTest<uint64_t>();
+    doAggregateTest<uint32_t>();
+    doAggregateTest<int64_t>();
+    doAggregateTest<int32_t>();
 }
 
 }  // namespace mongo::query_stats

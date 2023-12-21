@@ -32,6 +32,7 @@
 #include <algorithm>
 #include <concepts>
 #include <cstdint>
+#include <limits>
 #include <type_traits>
 
 #include "mongo/base/string_data.h"
@@ -39,20 +40,64 @@
 #include "mongo/util/summation.h"
 
 namespace mongo::query_stats {
+namespace agg_metric_detail {
 
 /**
- * An aggregated metric stores a compressed view of data. It balances the loss of information
- * with the reduction in required storage.
+ * Default to the _signed_ maximum (which fits in unsigned range) because we
+ * cast to BSONNumeric when serializing.
  */
 template <typename T>
-requires std::is_arithmetic_v<T>
-struct AggregatedMetric {
+constexpr inline T kInitialMin = static_cast<T>(std::numeric_limits<std::make_signed_t<T>>::max());
+template <>
+constexpr inline double kInitialMin<double> = std::numeric_limits<double>::max();
 
-    using make_signed_t = typename std::make_signed<T>::type;
+template <typename T>
+constexpr inline T kInitialMax = 0;
+template <>
+constexpr inline double kInitialMax<double> = 0;
+
+/** Arithmetic wrapper around DoubleDoubleSummation */
+class DoubleSum {
+public:
+    operator double() const {
+        return _v.getDouble();
+    }
+    DoubleSum& operator+=(double x) {
+        _v.addDouble(x);
+        return *this;
+    }
+    DoubleSum& operator+=(const DoubleSum& x) {
+        _v.addDouble(x);
+        return *this;
+    }
+
+private:
+    DoubleDoubleSummation _v;
+};
+
+template <typename T>
+long long bsonValue(const T& x) {
+    return static_cast<long long>(x);
+}
+inline double bsonValue(double x) {
+    return x;
+}
+inline double bsonValue(const DoubleSum& x) {
+    return x;
+}
+
+template <typename T>
+using Summation = std::conditional_t<std::is_same_v<T, double>, DoubleSum, T>;
+
+template <typename T>
+class AggregatedMetric {
+public:
     AggregatedMetric() = default;
 
-    explicit AggregatedMetric(const T& val)
-        : sum(val), min(val), max(val), sumOfSquares(val * val) {}
+    explicit AggregatedMetric(const T& val) : max{val}, min{val} {
+        sum += val;
+        sumOfSquares += val * val;
+    }
 
     void combine(const AggregatedMetric& other) {
         sum += other.sum;
@@ -71,71 +116,40 @@ struct AggregatedMetric {
         sumOfSquares += val * val;
     }
 
-    void appendTo(BSONObjBuilder& builder, StringData fieldName) const;
+    void appendTo(BSONObjBuilder& builder, StringData fieldName) const {
+        BSONObjBuilder{builder.subobjStart(fieldName)}
+            .append("sum", bsonValue(sum))
+            .append("max", bsonValue(max))
+            .append("min", bsonValue(min))
+            .append("sumOfSquares", bsonValue(sumOfSquares));
+    }
 
-    T sum = 0;
-    // Default to the _signed_ maximum (which fits in unsigned range) because we cast to
-    // BSONNumeric when serializing.
-    T min = static_cast<T>(std::numeric_limits<make_signed_t>::max());
-    T max = 0;
+private:
+    Summation<T> sum{};
+    T max{kInitialMax<T>};
+    T min{kInitialMin<T>};
 
     /**
      * The sum of squares along with (an externally stored) count will allow us to compute the
      * variance/stddev.
      */
-    T sumOfSquares = 0;
+    Summation<T> sumOfSquares{};
 };
 
 extern template void AggregatedMetric<uint64_t>::appendTo(BSONObjBuilder& builder,
                                                           StringData fieldName) const;
 
-template <>
-struct AggregatedMetric<double> {
+}  // namespace agg_metric_detail
 
-    AggregatedMetric() = default;
-
-    explicit AggregatedMetric(const double& val) : min(val), max(val) {
-        sum.addDouble(val);
-        sumOfSquares.addDouble(val * val);
-    }
-
-    void combine(const AggregatedMetric& other) {
-        sum.addDouble(other.sum.getDouble());
-        max = std::max(other.max, max);
-        min = std::min(other.min, min);
-        sumOfSquares.addDouble(other.sumOfSquares.getDouble());
-    }
-
-    /**
-     * Aggregate an observed value into the metric.
-     */
-    void aggregate(double val) {
-        sum.addDouble(val);
-        max = std::max(val, max);
-        min = std::min(val, min);
-        sumOfSquares.addDouble(val * val);
-    }
-
-    void appendTo(BSONObjBuilder& builder, StringData fieldName) const {
-        BSONObjBuilder metricsBuilder = builder.subobjStart(fieldName);
-        metricsBuilder.append("sum", static_cast<double>(sum.getDouble()));
-        metricsBuilder.append("max", static_cast<double>(max));
-        metricsBuilder.append("min", static_cast<double>(min));
-        metricsBuilder.append("sumOfSquares", static_cast<double>(sumOfSquares.getDouble()));
-        metricsBuilder.done();
-    }
-
-    DoubleDoubleSummation sum;
-    // Default to the _signed_ maximum (which fits in unsigned range) because we cast to
-    // BSONNumeric when serializing.
-    double min = std::numeric_limits<double>::max();
-    double max = 0;
-
-    /**
-     * The sum of squares along with (an externally stored) count will allow us to compute the
-     * variance/stddev.
-     */
-    DoubleDoubleSummation sumOfSquares;
+/**
+ * An aggregated metric stores a compressed view of data. It balances the loss of information
+ * with the reduction in required storage.
+ */
+template <typename T>
+requires std::is_arithmetic_v<T>
+class AggregatedMetric : public agg_metric_detail::AggregatedMetric<T> {
+public:
+    using agg_metric_detail::AggregatedMetric<T>::AggregatedMetric;
 };
 
 /**

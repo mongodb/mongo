@@ -33,26 +33,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo::query_stats {
-
-template <typename T>
-requires std::is_arithmetic_v<T>
-void AggregatedMetric<T>::appendTo(BSONObjBuilder& builder, StringData fieldName) const {
-    BSONObjBuilder metricsBuilder = builder.subobjStart(fieldName);
-    metricsBuilder.append("sum", static_cast<long long>(sum));
-    metricsBuilder.append("max", static_cast<long long>(max));
-    metricsBuilder.append("min", static_cast<long long>(min));
-    metricsBuilder.append("sumOfSquares", static_cast<long long>(sumOfSquares));
-    metricsBuilder.done();
-}
-
+namespace agg_metric_detail {
 template void AggregatedMetric<uint64_t>::appendTo(BSONObjBuilder& builder,
                                                    StringData fieldName) const;
+}  // namespace agg_metric_detail
 
 void AggregatedBool::appendTo(BSONObjBuilder& builder, StringData fieldName) const {
-    BSONObjBuilder metricsBuilder = builder.subobjStart(fieldName);
-    metricsBuilder.append("true"_sd, (long long)trueCount);
-    metricsBuilder.append("false"_sd, (long long)falseCount);
-    metricsBuilder.done();
+    BSONObjBuilder{builder.subobjStart(fieldName)}
+        .append("true"_sd, static_cast<long long>(trueCount))
+        .append("false"_sd, static_cast<long long>(falseCount));
 }
-
 }  // namespace mongo::query_stats
