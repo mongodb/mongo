@@ -514,7 +514,10 @@ bool findSbeCompatibleStagesForPushdown(
 
     auto& queryKnob = QueryKnobConfiguration::decoration(cq->getExpCtxRaw()->opCtx);
 
-    const bool doFullPushdown = queryKnob.canPushDownFullyCompatibleStages() || sbeFullEnabled;
+    // We do a pushdown of all eligible stages when one of 3 conditions are met: the query knob is
+    // set to 'trySbeEngine'; featureFlagSbeFull is enabled; the given query is a search query.
+    const bool doFullPushdown =
+        queryKnob.canPushDownFullyCompatibleStages() || sbeFullEnabled || cq->isSearchQuery();
 
     CompatiblePipelineStages allowedStages = {
         .group = !queryKnob.getSbeDisableGroupPushdownForOp(),
