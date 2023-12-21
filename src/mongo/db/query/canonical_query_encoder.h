@@ -94,7 +94,8 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq);
  * Two queries with the same shape may not necessarily be able to use the same plan, so the
  * plan cache has to add information to discriminate between queries with the same shape.
  */
-CanonicalQuery::QueryShapeString encodeSBE(const CanonicalQuery& cq);
+CanonicalQuery::QueryShapeString encodeSBE(const CanonicalQuery& cq,
+                                           bool requiresSbeCompatibility = true);
 
 /**
  * Encode the given CanonicalQuery into a string representation which represents the shape of the

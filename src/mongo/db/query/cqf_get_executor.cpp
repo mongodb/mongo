@@ -59,9 +59,11 @@
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/stages/exchange.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
@@ -105,12 +107,14 @@
 #include "mongo/db/query/optimizer/utils/const_fold_interface.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/stats/collection_statistics_impl.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
@@ -391,6 +395,18 @@ void setupShardFiltering(OperationContext* opCtx,
     }
 }
 
+template <typename QueryType>
+concept IsSupported = (std::same_as<QueryType, CanonicalQuery> ||
+                       std::same_as<QueryType, Pipeline>);
+
+template <typename T>
+bool shouldCachePlan(const T&) {
+    // TODO SERVER-84385: Investigate ExchangeConsumer hangups when inserting into SBE plan cache.
+    return !std::same_as<T, sbe::ExchangeConsumer>;
+}
+
+template <typename QueryType>
+requires IsSupported<QueryType>
 static ExecParams createExecutor(
     OptPhaseManager phaseManager,
     PlanAndProps planAndProps,
@@ -400,6 +416,8 @@ static ExecParams createExecutor(
     const MultipleCollectionAccessor& collections,
     const bool requireRID,
     const boost::optional<MatchExpression*> pipelineMatchExpr,
+    const QueryType& query,
+    const boost::optional<sbe::PlanCacheKey>& planCacheKey,
     PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
     auto env = VariableEnvironment::build(planAndProps._node);
     SlotVarMap slotMap;
@@ -482,6 +500,26 @@ static ExecParams createExecutor(
 
     abtPrinter = std::make_unique<ABTPrinter>(
         phaseManager.getMetadata(), std::move(toExplain), explainVersion);
+
+    // (Possibly) cache the SBE plan.
+    if constexpr (std::same_as<QueryType, CanonicalQuery>) {
+        if (planCacheKey && shouldCachePlan(*sbePlan)) {
+            sbe::getPlanCache(opCtx).setPinned(
+                *planCacheKey,
+                canonical_query_encoder::computeHash(query.encodeKeyForPlanCacheCommand()),
+                std::make_unique<sbe::CachedSbePlan>(sbePlan->clone(),
+                                                     // Make a copy of the plan stage data,
+                                                     // since it needs to be owned by the
+                                                     // cached plan.
+                                                     stage_builder::PlanStageData(data),
+                                                     // No query solution, so no query solution
+                                                     // hash either.
+                                                     0),
+                opCtx->getServiceContext()->getPreciseClockSource()->now(),
+                plan_cache_debug_info::DebugInfoSBE(),
+                CurOp::get(opCtx)->getShouldOmitDiagnosticInformation());
+        }
+    }
 
     sbePlan->prepare(data.env.ctx);
     CurOp::get(opCtx)->stopQueryPlanningTimer();
@@ -619,6 +657,21 @@ std::unique_ptr<CardinalityEstimator> createCardinalityEstimator(
 
     tasserted(6624252,
               str::stream() << "Unknown estimator mode: " << internalQueryCardinalityEstimatorMode);
+}
+
+/**
+ * Creates a plan cache key from the provided CanonicalQuery.
+ */
+boost::optional<sbe::PlanCacheKey> createPlanCacheKey(
+    const CanonicalQuery& query, const MultipleCollectionAccessor& collections) {
+    if (!feature_flags::gFeatureFlagOptimizerPlanCache.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return boost::none;
+    } else if (!static_cast<bool>(collections.getMainCollection())) {
+        return boost::none;
+    } else {
+        return boost::make_optional(plan_cache_key_factory::make(query, collections, false));
+    }
 }
 }  // namespace
 
@@ -878,6 +931,9 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
         involvedCollections = pipeline->getInvolvedCollections();
     }
 
+    const auto planCacheKey =
+        canonicalQuery ? createPlanCacheKey(*canonicalQuery, collections) : boost::none;
+
     const auto& collection = collections.getMainCollection();
 
     const boost::optional<BSONObj>& hint =
@@ -1057,14 +1113,31 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                         "Optimized and lowered physical ABT",
                         "explain"_attr = ExplainGenerator::explainV2(planAndProps._node));
 
-    return createExecutor(std::move(phaseManager),
-                          std::move(planAndProps),
-                          opCtx,
-                          expCtx,
-                          nss,
-                          collections,
-                          requireRID,
-                          pipelineMatchExpr);
+    if (pipeline) {
+        return createExecutor(std::move(phaseManager),
+                              std::move(planAndProps),
+                              opCtx,
+                              expCtx,
+                              nss,
+                              collections,
+                              requireRID,
+                              pipelineMatchExpr,
+                              *pipeline,
+                              planCacheKey);
+    } else if (canonicalQuery) {
+        return createExecutor(std::move(phaseManager),
+                              std::move(planAndProps),
+                              opCtx,
+                              expCtx,
+                              nss,
+                              collections,
+                              requireRID,
+                              pipelineMatchExpr,
+                              *canonicalQuery,
+                              planCacheKey);
+    } else {
+        MONGO_UNREACHABLE;
+    }
 }
 
 boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
