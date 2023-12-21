@@ -32,6 +32,19 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
 
+structs:
+  ShardsvrCoordinateMultiUpdateResponse:
+        description: "Response for the internal multi update command."
+        strict: false
+        is_command_reply: true
+        fields:
+            result:
+                type: object_owned
+                description: >-
+                    Stores the result of the underlying update command. If the MultiUpdateCoordinator 
+                    fails, the error reason will be stored here instead.
+                optional: true
+
 commands:
   _shardsvrCoordinateMultiUpdate:
     command_name: _shardsvrCoordinateMultiUpdate
@@ -42,6 +55,10 @@ commands:
     api_version: ""
     type: namespacestring
     fields:
+      uuid:
+        description: "The unique identifier for this multi update operation."
+        type: uuid
+        optional: false
       command:
         type: object
         description: The original multi update command to coordinate.

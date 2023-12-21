@@ -36,11 +36,45 @@
 
 namespace mongo {
 
+class MultiUpdateCoordinatorExternalState {
+public:
+    virtual Future<DbResponse> sendClusterUpdateCommandToShards(OperationContext* opCtx,
+                                                                const Message& message) const = 0;
+    virtual ~MultiUpdateCoordinatorExternalState() {}
+};
+
+class MultiUpdateCoordinatorExternalStateImpl : public MultiUpdateCoordinatorExternalState {
+public:
+    Future<DbResponse> sendClusterUpdateCommandToShards(OperationContext* opCtx,
+                                                        const Message& message) const override;
+};
+
+class MultiUpdateCoordinatorExternalStateFactory {
+public:
+    virtual std::unique_ptr<MultiUpdateCoordinatorExternalState> createExternalState() const = 0;
+    virtual ~MultiUpdateCoordinatorExternalStateFactory() {}
+};
+
+class MultiUpdateCoordinatorExternalStateFactoryImpl
+    : public MultiUpdateCoordinatorExternalStateFactory {
+public:
+    std::unique_ptr<MultiUpdateCoordinatorExternalState> createExternalState() const {
+        return std::make_unique<MultiUpdateCoordinatorExternalStateImpl>();
+    }
+};
+
+class MultiUpdateCoordinatorInstance;
+
 class MultiUpdateCoordinatorService : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "MultiUpdateCoordinatorService"_sd;
 
-    MultiUpdateCoordinatorService(ServiceContext* serviceContext);
+    friend MultiUpdateCoordinatorInstance;
+
+    MultiUpdateCoordinatorService(
+        ServiceContext* serviceContext,
+        std::unique_ptr<MultiUpdateCoordinatorExternalStateFactory> factory =
+            std::make_unique<MultiUpdateCoordinatorExternalStateFactoryImpl>());
 
     StringData getServiceName() const override;
 
@@ -57,6 +91,7 @@ public:
 
 private:
     ServiceContext* _serviceContext;
+    std::unique_ptr<MultiUpdateCoordinatorExternalStateFactory> _externalStateFactory;
 };
 
 class MultiUpdateCoordinatorInstance
@@ -78,7 +113,7 @@ public:
 
     const MultiUpdateCoordinatorMetadata& getMetadata() const;
 
-    SharedSemiFuture<void> getCompletionFuture() const;
+    SharedSemiFuture<BSONObj> getCompletionFuture() const;
 
 private:
     MultiUpdateCoordinatorMutableFields _getMutableFields() const;
@@ -87,24 +122,31 @@ private:
 
     void _initializeRun(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                         const CancellationToken& stepdownToken);
-    ExecutorFuture<void> _runWorkflow();
     ExecutorFuture<void> _transitionToState(MultiUpdateCoordinatorStateEnum newState);
 
     void _updateInMemoryState(const MultiUpdateCoordinatorDocument& newStateDocument);
     void _updateOnDiskState(OperationContext* opCtx,
                             const MultiUpdateCoordinatorDocument& newStateDocument);
 
+    ExecutorFuture<void> _beginOperation();
+    ExecutorFuture<void> _performUpdate();
+    ExecutorFuture<void> _checkForPendingUpdates();
+    ExecutorFuture<void> _cleanup();
+    void _endOperation();
+
     const MultiUpdateCoordinatorService* const _service;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("MultiUpdateCoordinatorInstance::_mutex");
     const MultiUpdateCoordinatorMetadata _metadata;
     MultiUpdateCoordinatorMutableFields _mutableFields;
+    std::unique_ptr<MultiUpdateCoordinatorExternalState> _externalState;
 
     std::shared_ptr<executor::ScopedTaskExecutor> _taskExecutor;
     boost::optional<primary_only_service_helpers::CancelState> _cancelState;
     boost::optional<primary_only_service_helpers::RetryUntilMajorityCommit> _retry;
 
-    SharedPromise<void> _completionPromise;
+    SharedPromise<BSONObj> _completionPromise;
+    boost::optional<BSONObj> _cmdResponse;
 };
 
 }  // namespace mongo

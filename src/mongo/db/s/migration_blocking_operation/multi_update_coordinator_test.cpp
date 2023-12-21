@@ -45,9 +45,80 @@ constexpr auto kPauseInStateFailpoint = "pauseDuringMultiUpdateCoordinatorStateT
 constexpr auto kPauseInStateFailpointAlternate =
     "pauseDuringMultiUpdateCoordinatorStateTransitionAlternate";
 
+BSONObj updateSuccessResponseBSONObj() {
+    BSONObjBuilder bodyBob;
+    bodyBob.append("nModified", 2);
+    bodyBob.append("n", 2);
+    bodyBob.append("ok", 1);
+    return bodyBob.obj();
+}
+
+BSONObj updateFailedResponseBSONObj() {
+    BSONObjBuilder bodyBob;
+    bodyBob.append("ok", 0);
+    bodyBob.append("code", ErrorCodes::Error::UpdateOperationFailed);
+    return bodyBob.obj();
+}
+
+class MultiUpdateCoordinatorExternalStateForTest : public MultiUpdateCoordinatorExternalState {
+public:
+    explicit MultiUpdateCoordinatorExternalStateForTest(bool shouldFail)
+        : _shouldFail{shouldFail} {}
+
+    Future<DbResponse> sendClusterUpdateCommandToShards(OperationContext* opCtx,
+                                                        const Message& message) const override {
+        OpMsgBuilder builder;
+
+        if (_shouldFail) {
+            builder.setBody(updateFailedResponseBSONObj());
+        } else {
+            builder.setBody(updateSuccessResponseBSONObj());
+        }
+
+        auto response = builder.finish();
+        response.header().setId(nextMessageId());
+        response.header().setResponseToMsgId(1);
+        OpMsg::appendChecksum(&response);
+
+        auto dbResponse = DbResponse();
+        dbResponse.response = response;
+        return Future<DbResponse>::makeReady(dbResponse);
+    }
+
+private:
+    bool _shouldFail = false;
+};
+
+class MultiUpdateCoordinatorExternalStateFactoryForTest
+    : public MultiUpdateCoordinatorExternalStateFactory {
+public:
+    MultiUpdateCoordinatorExternalStateFactoryForTest(bool shouldFail) : _shouldFail{shouldFail} {}
+
+    std::unique_ptr<MultiUpdateCoordinatorExternalState> createExternalState() const {
+        return std::make_unique<MultiUpdateCoordinatorExternalStateForTest>(_shouldFail);
+    }
+
+private:
+    bool _shouldFail;
+};
+
+class MultiUpdateCoordinatorServiceForTest : public MultiUpdateCoordinatorService {
+public:
+    explicit MultiUpdateCoordinatorServiceForTest(ServiceContext* serviceContext,
+                                                  bool shouldFail = false)
+        : MultiUpdateCoordinatorService{serviceContext,
+                                        std::make_unique<
+                                            MultiUpdateCoordinatorExternalStateFactoryForTest>(
+                                            shouldFail)},
+          _serviceContext(serviceContext) {}
+
+private:
+    ServiceContext* _serviceContext;
+};
+
 class MultiUpdateCoordinatorTest : public repl::PrimaryOnlyServiceMongoDTest {
 protected:
-    using Service = MultiUpdateCoordinatorService;
+    using Service = MultiUpdateCoordinatorServiceForTest;
     using Instance = MultiUpdateCoordinatorInstance;
     using State = MultiUpdateCoordinatorStateEnum;
     using Progress = StateTransitionProgressEnum;
@@ -81,8 +152,16 @@ protected:
     MultiUpdateCoordinatorMetadata createMetadata() {
         MultiUpdateCoordinatorMetadata metadata;
         metadata.setId(UUID::gen());
-        metadata.setUpdateCommand(BSON("update"
-                                       << "testDb.coll"));
+
+        const BSONObj query = BSON("member"
+                                   << "abc123");
+        const BSONObj update = BSON("$set" << BSON("points" << 50));
+        auto rawUpdate = BSON("q" << query << "u" << update << "multi" << true);
+        auto cmd = BSON("update"
+                        << "coll"
+                        << "updates" << BSON_ARRAY(rawUpdate));
+        metadata.setUpdateCommand(cmd);
+        metadata.setNss(NamespaceString::createNamespaceString_forTest("test.coll"));
         return metadata;
     }
 
@@ -162,7 +241,11 @@ protected:
         auto doc = getStateDocumentOnDisk(instance);
         ASSERT_EQ(doc.getMutableFields().getState(), state);
         fp->setMode(FailPoint::off);
-        ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+        auto status = instance->getCompletionFuture().getNoThrow();
+        ASSERT_OK(status);
+        auto expectedBSONObj = updateSuccessResponseBSONObj();
+        ASSERT_BSONOBJ_EQ(status.getValue(), expectedBSONObj);
     }
 
     void testStateTransitionUpdatesOnDiskStateWithWriteFailure(State state) {
@@ -180,7 +263,18 @@ protected:
         ASSERT_EQ(getState(instance), state);
 
         afterFp->setMode(FailPoint::off);
-        ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+        auto status = instance->getCompletionFuture().getNoThrow();
+        ASSERT_OK(status);
+        auto expectedBSONObj = updateSuccessResponseBSONObj();
+        ASSERT_BSONOBJ_EQ(status.getValue(), expectedBSONObj);
+    }
+};
+
+class MultiUpdateCoordinatorExternalStateFailTest : public MultiUpdateCoordinatorTest {
+public:
+    std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
+        return std::make_unique<Service>(serviceContext, true);
     }
 };
 
@@ -218,6 +312,39 @@ TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailurePerformUpdate)
 
 TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureCleanup) {
     testStateTransitionUpdatesOnDiskStateWithWriteFailure(State::kCleanup);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureDone) {
+    testStateTransitionUpdatesOnDiskStateWithWriteFailure(State::kDone);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, FailsForUnsupportedCmd) {
+    MultiUpdateCoordinatorMetadata metadata;
+    metadata.setId(UUID::gen());
+
+    const BSONObj query = BSON("member"
+                               << "abc123");
+    const BSONObj update = BSON("$set" << BSON("points" << 50));
+    auto rawUpdate = BSON("q" << query << "u" << update << "multi" << true);
+    auto cmd = BSON("NotARealUpdateCmd"
+                    << "coll"
+                    << "updates" << BSON_ARRAY(rawUpdate));
+    metadata.setUpdateCommand(cmd);
+    metadata.setNss(NamespaceString::createNamespaceString_forTest("test.coll"));
+
+    MultiUpdateCoordinatorDocument document;
+    document.setMetadata(metadata);
+
+    auto instance = createInstanceFrom(document);
+    ASSERT_THROWS_CODE(instance->getCompletionFuture().get(_opCtx), DBException, 8126601);
+}
+
+TEST_F(MultiUpdateCoordinatorExternalStateFailTest, CompletesSuccessfullyIfUnderlyingUpdateFails) {
+    auto instance = createInstance();
+    auto status = instance->getCompletionFuture().getNoThrow();
+    ASSERT_OK(status);
+    auto expectedBSONObj = updateFailedResponseBSONObj();
+    ASSERT_BSONOBJ_EQ(status.getValue(), expectedBSONObj);
 }
 
 }  // namespace

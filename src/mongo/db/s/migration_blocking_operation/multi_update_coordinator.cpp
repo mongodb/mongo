@@ -28,9 +28,16 @@
  */
 
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
+#include "mongo/db/cluster_command_translations.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_server_parameters_gen.h"
 #include "mongo/db/s/primary_only_service_helpers/pause_during_state_transition_fail_point.h"
+#include "mongo/rpc/factory.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/protocol.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/s/service_entry_point_mongos.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -38,6 +45,8 @@ namespace mongo {
 namespace {
 MONGO_FAIL_POINT_DEFINE(pauseDuringMultiUpdateCoordinatorStateTransition);
 MONGO_FAIL_POINT_DEFINE(pauseDuringMultiUpdateCoordinatorStateTransitionAlternate);
+using State = MultiUpdateCoordinatorStateEnum;
+
 primary_only_service_helpers::PauseDuringStateTransitionFailPoint<MultiUpdateCoordinatorStateEnum>
     pauseDuringStateTransitions{
         {pauseDuringMultiUpdateCoordinatorStateTransition,
@@ -49,8 +58,17 @@ primary_only_service_helpers::PauseDuringStateTransitionFailPoint<MultiUpdateCoo
         }};
 }  // namespace
 
-MultiUpdateCoordinatorService::MultiUpdateCoordinatorService(ServiceContext* serviceContext)
-    : PrimaryOnlyService{serviceContext}, _serviceContext{serviceContext} {}
+Future<DbResponse> MultiUpdateCoordinatorExternalStateImpl::sendClusterUpdateCommandToShards(
+    OperationContext* opCtx, const Message& message) const {
+    return ServiceEntryPointMongos::handleRequestImpl(opCtx, message);
+}
+
+MultiUpdateCoordinatorService::MultiUpdateCoordinatorService(
+    ServiceContext* serviceContext,
+    std::unique_ptr<MultiUpdateCoordinatorExternalStateFactory> factory)
+    : PrimaryOnlyService{serviceContext},
+      _serviceContext{serviceContext},
+      _externalStateFactory{std::move(factory)} {}
 
 StringData MultiUpdateCoordinatorService::getServiceName() const {
     return kServiceName;
@@ -84,9 +102,11 @@ MultiUpdateCoordinatorInstance::MultiUpdateCoordinatorInstance(
     MultiUpdateCoordinatorDocument initialDocument)
     : _service{service},
       _metadata{std::move(initialDocument.getMetadata())},
-      _mutableFields{std::move(initialDocument.getMutableFields())} {}
+      _mutableFields{std::move(initialDocument.getMutableFields())},
+      _externalState{service->_externalStateFactory->createExternalState()},
+      _cmdResponse{_mutableFields.getResult()} {}
 
-SharedSemiFuture<void> MultiUpdateCoordinatorInstance::getCompletionFuture() const {
+SharedSemiFuture<BSONObj> MultiUpdateCoordinatorInstance::getCompletionFuture() const {
     return _completionPromise.getFuture();
 }
 
@@ -94,14 +114,99 @@ SemiFuture<void> MultiUpdateCoordinatorInstance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
     _initializeRun(executor, stepdownToken);
-    _completionPromise.setFrom(
-        _runWorkflow().unsafeToInlineFuture().tapError([this](const Status& status) {
-            LOGV2(8126401,
-                  "MultiUpdateCoordinatorInstance encountered an error",
-                  "error"_attr = redact(status),
-                  "metadata"_attr = getMetadata());
-        }));
-    return _completionPromise.getFuture().semi();
+
+    return _transitionToState(State::kBlockMigrations)
+        .then([this] { return _beginOperation(); })
+        .then([this] { return _performUpdate(); })
+        .then([this] { return _checkForPendingUpdates(); })
+        .then([this] { return _cleanup(); })
+        .onCompletion([this, self = shared_from_this()](Status operationStatus) {
+            return _retry
+                ->untilStepdownOrMajorityCommit("MultiUpdateCoordinator::endOperation",
+                                                [this](const auto& factory) { _endOperation(); })
+                .then([this] { return _transitionToState(State::kDone); })
+                .onCompletion([this, operationStatus](Status cleanupStatus) {
+                    // Validating that cleanup status is ok is redundant because
+                    // untilStepdownOrMajorityCommit() will only stop retrying on a stepdown, which
+                    // means we will directly run the instance cleanup executor chain with a non-ok
+                    // status.
+                    invariant(cleanupStatus.isOK());
+                    return operationStatus;
+                });
+        })
+        .thenRunOn(_service->getInstanceCleanupExecutor())
+        .onCompletion([this, self = shared_from_this()](Status status) {
+            if (status.isOK()) {
+                invariant(_cmdResponse);
+                _completionPromise.emplaceValue(_cmdResponse.get());
+            } else {
+                _completionPromise.setError(status);
+            }
+        })
+        .semi();
+}
+
+ExecutorFuture<void> MultiUpdateCoordinatorInstance::_beginOperation() {
+    if (_getCurrentState() > State::kBlockMigrations) {
+        return ExecutorFuture<void>(**_taskExecutor, Status::OK());
+    }
+
+    // TODO(SERVER-81265): Chain call to beginOperation();
+    return ExecutorFuture<void>(**_taskExecutor, Status::OK());
+}
+
+ExecutorFuture<void> MultiUpdateCoordinatorInstance::_performUpdate() {
+    if (_getCurrentState() > State::kPerformUpdate) {
+        return ExecutorFuture<void>(**_taskExecutor, Status::OK());
+    }
+
+    return _transitionToState(State::kPerformUpdate)
+        .then([this]() {
+            // Replace the cmd name to the equivalent cluster cmd name.
+            auto updateCmdObj = _metadata.getUpdateCommand();
+            auto cmdName = updateCmdObj.firstElement().fieldNameStringData();
+            uassert(8126601,
+                    str::stream() << "Unsupported cmd specified for multi update: " << cmdName,
+                    (cmdName == "update"_sd) || (cmdName == "delete"_sd));
+
+            auto modifiedCmdObj =
+                cluster::cmd::translations::replaceCommandNameWithClusterCommandName(updateCmdObj);
+
+            // Call the modified command.
+            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtx = opCtxHolder.get();
+
+            auto opMsgRequest =
+                OpMsgRequestBuilder::create(_metadata.getNss().dbName(), modifiedCmdObj);
+            auto requestMessage = opMsgRequest.serialize();
+
+            return _externalState->sendClusterUpdateCommandToShards(opCtx, requestMessage);
+        })
+        .thenRunOn(**_taskExecutor)
+        .then([this](DbResponse dbResponse) {
+            _cmdResponse = rpc::makeReply(&dbResponse.response)->getCommandReply();
+        });
+}
+
+ExecutorFuture<void> MultiUpdateCoordinatorInstance::_checkForPendingUpdates() {
+    if (_cmdResponse || (_getCurrentState() > State::kPerformUpdate)) {
+        return ExecutorFuture<void>(**_taskExecutor, Status::OK());
+    }
+
+    // TODO(SERVER-81267): $currentOp check for pending updates.
+    return ExecutorFuture<void>(**_taskExecutor, Status::OK());
+}
+
+ExecutorFuture<void> MultiUpdateCoordinatorInstance::_cleanup() {
+    if (_getCurrentState() > State::kCleanup) {
+        return ExecutorFuture<void>(**_taskExecutor, Status::OK());
+    }
+
+    return _transitionToState(State::kCleanup);
+}
+
+void MultiUpdateCoordinatorInstance::_endOperation() {
+    // TODO(SERVER-81265): chain call to endOperation().
 }
 
 void MultiUpdateCoordinatorInstance::interrupt(Status status) {}
@@ -143,17 +248,9 @@ void MultiUpdateCoordinatorInstance::_initializeRun(
         _service->getServiceName(), _taskExecutor, _cancelState.get_ptr(), getMetadata().toBSON());
 }
 
-ExecutorFuture<void> MultiUpdateCoordinatorInstance::_runWorkflow() {
-    using State = MultiUpdateCoordinatorStateEnum;
-    return _transitionToState(State::kBlockMigrations)
-        .then([this] { return _transitionToState(State::kPerformUpdate); })
-        .then([this] { return _transitionToState(State::kCleanup); })
-        .then([this] { return _transitionToState(State::kDone); });
-}
-
 ExecutorFuture<void> MultiUpdateCoordinatorInstance::_transitionToState(
     MultiUpdateCoordinatorStateEnum newState) {
-    return _retry->untilAbortOrMajorityCommit(
+    return _retry->untilStepdownOrMajorityCommit(
         fmt::format("transitionToState({})", MultiUpdateCoordinatorState_serializer(newState)),
         [this, newState](const auto& factory) {
             auto oldState = _getCurrentState();
@@ -163,6 +260,9 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_transitionToState(
             auto opCtx = factory.makeOperationContext(&cc());
             auto newDocument = _buildCurrentStateDocument();
             newDocument.getMutableFields().setState(newState);
+            if (newState == State::kCleanup) {
+                newDocument.getMutableFields().setResult(_cmdResponse);
+            }
             pauseDuringStateTransitions.evaluate(StateTransitionProgressEnum::kBefore, newState);
             _updateOnDiskState(opCtx.get(), newDocument);
             pauseDuringStateTransitions.evaluate(StateTransitionProgressEnum::kPartial, newState);
@@ -176,9 +276,9 @@ void MultiUpdateCoordinatorInstance::_updateOnDiskState(
     PersistentTaskStore<MultiUpdateCoordinatorDocument> store(_service->getStateDocumentsNS());
     auto oldState = _getCurrentState();
     auto newState = newStateDocument.getMutableFields().getState();
-    if (oldState == MultiUpdateCoordinatorStateEnum::kUnused) {
+    if (oldState == State::kUnused) {
         store.add(opCtx, newStateDocument, WriteConcerns::kLocalWriteConcern);
-    } else if (newState == MultiUpdateCoordinatorStateEnum::kDone) {
+    } else if (newState == State::kDone) {
         store.remove(opCtx,
                      BSON(MultiUpdateCoordinatorDocument::kIdFieldName << _metadata.getId()),
                      WriteConcerns::kLocalWriteConcern);

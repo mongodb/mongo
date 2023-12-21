@@ -31,6 +31,8 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
+#include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_gen.h"
 #include "mongo/s/request_types/coordinate_multi_update_gen.h"
 #include "mongo/s/sharding_state.h"
 
@@ -41,6 +43,7 @@ class ShardsvrCoordinateMultiUpdateCommand final
     : public TypedCommand<ShardsvrCoordinateMultiUpdateCommand> {
 public:
     using Request = ShardsvrCoordinateMultiUpdate;
+    using Response = ShardsvrCoordinateMultiUpdateResponse;
 
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
@@ -66,9 +69,27 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext* opCtx) {
+        Response typedRun(OperationContext* opCtx) {
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+
+            auto metadata = MultiUpdateCoordinatorMetadata();
+            metadata.setId(request().getUuid());
+            metadata.setUpdateCommand(request().getCommand());
+            metadata.setNss(ns());
+
+            auto coordinatorDoc = MultiUpdateCoordinatorDocument();
+            coordinatorDoc.setMetadata(metadata);
+
+            auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+            auto service =
+                registry->lookupServiceByName(MultiUpdateCoordinatorService::kServiceName);
+            auto instance = MultiUpdateCoordinatorInstance::getOrCreate(
+                opCtx, service, coordinatorDoc.toBSON());
+
+            auto response = Response();
+            response.setResult(instance->getCompletionFuture().get(opCtx));
+            return response;
         }
 
     private:
