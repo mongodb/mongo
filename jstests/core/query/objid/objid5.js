@@ -1,3 +1,9 @@
+/**
+ * @tags: [
+ *   # The machine OID value is global and cannot be modified by multiple clients simultaneously.
+ *   multi_clients_incompatible,
+ ]
+ */
 let t = db.objid5;
 t.drop();
 
