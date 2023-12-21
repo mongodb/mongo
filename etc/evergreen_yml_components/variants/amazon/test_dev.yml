@@ -80,8 +80,8 @@ buildvariants:
   - name: .cqf
   - name: .misc_js
   - name: .clustered_collections
-  - name: .concurrency !.large !.ubsan !.no_txns
-  - name: .concurrency .large !.ubsan !.no_txns
+  - name: .concurrency !.large !.no_txns
+  - name: .concurrency .large !.no_txns
   - name: .config_fuzzer !.large
   - name: .config_fuzzer .large
     distros:
@@ -210,8 +210,8 @@ buildvariants:
   - name: cqf_parallel
   - name: .misc_js
   - name: .clustered_collections
-  - name: .concurrency !.large !.ubsan !.no_txns
-  - name: .concurrency .large !.ubsan !.no_txns
+  - name: .concurrency !.large !.no_txns
+  - name: .concurrency .large !.no_txns
   - name: .config_fuzzer !.large
   - name: .config_fuzzer .large
     distros:

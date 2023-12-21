@@ -101,7 +101,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
+  - name: .concurrency !.no_txns !.kill_terminate
   - name: .encrypt
   - name: external_auth
   - name: external_auth_aws

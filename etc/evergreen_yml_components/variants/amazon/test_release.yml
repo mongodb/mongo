@@ -360,8 +360,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns
-  - name: .concurrency .large !.ubsan !.no_txns
+  - name: .concurrency !.large !.no_txns
+  - name: .concurrency .large !.no_txns
     distros:
     - amazon2-arm64-large
   - name: .config_fuzzer !.large
@@ -537,8 +537,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns
-  - name: .concurrency .large !.ubsan !.no_txns
+  - name: .concurrency !.large !.no_txns
+  - name: .concurrency .large !.no_txns
     distros:
     - amazon2-arm64-openssl111-large
   - name: .config_fuzzer !.large
@@ -708,8 +708,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns
-  - name: .concurrency .large !.ubsan !.no_txns
+  - name: .concurrency !.large !.no_txns
+  - name: .concurrency .large !.no_txns
     distros:
     - amazon2023.0-large
   - name: config_fuzzer_concurrency
@@ -820,8 +820,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns
-  - name: .concurrency .large !.ubsan !.no_txns
+  - name: .concurrency !.large !.no_txns
+  - name: .concurrency .large !.no_txns
     distros:
     - amazon2023.0-large
   - name: config_fuzzer_concurrency
@@ -985,8 +985,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns
-  - name: .concurrency .large !.ubsan !.no_txns
+  - name: .concurrency !.large !.no_txns
+  - name: .concurrency .large !.no_txns
     distros:
     - amazon2023.0-arm64-large
   - name: .config_fuzzer !.large
@@ -1103,8 +1103,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns
-  - name: .concurrency .large !.ubsan !.no_txns
+  - name: .concurrency !.large !.no_txns
+  - name: .concurrency .large !.no_txns
     distros:
     - amazon2023.0-arm64-large
   - name: .config_fuzzer !.large

@@ -40,7 +40,7 @@ buildvariants:
   - name: .misc_js
     # Some concurrency workloads require a lot of memory, so we use machines
     # with more RAM for these suites.
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.common
+  - name: .concurrency !.no_txns !.kill_terminate !.common
     distros:
     - windows-vsCurrent-large
   - name: .concurrency .common
@@ -114,7 +114,7 @@ buildvariants:
   - name: .misc_js
     # Some concurrency workloads require a lot of memory, so we use machines
     # with more RAM for these suites.
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.common
+  - name: .concurrency !.no_txns !.kill_terminate !.common
     distros:
     - windows-vsCurrent-large
   - name: .concurrency .common

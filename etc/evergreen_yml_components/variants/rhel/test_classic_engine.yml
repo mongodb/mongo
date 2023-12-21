@@ -135,8 +135,8 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_stream_fuzzer
   - name: .change_streams
-  - name: .concurrency !.large !.ubsan !.no_txns !.compute_mode
-  - name: .concurrency .large !.ubsan !.no_txns !.compute_mode
+  - name: .concurrency !.large !.no_txns !.compute_mode
+  - name: .concurrency .large !.no_txns !.compute_mode
     distros:
     - rhel80-medium
   - name: .encrypt
@@ -249,7 +249,7 @@ buildvariants:
   - name: .change_streams
   # - name: disk_wiredtiger
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.compute_mode
+  - name: .concurrency !.no_txns !.kill_terminate !.compute_mode
   - name: .encrypt
   - name: external_auth
   - name: external_auth_aws

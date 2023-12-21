@@ -7037,34 +7037,6 @@ tasks:
     vars:
       resmoke_jobs_max: 1
 
-  # TODO: SERVER-35964 revert the addition of UBSAN concurrency_replication suites.
-- <<: *task_template
-  name: concurrency_replication_ubsan
-  tags: ["concurrency", "ubsan", "repl"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: concurrency_replication_causal_consistency_ubsan
-  tags: ["concurrency", "ubsan", "repl"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: concurrency_replication_multi_stmt_txn_ubsan
-  tags: ["concurrency", "ubsan", "repl"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
 - <<: *gen_task_template
   name: concurrency_replication_wiredtiger_cursor_sweeps_gen
   tags: ["concurrency", "repl", "cursor_sweeps"]
@@ -9179,8 +9151,8 @@ tasks:
   tags: ["timeseries_crud"]
   commands:
   - func: "generate resmoke tasks"
-  vars:
-    suite: timeseries_crud_jscore_passthrough
+    vars:
+      suite: timeseries_crud_jscore_passthrough
 
 
 - name: shared_scons_cache_pruning
