@@ -114,9 +114,9 @@ def bazel_builder_action(env: SCons.Environment.Environment, target: List[SCons.
     def check_bazel_target_done(bazel_target: str) -> bool:
         """
         Check the done queue and pull off the desired target if it exists.
-        
+
         bazel_target: the target we are looking for
-        return: True to stop waiting, False if we should keep waiting 
+        return: True to stop waiting, False if we should keep waiting
 
         Note that this function will signal True to indicate a shutdown/failure case. SCons main build
         thread will be waiting for this action to complete before shutting down, so we need to
@@ -425,6 +425,13 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--host_platform=//bazel/platforms:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g
         ]
+
+        sanitizer_option = env.GetOption("sanitize")
+
+        if sanitizer_option is not None:
+            options = sanitizer_option.split(",")
+            formatted_options = [f'--//bazel/config:sanitize={opt}' for opt in options]
+            bazel_internal_flags.extend(formatted_options)
 
         if normalized_os != "linux" or normalized_arch not in ["arm64", 'amd64']:
             bazel_internal_flags.append('--config=local')

@@ -38,7 +38,7 @@ build_mode = rule(
 
 # =========
 # gdbserver
-# ========= 
+# =========
 
 use_gdbserver_provider = provider(
     doc = "Choose if gdbserver should be used",
@@ -96,7 +96,7 @@ allocator = rule(
 
 # =========
 # lldb-server
-# ========= 
+# =========
 
 use_lldbserver_provider = provider(
     doc = "Choose if lldbserver should be used",
@@ -110,7 +110,7 @@ use_lldbserver = rule(
 
 # =========
 # wait_for_debugger
-# ========= 
+# =========
 
 use_wait_for_debugger_provider = provider(
     doc = "Wait for debugger attach on process startup",
@@ -141,7 +141,7 @@ use_ocsp_stapling = rule(
 # =========
 
 use_disable_ref_track_provider = provider(
-    doc = """Disables runtime tracking of REF state changes for pages within wiredtiger. 
+    doc = """Disables runtime tracking of REF state changes for pages within wiredtiger.
     Tracking the REF state changes is useful for debugging but there is a small performance cost.""",
     fields = ["enabled"],
 )
@@ -177,4 +177,36 @@ build_grpc_provider = provider(
 build_grpc = rule(
     implementation = lambda ctx: build_grpc_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
+)
+
+# =========
+# sanitize
+# =========
+
+sanitize_provider = provider(
+    doc = "enable selected sanitizers",
+    fields = ["type"],
+)
+
+valid_sanitizer_values = [
+    "address",
+    "fuzzer",
+    "leak",
+    "thread",
+    "undefined",
+    "memory",
+    "disabled",
+]
+
+def sanitizer_impl(ctx):
+    sanitizer_values = ctx.build_setting_value
+    for sv in sanitizer_values:
+        if sv not in valid_sanitizer_values:
+            fail(str(ctx.label) + " sanitizer allowed to take values {" + ", ".join(valid_sanitizer_values) + "} but was set to unallowed value " + sv)
+    return sanitize_provider(type = sanitizer_values)
+
+
+sanitize = rule(
+    implementation = sanitizer_impl,
+    build_setting = config.string_list(flag = True, repeatable = True)
 )

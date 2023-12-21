@@ -1,18 +1,21 @@
 load(
-    "//bazel/config:configs.bzl", 
-    "build_mode", 
-    "compiler_type", 
-    "use_libunwind", 
-    "use_gdbserver", 
-    "spider_monkey_dbg", 
-    "allocator", 
-    "use_lldbserver", 
-    "use_wait_for_debugger", 
-    "use_disable_ref_track", 
+    "//bazel/config:configs.bzl",
+    "build_mode",
+    "compiler_type",
+    "use_libunwind",
+    "use_gdbserver",
+    "spider_monkey_dbg",
+    "allocator",
+    "use_lldbserver",
+    "use_wait_for_debugger",
+    "use_disable_ref_track",
     "use_ocsp_stapling",
+    "sanitize",
     "use_wiredtiger",
     "build_grpc",
 )
+
+load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -325,6 +328,20 @@ config_setting(
 )
 
 config_setting(
+    name = "auto_allocator",
+    flag_values = {
+        "//bazel/config:allocator": "auto",
+    },
+)
+
+config_setting(
+    name = "system_allocator",
+    flag_values = {
+        "//bazel/config:allocator": "system",
+    },
+)
+
+config_setting(
     name = "tcmalloc_allocator",
     flag_values = {
         "//bazel/config:allocator": "tcmalloc",
@@ -429,4 +446,74 @@ config_setting(
     flag_values = {
         "//bazel/config:build_grpc": "True",
     },
+)
+
+# --------------------------------------
+# sanitizer options
+# --------------------------------------
+
+sanitize(
+    name = "sanitize",
+    build_setting_default = ["disabled"],
+)
+
+config_setting(
+    name = "sanitize_address",
+    flag_values = {
+        "//bazel/config:sanitize": "address",
+    },
+)
+
+config_setting(
+    name = "sanitize_fuzzer",
+    flag_values = {
+        "//bazel/config:sanitize": "fuzzer",
+    },
+)
+
+config_setting(
+    name = "sanitize_leak",
+    flag_values = {
+        "//bazel/config:sanitize": "leak",
+    },
+)
+
+config_setting(
+    name = "sanitize_memory",
+    flag_values = {
+        "//bazel/config:sanitize": "memory",
+    },
+)
+
+config_setting(
+    name = "sanitize_thread",
+    flag_values = {
+        "//bazel/config:sanitize": "thread",
+    },
+)
+
+config_setting(
+    name = "sanitize_undefined",
+    flag_values = {
+        "//bazel/config:sanitize": "undefined",
+    },
+)
+
+config_setting(
+     name = "sanitize_disabled",
+    flag_values = {
+        "//bazel/config:sanitize": "disabled",
+    },
+)
+# --------------------------------------------
+# ----------- computed sanitizer flags -------
+
+selects.config_setting_group(
+    name = "sanitize_address_build_mode",
+    match_any = [":opt_on", ":opt_debug"],
+)
+
+selects.config_setting_group(
+    name = "sanitize_address_required_settings",
+    match_all = [":sanitize_address", ":system_allocator", ":sanitize_address_build_mode", ":compiler_type_clang"],
 )

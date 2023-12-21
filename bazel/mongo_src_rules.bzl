@@ -1,5 +1,9 @@
 # Common mongo-specific bazel build rules intended to be used in individual BUILD files in the "src/" subtree.
 load("@poetry//:dependencies.bzl", "dependency")
+
+# config selection
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
 # === Windows-specific compilation settings ===
 
 # /RTC1              Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized (implies /Od: no optimizations)
@@ -64,6 +68,35 @@ LIBUNWIND_DEFINES = select({
     "//conditions:default": [],
 })
 
+ADDRESS_SANITIZER_ERROR_MESSAGE = (
+    "\nError:\n" +
+    "    address sanitizer requires these configurations:\n"+
+    "    --//bazel/config:compiler_type=clang\n" +
+    "    --//bazel/config:allocator=system\n" +
+    "    --//bazel/config:build_mode=opt_on [OR] --//bazel/config:build_mode=opt_debug"
+)
+
+ADDRESS_SANITIZER_COPTS = select({
+    ("//bazel/config:sanitize_address_required_settings"): ["-fsanitize=address", "-fno-omit-frame-pointer"],
+    ("//bazel/config:sanitize_disabled"): [],
+}, no_match_error = ADDRESS_SANITIZER_ERROR_MESSAGE)
+
+ADDRESS_SANITIZER_LINKFLAGS = select({
+    ("//bazel/config:sanitize_address_required_settings"): ["-fsanitize=address"],
+    ("//bazel/config:sanitize_disabled"): [],
+}, no_match_error = ADDRESS_SANITIZER_ERROR_MESSAGE)
+
+# Unfortunately, abseil requires that we make these macros
+# (this, and THREAD_ and UNDEFINED_BEHAVIOR_ below) set,
+# because apparently it is too hard to query the running
+# compiler. We do this unconditionally because abseil is
+# basically pervasive via the 'base' library.
+ADDRESS_SANITIZER_DEFINES = select({
+    ("//bazel/config:sanitize_address_required_settings"): ["ADDRESS_SANITIZER"],
+    ("//bazel/config:sanitize_disabled"): [],
+}, no_match_error = ADDRESS_SANITIZER_ERROR_MESSAGE)
+
+
 def force_includes_copt(package_name, name):
 
     if package_name.startswith("src/mongo"):
@@ -83,7 +116,7 @@ def force_includes_copt(package_name, name):
             "//bazel/config:macos_x86_64": ["-include", "third_party/mozjs/platform/x86_64/macOS/build/js-confdefs.h"],
             "//bazel/config:macos_aarch64": ["-include", "third_party/mozjs/platform/aarch64/macOS/build/js-confdefs.h"],
         })
-            
+
     if name in ['scripting', 'scripting_mozjs_test', 'encrypted_dbclient']:
         return select({
             "//bazel/config:linux_aarch64": ["-include", "third_party/mozjs/platform/aarch64/linux/build/js-config.h"],
@@ -103,7 +136,7 @@ def force_includes_hdr(package_name, name):
             "@platforms//os:windows": ["//src/mongo/platform:basic.h", "//src/mongo/platform:windows_basic.h"],
             "//conditions:default": ["//src/mongo/platform:basic.h"],
         })
-        return 
+        return
 
     if package_name.startswith("src/third_party/mozjs"):
         return select({
@@ -115,7 +148,7 @@ def force_includes_hdr(package_name, name):
             "//bazel/config:macos_x86_64": ["//src/third_party/mozjs:platform/x86_64/macOS/build/js-confdefs.h"],
             "//bazel/config:macos_aarch64": ["//src/third_party/mozjs:platform/aarch64/macOS/build/js-confdefs.h"],
         })
-            
+
     if name in ['scripting', 'scripting_mozjs_test', 'encrypted_dbclient']:
         return select({
             "//bazel/config:linux_aarch64": ["//src/third_party/mozjs:platform/aarch64/linux/build/js-config.h"],
@@ -175,14 +208,14 @@ def mongo_cc_library(
         deps = deps,
         visibility = visibility,
         testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
+        copts = MONGO_GLOBAL_COPTS + ADDRESS_SANITIZER_COPTS + copts + fincludes_copt,
         data = data,
         tags = tags,
         linkstatic = select({
             "@platforms//os:windows": True,
             "//conditions:default": linkstatic,
         }),
-        local_defines = MONGO_GLOBAL_DEFINES + local_defines,
+        local_defines = MONGO_GLOBAL_DEFINES + ADDRESS_SANITIZER_DEFINES + local_defines,
         includes = [],
     )
 
@@ -214,7 +247,7 @@ def mongo_cc_binary(
         is ignored on windows since linking into DLLs is not currently supported.
       local_defines: macro definitions passed to all source and header files.
     """
-    
+
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
 
@@ -224,14 +257,14 @@ def mongo_cc_binary(
         deps = deps + LIBUNWIND_DEPS,
         visibility = visibility,
         testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
+        copts = MONGO_GLOBAL_COPTS + ADDRESS_SANITIZER_COPTS + copts + fincludes_copt,
         data = data,
         tags = tags,
         linkstatic = select({
             "@platforms//os:windows": True,
             "//conditions:default": linkstatic,
         }),
-        local_defines = MONGO_GLOBAL_DEFINES + LIBUNWIND_DEFINES + local_defines,
+        local_defines = MONGO_GLOBAL_DEFINES + ADDRESS_SANITIZER_DEFINES + LIBUNWIND_DEFINES + local_defines,
         malloc = select({
           "//bazel/config:tcmalloc_allocator": "//src/third_party/gperftools:tcmalloc_minimal",
           "//bazel/config:auto_allocator_windows": "//src/third_party/gperftools:tcmalloc_minimal",
@@ -248,14 +281,11 @@ IdlInfo = provider(
 )
 
 def idl_generator_impl(ctx):
-    
     base = ctx.attr.src.files.to_list()[0].basename.removesuffix(".idl")
-    
     gen_source = ctx.actions.declare_file(base + "_gen.cpp")
     gen_header = ctx.actions.declare_file(base + "_gen.h")
 
     python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
-    
     idlc_path = ctx.attr.idlc.files.to_list()[0].path
     dep_depsets = [dep[IdlInfo].idl_deps for dep in ctx.attr.deps]
 
@@ -270,26 +300,26 @@ def idl_generator_impl(ctx):
 
     inputs = depset(transitive=[
         ctx.attr.src.files,
-        ctx.attr.idlc.files, 
+        ctx.attr.idlc.files,
         python.files] + dep_depsets + py_depsets)
 
     ctx.actions.run(
         executable = python.interpreter.path,
         outputs = [gen_source, gen_header],
         inputs = inputs,
-        arguments = [ 
+        arguments = [
             'buildscripts/idl/idlc.py',
-            '--include', 'src', 
+            '--include', 'src',
             '--base_dir', ctx.bin_dir.path + '/src',
             '--target_arch', ctx.var['TARGET_CPU'],
-            '--header', gen_header.path, 
-            '--output', gen_source.path, 
+            '--header', gen_header.path,
+            '--output', gen_source.path,
             ctx.attr.src.files.to_list()[0].path
         ],
         mnemonic = "IdlcGenerator",
          env={"PYTHONPATH":ctx.configuration.host_path_separator.join(python_path)}
     )
-    
+
     return [
         DefaultInfo(
             files = depset([gen_source, gen_header]),
