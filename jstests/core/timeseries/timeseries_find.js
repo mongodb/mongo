@@ -54,8 +54,7 @@ function runTest(docs, query, results) {
             }
         }
     };
-    if (!FixtureHelpers.isMongos(db)) {
-        assert(Array.isArray(explain.stages), explain);
+    if (Array.isArray(explain.stages)) {
         noTypeExpression(explain.stages);
     } else {
         if (explain.splitPipeline) {

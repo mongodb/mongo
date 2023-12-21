@@ -363,6 +363,31 @@ export function getExecutionStages(root) {
 }
 
 /**
+ * Returns an array of "executionStats" from the given replset or sharded explain output.
+ *
+ * This helper function can be used for any optimizer.
+ */
+export function getExecutionStats(root) {
+    const allExecutionStats = [];
+    if (root.hasOwnProperty("shards")) {
+        // This test assumes that there is only one shard in the cluster.
+        for (let shardExplain of getAllNodeExplains(root)) {
+            allExecutionStats.push(shardExplain.executionStats);
+        }
+        return allExecutionStats;
+    }
+    assert(root.hasOwnProperty("executionStats"), root);
+    if (root.executionStats.hasOwnProperty("executionStages") &&
+        root.executionStats.executionStages.hasOwnProperty("shards")) {
+        for (let shardExecutionStats of root.executionStats.executionStages.shards) {
+            allExecutionStats.push(shardExecutionStats);
+        }
+        return allExecutionStats;
+    }
+    return [root.executionStats];
+}
+
+/**
  * Returns the winningPlan.queryPlan of each shard in the explain in a list.
  *
  * This helper function can be used for any optimizer.
@@ -853,8 +878,8 @@ export function getFieldValueFromExplain(explainRes, getValueCallback) {
 export function getPlanCacheKeyFromExplain(explainRes, db) {
     explainRes = getSingleNodeExplain(explainRes);
     return getFieldValueFromExplain(explainRes, function(plannerOutput) {
-        return FixtureHelpers.isMongos(db) && plannerOutput.hasOwnProperty("winningPlan") &&
-                plannerOutput.winningPlan.hasOwnProperty("shards")
+        return (plannerOutput.hasOwnProperty("winningPlan") &&
+                plannerOutput.winningPlan.hasOwnProperty("shards"))
             ? plannerOutput.winningPlan.shards[0].planCacheKey
             : plannerOutput.planCacheKey;
     });
@@ -867,8 +892,10 @@ export function getPlanCacheKeyFromExplain(explainRes, db) {
  */
 export function getQueryHashFromExplain(explainRes, db) {
     return getFieldValueFromExplain(explainRes, function(plannerOutput) {
-        return FixtureHelpers.isMongos(db) ? plannerOutput.winningPlan.shards[0].queryHash
-                                           : plannerOutput.queryHash;
+        return (plannerOutput.hasOwnProperty("winningPlan") &&
+                plannerOutput.winningPlan.hasOwnProperty("shards"))
+            ? plannerOutput.winningPlan.shards[0].queryHash
+            : plannerOutput.queryHash;
     });
 }
 

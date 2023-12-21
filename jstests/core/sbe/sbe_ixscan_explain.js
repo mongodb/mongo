@@ -8,7 +8,7 @@
 //   featureFlagSbeFull,
 // ]
 
-import {getPlanStages, getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getQueryPlanner, isIxscan} from "jstests/libs/analyze_plan.js";
 
 function assertStageContainsIndexName(stage) {
     assert(stage.hasOwnProperty("indexName"));
@@ -27,9 +27,10 @@ assert.commandWorked(coll.insertMany([
 ]));
 
 let explain = coll.find({a: 3}).hint({a: 1}).explain("executionStats");
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+let queryPlanner = getQueryPlanner(explain);
+assert(isIxscan(db, queryPlanner.winningPlan));
 // Ensure the query is run on sbe engine.
-assert('slotBasedPlan' in explain.queryPlanner.winningPlan);
+assert('slotBasedPlan' in queryPlanner.winningPlan);
 
 let ixscanStages = getPlanStages(explain.executionStats.executionStages, "ixseek");
 assert(ixscanStages.length !== 0);

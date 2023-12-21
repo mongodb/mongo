@@ -34,8 +34,15 @@ function checkExplainOutput(explain, verbosity) {
     if (verbosity == "allPlansExecution") {
         const allPlans = explain.executionStats.allPlansExecution;
         for (let plan of allPlans) {
-            assert(plan.hasOwnProperty("score"), explain);
-            assert.gt(plan.score, 0, explain);
+            if (plan.hasOwnProperty("shardName")) {
+                for (let shardPlan of plan.allPlans) {
+                    assert(shardPlan.hasOwnProperty("score"), {explain, shardPlan});
+                    assert.gt(shardPlan.score, 0, {explain, shardPlan});
+                }
+            } else {
+                assert(plan.hasOwnProperty("score"), {explain, plan});
+                assert.gt(plan.score, 0, {explain, plan});
+            }
         }
     }
 }

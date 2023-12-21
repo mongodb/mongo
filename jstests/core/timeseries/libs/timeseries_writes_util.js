@@ -2,8 +2,7 @@
  * Helpers for testing timeseries arbitrary writes.
  */
 
-import {getExecutionStages, getPlanStage} from "jstests/libs/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getExecutionStages, getPlanStage, getQueryPlanner} from "jstests/libs/analyze_plan.js";
 
 export const timeFieldName = "time";
 export const metaFieldName = "tag";
@@ -409,9 +408,7 @@ export function testCollation(
         };
     }
     const explain = testDB.runCommand({explain: command, verbosity: "queryPlanner"});
-    const parsedQuery = FixtureHelpers.isMongos(testDB)
-        ? explain.queryPlanner.winningPlan.shards[0].parsedQuery
-        : explain.queryPlanner.parsedQuery;
+    const parsedQuery = getQueryPlanner(explain).parsedQuery;
 
     assert.eq(expectedBucketQuery, parsedQuery, `Got wrong parsedQuery: ${tojson(explain)}`);
     assert.neq(null,

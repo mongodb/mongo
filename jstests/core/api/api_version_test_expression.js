@@ -12,6 +12,8 @@
  * ]
  */
 
+import {getExecutionStats} from "jstests/libs/analyze_plan.js";
+
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_test_expression";
 const coll = testDb[collName];
@@ -232,8 +234,8 @@ function checkExplainInnerCommandGetsAPIVersionParameters(explainedCmd, errCode)
     // If 'apiStrict: false' the inner aggregate command will execute successfully.
     const explainRes =
         testDb.runCommand({explain: explainedCmd, apiVersion: "1", apiStrict: false});
-    assert(explainRes.hasOwnProperty('executionStats'), explainRes);
-    assert.eq(explainRes['executionStats']['executionSuccess'], true, explainRes);
+    const executionStats = getExecutionStats(explainRes)[0];
+    assert.eq(executionStats.executionSuccess, true, {explainRes, executionStats});
 }
 
 pipeline = [{$project: {v: {$_testApiVersion: {unstable: true}}}}];

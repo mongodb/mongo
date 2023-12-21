@@ -1,6 +1,8 @@
 // Test to check whether the number of intervals in a geoNear query equals
 // the number of inputStages it completes
 
+import {getExecutionStages} from "jstests/libs/analyze_plan.js";
+
 var t = db.jstests_geo_s2explain;
 t.drop();
 
@@ -13,7 +15,7 @@ assert.commandWorked(t.createIndex({loc: "2dsphere"}));
 var explain = t.find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
                   .limit(1)
                   .explain("executionStats");
-var inputStage = explain.executionStats.executionStages.inputStage;
+var inputStage = getExecutionStages(explain)[0].inputStage;
 
 assert.eq(1, inputStage.searchIntervals.length);
 
@@ -28,20 +30,20 @@ assert.commandWorked(t.insert(points));
 explain = t.find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
               .limit(10)
               .explain("executionStats");
-inputStage = explain.executionStats.executionStages.inputStage;
+inputStage = getExecutionStages(explain)[0].inputStage;
 
 assert.eq(inputStage.inputStages.length, inputStage.searchIntervals.length);
 
 explain = t.find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
               .limit(50)
               .explain("executionStats");
-inputStage = explain.executionStats.executionStages.inputStage;
+inputStage = getExecutionStages(explain)[0].inputStage;
 
 assert.eq(inputStage.inputStages.length, inputStage.searchIntervals.length);
 
 explain = t.find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
               .limit(200)
               .explain("executionStats");
-inputStage = explain.executionStats.executionStages.inputStage;
+inputStage = getExecutionStages(explain)[0].inputStage;
 
 assert.eq(inputStage.inputStages.length, inputStage.searchIntervals.length);

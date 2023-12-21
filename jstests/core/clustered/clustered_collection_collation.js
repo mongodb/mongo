@@ -10,7 +10,7 @@
  * ]
  */
 
-import {getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {
     validateClusteredCollectionHint
 } from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";
@@ -120,9 +120,9 @@ const verifyHasBoundsAndFindsN = function(coll, expected, predicate, queryCollat
     const res = queryCollation === undefined
         ? assert.commandWorked(coll.find(predicate).explain())
         : assert.commandWorked(coll.find(predicate).collation(queryCollation).explain());
-    const queryPlan = getWinningPlan(res.queryPlanner);
-    const min = assert(queryPlan.minRecord, "No min bound");
-    const max = assert(queryPlan.maxRecord, "No max bound");
+    const queryPlan = getWinningPlan(getQueryPlanner(res));
+    const min = assert(queryPlan.minRecord, "No min bound " + tojson({res, queryPlan}));
+    const max = assert(queryPlan.maxRecord, "No max bound " + tojson({res, queryPlan}));
     assert.eq(min, max, "COLLSCAN bounds are not equal");
     assert.eq(expected, coll.find(predicate).count(), "Didn't find the expected records");
 };
@@ -131,9 +131,9 @@ const verifyNoBoundsAndFindsN = function(coll, expected, predicate, queryCollati
     const res = queryCollation === undefined
         ? assert.commandWorked(coll.find(predicate).explain())
         : assert.commandWorked(coll.find(predicate).collation(queryCollation).explain());
-    const queryPlan = getWinningPlan(res.queryPlanner);
-    assert.eq(null, queryPlan.minRecord, "There's a min bound");
-    assert.eq(null, queryPlan.maxRecord, "There's a max bound");
+    const queryPlan = getWinningPlan(getQueryPlanner(res));
+    assert.eq(null, queryPlan.minRecord, "There's a min bound " + tojson({res, queryPlan}));
+    assert.eq(null, queryPlan.maxRecord, "There's a max bound " + tojson({res, queryPlan}));
     assert.eq(expected, coll.find(predicate).count(), "Didn't find the expected records");
 };
 
@@ -141,12 +141,12 @@ const verifyNoTightBoundsAndFindsN = function(coll, expected, predicate, queryCo
     const res = queryCollation === undefined
         ? assert.commandWorked(coll.find(predicate).explain())
         : assert.commandWorked(coll.find(predicate).collation(queryCollation).explain());
-    const queryPlan = getWinningPlan(res.queryPlanner);
+    const queryPlan = getWinningPlan(getQueryPlanner(res));
     const min = queryPlan.minRecord;
     const max = queryPlan.maxRecord;
-    assert.neq(null, min, "No min bound");
-    assert.neq(null, max, "No max bound");
-    assert(min !== max, "COLLSCAN bounds are equal");
+    assert.neq(null, min, "No min bound " + tojson({res, queryPlan}));
+    assert.neq(null, max, "No max bound " + tojson({res, queryPlan}));
+    assert(min !== max, "COLLSCAN bounds are equal" + tojson({res, queryPlan}));
     assert.eq(expected, coll.find(predicate).count(), "Didn't find the expected records");
 };
 

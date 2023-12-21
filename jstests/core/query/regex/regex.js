@@ -1,7 +1,7 @@
 // @tags: [
 //   assumes_read_concern_local,
 // ]
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getQueryPlanner} from "jstests/libs/analyze_plan.js";
 
 const t = db.jstests_regex;
 
@@ -42,11 +42,9 @@ assert.eq(1, t.count(query));
 const result = t.find(query).explain();
 assert.commandWorked(result);
 
-if (!FixtureHelpers.isMongos(db)) {
-    assert(result.hasOwnProperty("queryPlanner"));
-    assert(result.queryPlanner.hasOwnProperty("parsedQuery"), tojson(result));
-    assert.eq(result.queryPlanner.parsedQuery, query);
-}
+const queryPlanner = getQueryPlanner(result);
+assert(queryPlanner.hasOwnProperty("parsedQuery"), tojson(result));
+assert.eq(queryPlanner.parsedQuery, query);
 
 //
 // Disallow embedded null bytes when using $regex syntax.

@@ -1,7 +1,7 @@
 /**
  * Validate bounded collection scans on a clustered collection.
  */
-import {getPlanStage} from "jstests/libs/analyze_plan.js";
+import {getExecutionStats, getPlanStage} from "jstests/libs/analyze_plan.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
@@ -70,9 +70,12 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         assert.eq(5, clusteredIxScan.maxRecord);
 
         assert.eq(1, expl.executionStats.executionStages.nReturned);
+
+        // On a sharded cluster, assume that the cluster only has one shard.
+        const executionStats = getExecutionStats(expl)[0];
         // In Classic, expect nReturned + 1 documents examined by design - additional cursor 'next'
         // beyond the range. In SBE, expect nReturned as it does not examine the extra document.
-        assertDocsExamined(expl.executionStats, 2, 1);
+        assertDocsExamined(executionStats, 2, 1);
     }
 
     function testLT(op,

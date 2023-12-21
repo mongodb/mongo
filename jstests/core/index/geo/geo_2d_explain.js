@@ -1,7 +1,7 @@
 // @tags: [
 //   assumes_balancer_off,
 // ]
-import {getPlanStages} from "jstests/libs/analyze_plan.js";
+import {getExecutionStats, getPlanStages} from "jstests/libs/analyze_plan.js";
 
 var t = db.geo_2d_explain;
 
@@ -27,7 +27,8 @@ for (var i = 0; i < n; i++) {
 
 var explain = t.find({loc: {$near: [40, 40]}, _id: {$lt: 50}}).explain("executionStats");
 
-var stats = explain.executionStats;
+// On a sharded cluster, this test assumes that the cluster only has one shard.
+var stats = getExecutionStats(explain)[0];
 assert.eq(stats.nReturned, 50);
 assert.lte(stats.nReturned, stats.totalDocsExamined);
 assert.eq(stats.executionSuccess, true, "expected success: " + tojson(explain));

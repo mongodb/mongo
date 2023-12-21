@@ -18,7 +18,6 @@
  * ]
  */
 import {getOptimizer} from "jstests/libs/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const collName = "query_hash_stability";
@@ -52,7 +51,11 @@ let assertPlanCacheField = function(
     // by shard. This is because in a multi-version environment, we want to ensure that we are
     // comparing the results produced by the same shard in the event that the planCacheKey format
     // changed in between versions.
-    if (FixtureHelpers.isMongos(db)) {
+    if (firstExplain.queryPlanner.hasOwnProperty("winningPlan") &&
+        firstExplain.queryPlanner.winningPlan.hasOwnProperty("shards")) {
+        assert(secondExplain.queryPlanner.hasOwnProperty("winningPlan"), secondExplain);
+        assert(secondExplain.queryPlanner.winningPlan.hasOwnProperty("shards"), secondExplain);
+
         let buildShardMap = function(shardedPlan) {
             let explainMap = {};
             for (const shard of shardedPlan.queryPlanner.winningPlan.shards) {

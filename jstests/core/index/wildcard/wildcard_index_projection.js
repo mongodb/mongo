@@ -8,7 +8,7 @@
  * ]
  */
 
-import {getRejectedPlan, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getQueryPlanner, getRejectedPlan, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const collName = jsTestName();
@@ -17,15 +17,6 @@ coll.drop();
 coll.createIndex({"$**": 1}, {wildcardProjection: {name: 0, type: 0, _id: 1}});
 
 const sharded = FixtureHelpers.isMongos(db);
-
-// Return the explain object containing the winning plan and rejected plans.
-function getExplainObj(explainRes) {
-    if (sharded) {
-        return explainRes.queryPlanner.winningPlan.shards[0];
-    }
-
-    return explainRes.queryPlanner;
-}
 
 const indexes = coll.getIndexes().filter(idx => idx.name === "$**_1");
 assert.eq(1, indexes.length);
@@ -37,7 +28,7 @@ assert.eq(true, indexSpec.wildcardProjection._id, indexes);
 coll.insert({name: "Ted", type: "Person", _id: 1});
 coll.insert({name: "Bernard", type: "Person", _id: 2});
 const explainResFull = coll.find({_id: {$eq: 1}}).explain();
-const plannerRes = getExplainObj(explainResFull);
+const plannerRes = getQueryPlanner(explainResFull);
 // For a query on _id we expect that the IDHACK plan will be selected. However, we should also
 // observe a rejected plan which uses the wildcard index to resolve _id. In a sharded cluster we
 // may also need to skip the _id: hashed index.
@@ -56,7 +47,7 @@ assert.eq(indexStage.keyPattern, {"$_path": 1, "_id": 1}, indexStage);
 
 // Ensure we use the index for _id if we supply a hint.
 const hintExplainRes = coll.find({_id: {$eq: 1}}).hint("$**_1").explain();
-const winningPlan = getWinningPlan(getExplainObj(hintExplainRes));
+const winningPlan = getWinningPlan(getQueryPlanner(hintExplainRes));
 assert.eq(winningPlan.inputStage.stage, "IXSCAN", winningPlan.inputStage);
 assert.eq(winningPlan.inputStage.keyPattern, {$_path: 1, _id: 1}, winningPlan.inputStage);
 

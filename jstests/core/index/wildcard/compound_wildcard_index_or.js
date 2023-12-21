@@ -11,7 +11,7 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const documentList = [
     {
@@ -66,7 +66,7 @@ let explain = assert.commandWorked(wild.explain('executionStats').aggregate(pipe
 //      1) {"str": -1, "obj.obj.obj.obj.obj": -1} for predicates including "obj.obj.obj.obj.obj".
 //      2) {"str": -1, "$_path": -1} for queries only on the prefix field 'str'.
 // The latter key pattern should be used for the predicate with {"str": {$regex: /^Chicken/}}.
-let winningPlan = getWinningPlan(explain.queryPlanner);
+let winningPlan = getWinningPlan(getQueryPlanner(explain));
 let planStages = getPlanStages(winningPlan, 'IXSCAN');
 
 let idxUsedCnt = 0;

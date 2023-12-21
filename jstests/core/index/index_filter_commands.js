@@ -44,6 +44,7 @@ import {
     getPlanCacheKeyFromPipeline,
     getPlanCacheKeyFromShape,
     getPlanStage,
+    getQueryPlanner,
     getSingleNodeExplain,
     getWinningPlan,
     getWinningPlanFromExplain,
@@ -220,10 +221,11 @@ var explain = coll.explain("executionStats").find(queryID).finish();
 assert.commandWorked(explain);
 
 explain = getSingleNodeExplain(explain);
-const winningPlan = getWinningPlan(explain.queryPlanner);
+const queryPlanner = getQueryPlanner(explain);
+const winningPlan = getWinningPlan(queryPlanner);
 const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
 if (collectionIsClustered) {
-    assert(isClusteredIxscan(db, getWinningPlan(explain.queryPlanner)),
+    assert(isClusteredIxscan(db, getWinningPlan(queryPlanner)),
            "Expected clustered ixscan: " + tojson(explain));
 } else {
     switch (getOptimizer(explain)) {
@@ -258,19 +260,19 @@ if (!FixtureHelpers.isMongos(db)) {
         // No filter.
         coll.getPlanCache().clear();
         explain = getSingleNodeExplain(coll.find({z: 1}).explain(verbosity));
-        assert.eq(false, explain.queryPlanner.indexFilterSet, explain);
+        assert.eq(false, getQueryPlanner(explain).indexFilterSet, explain);
         explain =
             getSingleNodeExplain(coll.find(queryA1, projectionA1).sort(sortA1).explain(verbosity));
-        assert.eq(false, explain.queryPlanner.indexFilterSet, explain);
+        assert.eq(false, getQueryPlanner(explain).indexFilterSet, explain);
 
         // With one filter set.
         assert.commandWorked(
             coll.runCommand('planCacheSetFilter', {query: {z: 1}, indexes: [{z: 1}]}));
         explain = getSingleNodeExplain(coll.find({z: 1}).explain(verbosity));
-        assert.eq(true, explain.queryPlanner.indexFilterSet, explain);
+        assert.eq(true, getQueryPlanner(explain).indexFilterSet, explain);
         explain =
             getSingleNodeExplain(coll.find(queryA1, projectionA1).sort(sortA1).explain(verbosity));
-        assert.eq(false, explain.queryPlanner.indexFilterSet, verbosity);
+        assert.eq(false, getQueryPlanner(explain).indexFilterSet, verbosity);
 
         // With two filters set.
         assert.commandWorked(coll.runCommand('planCacheSetFilter', {
@@ -280,10 +282,10 @@ if (!FixtureHelpers.isMongos(db)) {
             indexes: [indexA1B1, indexA1C1]
         }));
         explain = getSingleNodeExplain(coll.find({z: 1}).explain(verbosity));
-        assert.eq(true, explain.queryPlanner.indexFilterSet, explain);
+        assert.eq(true, getQueryPlanner(explain).indexFilterSet, explain);
         explain =
             getSingleNodeExplain(coll.find(queryA1, projectionA1).sort(sortA1).explain(verbosity))
-        assert.eq(true, explain.queryPlanner.indexFilterSet, verbosity);
+        assert.eq(true, getQueryPlanner(explain).indexFilterSet, verbosity);
     });
 } else {
     clearFilters(coll, shape);
@@ -310,11 +312,11 @@ assert.commandWorked(coll.runCommand('planCacheSetFilter',
 // pattern.
 
 explain = getSingleNodeExplain(coll.find(queryAA).explain());
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)),
+assert(isIxscan(db, getWinningPlan(getQueryPlanner(explain))),
        "Expected index scan: " + tojson(explain));
 
 explain = getSingleNodeExplain(coll.find(queryAA).collation(collationEN).explain());
-assert(isIxscan(db, getWinningPlan(explain.queryPlanner)),
+assert(isIxscan(db, getWinningPlan(getQueryPlanner(explain))),
        "Expected index scan: " + tojson(explain));
 
 // Ensure that index names in planCacheSetFilter only select matching names.
@@ -323,7 +325,7 @@ assert.commandWorked(coll.runCommand('planCacheSetFilter',
                                      {query: queryAA, collation: collationEN, indexes: ["a_1"]}));
 
 explain = getSingleNodeExplain(coll.find(queryAA).collation(collationEN).explain());
-assert(isCollscan(db, getWinningPlan(explain.queryPlanner)),
+assert(isCollscan(db, getWinningPlan(getQueryPlanner(explain))),
        "Expected collscan: " + tojson(explain));
 
 //
