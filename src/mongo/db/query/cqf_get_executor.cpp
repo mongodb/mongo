@@ -395,36 +395,32 @@ void setupShardFiltering(OperationContext* opCtx,
     }
 }
 
+struct PlanWithData {
+    bool fromCache;
+    std::unique_ptr<sbe::PlanStage> plan;
+    stage_builder::PlanStageData planData;
+};
+
 bool shouldCachePlan(const sbe::PlanStage& plan) {
     // TODO SERVER-84385: Investigate ExchangeConsumer hangups when inserting into SBE plan cache.
     return typeid(plan) != typeid(sbe::ExchangeConsumer);
 }
 
-template <typename QueryType>
-static ExecParams createExecutor(
-    OptPhaseManager phaseManager,
-    PlanAndProps planAndProps,
-    OperationContext* opCtx,
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const NamespaceString& nss,
-    const MultipleCollectionAccessor& collections,
-    const bool requireRID,
-    const boost::optional<MatchExpression*> pipelineMatchExpr,
-    const QueryType& query,
-    const boost::optional<sbe::PlanCacheKey>& planCacheKey,
-    OptimizerCounterInfo optCounterInfo,
-    PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
-    auto env = VariableEnvironment::build(planAndProps._node);
+/*
+ * This function either creates a plan or fetches one from cache.
+ */
+PlanWithData plan(OptPhaseManager& phaseManager,
+                  PlanAndProps& planAndProps,
+                  OperationContext* opCtx,
+                  const MultipleCollectionAccessor& collections,
+                  const bool requireRID,
+                  const std::unique_ptr<PlanYieldPolicySBE>& sbeYieldPolicy,
+                  VariableEnvironment& env) {
+
     SlotVarMap slotMap;
     auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO use factory
     sbe::value::SlotIdGenerator ids;
     boost::optional<sbe::value::SlotId> ridSlot;
-
-    std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
-    if (!phaseManager.getMetadata().isParallelExecution()) {
-        // TODO SERVER-80311: Enable yielding for parallel scan plans.
-        sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, nss);
-    }
 
     // Construct the ShardFilterer and bind it to the correct slot.
     setupShardFiltering(opCtx, collections, *runtimeEnvironment, ids);
@@ -455,6 +451,35 @@ static ExecParams createExecutor(
 
     stage_builder::PlanStageData data(stage_builder::Environment(std::move(runtimeEnvironment)),
                                       std::move(staticData));
+
+    return {false, std::move(sbePlan), data};
+}
+
+template <typename QueryType>
+static ExecParams createExecutor(
+    OptPhaseManager phaseManager,
+    PlanAndProps planAndProps,
+    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const NamespaceString& nss,
+    const MultipleCollectionAccessor& collections,
+    const bool requireRID,
+    const boost::optional<MatchExpression*> pipelineMatchExpr,
+    const QueryType& query,
+    const boost::optional<sbe::PlanCacheKey>& planCacheKey,
+    OptimizerCounterInfo optCounterInfo,
+    PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
+    auto env = VariableEnvironment::build(planAndProps._node);
+
+    std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
+    if (!phaseManager.getMetadata().isParallelExecution()) {
+        // TODO SERVER-80311: Enable yielding for parallel scan plans.
+        sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, nss);
+    }
+
+    // Get the plan either from cache or by lowering + optimization.
+    auto [fromCache, sbePlan, data] =
+        plan(phaseManager, planAndProps, opCtx, collections, requireRID, sbeYieldPolicy, env);
 
     sbePlan->attachToOperationContext(opCtx);
     if (expCtx->explain || expCtx->mayDbProfile) {
