@@ -84,14 +84,11 @@ namespace jit {
   _(BigIntNeg, JS::BigInt::neg)                                                \
   _(BigIntPow, JS::BigInt::pow)                                                \
   _(BigIntRightShift, JS::BigInt::rsh)                                         \
-  _(BigIntStringEqual,                                                         \
-    js::jit::BigIntStringEqual<js::jit::EqualityKind::Equal>)                  \
+  _(BigIntStringEqual, js::jit::InstantiatedBigIntStringEqual)                 \
   _(BigIntStringGreaterThanOrEqual,                                            \
-    js::jit::BigIntStringCompare<js::jit::ComparisonKind::GreaterThanOrEqual>) \
-  _(BigIntStringLessThan,                                                      \
-    js::jit::BigIntStringCompare<js::jit::ComparisonKind::LessThan>)           \
-  _(BigIntStringNotEqual,                                                      \
-    js::jit::BigIntStringEqual<js::jit::EqualityKind::NotEqual>)               \
+    js::jit::InstantiatedBigIntStringGreaterThanOrEqual)                       \
+  _(BigIntStringLessThan, js::jit::InstantiatedBigIntStringLessThan)           \
+  _(BigIntStringNotEqual, js::jit::InstantiatedBigIntStringNotEqual)           \
   _(BigIntSub, JS::BigInt::sub)                                                \
   _(BindVarOperation, js::BindVarOperation)                                    \
   _(BlockLexicalEnvironmentObjectCreate,                                       \
@@ -246,9 +243,8 @@ namespace jit {
   _(SetPropertySuper, js::SetPropertySuper)                                    \
   _(StartDynamicModuleImport, js::StartDynamicModuleImport)                    \
   _(StringBigIntGreaterThanOrEqual,                                            \
-    js::jit::StringBigIntCompare<js::jit::ComparisonKind::GreaterThanOrEqual>) \
-  _(StringBigIntLessThan,                                                      \
-    js::jit::StringBigIntCompare<js::jit::ComparisonKind::LessThan>)           \
+    js::jit::InstantiatedStringBigIntGreaterThanOrEqual)                       \
+  _(StringBigIntLessThan, js::jit::InstantiatedStringBigIntLessThan)           \
   _(StringFlatReplaceString, js::StringFlatReplaceString)                      \
   _(StringFromCharCode, js::jit::StringFromCharCode)                           \
   _(StringFromCodePoint, js::jit::StringFromCodePoint)                         \

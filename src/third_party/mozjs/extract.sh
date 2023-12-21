@@ -43,7 +43,8 @@ CFLAGS="$CFLAGS -D__STDC_FORMAT_MACROS" \
     --without-intl-api \
     --enable-optimize \
     --disable-js-shell \
-    --disable-tests
+    --disable-tests \
+    --disable-new-pass-manager
 
 
 # we have to run make to generate a byte code version of the self hosted js and

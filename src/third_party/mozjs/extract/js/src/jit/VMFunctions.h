@@ -617,13 +617,38 @@ template <EqualityKind Kind>
 bool BigIntStringEqual(JSContext* cx, HandleBigInt x, HandleString y,
                        bool* res);
 
+// Note: The "instantiated" shims around templated functions are here as a
+// workaround for an internal compiler error encountered when compiling
+// 'CacheIRCompiler::emitCompareBigIntStringResult()' with MSVC. From
+// experimentation, calling regular functions instead of templates avoids the
+// failure.
+bool InstantiatedBigIntStringEqual(JSContext* cx, HandleBigInt x,
+                                   HandleString y, bool* res);
+
+bool InstantiatedBigIntStringNotEqual(JSContext* cx, HandleBigInt x,
+                                      HandleString y, bool* res);
+
 template <ComparisonKind Kind>
 bool BigIntStringCompare(JSContext* cx, HandleBigInt x, HandleString y,
                          bool* res);
 
+// See the note above the 'InstantiatedBigIntStringEqual' shim.
+bool InstantiatedBigIntStringLessThan(JSContext* cx, HandleBigInt x,
+                                      HandleString y, bool* res);
+
+bool InstantiatedBigIntStringGreaterThanOrEqual(JSContext* cx, HandleBigInt x,
+                                                HandleString y, bool* res);
+
 template <ComparisonKind Kind>
 bool StringBigIntCompare(JSContext* cx, HandleString x, HandleBigInt y,
                          bool* res);
+
+// See the note above the 'InstantiatedBigIntStringEqual' shim.
+bool InstantiatedStringBigIntLessThan(JSContext* cx, HandleString x,
+                                      HandleBigInt y, bool* res);
+
+bool InstantiatedStringBigIntGreaterThanOrEqual(JSContext* cx, HandleString x,
+                                                HandleBigInt y, bool* res);
 
 BigInt* BigIntAsIntN(JSContext* cx, HandleBigInt x, int32_t bits);
 BigInt* BigIntAsUintN(JSContext* cx, HandleBigInt x, int32_t bits);

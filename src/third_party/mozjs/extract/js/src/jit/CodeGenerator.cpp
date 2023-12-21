@@ -9603,33 +9603,31 @@ void CodeGenerator::visitCompareBigIntString(LCompareBigIntString* lir) {
 
   switch (op) {
     case JSOp::Eq: {
-      constexpr auto Equal = EqualityKind::Equal;
-      callVM<FnBigIntString, BigIntStringEqual<Equal>>(lir);
+      callVM<FnBigIntString, InstantiatedBigIntStringEqual>(lir);
       break;
     }
     case JSOp::Ne: {
-      constexpr auto NotEqual = EqualityKind::NotEqual;
-      callVM<FnBigIntString, BigIntStringEqual<NotEqual>>(lir);
+      callVM<FnBigIntString, InstantiatedBigIntStringNotEqual>(lir);
       break;
     }
     case JSOp::Lt: {
       constexpr auto LessThan = ComparisonKind::LessThan;
-      callVM<FnBigIntString, BigIntStringCompare<LessThan>>(lir);
+      callVM<FnBigIntString, InstantiatedBigIntStringLessThan>(lir);
       break;
     }
     case JSOp::Gt: {
       constexpr auto LessThan = ComparisonKind::LessThan;
-      callVM<FnStringBigInt, StringBigIntCompare<LessThan>>(lir);
+      callVM<FnStringBigInt, InstantiatedStringBigIntLessThan>(lir);
       break;
     }
     case JSOp::Le: {
       constexpr auto GreaterThanOrEqual = ComparisonKind::GreaterThanOrEqual;
-      callVM<FnStringBigInt, StringBigIntCompare<GreaterThanOrEqual>>(lir);
+      callVM<FnStringBigInt, InstantiatedStringBigIntGreaterThanOrEqual>(lir);
       break;
     }
     case JSOp::Ge: {
       constexpr auto GreaterThanOrEqual = ComparisonKind::GreaterThanOrEqual;
-      callVM<FnBigIntString, BigIntStringCompare<GreaterThanOrEqual>>(lir);
+      callVM<FnBigIntString, InstantiatedBigIntStringGreaterThanOrEqual>(lir);
       break;
     }
     default:

@@ -199,14 +199,6 @@ inline uint_fast8_t CountTrailingZeroes64(uint64_t aValue) {
 
 #elif defined(__clang__) || defined(__GNUC__)
 
-#  if defined(__clang__)
-#    if !__has_builtin(__builtin_ctz) || !__has_builtin(__builtin_clz)
-#      error "A clang providing __builtin_c[lt]z is required to build"
-#    endif
-#  else
-// gcc has had __builtin_clz and friends since 3.4: no need to check.
-#  endif
-
 inline uint_fast8_t CountLeadingZeroes32(uint32_t aValue) {
   return static_cast<uint_fast8_t>(__builtin_clz(aValue));
 }
