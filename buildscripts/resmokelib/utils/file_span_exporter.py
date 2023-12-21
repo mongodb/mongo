@@ -41,23 +41,24 @@ class FileSpanExporter(SpanExporter):
             span[key] = base64.b64decode(span[key]).hex()
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        self.file_count += 1
+        file_name = f"metrics{self.file_count}.json"
         try:
             encoded_spans = encode_spans(spans)
             message = MessageToDict(encoded_spans)
-            self.file_count += 1
             # Evergreen expects the ids in hex but the python otel library exportes them in base64
             for resourceSpan in message["resourceSpans"]:
                 for scopeSpan in resourceSpan["scopeSpans"]:
                     for span in scopeSpan["spans"]:
                         self.convert_span(span)
 
-            with open(os.path.join(self.directory, f"metrics{self.file_count}.json"), "w") as file:
+            with open(os.path.join(self.directory, file_name), "w") as file:
                 if self.pretty_print:
                     json.dump(message, file, indent=2)
                 else:
                     json.dump(message, file, indent=None, separators=(',', ':'))
         except:
-            logger.exception("Failed to write OTEL metrics to file %s", self.out.name)
+            logger.exception("Failed to write OTEL metrics to file %s", file_name)
             return SpanExportResult.FAILURE
 
         return SpanExportResult.SUCCESS
