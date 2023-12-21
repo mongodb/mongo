@@ -49,6 +49,7 @@
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/parsed_find_command.h"
+#include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -285,6 +286,27 @@ void CanonicalQuery::setCollator(std::unique_ptr<CollatorInterface> collator) {
     // The collator associated with the match expression tree is now invalid, since we have reset
     // the collator owned by the ExpressionContext.
     _primaryMatchExpression->setCollator(collatorRaw);
+}
+
+void CanonicalQuery::serializeToBson(BSONObjBuilder* out) const {
+    // Display the filter.
+    auto filter = getPrimaryMatchExpression();
+    if (filter) {
+        out->append("filter", filter->serialize());
+    }
+
+    // Display the projection, if present.
+    auto proj = getProj();
+    if (proj) {
+        out->append("projection", projection_ast::serialize(*proj->root(), {}));
+    }
+
+    // Display the sort, if present.
+    auto sort = getSortPattern();
+    if (sort && !sort->empty()) {
+        out->append("sort",
+                    sort->serialize(SortPattern::SortKeySerialization::kForExplain).toBson());
+    }
 }
 
 // static

@@ -130,7 +130,24 @@ void generatePlannerInfo(PlanExecutor* exec,
     // query as an optimization (specifically, the update system does not canonicalize for idhack
     // updates). In these cases, 'query' is NULL.
     auto query = exec->getCanonicalQuery();
-    if (nullptr != query) {
+
+    auto framework = exec->getQueryFramework();
+
+    // For CQF explains, we serialize the entire input MQL (via CanonicalQuery or Pipeline) under
+    // "parsedQuery". For classic explains, we serialize just the match expression.
+    if (framework == PlanExecutor::QueryFramework::kCQF) {
+        BSONObjBuilder parsedQueryBob(plannerBob.subobjStart("parsedQuery"));
+
+        // Given the current set of supported language features for CQF, at this point we will
+        // either have a Pipeline or a CanonicalQuery.
+        if (auto pipeline = exec->getPipeline()) {
+            parsedQueryBob.append("pipeline", pipeline->serializeToBson());
+        } else {
+            query->serializeToBson(&parsedQueryBob);
+        }
+
+        parsedQueryBob.doneFast();
+    } else if (nullptr != query) {
         BSONObjBuilder parsedQueryBob(plannerBob.subobjStart("parsedQuery"));
         query->getPrimaryMatchExpression()->serialize(&parsedQueryBob, {});
         parsedQueryBob.doneFast();
@@ -163,7 +180,6 @@ void generatePlannerInfo(PlanExecutor* exec,
     plannerBob.append("maxIndexedAndSolutionsReached", enumeratorInfo.hitIndexedAndLimit);
     plannerBob.append("maxScansToExplodeReached", enumeratorInfo.hitScanLimit);
 
-    auto framework = exec->getQueryFramework();
     if (framework == PlanExecutor::QueryFramework::kCQF) {
         plannerBob.append("queryFramework", "cqf");
     }

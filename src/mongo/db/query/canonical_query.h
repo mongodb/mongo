@@ -201,6 +201,18 @@ public:
      */
     void setCollator(std::unique_ptr<CollatorInterface> collator);
 
+    /**
+     * Serializes this CanonicalQuery to a BSON object of the following form:
+     * {
+     *   filter: <filter object>,            // empty object if there is no filter
+     *   projection: <projection object>,    // field only included if there is a projection
+     *   sort: <sort object>                 // field only included if there is a sort
+     * }
+     *
+     * This function is used for CQF explain purposes.
+     */
+    void serializeToBson(BSONObjBuilder* out) const;
+
     // Debugging
     std::string toString(bool forErrMsg = false) const;
     std::string toStringShort(bool forErrMsg = false) const;

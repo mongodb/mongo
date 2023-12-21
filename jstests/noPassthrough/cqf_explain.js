@@ -5,7 +5,8 @@
 import {
     getAllPlanStages,
     getShardQueryPlans,
-    getWinningPlanFromExplain
+    getWinningPlanFromExplain,
+    runOnAllTopLevelExplains
 } from "jstests/libs/analyze_plan.js"
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {
@@ -130,6 +131,25 @@ function analyzeExplainHelper(explainPathList, expectedStages, expectedDir) {
             checkScanDirection(explain, expectedDir);
         }
     }
+}
+
+// Asserts on some of the top-level fields in the find explain.
+function analyzeTopLevelExplain(explain, expectedParsedQuery) {
+    function nodeAssertions(nodeExplain) {
+        let path = nodeExplain;
+        if (nodeExplain.hasOwnProperty("queryPlanner")) {
+            path = nodeExplain.queryPlanner;
+        }
+
+        // Assert that the parsedQuery sub-object is as expected.
+        assert.eq(
+            path.parsedQuery,
+            expectedParsedQuery,
+            `Expected the parsedQuery field to be ${tojson(expectedParsedQuery)} but got ${
+                tojson(path.parsedQuery)}. The whole top-level explain is ${tojson(nodeExplain)}.`);
+    }
+
+    runOnAllTopLevelExplains(explain, nodeAssertions);
 }
 
 function analyzeExplain(
@@ -290,6 +310,37 @@ function runTest(db, coll, isSharded) {
         isSharded,
         [{$match: {a: {$lt: 5}}}, {$project: {'a': 1}}] /* pipeline */,
         {} /* hint */);
+
+    // Test that the parsedQuery field is empty when the query is empty.
+    let explain = coll.find().explain();
+    analyzeTopLevelExplain(explain, {"filter": {}} /* expectedParsedQuery */)
+
+    explain = coll.explain().aggregate();
+    analyzeTopLevelExplain(explain, {"pipeline": []} /* expectedParsedQuery */)
+
+    // Test that the parsedQuery field is correct for a more complex query.
+    explain = coll.find({$or: [{a: 1}, {a: {$lt: 1}}]}, {a: 1}).explain();
+    analyzeTopLevelExplain(explain, {
+        "filter": {"$or": [{"a": {"$eq": 1}}, {"a": {"$lt": 1}}]},
+        "projection": {"a": true, "_id": true}
+    })
+
+    explain = coll.explain().aggregate([{$match: {$and: [{a: {$lt: 5}}, {a: 5}]}}]);
+    analyzeTopLevelExplain(explain, {"pipeline": [{$match: {$and: [{a: {$lt: 5}}, {a: 5}]}}]});
+
+    // Test that the parsedQuery field reveals optimizations done before the query gets translated
+    // to ABT.
+
+    // Combine $or of equality predicates into $in.
+    explain = coll.find({$or: [{a: 1}, {a: 2}]}).explain();
+    analyzeTopLevelExplain(explain, {"filter": {"a": {"$in": [1, 2]}}});
+
+    // Reorder stages such that filter comes first.
+    explain = coll.explain().aggregate([{$project: {a: 1}}, {$match: {a: 5}}]);
+    analyzeTopLevelExplain(
+        explain,
+        {"pipeline": [{$match: {a: 5}}, {$project: {_id: true, a: true}}]},
+    );
 }
 
 function setup(conn, db, isSharded) {

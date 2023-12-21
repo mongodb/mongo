@@ -223,6 +223,13 @@ public:
     virtual CanonicalQuery* getCanonicalQuery() const = 0;
 
     /**
+     * Get the pipeline that this executor is executing, without transferring ownership.
+     */
+    virtual Pipeline* getPipeline() const {
+        return nullptr;
+    }
+
+    /**
      * Return the namespace that the query is running over.
      *
      * WARNING: In general, a query execution plan can involve multiple collections, and therefore

@@ -410,6 +410,31 @@ export function getShardQueryPlans(root) {
 }
 
 /**
+ * Performs the given fn on each shard's explain output in root or the top-level explain, if root
+ * comes from a standalone explain. fn should accept a single node's top-level explain as input.
+ *
+ * This helper function currently only works for CQF queries. It can be extended to work for
+ * aggregation-like explains.
+ */
+export function runOnAllTopLevelExplains(root, fn) {
+    if (root.hasOwnProperty("shards")) {
+        // Sharded agg explain, where the aggregations get pushed down to find on the shards.
+        for (let shardName of Object.keys(root.shards)) {
+            let shard = root.shards[shardName];
+            fn(shard);
+        }
+    } else if (root.queryPlanner.winningPlan.hasOwnProperty("shards")) {
+        // Sharded find explain.
+        for (let shard of root.queryPlanner.winningPlan.shards) {
+            fn(shard);
+        }
+    } else {
+        // Standalone find explain.
+        fn(root);
+    }
+}
+
+/**
  * Returns an array of strings representing the "planSummary" values found in the input explain.
  * Assumes the given input is the root of an explain.
  *
