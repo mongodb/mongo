@@ -2022,7 +2022,7 @@ if env.get('ENABLE_OOM_RETRY'):
                 'C1060: compiler is out of heap space',
                 'c1xx : fatal error C1063: INTERNAL COMPILER ERROR',
                 r'LNK1171: unable to load mspdbcore\.dll',
-                "LNK1201: error writing to program database ''",
+                "LNK1201: error writing to program database ",
             ]
             env['OOM_RETRY_RETURNCODES'] = [1102]
 
