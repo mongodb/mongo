@@ -69,6 +69,7 @@ const expectedParamDefaults = {
     deprioritizeUnboundedUserIndexScans: true,
     internalQueryDocumentSourceWriterBatchExtraReservedBytes: 0,
     internalQuerySlotBasedExecutionDisableTimeSeriesPushdown: false,
+    internalQueryCollectOptimizerMetrics: false,
 };
 
 function assertDefaultParameterValues() {
@@ -314,5 +315,8 @@ assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedByte
 
 assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableTimeSeriesPushdown", true);
 assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableTimeSeriesPushdown", false);
+
+assertSetParameterSucceeds("internalQueryCollectOptimizerMetrics", true);
+assertSetParameterSucceeds("internalQueryCollectOptimizerMetrics", false);
 
 MongoRunner.stopMongod(conn);

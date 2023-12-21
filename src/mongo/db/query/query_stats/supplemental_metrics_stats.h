@@ -46,6 +46,7 @@ namespace mongo::query_stats {
 #define SUPPLEMENTAL_METRIC_STATS_TYPE(X) \
     X(BonsaiM2)                           \
     X(BonsaiM4)                           \
+    X(ForceBonsai)                        \
     X(Classic)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(SupplementalMetricType, SUPPLEMENTAL_METRIC_STATS_TYPE);

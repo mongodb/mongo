@@ -51,14 +51,16 @@ public:
         : SupplementalStatsEntry(metricType),
           optimizationTimeMicros(optimizationTimeMicros),
           estimatedCost(estimatedCost),
-          estimatedCardinality(estimatedCardinality) {}
+          estimatedCardinality(estimatedCardinality) {
+        updateCount++;
+    }
 
     void updateStats(const SupplementalStatsEntry* other) override;
     void appendTo(BSONObjBuilder& builder) const override;
     std::unique_ptr<SupplementalStatsEntry> clone() const override;
 
     /**
-     * Once the metrics is created the updateCount is 0 i.e. the metricsEntry contains non
+     * Once the metrics is created the updateCount is 1 i.e. the metricsEntry contains non
      * aggregated data from one data point. Every consequent update increments the updateCount by 1.
      */
     uint64_t updateCount = 0;
@@ -76,14 +78,16 @@ public:
     OptimizerMetricsClassicStatsEntry(
         double optimizationTimeMicros,
         SupplementalMetricType metricType = SupplementalMetricType::Classic)
-        : SupplementalStatsEntry(metricType), optimizationTimeMicros(optimizationTimeMicros) {}
+        : SupplementalStatsEntry(metricType), optimizationTimeMicros(optimizationTimeMicros) {
+        updateCount++;
+    }
 
     void updateStats(const SupplementalStatsEntry* other) override;
     void appendTo(BSONObjBuilder& builder) const override;
     std::unique_ptr<SupplementalStatsEntry> clone() const override;
 
     /**
-     * Once the metrics is created the updateCount is 0 i.e. the metricsEntry contains non
+     * Once the metrics is created the updateCount is 1 i.e. the metricsEntry contains non
      * aggregated data from one data point. Every consequent update increments the updateCount by 1.
      */
     uint64_t updateCount = 0;

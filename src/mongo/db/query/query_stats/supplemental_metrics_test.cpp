@@ -44,14 +44,28 @@ namespace mongo::query_stats {
 TEST(SupplementalMetricsStats, ClassicMetrics) {
     query_stats::SupplementalStatsMap metrics;
     auto entry = std::make_unique<query_stats::OptimizerMetricsClassicStatsEntry>(1);
-    auto entry2 = std::make_unique<query_stats::OptimizerMetricsClassicStatsEntry>(10);
     metrics.update(std::move(entry));
-    metrics.update(std::move(entry2));
-    BSONObj res = metrics.toBSON();
+    BSONObj res1 = metrics.toBSON();
     ASSERT_BSONOBJ_EQ_AUTO(
         R"({
             "Classic": {
                 "updateCount": 1,
+                "optimizationTimeMicros": {
+                    "sum": 1,
+                    "max": 1,
+                    "min": 1,
+                    "sumOfSquares": 1
+                }
+            }
+        })",
+        res1);
+    auto entry2 = std::make_unique<query_stats::OptimizerMetricsClassicStatsEntry>(10);
+    metrics.update(std::move(entry2));
+    BSONObj res2 = metrics.toBSON();
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "Classic": {
+                "updateCount": 2,
                 "optimizationTimeMicros": {
                     "sum": 11,
                     "max": 10,
@@ -60,7 +74,7 @@ TEST(SupplementalMetricsStats, ClassicMetrics) {
                 }
             }
         })",
-        res);
+        res2);
 }
 
 TEST(SupplementalMetricsStats, BonsaiM2Metrics) {
@@ -72,7 +86,7 @@ TEST(SupplementalMetricsStats, BonsaiM2Metrics) {
     ASSERT_BSONOBJ_EQ_AUTO(
         R"({
             "BonsaiM2": {
-                "updateCount": 0,
+                "updateCount": 1,
                 "optimizationTimeMicros": {
                     "sum": 1,
                     "max": 1,
@@ -105,7 +119,7 @@ TEST(SupplementalMetricsStats, BonsaiM4Metrics) {
     ASSERT_BSONOBJ_EQ_AUTO(
         R"({
             "BonsaiM4": {
-                "updateCount": 0,
+                "updateCount": 1,
                 "optimizationTimeMicros": {
                     "sum": 1,
                     "max": 1,

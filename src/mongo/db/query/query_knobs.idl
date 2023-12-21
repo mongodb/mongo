@@ -1435,6 +1435,13 @@ server_parameters:
     validator:
       gte: 0
 
+  internalQueryCollectOptimizerMetrics:
+   description: "If true, collect query optimizer metrics in queryStats."
+   set_at: [ startup, runtime ]
+   cpp_varname:  internalQueryCollectOptimizerMetrics
+   cpp_vartype: AtomicWord<bool>
+   default: false
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

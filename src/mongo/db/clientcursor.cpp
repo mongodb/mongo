@@ -47,7 +47,11 @@
 #include "mongo/db/cursor_server_params.h"
 #include "mongo/db/locker_api.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/query_decorations.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/background.h"
 #include "mongo/util/clock_source.h"
@@ -435,7 +439,39 @@ void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stat
         query_stats::microsecondsToUint64(opDebug.additiveMetrics.executionTime),
         opDebug.additiveMetrics);
 
-    query_stats::writeQueryStats(opCtx, opDebug.queryStatsInfo.keyHash, std::move(key), snapshot);
+    std::unique_ptr<query_stats::SupplementalStatsEntry> supplementalMetrics(nullptr);
+    if (internalQueryCollectOptimizerMetrics.load()) {
+        if (opDebug.estimatedCost && opDebug.estimatedCardinality) {
+            const auto frameworkControl =
+                QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+
+            auto bonsaiMetricType(query_stats::SupplementalMetricType::BonsaiM2);
+
+            if (frameworkControl == QueryFrameworkControlEnum::kTryBonsai) {
+                bonsaiMetricType = query_stats::SupplementalMetricType::BonsaiM2;
+            } else if (frameworkControl == QueryFrameworkControlEnum::kTryBonsaiExperimental) {
+                bonsaiMetricType = query_stats::SupplementalMetricType::BonsaiM4;
+            } else if (frameworkControl == QueryFrameworkControlEnum::kForceBonsai) {
+                bonsaiMetricType = query_stats::SupplementalMetricType::ForceBonsai;
+            }
+
+            supplementalMetrics = std::make_unique<query_stats::OptimizerMetricsBonsaiStatsEntry>(
+                opDebug.planningTime.count(),
+                *opDebug.estimatedCost,
+                *opDebug.estimatedCardinality,
+                bonsaiMetricType);
+        } else {  // TODO: The assumption that its Classic optimizer if no cardinality or cost is
+                  // estimated ignores fast paths.
+            supplementalMetrics = std::make_unique<query_stats::OptimizerMetricsClassicStatsEntry>(
+                opDebug.planningTime.count());
+        }
+    }
+
+    query_stats::writeQueryStats(opCtx,
+                                 opDebug.queryStatsInfo.keyHash,
+                                 std::move(key),
+                                 snapshot,
+                                 std::move(supplementalMetrics));
 }
 
 }  // namespace mongo
