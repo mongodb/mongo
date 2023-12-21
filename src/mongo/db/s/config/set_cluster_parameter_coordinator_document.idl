@@ -66,3 +66,11 @@ structs:
                 type: timestamp
                 description: "Timestamp determined at the beginning that determines the parameter time."
                 optional: true
+            previousTime:
+                type: logicalTime
+                description: >-
+                    "Expected current cluster parameter time for this parameter before the
+                    'setClusterParameter' invocation. If this current time does not match the
+                    'previousTime' persisted in the 'config.clusterParameters' collection then
+                    'setClusterParameter' will fail."
+                optional: true

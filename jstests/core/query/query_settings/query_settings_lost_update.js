@@ -1,19 +1,32 @@
-// Tests concurrent updates of query settings.
-// @tags: [
-//   featureFlagQuerySettings,
-// ]
-//
+/**
+ * Tests concurrent updates of query settings.
+ * Excluding test suites that do not expect parallel shell or connect to shards directly
+ * ('setClusterParameter' can only run on mongos in sharded clusters).
+ * @tags: [
+ *   command_not_supported_in_serverless,
+ *   directly_against_shardsvrs_incompatible,
+ *   does_not_support_stepdowns,
+ *   featureFlagQuerySettings,
+ *   tenant_migration_incompatible,
+ *   uses_parallel_shell,
+ * ]
+ */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
-const rst = new ReplSetTest({nodes: 1});
-rst.startSet();
-rst.initiate();
+// Early exit in case we are running on standalone mongod. Standalone mongod does not contain a
+// functioning 'VectorClock' instance. The check we have introduced in this change relies on a
+// functioning vector clock.
+if (!FixtureHelpers.isMongos(db) && !db.runCommand({hello: 1}).hasOwnProperty('setName')) {
+    quit();
+}
 
-const testDB = rst.getPrimary().getDB("test");
-const qsutils = new QuerySettingsUtils(testDB, jsTestName());
+const testConn = db.getMongo();
+const adminDB = testConn.getDB("admin");
+const qsutils = new QuerySettingsUtils(adminDB, jsTestName());
 
 const queryA = qsutils.makeFindQueryInstance({filter: {a: 1}});
 const queryB = qsutils.makeFindQueryInstance({filter: {b: "string"}});
@@ -32,8 +45,8 @@ function runSetQuerySettingsConcurrently(
     {initialConfiguration, settingToFail, settingToPass, finalConfiguration}) {
     qsutils.assertQueryShapeConfiguration(initialConfiguration);
 
-    const hangSetParamFailPoint = configureFailPoint(testDB, "hangInSetClusterParameter", {
-        "settingsArray.representativeQuery": settingToFail.representativeQuery
+    const hangSetParamFailPoint = configureFailPoint(testConn, "hangInSetClusterParameter", {
+        "querySettings.settingsArray.representativeQuery": settingToFail.representativeQuery
     });
 
     // Set 'settingToFail' in a parallel shell. This command will hang because of the active
@@ -43,7 +56,7 @@ function runSetQuerySettingsConcurrently(
             return assert.commandFailedWithCode(
                 db.adminCommand({setQuerySettings: query, settings: settings}),
                 ErrorCodes.ConflictingOperationInProgress);
-        }, settingToFail.representativeQuery, settingToFail.settings), rst.getPrimary().port);
+        }, settingToFail.representativeQuery, settingToFail.settings), testConn.port);
 
     // Wait until the failpoint is hit.
     hangSetParamFailPoint.wait();
@@ -54,7 +67,7 @@ function runSetQuerySettingsConcurrently(
         funWithArgs((query, settings) => {
             return assert.commandWorked(
                 db.adminCommand({setQuerySettings: query, settings: settings}));
-        }, settingToPass.representativeQuery, settingToPass.settings), rst.getPrimary().port);
+        }, settingToPass.representativeQuery, settingToPass.settings), testConn.port);
 
     waitForSettingToPass();
 
@@ -95,10 +108,5 @@ function runSetQuerySettingsConcurrently(
     });
 }
 
-{
-    // Ensure that query settings cluster parameter is empty at the end of the test.
-    qsutils.removeAllQuerySettings();
-    qsutils.assertQueryShapeConfiguration([]);
-}
-
-rst.stopSet();
+// Ensure that query settings cluster parameter is empty at the end of the test.
+qsutils.removeAllQuerySettings();

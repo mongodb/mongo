@@ -44,6 +44,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
@@ -70,13 +71,32 @@
 
 namespace mongo {
 namespace {
-
+MONGO_FAIL_POINT_DEFINE(hangInSetClusterParameter);
 const auto setClusterParameterImplDecoration =
     Service::declareDecoration<SetClusterParameterImplFn>();
 
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kNoTimeout};
+
+void hangInSetClusterParameterFailPointCheck(const SetClusterParameter& request) {
+    // The failpoint will block the thread unless the 'data' parameter contains a pattern
+    // that does not match the 'cmdObject'.
+    if (MONGO_unlikely(hangInSetClusterParameter.shouldFail(
+            [cmdObject = request.getCommandParameter()](const BSONObj& data) {
+                if (data.isEmpty()) {
+                    return true;
+                }
+                BSONElementMultiSet bSet;
+                dotted_path_support::extractAllElementsAlongPath(
+                    cmdObject, data.firstElementFieldNameStringData(), bSet, false);
+                return std::any_of(bSet.begin(), bSet.end(), [data](const BSONElement& elem) {
+                    return elem.Obj().woCompare(data.firstElement().Obj()) == 0;
+                });
+            }))) {
+        hangInSetClusterParameter.pauseWhileSet();
+    }
+}
 
 void setClusterParameterImplShard(OperationContext* opCtx,
                                   const SetClusterParameter& request,
@@ -93,6 +113,8 @@ void setClusterParameterImplShard(OperationContext* opCtx,
                               << " cannot be run on standalones",
                 repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
     }
+
+    hangInSetClusterParameterFailPointCheck(request);
 
     // setClusterParameter is serialized against setFeatureCompatibilityVersion.
     FixedFCVRegion fcvRegion(opCtx);
@@ -111,10 +133,12 @@ void setClusterParameterImplShard(OperationContext* opCtx,
 void setClusterParameterImplRouter(OperationContext* opCtx,
                                    const SetClusterParameter& request,
                                    boost::optional<Timestamp>,
-                                   boost::optional<LogicalTime>) {
+                                   boost::optional<LogicalTime> previousTime) {
 
+    hangInSetClusterParameterFailPointCheck(request);
     ConfigsvrSetClusterParameter configsvrSetClusterParameter(request.getCommandParameter());
     configsvrSetClusterParameter.setDbName(request.getDbName());
+    configsvrSetClusterParameter.setPreviousTime(previousTime);
 
     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 

@@ -122,7 +122,7 @@ structs:
                 optional: true
             targetMustNotBeSharded:
                 type: bool
-                description: "If true, then the command will error out if the target collection is 
+                description: "If true, then the command will error out if the target collection is
                               sharded. If false or not set, no restriction is imposed."
                 optional: true
 
@@ -141,7 +141,7 @@ structs:
         generate_comparison_operators: false
         strict: false
         fields:
-            #TODO SERVER-81447: rewrite this Request as a chained struct of 
+            #TODO SERVER-81447: rewrite this Request as a chained struct of
             #CreateCollectionRequest and ShardCollectionRequest + unsplittable
             shardKey:
                 type: object_owned
@@ -283,9 +283,9 @@ structs:
 
             unsplittable:
                 type: optionalBool
-                description: "Flag that identifies whether the collection is splittable in multiple 
-                            chunks. If unsplittable, the collection is always equivalent to a 1 
-                            chunk collection. The shardKey must be set to {_id:1} in case this 
+                description: "Flag that identifies whether the collection is splittable in multiple
+                            chunks. If unsplittable, the collection is always equivalent to a 1
+                            chunk collection. The shardKey must be set to {_id:1} in case this
                             flag is enabled"
             dataShard:
                 description: >-
@@ -293,8 +293,8 @@ structs:
                     doesn't already exist. Only allowed if `unsplittable` is true.
                 type: shard_id
                 optional: true
-            # TODO SERVER-81190 Remove this parameter when unsplittable collections request coming 
-            # from the {create...} cmd start getting tracked in the catalog 
+            # TODO SERVER-81190 Remove this parameter when unsplittable collections request coming
+            # from the {create...} cmd start getting tracked in the catalog
             isFromCreateUnsplittableCollectionTestCommand:
                 description: "Temporary field to differentiate calls originating from the createUnsplittableCollection test command."
                 type: optionalBool
@@ -505,12 +505,12 @@ commands:
         cpp_name: ShardsvrDropCollectionParticipant
         strict: false
         fields:
-            fromMigrate: 
-                type: bool 
+            fromMigrate:
+                type: bool
                 description: "Whether the drop comes as a result of an interrupted migration process."
                 optional: true
-            dropSystemCollections: 
-                type: bool 
+            dropSystemCollections:
+                type: bool
                 description: "Allow dropping a system collection. False if no value is present."
                 optional: true
 
@@ -563,7 +563,7 @@ commands:
         strict: false
         chained_structs:
             RefineCollectionShardKeyRequest: RefineCollectionShardKeyRequest
-    
+
     _shardsvrValidateShardKeyCandidate:
         description: "Command run on shards to ensure we have a viable key to refine the shard key."
         command_name: _shardsvrValidateShardKeyCandidate
@@ -693,7 +693,7 @@ commands:
                 description: "Time that will be associated with the cluster parameter"
 
     _shardsvrCheckMetadataConsistency:
-        description: "Internal command sent to the primary shard of a database to check metadata 
+        description: "Internal command sent to the primary shard of a database to check metadata
                       consistency."
         command_name: _shardsvrCheckMetadataConsistency
         cpp_name: ShardsvrCheckMetadataConsistency
@@ -731,7 +731,7 @@ commands:
                 type: shard_id
 
     _configsvrCheckClusterMetadataConsistency:
-          description: "Internal command sent to the config server to check cluster metadata 
+          description: "Internal command sent to the config server to check cluster metadata
                         consistency."
           command_name: _configsvrCheckClusterMetadataConsistency
           cpp_name: ConfigsvrCheckClusterMetadataConsistency
@@ -743,7 +743,7 @@ commands:
               cursor:
                   type: SimpleCursorOptions
                   optional: true
-                  
+
     _configsvrCheckMetadataConsistency:
          description: "Internal command sent to the config server to check metadata consistency."
          command_name: _configsvrCheckMetadataConsistency
@@ -767,6 +767,15 @@ commands:
         type: object_owned
         api_version: ""
         strict: false
+        fields:
+            previousTime:
+                type: logicalTime
+                description: >-
+                    "Expected current cluster parameter time for this parameter before the
+                    'setClusterParameter' invocation. If this current time does not match the
+                    'previousTime' persisted in the 'config.clusterParameters' collection then
+                    'setClusterParameter' will fail."
+                optional: true
 
     _configsvrClearJumboFlag:
         command_name: _configsvrClearJumboFlag

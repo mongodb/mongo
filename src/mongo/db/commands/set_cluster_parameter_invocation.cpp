@@ -41,7 +41,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/database_name.h"
@@ -64,9 +63,6 @@
 
 
 namespace mongo {
-namespace {
-MONGO_FAIL_POINT_DEFINE(hangInSetClusterParameter);
-}
 bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                                            const SetClusterParameter& cmd,
                                            boost::optional<Timestamp> clusterParameterTime,
@@ -88,22 +84,6 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
         tenantId,
         skipValidation || serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer));
 
-    // The fail point will block the thread unless the 'data' parameter contains a pattern that does
-    // not match the 'update' object.
-    if (MONGO_unlikely(
-            hangInSetClusterParameter.shouldFail([updateCopy = update](const BSONObj& data) {
-                if (data.isEmpty())
-                    return true;
-                BSONElementMultiSet bSet;
-                dotted_path_support::extractAllElementsAlongPath(
-                    updateCopy, data.firstElementFieldNameStringData(), bSet, false);
-                return std::any_of(bSet.begin(), bSet.end(), [data](const BSONElement& elem) {
-                    return elem.Obj().woCompare(data.firstElement().Obj()) == 0;
-                });
-            }))) {
-        hangInSetClusterParameter.pauseWhileSet();
-    };
-
     BSONObjBuilder oldValueBob;
     serverParameter->append(opCtx, &oldValueBob, parameterName.toString(), tenantId);
     audit::logSetClusterParameter(opCtx->getClient(), oldValueBob.obj(), update, tenantId);
@@ -119,11 +99,9 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                 ? _dbService.insertParameterOnDisk(opCtx, update, writeConcern, tenantId)
                 : _dbService.updateParameterOnDisk(
                       opCtx, query, update, false /* upsert */, writeConcern, tenantId));
-        uassert(
-            ErrorCodes::ConflictingOperationInProgress,
-            str::stream()
-                << "encountered concurrent cluster parameter update operations, please try again",
-            result.getN() == 1);
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                "encountered concurrent cluster parameter update operations, please try again",
+                result.getN() == 1);
         return true;
     }
 

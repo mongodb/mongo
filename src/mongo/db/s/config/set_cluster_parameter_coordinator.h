@@ -63,6 +63,14 @@ public:
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
+    /**
+     * Returns 'true' if the coordinator instance has detected an unexpected concurrent update
+     * operation.
+     */
+    bool detectedConcurrentUpdate() const {
+        return _detectedConcurrentUpdate;
+    }
+
 private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
@@ -73,9 +81,9 @@ private:
     void _commit(OperationContext* opCtx);
 
     /*
-     * Checks if the cluster parameter was already set to the provided value.
+     * Returns the timestamp of the persisted cluster parameter value.
      */
-    bool _isClusterParameterSetAtTimestamp(OperationContext* opCtx);
+    boost::optional<Timestamp> _getPersistedClusterParameterTime(OperationContext* opCtx) const;
 
     /*
      * Sends setClusterParameter to every shard in the cluster with the appropiate session.
@@ -90,6 +98,8 @@ private:
     StringData serializePhase(const Phase& phase) const override {
         return SetClusterParameterCoordinatorPhase_serializer(phase);
     }
+
+    bool _detectedConcurrentUpdate = false;
 };
 
 }  // namespace mongo

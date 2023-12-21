@@ -55,6 +55,7 @@
 #include "mongo/db/s/config/configsvr_coordinator.h"
 #include "mongo/db/s/config/configsvr_coordinator_gen.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
+#include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator_document_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
@@ -103,8 +104,7 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName << " can only be run on config servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-
-            const auto coordinatorCompletionFuture = [&]() -> SharedSemiFuture<void> {
+            const auto setClusterParameterCoordinator = [&]() {
                 // configsvrSetClusterParameter must serialize against
                 // setFeatureCompatibilityVersion.
                 FixedFCVRegion fcvRegion(opCtx);
@@ -121,30 +121,34 @@ public:
 
                 SetClusterParameterInvocation invocation{std::move(sps), dbService};
 
+                auto tenantId = request().getDbName().tenantId();
                 invocation.normalizeParameter(opCtx,
                                               cmdParamObj,
                                               boost::none /* clusterParameterTime */,
                                               boost::none /* previousTime */,
                                               serverParameter,
-                                              request().getDbName().tenantId(),
+                                              tenantId,
                                               false /* skipValidation */);
-
-                auto tenantId = request().getDbName().tenantId();
 
                 SetClusterParameterCoordinatorDocument coordinatorDoc;
                 ConfigsvrCoordinatorId cid(ConfigsvrCoordinatorTypeEnum::kSetClusterParameter);
                 cid.setSubId(StringData(tenantId ? tenantId->toString() : ""));
                 coordinatorDoc.setConfigsvrCoordinatorMetadata({cid});
-                coordinatorDoc.setParameter(request().getCommandParameter());
+                coordinatorDoc.setParameter(cmdParamObj);
                 coordinatorDoc.setTenantId(tenantId);
+                coordinatorDoc.setPreviousTime(request().getPreviousTime());
 
                 const auto service = ConfigsvrCoordinatorService::getService(opCtx);
-                const auto instance = service->getOrCreateService(opCtx, coordinatorDoc.toBSON());
-
-                return instance->getCompletionFuture();
+                return dynamic_pointer_cast<SetClusterParameterCoordinator>(
+                    service->getOrCreateService(opCtx, coordinatorDoc.toBSON()));
             }();
 
-            coordinatorCompletionFuture.get(opCtx);
+            setClusterParameterCoordinator->getCompletionFuture().get(opCtx);
+
+            // If the coordinator detected an unexpected concurrent update, report the error.
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    "encountered concurrent cluster parameter update operations, please try again",
+                    !setClusterParameterCoordinator->detectedConcurrentUpdate());
         }
 
     private:

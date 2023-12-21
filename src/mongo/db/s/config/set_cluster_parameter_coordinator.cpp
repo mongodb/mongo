@@ -120,23 +120,32 @@ boost::optional<BSONObj> SetClusterParameterCoordinator::reportForCurrentOp(
     return bob.obj();
 }
 
-bool SetClusterParameterCoordinator::_isClusterParameterSetAtTimestamp(OperationContext* opCtx) {
-    auto parameterElem = _doc.getParameter().firstElement();
-    auto parameterName = parameterElem.fieldName();
-    auto parameter = _doc.getParameter()[parameterName].Obj();
+boost::optional<Timestamp> SetClusterParameterCoordinator::_getPersistedClusterParameterTime(
+    OperationContext* opCtx) const {
+    auto parameterName = _doc.getParameter().firstElement().fieldName();
     const auto& configShard = ShardingCatalogManager::get(opCtx)->localConfigShard();
     auto configsvrParameters = uassertStatusOK(configShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         repl::ReadConcernLevel::kMajorityReadConcern,
         NamespaceString::makeClusterParametersNSS(_doc.getTenantId()),
-        BSON("_id" << parameterName << "clusterParameterTime" << *_doc.getClusterParameterTime()),
+        BSON("_id" << parameterName),
         BSONObj(),
         boost::none));
 
     dassert(configsvrParameters.docs.size() <= 1);
 
-    return !configsvrParameters.docs.empty();
+    if (configsvrParameters.docs.empty()) {
+        return boost::none;
+    }
+
+    BSONObj& parameterDoc = configsvrParameters.docs.front();
+    BSONElement clusterParameterTimeElem = parameterDoc.getField(
+        SetClusterParameterCoordinatorDocument::kClusterParameterTimeFieldName);
+
+    dassert(!clusterParameterTimeElem.eoo() && !clusterParameterTimeElem.isNull());
+
+    return clusterParameterTimeElem.timestamp();
 }
 
 void SetClusterParameterCoordinator::_sendSetClusterParameterToAllShards(
@@ -208,6 +217,39 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 
+                // Get 'clusterParameterTime' stored on disk.
+                auto persistedClusterParameterTime = _getPersistedClusterParameterTime(opCtx);
+
+                // If the parameter was already set on the config server, there is
+                // nothing else to do.
+                if (persistedClusterParameterTime &&
+                    *persistedClusterParameterTime == *_doc.getClusterParameterTime()) {
+                    return;
+                }
+
+                // If 'previousTime' is provided, check whether the cluster parameter value was
+                // modified (by a concurrent update) since 'previousTime' by comparing
+                // 'clusterParameterTime' stored on disk with 'previousTime'. The 'previousTime'
+                // equal to 'LogicalTime::kUninitialized' denotes a special case when the cluster
+                // parameter value is still unset. In such a case, we expect that
+                // 'persistedClusterParameterTime' does not have a value.
+                if (auto previousTime = _doc.getPreviousTime()) {
+                    _detectedConcurrentUpdate = (*previousTime == LogicalTime::kUninitialized)
+                        ? persistedClusterParameterTime.has_value()
+                        : !(persistedClusterParameterTime &&
+                            *persistedClusterParameterTime == previousTime->asTimestamp());
+
+                    // If the cluster parameter value was modified since 'previousTime' (detected
+                    // concurrent update), do not proceed with updating server cluster parameter.
+                    if (_detectedConcurrentUpdate) {
+                        LOGV2_DEBUG(7880300,
+                                    1,
+                                    "encountered unexpected 'clusterParameterTime'",
+                                    "previousTime"_attr = previousTime->asTimestamp());
+                        return;
+                    }
+                }
+
                 auto catalogManager = ShardingCatalogManager::get(opCtx);
                 ShardingLogging::get(opCtx)->logChange(opCtx,
                                                        "setClusterParameter.start",
@@ -216,12 +258,6 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                                                        kMajorityWriteConcern,
                                                        catalogManager->localConfigShard(),
                                                        catalogManager->localCatalogClient());
-
-                // If the parameter was already set on the config server, there is
-                // nothing else to do.
-                if (_isClusterParameterSetAtTimestamp(opCtx)) {
-                    return;
-                }
 
                 _updateSession(opCtx);
                 const auto session = _getCurrentSession();

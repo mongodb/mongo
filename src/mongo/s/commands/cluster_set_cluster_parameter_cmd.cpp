@@ -83,8 +83,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            // TODO SERVER-78803: Handle concurrent cluster parameter updates correctly in sharded
-            // clusters.
             auto service = opCtx->getService();
             invariant(service->role().hasExclusively(ClusterRole::RouterServer),
                       "Attempted to run a router-only command directly from the shard role.");
