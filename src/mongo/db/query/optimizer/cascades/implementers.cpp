@@ -2329,6 +2329,10 @@ private:
               _scanProjName(scanProjName){};
 
         boost::optional<ABT> operator()(const ABT& n, const PathGet& pathGet) {
+            if (_fieldProjectionMap._fieldProjections.size() > kMaxPushdownFields) {
+                // Do not push down any fields if we exceed a certain maximum.
+                return {};
+            }
             const FieldNameType& fieldName = pathGet.name();
             // Create the projection that replaces the top-level pathGet field, and add it to
             // _fieldProjectionMap which contains the projections pushed to the physical scan.
@@ -2391,6 +2395,9 @@ private:
         }
 
     private:
+        // Maximum number of fields to push down into a PhysicalScan.
+        static constexpr size_t kMaxPushdownFields = 256;
+
         template <class ComposeType>
         boost::optional<ABT> handleComposition(ComposeType composeOp, Operations boolOp) {
             auto child1 = composeOp.getPath1().visit(*this);
