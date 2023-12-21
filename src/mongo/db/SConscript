@@ -3018,3 +3018,14 @@ env.Benchmark(
         'storage/wiredtiger/storage_wiredtiger',
     ],
 )
+
+env.Benchmark(
+    target='namespace_string_bm',
+    source=[
+        'namespace_string_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/optime',
+        'server_base',
+    ],
+)
