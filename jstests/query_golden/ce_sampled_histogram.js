@@ -187,7 +187,8 @@ await runHistogramsTest(async function testSampleHistogram() {
     // Sargable nodes and Filter nodes get different CEs. Repeat test with/without sargable rewrite.
     runWithParams([{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}],
                   runTest);
-    // TODO: Enable with SERVER-83456
+    // TODO: Enable with SERVER-84366 - currently explain will incorrectly show Filter CE as the
+    // CE of the PhysicalScanNode.
     // runWithParams([{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: true}],
     //              runTest);
 });

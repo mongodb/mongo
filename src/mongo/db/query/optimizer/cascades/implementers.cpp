@@ -510,10 +510,9 @@ public:
             return;
         }
 
-        bool canUseParallelScan = false;
         // Find a ScanNode that is suitable for pushing down projections to.
         if (auto scanNodeInfo = getPushdownScanNodeInfo(node)) {
-            auto [scanNode, scanGroupId, GroupIdType] = *scanNodeInfo;
+            auto [scanNode, scanGroupId, canUseParallelScan] = *scanNodeInfo;
             boost::optional<ABT> newFilter;
             FieldProjectionMap fieldProjectionMap;
 

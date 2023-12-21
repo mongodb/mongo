@@ -19,8 +19,7 @@ for (let i = 0; i < 100; i++) {
 const res = runWithParams(
     [
         {key: "internalCascadesOptimizerExplainVersion", value: "v2"},
-        {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true},
-        {key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: true}
+        {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true}
     ],
     () => t.explain("executionStats").aggregate([
         {$match: {a: 2}},

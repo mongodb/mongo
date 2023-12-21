@@ -1,6 +1,7 @@
 import {
     assertValueOnPlanPath,
-    checkCascadesOptimizerEnabled
+    checkCascadesOptimizerEnabled,
+    runWithParams
 } from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
@@ -17,6 +18,15 @@ assert.commandWorked(t.insert({a: {b: 3}}));
 assert.commandWorked(t.insert({a: {b: 4}}));
 assert.commandWorked(t.insert({a: {b: 5}}));
 
-const res = t.explain("executionStats").aggregate([{$match: {'a.b': 2}}]);
-assert.eq(1, res.executionStats.nReturned);
-assertValueOnPlanPath("Exchange", res, "child.nodeType");
+const runTest =
+    () => {
+        const res = t.explain("executionStats").aggregate([{$match: {'a.b': 2}}]);
+        assert.eq(1, res.executionStats.nReturned);
+        assertValueOnPlanPath("Exchange", res, "child.nodeType");
+    }
+
+// Test exchange with both Sargable nodes & Filter nodes
+runWithParams([{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}],
+              runTest);
+runWithParams([{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: true}],
+              runTest);

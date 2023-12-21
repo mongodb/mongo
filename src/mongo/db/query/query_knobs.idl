@@ -852,7 +852,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerDisableSargableWhenNoIndexes"
     cpp_vartype: AtomicWord<bool>
-    default: false
+    default: true
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalCascadesOptimizerFastIndexNullHandling:
