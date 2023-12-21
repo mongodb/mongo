@@ -189,16 +189,17 @@ public:
                         result.append("lastStableRecoveryTimestamp", ts.value());
                     }
                 } else {
-                    LOGV2_WARNING(6100700,
-                                  "Failed to get last stable recovery timestamp due to {error}. "
-                                  "Note this is expected if shutdown is in progress.",
-                                  "error"_attr = "lock acquire timeout"_sd);
+                    LOGV2_WARNING(
+                        6100700,
+                        "Failed to get last stable recovery timestamp due to lock acquire timeout. "
+                        "Note this is expected if shutdown is in progress.");
                 }
             } catch (const ExceptionForCat<ErrorCategory::CancellationError>& ex) {
-                LOGV2_WARNING(6100701,
-                              "Failed to get last stable recovery timestamp due to {error}. Note "
-                              "this is expected if shutdown is in progress.",
-                              "error"_attr = redact(ex));
+                LOGV2_WARNING(
+                    6100701,
+                    "Failed to get last stable recovery timestamp due to cancellation error. Note "
+                    "this is expected if shutdown is in progress.",
+                    "error"_attr = redact(ex));
             }
             return true;
         } else if (cmdObj.hasElement("restartHeartbeats")) {

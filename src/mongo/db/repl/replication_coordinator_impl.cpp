@@ -3317,15 +3317,15 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
             lastStableRecoveryTimestamp = _storage->getLastStableRecoveryTimestamp(_service);
         } else {
             LOGV2_WARNING(6100702,
-                          "Failed to get last stable recovery timestamp due to {error}. Note this "
-                          "is expected if shutdown is in progress.",
-                          "error"_attr = "lock acquire timeout"_sd);
+                          "Failed to get last stable recovery timestamp due to lock acquire "
+                          "timeout. Note this is expected if shutdown is in progress.");
         }
     } catch (const ExceptionForCat<ErrorCategory::CancellationError>& ex) {
-        LOGV2_WARNING(6100703,
-                      "Failed to get last stable recovery timestamp due to {error}. Note this is "
-                      "expected if shutdown is in progress.",
-                      "error"_attr = redact(ex));
+        LOGV2_WARNING(
+            6100703,
+            "Failed to get last stable recovery timestamp due to cancellation error. Note this is "
+            "expected if shutdown is in progress.",
+            "error"_attr = redact(ex));
     }
 
     stdx::lock_guard<Latch> lk(_mutex);
