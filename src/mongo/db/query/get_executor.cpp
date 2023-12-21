@@ -1633,9 +1633,8 @@ attemptToGetSlotBasedExecutor(
         extractAndAttachPipelineStages(canonicalQuery.get(), true /* attachOnly */);
     }
 
-    // (Ignore FCV check): This is intentional because we always want to use this feature once the
-    // feature flag is enabled.
-    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
+    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
 
     if (canUseRegularSbe || sbeFull) {

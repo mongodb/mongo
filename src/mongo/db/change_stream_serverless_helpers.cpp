@@ -67,8 +67,11 @@ MONGO_FAIL_POINT_DEFINE(injectCurrentWallTimeForChangeCollectionRemoval);
 namespace change_stream_serverless_helpers {
 namespace {
 bool isServerlessChangeStreamFeatureFlagEnabled() {
-    return feature_flags::gFeatureFlagServerlessChangeStreams.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    // We need to use isEnabledUseLastLTSFCVWhenUninitialized since this could run during startup
+    // while the FCV is still uninitialized.
+    return feature_flags::gFeatureFlagServerlessChangeStreams
+        .isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 }  // namespace
 

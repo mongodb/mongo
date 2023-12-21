@@ -230,11 +230,16 @@ void validate(OperationContext* opCtx,
             !hasRequestReshardingResumeToken || nss.isOplog());
 
     auto requestResumeTokenElem = cmdObj[AggregateCommandRequest::kRequestResumeTokenFieldName];
-    uassert(ErrorCodes::InvalidOptions,
-            "$_requestResumeToken is not supported without Resharding Improvements",
-            !requestResumeTokenElem ||
-                resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    // We need to use isEnabledUseLastLTSFCVWhenUninitialized here because an aggregate
+    // command with $_requestResumeToken could be sent directly to an initial sync node with
+    // uninitialized FCV, and creating/parsing/validating this command invocation happens before
+    // any check that the node is a primary.
+    uassert(
+        ErrorCodes::InvalidOptions,
+        "$_requestResumeToken is not supported without Resharding Improvements",
+        !requestResumeTokenElem ||
+            resharding::gFeatureFlagReshardingImprovements.isEnabledUseLastLTSFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     uassert(ErrorCodes::FailedToParse,
             str::stream() << AggregateCommandRequest::kRequestResumeTokenFieldName
                           << " must be a boolean type",

@@ -1630,7 +1630,10 @@ SortedFileWriter<Key, Value>::createFileIteratorForResume(
 
 template <typename Key, typename Value>
 SorterChecksumVersion SortedFileWriter<Key, Value>::_getSorterChecksumVersion() const {
-    if (gFeatureFlagUseSorterChecksumV2.isEnabled(
+    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+    // this could run during currentOp which is allowed during initial sync while the FCV is still
+    // uninitialized.
+    if (gFeatureFlagUseSorterChecksumV2.isEnabledUseLatestFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return SorterChecksumVersion::v2;
     }

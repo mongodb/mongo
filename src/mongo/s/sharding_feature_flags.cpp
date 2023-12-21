@@ -38,7 +38,9 @@ namespace mongo {
 MONGO_INITIALIZER_GENERAL(SetShouldEmitLogService, ("EndServerParameterRegistration"), ())
 (InitializerContext*) {
     logv2::setShouldEmitLogService([]() {
-        return feature_flags::gEmbeddedRouter.isEnabled(
+        // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+        // this could run during startup while the FCV is still uninitialized.
+        return feature_flags::gEmbeddedRouter.isEnabledUseLatestFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     });
 }

@@ -506,9 +506,8 @@ bool findSbeCompatibleStagesForPushdown(
 
     // SERVER-78998: Refactor these checks so that they do not load their values multiple times
     // during the same query.
-    // (Ignore FCV check): featureFlagSbeFull does not change the semantics of queries, so it can
-    // safely be enabled on some nodes and disabled on other nodes during upgrade/downgrade.
-    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
+    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     SbeCompatibility minRequiredCompatibility =
         sbeFullEnabled ? SbeCompatibility::flagGuarded : SbeCompatibility::fullyCompatible;
@@ -552,9 +551,8 @@ bool findSbeCompatibleStagesForPushdown(
 
         // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
         // enabled.
-        // (Ignore FCV check): As with 'featureFlagSbeFull' (above), the effects of
-        // 'featureFlagSearchInSbe' are local to this node, making it safe to ignore the FCV.
-        .search = feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe(),
+        .search = feature_flags::gFeatureFlagSearchInSbe.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
 
         .window = doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
 
@@ -2279,9 +2277,8 @@ bool PipelineD::isSearchPresentAndEligibleForSbe(const Pipeline* pipeline) {
         getSearchHelpers(expCtx->opCtx->getServiceContext())->isSearchPipeline(pipeline) ||
         getSearchHelpers(expCtx->opCtx->getServiceContext())->isSearchMetaPipeline(pipeline);
 
-    // (Ignore FCV check): FCV checking is unnecessary because SBE execution is local to a given
-    // node.
-    auto searchInSbeEnabled = feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe();
+    auto searchInSbeEnabled = feature_flags::gFeatureFlagSearchInSbe.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     auto forceClassicEngine =
         QueryKnobConfiguration::decoration(expCtx->opCtx).getInternalQueryFrameworkControlForOp() ==
         QueryFrameworkControlEnum::kForceClassicEngine;

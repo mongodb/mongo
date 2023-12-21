@@ -551,11 +551,10 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
                 "Pushing down $search into SBE but forceClassicEngine is true.",
                 !query.getForceClassicEngine());
 
-        // (Ignore FCV check): FCV checking is unnecessary because SBE execution is local to a given
-        // node.
         tassert(7816301,
                 "Pushing down $search into SBE but featureFlagSearchInSbe is disabled.",
-                feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe());
+                feature_flags::gFeatureFlagSearchInSbe.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
         auto searchNode = getSearchHelpers(query.getOpCtx()->getServiceContext())
                               ->getSearchNode(query.cqPipeline().front().get());

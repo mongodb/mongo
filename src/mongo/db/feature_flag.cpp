@@ -73,16 +73,6 @@ bool FeatureFlag::isEnabled(const ServerGlobalParams::FCVSnapshot fcv) const {
         return _enabled;
     }
 
-
-    // If the FCV is not initialized yet, we check whether the feature flag is enabled on the last
-    // LTS FCV, which is the lowest FCV we can have on this server. Because the version of a feature
-    // flag is not supposed to change, we are sure that if the feature flag is enabled on the last
-    // LTS FCV, it is enabled on all FCVs this server can have.
-    if (!fcv.isVersionInitialized()) {
-        // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-        return isEnabledOnVersion(multiversion::GenericFCV::kLastLTS);
-    }
-
     if (!_enabled) {
         return false;
     }

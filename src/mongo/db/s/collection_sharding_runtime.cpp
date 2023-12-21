@@ -506,8 +506,11 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     const auto& currentMetadata = optCurrentMetadata->get();
 
-    const auto indexFeatureFlag = feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    const auto indexFeatureFlag =
+        feature_flags::gGlobalIndexesShardingCatalog.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     const auto wantedPlacementVersion = currentMetadata.getShardPlacementVersion();
     const auto wantedCollectionIndexes =
         indexFeatureFlag ? getCollectionIndexes(opCtx) : boost::none;

@@ -641,16 +641,11 @@ whether the feature flag is enabled.
 
 ### Feature Flag Gating During Initial Sync
 ***IMPORTANT NOTE ABOUT INITIAL SYNC***:
-
-// TODO SERVER-82246: Update README once invariant is added back in.
-
 `isEnabled` checks if the feature flag is enabled on the input FCV, which is usually
 the server's current FCV `serverGlobalParams.featureCompatibility`. However, during initial sync, we temporarily reset the FCV to be uninintialized. 
 
-Currently, if the FCV has not been initialized yet, it will check if the feature flag is enabled on the lastLTS FCV. After SERVER-82246, 
-this function will instead invariant if the FCV is uninitialized.
-
-Each feature team should think about whether the feature could be run during initial sync, for example: 
+***`isEnabled` will invariant if the FCV is uninitialized.***
+Because of this, each feature team should think about whether the feature could be run during initial sync, for example: 
  * if the feature is part of initial sync itself
  * if the feature is in a background thread that runs during initial sync
  * if the feature is run in a command that is allowed during initial sync, such as `hello`, `serverStatus`,etc, or any command that returns `secondaryAllowed() == kAlways` or `kOptIn`, and returns `maintenanceOk() == true`

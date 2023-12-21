@@ -221,7 +221,9 @@ QuerySettings lookupQuerySettings(const boost::intrusive_ptr<ExpressionContext>&
                                   const NamespaceString& nss,
                                   const mongo::SerializationContext& serializationContext,
                                   std::function<query_shape::QueryShapeHash()> queryShapeHashFn) {
-    if (!feature_flags::gFeatureFlagQuerySettings.isEnabled(
+    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return query_settings::QuerySettings();
     }

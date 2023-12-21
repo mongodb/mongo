@@ -98,7 +98,10 @@ std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
         return ns.toStringWithTenantId();
     }
 
-    if (gFeatureFlagRequireTenantID.isEnabled(
+    // TODO SERVER-84275: Change to use isEnabled again.
+    // We need to use isEnabledUseLastLTSFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    if (gFeatureFlagRequireTenantID.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return ns.toString();
     }
@@ -186,7 +189,10 @@ NamespaceString NamespaceStringUtil::deserializeForAuthPrevalidated(
 NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<TenantId> tenantId,
                                                            StringData ns,
                                                            const SerializationContext& context) {
-    if (gFeatureFlagRequireTenantID.isEnabled(
+    // TODO SERVER-84275: Change to use isEnabled again.
+    // We need to use isEnabledUseLastLTSFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    if (gFeatureFlagRequireTenantID.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         StringData dbName = ns.substr(0, ns.find('.'));
         if (!(dbName == DatabaseName::kAdmin.db()) && !(dbName == DatabaseName::kLocal.db()) &&

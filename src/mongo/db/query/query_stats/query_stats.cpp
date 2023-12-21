@@ -78,7 +78,9 @@ CounterMetric queryStatsStoreWriteErrorsMetric("queryStats.numQueryStatsStoreWri
  * Indicates whether or not query stats is enabled via the feature flag.
  */
 bool isQueryStatsFeatureEnabled() {
-    return feature_flags::gFeatureFlagQueryStats.isEnabled(
+    // We need to use isEnabledUseLastLTSFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    return feature_flags::gFeatureFlagQueryStats.isEnabledUseLastLTSFCVWhenUninitialized(
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 

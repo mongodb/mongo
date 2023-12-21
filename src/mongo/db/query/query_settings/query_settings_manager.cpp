@@ -65,7 +65,9 @@ public:
 
     bool includeByDefault() const override {
         // Only include if Query Settings are enabled.
-        return feature_flags::gFeatureFlagQuerySettings.isEnabled(
+        // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+        // this could run during startup while the FCV is still uninitialized.
+        return feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     }
 

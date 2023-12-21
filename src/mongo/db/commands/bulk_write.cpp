@@ -1271,9 +1271,12 @@ public:
                    const Command* command,
                    const OpMsgRequest& opMsgRequest)
             : InvocationBaseGen(opCtx, command, opMsgRequest), _commandObj(opMsgRequest.body) {
+            // We need to use isEnabledUseLastLTSFCVWhenUninitialized here because a bulk write
+            // command could be sent directly to an initial sync node with uninitialized FCV, and
+            // creating this command invocation happens before any check that the node is a primary.
             uassert(ErrorCodes::CommandNotSupported,
                     "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
-                    gFeatureFlagBulkWriteCommand.isEnabled(
+                    gFeatureFlagBulkWriteCommand.isEnabledUseLastLTSFCVWhenUninitialized(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             bulk_write_common::validateRequest(request(), /*isRouter=*/false);

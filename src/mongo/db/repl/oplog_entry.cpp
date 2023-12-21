@@ -381,7 +381,8 @@ ReplOperation MutableOplogEntry::toReplOperation() const noexcept {
 }
 
 void MutableOplogEntry::setTid(boost::optional<mongo::TenantId> value) & {
-    if (gMultitenancySupport &&
+    // Only set Tid if we have a TenantId value and the server parameter and feature flag are on.
+    if (value && gMultitenancySupport &&
         gFeatureFlagRequireTenantID.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
         getDurableReplOperation().setTid(std::move(value));

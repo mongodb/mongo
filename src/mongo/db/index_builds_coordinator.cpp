@@ -596,8 +596,9 @@ IndexBuildsCoordinator::makeKillIndexBuildOnLowDiskSpaceAction() {
         }
 
         void act(OperationContext* opCtx, int64_t availableBytes) noexcept final {
-            if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            if (!feature_flags::gIndexBuildGracefulErrorHandling
+                     .isEnabledUseLastLTSFCVWhenUninitialized(
+                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 LOGV2(6826200,
                       "Index build: disk space monitor detected we're low on storage space but "
                       "'featureFlagIndexBuildGracefulErrorHandling' is disabled. Ignoring it");

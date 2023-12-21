@@ -572,7 +572,10 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                           << ns.toStringForErrorMsg() << " in a multi-document transaction.",
             !opCtx->inMultiDocumentTransaction());
 
-    if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
+    // We need to use isEnabledUseLastLTSFCVWhenUninitialized because it's possible for
+    // createIndexes to be sent directly to an initial sync node with uninitialized FCV if the
+    // collection is not replicated.
+    if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         uassertStatusOK(IndexBuildsCoordinator::checkDiskSpaceSufficientToStartIndexBuild(opCtx));
     }
