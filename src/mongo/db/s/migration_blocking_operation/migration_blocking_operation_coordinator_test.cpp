@@ -32,6 +32,7 @@
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_external_state_for_test.h"
+#include "mongo/unittest/death_test.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -56,27 +57,182 @@ protected:
                                         DDLCoordinatorTypeEnum::kMigrationBlockingOperation};
     }
 
-    ShardingDDLCoordinatorMetadata createMetadata(OperationContext* opCtx) const {
+    ShardingDDLCoordinatorMetadata createMetadata() const {
         ShardingDDLCoordinatorMetadata metadata(getCoordinatorId());
-        metadata.setForwardableOpMetadata(ForwardableOperationMetadata(opCtx));
+        metadata.setForwardableOpMetadata(ForwardableOperationMetadata(_opCtx));
         metadata.setDatabaseVersion(kDbVersion);
         return metadata;
     }
 
-    MigrationBlockingOperationCoordinatorDocument createStateDocument(
-        OperationContext* opCtx) const {
+    MigrationBlockingOperationCoordinatorDocument createStateDocument() const {
         MigrationBlockingOperationCoordinatorDocument doc;
-        auto metadata = createMetadata(opCtx);
+        auto metadata = createMetadata();
         doc.setShardingDDLCoordinatorMetadata(metadata);
         return doc;
     }
+
+    void setUp() override {
+        PrimaryOnlyServiceMongoDTest::setUp();
+
+        _opCtxHolder = makeOperationContext();
+        _opCtx = _opCtxHolder.get();
+        auto stateDocument = createStateDocument();
+        _instance = checked_pointer_cast<MigrationBlockingOperationCoordinator>(
+            Instance::getOrCreate(_opCtx, _service, stateDocument.toBSON()));
+    }
+
+    bool stateDocumentExistsOnDisk() {
+        DBDirectClient client(_opCtx);
+        auto count = client.count(NamespaceString::kShardingDDLCoordinatorsNamespace,
+                                  BSON("_id" << getCoordinatorId().toBSON()));
+        return count > 0;
+    }
+
+    MigrationBlockingOperationCoordinatorDocument getStateDocumentOnDisk() {
+        ASSERT_TRUE(stateDocumentExistsOnDisk());
+        DBDirectClient client(_opCtx);
+        auto doc = client.findOne(NamespaceString::kShardingDDLCoordinatorsNamespace,
+                                  BSON("_id" << getCoordinatorId().toBSON()));
+        IDLParserContext errCtx(
+            "MigrationBlockingOperationCoordinatorTest::getStateDocumentOnDisk()");
+        return MigrationBlockingOperationCoordinatorDocument::parse(errCtx, doc);
+    }
+
+    void assertOperationCountOnDisk(int expectedCount) {
+        auto doc = getStateDocumentOnDisk();
+        ASSERT_EQ(expectedCount, doc.getOperations().get().size());
+    }
+
+    void beginOperations() {
+        for (const auto& operationId : _operations) {
+            _instance->beginOperation(_opCtx, operationId);
+        }
+
+        ASSERT_TRUE(stateDocumentExistsOnDisk());
+    }
+
+    void endOperations() {
+        for (const auto& operationId : _operations) {
+            _instance->endOperation(_opCtx, operationId);
+        }
+    }
+
+    void tearDown() override {
+        if (stateDocumentExistsOnDisk()) {
+            auto doc = getStateDocumentOnDisk();
+            for (const auto& operationId : doc.getOperations().get()) {
+                _instance->endOperation(_opCtx, operationId);
+            }
+
+            ASSERT_OK(_instance->getCompletionFuture().getNoThrow());
+            ASSERT_FALSE(stateDocumentExistsOnDisk());
+        }
+
+        PrimaryOnlyServiceMongoDTest::tearDown();
+    }
+
+    std::shared_ptr<MigrationBlockingOperationCoordinator> _instance;
+    ServiceContext::UniqueOperationContext _opCtxHolder;
+    OperationContext* _opCtx;
+    std::vector<UUID> _operations;
 };
 
-TEST_F(MigrationBlockingOperationCoordinatorServiceTest, CreateCoordinator) {
-    auto opCtx = makeOperationContext();
-    auto stateDocument = createStateDocument(opCtx.get());
-    auto instance = Instance::getOrCreate(opCtx.get(), _service, stateDocument.toBSON());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+TEST_F(MigrationBlockingOperationCoordinatorServiceTest, CreateAndDeleteStateDocument) {
+    ASSERT_FALSE(stateDocumentExistsOnDisk());
+
+    _operations = {UUID::gen()};
+    beginOperations();
+    assertOperationCountOnDisk(1);
+    endOperations();
+
+    ASSERT_OK(_instance->getCompletionFuture().getNoThrow());
+    ASSERT_FALSE(stateDocumentExistsOnDisk());
+}
+
+TEST_F(MigrationBlockingOperationCoordinatorServiceTest, EndOperationDecrementsCount) {
+    _operations = {UUID::gen(), UUID::gen()};
+    beginOperations();
+    _instance->endOperation(_opCtx, _operations[0]);
+    assertOperationCountOnDisk(1);
+}
+
+TEST_F(MigrationBlockingOperationCoordinatorServiceTest, BeginMultipleOperations) {
+    _operations = {UUID::gen(), UUID::gen()};
+    beginOperations();
+    assertOperationCountOnDisk(2);
+}
+
+TEST_F(MigrationBlockingOperationCoordinatorServiceTest, BeginSameOperationMultipleTimes) {
+    _operations = {UUID::gen()};
+    beginOperations();
+    beginOperations();
+    assertOperationCountOnDisk(1);
+}
+
+TEST_F(MigrationBlockingOperationCoordinatorServiceTest, EndSameOperationMultipleTimes) {
+    _operations = {UUID::gen(), UUID::gen()};
+    beginOperations();
+
+    _instance->endOperation(_opCtx, _operations[0]);
+    _instance->endOperation(_opCtx, _operations[0]);
+
+    assertOperationCountOnDisk(1);
+}
+
+DEATH_TEST_F(MigrationBlockingOperationCoordinatorServiceTest,
+             InvalidInitialStateDocument,
+             "Operations should not be ongoing while migrations are running") {
+    auto stateDocument = createStateDocument();
+
+    std::vector<UUID> operations = {UUID::gen()};
+    stateDocument.setOperations(operations);
+
+    // Trigger a stepDown/stepUp to clear the default instance created in setUp().
+    stepDown();
+    stepUp(_opCtx);
+
+    Instance::getOrCreate(_opCtx, _service, stateDocument.toBSON());
+}
+
+DEATH_TEST_F(MigrationBlockingOperationCoordinatorServiceTest,
+             DuplicateOperationsOnDisk,
+             "Duplicate operations found on disk with same UUID") {
+    auto stateDocument = createStateDocument();
+    stateDocument.setPhase(MigrationBlockingOperationCoordinatorPhaseEnum::kBlockingMigrations);
+
+    auto duplicateUUID = UUID::gen();
+    std::vector<UUID> duplicateOperationVector = {duplicateUUID, duplicateUUID};
+    stateDocument.setOperations(duplicateOperationVector);
+
+    // Trigger a stepDown/stepUp to clear the default instance created in setUp().
+    stepDown();
+    stepUp(_opCtx);
+
+    Instance::getOrCreate(_opCtx, _service, stateDocument.toBSON());
+}
+
+TEST_F(MigrationBlockingOperationCoordinatorServiceTest, FunctionCallWhileCoordinatorCleaningUp) {
+    auto fp = globalFailPointRegistry().find("hangBeforeRemovingCoordinatorDocument");
+    invariant(fp);
+    fp->setMode(FailPoint::alwaysOn);
+
+    _operations = {UUID::gen()};
+    beginOperations();
+    endOperations();
+
+    fp->waitForTimesEntered(1);
+
+    ASSERT_THROWS_CODE(beginOperations(),
+                       DBException,
+                       ErrorCodes::MigrationBlockingOperationCoordinatorCleaningUp);
+
+    ASSERT_THROWS_CODE(
+        endOperations(), DBException, ErrorCodes::MigrationBlockingOperationCoordinatorCleaningUp);
+
+    fp->setMode(FailPoint::off);
+
+    ASSERT_OK(_instance->getCompletionFuture().getNoThrow());
+    ASSERT_FALSE(stateDocumentExistsOnDisk());
 }
 
 }  // namespace mongo

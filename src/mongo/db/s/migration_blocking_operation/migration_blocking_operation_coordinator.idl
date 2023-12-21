@@ -55,3 +55,4 @@ structs:
                 type: array<uuid>
                 description: The list of ongoing operation UUIDs.
                 optional: true
+                non_const_getter: true

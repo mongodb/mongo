@@ -361,11 +361,13 @@ protected:
         };
     }
 
+    auto _getDoc() const {
+        stdx::lock_guard lk{_docMutex};
+        return _doc;
+    }
+
     virtual void _enterPhase(const Phase& newPhase) {
-        auto newDoc = [&] {
-            stdx::lock_guard lk{_docMutex};
-            return _doc;
-        }();
+        auto newDoc = _getDoc();
 
         newDoc.setPhase(newPhase);
 
@@ -467,10 +469,7 @@ protected:
                    "phase"_attr = serializePhase(_doc.getPhase()),
                    "reason"_attr = redact(status));
 
-        auto newDoc = [&] {
-            stdx::lock_guard lk{_docMutex};
-            return _doc;
-        }();
+        auto newDoc = _getDoc();
 
         auto coordinatorMetadata = newDoc.getShardingDDLCoordinatorMetadata();
         coordinatorMetadata.setAbortReason(status);
@@ -484,10 +483,7 @@ protected:
 private:
     // lazily acquire Logical Session ID and a txn number
     void _updateSession(OperationContext* opCtx) {
-        auto newDoc = [&] {
-            stdx::lock_guard lk{_docMutex};
-            return _doc;
-        }();
+        auto newDoc = _getDoc();
         auto newShardingDDLCoordinatorMetadata = newDoc.getShardingDDLCoordinatorMetadata();
 
         auto optSession = newShardingDDLCoordinatorMetadata.getSession();

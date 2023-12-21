@@ -33,12 +33,29 @@
 
 namespace mongo {
 
+MigrationBlockingOperationCoordinator::UUIDSet recoverOperations(
+    MigrationBlockingOperationCoordinatorDocument doc) {
+    auto operationsVector = doc.getOperations().get_value_or({});
+    if (!operationsVector.empty()) {
+        invariant(doc.getPhase() ==
+                      MigrationBlockingOperationCoordinatorPhaseEnum::kBlockingMigrations,
+                  str::stream() << "Operations should not be ongoing while migrations are running");
+    }
+
+    MigrationBlockingOperationCoordinator::UUIDSet operationsSet = {};
+    for (const auto& uuid : operationsVector) {
+        invariant(!operationsSet.contains(uuid),
+                  str::stream() << "Duplicate operations found on disk with same UUID: " << uuid);
+        operationsSet.insert(uuid);
+    }
+    return operationsSet;
+}
+
 MigrationBlockingOperationCoordinator::MigrationBlockingOperationCoordinator(
     ShardingDDLCoordinatorService* service, const BSONObj& initialState)
     : RecoverableShardingDDLCoordinator(
           service, "MigrationBlockingOperationCoordinator", initialState),
-      _impl{std::make_unique<MigrationBlockingOperationCoordinatorImpl>()} {}
-
+      _operations{recoverOperations(_getDoc())} {}
 
 void MigrationBlockingOperationCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {}
 
@@ -49,13 +66,74 @@ StringData MigrationBlockingOperationCoordinator::serializePhase(const Phase& ph
 ExecutorFuture<void> MigrationBlockingOperationCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
-    return _impl->run(executor, token).thenRunOn(**executor);
+    return _completionPromise.getFuture().thenRunOn(**executor);
 }
 
-SemiFuture<void> MigrationBlockingOperationCoordinatorImpl::run(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
-    _completionPromise.emplaceValue();
-    return _completionPromise.getFuture().semi();
+MigrationBlockingOperationCoordinatorPhaseEnum
+MigrationBlockingOperationCoordinator::_getCurrentPhase() const {
+    stdx::unique_lock lock(_docMutex);
+    return _doc.getPhase();
+}
+
+bool MigrationBlockingOperationCoordinator::_isFirstOperation(WithLock) const {
+    return _operations.size() == 1 && _getCurrentPhase() != Phase::kBlockingMigrations;
+}
+
+void MigrationBlockingOperationCoordinator::_throwIfCleaningUp() {
+    uassert(
+        ErrorCodes::MigrationBlockingOperationCoordinatorCleaningUp,
+        str::stream() << "Migration blocking operation coordinator is currently being cleaned up",
+        !_completionPromise.getFuture().isReady());
+}
+
+void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opCtx,
+                                                           const UUID& operationUUID) {
+    stdx::unique_lock lock(_mutex);
+    _throwIfCleaningUp();
+
+    if (_operations.contains(operationUUID)) {
+        return;
+    }
+    _operations.insert(operationUUID);
+
+    auto newDoc = _getDoc();
+
+    if (_isFirstOperation(lock)) {
+        newDoc.setOperations(std::vector<UUID>{});
+        newDoc.setPhase(Phase::kBlockingMigrations);
+    }
+    newDoc.getOperations()->push_back(operationUUID);
+
+    _insertOrUpdateStateDocument(lock, opCtx, std::move(newDoc));
+}
+
+void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx,
+                                                         const UUID& operationUUID) {
+    stdx::unique_lock lock(_mutex);
+    _throwIfCleaningUp();
+
+    if (!_operations.contains(operationUUID)) {
+        return;
+    }
+    _operations.erase(operationUUID);
+
+    auto newDoc = _getDoc();
+    std::erase(newDoc.getOperations().get(), operationUUID);
+
+    _insertOrUpdateStateDocument(lock, opCtx, std::move(newDoc));
+}
+
+void MigrationBlockingOperationCoordinator::_insertOrUpdateStateDocument(
+    WithLock lk,
+    OperationContext* opCtx,
+    MigrationBlockingOperationCoordinatorDocument newStateDocument) {
+    if (_operations.empty()) {
+        _completionPromise.emplaceValue();
+    } else if (_isFirstOperation(lk)) {
+        _insertStateDocument(opCtx, std::move(newStateDocument));
+    } else {
+        _updateStateDocument(opCtx, std::move(newStateDocument));
+    }
 }
 
 }  // namespace mongo

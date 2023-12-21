@@ -532,6 +532,8 @@ error_codes:
 
     - {code: 405, name: CannotCreateChunkDistribution}
 
+    - {code: 406, name: MigrationBlockingOperationCoordinatorCleaningUp}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
