@@ -394,7 +394,6 @@ buildvariants:
   name: perf-atlas-M60-real.intel.azure.2023-11
   display_name: PERF M60-Atlas ReplSet Intel Azure 2023-11
   cron: *cron_sunday_thursday
-  activate: false
   modules: *perf_modules
   expansions:
     mongodb_setup: atlas
@@ -519,7 +518,6 @@ buildvariants:
 - <<: *amazon_linux2_x86_streams_compile_variant_dependency
   name: perf-streams-single.intel.aws.2023-10
   display_name: PERF Streams-Single Intel AWS 2023-10
-  activate: false
   # cron: "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
   modules: *perf_modules
   expansions:
