@@ -65,12 +65,25 @@ const checkEntries = function(collName, entries, type, {numSecondaryIndexes, vie
         if (FixtureHelpers.isMongos(testDB)) {
             assert(entry.shard);
         }
-        if (type === 'collection') {
-            assert.eq(entry.md.indexes.length,
-                      numIndexes(testDB[collName], entry, numSecondaryIndexes));
-        }
         if (type === 'view' || type === 'timeseries') {
             assert.eq(entry.viewOn, viewOn);
+        }
+
+        // Avoid checking index metadata of unsplittable collections that are not in the proper
+        // shard. Unsplittable collections can exist both in the primary shard and in the
+        // owning shard local catalog, but createIndexes will only contact the owning shard.
+        let checkIndexes = true;
+        if (FixtureHelpers.isMongos(testDB)) {
+            const configDB = db.getSiblingDB('config');
+            const coll = configDB.collections.findOne({_id: entry.ns});
+            if (coll && coll.unsplittable) {
+                const chunk = configDB.chunks.findOne({uuid: coll.uuid});
+                checkIndexes = chunk.shard == entry.shard;
+            }
+        }
+        if (checkIndexes && type === 'collection') {
+            assert.eq(entry.md.indexes.length,
+                      numIndexes(testDB[collName], entry, numSecondaryIndexes));
         }
     }
 };
