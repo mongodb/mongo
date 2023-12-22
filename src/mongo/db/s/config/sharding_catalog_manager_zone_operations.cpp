@@ -145,15 +145,17 @@ ChunkRange includeFullShardKey(OperationContext* opCtx,
                                const ChunkRange& range,
                                KeyPattern* shardKeyPatternOut) {
     auto findCollResult =
-        uassertStatusOK(configServer->exhaustiveFindOnConfig(
-                            opCtx,
-                            kConfigPrimarySelector,
-                            repl::ReadConcernLevel::kLocalReadConcern,
-                            CollectionType::ConfigNS,
-                            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
-                                     nss, SerializationContext::stateDefault())),
-                            BSONObj(),
-                            1))
+        uassertStatusOK(
+            configServer->exhaustiveFindOnConfig(
+                opCtx,
+                kConfigPrimarySelector,
+                repl::ReadConcernLevel::kLocalReadConcern,
+                CollectionType::ConfigNS,
+                BSON(CollectionType::kNssFieldName
+                     << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+                     << CollectionType::kUnsplittableFieldName << BSON("$ne" << true)),
+                BSONObj(),
+                1))
             .docs;
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << nss.toStringForErrorMsg() << " is not sharded",

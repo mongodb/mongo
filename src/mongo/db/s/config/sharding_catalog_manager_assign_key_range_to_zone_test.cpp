@@ -93,6 +93,16 @@ public:
 
         ASSERT_OK(insertToConfigCollection(
             operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+
+        CollectionType unsplittableCollection(unshardedNS(),
+                                              OID::gen(),
+                                              Timestamp(1, 2),
+                                              Date_t::now(),
+                                              UUID::gen(),
+                                              BSON("_id" << 1));
+        unsplittableCollection.setUnsplittable(true);
+        ASSERT_OK(insertToConfigCollection(
+            operationContext(), CollectionType::ConfigNS, unsplittableCollection.toBSON()));
     }
 
     /**

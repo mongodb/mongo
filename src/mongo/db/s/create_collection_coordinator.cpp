@@ -383,7 +383,13 @@ void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
 
 std::vector<TagsType> getTagsAndValidate(OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         const BSONObj& proposedKey) {
+                                         const BSONObj& proposedKey,
+                                         const bool isUnsplittable) {
+    if (isUnsplittable) {
+        // Tags should be ignored when creating an unsplittable collection
+        return {};
+    }
+
     // Read zone info
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto tags = uassertStatusOK(catalogClient->getTagsForCollection(opCtx, nss));
@@ -1260,7 +1266,8 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                     opCtx,
                     shardKeyPattern,
                     _request.getPresplitHashedZones().value_or(false),
-                    getTagsAndValidate(opCtx, nss(), shardKeyPattern.toBSON()),
+                    getTagsAndValidate(
+                        opCtx, nss(), shardKeyPattern.toBSON(), false /* isUnsplittable */),
                     getNumShards(opCtx),
                     *_collectionEmpty,
                     _request.getUnsplittable(),
@@ -1681,7 +1688,7 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator() {
         opCtx,
         shardKeyPattern,
         _request.getPresplitHashedZones().value_or(false),
-        getTagsAndValidate(opCtx, nss(), shardKeyPattern.toBSON()),
+        getTagsAndValidate(opCtx, nss(), shardKeyPattern.toBSON(), _request.getUnsplittable()),
         getNumShards(opCtx),
         *_collectionEmpty,
         _request.getUnsplittable(),
@@ -1790,7 +1797,8 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
                 opCtx,
                 shardKeyPattern,
                 _request.getPresplitHashedZones().value_or(false),
-                getTagsAndValidate(opCtx, nss(), shardKeyPattern.toBSON()),
+                getTagsAndValidate(
+                    opCtx, nss(), shardKeyPattern.toBSON(), _request.getUnsplittable()),
                 getNumShards(opCtx),
                 *_collectionEmpty,
                 _request.getUnsplittable(),
