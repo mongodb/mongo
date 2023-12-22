@@ -15,15 +15,11 @@ echo 'dist/s_all run started...'
 
 fast=""
 force=
-reconf=0
 errmode=0
 errfound=0
 
 while :
     do case "$1" in
-    -A)    # Reconfigure the library build.
-        reconf=1
-        shift;;
     -E)    # Return an error code on failure
         errmode=1
         shift;;
