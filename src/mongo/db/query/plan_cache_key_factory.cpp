@@ -167,9 +167,7 @@ sbe::PlanCacheKey make(const CanonicalQuery& query,
 }  // namespace plan_cache_detail
 
 namespace plan_cache_key_factory {
-sbe::PlanCacheKey make(const CanonicalQuery& query,
-                       const MultipleCollectionAccessor& collections,
-                       const bool requiresSbeCompatibility) {
+sbe::PlanCacheKey make(const CanonicalQuery& query, const MultipleCollectionAccessor& collections) {
     OperationContext* opCtx = query.getOpCtx();
     auto mainCollectionState = plan_cache_detail::computeCollectionState(
         opCtx, collections.getMainCollection(), false /* isSecondaryColl */);
@@ -184,7 +182,7 @@ sbe::PlanCacheKey make(const CanonicalQuery& query,
         }
     }
     secondaryCollectionStates.shrink_to_fit();
-    auto shapeString = canonical_query_encoder::encodeSBE(query, requiresSbeCompatibility);
+    auto shapeString = canonical_query_encoder::encodeSBE(query);
     return {plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString),
                                                     query.getPrimaryMatchExpression(),
                                                     collections.getMainCollection(),
