@@ -30,8 +30,19 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
      * least one page from disk. The result of this function will subsequently be checked by cursor
      * logic to determine if pre-fetching will be performed.
      */
-    if (!F_ISSET(session, WT_SESSION_PREFETCH) || F_ISSET(session, WT_SESSION_INTERNAL) ||
-      F_ISSET(ref, WT_REF_FLAG_INTERNAL) || session->pf.prefetch_disk_read_count < 2) {
+    if (!F_ISSET(session, WT_SESSION_PREFETCH)) {
+        WT_STAT_CONN_INCR(session, block_prefetch_skipped);
+        return (false);
+    }
+
+    if (F_ISSET(session, WT_SESSION_INTERNAL)) {
+        WT_STAT_CONN_INCR(session, block_prefetch_skipped_internal_session);
+        WT_STAT_CONN_INCR(session, block_prefetch_skipped);
+        return (false);
+    }
+
+    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
+        WT_STAT_CONN_INCR(session, block_prefetch_skipped_internal_page);
         WT_STAT_CONN_INCR(session, block_prefetch_skipped);
         return (false);
     }
@@ -45,6 +56,12 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
 
     if (session->pf.prefetch_disk_read_count == 1)
         WT_STAT_CONN_INCR(session, block_prefetch_disk_one);
+
+    if (session->pf.prefetch_disk_read_count < 2) {
+        WT_STAT_CONN_INCR(session, block_prefetch_skipped_disk_read_count);
+        WT_STAT_CONN_INCR(session, block_prefetch_skipped);
+        return (false);
+    }
 
     if (session->pf.prefetch_prev_ref == NULL) {
         WT_STAT_CONN_INCR(session, block_prefetch_attempts);
@@ -69,6 +86,7 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
     if (session->pf.prefetch_prev_ref->page == ref->home &&
       session->pf.prefetch_skipped_with_parent < WT_PREFETCH_QUEUE_PER_TRIGGER) {
         ++session->pf.prefetch_skipped_with_parent;
+        WT_STAT_CONN_INCR(session, block_prefetch_skipped_same_ref);
         WT_STAT_CONN_INCR(session, block_prefetch_skipped);
         return (false);
     }
