@@ -473,6 +473,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
             WT_ERR(__session_close_cached_cursors(session));
         }
     }
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     /*
      * FIXME-WT-12021 Replace this debug option with the corresponding failpoint once this project
@@ -485,6 +486,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
         else
             F_CLR(session, WT_SESSION_DEBUG_CHECKPOINT_FAIL_BEFORE_TURTLE_UPDATE);
     }
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     /*
      * There is a session debug configuration which can be set to evict pages as they are released

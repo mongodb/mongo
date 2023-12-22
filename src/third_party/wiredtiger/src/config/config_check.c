@@ -213,13 +213,12 @@ __config_check(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *checks, u_int ch
             if (v.len == 0)
                 WT_RET_MSG(session, EINVAL, "Key '%.*s' requires a value", (int)k.len, k.str);
             if (v.type == WT_CONFIG_ITEM_STRUCT) {
-                /*
-                 * Handle the 'verbose' case of a list containing restricted choices.
-                 */
+                /* Handle the 'verbose' case of a list containing restricted choices. */
                 __wt_config_subinit(session, &sparser, &v);
                 found = true;
                 while (found && (ret = __wt_config_next(&sparser, &v, &dummy)) == 0)
                     found = __config_get_choice(choices, &v);
+                WT_RET_NOTFOUND_OK(ret);
             } else
                 found = __config_get_choice(choices, &v);
 

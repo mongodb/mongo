@@ -273,6 +273,7 @@ __config_add_checks(WT_SESSION_IMPL *session, WT_CONFIG_ENTRY *entry, WT_CONFIG_
                 __conn_foc_add(session, cp->choices);
             }
         }
+        WT_RET_NOTFOUND_OK(ret);
     }
     return (0);
 }
