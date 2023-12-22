@@ -227,7 +227,6 @@ MADV
 MALLOC
 MEM
 MEMALIGN
-MEMORDER
 MERCHANTABILITY
 MONGODB
 MOVEFILE
@@ -909,7 +908,6 @@ lex
 lexically
 lexicographically
 lf
-lfence
 libdatasource
 libmemkind
 libs
@@ -937,7 +935,6 @@ logsize
 logtest
 lookaside
 lookups
-loongarch
 lossy
 lr
 lru
@@ -1189,7 +1186,6 @@ setname
 setstr
 setv
 setvbuf
-sfence
 shareability
 sig
 sigchld
@@ -1209,7 +1205,6 @@ snapsort
 snprintf
 sortable
 sp
-sparc
 spinlock
 spinlocks
 src

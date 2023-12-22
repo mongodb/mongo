@@ -21,7 +21,7 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
      *
      * Place a read barrier to avoid this issue.
      */
-    WT_ORDERED_READ_WEAK_MEMORDER(ins, WT_SKIP_LAST(ins_head));
+    WT_ORDERED_READ(ins, WT_SKIP_LAST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ins == NULL)
@@ -40,9 +40,6 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
         /*
          * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
          * and inconsistent value in the lower level. Place a read barrier to avoid this issue.
-         *
-         * This should use WT_ORDERED_READ_WEAK_MEMORDER. But to lower the risk of the change, we
-         * keep this as before for now.
          */
         WT_ORDERED_READ(ins, *insp);
         if (ins != NULL && recno >= WT_INSERT_RECNO(ins)) {
@@ -76,7 +73,7 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
          *
          * Place a read barrier to avoid this issue.
          */
-        WT_ORDERED_READ_WEAK_MEMORDER(ins, WT_SKIP_NEXT(ins));
+        WT_ORDERED_READ(ins, WT_SKIP_NEXT(ins));
     return (ins);
 }
 
@@ -95,7 +92,7 @@ __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
      *
      * Place a read barrier to avoid this issue.
      */
-    WT_ORDERED_READ_WEAK_MEMORDER(ins, WT_SKIP_FIRST(ins_head));
+    WT_ORDERED_READ(ins, WT_SKIP_FIRST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ins == NULL)
@@ -114,9 +111,6 @@ __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
         /*
          * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
          * and inconsistent value in the lower level. Place a read barrier to avoid this issue.
-         *
-         * This should use WT_ORDERED_READ_WEAK_MEMORDER. But to lower the risk of the change, we
-         * keep this as before for now.
          */
         WT_ORDERED_READ(ins, *insp);
         if (ins != NULL && recno > WT_INSERT_RECNO(ins)) {
@@ -148,7 +142,7 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
      *
      * Place a read barrier to avoid this issue.
      */
-    WT_ORDERED_READ_WEAK_MEMORDER(ins, WT_SKIP_LAST(ins_head));
+    WT_ORDERED_READ(ins, WT_SKIP_LAST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ins == NULL)
@@ -168,9 +162,6 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
         /*
          * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
          * and inconsistent value in the lower level. Place a read barrier to avoid this issue.
-         *
-         * This should use WT_ORDERED_READ_WEAK_MEMORDER. But to lower the risk of the change, we
-         * keep this as before for now.
          */
         WT_ORDERED_READ(ins, *insp);
         if (ins == NULL) {
@@ -212,7 +203,7 @@ __col_insert_search(
      *
      * Place a read barrier to avoid this issue.
      */
-    WT_ORDERED_READ_WEAK_MEMORDER(ret_ins, WT_SKIP_LAST(ins_head));
+    WT_ORDERED_READ(ret_ins, WT_SKIP_LAST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ret_ins == NULL)
@@ -242,7 +233,7 @@ __col_insert_search(
          * here to ensure we see consistent values in the lower levels to prevent any unexpected
          * behavior.
          */
-        WT_ORDERED_READ_WEAK_MEMORDER(ret_ins, *insp);
+        WT_ORDERED_READ(ret_ins, *insp);
         if (ret_ins == NULL) {
             next_stack[i] = NULL;
             ins_stack[i--] = insp--;
@@ -269,7 +260,7 @@ __col_insert_search(
                  * levels of the skip list due to read reordering on CPUs with weak memory ordering.
                  * Add a read barrier to avoid this issue.
                  */
-                WT_ORDERED_READ_WEAK_MEMORDER(next_stack[i], ret_ins->next[i]);
+                WT_ORDERED_READ(next_stack[i], ret_ins->next[i]);
                 ins_stack[i] = &ret_ins->next[i];
             }
         else { /* Drop down a level */

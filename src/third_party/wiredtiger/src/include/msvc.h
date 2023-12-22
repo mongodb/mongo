@@ -109,36 +109,22 @@ WT_PAUSE(void)
 
 /*
  * WT_READ_BARRIER --
- *	MSVC implementation of WT_READ_BARRIER.
+ *	MSVC implementation of WT_READ_BARRIER. As we're running on x86 TSO we only issue a compiler
+ *  barrier.
  */
 static inline void
 WT_READ_BARRIER(void)
 {
-    _mm_lfence();
-}
-
-/*
- * WT_READ_BARRIER_WEAK_MEMORDER --
- *	MSVC implementation of WT_READ_BARRIER_WEAK_MEMORDER.
- */
-static inline void
-WT_READ_BARRIER_WEAK_MEMORDER(void)
-{
-    /* x86 has a strong memory model, so we only need a compiler barrier here. */
-#ifdef _M_AMD64
     WT_BARRIER();
-#else
-    /* Default to a stronger read barrier for other platforms. */
-    WT_READ_BARRIER();
-#endif
 }
 
 /*
  * WT_WRITE_BARRIER --
- *	MSVC implementation of WT_WRITE_BARRIER.
+ *	MSVC implementation of WT_WRITE_BARRIER. As we're running on x86 TSO we only issue a
+ *compiler barrier.
  */
 static inline void
 WT_WRITE_BARRIER(void)
 {
-    _mm_sfence();
+    WT_BARRIER();
 }

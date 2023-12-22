@@ -89,7 +89,7 @@ restart:
              *
              * Place a read barrier to avoid this issue.
              */
-            WT_ORDERED_READ_WEAK_MEMORDER(ins, cbt->ins_head->head[i]);
+            WT_ORDERED_READ(ins, cbt->ins_head->head[i]);
             if (ins != NULL && ins != current)
                 break;
         }
@@ -115,7 +115,7 @@ restart:
          *
          * Place a read barrier to avoid this issue.
          */
-        WT_ORDERED_READ_WEAK_MEMORDER(next_ins, ins->next[i]);
+        WT_ORDERED_READ(next_ins, ins->next[i]);
         if (next_ins != current) /* Stay at this level */
             ins = next_ins;
         else { /* Drop down a level */
