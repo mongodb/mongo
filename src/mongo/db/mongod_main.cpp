@@ -1339,17 +1339,6 @@ void startupConfigActions(const std::vector<std::string>& args) {
 #endif
 }
 
-void setUpCollectionShardingState(ServiceContext* serviceContext) {
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-        CollectionShardingStateFactory::set(
-            serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
-    } else {
-        CollectionShardingStateFactory::set(
-            serviceContext,
-            std::make_unique<CollectionShardingStateFactoryStandalone>(serviceContext));
-    }
-}
-
 void setUpCatalog(ServiceContext* serviceContext) {
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
@@ -1525,6 +1514,18 @@ void setUpObservers(ServiceContext* serviceContext) {
     }
 
     serviceContext->setOpObserver(std::move(opObserverRegistry));
+}
+
+void setUpSharding(ServiceContext* service) {
+    ShardingState::create(service);
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+        CollectionShardingStateFactory::set(
+            service, std::make_unique<CollectionShardingStateFactoryShard>(service));
+    } else {
+        CollectionShardingStateFactory::set(
+            service, std::make_unique<CollectionShardingStateFactoryStandalone>(service));
+    }
 }
 
 namespace {
@@ -2145,13 +2146,11 @@ int mongod_main(int argc, char* argv[]) {
         quickExit(ExitCode::auditRotateError);
     }
 
-    setUpCollectionShardingState(service);
     setUpCatalog(service);
     setUpReplication(service);
     setUpObservers(service);
     setUpMultitenancyCheck(service, gMultitenancySupport);
-    service->getService(ClusterRole::ShardServer)
-        ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    setUpSharding(service);
 
     ErrorExtraInfo::invariantHaveAllParsers();
 

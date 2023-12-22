@@ -2188,6 +2188,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/mongo/util/fail_point',
         'server_base',
         'service_context',
     ],

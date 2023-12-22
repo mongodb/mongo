@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/s/sharding_router_test_fixture.h"
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
@@ -88,7 +90,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/sharding_initialization.h"
-#include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/sharding_task_executor.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/transport/mock_session.h"
@@ -132,6 +134,7 @@ ShardingTestFixture::ShardingTestFixture(bool withMockCatalogCache)
     service->setTickSource(std::make_unique<TickSourceMock<>>());
 
     CollatorFactoryInterface::set(service, std::make_unique<CollatorFactoryMock>());
+    ShardingState::create(service);
 
     // Set up executor pool used for most operations.
     auto fixedNet = std::make_unique<executor::NetworkInterfaceMock>();

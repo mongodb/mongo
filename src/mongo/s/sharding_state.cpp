@@ -49,11 +49,11 @@
 namespace mongo {
 namespace {
 
-const auto getShardingState = ServiceContext::declareDecoration<ShardingState>();
+const auto getShardingState = ServiceContext::declareDecoration<boost::optional<ShardingState>>();
 
 }  // namespace
 
-ShardingState::ShardingState() {
+ShardingState::ShardingState(bool inMaintenanceMode) : _inMaintenanceMode(inMaintenanceMode) {
     auto [promise, future] = makePromiseFuture<RecoveredClusterRole>();
     _promise = std::move(promise);
     _future = std::move(future).tapAll(
@@ -62,12 +62,30 @@ ShardingState::ShardingState() {
 
 ShardingState::~ShardingState() = default;
 
+void ShardingState::create(ServiceContext* serviceContext) {
+    auto& shardingState = getShardingState(serviceContext);
+    invariant(!shardingState);
+    shardingState.emplace(serverGlobalParams.maintenanceMode !=
+                          ServerGlobalParams::MaintenanceMode::None);
+}
+
+void ShardingState::create_forTest_DO_NOT_USE(ServiceContext* serviceContext) {
+    auto& shardingState = getShardingState(serviceContext);
+    shardingState.emplace(serverGlobalParams.maintenanceMode !=
+                          ServerGlobalParams::MaintenanceMode::None);
+}
+
 ShardingState* ShardingState::get(ServiceContext* serviceContext) {
-    return &getShardingState(serviceContext);
+    auto& shardingState = getShardingState(serviceContext);
+    return shardingState.get_ptr();
 }
 
 ShardingState* ShardingState::get(OperationContext* operationContext) {
     return ShardingState::get(operationContext->getServiceContext());
+}
+
+bool ShardingState::inMaintenanceMode() const {
+    return _inMaintenanceMode;
 }
 
 void ShardingState::setRecoveryCompleted(RecoveredClusterRole role) {
@@ -109,6 +127,9 @@ boost::optional<ClusterRole> ShardingState::pollClusterRole() const {
 }
 
 bool ShardingState::enabled() const {
+    if (inMaintenanceMode())
+        return false;
+
     const auto role = pollClusterRole();
     return role && (role->has(ClusterRole::ConfigServer) || role->has(ClusterRole::ShardServer));
 }

@@ -87,10 +87,12 @@ if not get_option('ssl') == 'off':
                 'openssl_init.cpp',
             ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
                 'ssl_options',
             ],
-            LIBDEPS_PRIVATE=['$BUILD_DIR/mongo/crypto/symmetric_crypto'],
+            LIBDEPS_PRIVATE=[
+                '$BUILD_DIR/mongo/base',
+                '$BUILD_DIR/mongo/crypto/symmetric_crypto',
+            ],
         )
 
     env.Library(
@@ -98,7 +100,7 @@ if not get_option('ssl') == 'off':
         source=[
             'ssl_util.cpp',
         ],
-        LIBDEPS=[
+        LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base',
         ],
     )
@@ -117,7 +119,6 @@ if not get_option('ssl') == 'off':
             'ocsp/ocsp_manager.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/client/internal_auth',
             '$BUILD_DIR/mongo/db/auth/auth',
             '$BUILD_DIR/mongo/db/server_feature_flags',
@@ -138,6 +139,7 @@ if not get_option('ssl') == 'off':
             '$BUILD_DIR/mongo/db/server_base',
             '$BUILD_DIR/mongo/db/service_context',
             '$BUILD_DIR/mongo/util/background_job',
+            '$BUILD_DIR/mongo/util/fail_point',
             '$BUILD_DIR/mongo/util/icu',
             '$BUILD_DIR/mongo/util/winutil',
             'http_client',
@@ -165,19 +167,21 @@ else:
             'ssl_manager_none.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/util/fail_point',
             'network',
             'ssl_options',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/util/fail_point',
         ],
     )
 
     env.Library(
         target='ssl_parameters_auth',
         source=[
-            "ssl_parameters_auth_none.cpp",
+            'ssl_parameters_auth_none.cpp',
         ],
-        LIBDEPS=[
+        LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base',
         ],
     )

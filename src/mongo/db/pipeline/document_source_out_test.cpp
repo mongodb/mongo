@@ -42,11 +42,11 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/chunk_version.h"
@@ -55,8 +55,6 @@
 
 namespace mongo {
 namespace {
-
-using boost::intrusive_ptr;
 
 /**
  * For the purpsoses of this test, assume every collection is unsharded. Stages may ask this during
@@ -91,9 +89,9 @@ public:
         getExpCtx()->mongoProcessInterface = std::make_shared<MongoProcessInterfaceForTest>();
     }
 
-    intrusive_ptr<DocumentSourceOut> createOutStage(BSONObj spec) {
+    boost::intrusive_ptr<DocumentSourceOut> createOutStage(BSONObj spec) {
         auto specElem = spec.firstElement();
-        intrusive_ptr<DocumentSourceOut> outStage = dynamic_cast<DocumentSourceOut*>(
+        boost::intrusive_ptr<DocumentSourceOut> outStage = dynamic_cast<DocumentSourceOut*>(
             DocumentSourceOut::createFromBson(specElem, getExpCtx()).get());
         ASSERT_TRUE(outStage);
         return outStage;

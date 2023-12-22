@@ -61,6 +61,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/rpc/message.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
@@ -126,6 +127,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
                                 StorageEngineInitFlags::kSkipMetadataFile);
     StorageControl::startStorageControls(_serviceContext, true /*forTestOnly*/);
 
+    ShardingState::create(_serviceContext);
     CollectionShardingStateFactory::set(
         _serviceContext,
         std::make_unique<CollectionShardingStateFactoryStandalone>(_serviceContext));

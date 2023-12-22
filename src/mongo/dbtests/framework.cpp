@@ -57,6 +57,7 @@
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/unittest/framework.h"
@@ -80,53 +81,49 @@ int runDbTests(int argc, char** argv) {
     frameworkGlobalParams.seed = time(nullptr);
     frameworkGlobalParams.runsPerTest = 1;
 
-    registerShutdownTask([] {
-        // We drop the scope cache because leak sanitizer can't see across the
-        // thread we use for proxying MozJS requests. Dropping the cache cleans up
-        // the memory and makes leak sanitizer happy.
+    auto serviceContext = getGlobalServiceContext();
+
+    registerShutdownTask([serviceContext] {
+        // We drop the scope cache because leak sanitizer can't see across the thread we use for
+        // proxying MozJS requests. Dropping the cache cleans up the memory and makes leak sanitizer
+        // happy.
         ScriptEngine::dropScopeCache();
 
-        // We may be shut down before we have a global storage
-        // engine.
-        if (!getGlobalServiceContext()->getStorageEngine())
+        // We may be shut down before we have a global storage engine.
+        if (!serviceContext->getStorageEngine())
             return;
 
-        shutdownGlobalStorageEngineCleanly(getGlobalServiceContext());
+        shutdownGlobalStorageEngineCleanly(serviceContext);
     });
 
-    Client::initThread("testsuite", getGlobalServiceContext()->getService());
-
-    auto globalServiceContext = getGlobalServiceContext();
-    CollectionShardingStateFactory::set(
-        globalServiceContext,
-        std::make_unique<CollectionShardingStateFactoryShard>(globalServiceContext));
-
+    ThreadClient tc("testsuite", serviceContext->getService());
 
     // DBTests run as if in the database, so allow them to create direct clients.
-    DBDirectClientFactory::get(globalServiceContext)
-        .registerImplementation([](OperationContext* opCtx) {
-            return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));
-        });
+    DBDirectClientFactory::get(serviceContext).registerImplementation([](OperationContext* opCtx) {
+        return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));
+    });
 
     srand((unsigned)frameworkGlobalParams.seed);  // NOLINT
 
     // Set up the periodic runner for background job execution, which is required by the storage
     // engine to be running beforehand.
-    auto runner = makePeriodicRunner(globalServiceContext);
-    globalServiceContext->setPeriodicRunner(std::move(runner));
+    auto runner = makePeriodicRunner(serviceContext);
+    serviceContext->setPeriodicRunner(std::move(runner));
 
     {
-        auto opCtx = globalServiceContext->makeOperationContext(&cc());
+        auto opCtx = serviceContext->makeOperationContext(&cc());
         initializeStorageEngine(opCtx.get(), StorageEngineInitFlags{});
     }
 
-    StorageControl::startStorageControls(globalServiceContext, true /*forTestOnly*/);
-    DatabaseHolder::set(globalServiceContext, std::make_unique<DatabaseHolderImpl>());
-    Collection::Factory::set(globalServiceContext, std::make_unique<CollectionImpl::FactoryImpl>());
-    IndexBuildsCoordinator::set(globalServiceContext,
-                                std::make_unique<IndexBuildsCoordinatorMongod>());
+    StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
+    DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
+    Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
+    IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
     auto registry = std::make_unique<OpObserverRegistry>();
-    globalServiceContext->setOpObserver(std::move(registry));
+    serviceContext->setOpObserver(std::move(registry));
+    ShardingState::create(serviceContext);
+    CollectionShardingStateFactory::set(
+        serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
 
     int ret = unittest::Suite::run(frameworkGlobalParams.suites,
                                    frameworkGlobalParams.filter,
@@ -134,7 +131,7 @@ int runDbTests(int argc, char** argv) {
                                    frameworkGlobalParams.runsPerTest);
 
     // So everything shuts down cleanly
-    CollectionShardingStateFactory::clear(globalServiceContext);
+    CollectionShardingStateFactory::clear(serviceContext);
     exitCleanly((ExitCode)ret);
     return ret;
 }

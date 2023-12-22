@@ -59,11 +59,28 @@ class ShardingState {
     ShardingState& operator=(const ShardingState&) = delete;
 
 public:
-    ShardingState();
+    ShardingState(bool inMaintenanceMode);
     ~ShardingState();
+
+    static void create(ServiceContext* serviceContext);
+
+    // DO NOT ADD NEW USAGES
+    //
+    // TODO (SERVER-84334): This method is necessary to get tests that use multiple sharding
+    // features to work. Without it and due to the multiple inheritance of features, certain tests
+    // invoke the `create` method above more than once.
+    //
+    static void create_forTest_DO_NOT_USE(ServiceContext* serviceContext);
 
     static ShardingState* get(ServiceContext* serviceContext);
     static ShardingState* get(OperationContext* operationContext);
+
+    /**
+     * Returns whether this node is in sharding maintenance mode, which means the cluste role will
+     * never be recovered. Sharding maintenance mode means that the node will serve as replica set
+     * or sharded clusters but none of the sharding infrastructure will be enabled or consulted.
+     */
+    bool inMaintenanceMode() const;
 
     struct RecoveredClusterRole {
         OID clusterId;
@@ -131,6 +148,8 @@ public:
     void setRecoveryFailed(Status failedStatus);
 
 private:
+    const bool _inMaintenanceMode;
+
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingState::_mutex");
 
     // Promise/future pair which will be set when the recovery of the shard role completes

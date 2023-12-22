@@ -52,12 +52,12 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -71,6 +71,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/str.h"
@@ -78,12 +79,13 @@
 
 namespace mongo {
 namespace {
-using boost::intrusive_ptr;
-using std::deque;
-using std::vector;
 
-// This provides access to getExpCtx(), but we'll use a different name for this test suite.
-using DocumentSourceLookUpTest = AggregationContextFixture;
+class DocumentSourceLookUpTest : public AggregationContextFixture {
+protected:
+    DocumentSourceLookUpTest() {
+        ShardingState::create(getServiceContext());
+    }
+};
 
 const long long kDefaultMaxCacheSize = internalDocumentSourceLookupCacheSizeBytes.load();
 const auto kExplain = SerializationOptions{
@@ -478,7 +480,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
     //
     // Serialize the $lookup stage and confirm contents.
     //
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     lookupStage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::Object);
@@ -509,7 +511,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
     auto serializedBson = serializedDoc.toBson();
     auto roundTripped = DocumentSourceLookUp::createFromBson(serializedBson.firstElement(), expCtx);
 
-    vector<Value> newSerialization;
+    std::vector<Value> newSerialization;
     roundTripped->serializeToArray(newSerialization);
 
     ASSERT_EQ(newSerialization.size(), 1UL);
@@ -542,7 +544,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithFieldsA
     //
     // Serialize the $lookup stage and confirm contents.
     //
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     lookupStage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::Object);
@@ -575,7 +577,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithFieldsA
     auto serializedBson = serializedDoc.toBson();
     auto roundTripped = DocumentSourceLookUp::createFromBson(serializedBson.firstElement(), expCtx);
 
-    vector<Value> newSerialization;
+    std::vector<Value> newSerialization;
     roundTripped->serializeToArray(newSerialization);
 
     ASSERT_EQ(newSerialization.size(), 1UL);
@@ -606,7 +608,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithFromDBAndColl) 
     //
     // Serialize the $lookup stage and confirm contents.
     //
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     static const UnorderedFieldsBSONObjComparator kComparator;
     lookupStage->serializeToArray(serialization);
     auto serializedBSON = serialization[0].getDocument().toBson();
@@ -614,7 +616,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithFromDBAndColl) 
 
     auto roundTripped = DocumentSourceLookUp::createFromBson(serializedBSON.firstElement(), expCtx);
 
-    vector<Value> newSerialization;
+    std::vector<Value> newSerialization;
     roundTripped->serializeToArray(newSerialization);
 
     ASSERT_EQ(newSerialization.size(), 1UL);
@@ -646,7 +648,7 @@ TEST_F(DocumentSourceLookUpTest, LookupWithLetReParseSerializedStageWithFromDBAn
     //
     // Serialize the $lookup stage and confirm contents.
     //
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     static const UnorderedFieldsBSONObjComparator kComparator;
     lookupStage->serializeToArray(serialization);
     auto serializedBSON = serialization[0].getDocument().toBson();
@@ -654,7 +656,7 @@ TEST_F(DocumentSourceLookUpTest, LookupWithLetReParseSerializedStageWithFromDBAn
 
     auto roundTripped = DocumentSourceLookUp::createFromBson(serializedBSON.firstElement(), expCtx);
 
-    vector<Value> newSerialization;
+    std::vector<Value> newSerialization;
     roundTripped->serializeToArray(newSerialization);
 
     ASSERT_EQ(newSerialization.size(), 1UL);
@@ -694,7 +696,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithCollation) {
     //
     // Serialize the $lookup stage and confirm contents.
     //
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     static const UnorderedFieldsBSONObjComparator kComparator;
     lookupStage->serializeToArray(serialization);
     auto serializedBSON = serialization[0].getDocument().toBson();
@@ -703,7 +705,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithCollation) {
 
     auto roundTripped = DocumentSourceLookUp::createFromBson(serializedBSON.firstElement(), expCtx);
 
-    vector<Value> newSerialization;
+    std::vector<Value> newSerialization;
     roundTripped->serializeToArray(newSerialization);
 
     ASSERT_EQ(newSerialization.size(), 1UL);
@@ -732,7 +734,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithDocumentsPipeli
     //
     // Serialize the $lookup stage and confirm contents.
     //
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
     lookupStage->serializeToArray(serialization, opts);
     auto serializedDoc = serialization[0].getDocument();
@@ -749,7 +751,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithDocumentsPipeli
     auto roundTripped =
         DocumentSourceLookUp::createFromBson(serializedDoc.toBson().firstElement(), expCtx);
 
-    vector<Value> newSerialization;
+    std::vector<Value> newSerialization;
     roundTripped->serializeToArray(newSerialization, opts);
 
     ASSERT_EQ(newSerialization.size(), 1UL);
@@ -875,7 +877,7 @@ TEST(MakeMatchStageFromInput, RegexValueUsesEqQuery) {
 }
 
 TEST(MakeMatchStageFromInput, ArrayValueUsesInQuery) {
-    vector<Value> inputArray = {Value(1), Value(2)};
+    std::vector<Value> inputArray = {Value(1), Value(2)};
     Document input = DOC("local" << Value(inputArray));
     BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
         input, FieldPath("local"), "foreign", BSONObj());
@@ -884,7 +886,7 @@ TEST(MakeMatchStageFromInput, ArrayValueUsesInQuery) {
 
 TEST(MakeMatchStageFromInput, ArrayValueWithRegexUsesOrQuery) {
     BSONRegEx regex("^a");
-    vector<Value> inputArray = {Value(1), Value(regex), Value(2)};
+    std::vector<Value> inputArray = {Value(1), Value(regex), Value(2)};
     Document input = DOC("local" << Value(inputArray));
     BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
         input, FieldPath("local"), "foreign", BSONObj());
@@ -907,7 +909,7 @@ TEST(MakeMatchStageFromInput, ArrayValueWithRegexUsesOrQuery) {
  */
 class MockMongoInterface final : public StubMongoProcessInterface {
 public:
-    MockMongoInterface(deque<DocumentSource::GetNextResult> mockResults,
+    MockMongoInterface(std::deque<DocumentSource::GetNextResult> mockResults,
                        bool removeLeadingQueryStages = false)
         : _mockResults(std::move(mockResults)),
           _removeLeadingQueryStages(removeLeadingQueryStages) {}
@@ -949,7 +951,7 @@ public:
     }
 
 private:
-    deque<DocumentSource::GetNextResult> _mockResults;
+    std::deque<DocumentSource::GetNextResult> _mockResults;
     bool _removeLeadingQueryStages = false;
 };
 
@@ -969,8 +971,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
                                           expCtx);
 
     // Mock out the foreign collection.
-    deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
-                                                             Document{{"_id", 1}}};
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
+                                                                  Document{{"_id", 1}}};
     expCtx->mongoProcessInterface =
         std::make_shared<MockMongoInterface>(std::move(mockForeignContents));
 
@@ -1010,8 +1012,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
     // Mock out the foreign collection.
-    deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
-                                                             Document{{"_id", 1}}};
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
+                                                                  Document{{"_id", 1}}};
     expCtx->mongoProcessInterface =
         std::make_shared<MockMongoInterface>(std::move(mockForeignContents));
 
@@ -1375,7 +1377,7 @@ TEST_F(DocumentSourceLookUpTest,
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
-    deque<DocumentSource::GetNextResult> mockForeignContents{
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{
         Document{{"x", 0}}, Document{{"x", 1}}, Document{{"x", 2}}};
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockForeignContents);
 
@@ -1450,8 +1452,8 @@ TEST_F(DocumentSourceLookUpTest,
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
-    deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"x", 0}},
-                                                             Document{{"x", 1}}};
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"x", 0}},
+                                                                  Document{{"x", 1}}};
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockForeignContents);
 
     // Ensure the cache is abandoned after the first iteration by setting its max size to 0.

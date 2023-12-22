@@ -81,6 +81,7 @@
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/s/sharding_state.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
@@ -5435,7 +5436,12 @@ TEST_F(PipelineRenameTracking, CanHandleBackAndForthRename) {
     }
 }
 
-using InvolvedNamespacesTest = AggregationContextFixture;
+class InvolvedNamespacesTest : public AggregationContextFixture {
+protected:
+    InvolvedNamespacesTest() {
+        ShardingState::create(getServiceContext());
+    }
+};
 
 TEST_F(InvolvedNamespacesTest, NoInvolvedNamespacesForMatchSortProject) {
     boost::intrusive_ptr<ExpressionContext> expCtx(getExpCtx());

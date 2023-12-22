@@ -101,6 +101,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_options.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
@@ -175,9 +176,10 @@ GlobalInitializerRegisterer filterAllowedIndexFieldNamesEmbeddedInitializer(
     {},
     {"FilterAllowedIndexFieldNames"});
 
-ServiceContext::ConstructorActionRegisterer collectionShardingStateFactoryRegisterer{
-    "CollectionShardingStateFactory",
+ServiceContext::ConstructorActionRegisterer shardingStateRegisterer{
+    "ShardingState",
     [](ServiceContext* service) {
+        ShardingState::create(service);
         CollectionShardingStateFactory::set(
             service, std::make_unique<CollectionShardingStateFactoryStandalone>(service));
     },
@@ -233,7 +235,6 @@ void shutdown(ServiceContext* srvContext) {
 
     LOGV2_OPTIONS(22551, {LogComponent::kControl}, "now exiting");
 }
-
 
 ServiceContext* initialize(const char* yaml_config) {
     srand(static_cast<unsigned>(curTimeMicros64()));  // NOLINT

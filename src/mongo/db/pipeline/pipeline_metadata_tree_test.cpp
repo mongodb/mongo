@@ -63,6 +63,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_metadata_tree.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/intrusive_counter.h"
@@ -73,6 +74,10 @@ namespace {
 
 class PipelineMetadataTreeTest : public AggregationContextFixture {
 protected:
+    PipelineMetadataTreeTest() {
+        ShardingState::create(getServiceContext());
+    }
+
     auto jsonToPipeline(StringData jsonArray) {
         const auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
 

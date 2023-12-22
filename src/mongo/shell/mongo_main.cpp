@@ -95,6 +95,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/linenoise.h"
 #include "mongo/shell/mongo_main.h"
@@ -771,6 +772,8 @@ int mongo_main(int argc, char* argv[]) {
         // before the transport layer is initialized.
         auto runner = makePeriodicRunner(serviceContext);
         serviceContext->setPeriodicRunner(std::move(runner));
+
+        ShardingState::create(serviceContext);
 
 #ifdef MONGO_CONFIG_SSL
         OCSPManager::start(serviceContext);

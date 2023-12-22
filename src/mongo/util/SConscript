@@ -442,6 +442,7 @@ if get_option('use-diagnostic-latches') == 'on':
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/service_context',
             'concurrency/spin_lock',
+            'fail_point',
         ],
     )
 
@@ -454,6 +455,7 @@ if get_option('use-diagnostic-latches') == 'on':
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/commands/server_status_core',
             '$BUILD_DIR/mongo/db/service_context',
+            'fail_point',
         ],
     )
 

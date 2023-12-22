@@ -42,11 +42,11 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
@@ -56,8 +56,6 @@
 
 namespace mongo {
 namespace {
-
-using boost::intrusive_ptr;
 
 constexpr StringData kWhenMatchedModeFieldName = DocumentSourceMergeSpec::kWhenMatchedFieldName;
 constexpr StringData kWhenNotMatchedModeFieldName =
@@ -71,9 +69,9 @@ const StringData kDefaultWhenNotMatchedMode =
 
 class DocumentSourceMergeTest : public AggregationContextFixture {
 public:
-    intrusive_ptr<DocumentSourceMerge> createMergeStage(BSONObj spec) {
+    boost::intrusive_ptr<DocumentSourceMerge> createMergeStage(BSONObj spec) {
         auto specElem = spec.firstElement();
-        intrusive_ptr<DocumentSourceMerge> mergeStage = dynamic_cast<DocumentSourceMerge*>(
+        boost::intrusive_ptr<DocumentSourceMerge> mergeStage = dynamic_cast<DocumentSourceMerge*>(
             DocumentSourceMerge::createFromBson(specElem, getExpCtx()).get());
         ASSERT_TRUE(mergeStage);
         return mergeStage;

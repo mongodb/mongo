@@ -30,7 +30,7 @@ env.Library(
     source=[
         'change_stream_preimage.idl',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
     ],
 )
@@ -61,14 +61,16 @@ env.Library(
 )
 
 env.Library(
-    target='aggregation_request_helper', source=[
+    target='aggregation_request_helper',
+    source=[
         'aggregate_command.idl',
         'aggregation_request_helper.cpp',
         'external_data_source_option.idl',
         'name_expression_parser.cpp',
         'name_expression.idl',
         'query_request_conversion.cpp',
-    ], LIBDEPS=[
+    ],
+    LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
@@ -79,7 +81,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/write_concern_options',
         'document_sources_idl',
-    ])
+    ],
+)
 
 env.Library(
     target='variable_validation',
@@ -458,7 +461,7 @@ env.Benchmark(
 )
 
 env.Library(
-    target="document_source_internal_apply_oplog_update",
+    target='document_source_internal_apply_oplog_update',
     source=[
         'document_source_internal_apply_oplog_update.cpp',
     ],
@@ -473,7 +476,7 @@ env.Library(
 )
 
 env.Library(
-    target="change_stream_pipeline",
+    target='change_stream_pipeline',
     source=[
         'change_stream_document_diff_parser.cpp',
         'change_stream_event_transform.cpp',
@@ -592,7 +595,9 @@ env.Library(
     LIBDEPS=[
         "document_sources_idl",
     ],
-    LIBDEPS_PRIVATE=["$BUILD_DIR/mongo/db/repl/oplog_entry"],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/repl/oplog_entry",
+    ],
 )
 
 env.Library(
@@ -603,7 +608,6 @@ env.Library(
     LIBDEPS=[
         "change_stream_pipeline",
     ],
-    LIBDEPS_PRIVATE=[],
 )
 
 env.Benchmark(
@@ -736,6 +740,7 @@ env.CppUnitTest(
         'sampling_based_initial_split_policy_test.cpp',
         'semantic_analysis_test.cpp',
         'sequential_document_cache_test.cpp',
+        'serverless_aggregation_context_fixture.cpp',
         'sharded_union_test.cpp',
         'skip_and_limit_test.cpp',
         'tee_buffer_test.cpp',
@@ -832,7 +837,9 @@ env.Benchmark(
 
 env.Benchmark(
     target='window_function_percentile_bm',
-    source=['window_function/window_function_percentile_bm_fixture.cpp'],
+    source=[
+        'window_function/window_function_percentile_bm_fixture.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_non_d',

@@ -71,6 +71,8 @@ class TransportLayerMock;
 class ShardingTestFixture : public ShardingTestFixtureCommon {
 protected:
     ShardingTestFixture();
+    ShardingTestFixture(bool withMockCatalogCache);
+
     ~ShardingTestFixture();
 
     /**
@@ -161,9 +163,6 @@ protected:
         result.appendBool("ok", false);
         return result.obj();
     }
-
-protected:
-    ShardingTestFixture(bool withMockCatalogCache);
 
 private:
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;

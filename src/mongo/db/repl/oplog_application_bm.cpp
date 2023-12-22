@@ -103,6 +103,7 @@
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_severity.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util.h"
@@ -198,6 +199,7 @@ public:
         registry->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
         _svcCtx->setOpObserver(std::move(registry));
+        ShardingState::create(_svcCtx);
         CollectionShardingStateFactory::set(
             _svcCtx, std::make_unique<CollectionShardingStateFactoryStandalone>(_svcCtx));
 

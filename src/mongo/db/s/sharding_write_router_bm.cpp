@@ -149,6 +149,7 @@ protected:
                                         ConnectionString(kConfigHostAndPort),
                                         originatorShard});
 
+            ShardingState::create(serviceContext);
             CollectionShardingStateFactory::set(
                 serviceContext,
                 std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));

@@ -129,6 +129,7 @@
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/sessions_collection_sharded.h"
 #include "mongo/s/sharding_initialization.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/sharding_uptime_reporter.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/version_mongos.h"
@@ -1125,6 +1126,7 @@ ExitCode mongos_main(int argc, char* argv[]) {
     logCommonStartupWarnings(serverGlobalParams);
 
     setUpMultitenancyCheck(service, gMultitenancySupport);
+    ShardingState::create(service);
 
     try {
         if (!initialize_server_global_state::checkSocketPath())

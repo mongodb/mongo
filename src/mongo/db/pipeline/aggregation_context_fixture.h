@@ -119,14 +119,4 @@ struct DocumentSourceDeleter {
     }
 };
 
-class ServerlessAggregationContextFixture : public AggregationContextFixture {
-public:
-    ServerlessAggregationContextFixture()
-        : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
-              TenantId(OID::gen()), "unittests", "pipeline_test")) {}
-
-    const std::string _targetDb = "test";
-    const std::string _targetColl = "target_collection";
-};
-
 }  // namespace mongo

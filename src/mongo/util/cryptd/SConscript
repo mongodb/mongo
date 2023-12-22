@@ -28,6 +28,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/windows_options' if env.TargetOSIs('windows') else [],
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/rpc/rpc',
+        '$BUILD_DIR/mongo/s/grid',
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/service_executor',
         '$BUILD_DIR/mongo/transport/session_manager',

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 
-#include <memory>
-
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/s/sharding_state.h"
 
 namespace mongo {
 
-QueryTestServiceContext::QueryTestServiceContext()
-    : _service(ServiceContext::make()), _client(_service->getService()->makeClient("query_test")) {
-    CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());
+ServerlessAggregationContextFixture::ServerlessAggregationContextFixture()
+    : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
+          TenantId(OID::gen()), "unittests", "pipeline_test")) {
     ShardingState::create(getServiceContext());
-}
-
-QueryTestServiceContext::~QueryTestServiceContext() = default;
-
-ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationContext() {
-    return getClient()->makeOperationContext();
-}
-
-ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationContext(
-    LogicalSessionId lsid) {
-    auto opCtx = makeOperationContext();
-    opCtx->setLogicalSessionId(lsid);
-    return opCtx;
-}
-
-Client* QueryTestServiceContext::getClient() const {
-    return _client.get();
-}
-
-ServiceContext* QueryTestServiceContext::getServiceContext() {
-    return _service.get();
 }
 
 }  // namespace mongo

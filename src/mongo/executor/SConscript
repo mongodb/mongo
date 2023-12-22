@@ -282,13 +282,17 @@ env.Library(
 )
 
 env.Library(
-    target='hedge_options_util', source=[
+    target='hedge_options_util',
+    source=[
         'hedge_options_util.cpp',
-    ], LIBDEPS=[
+    ],
+    LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/s/mongos_server_parameters',
-    ])
+        '$BUILD_DIR/mongo/util/fail_point',
+    ],
+)
 
 env.Library(
     target='async_rpc',

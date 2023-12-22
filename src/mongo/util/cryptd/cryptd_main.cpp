@@ -42,6 +42,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
@@ -74,7 +75,6 @@ const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
     L"MongoCryptD", L"MongoDB FLE Crypto", L"MongoDB Field Level Encryption Daemon"};
 #endif
 
-namespace {
 ServiceContext::ConstructorActionRegisterer registerWireSpec{
     "RegisterWireSpec", [](ServiceContext* service) {
         // For MongoCryptd, we set the minimum wire version to be 4.2
@@ -87,7 +87,6 @@ ServiceContext::ConstructorActionRegisterer registerWireSpec{
 
         WireSpec::getWireSpec(service).initialize(std::move(spec));
     }};
-}  // namespace
 
 void createLockFile(ServiceContext* serviceContext) {
     auto& lockFile = StorageEngineLockFile::get(serviceContext);
@@ -263,6 +262,7 @@ int CryptDMain(int argc, char** argv) {
     setGlobalServiceContext(std::move(serviceContextHolder));
     auto serviceContext = getGlobalServiceContext();
 
+    ShardingState::create(serviceContext);
     serviceContext->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointCryptD>());
 
     auto tl = transport::TransportLayerManagerImpl::createWithConfig(

@@ -117,11 +117,11 @@ env.Library(
         'change_stream_pre_images_op_observer.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_preimage',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_decoration',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/transaction/transaction_operations',
         'op_observer',
     ],
@@ -169,7 +169,6 @@ env.Library(
         'op_observer',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/s/user_writes_recoverable_critical_section',
         '$BUILD_DIR/mongo/db/shard_role_api',
     ],
