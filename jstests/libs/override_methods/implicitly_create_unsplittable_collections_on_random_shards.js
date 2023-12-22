@@ -10,10 +10,7 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
-import {
-    denylistedNamespaces,
-    ShardingOverrideCommon
-} from "jstests/libs/override_methods/shard_collection_util.js";
+import {ShardingOverrideCommon} from "jstests/libs/override_methods/shard_collection_util.js";
 
 // Save a reference to the original methods to be called by the overrides below.
 var originalCreateCollection = DB.prototype.createCollection;
@@ -61,7 +58,8 @@ DB.prototype.createCollection = function(collName, opts) {
         }
     })
 
-    if (unsupportedOption || !FixtureHelpers.isMongos(this)) {
+    if (unsupportedOption || !FixtureHelpers.isMongos(this) ||
+        ShardingOverrideCommon.nssCanBeTrackedByShardingCatalog(collName)) {
         return originalCreateCollection.apply(this, [collName, options]);
     }
 
@@ -80,10 +78,8 @@ DB.prototype.getCollection = function() {
         return collection;
     }
 
-    for (const ns of denylistedNamespaces) {
-        if (collection.getFullName().match(ns)) {
-            return collection;
-        }
+    if (ShardingOverrideCommon.nssCanBeTrackedByShardingCatalog(collection.getFullName())) {
+        return collection
     }
 
     if (!FixtureHelpers.isMongos(this)) {
@@ -126,10 +122,8 @@ DBCollection.prototype.insert = function() {
         return originalInsert.apply(this, arguments);
     }
 
-    for (const ns of denylistedNamespaces) {
-        if (this.getFullName().match(ns)) {
-            return originalInsert.apply(this, arguments);
-        }
+    if (ShardingOverrideCommon.nssCanBeTrackedByShardingCatalog(this.getFullName())) {
+        return originalInsert.apply(this, arguments);
     }
 
     const collName = this.getName();
@@ -166,10 +160,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, runCommandOriginal, m
 
     let options = Object.merge({}, cmdObj);
     let nss = options['create'];
-    // TODO SERVER-79248 or SERVER-79254 remove this entire check once both cleanup
-    // and compaction coordinator work on unsplittable collection
-    if (nss.endsWith(".ecoc") || nss.endsWith(".esc") || nss.endsWith(".ecc") ||
-        nss.startsWith("enxcol_.")) {
+    if (ShardingOverrideCommon.nssCanBeTrackedByShardingCatalog(nss)) {
         unsupportedOption = true
     }
     delete options['create'];

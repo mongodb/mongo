@@ -15,6 +15,8 @@ export const denylistedNamespaces = [
     /^admin\./,
     /^config\./,
     /\.system\./,
+    // TODO SERVER-84406 create a new list for the case unsplittable collection. The
+    // below nss should now be allowed in case of unsplittable.
     /enxcol_\..*\.esc/,
     /enxcol_\..*\.ecc/,
     /enxcol_\..*\.ecoc/,
@@ -145,6 +147,19 @@ export var ShardingOverrideCommon = (function() {
         return db.runCommand(createCmd);
     }
 
+    /**
+     * @param {*} collection name as string
+     * @returns true if unsupported, false otherwise
+     */
+    function nssCanBeTrackedByShardingCatalog(nss) {
+        for (const ns of denylistedNamespaces) {
+            if (nss.match(ns)) {
+                return true
+            }
+        }
+        return false;
+    }
+
     // SERVER-83396 Get rid of this function
     function createUnsplittableCollectionOnRandomShard({db, collName, opts}) {
         let options = opts || {};
@@ -163,6 +178,7 @@ export var ShardingOverrideCommon = (function() {
     return {
         shardCollection: shardCollection,
         shardCollectionWithSpec: shardCollectionWithSpec,
+        nssCanBeTrackedByShardingCatalog: nssCanBeTrackedByShardingCatalog,
         createUnsplittableCollection: createUnsplittableCollection,
         // SERVER-83396 Get rid of this function
         createUnsplittableCollectionOnRandomShard: createUnsplittableCollectionOnRandomShard
