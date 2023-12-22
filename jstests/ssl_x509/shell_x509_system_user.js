@@ -3,10 +3,10 @@
 
 const x509Options = {
     clusterAuthMode: 'x509',
-    sslMode: 'requireSSL',
-    sslPEMKeyFile: 'jstests/libs/server.pem',
-    sslCAFile: 'jstests/libs/ca.pem',
-    sslAllowInvalidCertificates: '',
+    tlsMode: 'requireTLS',
+    tlsCertificateKeyFile: 'jstests/libs/server.pem',
+    tlsCAFile: 'jstests/libs/ca.pem',
+    tlsAllowInvalidCertificates: '',
 };
 
 const rst = new ReplSetTest({nodes: 1, nodeOptions: x509Options, waitForKeys: false});
@@ -41,9 +41,9 @@ const subShellCommands = async function() {
 const subShellArgs = [
     'mongo',
     '--ssl',
-    '--sslCAFile=jstests/libs/ca.pem',
-    '--sslPEMKeyFile=jstests/libs/server.pem',
-    '--sslAllowInvalidHostnames',
+    '--tlsCAFile=jstests/libs/ca.pem',
+    '--tlsCertificateKeyFile=jstests/libs/server.pem',
+    '--tlsAllowInvalidHostnames',
     '--authenticationDatabase=$external',
     '--authenticationMechanism=MONGODB-X509',
     primaryConnString,

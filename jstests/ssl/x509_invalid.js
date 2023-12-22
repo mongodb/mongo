@@ -1,4 +1,4 @@
-// Test X509 auth when --sslAllowInvalidCertificates is enabled
+// Test X509 auth when --tlsAllowInvalidCertificates is enabled
 
 const CLIENT_NAME = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
 const CLIENT_CERT = 'jstests/libs/client.pem';
@@ -22,10 +22,10 @@ function testClient(cert, name, shouldSucceed) {
     print("Starting mongod...");
     const conn = MongoRunner.runMongod({
         auth: '',
-        sslMode: 'requireSSL',
-        sslPEMKeyFile: SERVER_CERT,
-        sslCAFile: CA_CERT,
-        sslAllowInvalidCertificates: '',
+        tlsMode: 'requireTLS',
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsCAFile: CA_CERT,
+        tlsAllowInvalidCertificates: '',
     });
 
     print("Creating admin user...");
@@ -49,11 +49,11 @@ function testClient(cert, name, shouldSucceed) {
 
     const script = 'assert(db.getSiblingDB(\'$external\').auth(' + tojson(auth) + '));';
     const exitCode = runMongoProgram('mongo',
-                                     '--ssl',
-                                     '--sslAllowInvalidHostnames',
-                                     '--sslPEMKeyFile',
+                                     '--tls',
+                                     '--tlsAllowInvalidHostnames',
+                                     '--tlsCertificateKeyFile',
                                      cert,
-                                     '--sslCAFile',
+                                     '--tlsCAFile',
                                      CA_CERT,
                                      '--port',
                                      conn.port,

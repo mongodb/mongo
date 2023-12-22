@@ -3,7 +3,7 @@
  * in a sharded clutster can or cannot function
  */
 
-import {allowSSL, disabled, mixedShardTest, preferSSL} from "jstests/ssl/libs/ssl_helpers.js";
+import {allowTLS, disabled, mixedShardTest, preferTLS} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Due to mixed SSL mode settings, a shard will be unable to establish an outgoing
 // connection to the config server in order to load relevant collection UUIDs into
@@ -14,13 +14,13 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 print("=== Testing disabled cluster ===");
 mixedShardTest(disabled, disabled, true);
 
-print("=== Testing disabled/preferSSL cluster - SHOULD FAIL ===");
-mixedShardTest(disabled, preferSSL, false);
+print("=== Testing disabled/preferTLS cluster - SHOULD FAIL ===");
+mixedShardTest(disabled, preferTLS, false);
 
-print("=== Testing allowSSL/disabled cluster ===");
-mixedShardTest(disabled, allowSSL, true);
-mixedShardTest(allowSSL, disabled, true);
+print("=== Testing allowTLS/disabled cluster ===");
+mixedShardTest(disabled, allowTLS, true);
+mixedShardTest(allowTLS, disabled, true);
 
-print("=== Testing allowSSL/preferSSL cluster ===");
-mixedShardTest(preferSSL, allowSSL, true);
-mixedShardTest(allowSSL, preferSSL, true);
+print("=== Testing allowTLS/preferTLS cluster ===");
+mixedShardTest(preferTLS, allowTLS, true);
+mixedShardTest(allowTLS, preferTLS, true);

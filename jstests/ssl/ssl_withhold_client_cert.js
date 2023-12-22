@@ -41,8 +41,8 @@ const test_options = Object.extend({
 testRS(test_options, true);
 
 const depr_options = Object.extend({
-    sslAllowConnectionsWithoutCertificates: '',
-    setParameter: 'sslWithholdClientCertificate=true',
+    tlsAllowConnectionsWithoutCertificates: '',
+    setParameter: 'tlsWithholdClientCertificate=true',
 },
                                    base_options);
 

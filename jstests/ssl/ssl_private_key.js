@@ -9,10 +9,10 @@ function authAndTest(port) {
                                   "localhost",
                                   "--port",
                                   port,
-                                  "--ssl",
-                                  "--sslCAFile",
+                                  "--tls",
+                                  "--tlsCAFile",
                                   CA_CERT,
-                                  "--sslPEMKeyFile",
+                                  "--tlsCertificateKeyFile",
                                   CLIENT_CERT,
                                   "--eval",
                                   "1");
@@ -22,9 +22,9 @@ function authAndTest(port) {
 }
 
 const x509_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT
 };
 
 let mongo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));

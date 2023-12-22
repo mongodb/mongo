@@ -13,11 +13,11 @@ copyCertificateFile("jstests/libs/server.pem", dbPath + "/server-test.pem");
 // a node with new certificates.
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet({
-    sslMode: "requireSSL",
-    sslPEMKeyFile: dbPath + "/server-test.pem",
-    sslCAFile: dbPath + "/ca-test.pem",
-    sslClusterFile: dbPath + "/client-test.pem",
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: dbPath + "/server-test.pem",
+    tlsCAFile: dbPath + "/ca-test.pem",
+    tlsClusterFile: dbPath + "/client-test.pem",
+    tlsAllowInvalidHostnames: "",
 });
 
 rst.initiate();
@@ -32,11 +32,11 @@ for (let node of rst.nodes) {
 }
 
 const newnode = rst.add({
-    sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/trusted-server.pem",
-    sslCAFile: "jstests/libs/trusted-ca.pem",
-    sslClusterFile: "jstests/libs/trusted-client.pem",
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",
+    tlsCAFile: "jstests/libs/trusted-ca.pem",
+    tlsClusterFile: "jstests/libs/trusted-client.pem",
+    tlsAllowInvalidHostnames: "",
     // IMPORTANT: shell will not be able to talk to the new node due to cert rotation
     // therefore we set "waitForConnect:false" to ensure shell does not try to acess it
     waitForConnect: false,
@@ -48,13 +48,13 @@ assert.soon(() => {
     print(`Testing that ${host} is up`);
     return 0 ===
         runMongoProgram("mongo",
-                        "--ssl",
-                        "--sslAllowInvalidHostnames",
+                        "--tls",
+                        "--tlsAllowInvalidHostnames",
                         "--host",
                         host,
-                        "--sslPEMKeyFile",
+                        "--tlsCertificateKeyFile",
                         "jstests/libs/trusted-client.pem",
-                        "--sslCAFile",
+                        "--tlsCAFile",
                         "jstests/libs/trusted-ca.pem",
                         "--eval",
                         ";");
@@ -67,13 +67,13 @@ assert.soon(() => {
     print(`Waiting for ${host} to join replica set`);
     return 0 ===
         runMongoProgram("mongo",
-                        "--ssl",
-                        "--sslAllowInvalidHostnames",
+                        "--tls",
+                        "--tlsAllowInvalidHostnames",
                         "--host",
                         host,
-                        "--sslPEMKeyFile",
+                        "--tlsCertificateKeyFile",
                         "jstests/libs/trusted-client.pem",
-                        "--sslCAFile",
+                        "--tlsCAFile",
                         "jstests/libs/trusted-ca.pem",
                         "--eval",
                         `const PRIMARY = 1;
@@ -99,13 +99,13 @@ for (let node of rst.nodeList()) {
             assert.eq(0,
                       runMongoProgram(
                           "mongo",
-                          "--ssl",
-                          "--sslAllowInvalidHostnames",
+                          "--tls",
+                          "--tlsAllowInvalidHostnames",
                           "--host",
                           node,
-                          "--sslPEMKeyFile",
+                          "--tlsCertificateKeyFile",
                           "jstests/libs/trusted-client.pem",
-                          "--sslCAFile",
+                          "--tlsCAFile",
                           "jstests/libs/trusted-ca.pem",
                           "--eval",
                           `assert.commandWorked(db.adminCommand({replSetTestEgress: 1, target: "${

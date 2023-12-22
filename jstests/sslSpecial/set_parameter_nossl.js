@@ -1,15 +1,15 @@
-// Test changing the --sslMode and --clusterAuthMode
+// Test changing the --tlsMode and --clusterAuthMode
 // parameters using setParameter
 
 // setParameter should always fail since it
 // cannot be used to transition from disabled/keyFile modes
-function testTransition(newSSLMode, newClusterAuthMode) {
-    // If no parameters are given sslMode defaults to disabled
+function testTransition(newtlsMode, newClusterAuthMode) {
+    // If no parameters are given tlsMode defaults to disabled
     var conn = MongoRunner.runMongod({clusterAuthMode: "keyFile", keyFile: 'jstests/libs/key1'});
     var adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ["root"]});
     adminDB.auth("root", "pwd");
-    var res = adminDB.runCommand({"setParameter": 1, "sslMode": newSSLMode});
+    var res = adminDB.runCommand({"setParameter": 1, "tlsMode": newtlsMode});
     assert.commandFailedWithCode(res, ErrorCodes.BadValue);
 
     res = adminDB.runCommand({"setParameter": 1, "clusterAuthMode": newClusterAuthMode});
@@ -17,6 +17,6 @@ function testTransition(newSSLMode, newClusterAuthMode) {
     MongoRunner.stopMongod(conn);
 }
 
-testTransition("allowSSL", "sendKeyFile");
-testTransition("preferSSL", "sendX509");
-testTransition("requireSSL", "x509");
+testTransition("allowTLS", "sendKeyFile");
+testTransition("preferTLS", "sendX509");
+testTransition("requireTLS", "x509");

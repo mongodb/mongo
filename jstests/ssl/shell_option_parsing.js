@@ -3,15 +3,15 @@ const SERVER_CERT = "jstests/libs/server.pem";
 const CAFILE = "jstests/libs/ca.pem";
 
 var opts = {
-    sslMode: "allowSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslAllowInvalidCertificates: "",
-    sslAllowConnectionsWithoutCertificates: "",
-    sslCAFile: CAFILE,
+    tlsMode: "allowTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsAllowInvalidCertificates: "",
+    tlsAllowConnectionsWithoutCertificates: "",
+    tlsCAFile: CAFILE,
     setParameter: "authenticationMechanisms=MONGODB-X509,SCRAM-SHA-1"
 };
 
-var rst = new ReplSetTest({name: 'sslSet', nodes: 3, nodeOptions: opts});
+var rst = new ReplSetTest({name: 'tlsSet', nodes: 3, nodeOptions: opts});
 
 rst.startSet();
 rst.initiate();
@@ -38,9 +38,9 @@ function testConnect(expectPasswordPrompt, expectSuccess, ...args) {
         'newLineAfterPasswordPromptForTest=true',
         '--eval',
         ';',
-        '--ssl',
-        '--sslAllowInvalidHostnames',
-        '--sslCAFile',
+        '--tls',
+        '--tlsAllowInvalidHostnames',
+        '--tlsCAFile',
         CAFILE,
         ...args
     ];

@@ -9,11 +9,11 @@ const INVALID_CA = 'jstests/libs/trusted-ca.pem';
 
 function runTest(inbound, outbound) {
     const mongod = MongoRunner.runMongod({
-        sslMode: 'requireSSL',
-        sslAllowConnectionsWithoutCertificates: '',
-        sslPEMKeyFile: 'jstests/libs/server-intermediate-ca.pem',
-        sslCAFile: outbound,
-        sslClusterCAFile: inbound,
+        tlsMode: 'requireTLS',
+        tlsAllowConnectionsWithoutCertificates: '',
+        tlsCertificateKeyFile: 'jstests/libs/server-intermediate-ca.pem',
+        tlsCAFile: outbound,
+        tlsClusterCAFile: inbound,
     });
     assert(mongod);
     assert.commandWorked(mongod.getDB('admin').runCommand('serverStatus'));
@@ -30,10 +30,10 @@ runTest(VALID_CA, INVALID_CA);
 // Validate we can make a connection from the shell with the intermediate certs
 {
     const mongod = MongoRunner.runMongod({
-        sslMode: 'requireSSL',
-        sslAllowConnectionsWithoutCertificates: '',
-        sslPEMKeyFile: 'jstests/libs/server.pem',
-        sslCAFile: VALID_CA,
+        tlsMode: 'requireTLS',
+        tlsAllowConnectionsWithoutCertificates: '',
+        tlsCertificateKeyFile: 'jstests/libs/server.pem',
+        tlsCAFile: VALID_CA,
     });
     assert(mongod);
     assert.eq(mongod.getDB('admin').system.users.find({}).toArray(), []);
@@ -43,10 +43,10 @@ runTest(VALID_CA, INVALID_CA);
                                   "localhost",
                                   "--port",
                                   mongod.port,
-                                  "--ssl",
-                                  "--sslCAFile",
+                                  "--tls",
+                                  "--tlsCAFile",
                                   VALID_CA,
-                                  "--sslPEMKeyFile",
+                                  "--tlsCertificateKeyFile",
                                   "jstests/libs/server-intermediate-ca.pem",
                                   "--eval",
                                   "1;");
@@ -65,10 +65,10 @@ if (determineSSLProvider() === 'apple') {
 // files.
 {
     const mongod = MongoRunner.runMongod({
-        sslMode: 'requireSSL',
-        sslAllowConnectionsWithoutCertificates: '',
-        sslPEMKeyFile: 'jstests/libs/server-intermediate-leaf.pem',
-        sslCAFile: 'jstests/libs/intermediate-ca-chain.pem',
+        tlsMode: 'requireTLS',
+        tlsAllowConnectionsWithoutCertificates: '',
+        tlsCertificateKeyFile: 'jstests/libs/server-intermediate-leaf.pem',
+        tlsCAFile: 'jstests/libs/intermediate-ca-chain.pem',
     });
     assert(mongod);
     assert.eq(mongod.getDB('admin').system.users.find({}).toArray(), []);
@@ -78,10 +78,10 @@ if (determineSSLProvider() === 'apple') {
                                   "localhost",
                                   "--port",
                                   mongod.port,
-                                  "--ssl",
-                                  "--sslCAFile",
+                                  "--tls",
+                                  "--tlsCAFile",
                                   VALID_CA,
-                                  "--sslPEMKeyFile",
+                                  "--tlsCertificateKeyFile",
                                   "jstests/libs/client.pem",
                                   "--eval",
                                   "1;");

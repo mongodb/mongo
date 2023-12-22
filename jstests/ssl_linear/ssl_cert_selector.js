@@ -21,8 +21,8 @@ requireSSLProvider('windows', function() {
 
     try {
         const conn = MongoRunner.runMongod({
-            sslMode: 'requireSSL',
-            sslPEMKeyFile: "jstests\\libs\\trusted-server.pem",
+            tlsMode: 'requireTLS',
+            tlsCertificateKeyFile: "jstests\\libs\\trusted-server.pem",
             setParameter: {tlsUseSystemCA: true},
         });
 
@@ -31,7 +31,7 @@ requireSSLProvider('windows', function() {
             const argv = [
                 'mongo',
                 '--ssl',
-                '--sslCertificateSelector',
+                '--tlsCertificateSelector',
                 certSelector,
                 '--port',
                 conn.port,

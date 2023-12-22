@@ -23,18 +23,18 @@ copyCertificateFile("jstests/libs/server.pem", dbPath + "/server-test.pem");
 // Make sure that mongos can communicate with every connected host EXCEPT that shard before a
 // rotate, and make sure it can communicate with ONLY that shard after a rotate.
 const mongosOptions = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/server.pem",
-    sslCAFile: dbPath + "/ca-test.pem",
-    sslClusterFile: dbPath + "/client-test.pem",
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: "jstests/libs/server.pem",
+    tlsCAFile: dbPath + "/ca-test.pem",
+    tlsClusterFile: dbPath + "/client-test.pem",
+    tlsAllowInvalidHostnames: "",
 };
 
 const configOptions = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: dbPath + "/server-test.pem",
-    sslCAFile: dbPath + "/ca-test.pem",
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: dbPath + "/server-test.pem",
+    tlsCAFile: dbPath + "/ca-test.pem",
+    tlsAllowInvalidHostnames: "",
 };
 
 const sharding_config = {

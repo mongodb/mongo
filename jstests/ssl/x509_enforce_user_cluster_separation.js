@@ -77,9 +77,9 @@ function initUser(conn, user) {
 }
 
 const x509_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT
 };
 
 const mongodOptions =

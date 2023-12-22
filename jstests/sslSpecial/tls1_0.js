@@ -35,13 +35,13 @@ const supportsTLS1_3 = detectDefaultTLSProtocol() !== "TLS1_2";
 function test(serverDP, clientDP, shouldSucceed) {
     const expectLogMessage = !defaultEnableTLS1_0 && (serverDP === null);
     let serverOpts = {
-        sslMode: 'allowSSL',
-        sslPEMKeyFile: 'jstests/libs/server.pem',
-        sslCAFile: 'jstests/libs/ca.pem',
+        tlsMode: 'allowTLS',
+        tlsCertificateKeyFile: 'jstests/libs/server.pem',
+        tlsCAFile: 'jstests/libs/ca.pem',
         waitForConnect: true
     };
     if (serverDP !== null) {
-        serverOpts.sslDisabledProtocols = serverDP;
+        serverOpts.tlsDisabledProtocols = serverDP;
     }
     clearRawMongoProgramOutput();
     let mongod;
@@ -55,16 +55,16 @@ function test(serverDP, clientDP, shouldSucceed) {
 
     let clientOpts = [];
     if (clientDP !== null) {
-        clientOpts = ['--sslDisabledProtocols', clientDP];
+        clientOpts = ['--tlsDisabledProtocols', clientDP];
     }
     const didSucceed = (0 ==
                         runMongoProgram('mongo',
                                         '--ssl',
                                         '--port',
                                         mongod.port,
-                                        '--sslPEMKeyFile',
+                                        '--tlsCertificateKeyFile',
                                         'jstests/libs/client.pem',
-                                        '--sslCAFile',
+                                        '--tlsCAFile',
                                         'jstests/libs/ca.pem',
                                         ...clientOpts,
                                         '--eval',

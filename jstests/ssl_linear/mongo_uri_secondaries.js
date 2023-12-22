@@ -17,16 +17,16 @@ if (HOST_TYPE == "windows") {
 }
 try {
     const x509Options = {
-        sslMode: 'requireSSL',
-        sslPEMKeyFile: 'jstests/libs/trusted-server.pem',
-        sslCAFile: 'jstests/libs/trusted-ca.pem',
-        sslAllowInvalidCertificates: '',
-        sslWeakCertificateValidation: '',
+        tlsMode: 'requireTLS',
+        tlsCertificateKeyFile: 'jstests/libs/trusted-server.pem',
+        tlsCAFile: 'jstests/libs/trusted-ca.pem',
+        tlsAllowInvalidCertificates: '',
+        tlsWeakCertificateValidation: '',
     };
 
     const rst = new ReplSetTest({
         nodes: 2,
-        name: "sslSet",
+        name: "tlsSet",
         useHostName: false,
         nodeOptions: x509Options,
         waitForKeys: false
@@ -38,7 +38,7 @@ try {
         var Ms = [];
         for (let i = 0; i < 10; i++) {
             Ms.push(new Mongo("mongodb://" + hosts[0] + "," + hosts[1] +
-                              "/?ssl=true&replicaSet=sslSet"));
+                              "/?ssl=true&replicaSet=tlsSet"));
         }
 
         for (let i = 0; i < 10; i++) {

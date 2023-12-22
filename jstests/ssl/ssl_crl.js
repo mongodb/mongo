@@ -4,25 +4,25 @@
 // Note: crl_expired.pem is a CRL with no revoked certificates, but is an expired CRL.
 //       crl.pem is a CRL with no revoked certificates.
 
-import {SSLTest} from "jstests/libs/ssl_test.js";
+import {TLSTest} from "jstests/libs/ssl_test.js";
 import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 requireSSLProvider(['openssl', 'windows'], function() {
-    var testUnrevoked = new SSLTest(
+    var testUnrevoked = new TLSTest(
         // Server option overrides
         {
-            sslMode: "requireSSL",
-            sslCRLFile: "jstests/libs/crl.pem",
+            tlsMode: "requireTLS",
+            tlsCRLFile: "jstests/libs/crl.pem",
             setParameter: {enableTestCommands: 1}
         });
 
     assert(testUnrevoked.connectWorked());
 
-    var testRevoked = new SSLTest(
+    var testRevoked = new TLSTest(
         // Server option overrides
         {
-            sslMode: "requireSSL",
-            sslCRLFile: "jstests/libs/crl_expired.pem",
+            tlsMode: "requireTLS",
+            tlsCRLFile: "jstests/libs/crl_expired.pem",
             setParameter: {enableTestCommands: 1}
         });
 

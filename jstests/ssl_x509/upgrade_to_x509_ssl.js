@@ -1,6 +1,6 @@
 /**
  * This test checks the upgrade path for mixed mode ssl + x509 auth
- * from disabled/keyfiles up to preferSSL/x509
+ * from disabled/keyfiles up to preferTLS/x509
  *
  * NOTE: This test is similar to upgrade_to_x509_ssl_nossl.js in the
  * sslSpecial test suite. This test uses ssl communication
@@ -19,16 +19,16 @@ function authAllNodes() {
 }
 
 let opts = {
-    sslMode: "allowSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslAllowInvalidCertificates: "",
+    tlsMode: "allowTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsAllowInvalidCertificates: "",
     clusterAuthMode: "sendKeyFile",
     keyFile: KEYFILE,
-    sslCAFile: CA_CERT
+    tlsCAFile: CA_CERT
 };
 var NUM_NODES = 3;
 var rst = new ReplSetTest({
-    name: 'sslSet',
+    name: 'tlsSet',
     nodes: NUM_NODES,
     nodeOptions: opts,
     waitForKeys: false,
@@ -46,16 +46,16 @@ rstConn1.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"});
 rstConn1.getDB("test").a.insert({a: 1, str: "WOOPWOOPWOOPWOOPWOOP"});
 assert.eq(2, rstConn1.getDB("test").a.count(), "Error interacting with replSet");
 
-print("===== UPGRADE allowSSL,sendKeyfile -> preferSSL,sendX509 =====");
+print("===== UPGRADE allowTLS,sendKeyfile -> preferTLS,sendX509 =====");
 authAllNodes();
 rst.awaitReplication();
 rst.upgradeSet({
-    sslMode: "preferSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslAllowInvalidCertificates: "",
+    tlsMode: "preferTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsAllowInvalidCertificates: "",
     clusterAuthMode: "sendX509",
     keyFile: KEYFILE,
-    sslCAFile: CA_CERT
+    tlsCAFile: CA_CERT
 },
                "root",
                "pwd");
@@ -69,14 +69,14 @@ rst.awaitReplication();
 var canConnectNoSSL = runMongoProgram("mongo", "--port", rst.ports[0], "--eval", ";");
 assert.eq(0, canConnectNoSSL, "SSL Connection attempt failed when it should succeed");
 
-print("===== UPGRADE preferSSL,sendX509 -> requireSSL,x509 =====");
+print("===== UPGRADE preferTLS,sendX509 -> requireTLS,x509 =====");
 rst.upgradeSet({
-    sslMode: "requireSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslAllowInvalidCertificates: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsAllowInvalidCertificates: "",
     clusterAuthMode: "x509",
     keyFile: KEYFILE,
-    sslCAFile: CA_CERT
+    tlsCAFile: CA_CERT
 },
                "root",
                "pwd");

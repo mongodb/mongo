@@ -2,11 +2,11 @@
 // the sslSpecial test set. This test must be run with --use-ssl
 
 import {
-    allowSSL,
-    preferSSL,
+    allowTLS,
+    preferTLS,
     replShouldFail,
     replShouldSucceed,
-    requireSSL
+    requireTLS
 } from "jstests/ssl/libs/ssl_helpers.js";
 
 // Limit the amount of time we'll wait on a failure.
@@ -15,18 +15,18 @@ import {
 // give us a false negative, than a false positive.
 ReplSetTest.kDefaultTimeoutMS = 3 * 60 * 1000;
 
-// Verify that requireSSL allows ssl connections
-print("=== Testing requireSSL/requireSSL cluster ===");
-replShouldSucceed("require-require", requireSSL, requireSSL);
+// Verify that requireTLS allows ssl connections
+print("=== Testing requireTLS/requireTLS cluster ===");
+replShouldSucceed("require-require", requireTLS, requireTLS);
 
-// Test mixed sslMode allowSSL/preferSSL
-print("=== Testing allowSSL/preferSSL cluster ===");
-replShouldSucceed("allow-prefer", allowSSL, preferSSL);
+// Test mixed tlsMode allowTLS/preferTLS
+print("=== Testing allowTLS/preferTLS cluster ===");
+replShouldSucceed("allow-prefer", allowTLS, preferTLS);
 
-// Test mixed sslMode preferSSL/requireSSL
-print("=== Testing preferSSL/requireSSL cluster ===");
-replShouldSucceed("prefer-require", preferSSL, requireSSL);
+// Test mixed tlsMode preferTLS/requireTLS
+print("=== Testing preferTLS/requireTLS cluster ===");
+replShouldSucceed("prefer-require", preferTLS, requireTLS);
 
-// Test mixed sslMode disabled/preferSSL - should fail
-print("=== Testing allowSSL/requireSSL cluster - SHOULD FAIL ===");
-replShouldFail("allow-require", allowSSL, requireSSL);
+// Test mixed tlsMode disabled/preferTLS - should fail
+print("=== Testing allowTLS/requireTLS cluster - SHOULD FAIL ===");
+replShouldFail("allow-require", allowTLS, requireTLS);

@@ -74,7 +74,7 @@ function runTest(checkMongos,
 function runTests(checkMongos) {
     runTest(checkMongos,
             {
-                sslMode: 'requireSSL',
+                tlsMode: 'requireTLS',
                 tlsCertificateKeyFile: SERVER_CERT,
                 tlsCAFile: CA_CERT,
                 tlsClusterFile: CLUSTER_CERT,
@@ -90,7 +90,7 @@ function runTests(checkMongos) {
 
     runTest(checkMongos,
             {
-                sslMode: 'requireSSL',
+                tlsMode: 'requireTLS',
                 tlsCertificateKeyFile: SERVER_CERT,
                 tlsCAFile: CA_CERT,
                 tlsClusterFile: CLUSTER_CERT,
@@ -104,10 +104,10 @@ function runTests(checkMongos) {
 
     runTest(checkMongos,
             {
-                sslMode: 'requireSSL',
+                tlsMode: 'requireTLS',
                 tlsCertificateKeyFile: SERVER_CERT,
-                sslCAFile: CA_CERT,
-                sslCRLFile: CRL_FILE,
+                tlsCAFile: CA_CERT,
+                tlsCRLFile: CRL_FILE,
             },
             true,
             false,

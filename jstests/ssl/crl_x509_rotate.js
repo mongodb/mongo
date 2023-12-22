@@ -12,10 +12,10 @@ mkdir(dbPath);
 copyCertificateFile("jstests/libs/crl.pem", dbPath + "/crl-test.pem");
 
 const mongod = MongoRunner.runMongod({
-    sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/server.pem",
-    sslCAFile: "jstests/libs/ca.pem",
-    sslCRLFile: dbPath + "/crl-test.pem"
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: "jstests/libs/server.pem",
+    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCRLFile: dbPath + "/crl-test.pem"
 });
 
 const host = "localhost:" + mongod.port;
@@ -24,10 +24,10 @@ const host = "localhost:" + mongod.port;
 let out = runMongoProgram("mongo",
                           "--host",
                           host,
-                          "--ssl",
-                          "--sslPEMKeyFile",
+                          "--tls",
+                          "--tlsCertificateKeyFile",
                           "jstests/libs/client_revoked.pem",
-                          "--sslCAFile",
+                          "--tlsCAFile",
                           "jstests/libs/ca.pem",
                           "--eval",
                           ";");
@@ -42,10 +42,10 @@ assert.commandWorked(mongod.adminCommand({rotateCertificates: 1}));
 out = runMongoProgram("mongo",
                       "--host",
                       host,
-                      "--ssl",
-                      "--sslPEMKeyFile",
+                      "--tls",
+                      "--tlsCertificateKeyFile",
                       "jstests/libs/client_revoked.pem",
-                      "--sslCAFile",
+                      "--tlsCAFile",
                       "jstests/libs/ca.pem",
                       "--eval",
                       ";");
@@ -55,10 +55,10 @@ assert.neq(out, 0, "Mongo invocation did not fail");
 out = runMongoProgram("mongo",
                       "--host",
                       host,
-                      "--ssl",
-                      "--sslPEMKeyFile",
+                      "--tls",
+                      "--tlsCertificateKeyFile",
                       "jstests/libs/client.pem",
-                      "--sslCAFile",
+                      "--tlsCAFile",
                       "jstests/libs/ca.pem",
                       "--eval",
                       ";");

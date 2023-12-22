@@ -9,9 +9,9 @@ copyCertificateFile("jstests/libs/ca.pem", dbPath + "/ca-test.pem");
 copyCertificateFile("jstests/libs/server.pem", dbPath + "/server-test.pem");
 
 const mongod = MongoRunner.runMongod({
-    sslMode: "requireSSL",
-    sslPEMKeyFile: dbPath + "/server-test.pem",
-    sslCAFile: dbPath + "/ca-test.pem"
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: dbPath + "/server-test.pem",
+    tlsCAFile: dbPath + "/ca-test.pem"
 });
 
 // Rotate in new certificates
@@ -28,10 +28,10 @@ const host = "localhost:" + mongod.port;
 let out = runMongoProgram("mongo",
                           "--host",
                           host,
-                          "--ssl",
-                          "--sslPEMKeyFile",
+                          "--tls",
+                          "--tlsCertificateKeyFile",
                           "jstests/libs/client.pem",
-                          "--sslCAFile",
+                          "--tlsCAFile",
                           "jstests/libs/ca.pem",
                           "--eval",
                           ";");
@@ -41,10 +41,10 @@ assert.neq(out, 0, "Mongo invocation did not fail");
 out = runMongoProgram("mongo",
                       "--host",
                       host,
-                      "--ssl",
-                      "--sslPEMKeyFile",
+                      "--tls",
+                      "--tlsCertificateKeyFile",
                       "jstests/libs/trusted-client.pem",
-                      "--sslCAFile",
+                      "--tlsCAFile",
                       "jstests/libs/trusted-ca.pem",
                       "--eval",
                       ";");

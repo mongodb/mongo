@@ -7,9 +7,9 @@ const CLIENT_CERT = "jstests/libs/client.pem";
 // address.
 var hasIpv6 = true;
 const mongodHasIpv6 = MongoRunner.runMongod({
-    sslMode: "requireSSL",
-    sslPEMKeyFile: SERVER1_CERT,
-    sslCAFile: CA_CERT,
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: SERVER1_CERT,
+    tlsCAFile: CA_CERT,
     ipv6: "",
     bind_ip: "::1,127.0.0.1"
 });
@@ -28,10 +28,10 @@ function authAndTest(cert_option) {
             host,
             "--port",
             port,
-            "--ssl",
-            "--sslCAFile",
+            "--tls",
+            "--tlsCAFile",
             CA_CERT,
-            "--sslPEMKeyFile",
+            "--tlsCertificateKeyFile",
             CLIENT_CERT,
             "--eval",
             ";"
@@ -46,7 +46,7 @@ function authAndTest(cert_option) {
         assert.eq(0, mongo, "Connection succeeded");
     }
 
-    const x509_options = {sslMode: "requireSSL", sslCAFile: CA_CERT, bind_ip_all: ""};
+    const x509_options = {tlsMode: "requireTLS", tlsCAFile: CA_CERT, bind_ip_all: ""};
 
     if (hasIpv6) {
         Object.extend(x509_options, {ipv6: ""});
@@ -64,6 +64,6 @@ function authAndTest(cert_option) {
 }
 
 print("1. Test parsing different values in SAN DNS and IP fields. ");
-authAndTest({sslPEMKeyFile: SERVER1_CERT});
+authAndTest({tlsCertificateKeyFile: SERVER1_CERT});
 print("2. Test parsing IP Addresses in SAN DNS fields. ");
-authAndTest({sslPEMKeyFile: SERVER2_CERT});
+authAndTest({tlsCertificateKeyFile: SERVER2_CERT});

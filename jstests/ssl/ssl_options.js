@@ -8,11 +8,11 @@ requireSSLProvider('openssl', function() {
     jsTest.log("Testing censorship of ssl options");
 
     const mongodConfig = {
-        sslPEMKeyFile: "jstests/libs/password_protected.pem",
-        sslMode: "requireSSL",
-        sslPEMKeyPassword: "qwerty",
-        sslClusterPassword: "qwerty",
-        sslCAFile: "jstests/libs/ca.pem"
+        tlsCertificateKeyFile: "jstests/libs/password_protected.pem",
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFilePassword: "qwerty",
+        tlsClusterPassword: "qwerty",
+        tlsCAFile: "jstests/libs/ca.pem"
     };
     const mongodSource = MongoRunner.runMongod(mongodConfig);
 
@@ -29,8 +29,8 @@ requireSSLProvider('openssl', function() {
             continue;
         }
 
-        if (getCmdLineOptsResult.argv[i] === "--sslPEMKeyPassword" ||
-            getCmdLineOptsResult.argv[i] === "--sslClusterPassword") {
+        if (getCmdLineOptsResult.argv[i] === "--tlsPEMKeyPassword" ||
+            getCmdLineOptsResult.argv[i] === "--tlsClusterPassword") {
             isPassword = true;
         }
     }

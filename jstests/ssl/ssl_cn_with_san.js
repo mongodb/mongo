@@ -8,9 +8,9 @@ const CA = 'jstests/libs/ca.pem';
 const SERVER = 'jstests/ssl/libs/localhost-cn-with-san.pem';
 
 const mongod = MongoRunner.runMongod({
-    sslMode: 'requireSSL',
-    sslPEMKeyFile: SERVER,
-    sslCAFile: CA,
+    tlsMode: 'requireTLS',
+    tlsCertificateKeyFile: SERVER,
+    tlsCAFile: CA,
 });
 assert(mongod);
 

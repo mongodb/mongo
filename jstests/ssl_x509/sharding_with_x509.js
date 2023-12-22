@@ -3,11 +3,11 @@
 import {findMatchingLogLine} from "jstests/libs/log.js";
 
 const x509_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/server.pem",
-    sslCAFile: "jstests/libs/ca.pem",
-    sslClusterFile: "jstests/libs/cluster_cert.pem",
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: "jstests/libs/server.pem",
+    tlsCAFile: "jstests/libs/ca.pem",
+    tlsClusterFile: "jstests/libs/cluster_cert.pem",
+    tlsAllowInvalidHostnames: "",
     clusterAuthMode: "x509"
 };
 

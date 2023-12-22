@@ -4,10 +4,10 @@ var CLIENT_CERT = "jstests/libs/client.pem";
 var BAD_SAN_CERT = "jstests/libs/badSAN.pem";
 
 var mongod = MongoRunner.runMongod({
-    sslMode: "requireSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT,
-    sslClusterFile: BAD_SAN_CERT
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT,
+    tlsClusterFile: BAD_SAN_CERT
 });
 
 var mongo = runMongoProgram("mongo",
@@ -15,10 +15,10 @@ var mongo = runMongoProgram("mongo",
                             "localhost",
                             "--port",
                             mongod.port,
-                            "--ssl",
-                            "--sslCAFile",
+                            "--tls",
+                            "--tlsCAFile",
                             CA_CERT,
-                            "--sslPEMKeyFile",
+                            "--tlsCertificateKeyFile",
                             CLIENT_CERT,
                             "--eval",
                             ";");
@@ -27,5 +27,5 @@ var mongo = runMongoProgram("mongo",
 assert.eq(
     0,
     mongo,
-    "Connection attempt failed when an irrelevant sslClusterFile was provided to the server!");
+    "Connection attempt failed when an irrelevant tlsClusterFile was provided to the server!");
 MongoRunner.stopMongod(mongod);

@@ -72,8 +72,8 @@ var replTest = new ReplSetTest({
     name: "splitHorizontest",
     nodes: 2,
     nodeOptions: {
-        sslMode: "requireSSL",
-        sslPEMKeyFile: "jstests/libs/splithorizon-server.pem",
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: "jstests/libs/splithorizon-server.pem",
         setParameter: {tlsUseSystemCA: true},
     },
     host: "localhost",

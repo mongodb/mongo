@@ -3,10 +3,10 @@
 import {determineSSLProvider, sslProviderSupportsTLS1_1} from "jstests/ssl/libs/ssl_helpers.js";
 
 const clientOptions = [
-    "--ssl",
-    "--sslPEMKeyFile",
+    "--tls",
+    "--tlsCertificateKeyFile",
     "jstests/libs/client.pem",
-    "--sslCAFile",
+    "--tlsCAFile",
     "jstests/libs/ca.pem",
     "--eval",
     ";"
@@ -37,10 +37,10 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
     }
 
     var md = MongoRunner.runMongod({
-        sslMode: "requireSSL",
-        sslCAFile: "jstests/libs/ca.pem",
-        sslPEMKeyFile: "jstests/libs/server.pem",
-        sslDisabledProtocols: serverDisabledProtos,
+        tlsMode: "requireTLS",
+        tlsCAFile: "jstests/libs/ca.pem",
+        tlsCertificateKeyFile: "jstests/libs/server.pem",
+        tlsDisabledProtocols: serverDisabledProtos,
     });
 
     let mongoOutput;
@@ -51,7 +51,7 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
                         "--port",
                         md.port,
                         ...clientOptions,
-                        "--sslDisabledProtocols",
+                        "--tlsDisabledProtocols",
                         clientDisabledProtos);
         mongoOutput = rawMongoProgramOutput();
         return mongoOutput.match(expectedRegex);

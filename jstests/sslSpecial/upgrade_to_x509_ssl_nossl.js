@@ -1,6 +1,6 @@
 /**
  * This test checks the upgrade path for mixed mode ssl + x509 auth
- * from disabled/keyfiles up to preferSSL/x509
+ * from disabled/keyfiles up to preferTLS/x509
  *
  * NOTE: This test is similar to upgrade_to_x509_ssl.js in the
  * ssl test suite. This test cannot use ssl communication
@@ -19,12 +19,12 @@ import {CA_CERT, CLIENT_CERT, KEYFILE, SERVER_CERT} from "jstests/ssl/libs/ssl_h
 const wcMajorityJournalDefault = jsTestOptions().storageEngine != "inMemory";
 
 const opts = {
-    sslMode: "disabled",
+    tlsMode: "disabled",
     clusterAuthMode: "keyFile",
 };
 const NUM_NODES = 3;
 const rst = new ReplSetTest(
-    {name: 'sslSet', nodes: NUM_NODES, waitForKeys: false, keyFile: KEYFILE, nodeOptions: opts});
+    {name: 'tlsSet', nodes: NUM_NODES, waitForKeys: false, keyFile: KEYFILE, nodeOptions: opts});
 rst.startSet();
 
 // ReplSetTest.initiate() requires all nodes to be to be authorized to run replSetGetStatus.
@@ -69,8 +69,8 @@ function upgradeWriteAndConnect(newOpts, str) {
                               "--port",
                               rst.ports[0],
                               "--ssl",
-                              "--sslAllowInvalidCertificates",
-                              "--sslPEMKeyFile",
+                              "--tlsAllowInvalidCertificates",
+                              "--tlsCertificateKeyFile",
                               CLIENT_CERT,
                               "--eval",
                               ";"),
@@ -79,37 +79,37 @@ function upgradeWriteAndConnect(newOpts, str) {
 
 testWrite(rst.getPrimary(), 'TESTTESTTEST');
 
-jsTest.log("===== UPGRADE disabled,keyFile -> allowSSL,sendKeyfile =====");
+jsTest.log("===== UPGRADE disabled,keyFile -> allowTLS,sendKeyfile =====");
 upgradeAndWrite({
-    sslMode: "allowSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslAllowInvalidCertificates: "",
+    tlsMode: "allowTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsAllowInvalidCertificates: "",
     clusterAuthMode: "sendKeyFile",
     keyFile: KEYFILE,
-    sslCAFile: CA_CERT
+    tlsCAFile: CA_CERT
 },
                 'CHECKCHECKCHECK');
 
-jsTest.log("===== UPGRADE allowSSL,sendKeyfile -> preferSSL,sendX509 =====");
+jsTest.log("===== UPGRADE allowTLS,sendKeyfile -> preferTLS,sendX509 =====");
 upgradeWriteAndConnect({
-    sslMode: "preferSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslAllowInvalidCertificates: "",
+    tlsMode: "preferTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsAllowInvalidCertificates: "",
     clusterAuthMode: "sendX509",
     keyFile: KEYFILE,
-    sslCAFile: CA_CERT
+    tlsCAFile: CA_CERT
 },
                        'PEASandCARROTS');
 
-jsTest.log("===== UPGRADE preferSSL,sendX509 -> preferSSL,x509 =====");
-// we cannot upgrade past preferSSL here because it will break the test client
+jsTest.log("===== UPGRADE preferTLS,sendX509 -> preferTLS,x509 =====");
+// we cannot upgrade past preferTLS here because it will break the test client
 upgradeWriteAndConnect({
-    sslMode: "preferSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslAllowInvalidCertificates: "",
+    tlsMode: "preferTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsAllowInvalidCertificates: "",
     clusterAuthMode: "x509",
     keyFile: KEYFILE,
-    sslCAFile: CA_CERT
+    tlsCAFile: CA_CERT
 },
                        'BEEP BOOP');
 

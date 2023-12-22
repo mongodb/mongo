@@ -8,18 +8,18 @@ var CA_CERT = "jstests/libs/ca.pem";
 function runTestWithoutSubset(subset) {
     const disabledProtocols = subset.join(",");
     const conn = MongoRunner.runMongod({
-        sslMode: 'allowSSL',
-        sslPEMKeyFile: SERVER_CERT,
-        sslDisabledProtocols: disabledProtocols,
+        tlsMode: 'allowTLS',
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsDisabledProtocols: disabledProtocols,
         tlsCAFile: CA_CERT
     });
 
     const exitStatus = runMongoProgram('mongo',
-                                       '--ssl',
-                                       '--sslAllowInvalidHostnames',
-                                       '--sslPEMKeyFile',
+                                       '--tls',
+                                       '--tlsAllowInvalidHostnames',
+                                       '--tlsCertificateKeyFile',
                                        CLIENT_CERT,
-                                       '--sslCAFile',
+                                       '--tlsCAFile',
                                        CA_CERT,
                                        '--port',
                                        conn.port,

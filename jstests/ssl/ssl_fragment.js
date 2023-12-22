@@ -18,19 +18,19 @@ function runTest(conn) {
 }
 
 let options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/server.pem",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: "jstests/libs/server.pem",
     networkMessageCompressors: 'disabled',
     tlsCAFile: 'jstests/libs/ca.pem',
-    sslAllowInvalidCertificates: ""
+    tlsAllowInvalidCertificates: ""
 };
 
 let mongosOptions = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/server.pem",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: "jstests/libs/server.pem",
     networkMessageCompressors: 'disabled',
     tlsCAFile: 'jstests/libs/ca.pem',
-    sslAllowInvalidCertificates: ""
+    tlsAllowInvalidCertificates: ""
 };
 
 if (_isWindows()) {

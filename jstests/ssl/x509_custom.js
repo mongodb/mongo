@@ -8,11 +8,11 @@ function testClient(conn, name) {
     const script = 'assert(db.getSiblingDB(\'$external\').auth(' + tojson(auth) + '));';
     clearRawMongoProgramOutput();
     const exitCode = runMongoProgram('mongo',
-                                     '--ssl',
-                                     '--sslAllowInvalidHostnames',
-                                     '--sslPEMKeyFile',
+                                     '--tls',
+                                     '--tlsAllowInvalidHostnames',
+                                     '--tlsCertificateKeyFile',
                                      'jstests/libs/client-custom-oids.pem',
-                                     '--sslCAFile',
+                                     '--tlsCAFile',
                                      'jstests/libs/ca.pem',
                                      '--port',
                                      conn.port,
@@ -39,12 +39,12 @@ function runTest(conn) {
 // Standalone.
 const mongod = MongoRunner.runMongod({
     auth: '',
-    sslMode: 'requireSSL',
+    tlsMode: 'requireTLS',
     // Server PEM file is server.pem to match the shell's ca.pem.
-    sslPEMKeyFile: 'jstests/libs/server.pem',
+    tlsCertificateKeyFile: 'jstests/libs/server.pem',
     // Server CA file is non-expiring-ca.pem to match the shell's client-custom-oids.pem.
-    sslCAFile: 'jstests/libs/non-expiring-ca.pem',
-    sslAllowInvalidCertificates: '',
+    tlsCAFile: 'jstests/libs/non-expiring-ca.pem',
+    tlsAllowInvalidCertificates: '',
 });
 runTest(mongod);
 MongoRunner.stopMongod(mongod);

@@ -6,10 +6,10 @@ requireSSLProvider('apple', function() {
     jsTest.log("Verifying that mongod will fail to start using an encrypted PEM file");
 
     const config = MongoRunner.mongodOptions({
-        sslPEMKeyFile: "jstests/libs/password_protected.pem",
-        sslMode: "requireSSL",
-        sslPEMKeyPassword: "qwerty",
-        sslCAFile: "jstests/libs/ca.pem",
+        tlsCertificateKeyFile: "jstests/libs/password_protected.pem",
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFilePassword: "qwerty",
+        tlsCAFile: "jstests/libs/ca.pem",
     });
 
     assert.throws(() => MongoRunner.runMongod(config), [], "MongoD unexpectedly started up");

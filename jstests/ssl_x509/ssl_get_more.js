@@ -1,7 +1,7 @@
-import {CLUSTER_CERT, requireSSL} from "jstests/ssl/libs/ssl_helpers.js";
+import {CLUSTER_CERT, requireTLS} from "jstests/ssl/libs/ssl_helpers.js";
 
 const x509_options =
-    Object.extend(requireSSL, {sslClusterFile: CLUSTER_CERT, clusterAuthMode: "x509"});
+    Object.extend(requireTLS, {tlsClusterFile: CLUSTER_CERT, clusterAuthMode: "x509"});
 
 const st = new ShardingTest({
     shards: 1,

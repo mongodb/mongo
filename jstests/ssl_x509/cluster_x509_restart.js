@@ -8,12 +8,12 @@ const rst = new ReplSetTest({
     nodes: 3,
     waitForKeys: false,
     nodeOptions: {
-        sslMode: "requireSSL",
+        tlsMode: "requireTLS",
         clusterAuthMode: "x509",
         keyFile: "jstests/libs/key1",
-        sslPEMKeyFile: "jstests/libs/server.pem",
-        sslCAFile: "jstests/libs/ca.pem",
-        sslAllowInvalidHostnames: ""
+        tlsCertificateKeyFile: "jstests/libs/server.pem",
+        tlsCAFile: "jstests/libs/ca.pem",
+        tlsAllowInvalidHostnames: ""
     }
 });
 rst.startSet();

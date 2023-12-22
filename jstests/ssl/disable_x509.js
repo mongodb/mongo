@@ -4,9 +4,9 @@ var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=c
 
 var conn = MongoRunner.runMongod({
     auth: "",
-    sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/server.pem",
-    sslCAFile: "jstests/libs/ca.pem"
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: "jstests/libs/server.pem",
+    tlsCAFile: "jstests/libs/ca.pem"
 });
 
 // Find out if this build supports the authenticationMechanisms startup parameter.

@@ -1,4 +1,4 @@
-// Test for startuo warning when X509 auth and sslAllowInvalidCertificates are enabled
+// Test for startuo warning when X509 auth and tlsAllowInvalidCertificates are enabled
 
 function runTest(checkMongos, opts, expectWarningCertifcates, expectWarningHostnames) {
     clearRawMongoProgramOutput();
@@ -13,9 +13,9 @@ function runTest(checkMongos, opts, expectWarningCertifcates, expectWarningHostn
     } else {
         mongo = MongoRunner.runMongod(Object.assign({
             auth: '',
-            sslMode: 'preferSSL',
-            sslPEMKeyFile: 'jstests/libs/server.pem',
-            sslCAFile: 'jstests/libs/ca.pem',
+            tlsMode: 'preferTLS',
+            tlsCertificateKeyFile: 'jstests/libs/server.pem',
+            tlsCAFile: 'jstests/libs/ca.pem',
             waitForConnect: false,
         },
                                                     opts));
@@ -41,14 +41,14 @@ function runTests(checkMongos) {
     runTest(checkMongos, {}, false, false);
 
     // Do expect a warning for certificates when we're combining options.
-    runTest(checkMongos, {sslAllowInvalidCertificates: ''}, true, false);
+    runTest(checkMongos, {tlsAllowInvalidCertificates: ''}, true, false);
 
     // Do expect a warning for hostnames.
-    runTest(checkMongos, {sslAllowInvalidHostnames: ''}, false, true);
+    runTest(checkMongos, {tlsAllowInvalidHostnames: ''}, false, true);
 
     // Do expect a warning for certificates and hostnames.
     runTest(
-        checkMongos, {sslAllowInvalidCertificates: '', sslAllowInvalidHostnames: ''}, true, true);
+        checkMongos, {tlsAllowInvalidCertificates: '', tlsAllowInvalidHostnames: ''}, true, true);
 }
 
 // Run tests on mongos

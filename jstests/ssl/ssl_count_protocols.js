@@ -27,24 +27,24 @@ function runTestWithoutSubset(client) {
     print(tojson(expectedCounts));
 
     const conn = MongoRunner.runMongod({
-        sslMode: 'allowSSL',
-        sslPEMKeyFile: SERVER_CERT,
-        sslDisabledProtocols: 'none',
+        tlsMode: 'allowTLS',
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsDisabledProtocols: 'none',
         useLogFiles: true,
         tlsLogVersions: "TLS1_0,TLS1_1,TLS1_2,TLS1_3",
         tlsCAFile: CA_CERT
     });
 
     const exitStatus = runMongoProgram('mongo',
-                                       '--ssl',
-                                       '--sslAllowInvalidHostnames',
-                                       '--sslPEMKeyFile',
+                                       '--tls',
+                                       '--tlsAllowInvalidHostnames',
+                                       '--tlsCertificateKeyFile',
                                        CLIENT_CERT,
-                                       '--sslCAFile',
+                                       '--tlsCAFile',
                                        CA_CERT,
                                        '--port',
                                        conn.port,
-                                       '--sslDisabledProtocols',
+                                       '--tlsDisabledProtocols',
                                        disabledProtocols.join(","),
                                        '--eval',
                                        // The Javascript string "1.0" is implicitly converted to the

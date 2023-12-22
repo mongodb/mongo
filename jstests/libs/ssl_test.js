@@ -1,7 +1,7 @@
-// The SSLTest class is used to check if a shell with a certain SSL configuration
-// can be used to connect to a server with a given SSL configuration.
-// This is necessary because SSL settings are currently process global - so if the mongo shell
-// started by resmoke.py has an SSL configuration that's incompatible with a server created with
+// The TLSTest class is used to check if a shell with a certain TLS configuration
+// can be used to connect to a server with a given TLS configuration.
+// This is necessary because TLS settings are currently process global - so if the mongo shell
+// started by resmoke.py has an TLS configuration that's incompatible with a server created with
 // MongoRunner, it will not be able to connect to it.
 
 /**
@@ -11,26 +11,26 @@
  * The 'serverOpts' and 'clientOpts' objects are in the form of
  * {'cmdLineParam': 'value', ...}. For flag arguments, the empty string is used as the value.
  *
- * For serverOpts a few defaults are set if values are not provided: specifically 'sslMode'
- * (preferSSL), sslPEMKeyFile ("jstests/libs/server.pem"), and sslCAFile
+ * For serverOpts a few defaults are set if values are not provided: specifically 'tlsMode'
+ * (preferTLS), tlsCertificateKeyFile ("jstests/libs/server.pem"), and tlsCAFile
  * "jstests/libs/ca.pem").
  */
-export function SSLTest(serverOpts, clientOpts) {
+export function TLSTest(serverOpts, clientOpts) {
     var canonicalServerOpts = function(userProvidedOpts) {
         var canonical = Object.extend({}, userProvidedOpts || {});
 
-        if (!canonical.hasOwnProperty("sslMode")) {
-            canonical.sslMode = "preferSSL";
-        } else if (canonical.sslMode === "disabled") {
-            // should not add further options if SSL is disabled
+        if (!canonical.hasOwnProperty("tlsMode")) {
+            canonical.tlsMode = "preferTLS";
+        } else if (canonical.tlsMode === "disabled") {
+            // should not add further options if TLS is disabled
             return canonical;
         }
 
-        if (!canonical.hasOwnProperty("sslPEMKeyFile")) {
-            canonical.sslPEMKeyFile = "jstests/libs/server.pem";
+        if (!canonical.hasOwnProperty("tlsCertificateKeyFile")) {
+            canonical.tlsCertificateKeyFile = "jstests/libs/server.pem";
         }
-        if (!canonical.hasOwnProperty("sslCAFile")) {
-            canonical.sslCAFile = "jstests/libs/ca.pem";
+        if (!canonical.hasOwnProperty("tlsCAFile")) {
+            canonical.tlsCAFile = "jstests/libs/ca.pem";
         }
         return canonical;
     };
@@ -39,24 +39,24 @@ export function SSLTest(serverOpts, clientOpts) {
     this.port = this.serverOpts.port;
     resetDbpath(this.serverOpts.dbpath);
 
-    this.clientOpts = Object.extend({}, clientOpts || this.defaultSSLClientOptions);
+    this.clientOpts = Object.extend({}, clientOpts || this.defaultTLSClientOptions);
     this.clientOpts.port = this.port;
 }
 
 /**
- * The default shell arguments for a shell with SSL enabled.
+ * The default shell arguments for a shell with TLS enabled.
  */
-SSLTest.prototype.defaultSSLClientOptions = {
-    "ssl": "",
-    "sslPEMKeyFile": "jstests/libs/client.pem",
-    "sslAllowInvalidCertificates": "",
+TLSTest.prototype.defaultTLSClientOptions = {
+    "tls": "",
+    "tlsCertificateKeyFile": "jstests/libs/client.pem",
+    "tlsAllowInvalidCertificates": "",
     "eval": ";"  // prevent the shell from entering interactive mode
 };
 
 /**
- * The default shell arguments for a shell without SSL enabled.
+ * The default shell arguments for a shell without TLS enabled.
  */
-SSLTest.prototype.noSSLClientOptions = {
+TLSTest.prototype.noTLSClientOptions = {
     eval: ";"  // prevent the shell from entering interactive mode
 };
 
@@ -65,7 +65,7 @@ SSLTest.prototype.noSSLClientOptions = {
  * connect with a shell created with the configured options. Returns whether a connection
  * was successfully established.
  */
-SSLTest.prototype.connectWorked = function() {
+TLSTest.prototype.connectWorked = function() {
     var connectTimeoutMillis = 3 * 60 * 1000;
 
     var serverArgv = MongoRunner.arrOptions("mongod", this.serverOpts);

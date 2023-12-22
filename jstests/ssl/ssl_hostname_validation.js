@@ -11,42 +11,42 @@ var NOSUBJ_NOSAN_CERT = "jstests/libs/server_no_subject_no_SAN.pem";
 
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
     jsTestLog("Testing certificate: " + JSON.stringify(arguments));
-    var mongod =
-        MongoRunner.runMongod({sslMode: "requireSSL", sslPEMKeyFile: certPath, sslCAFile: CA_CERT});
+    var mongod = MongoRunner.runMongod(
+        {tlsMode: "requireTLS", tlsCertificateKeyFile: certPath, tlsCAFile: CA_CERT});
 
     var mongo;
     if (allowInvalidCert) {
         mongo = runMongoProgram("mongo",
                                 "--port",
                                 mongod.port,
-                                "--ssl",
-                                "--sslCAFile",
+                                "--tls",
+                                "--tlsCAFile",
                                 CA_CERT,
-                                "--sslPEMKeyFile",
+                                "--tlsCertificateKeyFile",
                                 CLIENT_CERT,
-                                "--sslAllowInvalidCertificates",
+                                "--tlsAllowInvalidCertificates",
                                 "--eval",
                                 ";");
     } else if (allowInvalidHost) {
         mongo = runMongoProgram("mongo",
                                 "--port",
                                 mongod.port,
-                                "--ssl",
-                                "--sslCAFile",
+                                "--tls",
+                                "--tlsCAFile",
                                 CA_CERT,
-                                "--sslPEMKeyFile",
+                                "--tlsCertificateKeyFile",
                                 CLIENT_CERT,
-                                "--sslAllowInvalidHostnames",
+                                "--tlsAllowInvalidHostnames",
                                 "--eval",
                                 ";");
     } else {
         mongo = runMongoProgram("mongo",
                                 "--port",
                                 mongod.port,
-                                "--ssl",
-                                "--sslCAFile",
+                                "--tls",
+                                "--tlsCAFile",
                                 CA_CERT,
-                                "--sslPEMKeyFile",
+                                "--tlsCertificateKeyFile",
                                 CLIENT_CERT,
                                 "--eval",
                                 ";");
@@ -89,10 +89,10 @@ TestData.skipCheckDBHashes = true;
 
 // 2. Initiate ReplSetTest with invalid certs
 let ssl_options = {
-    sslMode: "requireSSL",
+    tlsMode: "requireTLS",
     // SERVER_CERT has SAN=localhost. CLIENT_CERT is exact same except no SANS
-    sslPEMKeyFile: CLIENT_CERT,
-    sslCAFile: CA_CERT
+    tlsCertificateKeyFile: CLIENT_CERT,
+    tlsCAFile: CA_CERT
 };
 
 replTest = new ReplSetTest({nodes: {node0: ssl_options, node1: ssl_options}});
@@ -114,10 +114,10 @@ TestData.skipCheckDBHashes = false;
 
 // 3. Initiate ReplSetTest with invalid certs but set allowInvalidHostnames
 ssl_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT,
-    sslAllowInvalidHostnames: ""
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT,
+    tlsAllowInvalidHostnames: ""
 };
 
 var replTest = new ReplSetTest({nodes: {node0: ssl_options, node1: ssl_options}});
@@ -127,11 +127,11 @@ replTest.stopSet();
 
 // 4. Initiate ReplSetTest with invalid certs but set allowInvalidCertificates
 ssl_options = {
-    sslMode: "requireSSL",
+    tlsMode: "requireTLS",
     // SERVER_CERT has SAN=localhost. CLIENT_CERT is exact same except no SANS
-    sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT,
-    sslAllowInvalidCertificates: ""
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT,
+    tlsAllowInvalidCertificates: ""
 };
 
 replTest = new ReplSetTest({nodes: {node0: ssl_options, node1: ssl_options}});

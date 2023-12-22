@@ -1,5 +1,5 @@
 /**
- * This test checks the upgrade path from noauth/allowSSL to x509/requireSSL
+ * This test checks the upgrade path from noauth/allowTLS to x509/requireTLS
  *
  * NOTE: This test is similar to upgrade_noauth_to_x509_ssl.js in the ssl test
  * suite. This test cannot use ssl communication and therefore cannot test
@@ -9,7 +9,7 @@
  * @tags: [requires_persistence]
  */
 
-import {allowSSL} from "jstests/ssl/libs/ssl_helpers.js";
+import {allowTLS} from "jstests/ssl/libs/ssl_helpers.js";
 
 var dbName = 'upgradeToX509';
 
@@ -17,8 +17,8 @@ var dbName = 'upgradeToX509';
 var noAuth = {noauth: ''};
 
 // Undefine the flags we're replacing, otherwise upgradeSet will keep old values.
-var transitionToX509AllowSSL =
-    Object.merge(allowSSL, {noauth: undefined, transitionToAuth: '', clusterAuthMode: 'x509'});
+var transitionToX509allowTLS =
+    Object.merge(allowTLS, {noauth: undefined, transitionToAuth: '', clusterAuthMode: 'x509'});
 
 var rst = new ReplSetTest({name: 'noauthSet', nodes: 3, nodeOptions: noAuth});
 rst.startSet();
@@ -28,8 +28,8 @@ var testDB = rst.getPrimary().getDB(dbName);
 assert.commandWorked(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
 assert.eq(1, testDB.a.find().itcount(), 'Error interacting with replSet');
 
-print('=== UPGRADE no-auth/no-ssl -> transition to X509/allowSSL ===');
-rst.upgradeSet(transitionToX509AllowSSL);
+print('=== UPGRADE no-auth/no-ssl -> transition to X509/allowTLS ===');
+rst.upgradeSet(transitionToX509allowTLS);
 
 // Connect to the new primary
 testDB = rst.getPrimary().getDB(dbName);

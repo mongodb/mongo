@@ -2,10 +2,10 @@
 
 var common_options = {
     keyFile: "jstests/libs/key1",
-    sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/server.pem",
-    sslCAFile: "jstests/libs/ca.pem",
-    sslAllowInvalidHostnames: ""
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: "jstests/libs/server.pem",
+    tlsCAFile: "jstests/libs/ca.pem",
+    tlsAllowInvalidHostnames: ""
 };
 
 function runInitialSyncTest() {
@@ -56,14 +56,14 @@ function runInitialSyncTest() {
 
 // Standard case, clusterAuthMode: x509
 var x509_options1 = Object.merge(
-    common_options, {sslClusterFile: "jstests/libs/cluster_cert.pem", clusterAuthMode: "x509"});
+    common_options, {tlsClusterFile: "jstests/libs/cluster_cert.pem", clusterAuthMode: "x509"});
 var x509_options2 = x509_options1;
 runInitialSyncTest();
 
 // Mixed clusterAuthMode: sendX509 and sendKeyFile and try adding --auth
 x509_options1 = Object.merge(
     common_options,
-    {sslClusterFile: "jstests/libs/cluster_cert.pem", clusterAuthMode: "sendX509", auth: ""});
+    {tlsClusterFile: "jstests/libs/cluster_cert.pem", clusterAuthMode: "sendX509", auth: ""});
 x509_options2 = Object.merge(common_options, {clusterAuthMode: "sendKeyFile"});
 runInitialSyncTest();
 
@@ -75,7 +75,7 @@ runInitialSyncTest();
 // verify that replset initiate fails if using a self-signed cert
 x509_options1 = Object.merge(common_options, {clusterAuthMode: "x509"});
 x509_options2 = Object.merge(common_options,
-                             {sslClusterFile: "jstests/libs/smoke.pem", clusterAuthMode: "x509"});
+                             {tlsClusterFile: "jstests/libs/smoke.pem", clusterAuthMode: "x509"});
 var replTest = new ReplSetTest({nodes: {node0: x509_options1, node1: x509_options2}});
 
 // We don't want to invoke the hang analyzer because we

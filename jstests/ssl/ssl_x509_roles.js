@@ -18,10 +18,10 @@ function authAndTest(port, expectSuccess) {
                                   "localhost",
                                   "--port",
                                   port,
-                                  "--ssl",
-                                  "--sslCAFile",
+                                  "--tls",
+                                  "--tlsCAFile",
                                   CA_CERT,
-                                  "--sslPEMKeyFile",
+                                  "--tlsCertificateKeyFile",
                                   CLIENT_CERT_NO_ROLES,
                                   "--eval",
                                   smokeScript);
@@ -33,10 +33,10 @@ function authAndTest(port, expectSuccess) {
                                     "localhost",
                                     "--port",
                                     port,
-                                    "--ssl",
-                                    "--sslCAFile",
+                                    "--tls",
+                                    "--tlsCAFile",
                                     CA_CERT,
-                                    "--sslPEMKeyFile",
+                                    "--tlsCertificateKeyFile",
                                     cert,
                                     script);
 
@@ -77,9 +77,9 @@ const prepConn = function(conn) {
 };
 
 const x509_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT
 };
 
 print("1. Testing x.509 auth to mongod");

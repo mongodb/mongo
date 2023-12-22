@@ -4,9 +4,13 @@ var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=c
 
 jsTest.log("Assert x509 auth is not allowed when a standalone mongod is run without a CA file.");
 
-// allowSSL instead of requireSSL so that the non-SSL connection succeeds.
-var conn = MongoRunner.runMongod(
-    {sslMode: 'allowSSL', sslPEMKeyFile: SERVER_CERT, auth: '', tlsCAFile: 'jstests/libs/ca.pem'});
+// allowTLS instead of requireTLS so that the non-SSL connection succeeds.
+var conn = MongoRunner.runMongod({
+    tlsMode: 'allowTLS',
+    tlsCertificateKeyFile: SERVER_CERT,
+    auth: '',
+    tlsCAFile: 'jstests/libs/ca.pem'
+});
 
 var external = conn.getDB('$external');
 external.createUser({
@@ -20,9 +24,9 @@ external.createUser({
 // Should not be able to authenticate with x509.
 // Authenticate call will return 1 on success, 0 on error.
 var exitStatus = runMongoProgram('mongo',
-                                 '--ssl',
-                                 '--sslAllowInvalidCertificates',
-                                 '--sslPEMKeyFile',
+                                 '--tls',
+                                 '--tlsAllowInvalidCertificates',
+                                 '--tlsCertificateKeyFile',
                                  CLIENT_CERT,
                                  '--port',
                                  conn.port,
@@ -39,13 +43,13 @@ MongoRunner.stopMongod(conn);
 
 jsTest.log("Assert mongod doesn\'t start with CA file missing and clusterAuthMode=x509.");
 
-var sslParams = {
+var tlsParams = {
     clusterAuthMode: 'x509',
-    sslMode: 'requireSSL',
+    tlsMode: 'requireTLS',
     setParameter: {tlsUseSystemCA: true},
-    sslPEMKeyFile: SERVER_CERT
+    tlsCertificateKeyFile: SERVER_CERT
 };
-assert.throws(() => MongoRunner.runMongod(sslParams),
+assert.throws(() => MongoRunner.runMongod(tlsParams),
               [],
               "server started with x509 clusterAuthMode but no CA file");
 
@@ -62,8 +66,8 @@ var startOptions = {
     // Ensure that journaling is always enabled for config servers.
     configsvr: "",
     storageEngine: "wiredTiger",
-    sslMode: 'allowSSL',
-    sslPEMKeyFile: 'jstests/libs/trusted-server.pem',
+    tlsMode: 'allowTLS',
+    tlsCertificateKeyFile: 'jstests/libs/trusted-server.pem',
     tlsCAFile: 'jstests/libs/ca.pem'
 };
 
@@ -74,8 +78,8 @@ configRS.startSet(startOptions);
 // Make sure the mongoS failed to start up for the proper reason.
 assert.throws(() => MongoRunner.runMongos({
     clusterAuthMode: 'x509',
-    sslMode: 'requireSSL',
-    sslPEMKeyFile: SERVER_CERT,
+    tlsMode: 'requireTLS',
+    tlsCertificateKeyFile: SERVER_CERT,
     configdb: configRS.getURL()
 }),
               [],

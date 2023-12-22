@@ -18,11 +18,11 @@ if (_isWindows()) {
 
 try {
     var replTest = new ReplSetTest({
-        name: "ssltest",
+        name: "TLSTest",
         nodes: 1,
         nodeOptions: {
-            sslMode: "requireSSL",
-            sslPEMKeyFile: "jstests/libs/server.pem",
+            tlsMode: "requireTLS",
+            tlsCertificateKeyFile: "jstests/libs/server.pem",
             setParameter: {tlsUseSystemCA: true},
         },
         host: "localhost",

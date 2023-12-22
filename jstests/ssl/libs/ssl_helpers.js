@@ -17,38 +17,38 @@ export var CLIENT_CERT = "jstests/libs/client.pem";
 export var DH_PARAM = "jstests/libs/8k-prime.dhparam";
 export var CLUSTER_CERT = "jstests/libs/cluster_cert.pem";
 
-// Note: "sslAllowInvalidCertificates" is enabled to avoid
+// Note: "tlsAllowInvalidCertificates" is enabled to avoid
 // hostname conflicts with our testing certificates
 export var disabled = {
-    sslMode: "disabled"
+    tlsMode: "disabled"
 };
 
-export var allowSSL = {
-    sslMode: "allowSSL",
-    sslAllowInvalidCertificates: "",
-    sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT
+export var allowTLS = {
+    tlsMode: "allowTLS",
+    tlsAllowInvalidCertificates: "",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT
 };
 
-export var preferSSL = {
-    sslMode: "preferSSL",
-    sslAllowInvalidCertificates: "",
-    sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT
+export var preferTLS = {
+    tlsMode: "preferTLS",
+    tlsAllowInvalidCertificates: "",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT
 };
 
-export var requireSSL = {
-    sslMode: "requireSSL",
-    sslAllowInvalidCertificates: "",
-    sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT
+export var requireTLS = {
+    tlsMode: "requireTLS",
+    tlsAllowInvalidCertificates: "",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT
 };
 
 export var dhparamSSL = {
-    sslMode: "requireSSL",
-    sslAllowInvalidCertificates: "",
-    sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT,
+    tlsMode: "requireTLS",
+    tlsAllowInvalidCertificates: "",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT,
     setParameter: {"opensslDiffieHellmanParameters": DH_PARAM}
 };
 
@@ -269,9 +269,9 @@ export function requireSSLProvider(required, fn) {
 
 export function detectDefaultTLSProtocol() {
     const conn = MongoRunner.runMongod({
-        sslMode: 'allowSSL',
-        sslPEMKeyFile: SERVER_CERT,
-        sslDisabledProtocols: 'none',
+        tlsMode: 'allowTLS',
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsDisabledProtocols: 'none',
         useLogFiles: true,
         tlsLogVersions: "TLS1_0,TLS1_1,TLS1_2,TLS1_3",
         waitForConnect: true,
@@ -283,9 +283,9 @@ export function detectDefaultTLSProtocol() {
                               '--ssl',
                               '--port',
                               conn.port,
-                              '--sslPEMKeyFile',
+                              '--tlsCertificateKeyFile',
                               CLIENT_CERT,
-                              '--sslCAFile',
+                              '--tlsCAFile',
                               CA_CERT,
                               '--eval',
                               ';'));

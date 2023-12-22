@@ -6,18 +6,18 @@ import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 requireSSLProvider(['openssl', 'windows'], function() {
     var md = MongoRunner.runMongod({
-        sslMode: "requireSSL",
-        sslPEMKeyFile: "jstests/libs/server.pem",
-        sslCAFile: "jstests/libs/ca.pem",
-        sslCRLFile: "jstests/libs/crl_client_revoked.pem"
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: "jstests/libs/server.pem",
+        tlsCAFile: "jstests/libs/ca.pem",
+        tlsCRLFile: "jstests/libs/crl_client_revoked.pem"
     });
 
     var mongo = runMongoProgram("mongo",
                                 "--port",
                                 md.port,
-                                "--ssl",
-                                "--sslAllowInvalidCertificates",
-                                "--sslPEMKeyFile",
+                                "--tls",
+                                "--tlsAllowInvalidCertificates",
+                                "--tlsCertificateKeyFile",
                                 "jstests/libs/client_revoked.pem",
                                 "--eval",
                                 ";");
