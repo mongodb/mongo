@@ -5612,6 +5612,16 @@ tasks:
       suite: ssl_x509
       resmoke_args: --storageEngine=wiredTiger
 
+- <<: *gen_task_template
+  name: ssl_linear_gen
+  tags: ["encrypt", "ssl"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: ssl_linear
+      resmoke_jobs_max: 1
+      resmoke_args: --storageEngine=wiredTiger
+
 - <<: *task_template
   name: jsCore_decimal
   tags: ["jscore", "common", "decimal"]

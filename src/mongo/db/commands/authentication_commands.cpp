@@ -258,10 +258,6 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     auto sslConfiguration = opCtx->getClient()->session()->getSSLConfiguration();
 
-    uassert(ErrorCodes::AuthenticationFailed,
-            "Unable to verify x.509 certificate, as no CA has been provided.",
-            sslConfiguration->hasCA);
-
     uassert(ErrorCodes::ProtocolError,
             "X.509 authentication must always use the $external database.",
             user.getDB() == kExternalDB);
