@@ -121,7 +121,7 @@ snap_op_init(TINFO *tinfo, uint64_t read_ts, bool repeatable_reads)
          * tracking to the other snap list. Use a barrier to ensure a cached value doesn't cause us
          * to ignore a stable timestamp transition.
          */
-        WT_BARRIER();
+        WT_COMPILER_BARRIER();
         stable_ts = g.stable_timestamp;
         if (stable_ts != tinfo->stable_ts && read_ts > stable_ts) {
             tinfo->stable_ts = stable_ts;

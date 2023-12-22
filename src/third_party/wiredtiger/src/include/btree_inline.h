@@ -2181,7 +2181,7 @@ __wt_split_descent_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX *sa
      * Presumably we acquired a page index on the child page before calling
      * this code, don't re-order that acquisition with this check.
      */
-    WT_BARRIER();
+    WT_COMPILER_BARRIER();
     WT_INTL_INDEX_GET(session, ref->home, pindex);
     return (pindex != saved_pindex);
 }

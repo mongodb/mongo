@@ -78,11 +78,11 @@ __wt_atomic_cas_ptr(void *vp, void *old_val, void *new_val)
 }
 
 /*
- * WT_BARRIER --
- *	MSVC implementation of WT_BARRIER.
+ * WT_COMPILER_BARRIER --
+ *	MSVC implementation of WT_COMPILER_BARRIER.
  */
 static inline void
-WT_BARRIER(void)
+WT_COMPILER_BARRIER(void)
 {
     _ReadWriteBarrier();
 }
@@ -115,7 +115,7 @@ WT_PAUSE(void)
 static inline void
 WT_READ_BARRIER(void)
 {
-    WT_BARRIER();
+    WT_COMPILER_BARRIER();
 }
 
 /*
@@ -126,5 +126,5 @@ WT_READ_BARRIER(void)
 static inline void
 WT_WRITE_BARRIER(void)
 {
-    WT_BARRIER();
+    WT_COMPILER_BARRIER();
 }

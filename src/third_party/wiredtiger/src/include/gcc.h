@@ -155,7 +155,7 @@ WT_ATOMIC_FUNC(iv64, int64_t, volatile int64_t *vp, volatile int64_t v)
 WT_ATOMIC_FUNC(size, size_t, size_t *vp, size_t v)
 
 /* Compile read-write barrier */
-#define WT_BARRIER() __asm__ volatile("" ::: "memory")
+#define WT_COMPILER_BARRIER() __asm__ volatile("" ::: "memory")
 
 #if defined(x86_64) || defined(__x86_64__)
 /* Pause instruction to prevent excess processor bus usage */
@@ -165,8 +165,8 @@ WT_ATOMIC_FUNC(size, size_t, size_t *vp, size_t v)
         __asm__ volatile("mfence" ::: "memory"); \
     } while (0)
 /* We only need compiler barriers on x86 due to Total Store Ordering (TSO). */
-#define WT_READ_BARRIER() WT_BARRIER()
-#define WT_WRITE_BARRIER() WT_BARRIER()
+#define WT_READ_BARRIER() WT_COMPILER_BARRIER()
+#define WT_WRITE_BARRIER() WT_COMPILER_BARRIER()
 
 #elif defined(i386) || defined(__i386__)
 #define WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
