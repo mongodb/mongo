@@ -1,20 +1,35 @@
-In file included from src/block/block_write.c:9:
-In file included from ./src/include/wt_internal.h:439:
-./src/include/intpack_inline.h:193:7: warning: Assigned value is garbage or undefined
-    p = *pp;
-      ^ ~~~
-1 warning generated.
-src/btree/bt_delete.c:411:5: warning: Null pointer passed to 1st parameter expecting 'nonnull'
-    __wt_overwrite_and_free(session, ref->ft_info.del);
-    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./src/include/misc.h:141:13: note: expanded from macro '__wt_overwrite_and_free'
-            __wt_explicit_overwrite(p, sizeof(*(p))); \
-            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./src/include/misc.h:135:42: note: expanded from macro '__wt_explicit_overwrite'
-#define __wt_explicit_overwrite(p, size) memset(p, WT_DEBUG_BYTE, size)
-                                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-1 warning generated.
-src/conn/conn_capacity.c:289:5: warning: Value stored to 'capacity' is never read
-    capacity = steal_capacity = 0;
-    ^          ~~~~~~~~~~~~~~~~~~
-1 warning generated.
+wiredtiger/src/btree/bt_curnext.c Value stored to 'inclusive_set' is never read [deadcode.DeadStores]
+wiredtiger/src/btree/bt_curprev.c Value stored to 'inclusive_set' is never read [deadcode.DeadStores]
+wiredtiger/src/btree/bt_delete.c The left operand of '!=' is a garbage value [core.UndefinedBinaryOperatorResult]
+wiredtiger/src/btree/bt_sync.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
+wiredtiger/src/btree/bt_sync_obsolete.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
+wiredtiger/src/btree/bt_vrfy.c Although the value stored to 'skip_hs' is used in the enclosing expression, the value is never actually read from 'skip_hs' [deadcode.DeadStores]
+wiredtiger/src/btree/bt_vrfy.c Value stored to 'ret' is never read [deadcode.DeadStores]
+wiredtiger/src/config/config_api.c Value stored to 'compiled_type' is never read [deadcode.DeadStores]
+wiredtiger/src/conn/conn_api.c Although the value stored to 'verify_meta' is used in the enclosing expression, the value is never actually read from 'verify_meta' [deadcode.DeadStores]
+wiredtiger/src/conn/conn_api.c Value stored to 'config_base_set' is never read [deadcode.DeadStores]
+wiredtiger/src/conn/conn_capacity.c Value stored to 'capacity' is never read [deadcode.DeadStores]
+wiredtiger/src/evict/evict_lru.c Although the value stored to 'cache_bytes_updates' is used in the enclosing expression, the value is never actually read from 'cache_bytes_updates' [deadcode.DeadStores]
+wiredtiger/src/history/hs_verify.c The left operand of '!=' is a garbage value [core.UndefinedBinaryOperatorResult]
+wiredtiger/src/include/intpack_inline.h Assigned value is garbage or undefined [core.uninitialized.Assign]
+wiredtiger/src/meta/meta_turtle.c Value stored to 'file_len' is never read [deadcode.DeadStores]
+wiredtiger/src/reconcile/rec_row.c Branch condition evaluates to a garbage value [core.uninitialized.Branch]
+wiredtiger/src/rollback_to_stable/rts_btree.c Value stored to 'ret' is never read [deadcode.DeadStores]
+wiredtiger/src/rollback_to_stable/rts_btree.c Value stored to 'txn_id_visible' is never read [deadcode.DeadStores]
+wiredtiger/src/schema/schema_create.c Null pointer passed to 1st parameter expecting 'nonnull' [core.NonNullParamChecker]
+wiredtiger/src/schema/schema_drop.c Value stored to 'got_dhandle' is never read [deadcode.DeadStores]
+wiredtiger/src/schema/schema_worker.c Value stored to 'is_tiered' is never read [deadcode.DeadStores]
+wiredtiger/src/session/session_api.c Called function pointer is null (null dereference) [core.CallAndMessage]
+wiredtiger/src/session/session_dhandle.c Although the value stored to 'is_hs' is used in the enclosing expression, the value is never actually read from 'is_hs' [deadcode.DeadStores]
+wiredtiger/src/session/session_dhandle.c Although the value stored to 'is_reserved_name' is used in the enclosing expression, the value is never actually read from 'is_reserved_name' [deadcode.DeadStores]
+wiredtiger/src/session/session_dhandle.c Although the value stored to 'is_unnamed_ckpt' is used in the enclosing expression, the value is never actually read from 'is_unnamed_ckpt' [deadcode.DeadStores]
+wiredtiger/src/session/session_dhandle.c Although the value stored to 'must_resolve' is used in the enclosing expression, the value is never actually read from 'must_resolve' [deadcode.DeadStores]
+wiredtiger/src/session/session_dhandle.c Value stored to 'ckpt_gen' is never read [deadcode.DeadStores]
+wiredtiger/src/session/session_dhandle.c Value stored to 'ckpt_running' is never read [deadcode.DeadStores]
+wiredtiger/src/support/generation.c Assigned value is garbage or undefined [core.uninitialized.Assign]
+wiredtiger/src/support/generation.c Assigned value is garbage or undefined [core.uninitialized.Assign]
+wiredtiger/src/tiered/tiered_work.c Although the value stored to 'found' is used in the enclosing expression, the value is never actually read from 'found' [deadcode.DeadStores]
+wiredtiger/src/txn/txn.c Value stored to 'resolve_case' is never read [deadcode.DeadStores]
+wiredtiger/src/txn/txn_timestamp.c Value stored to 'name' is never read [deadcode.DeadStores]
+wiredtiger/src/utilities/util_dump.c Although the value stored to 'search_near' is used in the enclosing expression, the value is never actually read from 'search_near' [deadcode.DeadStores]
+wiredtiger/src/utilities/util_dump.c Null pointer passed to 1st parameter expecting 'nonnull' [core.NonNullParamChecker]
