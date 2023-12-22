@@ -450,6 +450,7 @@ replay_committed(TINFO *tinfo)
         return;
 
     testutil_assert(tinfo->replay_ts != 0);
+    testutil_assert(tinfo->lane != LANE_NONE);
 
     lane = tinfo->lane;
     testutil_assert(!tinfo->replay_again);
