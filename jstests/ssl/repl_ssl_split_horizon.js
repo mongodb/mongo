@@ -76,6 +76,7 @@ var replTest = new ReplSetTest({
     nodeOptions: {
         sslMode: "requireSSL",
         sslPEMKeyFile: "jstests/libs/splithorizon-server.pem",
+        setParameter: {tlsUseSystemCA: true},
     },
     host: "localhost",
     useHostName: false,
@@ -83,7 +84,7 @@ var replTest = new ReplSetTest({
 
 replTest.startSet({
     env: {
-        SSL_CERT_FILE: 'jstests/libs/splithorizon-ca.pem',
+        SSL_CERT_FILE: 'jstests/libs/ca.pem',
     },
 });
 
@@ -118,8 +119,11 @@ var checkExpectedHorizon = function(url, memberIndex, expectedHostname) {
     var argv = [
         'env',
         "HOSTALIASES=" + hostsFile,
-        "SSL_CERT_FILE=jstests/libs/splithorizon-ca.pem",
+        "SSL_CERT_FILE=jstests/libs/ca.pem",
         'mongo',
+        '--tls',
+        '--tlsCertificateKeyFile',
+        'jstests/libs/splithorizon-server.pem',
         url,
         '--eval',
         assertion

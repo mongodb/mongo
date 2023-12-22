@@ -24,12 +24,16 @@ let options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",
     networkMessageCompressors: 'disabled',
+    tlsCAFile: 'jstests/libs/ca.pem',
+    sslAllowInvalidCertificates: ""
 };
 
 let mongosOptions = {
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",
     networkMessageCompressors: 'disabled',
+    tlsCAFile: 'jstests/libs/ca.pem',
+    sslAllowInvalidCertificates: ""
 };
 
 if (_isWindows()) {

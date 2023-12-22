@@ -2548,6 +2548,8 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
         }
     }
 
+    // If the user has specified --setParameter tlsUseSystemCA=true, then no params.sslCAFile nor
+    // params.sslClusterCAFile will be defined, and the SSL Manager will fall back to the System CA.
     std::string cafile = params.sslCAFile;
     if (direction == ConnectionDirection::kIncoming && !params.sslClusterCAFile.empty()) {
         cafile = params.sslClusterCAFile;
@@ -2962,7 +2964,6 @@ Status SSLManagerOpenSSL::_setupCA(SSL_CTX* context, const std::string& caFile) 
     // Set SSL to require peer (client) certificate verification
     // if a certificate is presented
     SSL_CTX_set_verify(context, SSL_VERIFY_PEER, &SSLManagerOpenSSL::verify_cb);
-    _sslConfiguration.hasCA = true;
     return Status::OK();
 }
 
@@ -2987,7 +2988,7 @@ Status SSLManagerOpenSSL::_setupSystemCA(SSL_CTX* context) {
                           << "(default certificate file: " << X509_get_default_cert_file() << ", "
                           << "default certificate path: " << X509_get_default_cert_dir() << ")"};
     }
-
+    SSL_CTX_set_verify(context, SSL_VERIFY_PEER, &SSLManagerOpenSSL::verify_cb);
     return Status::OK();
 }
 
@@ -3226,9 +3227,6 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     }
 
     recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
-
-    if (!_sslConfiguration.hasCA && isSSLServer)
-        return SSLPeerInfo(sni);
 
     UniqueX509 peerCert(SSL_get_peer_certificate(conn));
 
