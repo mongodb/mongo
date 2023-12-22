@@ -1,6 +1,11 @@
 command_type: system
 stepback: false
 
+include:
+  - filename: etc/evergreen_yml_components/variants/task_generation.yml
+  - filename: etc/evergreen_yml_components/definitions.yml
+  - filename: etc/evergreen_yml_components/perf_tasks.yml
+  - filename: etc/evergreen_yml_components/variants/perf.yml
 
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
 parameters:
@@ -355,7 +360,7 @@ functions:
 
   ###
   # Compile mongodb
-  compile mongodb:
+  compile mongo tools:
     - command: shell.exec
       params:
         working_dir: src/mongo-tools/src/github.com/mongodb/mongo-tools
@@ -387,6 +392,7 @@ functions:
               go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../mongodb/bin/$i${exe|}" $i/main/$i.go
               "../../../../../mongodb/bin/$i${exe|}" --version
           done
+  generate feature flag list:
     - command: shell.exec
       params:
         working_dir: src
@@ -399,6 +405,7 @@ functions:
             mkdir -p mongodb/feature_flags
             cp ./all_feature_flags.txt mongodb/feature_flags
           fi
+  compile mongodb:
     - command: shell.exec
       params:
         working_dir: src
@@ -408,6 +415,30 @@ functions:
             set -o verbose
             source "${workdir}/compile_venv/bin/activate"
             python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} $extra_args install-core install-jstestshell SPLIT_DWARF=0 MONGO_VERSION=${version} DESTDIR=$(pwd)/mongodb ${patch_compile_flags|}
+          fi
+  download mongodb:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
+            set -o errexit
+            set -o verbose
+            wget --quiet https://s3.amazonaws.com/mciuploads/${project}/${compile_variant}/${version_id}/binaries/mongo-${revision_order_id}.${ext|tgz}
+            tar -xvf mongo-${revision_order_id}.${ext|tgz}
+            mv ./dist-test/bin/mongo mongodb/bin
+            mv ./dist-test/bin/mongos mongodb/bin
+            mv ./dist-test/bin/mongod mongodb/bin
+            mv ./dist-test/bin/mongocryptd mongodb/bin
+          fi
+  download jstests:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
+            set -o errexit
+            set -o verbose
             mkdir -p mongodb/jstests/hooks
             if [ -d jstests/hooks ]
             then
@@ -420,13 +451,17 @@ functions:
               cat << EOF > mongodb/jstests/hooks/run_validate_collections.js
               print("NOTE: run_validate_collections.js will skip the oplog!");
               TestData = { skipValidationNamespaces: ['local.oplog.rs'] };
-              load('jstests/hooks/run_validate_collections.actual.js');
+              await import("jstests/hooks/run_validate_collections.actual.js");
           EOF
             fi
+          fi
+  package binary:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
             tar czf mongodb${compile_variant|}.tar.gz mongodb
-            # Put all matching mongo debug from the build directory in an archive in the same location
-            # as the library archive (i.e. mongodb/bin).
-            tar czvf mongodb${compile_variant|}-debugsymbols.tar.gz $(find ./build/cached -name mongo\*.debug -type f) --xform 's:^.*/:mongodb/bin/:'
           fi
     - command: shell.exec
       params:
@@ -440,6 +475,19 @@ functions:
             python buildscripts/download_sys_perf_binaries.py -v ${reuse_compile_from} -b ${build_variant} -u ${evergreen_api_user} -k ${evergreen_api_key}
             mv binary.tar.gz mongodb${compile_variant|}.tar.gz
           fi
+  package old debugsymbols:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          if [ -z "${reuse_compile_from}" ] || [ "${is_patch|false}" = "false" ]; then
+            set -o errexit
+            set -o verbose
+            # Put all matching mongo debug from the build directory in an archive in the same location
+            # as the library archive (i.e. mongodb/bin).
+            tar czvf mongodb${compile_variant|}-debugsymbols.tar.gz $(find ./build/cached -name mongo\*.debug -type f) --xform 's:^.*/:mongodb/bin/:'
+          fi
+  upload binary:
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -450,6 +498,7 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb${compile_variant|}.tar.gz
+  upload old debugsymbols:
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -617,7 +666,31 @@ tasks:
             enterprise: ${enterprise_rev}
             mongo-tools: ${mongo-tools_rev}
       - func: "compile prep"
+      - func: "compile mongo tools"
+      - func: "generate feature flag list"
       - func: "compile mongodb"
+      - func: "download jstests"
+      - func: "package binary"
+      - func: "upload binary"
+      - func: "package old debugsymbols"
+      - func: "upload old debugsymbols"
+
+  - name: package_new_compile
+    commands:
+      - command: manifest.load
+      - command: git.get_project
+        params:
+          directory: src
+          revisions:
+            enterprise: ${enterprise_rev}
+            mongo-tools: ${mongo-tools_rev}
+      - func: "compile prep"
+      - func: "compile mongo tools"
+      - func: "generate feature flag list"
+      - func: "download mongodb"
+      - func: "download jstests"
+      - func: "package binary"
+      - func: "upload binary"
 
   - name: compile_mongocrypt_shlib
     commands:
@@ -1706,6 +1779,81 @@ buildvariants:
     tasks:
       - name: compile
 
+  ###
+  # New compiles
+  - name: amazon2-x86-compile
+    display_name: Compile for Amazon Linux 2 x86 NEW
+    modules: *modules
+    expansions:
+      platform: linux
+      project_dir: *project_dir
+      compile_variant: amazon2-x86-compile
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    run_on:
+      - amazon2-xlarge
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+      - name: package_new_compile
+        depends_on:
+          - name: archive_dist_test
+            variant: amazon2-x86-compile
+
+  - name: amazon2-arm64-compile
+    display_name: Compile for Amazon Linux 2 arm64 NEW
+    modules: *modules
+    expansions:
+      platform: linux
+      project_dir: *project_dir
+      compile_variant: amazon2-arm64-compile
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    run_on:
+      - amazon2-arm64-xlarge
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+      - name: package_new_compile
+        depends_on:
+          - name: archive_dist_test
+            variant: amazon2-arm64-compile
+
+  - name: rhel70-x86-compile
+    display_name: Compile for RHEL70 x86 NEW
+    modules: *modules
+    expansions:
+      platform: linux
+      project_dir: *project_dir
+      compile_variant: rhel70-x86-compile
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=rhel70
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    run_on:
+      - rhel70-xlarge
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+      - name: package_new_compile
+        depends_on:
+          - name: archive_dist_test
+            variant: rhel70-x86-compile
+  ###
+
   - name: atlas-M60-real
     display_name: M60-Atlas ReplSet AWS
     cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
@@ -1826,7 +1974,7 @@ buildvariants:
 
   - name: linux-3-node-replSet.2022-11
     display_name: Linux 3-Node ReplSet 2022-11
-    cron: "0 */12 * * *" # Every 12 hours starting at midnight, will change it back after 7.0 release
+    cron: "0 0 * * 1,2,3,4,5,6"  # Everyday except Sunday at 00:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11

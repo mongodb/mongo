@@ -54,6 +54,7 @@
 
 include:
 - filename: etc/evergreen_yml_components/project_and_distro_settings.yml
+- filename: etc/evergreen_yml_components/configuration.yml
 - filename: etc/evergreen_yml_components/definitions.yml
 - filename: etc/evergreen_yml_components/variants/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/sanitizer.yml
