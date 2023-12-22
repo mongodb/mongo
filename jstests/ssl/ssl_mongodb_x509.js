@@ -5,7 +5,8 @@ var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=c
 jsTest.log("Assert x509 auth is not allowed when a standalone mongod is run without a CA file.");
 
 // allowSSL instead of requireSSL so that the non-SSL connection succeeds.
-var conn = MongoRunner.runMongod({sslMode: 'allowSSL', sslPEMKeyFile: SERVER_CERT, auth: ''});
+var conn = MongoRunner.runMongod(
+    {sslMode: 'allowSSL', sslPEMKeyFile: SERVER_CERT, auth: '', tlsCAFile: 'jstests/libs/ca.pem'});
 
 var external = conn.getDB('$external');
 external.createUser({
@@ -30,13 +31,20 @@ var exitStatus = runMongoProgram('mongo',
                                   'user: "' + CLIENT_USER + '" ,' +
                                   'mechanism: "MONGODB-X509"}));'));
 
+jsTest.log("exitStatus: " + exitStatus);
+
 assert.eq(exitStatus, 0, "authentication via MONGODB-X509 without CA succeeded");
 
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Assert mongod doesn\'t start with CA file missing and clusterAuthMode=x509.");
 
-var sslParams = {clusterAuthMode: 'x509', sslMode: 'requireSSL', sslPEMKeyFile: SERVER_CERT};
+var sslParams = {
+    clusterAuthMode: 'x509',
+    sslMode: 'requireSSL',
+    setParameter: {tlsUseSystemCA: true},
+    sslPEMKeyFile: SERVER_CERT
+};
 assert.throws(() => MongoRunner.runMongod(sslParams),
               [],
               "server started with x509 clusterAuthMode but no CA file");
@@ -55,10 +63,12 @@ var startOptions = {
     configsvr: "",
     storageEngine: "wiredTiger",
     sslMode: 'allowSSL',
-    sslPEMKeyFile: 'jstests/libs/trusted-server.pem'
+    sslPEMKeyFile: 'jstests/libs/trusted-server.pem',
+    tlsCAFile: 'jstests/libs/ca.pem'
 };
 
 var configRS = new ReplSetTest(rstOptions);
+
 configRS.startSet(startOptions);
 
 // Make sure the mongoS failed to start up for the proper reason.

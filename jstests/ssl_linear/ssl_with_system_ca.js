@@ -8,6 +8,8 @@
 'use strict';
 
 const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
+jsTest.log("HOST_TYPE = " + HOST_TYPE);
+
 if (HOST_TYPE == "windows") {
     // OpenSSL backed imports Root CA and intermediate CA
     runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\trusted-ca.pem");
@@ -16,23 +18,33 @@ if (HOST_TYPE == "windows") {
     // Current User.
     runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\trusted-ca.pem");
 }
-
 function testWithCerts(prefix) {
-    jsTest.log(
-        `Testing with SSL certs $ {
-            clientPem connecting to serverPem
-        }`);
+    jsTest.log("Starting mongod blindly...");
+    // allowTLS to get a non-TLS control connection.
+    var opts = {
+        tlsMode: 'preferTLS',
+        tlsCertificateKeyFile: 'jstests/libs/' + prefix + 'server.pem',
+        waitForConnect: false,
+        setParameter: {tlsUseSystemCA: true},
+        env: {"SSL_CERT_FILE": "jstests/libs/" + prefix + "ca.pem"},
+    };
+    const conn = MongoRunner.runMongod(opts);
 
-    // allowSSL to get a non-SSL control connection.
-    const conn = MongoRunner.runMongod(
-        {sslMode: 'allowSSL', sslPEMKeyFile: 'jstests/libs/' + prefix + 'server.pem'});
+    jsTest.log("Waiting for mongod to be non-TLS connectable...");
+    let argv = ['mongo', '--port', conn.port, '--eval', ';'];
 
-    let argv = [
+    assert.soon((exitCode) => {
+        exitCode = runMongoProgram.apply(null, argv);
+        return 0 == exitCode;
+    });
+
+    jsTest.log("Testing connection with " + prefix + "client.pem ...");
+    argv = [
         'mongo',
-        '--ssl',
+        '--tls',
         '--port',
         conn.port,
-        '--sslPEMKeyFile',
+        '--tlsCertificateKeyFile',
         'jstests/libs/' + prefix + 'client.pem',
         '--eval',
         ';'
@@ -44,11 +56,22 @@ function testWithCerts(prefix) {
         argv.unshift("env", "SSL_CERT_FILE=jstests/libs/trusted-ca.pem");
     }
 
-    const exitCode = runMongoProgram.apply(null, argv);
+    let exitCode = runMongoProgram.apply(null, argv);
+
+    jsTest.log("Stopping mongod...");
     MongoRunner.stopMongod(conn);
+
     return exitCode;
 }
 
-assert.neq(0, testWithCerts(''), 'Certs signed with untrusted CA');
-assert.eq(0, testWithCerts('trusted-'), 'Certs signed with trusted CA');
+try {
+    assert.neq(0, testWithCerts(''), 'Certs signed with untrusted CA');
+    assert.eq(0, testWithCerts('trusted-'), 'Certs signed with trusted CA');
+} finally {
+    if (HOST_TYPE == "windows") {
+        const trusted_ca_thumbprint = cat('jstests/libs/trusted-ca.pem.digest.sha1');
+        runProgram("certutil.exe", "-delstore", "-f", "Root", trusted_ca_thumbprint);
+        runProgram("certutil.exe", "-delstore", "-user", "-f", "CA", trusted_ca_thumbprint);
+    }
+}
 })();

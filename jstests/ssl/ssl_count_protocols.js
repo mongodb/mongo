@@ -31,6 +31,7 @@ function runTestWithoutSubset(client) {
         sslDisabledProtocols: 'none',
         useLogFiles: true,
         tlsLogVersions: "TLS1_0,TLS1_1,TLS1_2,TLS1_3",
+        tlsCAFile: CA_CERT
     });
 
     print(disabledProtocols);

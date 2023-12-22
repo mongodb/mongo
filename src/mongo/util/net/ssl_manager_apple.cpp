@@ -1372,20 +1372,15 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
         }
     }
 
+    // If the user has specified --setParameter tlsUseSystemCA=true, then no params.sslCAFile nor
+    // params.sslClusterCAFile will be defined, and the SSL Manager will fall back to the System CA.
     if (!params.sslCAFile.empty()) {
         auto ca = uassertStatusOK(loadPEM(params.sslCAFile, "", kLoadPEMStripKeys));
         _clientCA = std::move(ca);
-        _sslConfiguration.hasCA = _clientCA && ::CFArrayGetCount(_clientCA.get());
-    }
-
-    if (!params.sslCertificateSelector.empty() || !params.sslClusterCertificateSelector.empty()) {
-        // By using the system keychain, we acknowledge it exists.
-        _sslConfiguration.hasCA = true;
     }
 
     if (!_clientCA) {
-        // No explicit CA was specified, use the Keychain CA explicitly on client connects,
-        // even though we're going to pretend it doesn't exist on server.
+        // No explicit CA was specified, use the Keychain CA explicitly
         ::CFArrayRef certs = nullptr;
         uassertOSStatusOK(SecTrustCopyAnchorCertificates(&certs));
         _clientCA.reset(certs);
@@ -1394,7 +1389,6 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
     if (!params.sslClusterCAFile.empty()) {
         auto ca = uassertStatusOK(loadPEM(params.sslClusterCAFile, "", kLoadPEMStripKeys));
         _serverCA = std::move(ca);
-        _sslConfiguration.hasCA = true;
     } else {
         // No inbound CA specified, share a reference with outbound CA.
         auto ca = _clientCA.get();
@@ -1560,17 +1554,6 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
     }
 
     recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
-
-    /* While we always have a system CA via the Keychain,
-     * we'll pretend not to in terms of validation if the server
-     * was started using a PEM file (legacy mode).
-     *
-     * When a certificate selector is used, we'll override hasCA to true
-     * so that the validation path runs anyway.
-     */
-    if (!_sslConfiguration.hasCA && isSSLServer) {
-        return Future<SSLPeerInfo>::makeReady(SSLPeerInfo(sniName));
-    }
 
     const auto badCert = [&](StringData msg, bool warn = false) -> Future<SSLPeerInfo> {
         if (warn) {

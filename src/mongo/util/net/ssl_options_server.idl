@@ -40,6 +40,13 @@ global:
 imports:
   - "mongo/db/basic_types.idl"
 
+server_parameters:
+  tlsUseSystemCA:
+    description: "Use System CA for certificate verification"
+    set_at: startup
+    cpp_varname: "sslGlobalParams.sslUseSystemCA"
+    default: false
+
 configs:
   "net.tls.tlsOnNormalPorts":
     description: "Use TLS on configured ports"

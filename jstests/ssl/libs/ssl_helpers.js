@@ -280,6 +280,7 @@ function detectDefaultTLSProtocol() {
         useLogFiles: true,
         tlsLogVersions: "TLS1_0,TLS1_1,TLS1_2,TLS1_3",
         waitForConnect: true,
+        tlsCAFile: CA_CERT
     });
 
     assert.eq(0,
@@ -288,9 +289,9 @@ function detectDefaultTLSProtocol() {
                               '--port',
                               conn.port,
                               '--sslPEMKeyFile',
-                              'jstests/libs/client.pem',
+                              CLIENT_CERT,
                               '--sslCAFile',
-                              'jstests/libs/ca.pem',
+                              CA_CERT,
                               '--eval',
                               ';'));
 
