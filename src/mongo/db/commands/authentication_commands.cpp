@@ -78,11 +78,6 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
                       "SSL support is required for the MONGODB-X509 mechanism.");
     }
 
-    if (!getSSLManager()->getSSLConfiguration().hasCA) {
-        return Status(ErrorCodes::AuthenticationFailed,
-                      "Unable to verify x.509 certificate, as no CA has been provided.");
-    }
-
     Client* client = opCtx->getClient();
     auto clientName = SSLPeerInfo::forSession(client->session()).subjectName;
     if (clientName.empty()) {
