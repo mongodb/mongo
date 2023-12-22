@@ -57,7 +57,7 @@ uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
  *     WiredTiger: detect CRC hardware and return the checksum function that accepts a starting
  *     seed.
  */
-uint32_t (*wiredtiger_crc32c_func(void))(uint32_t, const void *, size_t)
+uint32_t (*wiredtiger_crc32c_with_seed_func(void))(uint32_t, const void *, size_t)
 {
     return (__wt_checksum_with_seed_sw);
 }
