@@ -80,8 +80,8 @@ main(int argc, char *argv[])
     uint32_t cumulative_hw, cumulative_sw;
     uint32_t hw, sw;
     uint8_t *data;
-    uint8_t data_ff[9] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-    u_int i, j, k;
+    uint8_t data_ff[32];
+    u_int i, j, k, length, misalignment;
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
@@ -95,6 +95,7 @@ main(int argc, char *argv[])
 
     /* Allocate aligned memory for the data. */
     data = dcalloc(DATASIZE, sizeof(uint8_t));
+    memset(data_ff, 0xff, sizeof(data_ff));
 
     /* When available, get the hardware checksum function that accepts a starting seed. */
     hw_checksum_seed_fn = wiredtiger_crc32c_with_seed_func();
@@ -293,7 +294,7 @@ main(int argc, char *argv[])
         }
 
         len *= 2;
-        if (len > DATASIZE)
+        if (len > DATASIZE || len == 0)
             len = 512;
     }
 
@@ -301,7 +302,9 @@ main(int argc, char *argv[])
      * Checksums of random data chunks.
      */
     for (i = 0; i < WT_THOUSAND; ++i) {
-        len = __wt_random(&rnd) % DATASIZE;
+        do {
+            len = __wt_random(&rnd) % DATASIZE;
+        } while (len == 0);
         for (j = 0; j < len; ++j)
             data[j] = __wt_random(&rnd) & 0xff;
         hw = __wt_checksum(data, len);
@@ -318,6 +321,17 @@ main(int argc, char *argv[])
             /* FIXME-WT-12067: Re-enable after fixing CRC with seed in software on s390x. */
             check(cumulative_sw, sw, len, "(cumulative calculation) random: software");
 #endif
+        }
+    }
+
+    /*
+     * "Strobed" misalignments - test every combo of size/misalignment up to 16B.
+     */
+    for (length = 0; length < 16; length++) {
+        for (misalignment = 0; misalignment < 16; misalignment++) {
+            hw = __wt_checksum(&data_ff[misalignment], length);
+            sw = __wt_checksum_sw(&data_ff[misalignment], length);
+            check(hw, sw, length, "0xff: strobed");
         }
     }
 
