@@ -63,6 +63,7 @@ activate_venv
 # if build_patch_id is passed, try to download binaries from specified
 # evergreen patch.
 # This is purposfully before the venv setup so we do not touch the venv deps
+build_patch_id="${build_patch_id:-${reuse_compile_from}}"
 if [ -n "${build_patch_id}" ]; then
   echo "build_patch_id detected, trying to skip task"
   if [ "${task_name}" = "compile_dist_test" ] || [ "${task_name}" = "compile_dist_test_half" ]; then
