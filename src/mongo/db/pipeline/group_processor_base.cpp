@@ -47,11 +47,11 @@ GroupProcessorBase::GroupProcessorBase(const boost::intrusive_ptr<ExpressionCont
 void GroupProcessorBase::addAccumulationStatement(AccumulationStatement accumulationStatement) {
     tassert(7801002, "Can't mutate accumulated fields after initialization", !_executionStarted);
     _accumulatedFields.push_back(accumulationStatement);
-    _memoryTracker.set(accumulationStatement.fieldName, 0);
 }
 
 void GroupProcessorBase::setExecutionStarted() {
     if (!_executionStarted) {
+        _memoryTracker.clear();
         invariant(_accumulatedFieldMemoryTrackers.empty());
         for (const auto& accum : _accumulatedFields) {
             _accumulatedFieldMemoryTrackers.push_back(&_memoryTracker[accum.fieldName]);

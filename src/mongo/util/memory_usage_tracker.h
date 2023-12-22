@@ -58,6 +58,9 @@ namespace mongo {
  * consumption of individual parts, such as different accumulators in $group, while simulaniously
  * keeping track of the total.
  *
+ * Cannot be shallow copied because child memory trackers point to the address of the inline
+ * base tracker of the class.
+ *
  * TODO SERVER-80007: move implementation to .cpp to save on compilation time.
  */
 class MemoryUsageTracker {
@@ -135,6 +138,14 @@ public:
             funcTracker.set(0);
         }
         _baseTracker.set(0);
+    }
+
+    /**
+     * Clears the child memory trackers map and resets the base tracker memory usage to zero.
+     */
+    void clear() {
+        _functionMemoryTracker.clear();
+        resetCurrent();
     }
 
     /**
