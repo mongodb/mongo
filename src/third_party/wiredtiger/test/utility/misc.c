@@ -315,7 +315,7 @@ testutil_verify_src_backup(WT_CONNECTION *conn, const char *backup, const char *
     WT_DECL_RET;
     WT_SESSION *session;
     uint64_t cmp_size, offset, prev_offset, size, type;
-    int i, j, status;
+    int i, j;
     char buf[1024], *filename, *id[WT_BLKINCR_MAX];
     const char *idstr;
 
@@ -382,13 +382,8 @@ testutil_verify_src_backup(WT_CONNECTION *conn, const char *backup, const char *
                 if (offset > prev_offset) {
                     /* Compare the unchanged chunk. */
                     cmp_size = offset - prev_offset;
-                    testutil_snprintf(buf, sizeof(buf),
-                      "cmp -n %" PRIu64 " %s/%s %s/%s %" PRIu64 " %" PRIu64, cmp_size, home,
-                      filename, backup, filename, prev_offset, prev_offset);
-                    status = system(buf);
-                    if (status != 0)
-                        fprintf(stderr, "FAIL: status %d ID %s from cmd: %s\n", status, id[j], buf);
-                    testutil_assert(status == 0);
+                    testutil_system("cmp -n %" PRIu64 " %s/%s %s/%s %" PRIu64 " %" PRIu64, cmp_size,
+                      home, filename, backup, filename, prev_offset, prev_offset);
                 }
                 prev_offset = offset + size;
             }
@@ -716,11 +711,12 @@ is_mounted(const char *mount_dir)
 }
 
 /*
- * testutil_system --
+ * testutil_system_internal --
  *     A convenience function that combines snprintf, system, and testutil_check.
  */
 void
-testutil_system(const char *fmt, ...) WT_GCC_FUNC_ATTRIBUTE((format(printf, 1, 2)))
+testutil_system_internal(const char *function, uint32_t line, const char *fmt, ...)
+  WT_GCC_FUNC_ATTRIBUTE((format(printf, 2, 3)))
 {
     WT_DECL_RET;
     size_t len;
@@ -732,9 +728,12 @@ testutil_system(const char *fmt, ...) WT_GCC_FUNC_ATTRIBUTE((format(printf, 1, 2
     va_start(ap, fmt);
     ret = __wt_vsnprintf_len_incr(buf, sizeof(buf), &len, fmt, ap);
     va_end(ap);
+
     testutil_check(ret);
+
     if (len >= sizeof(buf))
         testutil_die(ERANGE, "The command is too long.");
 
-    testutil_check(system(buf));
+    if ((ret = (system(buf))) != 0)
+        testutil_die(ret, "%s/%d: system(%s)", function, line, buf);
 }

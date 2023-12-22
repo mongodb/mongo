@@ -67,11 +67,8 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 dump_table(const char *home, const char *table, const char *out_file)
 {
-    char buf[1024];
-
-    testutil_snprintf(buf, sizeof(buf), "%s -R -h %s/%s dump %s > %s/%s", wt_tool_path, test_root,
-      home, table, test_root, out_file);
-    testutil_check(system(buf));
+    testutil_system(
+      "%s -R -h %s/%s dump %s > %s/%s", wt_tool_path, test_root, home, table, test_root, out_file);
 }
 
 /*
