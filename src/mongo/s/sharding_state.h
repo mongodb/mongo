@@ -67,7 +67,7 @@ public:
     // DO NOT ADD NEW USAGES
     //
     // TODO (SERVER-84334): This method is necessary to get tests that use multiple sharding
-    // features to work. Without it and due to the multiple inheritance of features, certain tests
+    // fixtures to work. Without it and due to the multiple inheritance of fixtures, certain tests
     // invoke the `create` method above more than once.
     //
     static void create_forTest_DO_NOT_USE(ServiceContext* serviceContext);
