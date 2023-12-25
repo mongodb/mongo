@@ -143,16 +143,16 @@ protected:
             auto [chunks, chunkManager] = createChunks(nShards, nChunks, shards);
 
             const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
+            ShardingState::create(serviceContext);
+            CollectionShardingStateFactory::set(
+                serviceContext,
+                std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
+
             ShardingState::get(serviceContext)
                 ->setRecoveryCompleted({clusterId,
                                         ClusterRole::ShardServer,
                                         ConnectionString(kConfigHostAndPort),
                                         originatorShard});
-
-            ShardingState::create(serviceContext);
-            CollectionShardingStateFactory::set(
-                serviceContext,
-                std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
 
             _shardVersion.emplace(ShardVersionFactory::make(
                 chunkManager, originatorShard, boost::optional<CollectionIndexes>(boost::none)));
