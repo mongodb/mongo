@@ -76,8 +76,8 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
         if (computedFromMeta.find(field) == computedFromMeta.end()) {
             // For each path requested by the query we generate a 'topLevelPath' version, which is
             // just the value of the top level field, with no traversal.
-            ret.topLevelPaths.emplace_back(
-                sv::CellBlock::PathRequest{{sv::CellBlock::Get{field}, sv::CellBlock::Id{}}});
+            ret.topLevelPaths.emplace_back(sv::CellBlock::PathRequest(
+                sv::CellBlock::kProject, {sv::CellBlock::Get{field}, sv::CellBlock::Id{}}));
         }
     }
 
@@ -94,7 +94,7 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
                 computedFromMeta.find(rootField) == computedFromMeta.end()) {
 
                 FieldPath fp(path);
-                sv::CellBlock::PathRequest pReq;
+                sv::CellBlock::PathRequest pReq(sv::CellBlock::kFilter);
                 for (size_t i = 0; i < fp.getPathLength(); i++) {
                     pReq.path.insert(pReq.path.end(),
                                      {sv::CellBlock::Get{fp.getFieldName(i).toString()},
@@ -117,8 +117,9 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
         tassert(8032300,
                 "Should have no traverse fields if there are no top-level fields",
                 ret.traversePaths.empty());
-        ret.topLevelPaths.push_back(sv::CellBlock::PathRequest{
-            {sv::CellBlock::Get{unpackNode->bucketSpec.timeField()}, sv::CellBlock::Id{}}});
+        ret.topLevelPaths.push_back(sv::CellBlock::PathRequest(
+            sv::CellBlock::kProject,
+            {sv::CellBlock::Get{unpackNode->bucketSpec.timeField()}, sv::CellBlock::Id{}}));
     }
 
     return ret;

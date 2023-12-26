@@ -75,8 +75,15 @@ struct CellBlock {
 
     using Component = std::variant<Get, Traverse, Id>;
     using Path = std::vector<Component>;
+    enum PathRequestType { kFilter, kProject };
 
     struct PathRequest {
+        PathRequest() = delete;
+        PathRequest(PathRequestType t) : type(t) {}
+        PathRequest(PathRequestType t, Path p) : type(t), path(std::move(p)) {}
+
+        PathRequestType type;
+
         // The path requested (ie which fields).
         Path path;
 

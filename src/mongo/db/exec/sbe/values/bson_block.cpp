@@ -29,29 +29,95 @@
 
 #include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe::value {
 namespace {
 struct FilterPositionInfoRecorder {
-    std::vector<char> result;
+    FilterPositionInfoRecorder() : outputArr(std::make_unique<HeterogeneousBlock>()) {}
 
-    bool isNewDoc = false;
-
-    void recordValue() {
-        result.push_back(char(isNewDoc));
+    void recordValue(TypeTags tag, Value val) {
+        auto [cpyTag, cpyVal] = copyValue(tag, val);
+        outputArr->push_back(cpyTag, cpyVal);
+        posInfo.push_back(char(isNewDoc));
         isNewDoc = false;
     }
 
     void newDoc() {
         isNewDoc = true;
     }
+
+    void endDoc() {
+        if (isNewDoc) {
+            outputArr->push_back(value::TypeTags::Nothing, Value(0));
+            posInfo.push_back(char(true));
+        }
+    }
+
+    std::vector<char> posInfo;
+    bool isNewDoc = false;
+    std::unique_ptr<HeterogeneousBlock> outputArr;
+};
+
+struct ProjectionPositionInfoRecorder {
+    ProjectionPositionInfoRecorder() : outputArr(std::make_unique<HeterogeneousBlock>()) {}
+
+    void recordValue(TypeTags tag, Value val) {
+        isNewDoc = false;
+
+        auto [cpyTag, cpyVal] = copyValue(tag, val);
+        if (arrayStack.empty()) {
+            outputArr->push_back(cpyTag, cpyVal);
+        } else {
+            arrayStack.back()->push_back(cpyTag, cpyVal);
+        }
+    }
+
+    void newDoc() {
+        isNewDoc = true;
+    }
+
+    void endDoc() {
+        if (isNewDoc) {
+            // We didn't record anything for the last document, so add a Nothing to our block.
+            outputArr->push_back(TypeTags::Nothing, Value(0));
+        }
+        isNewDoc = false;
+    }
+
+    void startArray() {
+        isNewDoc = false;
+        arrayStack.push_back(std::make_unique<Array>());
+    }
+
+    void endArray() {
+        invariant(!arrayStack.empty());
+
+        if (arrayStack.size() > 1) {
+            // For a nested array, we cram it into its parent.
+            auto releasedArray = arrayStack.back().release();
+            arrayStack.pop_back();
+            arrayStack.back()->push_back(TypeTags::Array, bitcastFrom<Array*>(releasedArray));
+        } else {
+            outputArr->push_back(TypeTags::Array,
+                                 bitcastFrom<Array*>(arrayStack.front().release()));
+
+            arrayStack.clear();
+        }
+    }
+
+    std::unique_ptr<HeterogeneousBlock> outputArr;
+    std::vector<std::unique_ptr<value::Array>> arrayStack;
+    bool isNewDoc = false;
 };
 
 struct BsonWalkNode {
     bool isTraverse = false;
 
-    HeterogeneousBlock* outBlock = nullptr;
     FilterPositionInfoRecorder* filterPosInfoRecorder = nullptr;
+
+    std::vector<ProjectionPositionInfoRecorder*> childProjRecorders;
+    ProjectionPositionInfoRecorder* projRecorder = nullptr;
 
     // Children which are Get nodes.
     StringMap<std::unique_ptr<BsonWalkNode>> getChildren;
@@ -60,8 +126,8 @@ struct BsonWalkNode {
     std::unique_ptr<BsonWalkNode> traverseChild;
 
     void add(const CellBlock::Path& path,
-             HeterogeneousBlock* out,
              FilterPositionInfoRecorder* recorder,
+             ProjectionPositionInfoRecorder* outProjBlockRecorder,
              size_t pathIdx = 0) {
         if (pathIdx == 0) {
             // Check some invariants about the path.
@@ -74,18 +140,29 @@ struct BsonWalkNode {
             auto& get = std::get<CellBlock::Get>(path[pathIdx]);
             auto [it, inserted] =
                 getChildren.insert(std::pair(get.field, std::make_unique<BsonWalkNode>()));
-            it->second->add(path, out, recorder, pathIdx + 1);
+            it->second->add(path, recorder, outProjBlockRecorder, pathIdx + 1);
         } else if (holds_alternative<CellBlock::Traverse>(path[pathIdx])) {
             invariant(pathIdx != 0);
             if (!traverseChild) {
                 traverseChild = std::make_unique<BsonWalkNode>();
                 traverseChild->isTraverse = true;
             }
-            traverseChild->add(path, out, recorder, pathIdx + 1);
+            if (outProjBlockRecorder) {
+                // Each node must know about all projection recorders below it, not just ones
+                // directly below.
+                childProjRecorders.push_back(outProjBlockRecorder);
+            }
+
+            traverseChild->add(path, recorder, outProjBlockRecorder, pathIdx + 1);
         } else if (holds_alternative<CellBlock::Id>(path[pathIdx])) {
             invariant(pathIdx != 0);
-            filterPosInfoRecorder = recorder;
-            outBlock = out;
+
+            if (recorder) {
+                filterPosInfoRecorder = recorder;
+            }
+            if (outProjBlockRecorder) {
+                projRecorder = outProjBlockRecorder;
+            }
             invariant(pathIdx == path.size() - 1);
         }
     }
@@ -112,6 +189,11 @@ void walkField(BsonWalkNode* node, const BSONElement& elem) {
         }
     } else if (elem.type() == BSONType::Array) {
         if (node->traverseChild) {
+            // The projection traversal semantics are "special" in that the leaf must know
+            // when there is an array higher up in the tree.
+            for (auto& projRecorder : node->childProjRecorders) {
+                projRecorder->startArray();
+            }
             // Follow "traverse" semantics by invoking our children on direct array elements.
             size_t idx = 0;
             for (auto arrElem : elem.embeddedObject()) {
@@ -119,20 +201,25 @@ void walkField(BsonWalkNode* node, const BSONElement& elem) {
 
                 ++idx;
             }
+
+            for (auto& projRecorder : node->childProjRecorders) {
+                projRecorder->endArray();
+            }
         }
     } else if (node->traverseChild) {
-        // We didn't see an array but we will apply the traverse to this scalar anyway.
+        // We didn't see an array, so we apply the node below the traverse to this scalar.
         walkField(node->traverseChild.get(), elem);
     }
 
-    if (node->outBlock) {
-        auto [tag, val] = bson::convertFrom<false>(elem);
-
-        node->outBlock->push_back(tag, val);
+    if (node->filterPosInfoRecorder || node->projRecorder) {
+        auto [tag, val] = bson::convertFrom<true>(elem);
 
         if (auto rec = node->filterPosInfoRecorder) {
-            rec->recordValue();
-            invariant(node->outBlock->size() == rec->result.size());
+            rec->recordValue(tag, val);
+        }
+
+        if (auto rec = node->projRecorder) {
+            rec->recordValue(tag, val);
         }
     }
 }
@@ -141,67 +228,48 @@ void walkField(BsonWalkNode* node, const BSONElement& elem) {
 std::vector<std::unique_ptr<CellBlock>> extractCellBlocksFromBsons(
     const std::vector<CellBlock::PathRequest>& pathReqs, const std::vector<BSONObj>& bsons) {
 
-    std::vector<std::unique_ptr<HeterogeneousBlock>> out(pathReqs.size());
-    for (auto& req : out) {
-        req = std::make_unique<HeterogeneousBlock>();
-    }
-
-    std::vector<FilterPositionInfoRecorder> filterPositionInfoRecorders(out.size());
+    std::vector<FilterPositionInfoRecorder> filterPositionInfoRecorders(pathReqs.size());
+    std::vector<ProjectionPositionInfoRecorder> projPositionInfoRecorders(pathReqs.size());
     BsonWalkNode root;
     {
         size_t idx = 0;
         for (auto& pathReq : pathReqs) {
-            auto* filterRecorder = &filterPositionInfoRecorders[idx];
-
-            root.add(pathReq.path, out[idx].get(), filterRecorder);
-            invariant(out[idx]);
+            if (pathReq.type == CellBlock::PathRequestType::kFilter) {
+                root.add(pathReq.path, &filterPositionInfoRecorders[idx], nullptr);
+            } else {
+                root.add(pathReq.path, nullptr, &projPositionInfoRecorders[idx]);
+            }
             ++idx;
         }
     }
 
-    // Track which blocks were added to. This allows us to "fill" in explicit Nothings
-    // for missing fields.
-    std::vector<size_t> outSizes(out.size());
-
     for (auto& obj : bsons) {
-        {
-            size_t idx = 0;
-            for (auto& block : out) {
-                outSizes[idx] = block->size();
-
-                // Indicate that we're starting a new doc.
-                filterPositionInfoRecorders[idx].newDoc();
-
-                ++idx;
-            }
+        for (size_t idx = 0; idx < pathReqs.size(); ++idx) {
+            filterPositionInfoRecorders[idx].newDoc();
+            projPositionInfoRecorders[idx].newDoc();
         }
 
         walkObj(&root, obj);
 
-        {
-            size_t idx = 0;
-            for (auto& block : out) {
-                if (outSizes[idx] == block->size()) {
-                    // Nothing was added to the block for this document, so we pad with an explicit
-                    // Nothing.
-                    block->push_back(value::TypeTags::Nothing, Value(0));
-                    filterPositionInfoRecorders[idx].recordValue();
-                    invariant(block->size() == filterPositionInfoRecorders[idx].result.size());
-                }
-                ++idx;
-            }
+        for (size_t idx = 0; idx < pathReqs.size(); ++idx) {
+            filterPositionInfoRecorders[idx].endDoc();
+            projPositionInfoRecorders[idx].endDoc();
         }
     }
 
     std::vector<std::unique_ptr<CellBlock>> ret;
-    size_t idx = 0;
-    for (auto& block : out) {
+    for (size_t idx = 0; idx < pathReqs.size(); ++idx) {
         auto matBlock = std::make_unique<MaterializedCellBlock>();
-        matBlock->_deblocked = std::move(block);
-        matBlock->_filterPosInfo = std::move(filterPositionInfoRecorders[idx].result);
+        if (pathReqs[idx].type == CellBlock::PathRequestType::kFilter) {
+            matBlock->_deblocked = std::move(filterPositionInfoRecorders[idx].outputArr);
+            matBlock->_filterPosInfo = std::move(filterPositionInfoRecorders[idx].posInfo);
+        } else if (pathReqs[idx].type == CellBlock::PathRequestType::kProject) {
+            auto& block = projPositionInfoRecorders[idx].outputArr;
+            invariant(block->size() == bsons.size());
+            matBlock->_deblocked = std::move(block);
+            // No associated position info since we already have one value per document.
+        }
         ret.push_back(std::move(matBlock));
-
-        ++idx;
     }
 
     return ret;

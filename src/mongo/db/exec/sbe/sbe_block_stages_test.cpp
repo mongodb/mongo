@@ -87,8 +87,9 @@ protected:
 
         std::vector<value::CellBlock::PathRequest> pathRequests;
         for (const auto& cellPath : cellPaths) {
-            pathRequests.emplace_back(value::CellBlock::PathRequest{
-                {value::CellBlock::Get{cellPath}, value::CellBlock::Id{}}});
+            pathRequests.emplace_back(value::CellBlock::PathRequest(
+                value::CellBlock::PathRequestType::kFilter,
+                {value::CellBlock::Get{cellPath}, value::CellBlock::Id{}}));
         }
 
         auto tsBucketStage = makeS<TsBucketToCellBlockStage>(std::move(input),
