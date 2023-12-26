@@ -435,8 +435,6 @@ last-continuous:
     ticket: SERVER-78066
   - test_file: src/mongo/db/modules/enterprise/jstests/external_auth_oidc/oidc_omit_client_id.js
     ticket: SERVER-78066
-  - test_file: jstests/sharding/coordinate_txn_recover_on_stepup_with_tickets_exhausted.js
-    ticket: SERVER-82883
   - test_file: jstests/core/command_let_variables.js
     ticket: SERVER-83685
   - test_file: jstests/core/query/plan_cache/plan_cache_list_shapes.js
@@ -922,8 +920,6 @@ last-lts:
     ticket: SERVER-82984
   - test_file: jstests/core/timeseries/timeseries_project_pushdown.js
     ticket: SERVER-82447
-  - test_file: jstests/sharding/coordinate_txn_recover_on_stepup_with_tickets_exhausted.js
-    ticket: SERVER-82883
   - test_file: jstests/core/query/explode_for_sort_plan_cache.js
     ticket: SERVER-83777
   - test_file: jstests/core/command_let_variables.js

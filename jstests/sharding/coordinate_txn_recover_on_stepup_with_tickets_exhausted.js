@@ -7,6 +7,7 @@
  *   uses_transactions,
  *   uses_multi_shard_transaction,
  *   uses_prepare_transaction,
+ *   multiversion_incompatible,
  * ]
  */
 
