@@ -60,6 +60,11 @@ patch_aliases:
 - alias: security
   variant: '^(.*security-patch-only|linux-x86-dynamic-compile|windows-compile-required)$'
   task: '.*'
+- alias: bazel
+  variant_tags: ["bazel_check"]
+
+##
+
 
 #######################################
 #               Modules               #

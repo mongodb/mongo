@@ -43,6 +43,7 @@ buildvariants:
 - name: &windows-bazel-compile windows-bazel-compile
   display_name: "Windows Bazel Compile"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
   run_on:
   - windows-vsCurrent-xlarge
   stepback: false

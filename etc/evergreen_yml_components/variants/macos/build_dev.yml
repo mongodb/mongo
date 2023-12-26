@@ -6,6 +6,7 @@ buildvariants:
 - name: &macos-amd64-bazel-compile macos-amd64-bazel-compile
   display_name: "MacOS AMD64 Bazel Compile"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
   run_on:
   - macos-1100
   expansions:
@@ -31,6 +32,7 @@ buildvariants:
 - name: &macos-arm64-bazel-compile macos-arm64-bazel-compile
   display_name: "MacOS ARM64 Bazel Compile"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
   run_on:
   - macos-1100-arm64
   expansions:
