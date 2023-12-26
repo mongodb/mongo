@@ -87,7 +87,7 @@ class test_backup12(backup_base):
         self.session.drop(self.uri_rem)
 
         # Now do an incremental backup with id 2.
-        (bkup_files, _) = self.take_incr_backup(self.dir, 2)
+        (bkup_files, _) = self.take_incr_backup(self.dir, 1, 2)
         all_files += bkup_files
 
         # We need to remove files in the backup directory that are not in the current backup.

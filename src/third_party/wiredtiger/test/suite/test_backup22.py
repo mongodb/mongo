@@ -86,7 +86,7 @@ class test_backup22(backup_base):
             self.session.checkpoint()
         # Perform incremental backup with id 2 on empty directory. We want empty directory
         # because we expect all files to be copied over in it's entirety.
-        self.take_incr_backup(self.incr_dir, 2)
+        self.take_incr_backup(self.incr_dir, 1, 2)
         self.compare_backups(self.uri, self.dir, self.incr_dir)
 
 if __name__ == '__main__':
