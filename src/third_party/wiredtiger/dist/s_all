@@ -1,9 +1,36 @@
 #!/bin/bash
 
 # Run standard scripts.
+
 t=__wt.$$
 t_pfx=__s_all_tmp_
-trap 'rm -f $t *.pyc __tmp __wt.* __s_all_tmp*' 0 1 2 3 13 15
+
+allchildpids() { # Recursively get PIDs of all child processes.
+    ps -o pid,ppid | python3 -c '
+import re, os, sys
+children = {}   # Map from parent PID to list of child PIDs.
+for line in sys.stdin.readlines():
+    (pid, ppid) = [*re.findall("""(\d+)""", line), 0, 0][:2]
+    if pid and ppid and pid != str(os.getpid()):
+        if ppid not in children: children[ppid] = []
+        children[ppid].append(pid)
+pids = children[sys.argv[1]].copy() if sys.argv[1] in children else []
+while len(pids):
+    (pid, pids) = (pids[0], pids[1:])   # pop one element and shift the list.
+    print(pid)
+    if pid in children: pids.extend(children[pid])
+' $$
+}
+
+trap '
+    exitcode=$?
+    # Kill all child processes recursively.
+    kill `allchildpids` 2>/dev/null
+    # Cleanup in both current and parent dir.
+    rm -f {,../}{$t,*.pyc,__tmp*,__wt.*,__s_all_tmp*}
+    # Do not attempt to continue execution.
+    exit $exitcode
+' 0 1 2 3 13 15
 
 # We require python3 which may not be installed.
 type python3 > /dev/null 2>&1 || {
@@ -26,7 +53,7 @@ while :
     -f)    # Force versions to be updated
         force="-f"
         shift;;
-    -F) # Run fast.
+    -F)    # Run fast.
         echo "dist/s_all running in fast mode..."
         fast="-F"
         shift;;
@@ -44,14 +71,13 @@ errchk()
         return
     fi
 
-    echo "####################### MESSAGE ############################"
-    echo "s_all run of: \"$1\" resulted in:"
-    sed -e 's/^/    /' $2
-    echo "#######################"
+    echo '#########' s_all run of: "$1" resulted in:$'\n'"$(cat $2)"$'\n''#########'
 
-    # If the test was skipped or marked warning only, ignore the failure.
-    if [ ! `grep "$1.*skipped" $2 > /dev/null` ] && [ ! "$3" = "--warning-only" ] ; then
+    if grep -q "$1.*skipped" $2 || [[ "$3" = "--warning-only" ]]; then
+        : # If the test was skipped or marked warning only, ignore the failure.
+    else
         errfound=1;
+        echo "$1" >> "${t_pfx}_errfound"
     fi
 
     rm -f $2
@@ -59,76 +85,62 @@ errchk()
 
 run()
 {
-    2>&1 $1 > $t
-    errchk "$1" $t "$2"
+    local cmd="$1" flags="$2"
+    local name="${cmd%% *}"
+    local t="${t_pfx}-${name}-$$"
+    [[ "$name" =~ .*\.py$ ]] && cmd="python3 $cmd" || cmd="/bin/bash $cmd"
+    $cmd > $t 2>&1
+    errchk "$name" "$t" "$flags"
 }
 
 # Non parallelizable scripts. The following scripts either modify files or
 # already parallelize internally.
-run "bash ./s_readme $force"
-run "bash ./s_install $force"
-run "python3 api_config_gen.py"
-run "python3 api_err.py"
-run "python3 flags.py"
-run "python3 log.py"
-run "python3 stat.py"
-run "python3 verbose.py"
-run "bash ./s_copyright"
-run "bash ./s_style ${fast}"
-run "./s_clang_format ${fast}"
-run "python3 prototypes.py"
-run "bash ./s_typedef -b"
-run "python3 test_tag.py"
-# The s_mentions script requires bash.
-run "./s_mentions" "--warning-only"
+run "s_readme $force"
+run "s_install $force"
+run "api_config_gen.py"
+run "api_err.py"
+run "flags.py"
+run "log.py"
+run "stat.py"
+run "verbose.py"
+run "s_copyright"
+run "s_style $fast"
+run "s_clang_format $fast"
+run "prototypes.py"
+run "s_typedef -b"
+run "test_tag.py"
+run "s_mentions" "--warning-only"
 
-COMMANDS="
-2>&1 ./s_define > ${t_pfx}s_define
-2>&1 ./s_docs > ${t_pfx}s_docs
-2>&1 ./s_evergreen > ${t_pfx}s_evergreen
-2>&1 ./s_evergreen_validate ${fast} > ${t_pfx}s_evergreen_validate
-2>&1 ./s_export > ${t_pfx}s_export
-2>&1 ./s_free > ${t_pfx}s_free
-2>&1 ./s_funcs > ${t_pfx}s_funcs
-2>&1 ./s_function ${fast} > ${t_pfx}s_function
-2>&1 ./s_getopt > ${t_pfx}s_getopt
-2>&1 ./s_lang > ${t_pfx}s_lang
-2>&1 ./s_longlines > ${t_pfx}s_longlines
-2>&1 ./s_python > ${t_pfx}s_python
-2>&1 ./s_stat > ${t_pfx}_stat
-2>&1 ./s_string > ${t_pfx}s_string
-2>&1 ./s_tags > ${t_pfx}tags
-2>&1 ./s_typedef -c > ${t_pfx}s_typedef_c
-2>&1 ./s_visibility_checks > ${t_pfx}s_visibility_checks
-2>&1 ./s_void > ${t_pfx}s_void
-2>&1 ./s_whitespace > ${t_pfx}s_whitespace
-2>&1 python3 function.py > ${t_pfx}py_function
-2>&1 python3 style.py > ${t_pfx}py_style
-2>&1 python3 comment_style.py ${fast} > ${t_pfx}py_comment_style
-2>&1 python3 type_to_str.py > ${t_pfx}py_type_to_str
-" # the closing quote needs to be on a separate line, or the wrong command is run.
+# Run in parallel:
+run "s_define" &
+run "s_docs" &
+run "s_evergreen" &
+run "s_evergreen_validate $fast" &
+run "s_export" &
+run "s_free" &
+run "s_funcs" &
+run "s_function $fast" &
+run "s_getopt" &
+run "s_lang" &
+run "s_longlines" &
+run "s_python" &
+run "s_stat" &
+run "s_string" &
+run "s_tags" &
+run "s_typedef -c" &
+run "s_visibility_checks" &
+run "s_void" &
+run "s_whitespace" &
+run "function.py" &
+run "style.py" &
+run "comment_style.py $fast" &
+run "type_to_str.py" &
+wait
 
-# Parallelize if possible.
-xp=""
-echo date | xargs -P 20 >/dev/null 2>&1
-if test $? -eq 0; then
-    xp="-P 20"
-fi
-echo "$COMMANDS" | xargs $xp -I{} /bin/bash -c {}
-
-# For each command check if an output file has been generated. If it has, report the contents and
-# the command used to populate it.
-while read -r line ; do
-    outputfile=$(echo "$line" | sed -e 's/.* > //')
-    if test -s "$outputfile" ; then
-        check=$(echo "$line" | sed -e 's/ >.*//' -e 's/2>&1 //')
-        errchk "$check" "$outputfile"
-    fi
-done <<EOT
-"$COMMANDS"
-EOT
+[[ -s "${t_pfx}_errfound" ]] && errfound=1
 
 echo "dist/s_all run finished. Error? $errfound"
+[[ $errfound -ne 0 ]] && echo Fatal errors reported by: `cat "${t_pfx}_errfound"`
 if test $errmode -ne 0; then
     exit $errfound;
 fi

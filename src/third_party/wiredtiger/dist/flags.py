@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import re, sys
+import os, re, sys
 from dist import all_c_files, all_h_files, compare_srcfile
 
 # Automatically build flags values: read through all of the header files, and
@@ -12,7 +12,7 @@ from dist import all_c_files, all_h_files, compare_srcfile
 #
 # and it will be automatically alphabetized and assigned the proper value.
 def flag_declare(name):
-    tmp_file = '__tmp'
+    tmp_file = '__tmp_flags' + str(os.getpid())
     with open(name, 'r') as f:
         tfile = open(tmp_file, 'w')
 

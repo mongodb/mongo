@@ -17,7 +17,7 @@ else:
     import test_data as api_data_def
 
 # Temporary file.
-tmp_file = '__tmp'
+tmp_file = '__tmp_apiconfig' + str(os.getpid())
 
 #####################################################################
 # Update wiredtiger.in with doxygen comments

@@ -50,7 +50,8 @@ def main():
     closed_ticket_found=False
     STATUS_CATEGORY_DONE='rest/api/2/statuscategory/3'
     for ticket in sorted(find_fixme_tickets()):
-        rest_query = f"curl -X GET https://jira.mongodb.org/rest/api/2/issue/{ticket}?fields=status"
+        rest_query = \
+            f"curl -s -X GET https://jira.mongodb.org/rest/api/2/issue/{ticket}?fields=status"
         query_result = subprocess.run(rest_query, shell=True, capture_output=True, text=True).stdout
         if STATUS_CATEGORY_DONE in query_result:
             print(f"{ticket} has a FIXME comment in the codebase but the ticket is closed.")

@@ -201,6 +201,7 @@ else
     # Direct calls to functions we're not supposed to use in the library.
     # We don't check for all of them, just a few of the common ones.
     if ! expr "$f" : 'bench/.*' > /dev/null &&
+       ! expr "$f" : 'dist/.*' > /dev/null &&
        ! expr "$f" : 'examples/.*' > /dev/null &&
        ! expr "$f" : 'ext/.*' > /dev/null &&
        ! expr "$f" : 'test/.*' > /dev/null; then

@@ -45,7 +45,7 @@ def generate_string_conversion(docstring, name, define_regex, srcfile, out):
 
 if __name__ == '__main__':
     src = '../src/include/str_inline.h'
-    tmp = '__tmp' + str(os.getpid())
+    tmp = '__tmp_type_to_str' + str(os.getpid())
 
     with open(tmp, 'w') as tfile:
         generate_string_conversion('Convert a prepare state to its string representation.',

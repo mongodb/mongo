@@ -21,7 +21,7 @@ download_clang_format() {
     # The tarball should extract using the tar command below.
     # This tarball can then be uploaded via a Jira request to the BUILD team.
     if [[ "$arch_and_os" =~ ^("aarch64-Linux"|"x86_64-Darwin"|"arm64-Darwin"|"x86_64-Linux")$ ]] ; then
-        curl https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-llvm-"$version"-"$arch_and_os".tar.gz -o $archive
+        curl -s https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-llvm-"$version"-"$arch_and_os".tar.gz -o $archive
         tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-"$arch_and_os"/clang-format && rm $archive
         chmod +x ./dist/clang-format
 

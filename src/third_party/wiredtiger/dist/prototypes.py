@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Generate WiredTiger function prototypes.
-import fnmatch, re
+import fnmatch, re, os
 from dist import compare_srcfile, format_srcfile, source_files
 
 def clean_function_name(filename, fn):
@@ -60,7 +60,7 @@ def fn_prototypes(fns, tests, name):
 # Unit-testing functions are exposed separately in their own section to
 # allow them to be ifdef'd out.
 def output(fns, tests, f):
-    tmp_file = '__tmp'
+    tmp_file = '__tmp_prototypes' + str(os.getpid())
     tfile = open(tmp_file, 'w')
     for e in sorted(list(set(fns))):
         tfile.write(e)

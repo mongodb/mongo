@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import re
+import os, re
 from dist import compare_srcfile
 
 verbose_categories = []
@@ -41,7 +41,7 @@ start_tag = 'AUTOMATIC VERBOSE ENUM STRING GENERATION START'
 stop_tag = 'AUTOMATIC VERBOSE ENUM STRING GENERATION STOP'
 
 # Generate all verbose categories as strings
-tmp_file = '__tmp_verbose'
+tmp_file = '__tmp_verbose' + str(os.getpid())
 with open(filename, 'r') as f:
 
     tfile = open(tmp_file, 'w')

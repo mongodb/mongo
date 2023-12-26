@@ -1,2 +1,2 @@
 #!/bin/bash
-./s_all -F
+./s_all -F "$@"

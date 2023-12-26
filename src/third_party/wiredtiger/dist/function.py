@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Check the style of WiredTiger C code.
-import re, sys
+import os, re, sys
 from dist import all_c_files, compare_srcfile
 
 # Complain if a function comment is missing.
@@ -132,7 +132,7 @@ def function_args(name, line):
 
 # Put function arguments in correct sort order.
 def function_declaration():
-    tmp_file = '__tmp'
+    tmp_file = '__tmp_function' + str(os.getpid())
     for name in all_c_files():
         skip_re = re.compile(r'DO NOT EDIT: automatically built')
         s = open(name, 'r').read()

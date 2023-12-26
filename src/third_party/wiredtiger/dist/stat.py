@@ -3,7 +3,7 @@
 # Read the source files and output the statistics #defines plus the
 # initialize and refresh code.
 
-import re, string, sys, textwrap
+import os, textwrap
 from dist import compare_srcfile, format_srcfile
 from operator import attrgetter
 
@@ -50,7 +50,7 @@ def print_struct(title, name, base, stats):
     f.write('};\n\n')
 
 # Update the #defines in the stat.h file.
-tmp_file = '__tmp'
+tmp_file = '__tmp_stat' + str(os.getpid())
 f = open(tmp_file, 'w')
 skip = 0
 for line in open('../src/include/stat.h', 'r'):
@@ -133,7 +133,7 @@ def print_defines():
     f.write('/*! @} */\n')
 
 # Update the #defines in the wiredtiger.in file.
-tmp_file = '__tmp'
+tmp_file = '__tmp_stat' + str(os.getpid())
 f = open(tmp_file, 'w')
 skip = 0
 for line in open('../src/include/wiredtiger.in', 'r'):
