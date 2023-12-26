@@ -1,4 +1,6 @@
 /build
+/src/mongo/db/modules/*
+!/src/mongo/db/modules/enterprise/
 /src/mongo/db/modules
 /.jsdbshell
 /.cache

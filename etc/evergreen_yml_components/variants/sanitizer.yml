@@ -28,8 +28,6 @@ buildvariants:
 - name: rhel80-debug-asan
   display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -102,8 +100,6 @@ buildvariants:
 - name: rhel80-debug-ubsan
   display_name: ~ UBSAN Enterprise RHEL 8.0 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false

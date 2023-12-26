@@ -82,7 +82,6 @@ buildvariants:
   - name: burn_in_tags_gen
 - name: enterprise-rhel-80-64-bit-majority-read-concern-off
   display_name: "Enterprise RHEL 8.0 (majority read concern off)"
-  modules: ["enterprise"]
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-majority-read-concern-off-expansions
@@ -95,7 +94,6 @@ buildvariants:
   - name: aggregation
 - name: enterprise-rhel-80-64-bit-inmem
   display_name: Enterprise RHEL 8.0 (inMemory)
-  modules: ["enterprise"]
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-inmem-expansions
@@ -126,8 +124,6 @@ buildvariants:
     multiversion_platform: rhel80
     scons_cache_scope: shared
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   tasks:

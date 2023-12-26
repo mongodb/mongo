@@ -8,12 +8,12 @@ buildvariants:
   - amazon2-test
   expansions:
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux --enableEnterpriseTests=off
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: amazon2
     multiversion_edition: targeted
     has_packages: true
@@ -53,8 +53,6 @@ buildvariants:
 - name: enterprise-amazon2
   display_name: "Enterprise Amazon Linux 2"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - amazon2-test
   expansions:
@@ -118,8 +116,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -155,8 +153,6 @@ buildvariants:
 - name: enterprise-amazon2-arm64
   display_name: "Enterprise Amazon Linux 2 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - amazon2-arm64-small
   expansions:
@@ -283,7 +279,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-debian10
-    compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: debian10
@@ -324,8 +321,6 @@ buildvariants:
 - name: enterprise-debian10-64
   display_name: Enterprise Debian 10
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - debian10-test
   expansions:
@@ -382,7 +377,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-debian11
-    compile_flags: --ssl MONGO_DISTMOD=debian11 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=debian11 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: debian11
@@ -423,8 +419,6 @@ buildvariants:
 - name: enterprise-debian11-64
   display_name: Enterprise Debian 11
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - debian11-small
   expansions:
@@ -478,7 +472,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel70
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: rhel70
     multiversion_edition: targeted
     has_packages: true
@@ -522,7 +517,8 @@ buildvariants:
   run_on:
   - rhel76-test
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -539,11 +535,11 @@ buildvariants:
   expansions:
     resmoke_jobs_factor: 1
     disable_shared_scons_cache: true
-    compile_flags: MONGO_DISTMOD=rhel80 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: MONGO_DISTMOD=rhel80 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
-      --excludeWithAnyTags=requires_os_access
+      --excludeWithAnyTags=requires_os_access --enableEnterpriseTests=off
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -562,7 +558,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel80
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: rhel80
     multiversion_edition: targeted
     has_packages: true
@@ -602,8 +599,6 @@ buildvariants:
 - name: enterprise-rhel-80-64-bit
   display_name: "Enterprise RHEL 8.0"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-expansions
@@ -726,7 +721,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-rhel82
-    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -734,7 +729,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: rhel82-arm64-large
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -763,8 +758,6 @@ buildvariants:
 - name: enterprise-rhel-82-arm64
   display_name: "Enterprise RHEL 8.2 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel82-arm64-small
   expansions:
@@ -829,7 +822,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: rhel90
     multiversion_edition: targeted
     has_packages: true
@@ -869,8 +863,6 @@ buildvariants:
 - name: enterprise-rhel-90-64-bit
   display_name: "Enterprise RHEL 9.0"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel90-small
   expansions: &enterprise-rhel-90-64-bit-expansions
@@ -953,7 +945,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -989,8 +982,6 @@ buildvariants:
 - name: enterprise-rhel-90-arm64
   display_name: "Enterprise RHEL 9.0 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel90-arm64-small
   expansions:
@@ -1055,7 +1046,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: suse12
     multiversion_edition: targeted
     has_packages: true
@@ -1064,7 +1055,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: org
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
     large_distro_name: suse12-sp5-large
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1097,8 +1088,6 @@ buildvariants:
 - name: enterprise-suse12-64
   display_name: Enterprise SLES 12
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - suse12-sp5-small
   expansions:
@@ -1144,8 +1133,6 @@ buildvariants:
 - name: enterprise-suse15-64
   display_name: Enterprise SLES 15
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - suse15-test
   expansions:
@@ -1194,7 +1181,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-suse15
-    compile_flags: --ssl MONGO_DISTMOD=suse15 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=suse15 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: suse15
@@ -1205,7 +1192,7 @@ buildvariants:
     packager_distro: suse15
     repo_edition: org
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
     large_distro_name: suse15-build
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1243,10 +1230,10 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu1804
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -1288,8 +1275,6 @@ buildvariants:
 - name: enterprise-ubuntu1804-64
   display_name: Enterprise Ubuntu 18.04
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-test
   stepback: false
@@ -1353,8 +1338,6 @@ buildvariants:
 - name: enterprise-ubuntu1804-arm64
   display_name: Enterprise Ubuntu 18.04 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-arm64-build
   expansions:
@@ -1412,8 +1395,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu1804
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling --enableEnterpriseTests=off
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -1443,7 +1426,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: ubuntu2204
     multiversion_edition: targeted
     has_packages: true
@@ -1453,7 +1436,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: ubuntu2204-large
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -1491,7 +1474,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu2004
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     multiversion_platform: ubuntu2004
     multiversion_edition: targeted
     has_packages: true
@@ -1530,8 +1514,6 @@ buildvariants:
 - name: enterprise-ubuntu2004-64
   display_name: Enterprise Ubuntu 20.04
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu2004-small
   stepback: false
@@ -1581,8 +1563,6 @@ buildvariants:
 - name: enterprise-ubuntu2204-64
   display_name: Enterprise Ubuntu 22.04
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu2204-small
   stepback: false
@@ -1632,8 +1612,6 @@ buildvariants:
 - name: enterprise-ubuntu2004-arm64
   display_name: Enterprise Ubuntu 20.04 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu2004-arm64-large
   expansions:
@@ -1690,7 +1668,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2004
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -1713,8 +1692,6 @@ buildvariants:
 - name: enterprise-ubuntu2204-arm64
   display_name: Enterprise Ubuntu 22.04 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu2204-arm64-large
   expansions:
@@ -1771,7 +1748,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
+    test_flags: --enableEnterpriseTests=off
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -1807,13 +1785,13 @@ buildvariants:
     multiversion_platform_44_or_later: windows
     multiversion_edition: base
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
+    compile_flags: --ssl MONGO_DISTMOD=windows -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10 --modules=
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
     large_distro_name: windows-vsCurrent-large
-    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
+    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls --enableEnterpriseTests=off
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -1850,8 +1828,6 @@ buildvariants:
 - name: enterprise-windows
   display_name: "Enterprise Windows"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -1922,13 +1898,13 @@ buildvariants:
   run_on:
   - macos-1100
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos
+    test_flags: --excludeWithAnyTags=incompatible_with_macos --enableEnterpriseTests=off
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
     push_arch: x86_64
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --modules=
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1969,13 +1945,13 @@ buildvariants:
   run_on:
   - macos-1100-arm64
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos
+    test_flags: --excludeWithAnyTags=incompatible_with_macos --enableEnterpriseTests=off
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
     push_arch: arm64
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx_arm.vars
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx_arm.vars --modules=
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -2013,8 +1989,6 @@ buildvariants:
 - name: enterprise-macos
   display_name: Enterprise macOS
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - macos-1100
   expansions:
@@ -2048,8 +2022,6 @@ buildvariants:
 - name: enterprise-macos-arm64
   display_name: Enterprise macOS arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - macos-1100-arm64
   expansions:

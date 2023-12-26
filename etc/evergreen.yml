@@ -73,8 +73,6 @@ variables:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - windows-vsCurrent-small
-  modules:
-  - enterprise
   expansions: &enterprise-windows-nopush-expansions-template
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
     exe: ".exe"
@@ -122,8 +120,6 @@ variables:
   name: enterprise-rhel-70-64-bit
   display_name: "Enterprise RHEL 7.0"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel70-small
   expansions: &enterprise-rhel-70-64-bit-expansions-template
@@ -218,10 +214,10 @@ buildvariants:
   - rhel80-medium
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=on --link-model=dynamic
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=on --link-model=dynamic --modules=
     scons_cache_scope: shared
     scons_cache_mode: all
-    test_flags: --excludeWithAnyTags=requires_http_client
+    test_flags: --excludeWithAnyTags=requires_http_client --enableEnterpriseTests=off
     target_resmoke_time: 15
     max_sub_suites: 5
     num_scons_link_jobs_available: 0.99
@@ -282,11 +278,11 @@ buildvariants:
   expansions:
     use_wt_develop: true
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=on --link-model=dynamic
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=on --link-model=dynamic --modules=
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
-    test_flags: --excludeWithAnyTags=requires_http_client
+    test_flags: --excludeWithAnyTags=requires_http_client --enableEnterpriseTests=off
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -294,13 +290,13 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions: &linux-64-required-duroff-expansions
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=off --link-model=dynamic
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=off --link-model=dynamic --modules=
     multiversion_platform: rhel80
     multiversion_edition: targeted
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
     # does not include replica set tests. Since transactions are only supported on replica sets, we
     # exclude those tests as well.
-    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_sharding,uses_transactions,requires_http_client
+    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_sharding,uses_transactions,requires_http_client --enableEnterpriseTests=off
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
@@ -343,8 +339,6 @@ buildvariants:
   name: enterprise-rhel80-dynamic-v4gcc-debug-experimental
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
@@ -452,8 +446,6 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit-coverage
   display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage"
-  modules:
-  - enterprise
   run_on:
   - rhel80-medium
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -535,8 +527,6 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit-coverage-clang
   display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage (clang)"
-  modules:
-    - enterprise
   run_on:
     - rhel80-medium
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -568,8 +558,6 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit-coverage-experimental
   display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage (v4)"
-  modules:
-    - enterprise
   run_on:
     - rhel80-medium
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -598,8 +586,6 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit-coverage-clang-experimental
   display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage (v4 clang)"
-  modules:
-    - enterprise
   run_on:
     - rhel80-medium
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -628,8 +614,6 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit-bson-column
   display_name: "~ Shared Library Enterprise RHEL 8.0 (BSONColumn validate)"
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions:
@@ -773,8 +757,6 @@ buildvariants:
     compile_flags: --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=*
 
 - name: stm-daily-cron
-  modules:
-  - enterprise
   display_name: "~ STM Daily Cron"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -789,8 +771,6 @@ buildvariants:
   - name: powercycle_smoke_skip_compile_gen
 
 - name: security-daily-cron
-  modules:
-  - enterprise
   display_name: "~ Security Daily Cron"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -811,7 +791,7 @@ buildvariants:
   expansions:
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=on --win-version-min=win10 -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") MONGO_DISTMOD=windows
+    compile_flags: --dbg=on --opt=on --win-version-min=win10 -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") MONGO_DISTMOD=windows --modules=
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -819,7 +799,7 @@ buildvariants:
     multiversion_platform: windows
     multiversion_edition: enterprise
     large_distro_name: windows-vsCurrent-large
-    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
+    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls --enableEnterpriseTests=off
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -873,8 +853,6 @@ buildvariants:
   name: enterprise-windows-required
   display_name: "! Enterprise Windows"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -1028,8 +1006,6 @@ buildvariants:
 - name: enterprise-windows-cxx20-debug-experimental
   display_name: "~ Enterprise Windows C++20 DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -1083,8 +1059,6 @@ buildvariants:
 - name: enterprise-windows-debug-unoptimized
   display_name: Enterprise Windows DEBUG (Unoptimized)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -1122,10 +1096,10 @@ buildvariants:
   run_on:
   - macos-1100
   expansions: &macos-debug-expansions
-    test_flags: --excludeWithAnyTags=incompatible_with_macos
+    test_flags: --excludeWithAnyTags=incompatible_with_macos --enableEnterpriseTests=off
     resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --modules=
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1146,8 +1120,6 @@ buildvariants:
 - name: enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - macos-1100-arm64
   expansions:
@@ -1174,8 +1146,6 @@ buildvariants:
 - name: enterprise-macos-cxx20
   display_name: "Enterprise macOS C++20 DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - macos-1100
   expansions:
@@ -1200,8 +1170,6 @@ buildvariants:
 
 - name: enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64"
-  modules:
-  - enterprise
   run_on:
   - macos-1100-arm64
   expansions:
@@ -1237,10 +1205,11 @@ buildvariants:
   - macos-1100
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
-    test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos
+    test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos --enableEnterpriseTests=off
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: >-
+      --modules=
       --lto
       --variables-files=etc/scons/xcode_macosx.vars
       -j$(sysctl -n hw.logicalcpu)
@@ -1264,9 +1233,10 @@ buildvariants:
   run_on:
   - ubuntu1804-build
   expansions:
-    test_flags: --excludeWithAnyTags=uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions --enableEnterpriseTests=off
     # We need --allocator=system here to work around SERVER-27675
     compile_flags: >-
+      --modules=
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
       -j$(grep -c ^processor /proc/cpuinfo)
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
@@ -1288,8 +1258,6 @@ buildvariants:
   name: enterprise-rhel-80-64-bit-dynamic-required
   display_name: "! Shared Library Enterprise RHEL 8.0"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-dynamic-required-expansions
@@ -1436,8 +1404,6 @@ buildvariants:
   display_name: "! Shared Library Enterprise RHEL 8.0 (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   stepback: false
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
@@ -1575,8 +1541,6 @@ buildvariants:
   display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   stepback: false
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-dynamic-classic-engine-expansions
@@ -1694,8 +1658,6 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit-large-txns-format
   display_name: "Enterprise RHEL 8.0 (large transactions format)"
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -1778,8 +1740,6 @@ buildvariants:
   name: enterprise-rhel-80-64-bit-multiversion
   display_name: "Enterprise RHEL 8.0 (implicit multiversion)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-multiversion-expansions-template
@@ -1841,8 +1801,6 @@ buildvariants:
 - name: enterprise-rhel-80-64-bit-future-git-tag-multiversion
   display_name: "Enterprise RHEL 8.0 (future git tag multiversion)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions:
@@ -1916,8 +1874,6 @@ buildvariants:
   name: enterprise-rhel-80-64-bit-suggested
   display_name: "* Enterprise RHEL 8.0"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   expansions:
@@ -2064,11 +2020,12 @@ buildvariants:
   expansions:
     resmoke_jobs_factor: 1
     disable_shared_scons_cache: true
-    compile_flags: MONGO_DISTMOD=ubuntu1804 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: MONGO_DISTMOD=ubuntu1804 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
       --excludeWithAnyTags=requires_os_access
+      --enableEnterpriseTests=off
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -2079,8 +2036,6 @@ buildvariants:
 
 - name: enterprise-rhel-72-s390x-compile
   display_name: Enterprise RHEL 7.2 s390x Compile
-  modules:
-  - enterprise
   run_on:
   - rhel72-zseries-test
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -2114,8 +2069,6 @@ buildvariants:
 - name: enterprise-rhel80-dynamic-clang-tidy-required
   display_name: "! Enterprise Clang Tidy"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - rhel80-xlarge
   expansions:
@@ -2141,11 +2094,13 @@ buildvariants:
   - rhel80-small
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --modules=
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
     large_distro_name: rhel80-large
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_s390x
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -2177,8 +2132,6 @@ buildvariants:
 - name: enterprise-rhel-80-benchmarks
   display_name: Enterprise RHEL 8.0 (Benchmarks)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-medium
   expansions:
@@ -2202,7 +2155,8 @@ buildvariants:
       --storageEngine=ephemeralForTest
       --excludeWithAnyTags=requires_persistence,requires_fsync,requires_journaling,requires_wiredtiger,uses_transactions,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern,uses_change_streams,requires_sharding,incompatible_with_eft
       --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false}"
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+      --enableEnterpriseTests=off
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --modules=
     multiversion_platform: rhel80
     multiversion_edition: targeted
     scons_cache_mode: all
@@ -2247,8 +2201,6 @@ buildvariants:
 - name: rhel80-debug-asan-all-feature-flags
   display_name: "~ Shared Library ASAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -2258,7 +2210,7 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --modules=
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
@@ -2271,6 +2223,7 @@ buildvariants:
     test_flags: >-
       --additionalFeatureFlagsFile all_feature_flags.txt
       --excludeWithAnyTags=incompatible_with_shard_merge
+      --enableEnterpriseTests=off
     separate_debug: off
   tasks:
   - name: cqf
@@ -2322,8 +2275,6 @@ buildvariants:
 - name: rhel80-debug-asan-classic-engine
   display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG (Classic Engine)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -2333,10 +2284,11 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --modules=
     test_flags: >-
       --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
+      --enableEnterpriseTests=off
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
@@ -2394,8 +2346,6 @@ buildvariants:
 - name: rhel80-debug-ubsan-all-feature-flags
   display_name: "~ Shared Library UBSAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -2405,13 +2355,14 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --modules=
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --excludeWithAnyTags=requires_ocsp_stapling
       --excludeWithAnyTags=incompatible_with_shard_merge
       --additionalFeatureFlagsFile all_feature_flags.txt
+      --enableEnterpriseTests=off
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
@@ -2466,8 +2417,6 @@ buildvariants:
 - name: rhel80-debug-ubsan-classic-engine
   display_name: "~ UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -2477,10 +2426,11 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --modules=
     test_flags: >-
       --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
+      --enableEnterpriseTests=off
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
@@ -2533,8 +2483,6 @@ buildvariants:
   name: rhel80-debug-aubsan-lite-required
   display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: true
@@ -2544,8 +2492,8 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --modules=
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling --enableEnterpriseTests=off
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
@@ -2579,13 +2527,14 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --modules=
     # To force disable feature flags even on the all feature flags variant, please use this file:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --excludeWithAnyTags=requires_ocsp_stapling
       --excludeWithAnyTags=incompatible_with_shard_merge
       --additionalFeatureFlagsFile all_feature_flags.txt
+      --enableEnterpriseTests=off
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -2605,8 +2554,6 @@ buildvariants:
 - name: enterprise-rhel80-debug-tsan
   display_name: ~ TSAN Enterprise RHEL 8.0 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-large
   stepback: false
@@ -2637,8 +2584,6 @@ buildvariants:
 - name: enterprise-rhel80-unoptimized-64-bit
   display_name: "~ Enterprise RHEL 8.0 (without Diagnostic Latches)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   expansions:
     compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off --link-model=dynamic
     scons_cache_mode: all
@@ -2658,8 +2603,6 @@ buildvariants:
 - name: enterprise-rhel80-no-latch-64-bit
   display_name: "~ Enterprise RHEL 8.0 DEBUG (Unoptimized)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   expansions:
     compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --dbg=on --opt=off --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --detect-odr-violations
     scons_cache_mode: all
@@ -2681,8 +2624,6 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
-  modules:
-  - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -2721,8 +2662,6 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
-  modules:
-  - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -2760,8 +2699,6 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
-  modules:
-  - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -2797,8 +2734,6 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
-  modules:
-  - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -2835,8 +2770,6 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
-  modules:
-  - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -2873,8 +2806,6 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
-  modules:
-  - enterprise
   expansions:
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -2911,8 +2842,6 @@ buildvariants:
   activate: false
   run_on:
     - rhel80-small
-  modules:
-  - enterprise
   expansions:
     scons_cache_scope: shared
     compile_flags: MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -2958,8 +2887,6 @@ buildvariants:
 
 - name: selected-tests
   display_name: "~ Selected Tests"
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -2975,13 +2902,14 @@ buildvariants:
   expansions:
     # --link-model=dynamic is set by visiblity_test's task_compile_flags
     # expansion
-    compile_flags: CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    compile_flags: CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10 --modules=
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     has_packages: false
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
+    test_flags: --enableEnterpriseTests=off
   tasks:
   - name: visibility_test_TG
     distros:
@@ -3020,8 +2948,6 @@ buildvariants:
 - name: enterprise-ubuntu1804-64-libvoidstar
   display_name: ~ Enterprise Ubuntu 18.04 w/ libvoidstar
   cron: "0 4 * * FRI" # Every week at 0400 UTC Friday. This has to be a Friday since we run Antithesis on Fridays.
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-large
   stepback: false
@@ -3055,7 +2981,6 @@ buildvariants:
   display_name: "~ Enterprise Windows WiredTiger develop"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
-  - enterprise
   - wtdevelop
   expansions:
     <<: *enterprise-windows-nopush-expansions-template
@@ -3074,8 +2999,6 @@ buildvariants:
 - name: rhel80-debug-aubsan-lite_fuzzer
   display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -3085,8 +3008,8 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: LINKFLAGS=-nostdlib++ LIBS=stdc++ --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address,fuzzer --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    compile_flags: LINKFLAGS=-nostdlib++ LIBS=stdc++ --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address,fuzzer --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --modules=
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling --enableEnterpriseTests=off
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared

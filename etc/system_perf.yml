@@ -55,7 +55,6 @@ variables:
 
   _src_dir: &src_dir src/mongo
   _modules: &modules
-    - enterprise
     - mongo-tools
     # - mongo
     - dsi
@@ -122,10 +121,6 @@ modules:
 #    prefix: ${workdir}/src
 #    branch: master
   ###
-  - name: enterprise
-    repo: git@github.com:10gen/mongo-enterprise-modules.git
-    prefix: src/mongo/db/modules
-    branch: v6.0
   - name: mongo-tools
     repo: git@github.com:mongodb/mongo-tools.git
     prefix: mongo-tools/src/github.com/mongodb
@@ -554,7 +549,6 @@ tasks:
         params:
           directory: src
           revisions:
-            enterprise: ${enterprise_rev}
             mongo-tools: ${mongo-tools_rev}
       - func: "compile mongodb"
 

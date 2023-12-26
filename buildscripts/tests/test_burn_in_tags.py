@@ -79,7 +79,7 @@ class TestGenerateEvgBuildVariants(unittest.TestCase):
 
         generated_build_variant = build_variant.as_dict()
         self.assertEqual(generated_build_variant["name"], generated_variant)
-        self.assertEqual(generated_build_variant["modules"], variant.modules)
+        self.assertNotIn('modules', generated_build_variant)
         generated_expansions = generated_build_variant["expansions"]
         burn_in_bypass_expansion_value = generated_expansions.pop("burn_in_bypass")
         self.assertEqual(burn_in_bypass_expansion_value, burn_in_tags_gen_variant)

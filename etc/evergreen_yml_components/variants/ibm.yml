@@ -3,8 +3,6 @@
 buildvariants:
 - name: enterprise-rhel-81-ppc64le
   display_name: Enterprise RHEL 8.1 PPC64LE
-  modules:
-  - enterprise
   run_on:
   - rhel81-power8-small
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -57,8 +55,6 @@ buildvariants:
 
 - name: enterprise-rhel-71-ppc64le
   display_name: Enterprise RHEL 7.1 PPC64LE
-  modules:
-  - enterprise
   run_on:
   - rhel71-power8-small
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -111,8 +107,6 @@ buildvariants:
 
 - name: enterprise-rhel-72-s390x
   display_name: Enterprise RHEL 7.2 s390x
-  modules:
-  - enterprise
   run_on:
   - rhel72-zseries-test
   cron: "0 4 * * 0"
@@ -165,8 +159,6 @@ buildvariants:
 
 - name: enterprise-rhel-83-s390x
   display_name: Enterprise RHEL 8.3 s390x
-  modules:
-  - enterprise
   run_on:
   - rhel83-zseries-small
   cron: "0 4 * * 0"
