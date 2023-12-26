@@ -388,7 +388,7 @@ public:
 
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.
-            if (term && parsedNss == NamespaceString::kRsOplogNamespace) {
+            if (term && qr->nss() == NamespaceString::kRsOplogNamespace) {
                 // We do not want to take tickets for internal (replication) oplog reads. Stalling
                 // on ticket acquisition can cause complicated deadlocks. Primaries may depend on
                 // data reaching secondaries in order to proceed; and secondaries may get stalled

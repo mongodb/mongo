@@ -503,7 +503,7 @@ Status OpenWriteTransactionParam::setFromString(const std::string& str) {
     if (!status.isOK()) {
         return status;
     }
-    if (num <= 0) {
+    if (num <= 0 && !getTestCommandsEnabled()) {
         return {ErrorCodes::BadValue, str::stream() << name() << " has to be > 0"};
     }
     return _data->resize(num);
@@ -524,7 +524,7 @@ Status OpenReadTransactionParam::setFromString(const std::string& str) {
     if (!status.isOK()) {
         return status;
     }
-    if (num <= 0) {
+    if (num <= 0 && !getTestCommandsEnabled()) {
         return {ErrorCodes::BadValue, str::stream() << name() << " has to be > 0"};
     }
     return _data->resize(num);

@@ -35,6 +35,7 @@
 
 #include <iostream>
 
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
@@ -131,7 +132,7 @@ void TicketHolder::release() {
 Status TicketHolder::resize(int newSize) {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
-    if (newSize < 5)
+    if (newSize < 5 && !getTestCommandsEnabled())
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Minimum value for semaphore is 5; given " << newSize);
 
