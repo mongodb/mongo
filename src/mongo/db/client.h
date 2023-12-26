@@ -395,9 +395,7 @@ private:
     /**
      * Sets the active operation context on this client to "opCtx".
      */
-    void _setOperationContext(OperationContext* opCtx) {
-        _opCtx = opCtx;
-    }
+    void _setOperationContext(OperationContext* opCtx);
 
     Service* _service;
     const std::shared_ptr<transport::Session> _session;

@@ -171,7 +171,6 @@ tlEnv.Library(
 env.Library(
     target='session_manager',
     source=[
-        'session_manager.cpp',
         'session_manager_common.idl',
         'session_manager_common.cpp',
         'session_workflow.cpp',

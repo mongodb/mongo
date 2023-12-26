@@ -46,7 +46,7 @@
 namespace mongo::transport {
 namespace {
 
-class OperationObserverTest : public ServiceContextTest {
+class SessionManagerTest : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
@@ -68,7 +68,7 @@ public:
     auto makeClient(std::shared_ptr<transport::Session> session = nullptr) {
         return getServiceContext()
             ->getService(ClusterRole::ShardServer)
-            ->makeClient("OperationObserverTest", session);
+            ->makeClient("SessionManagerTest", session);
     }
 
     std::size_t getActiveOperations() const {
@@ -78,7 +78,7 @@ public:
     TransportLayerMock* transportLayer{nullptr};
 };
 
-TEST_F(OperationObserverTest, TestActiveClientOperationsForClientsWithoutSession) {
+TEST_F(SessionManagerTest, TestActiveClientOperationsForClientsWithoutSession) {
     auto client = makeClient();
     ASSERT_EQ(getActiveOperations(), 0);
     {
@@ -88,12 +88,24 @@ TEST_F(OperationObserverTest, TestActiveClientOperationsForClientsWithoutSession
     ASSERT_EQ(getActiveOperations(), 0);
 }
 
-TEST_F(OperationObserverTest, TestActiveClientOperationsForClientsWithSessions) {
+TEST_F(SessionManagerTest, TestActiveClientOperationsForClientsWithSessions) {
     auto client = makeClient(transportLayer->createSession());
     ASSERT_EQ(getActiveOperations(), 0);
     {
         auto opCtx = client->makeOperationContext();
         ASSERT_EQ(getActiveOperations(), 1);
+    }
+    ASSERT_EQ(getActiveOperations(), 0);
+}
+
+TEST_F(SessionManagerTest, TestActiveClientOperationsOnDelist) {
+    auto client = makeClient(transportLayer->createSession());
+    ASSERT_EQ(getActiveOperations(), 0);
+    {
+        auto opCtx = client->makeOperationContext();
+        ASSERT_EQ(getActiveOperations(), 1);
+        getServiceContext()->killAndDelistOperation(opCtx.get());
+        ASSERT_EQ(getActiveOperations(), 0);
     }
     ASSERT_EQ(getActiveOperations(), 0);
 }

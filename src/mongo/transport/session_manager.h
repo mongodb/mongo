@@ -60,7 +60,6 @@ protected:
     SessionManager() = default;
 
 public:
-    class OperationObserver;
     virtual ~SessionManager() = default;
 
     /**
@@ -128,6 +127,7 @@ public:
     ServiceExecutorStats serviceExecutorStats;
 
 protected:
+    friend class Session;
     AtomicWord<std::size_t> _totalOperations{0};
     AtomicWord<std::size_t> _completedOperations{0};
 };

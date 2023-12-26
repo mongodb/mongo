@@ -631,15 +631,18 @@ TEST_F(RollbackImplTest, RollbackKillsNecessaryOperations) {
     _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
 
     transport::TransportLayerMock transportLayer;
-    std::shared_ptr<transport::Session> session = transportLayer.createSession();
 
-    auto writeClient = getGlobalServiceContext()->getService()->makeClient("writeClient", session);
+    auto writeSession = transportLayer.createSession();
+    auto writeClient =
+        getGlobalServiceContext()->getService()->makeClient("writeClient", writeSession);
     auto writeOpCtx = writeClient->makeOperationContext();
     boost::optional<Lock::GlobalLock> globalWrite;
     globalWrite.emplace(writeOpCtx.get(), MODE_IX);
     ASSERT(globalWrite->isLocked());
 
-    auto readClient = getGlobalServiceContext()->getService()->makeClient("readClient", session);
+    auto readSession = transportLayer.createSession();
+    auto readClient =
+        getGlobalServiceContext()->getService()->makeClient("readClient", readSession);
     auto readOpCtx = readClient->makeOperationContext();
     boost::optional<Lock::GlobalLock> globalRead;
     globalRead.emplace(readOpCtx.get(), MODE_IS);

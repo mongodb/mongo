@@ -44,6 +44,7 @@
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log_service.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -240,6 +241,13 @@ void Client::mutateTags(const std::function<TagMask(TagMask)>& mutateFunc) {
 
 Client::TagMask Client::getTags() const {
     return _tags.load();
+}
+
+void Client::_setOperationContext(OperationContext* opCtx) {
+    _opCtx = opCtx;
+    if (_session) {
+        _session->setInOperation(opCtx != nullptr);
+    }
 }
 
 }  // namespace mongo

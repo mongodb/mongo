@@ -60,8 +60,9 @@ class SSLManagerInterface;
 
 namespace transport {
 
-class TransportLayer;
 class Session;
+class SessionManager;
+class TransportLayer;
 
 /**
  * This type contains data needed to associate Messages with connections
@@ -79,13 +80,23 @@ public:
 
     static const Status ClosedStatus;
 
-    virtual ~Session() = default;
+    virtual ~Session();
 
     Id id() const {
         return _id;
     }
 
     virtual TransportLayer* getTransportLayer() const = 0;
+
+    /**
+     * Signals the Session that an OperationContext is/is-not active on the associated Client.
+     * This method is not thread safe and should only be called from the Client's thread.
+     *
+     * While this method is marked virtual, it is not actually meant to be overridden by
+     * child classes.  The use of virtual here is to resolve an otherwise circular linking
+     * by way of using the type erased vtable lookup at runtime.
+     */
+    virtual void setInOperation(bool state);
 
     /**
      * Ends this Session.
@@ -190,6 +201,8 @@ protected:
 
 private:
     const Id _id;
+    bool _inOperation{false};
+    std::weak_ptr<SessionManager> _sessionManager;
 };
 
 }  // namespace transport
