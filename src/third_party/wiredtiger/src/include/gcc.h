@@ -248,10 +248,12 @@ WT_ATOMIC_FUNC(size, size_t, size_t *vp, size_t v)
     do {                                            \
         __asm__ volatile("dmb ishld" ::: "memory"); \
     } while (0)
-#define WT_WRITE_BARRIER()                          \
-    do {                                            \
-        __asm__ volatile("dmb ishst" ::: "memory"); \
-    } while (0)
+/*
+ * This is necessary as we're moving to utilizing acquire and release semantics. The ARM load
+ * barrier does provide us with acquire semantics but the store barrier does not. We upgrade it to a
+ * full barrier for that reason.
+ */
+#define WT_WRITE_BARRIER() WT_FULL_BARRIER();
 
 #elif defined(__s390x__)
 #define WT_PAUSE() __asm__ volatile("lr 0,0" ::: "memory")
