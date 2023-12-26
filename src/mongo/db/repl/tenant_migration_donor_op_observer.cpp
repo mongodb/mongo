@@ -49,6 +49,7 @@
 #include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -79,7 +80,7 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
     ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
         .acquireLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
                      donorStateDoc.getId());
-    opCtx->recoveryUnit()->onRollback(
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [migrationId = donorStateDoc.getId()](OperationContext* opCtx) {
             ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
                 .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor, migrationId);
@@ -109,11 +110,12 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
         }
     }
 
-    opCtx->recoveryUnit()->onRollback([donorStateDoc](OperationContext* opCtx) {
-        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-            .removeAccessBlockersForMigration(donorStateDoc.getId(),
-                                              TenantMigrationAccessBlocker::BlockerType::kDonor);
-    });
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+        [donorStateDoc](OperationContext* opCtx) {
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                .removeAccessBlockersForMigration(
+                    donorStateDoc.getId(), TenantMigrationAccessBlocker::BlockerType::kDonor);
+        });
 }
 
 /**
@@ -304,7 +306,7 @@ void TenantMigrationDonorOpObserver::onUpdate(OperationContext* opCtx,
                 break;
             case TenantMigrationDonorStateEnum::kCommitted:
             case TenantMigrationDonorStateEnum::kAborted:
-                opCtx->recoveryUnit()->registerChange(
+                shard_role_details::getRecoveryUnit(opCtx)->registerChange(
                     std::make_unique<TenantMigrationDonorCommitOrAbortHandler>(donorStateDoc));
                 break;
             default:
@@ -355,7 +357,7 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
         }
 
         auto migrationId = tmi->uuid;
-        opCtx->recoveryUnit()->onCommit(
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [migrationId](OperationContext* opCtx, boost::optional<Timestamp>) {
                 LOGV2_INFO(6461601,
                            "Removing expired migration access blocker",
@@ -374,13 +376,14 @@ repl::OpTime TenantMigrationDonorOpObserver::onDropCollection(OperationContext* 
                                                               const CollectionDropType dropType,
                                                               bool markFromMigrate) {
     if (collectionName == NamespaceString::kTenantMigrationDonorsNamespace) {
-        opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx, boost::optional<Timestamp>) {
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [](OperationContext* opCtx, boost::optional<Timestamp>) {
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
 
-            ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                .onDropStateCollection(ServerlessOperationLockRegistry::LockType::kTenantDonor);
-        });
+                ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
+                    .onDropStateCollection(ServerlessOperationLockRegistry::LockType::kTenantDonor);
+            });
     }
     return {};
 }

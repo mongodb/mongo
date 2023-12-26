@@ -53,6 +53,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -243,7 +244,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
 }
 
 void Scope::storedFuncMod(OperationContext* opCtx) {
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [](OperationContext*, boost::optional<Timestamp>) { _lastVersion.fetchAndAdd(1); });
 }
 

@@ -41,6 +41,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -81,8 +82,10 @@ public:
         client = serviceContext->getService()->makeClient("myClient");
         opCtx = serviceContext->makeOperationContext(client.get());
         kvEngine = makeKVEngine(serviceContext, home.path(), &cs);
-        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(kvEngine->newRecoveryUnit()),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        shard_role_details::setRecoveryUnit(
+            opCtx.get(),
+            std::unique_ptr<RecoveryUnit>(kvEngine->newRecoveryUnit()),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
 
     unittest::TempDir home{"temp"};
@@ -114,7 +117,8 @@ TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictOnce) {
 TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictMultipleTimes) {
     auto attempt = 0;
     auto sessionCache =
-        static_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit())->getSessionCache();
+        static_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()))
+            ->getSessionCache();
 
     auto throwWTPrepareConflictMultipleTimes = [&sessionCache, &attempt]() {
         // Manually increments '_prepareCommitOrAbortCounter' to simulate a unit of work has been

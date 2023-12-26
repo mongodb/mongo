@@ -47,6 +47,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/assert.h"
@@ -118,7 +119,8 @@ private:
 class WiredTigerUtilMetadataTest : public ServiceContextTest {
 protected:
     WiredTigerUtilMetadataTest() : _harnessHelper(""), _opCtxHolder(makeOperationContext()) {
-        _opCtxHolder->setRecoveryUnit(
+        shard_role_details::setRecoveryUnit(
+            _opCtxHolder.get(),
             std::make_unique<WiredTigerRecoveryUnit>(_harnessHelper.getSessionCache(),
                                                      _harnessHelper.getOplogManager()),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
@@ -303,11 +305,14 @@ class WiredTigerUtilTest : public ServiceContextTest {};
 TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     auto opCtx{makeOperationContext()};
-    opCtx->setRecoveryUnit(std::make_unique<WiredTigerRecoveryUnit>(
-                               harnessHelper.getSessionCache(), harnessHelper.getOplogManager()),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    shard_role_details::setRecoveryUnit(
+        opCtx.get(),
+        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
+                                                 harnessHelper.getOplogManager()),
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     WiredTigerSession* session =
-        checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit())->getSession();
+        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()))
+            ->getSession();
     auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
                                                      "statistics:table:no_such_table",
                                                      "statistics=(fast)",
@@ -319,11 +324,14 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
 TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(none)");
     auto opCtx{makeOperationContext()};
-    opCtx->setRecoveryUnit(std::make_unique<WiredTigerRecoveryUnit>(
-                               harnessHelper.getSessionCache(), harnessHelper.getOplogManager()),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    shard_role_details::setRecoveryUnit(
+        opCtx.get(),
+        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
+                                                 harnessHelper.getOplogManager()),
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     WiredTigerSession* session =
-        checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit())->getSession();
+        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()))
+            ->getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
     auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
@@ -337,11 +345,14 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
 TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     auto opCtx{makeOperationContext()};
-    opCtx->setRecoveryUnit(std::make_unique<WiredTigerRecoveryUnit>(
-                               harnessHelper.getSessionCache(), harnessHelper.getOplogManager()),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    shard_role_details::setRecoveryUnit(
+        opCtx.get(),
+        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
+                                                 harnessHelper.getOplogManager()),
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     WiredTigerSession* session =
-        checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit())->getSession();
+        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()))
+            ->getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
     // Use connection statistics key which does not apply to a table.
@@ -356,11 +367,14 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
 TEST_F(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     auto opCtx{makeOperationContext()};
-    opCtx->setRecoveryUnit(std::make_unique<WiredTigerRecoveryUnit>(
-                               harnessHelper.getSessionCache(), harnessHelper.getOplogManager()),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    shard_role_details::setRecoveryUnit(
+        opCtx.get(),
+        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
+                                                 harnessHelper.getOplogManager()),
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     WiredTigerSession* session =
-        checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit())->getSession();
+        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()))
+            ->getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
     // Use connection statistics key which does not apply to a table.
@@ -386,11 +400,14 @@ TEST_F(WiredTigerUtilTest, ParseAPIMessages) {
 
     // Create a session.
     auto opCtx{makeOperationContext()};
-    opCtx->setRecoveryUnit(std::make_unique<WiredTigerRecoveryUnit>(
-                               harnessHelper.getSessionCache(), harnessHelper.getOplogManager()),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    shard_role_details::setRecoveryUnit(
+        opCtx.get(),
+        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
+                                                 harnessHelper.getOplogManager()),
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     WiredTigerSession* session =
-        checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit())->getSession();
+        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()))
+            ->getSession();
     WT_SESSION* wtSession = session->getSession();
 
     // Perform simple WiredTiger operations while capturing the generated logs.

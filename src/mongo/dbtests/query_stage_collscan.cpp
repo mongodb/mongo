@@ -90,6 +90,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -1413,8 +1414,8 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanChangeCollectionGetLatestO
     insertDocument(collectionName, BSON("_id" << Timestamp(15, 5) << "ts" << Timestamp(15, 5)));
 
     // Set the read timestamp.
-    _opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                  Timestamp(16, 1));
+    shard_role_details::getRecoveryUnit(&_opCtx)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, Timestamp(16, 1));
 
     // Build the collection scan stage.
     AutoGetCollectionForRead autoColl(&_opCtx, collectionName);
@@ -1456,8 +1457,8 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanChangeCollectionLatestTime
     insertDocument(collectionName, BSON("_id" << Timestamp(15, 5) << "ts" << Timestamp(15, 5)));
 
     // Set the read timestamp.
-    _opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                  Timestamp(16, 1));
+    shard_role_details::getRecoveryUnit(&_opCtx)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, Timestamp(16, 1));
 
     // Build the collection scan stage.
     AutoGetCollectionForRead autoColl(&_opCtx, collectionName);

@@ -32,10 +32,6 @@
 namespace mongo {
 namespace shard_role_details {
 
-void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker) {
-    opCtx->setLockState_DO_NOT_USE(std::move(locker));
-}
-
 std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Locker> newLocker) {
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     return opCtx->swapLockState_DO_NOT_USE(std::move(newLocker), lk);

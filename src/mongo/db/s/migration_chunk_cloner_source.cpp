@@ -61,7 +61,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -79,6 +78,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
@@ -357,13 +357,15 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
         // Ignore prepare conflicts when we load ids of currently available documents. This is
         // acceptable because we will track changes made by prepared transactions at transaction
         // commit time.
-        auto originalPrepareConflictBehavior = opCtx->recoveryUnit()->getPrepareConflictBehavior();
+        auto originalPrepareConflictBehavior =
+            shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior();
 
         ON_BLOCK_EXIT([&] {
-            opCtx->recoveryUnit()->setPrepareConflictBehavior(originalPrepareConflictBehavior);
+            shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
+                originalPrepareConflictBehavior);
         });
 
-        opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
             PrepareConflictBehavior::kIgnoreConflicts);
 
         auto storeCurrentRecordIdStatus = _storeCurrentRecordId(opCtx);
@@ -917,7 +919,7 @@ Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONOb
     // It's important to abandon any open snapshots before processing updates so that we are sure
     // that our snapshot is at least as new as those updates. It's possible for a stale snapshot to
     // still be open from reads performed by _processDeferredXferMods(), above.
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     BSONArrayBuilder arrDel(builder->subarrayStart("deleted"));
     auto noopFn = [](BSONObj idDoc, BSONObj* fullDoc) {

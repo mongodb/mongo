@@ -173,6 +173,7 @@ wtEnv.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/storage/durable_catalog',
         '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
         '$BUILD_DIR/mongo/util/clock_source_mock',
@@ -187,6 +188,7 @@ wtEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
         'storage_wiredtiger_core',
     ],
@@ -265,6 +267,7 @@ wtEnv.Benchmark(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/storage/durable_catalog',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'storage_wiredtiger_core',

@@ -54,7 +54,6 @@
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
@@ -62,6 +61,7 @@
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/ticketholder_manager.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -2500,8 +2500,9 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockAbandonsSnapshotWhenNotInWriteUnit
     auto opCtx = clients[0].second.get();
     auto recovUnitOwned = std::make_unique<RecoveryUnitMock>();
     auto recovUnitBorrowed = recovUnitOwned.get();
-    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(recovUnitOwned.release()),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    shard_role_details::setRecoveryUnit(opCtx,
+                                        std::unique_ptr<RecoveryUnit>(recovUnitOwned.release()),
+                                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     {
         Lock::GlobalLock gw1(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
@@ -2525,8 +2526,9 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockDoesNotAbandonSnapshotWhenInWriteU
     auto opCtx = clients[0].second.get();
     auto recovUnitOwned = std::make_unique<RecoveryUnitMock>();
     auto recovUnitBorrowed = recovUnitOwned.get();
-    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(recovUnitOwned.release()),
-                           WriteUnitOfWork::RecoveryUnitState::kActiveUnitOfWork);
+    shard_role_details::setRecoveryUnit(opCtx,
+                                        std::unique_ptr<RecoveryUnit>(recovUnitOwned.release()),
+                                        WriteUnitOfWork::RecoveryUnitState::kActiveUnitOfWork);
     shard_role_details::getLocker(opCtx)->beginWriteUnitOfWork();
 
     {

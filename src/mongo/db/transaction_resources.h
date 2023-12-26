@@ -53,6 +53,7 @@
 
 namespace mongo {
 
+
 struct PlacementConcern {
     boost::optional<DatabaseVersion> dbVersion;
     boost::optional<ShardVersion> shardVersion;
@@ -203,6 +204,70 @@ struct AcquiredView {
     // ViewAcquisition class.
     mutable int64_t refCount = 0;
 };
+
+/**
+ * Interface for locking. Caller DOES NOT own pointer.
+ */
+// TODO (SERVER-77213): Move implementation to .cpp file
+inline Locker* getLocker(OperationContext* opCtx) {
+    return opCtx->lockState_DO_NOT_USE();
+}
+
+inline const Locker* getLocker(const OperationContext* opCtx) {
+    return opCtx->lockState_DO_NOT_USE();
+}
+
+/**
+ * Get the RecoveryUnit for the given opCtx. Caller DOES NOT own pointer.
+ */
+// TODO (SERVER-77213): Move implementation to .cpp file
+inline RecoveryUnit* getRecoveryUnit(OperationContext* opCtx) {
+    return opCtx->recoveryUnit_DO_NOT_USE();
+}
+
+inline const RecoveryUnit* getRecoveryUnit(const OperationContext* opCtx) {
+    return opCtx->recoveryUnit_DO_NOT_USE();
+}
+
+/**
+ * Returns the RecoveryUnit (same return value as recoveryUnit()) but the caller takes
+ * ownership of the returned RecoveryUnit, and the OperationContext instance relinquishes
+ * ownership. Sets the RecoveryUnit to NULL.
+ */
+// TODO (SERVER-77213): Move implementation to .cpp file
+std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx);
+
+/*
+ * Sets up a new, inactive RecoveryUnit in the OperationContext. Destroys any previous recovery
+ * unit and executes its rollback handlers.
+ */
+// TODO (SERVER-77213): Move implementation to .cpp file
+inline void replaceRecoveryUnit(OperationContext* opCtx) {
+    opCtx->replaceRecoveryUnit_DO_NOT_USE();
+}
+
+/*
+ * Similar to replaceRecoveryUnit(), but returns the previous recovery unit like
+ * releaseRecoveryUnit().
+ */
+std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit(OperationContext* opCtx);
+
+
+/**
+ * Associates the OperatingContext with a different RecoveryUnit for getMore or
+ * subtransactions, see RecoveryUnitSwap. The new state is passed and the old state is
+ * returned separately even though the state logically belongs to the RecoveryUnit,
+ * as it is managed by the OperationContext.
+ */
+WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(OperationContext* opCtx,
+                                                   std::unique_ptr<RecoveryUnit> unit,
+                                                   WriteUnitOfWork::RecoveryUnitState state);
+
+/**
+ * Sets the locker for use by this OperationContext. Call during OperationContext initialization,
+ * only.
+ */
+void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker);
 
 /**
  * This class is a container for all the collection resources which are currently acquired by a

@@ -65,7 +65,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
@@ -101,6 +100,7 @@
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/views/view.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -156,7 +156,7 @@ void assertIgnorePrepareConflictsBehavior(const boost::intrusive_ptr<ExpressionC
     tassert(5996900,
             "Expected operation to either be blocking on prepare conflicts or ignoring prepare "
             "conflicts and allowing writes",
-            expCtx->opCtx->recoveryUnit()->getPrepareConflictBehavior() !=
+            shard_role_details::getRecoveryUnit(expCtx->opCtx)->getPrepareConflictBehavior() !=
                 PrepareConflictBehavior::kIgnoreConflicts);
 }
 

@@ -297,9 +297,9 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     onCreate(opCtx.get(), _clientObservers);
     ScopeGuard onCreateGuard([&] { onDestroy(opCtx.get(), _clientObservers); });
 
-    if (!opCtx->recoveryUnit()) {
-        opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    if (!opCtx->recoveryUnit_DO_NOT_USE()) {
+        opCtx->setRecoveryUnit_DO_NOT_USE(std::make_unique<RecoveryUnitNoop>(),
+                                          WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
     // The baton must be attached before attaching to a client
     if (_transportLayerManager) {

@@ -48,7 +48,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/plan_executor_sbe.h"
 #include "mongo/db/query/plan_explainer_factory.h"
@@ -59,6 +58,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
@@ -188,8 +188,9 @@ void PlanExecutorSBE::saveState() {
         // cursors positioned. This ensures that no pointers into memory owned by the storage
         // engine held by the SBE PlanStage tree become invalid while the executor is in a saved
         // state.
-        _opCtx->recoveryUnit()->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kCommit);
-        _opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(_opCtx)->setAbandonSnapshotMode(
+            RecoveryUnit::AbandonSnapshotMode::kCommit);
+        shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
     } else {
         // Discard the slots as we won't access them before subsequent PlanExecutorSBE::getNext()
         // method call.
@@ -221,7 +222,8 @@ void PlanExecutorSBE::restoreState(const RestoreContext& context) {
         // Put the RU back into 'kAbort' mode. Since the executor is now in a restored state, calls
         // to doAbandonSnapshot() only happen if the query has failed and the executor will not be
         // used again. In this case, we do not rely on the guarantees provided by 'kCommit' mode.
-        _opCtx->recoveryUnit()->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
+        shard_role_details::getRecoveryUnit(_opCtx)->setAbandonSnapshotMode(
+            RecoveryUnit::AbandonSnapshotMode::kAbort);
     } else {
         _root->restoreState(true /* relinquish cursor */);
     }

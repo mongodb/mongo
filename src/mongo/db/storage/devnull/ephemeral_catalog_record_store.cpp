@@ -47,6 +47,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -354,7 +355,8 @@ void EphemeralForTestRecordStore::deleteRecord(WithLock lk,
                                                OperationContext* opCtx,
                                                const RecordId& loc) {
     EphemeralForTestRecord* rec = recordFor(lk, loc);
-    opCtx->recoveryUnit()->registerChange(std::make_unique<RemoveChange>(_data, loc, *rec));
+    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+        std::make_unique<RemoveChange>(_data, loc, *rec));
     _data->dataSize -= rec->size;
     invariant(_data->records.erase(loc) == 1);
 }
@@ -399,15 +401,16 @@ Status EphemeralForTestRecordStore::doInsertRecords(OperationContext* opCtx,
         _data->records[loc] = rec;
         record->id = loc;
 
-        opCtx->recoveryUnit()->onRollback([this, loc = std::move(loc)](OperationContext*) {
-            stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+            [this, loc = std::move(loc)](OperationContext*) {
+                stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
-            Records::iterator it = _data->records.find(loc);
-            if (it != _data->records.end()) {
-                _data->dataSize -= it->second.size;
-                _data->records.erase(it);
-            }
-        });
+                Records::iterator it = _data->records.find(loc);
+                if (it != _data->records.end()) {
+                    _data->dataSize -= it->second.size;
+                    _data->records.erase(it);
+                }
+            });
         return Status::OK();
     };
 
@@ -431,7 +434,8 @@ Status EphemeralForTestRecordStore::doUpdateRecord(OperationContext* opCtx,
     EphemeralForTestRecord newRecord(len);
     memcpy(newRecord.data.get(), data, len);
 
-    opCtx->recoveryUnit()->registerChange(std::make_unique<RemoveChange>(_data, loc, *oldRecord));
+    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+        std::make_unique<RemoveChange>(_data, loc, *oldRecord));
     _data->dataSize += len - oldLen;
     *oldRecord = newRecord;
     return Status::OK();
@@ -458,7 +462,8 @@ StatusWith<RecordData> EphemeralForTestRecordStore::doUpdateWithDamages(
 
     EphemeralForTestRecord newRecord(len);
 
-    opCtx->recoveryUnit()->registerChange(std::make_unique<RemoveChange>(_data, loc, *oldRecord));
+    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+        std::make_unique<RemoveChange>(_data, loc, *oldRecord));
 
     char* root = newRecord.data.get();
     char* old = oldRecord->data.get();
@@ -504,7 +509,7 @@ std::unique_ptr<SeekableRecordCursor> EphemeralForTestRecordStore::getCursor(
 Status EphemeralForTestRecordStore::doTruncate(OperationContext* opCtx) {
     // Unlike other changes, TruncateChange mutates _data on construction to perform the
     // truncate
-    opCtx->recoveryUnit()->registerChange(
+    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
         std::make_unique<TruncateChange>(opCtx, _data, RecordId::minLong(), RecordId::maxLong()));
     return Status::OK();
 }
@@ -516,7 +521,7 @@ Status EphemeralForTestRecordStore::doRangeTruncate(OperationContext* opCtx,
                                                     int64_t hintNumRecordsDiff) {
     // Unlike other changes, TruncateChange mutates _data on construction to perform the
     // truncate.
-    opCtx->recoveryUnit()->registerChange(
+    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
         std::make_unique<TruncateChange>(opCtx, _data, minRecordId, maxRecordId));
     return Status::OK();
 }
@@ -537,7 +542,8 @@ void EphemeralForTestRecordStore::doCappedTruncateAfter(
             aboutToDelete(opCtx, id, record.toRecordData());
         }
 
-        opCtx->recoveryUnit()->registerChange(std::make_unique<RemoveChange>(_data, id, record));
+        shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+            std::make_unique<RemoveChange>(_data, id, record));
         _data->dataSize -= record.size;
         _data->records.erase(it++);
     }

@@ -90,6 +90,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
@@ -675,12 +676,13 @@ void _setClusteredExpireAfterSeconds(
                   // commit.
                   if (!oldExpireAfterSeconds) {
                       auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
-                      opCtx->recoveryUnit()->onCommit([ttlCache, uuid = coll->uuid()](
-                                                          OperationContext*,
+                      shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                          [ttlCache, uuid = coll->uuid()](OperationContext*,
                                                           boost::optional<Timestamp>) {
-                          ttlCache->registerTTLInfo(
-                              uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
-                      });
+                              ttlCache->registerTTLInfo(
+                                  uuid,
+                                  TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
+                          });
                   }
 
                   invariant(newExpireAfterSeconds >= 0);

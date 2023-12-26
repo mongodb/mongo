@@ -73,7 +73,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"

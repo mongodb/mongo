@@ -61,7 +61,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/resumable_index_builds_gen.h"
@@ -75,6 +74,7 @@
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -150,9 +150,10 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
     // has been initialized. This is needed because at the time of startup, when the operation
     // context gets created, the storage engine initialization has not yet begun and so it gets
     // assigned a noop recovery unit. See the StorageClientObserver class.
-    invariant(opCtx->recoveryUnit()->isNoop());
-    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(_engine->newRecoveryUnit()),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    invariant(shard_role_details::getRecoveryUnit(opCtx)->isNoop());
+    shard_role_details::setRecoveryUnit(opCtx,
+                                        std::unique_ptr<RecoveryUnit>(_engine->newRecoveryUnit()),
+                                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     // If we are loading the catalog after an unclean shutdown, it's possible that there are
     // collections in the catalog that are unknown to the storage engine. We should attempt to
@@ -433,7 +434,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
         }
     }
 
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 }
 
 void StorageEngineImpl::_initCollection(OperationContext* opCtx,
@@ -694,7 +695,8 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             addDropPendingIdent(identDropTs, std::make_shared<Ident>(toRemove), /*onDrop=*/nullptr);
         } else {
             WriteUnitOfWork wuow(opCtx);
-            Status status = _engine->dropIdent(opCtx->recoveryUnit(), toRemove);
+            Status status =
+                _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx), toRemove);
             if (!status.isOK()) {
                 // A concurrent operation, such as a checkpoint could be holding an open data handle
                 // on the ident. Handoff the ident drop to the ident reaper to retry later.
@@ -826,7 +828,8 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                       logAttrs(md->nss),
                       "index"_attr = indexName);
                 // Ensure the `ident` is dropped while we have the `indexIdent` value.
-                Status status = _engine->dropIdent(opCtx->recoveryUnit(), indexIdent);
+                Status status =
+                    _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx), indexIdent);
                 if (!status.isOK()) {
                     // A concurrent operation, such as a checkpoint could be holding an open data
                     // handle on the ident. Handoff the ident drop to the ident reaper to retry
@@ -863,7 +866,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     for (auto&& temp : internalIdentsToDrop) {
         LOGV2(22257, "Dropping internal ident", "ident"_attr = temp);
         WriteUnitOfWork wuow(opCtx);
-        Status status = _engine->dropIdent(opCtx->recoveryUnit(), temp);
+        Status status = _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx), temp);
         if (!status.isOK()) {
             // A concurrent operation, such as a checkpoint could be holding an open data handle on
             // the ident. Handoff the ident drop to the ident reaper to retry later.
@@ -1137,7 +1140,7 @@ StatusWith<Timestamp> StorageEngineImpl::recoverToStableTimestamp(OperationConte
 
     // SERVER-58311: Reset the recovery unit to unposition storage engine cursors. This allows WT to
     // assert it has sole access when performing rollback_to_stable().
-    opCtx->replaceRecoveryUnit();
+    shard_role_details::replaceRecoveryUnit(opCtx);
 
     StatusWith<Timestamp> swTimestamp = _engine->recoverToStableTimestamp(opCtx);
     if (!swTimestamp.isOK()) {
@@ -1215,7 +1218,7 @@ void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
         }
         rec = cursor->next();
     }
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 }
 
 void StorageEngineImpl::addDropPendingIdent(

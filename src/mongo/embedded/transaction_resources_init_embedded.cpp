@@ -32,7 +32,6 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_impl.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -69,8 +68,10 @@ public:
         //    testing purpose.
         auto storageEngine = service->getStorageEngine();
         if (storageEngine) {
-            opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(storageEngine->newRecoveryUnit()),
-                                   WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+            shard_role_details::setRecoveryUnit(
+                opCtx,
+                std::unique_ptr<RecoveryUnit>(storageEngine->newRecoveryUnit()),
+                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         }
     }
 

@@ -592,7 +592,7 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
         }
         const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
         writeConflictRetry(opCtx, "updateSessionTransactionsTableInRollback", nss, [&] {
-            opCtx->recoveryUnit()->allowOneUntimestampedWrite();
+            shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
             auto collection =
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
@@ -614,8 +614,9 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
     // persisted to disk before truncating the oplog. If we were to take an unstable checkpoint, we
     // would have to update replication metadata like 'minValid.appliedThrough' to be consistent
     // with the oplog.
-    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,
-                                                             /*stableCheckpoint=*/true);
+    shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
+        opCtx,
+        /*stableCheckpoint=*/true);
 }
 
 void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(

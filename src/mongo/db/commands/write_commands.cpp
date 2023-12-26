@@ -60,7 +60,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"

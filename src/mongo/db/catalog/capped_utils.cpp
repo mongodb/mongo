@@ -74,6 +74,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -215,7 +216,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
     int retries = 0;  // non-zero when retrying our last document.
     while (true) {
-        auto beforeGetNextSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
+        auto beforeGetNextSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
         PlanExecutor::ExecState state = PlanExecutor::IS_EOF;
         if (!retries) {
             state = exec->getNext(&objToClone, &loc);
@@ -238,7 +239,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             // If the snapshot id changed while using the 'PlanExecutor' to retrieve the next
             // document from the collection scan, then it's possible that the document retrieved
             // from the scan may have since been deleted or modified in our current snapshot.
-            if (beforeGetNextSnapshotId != opCtx->recoveryUnit()->getSnapshotId()) {
+            if (beforeGetNextSnapshotId !=
+                shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId()) {
                 // The snapshot has changed. Fetch the document again from the collection in order
                 // to check whether it has been deleted.
                 Snapshotted<BSONObj> snapshottedObj;
@@ -280,7 +282,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             // Can't use writeConflictRetry since we need to save/restore exec around call to
             // abandonSnapshot.
             exec->saveState();
-            opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             exec->restoreState(&fromCollection);  // Handles any WCEs internally.
         }
     }

@@ -64,7 +64,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -81,6 +80,7 @@
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -672,8 +672,9 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
         bool shouldRegisterKill = !isInternalSessionForRetryableWrite(lsid) ||
             *lsid.getTxnNumber() >= session.getLastClientTxnNumberStarted();
         if (shouldRegisterKill) {
-            opCtx->recoveryUnit()->registerChange(std::make_unique<KillSessionTokenOnCommit>(
-                ti, session.kill(ErrorCodes::Interrupted)));
+            shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+                std::make_unique<KillSessionTokenOnCommit>(ti,
+                                                           session.kill(ErrorCodes::Interrupted)));
         }
     });
 }

@@ -64,6 +64,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -157,7 +158,8 @@ public:
 protected:
     ServiceContext::UniqueOperationContext _makeOperationContext() {
         auto opCtx = makeOperationContext();
-        opCtx->setRecoveryUnit(
+        shard_role_details::setRecoveryUnit(
+            opCtx.get(),
             std::unique_ptr<RecoveryUnit>(_helper.getEngine()->newRecoveryUnit()),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return opCtx;
@@ -221,7 +223,8 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     boost::filesystem::rename(*dataFilePath, tmpFile, err);
     ASSERT(!err) << err.message();
 
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(opCtxPtr.get()->recoveryUnit(), ident));
+    ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
+        shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident));
 
     // The data file is moved back in place so that it becomes an "orphan" of the storage
     // engine and the restoration process can be tested.
@@ -269,7 +272,8 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     // Dropping a collection might fail if we haven't checkpointed the data
     _helper.getWiredTigerKVEngine()->checkpoint();
 
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(opCtxPtr.get()->recoveryUnit(), ident));
+    ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
+        shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident));
 
 #ifdef _WIN32
     auto status = _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(
@@ -436,7 +440,8 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
     ASSERT(boost::filesystem::exists(*dataFilePath));
     ASSERT(boost::filesystem::exists(renamedFilePath));
 
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(opCtxPtr.get()->recoveryUnit(), ident));
+    ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
+        shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident));
 
     // WiredTiger drops files asynchronously.
     for (size_t check = 0; check < 30; check++) {

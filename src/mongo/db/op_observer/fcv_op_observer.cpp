@@ -54,6 +54,7 @@
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
@@ -191,7 +192,7 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
         LOGV2(20459, "Setting featureCompatibilityVersion", attrs);
     }
 
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [newVersion](OperationContext* opCtx, boost::optional<Timestamp> ts) {
             _setVersion(opCtx, newVersion, false /*onRollback*/, true /*withinRecoveryUnit*/, ts);
         });

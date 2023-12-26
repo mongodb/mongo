@@ -56,6 +56,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -144,7 +145,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
-        WiredTigerRecoveryUnit* ru = checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
+        WiredTigerRecoveryUnit* ru =
+            checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
 
         {
             WriteUnitOfWork uow(opCtx.get());

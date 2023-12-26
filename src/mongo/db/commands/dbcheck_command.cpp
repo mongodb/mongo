@@ -87,6 +87,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -862,7 +863,8 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
     const CollectionPtr& collection = acquisition.coll.getCollectionPtr();
 
     // TODO SERVER-80347: Add check for stepdown here.
-    auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+    auto readTimestamp =
+        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
     uassert(ErrorCodes::SnapshotUnavailable,
             "No snapshot available yet for dbCheck extra index keys check",
             readTimestamp);
@@ -1599,7 +1601,8 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
         return {ErrorCodes::NamespaceNotFound, msg};
     }
 
-    auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+    auto readTimestamp =
+        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
     uassert(
         ErrorCodes::SnapshotUnavailable, "No snapshot available yet for dbCheck", readTimestamp);
 

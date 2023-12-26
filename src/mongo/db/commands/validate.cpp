@@ -53,6 +53,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -425,7 +426,7 @@ public:
         }();
 
         if (repair) {
-            opCtx->recoveryUnit()->setPrepareConflictBehavior(
+            shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
                 PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
         }
 

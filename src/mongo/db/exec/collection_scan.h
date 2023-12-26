@@ -40,7 +40,6 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -48,6 +47,7 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/s/resharding/resume_token_gen.h"
 
 namespace mongo {

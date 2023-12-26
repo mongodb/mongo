@@ -38,6 +38,7 @@
 #include "mongo/db/operation_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine_change_context.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -111,8 +112,8 @@ StorageChangeLock::Token StorageEngineChangeContext::killOpsForStorageEngineChan
             {
                 stdx::lock_guard<Client> lk(*client);
                 auto opCtxToKill = client->getOperationContext();
-                if (!opCtxToKill || !opCtxToKill->recoveryUnit() ||
-                    opCtxToKill->recoveryUnit()->isNoop())
+                if (!opCtxToKill || !shard_role_details::getRecoveryUnit(opCtxToKill) ||
+                    shard_role_details::getRecoveryUnit(opCtxToKill)->isNoop())
                     continue;
                 service->killOperation(lk, opCtxToKill, ErrorCodes::InterruptedDueToStorageChange);
                 auto& doneNotifier =

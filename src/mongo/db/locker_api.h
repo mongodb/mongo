@@ -38,23 +38,6 @@ namespace mongo {
 namespace shard_role_details {
 
 /**
- * Interface for locking.  Caller DOES NOT own pointer.
- */
-inline Locker* getLocker(OperationContext* opCtx) {
-    return opCtx->lockState_DO_NOT_USE();
-}
-
-inline const Locker* getLocker(const OperationContext* opCtx) {
-    return opCtx->lockState_DO_NOT_USE();
-}
-
-/**
- * Sets the locker for use by this OperationContext. Call during OperationContext initialization,
- * only.
- */
-void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker);
-
-/**
  * Swaps the locker, releasing the old locker to the caller.
  * The Client lock is going to be acquired by this function.
  */

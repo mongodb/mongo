@@ -296,7 +296,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
         // This fail point pauses with an open snapshot on the oplog. Some tests pause on this fail
         // point prior to running replication rollback. This prevents the operation from being
         // killed and the snapshot being released. Hence, we release the snapshot here.
-        opCtx->replaceRecoveryUnit();
+        shard_role_details::replaceRecoveryUnit(opCtx);
 
         hangBeforeWaitingForWriteConcern.pauseWhileSet();
     }

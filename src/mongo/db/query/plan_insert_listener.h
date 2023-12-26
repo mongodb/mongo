@@ -45,6 +45,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -108,7 +109,8 @@ public:
 
     // Computes the OpTime to wait on by incrementing the current read timestamp.
     void prepareForWait(OperationContext* opCtx) final {
-        auto readTs = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+        auto readTs =
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
         invariant(readTs);
         _opTimeToBeMajorityCommitted =
             repl::OpTime(*readTs + 1, repl::ReplicationCoordinator::get(opCtx)->getTerm());

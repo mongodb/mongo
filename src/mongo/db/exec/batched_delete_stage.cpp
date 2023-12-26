@@ -61,6 +61,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
@@ -146,7 +147,7 @@ bool ensureStillMatchesAndUpdateStats(const CollectionPtr& collection,
                                       WorkingSetID id,
                                       const CanonicalQuery* cq) {
     WorkingSetMember* member = ws->get(id);
-    if (opCtx->recoveryUnit()->getSnapshotId() != member->doc.snapshotId()) {
+    if (shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId() != member->doc.snapshotId()) {
         incrementSSSMetricNoOverflow(batchedDeletesSSS.refetchesDueToYield, 1);
     }
     return write_stage_common::ensureStillMatches(collection, opCtx, ws, id, cq);

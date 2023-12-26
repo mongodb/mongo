@@ -342,7 +342,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     // be written to out-of-order. Temporarily do not enforce constraints in order to bypass this
     // check when getting the collection.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              opCtx->recoveryUnit()->getTimestampReadSource());
+              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
     ScopeGuard guard{[opCtx, isEnforcingConstraints = opCtx->isEnforcingConstraints()] {
         opCtx->setEnforceConstraints(isEnforcingConstraints);
     }};

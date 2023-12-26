@@ -42,6 +42,7 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/str.h"
@@ -53,7 +54,7 @@ void assertIgnorePrepareConflictsBehavior(OperationContext* opCtx) {
     tassert(5907502,
             "The operation must be ignoring conflicts and allowing writes or enforcing prepare "
             "conflicts entirely",
-            opCtx->recoveryUnit()->getPrepareConflictBehavior() !=
+            shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior() !=
                 PrepareConflictBehavior::kIgnoreConflicts);
 }
 
@@ -187,13 +188,15 @@ bool SpillingStore::findRecord(OperationContext* opCtx, const RecordId& loc, Rec
 
 void SpillingStore::switchToSpilling(OperationContext* opCtx) {
     invariant(!_originalUnit);
-    _originalUnit = opCtx->releaseRecoveryUnit();
-    _originalState = opCtx->setRecoveryUnit(std::move(_spillingUnit), _spillingState);
+    _originalUnit = shard_role_details::releaseRecoveryUnit(opCtx);
+    _originalState =
+        shard_role_details::setRecoveryUnit(opCtx, std::move(_spillingUnit), _spillingState);
 }
 void SpillingStore::switchToOriginal(OperationContext* opCtx) {
     invariant(!_spillingUnit);
-    _spillingUnit = opCtx->releaseRecoveryUnit();
-    _spillingState = opCtx->setRecoveryUnit(std::move(_originalUnit), _originalState);
+    _spillingUnit = shard_role_details::releaseRecoveryUnit(opCtx);
+    _spillingState =
+        shard_role_details::setRecoveryUnit(opCtx, std::move(_originalUnit), _originalState);
     invariant(!(_spillingUnit->getState() == RecoveryUnit::State::kInactiveInUnitOfWork ||
                 _spillingUnit->getState() == RecoveryUnit::State::kActive));
 }

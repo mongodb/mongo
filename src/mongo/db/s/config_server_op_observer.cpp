@@ -47,6 +47,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -145,7 +146,7 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
                  * Signal that the config shard is ready when we are certain that the config shard
                  * document inserted into config.shards is committed.
                  */
-                opCtx->recoveryUnit()->onCommit(
+                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                     [&](OperationContext* opCtx, boost::optional<Timestamp>) {
                         ShardingReady::get(opCtx)->setIsReady();
                     });
@@ -171,7 +172,7 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
             // OperationContext, we can safely obtain a reference at this point and passed it to the
             // onCommit callback.
             auto& topologyTicker = TopologyTimeTicker::get(opCtx);
-            opCtx->recoveryUnit()->onCommit(
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                 [&topologyTicker, maxTopologyTime](OperationContext* opCtx,
                                                    boost::optional<Timestamp> commitTime) mutable {
                     invariant(commitTime);
@@ -212,7 +213,7 @@ void ConfigServerOpObserver::onUpdate(OperationContext* opCtx,
     // to the mongod instance and not to the OperationContext, we can safely obtain a reference at
     // this point and passed it to the onCommit callback.
     auto& topologyTicker = TopologyTimeTicker::get(opCtx);
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [&topologyTicker, topologyTime](OperationContext*,
                                         boost::optional<Timestamp> commitTime) mutable {
             invariant(commitTime);

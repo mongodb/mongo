@@ -76,6 +76,7 @@
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
@@ -123,7 +124,8 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     ASSERT_TRUE(idents.find("_mdb_catalog") != idents.end());
 
     // Drop the `db.coll1` table, while leaving the DurableCatalog entry.
-    ASSERT_OK(dropIdent(opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
+    ASSERT_OK(
+        dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()), swCollInfo.getValue().ident));
     ASSERT_EQUALS(static_cast<const unsigned long>(1), getAllKVEngineIdents(opCtx.get()).size());
 
     // Reconciling this should result in an error.
@@ -139,7 +141,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(dropIdent(opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
+    ASSERT_OK(
+        dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // After the catalog is reloaded, we expect that the collection has been dropped because the
@@ -507,7 +510,8 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(dropIdent(opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
+    ASSERT_OK(
+        dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // Reconcile would normally return an error if a collection existed with a missing ident in the

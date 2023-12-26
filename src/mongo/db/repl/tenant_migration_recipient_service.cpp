@@ -125,6 +125,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
@@ -1888,8 +1889,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
 
                     const auto originalRecordId = Helpers::findOne(
                         opCtx, collection.getCollection(), BSON("_id" << _migrationUuid));
-                    const auto originalSnapshot =
-                        Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(), preImageDoc);
+                    const auto originalSnapshot = Snapshotted<BSONObj>(
+                        shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(), preImageDoc);
 
                     invariant(!originalRecordId.isNull(),
                               str::stream() << "Existing tenant migration state document "

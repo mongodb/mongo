@@ -44,12 +44,12 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util_core.h"
@@ -138,10 +138,11 @@ TEST_F(AutoGetCollectionMultiTest, SecondaryNssMinimumVisible) {
 
     // Set the read source earlier than Collection _secondaryNss2' min valid timestamp, but later
     // than _primaryNss' min visible timestamp.
-    opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, [&]() {
-        AutoGetCollection secondaryCollection1(opCtx1, _secondaryNss1, MODE_IS);
-        return secondaryCollection1->getMinimumValidSnapshot();
-    }());
+    shard_role_details::getRecoveryUnit(opCtx1)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, [&]() {
+            AutoGetCollection secondaryCollection1(opCtx1, _secondaryNss1, MODE_IS);
+            return secondaryCollection1->getMinimumValidSnapshot();
+        }());
 
     // Create the AutoGet* instance on multiple collections.
     std::vector<NamespaceStringOrUUID> secondaryNamespaces{NamespaceStringOrUUID(_secondaryNss1),

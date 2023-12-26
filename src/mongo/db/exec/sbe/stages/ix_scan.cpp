@@ -46,12 +46,12 @@
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
@@ -122,7 +122,7 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
     }
 
     if (_snapshotIdSlot) {
-        _latestSnapshotId = _opCtx->recoveryUnit()->getSnapshotId().toNumber();
+        _latestSnapshotId = shard_role_details::getRecoveryUnit(_opCtx)->getSnapshotId().toNumber();
     }
 }
 
@@ -214,7 +214,7 @@ void IndexScanStageBase::doRestoreState(bool relinquishCursor) {
     // Yield is the only time during plan execution that the snapshotId can change. As such, we
     // update it accordingly as part of yield recovery.
     if (_snapshotIdSlot) {
-        _latestSnapshotId = _opCtx->recoveryUnit()->getSnapshotId().toNumber();
+        _latestSnapshotId = shard_role_details::getRecoveryUnit(_opCtx)->getSnapshotId().toNumber();
     }
 }
 

@@ -67,6 +67,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
@@ -471,7 +472,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             // This result didn't have the data the caller wanted, try again.
         } else if (PlanStage::NEED_YIELD == code) {
             invariant(id == WorkingSet::INVALID_ID);
-            invariant(_opCtx->recoveryUnit());
+            invariant(shard_role_details::getRecoveryUnit(_opCtx));
 
             if (_expCtx->getTemporarilyUnavailableException()) {
                 _expCtx->setTemporarilyUnavailableException(false);

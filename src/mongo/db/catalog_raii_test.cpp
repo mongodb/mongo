@@ -42,11 +42,11 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_impl.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -452,24 +452,35 @@ protected:
 
 void ReadSourceScopeTest::setUp() {
     _opCtx = getClient()->makeOperationContext();
-    _opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitMock>(),
-                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    shard_role_details::setRecoveryUnit(_opCtx.get(),
+                                        std::make_unique<RecoveryUnitMock>(),
+                                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 }
 
 TEST_F(ReadSourceScopeTest, RestoreReadSource) {
-    opCtx()->recoveryUnit()->setTimestampReadSource(ReadSource::kProvided, Timestamp(1, 2));
-    ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kProvided);
-    ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(opCtx()), Timestamp(1, 2));
+    shard_role_details::getRecoveryUnit(opCtx())->setTimestampReadSource(ReadSource::kProvided,
+                                                                         Timestamp(1, 2));
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource(),
+              ReadSource::kProvided);
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp(opCtx()),
+              Timestamp(1, 2));
     {
         ReadSourceScope scope(opCtx(), ReadSource::kNoTimestamp);
-        ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kNoTimestamp);
+        ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource(),
+                  ReadSource::kNoTimestamp);
 
-        opCtx()->recoveryUnit()->setTimestampReadSource(ReadSource::kNoOverlap);
-        ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kNoOverlap);
-        ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(opCtx()), boost::none);
+        shard_role_details::getRecoveryUnit(opCtx())->setTimestampReadSource(
+            ReadSource::kNoOverlap);
+        ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource(),
+                  ReadSource::kNoOverlap);
+        ASSERT_EQ(
+            shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp(opCtx()),
+            boost::none);
     }
-    ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kProvided);
-    ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(opCtx()), Timestamp(1, 2));
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource(),
+              ReadSource::kProvided);
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp(opCtx()),
+              Timestamp(1, 2));
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetDBDifferentTenantsConflictingNamespaces) {

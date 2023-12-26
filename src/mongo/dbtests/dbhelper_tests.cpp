@@ -184,7 +184,8 @@ public:
             auto lastApplied = repl::ReplicationCoordinator::get(opCtx1->getServiceContext())
                                    ->getMyLastAppliedOpTime()
                                    .getTimestamp();
-            ASSERT_OK(opCtx1->recoveryUnit()->setTimestamp(lastApplied + 1));
+            ASSERT_OK(
+                shard_role_details::getRecoveryUnit(opCtx1.get())->setTimestamp(lastApplied + 1));
             auto foundDoc = Helpers::findByIdAndNoopUpdate(opCtx1.get(), collection1, idQuery, res);
             wuow.commit();
             ASSERT_TRUE(foundDoc);
@@ -230,7 +231,7 @@ private:
             auto lastApplied = repl::ReplicationCoordinator::get(opCtx2->getServiceContext())
                                    ->getMyLastAppliedOpTime()
                                    .getTimestamp();
-            ASSERT_OK(opCtx2->recoveryUnit()->setTimestamp(lastApplied + 1));
+            ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx2)->setTimestamp(lastApplied + 1));
             BSONObj res;
             ASSERT_TRUE(Helpers::findByIdAndNoopUpdate(
                 opCtx2, collection2.getCollectionPtr(), idQuery, res));
@@ -273,7 +274,8 @@ private:
                 auto lastApplied = repl::ReplicationCoordinator::get(opCtx1->getServiceContext())
                                        ->getMyLastAppliedOpTime()
                                        .getTimestamp();
-                ASSERT_OK(opCtx1->recoveryUnit()->setTimestamp(lastApplied + 1));
+                ASSERT_OK(
+                    shard_role_details::getRecoveryUnit(opCtx1)->setTimestamp(lastApplied + 1));
                 Helpers::emptyCollection(opCtx1, coll);
             }
 

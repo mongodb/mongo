@@ -60,7 +60,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -83,6 +82,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"

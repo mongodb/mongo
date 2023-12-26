@@ -46,13 +46,13 @@
 #include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
@@ -107,8 +107,9 @@ void verifyDbAndCollection(OperationContext* opCtx,
                                                       << "' due to catalog changes; please "
                                                          "retry the operation");
         }
-        if (opCtx->recoveryUnit()->isActive()) {
-            const auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+        if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
+            const auto mySnapshot =
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
             if (mySnapshot && *mySnapshot < coll->getMinimumValidSnapshot()) {
                 throwWriteConflictException(str::stream()
                                             << "Unable to write to collection '"
@@ -289,7 +290,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     // This may not be the case if an operation already has a snapshot open before acquiring an
     // exclusive lock.
     if (modeColl == MODE_X) {
-        invariant(!opCtx->recoveryUnit()->isActive(),
+        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isActive(),
                   str::stream() << "Snapshot opened before acquiring X lock for "
                                 << toStringForLogging(nsOrUUID));
     }
@@ -438,7 +439,7 @@ Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx) {
         // Makes the internal CollectionPtr Yieldable and resets the writable Collection when
         // the write unit of work finishes so we re-fetches and re-clones the Collection if a
         // new write unit of work is opened.
-        opCtx->recoveryUnit()->registerChange(
+        shard_role_details::getRecoveryUnit(opCtx)->registerChange(
             [this](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
                 _coll = CollectionPtr(_coll.get());
                 _coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _coll));
@@ -551,7 +552,7 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
             // and re-clone the Collection if a new write unit of work is opened. Holds the back
             // pointer to the CollectionWriter explicitly so we can detect if the instance is
             // already destroyed.
-            opCtx->recoveryUnit()->registerChange(
+            shard_role_details::getRecoveryUnit(opCtx)->registerChange(
                 [shared = _sharedImpl](OperationContext* opCtx, boost::optional<Timestamp>) {
                     if (shared->_parent) {
                         shared->_parent->_writableCollection = nullptr;
@@ -588,17 +589,19 @@ LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMod
 ReadSourceScope::ReadSourceScope(OperationContext* opCtx,
                                  RecoveryUnit::ReadSource readSource,
                                  boost::optional<Timestamp> provided)
-    : _opCtx(opCtx), _originalReadSource(opCtx->recoveryUnit()->getTimestampReadSource()) {
+    : _opCtx(opCtx),
+      _originalReadSource(shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()) {
     // Abandoning the snapshot is unsafe when the snapshot is managed by a lock free read
     // helper.
     invariant(!_opCtx->isLockFreeReadsOp());
 
     if (_originalReadSource == RecoveryUnit::ReadSource::kProvided) {
-        _originalReadTimestamp = *_opCtx->recoveryUnit()->getPointInTimeReadTimestamp(_opCtx);
+        _originalReadTimestamp =
+            *shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp(_opCtx);
     }
 
-    _opCtx->recoveryUnit()->abandonSnapshot();
-    _opCtx->recoveryUnit()->setTimestampReadSource(readSource, provided);
+    shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(readSource, provided);
 }
 
 ReadSourceScope::~ReadSourceScope() {
@@ -606,11 +609,12 @@ ReadSourceScope::~ReadSourceScope() {
     // helper.
     invariant(!_opCtx->isLockFreeReadsOp());
 
-    _opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
     if (_originalReadSource == RecoveryUnit::ReadSource::kProvided) {
-        _opCtx->recoveryUnit()->setTimestampReadSource(_originalReadSource, _originalReadTimestamp);
+        shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(_originalReadSource,
+                                                                            _originalReadTimestamp);
     } else {
-        _opCtx->recoveryUnit()->setTimestampReadSource(_originalReadSource);
+        shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(_originalReadSource);
     }
 }
 

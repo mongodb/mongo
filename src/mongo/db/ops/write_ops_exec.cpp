@@ -83,7 +83,6 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/introspect.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/not_primary_error_tracker.h"
@@ -1961,7 +1960,7 @@ Status performAtomicTimeseriesWrites(
     // Since we are manually updating the "lastWriteOpTime" before committing, we'll also need to
     // manually reset if the storage transaction is aborted.
     if (slot && participant) {
-        opCtx->recoveryUnit()->onRollback([](OperationContext* opCtx) {
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback([](OperationContext* opCtx) {
             TransactionParticipant::get(opCtx).setLastWriteOpTime(opCtx, repl::OpTime());
         });
     }
@@ -2033,7 +2032,8 @@ Status performAtomicTimeseriesWrites(
         if (slot) {
             args.oplogSlots = {**slot};
             fassert(5481600,
-                    opCtx->recoveryUnit()->setTimestamp(args.oplogSlots[0].getTimestamp()));
+                    shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
+                        args.oplogSlots[0].getTimestamp()));
         }
 
         collection_internal::updateDocument(opCtx,
@@ -2436,7 +2436,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                       ? Status{ErrorCodes::WriteConflict, "Could not update non-existent bucket"}
                       : output.result.getStatus());
             docsToRetry->push_back(index);
-            opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             return true;
         } else if (auto error = write_ops_exec::generateError(
                        opCtx, output.result.getStatus(), start + index, errors->size())) {
@@ -2736,7 +2736,7 @@ void getTimeseriesBatchResults(OperationContext* opCtx,
         if (swCommitInfo.getStatus() == ErrorCodes::WriteConflict ||
             swCommitInfo.getStatus() == ErrorCodes::TemporarilyUnavailable) {
             docsToRetry->push_back(index);
-            opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             continue;
         }
         if (auto error = write_ops_exec::generateError(

@@ -42,6 +42,7 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -140,10 +141,11 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
             member->recordId = kv->loc;
-            member->keyData.push_back(IndexKeyDatum(_keyPattern,
-                                                    kv->key,
-                                                    workingSetIndexId(),
-                                                    opCtx()->recoveryUnit()->getSnapshotId()));
+            member->keyData.push_back(
+                IndexKeyDatum(_keyPattern,
+                              kv->key,
+                              workingSetIndexId(),
+                              shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId()));
             _workingSet->transitionToRecordIdAndIdx(id);
 
             *out = id;

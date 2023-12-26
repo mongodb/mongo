@@ -58,7 +58,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/member_state.h"
@@ -84,6 +83,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
@@ -201,7 +201,7 @@ public:
             auto opTime = repl::getNextOpTime(opCtx);
             wuow.release();
 
-            opCtx->recoveryUnit()->abortUnitOfWork();
+            shard_role_details::getRecoveryUnit(opCtx)->abortUnitOfWork();
             shard_role_details::getLocker(opCtx)->endWriteUnitOfWork();
 
             return opTime;

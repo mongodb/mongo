@@ -56,7 +56,6 @@
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id_helpers.h"
@@ -87,6 +86,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -209,7 +209,8 @@ WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(Operatio
             minBytesPerTruncateMarker > 0);
 
     // We need to read the whole oplog, override the recoveryUnit's oplogVisibleTimestamp.
-    ScopedOplogVisibleTimestamp scopedOplogVisibleTimestamp(opCtx->recoveryUnit(), boost::none);
+    ScopedOplogVisibleTimestamp scopedOplogVisibleTimestamp(
+        shard_role_details::getRecoveryUnit(opCtx), boost::none);
     UnyieldableCollectionIterator iterator(opCtx, rs);
     auto initialSetOfMarkers = CollectionTruncateMarkers::createFromCollectionIterator(
         opCtx,
@@ -264,15 +265,16 @@ void WiredTigerRecordStore::OplogTruncateMarkers::kill() {
 }
 
 void WiredTigerRecordStore::OplogTruncateMarkers::clearMarkersOnCommit(OperationContext* opCtx) {
-    opCtx->recoveryUnit()->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
-        modifyMarkersWith([&](std::deque<CollectionTruncateMarkers::Marker>& markers) {
-            markers.clear();
-            modifyPartialMarker([&](CollectionTruncateMarkers::PartialMarkerMetrics metrics) {
-                metrics.currentRecords->store(0);
-                metrics.currentBytes->store(0);
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [this](OperationContext*, boost::optional<Timestamp>) {
+            modifyMarkersWith([&](std::deque<CollectionTruncateMarkers::Marker>& markers) {
+                markers.clear();
+                modifyPartialMarker([&](CollectionTruncateMarkers::PartialMarkerMetrics metrics) {
+                    metrics.currentRecords->store(0);
+                    metrics.currentBytes->store(0);
+                });
             });
         });
-    });
 }
 
 void WiredTigerRecordStore::OplogTruncateMarkers::updateMarkersAfterCappedTruncateAfter(
@@ -904,7 +906,8 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
 
     // The top-level locks were freed, so also release any potential low-level (storage engine)
     // locks that might be held.
-    WiredTigerRecoveryUnit* recoveryUnit = (WiredTigerRecoveryUnit*)opCtx->recoveryUnit();
+    WiredTigerRecoveryUnit* recoveryUnit =
+        (WiredTigerRecoveryUnit*)shard_role_details::getRecoveryUnit(opCtx);
     recoveryUnit->abandonSnapshot();
     recoveryUnit->beginIdle();
 
@@ -1109,18 +1112,19 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
             // Setting this transaction to be unordered will trigger a journal flush. Because these
             // are direct writes into the oplog, the machinery to trigger a journal flush is
             // bypassed. A followup oplog read will require a fres value to make progress.
-            opCtx->recoveryUnit()->setOrderedCommit(false);
+            shard_role_details::getRecoveryUnit(opCtx)->setOrderedCommit(false);
             auto oplogKeyTs = Timestamp(record.id.getLong());
             if (!ts.isNull()) {
                 invariant(oplogKeyTs == ts);
             }
-            if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
-                invariant(oplogKeyTs == opCtx->recoveryUnit()->getCommitTimestamp());
+            if (!shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull()) {
+                invariant(oplogKeyTs ==
+                          shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp());
             }
         }
         if (!ts.isNull()) {
             LOGV2_DEBUG(22403, 4, "inserting record with timestamp {ts}", "ts"_attr = ts);
-            fassert(39001, opCtx->recoveryUnit()->setTimestamp(ts));
+            fassert(39001, shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts));
         }
         CursorKey key = makeCursorKey(record.id, _keyFormat);
         setKey(c, &key);
@@ -1281,7 +1285,7 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
                   c->session,
                   str::stream() << "Namespace: " << ns(opCtx).toStringForErrorMsg()
                                 << "; Key: " << getKey(c) << "; Read Timestamp: "
-                                << opCtx->recoveryUnit()
+                                << shard_role_details::getRecoveryUnit(opCtx)
                                        ->getPointInTimeReadTimestamp(opCtx)
                                        .value_or(Timestamp{})
                                        .toString());
@@ -1574,7 +1578,7 @@ Status WiredTigerRecordStore::doCompact(OperationContext* opCtx,
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     if (!cache->isEphemeral()) {
         WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
-        opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
         // Set a pointer on the WT_SESSION to the opCtx, so that WT::compact can use a callback to
         // check for interrupts.
@@ -1713,11 +1717,12 @@ void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisibleImpl(
     OperationContext* opCtx) const {
     // Make sure that callers do not hold an active snapshot so it will be able to see the oplog
     // entries it waited for afterwards.
-    if (opCtx->recoveryUnit()->isActive()) {
+    if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
         shard_role_details::getLocker(opCtx)->dump();
-        invariant(!opCtx->recoveryUnit()->isActive(),
+        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isActive(),
                   str::stream() << "Unexpected open storage txn. RecoveryUnit state: "
-                                << RecoveryUnit::toString(opCtx->recoveryUnit()->getState())
+                                << RecoveryUnit::toString(
+                                       shard_role_details::getRecoveryUnit(opCtx)->getState())
                                 << ", inMultiDocumentTransaction:"
                                 << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
     }
@@ -1870,7 +1875,7 @@ void WiredTigerRecordStore::_changeNumRecordsAndDataSize(OperationContext* opCtx
             _sizeStorer->store(_uri, _sizeInfo);
     };
 
-    opCtx->recoveryUnit()->onRollback(
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [updateAndStoreSizeInfo, numRecordDiff, dataSizeDiff](OperationContext*) {
             LOGV2_DEBUG(7105300,
                         3,
@@ -2000,13 +2005,13 @@ void WiredTigerRecordStore::doCappedTruncateAfter(
 Status WiredTigerRecordStore::oplogDiskLocRegisterImpl(OperationContext* opCtx,
                                                        const Timestamp& ts,
                                                        bool orderedCommit) {
-    opCtx->recoveryUnit()->setOrderedCommit(orderedCommit);
+    shard_role_details::getRecoveryUnit(opCtx)->setOrderedCommit(orderedCommit);
 
     if (!orderedCommit) {
         // This labels the current transaction with a timestamp.
         // This is required for oplog visibility to work correctly, as WiredTiger uses the
         // transaction list to determine where there are holes in the oplog.
-        return opCtx->recoveryUnit()->setTimestamp(ts);
+        return shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts);
     }
 
     // This handles non-primary (secondary) state behavior; we simply set the oplog visiblity read
@@ -2144,7 +2149,7 @@ void WiredTigerRecordStoreCursorBase::reportOutOfOrderRead(RecordId& id,
     }
 
     auto options = [&] {
-        if (_opCtx->recoveryUnit()->getDataCorruptionDetectionMode() ==
+        if (shard_role_details::getRecoveryUnit(_opCtx)->getDataCorruptionDetectionMode() ==
             DataCorruptionDetectionMode::kThrow) {
             // uassert with 'DataCorruptionDetected' after logging.
             return logv2::LogOptions{logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)};

@@ -35,11 +35,11 @@
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/authz_session_external_state_d.h"
 #include "mongo/db/client.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

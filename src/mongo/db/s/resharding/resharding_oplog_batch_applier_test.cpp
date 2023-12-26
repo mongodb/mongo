@@ -61,7 +61,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -104,6 +103,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -272,7 +272,7 @@ public:
             auto opTime = repl::getNextOpTime(opCtx);
             wuow.release();
 
-            opCtx->recoveryUnit()->abortUnitOfWork();
+            shard_role_details::getRecoveryUnit(opCtx)->abortUnitOfWork();
             shard_role_details::getLocker(opCtx)->endWriteUnitOfWork();
 
             return opTime;

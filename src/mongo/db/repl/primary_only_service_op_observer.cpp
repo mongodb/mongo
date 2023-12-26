@@ -38,6 +38,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
@@ -69,7 +70,7 @@ void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
     if (!service) {
         return;
     }
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [service, documentId, nss](OperationContext*, boost::optional<Timestamp>) {
             // Release the instance without interrupting it since for some primary-only services
             // there is still work to be done after the state document is removed.
@@ -86,7 +87,7 @@ repl::OpTime PrimaryOnlyServiceOpObserver::onDropCollection(OperationContext* op
                                                             bool markFromMigrate) {
     auto service = _registry->lookupServiceByNamespace(collectionName);
     if (service) {
-        opCtx->recoveryUnit()->onCommit(
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [service, collectionName](OperationContext*, boost::optional<Timestamp>) {
                 // Release and interrupt all the instances since the state document collection is
                 // not supposed to be dropped.

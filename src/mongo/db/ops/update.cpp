@@ -42,7 +42,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update.h"
@@ -50,6 +49,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

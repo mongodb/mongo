@@ -75,7 +75,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -119,6 +118,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -587,7 +587,7 @@ public:
                 }
 
                 if (reverseScan && isInternal) {
-                    pinReadSourceBlock.emplace(opCtx->recoveryUnit());
+                    pinReadSourceBlock.emplace(shard_role_details::getRecoveryUnit(opCtx));
                 }
             }
 
@@ -739,7 +739,7 @@ public:
             if (cq->getFindCommandRequest().getReadOnce()) {
                 // The readOnce option causes any storage-layer cursors created during plan
                 // execution to assume read data will not be needed again and need not be cached.
-                opCtx->recoveryUnit()->setReadOnce(true);
+                shard_role_details::getRecoveryUnit(opCtx)->setReadOnce(true);
             }
 
             cq->setUseCqfIfEligible(true);
@@ -883,7 +883,8 @@ public:
                     // The stats collected here will not get overwritten, as the service entry
                     // point layer will only set these stats when they're not empty.
                     CurOp::get(opCtx)->debug().storageStats =
-                        opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
+                        shard_role_details::getRecoveryUnit(opCtx)
+                            ->computeOperationStatisticsSinceLastCall();
                 }
 
                 stashTransactionResourcesFromOperationContext(opCtx, pinnedCursor.getCursor());

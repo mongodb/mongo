@@ -37,6 +37,7 @@
 #include "mongo/db/s/query_analysis_coordinator.h"
 #include "mongo/db/s/query_analysis_op_observer_configsvr.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -60,10 +61,11 @@ void QueryAnalysisOpObserverConfigSvr::onInserts(OperationContext* opCtx,
     } else if (ns == MongosType::ConfigNS) {
         for (auto it = begin; it != end; ++it) {
             const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(it->doc));
-            opCtx->recoveryUnit()->onCommit([parsedDoc](OperationContext* opCtx,
-                                                        boost::optional<Timestamp>) {
-                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerInsert(parsedDoc);
-            });
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                [parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                    analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerInsert(
+                        parsedDoc);
+                });
         }
     }
 }
@@ -77,7 +79,7 @@ void QueryAnalysisOpObserverConfigSvr::onUpdate(OperationContext* opCtx,
         updateToConfigQueryAnalyzersNamespaceImpl(opCtx, args);
     } else if (ns == MongosType::ConfigNS) {
         const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(args.updateArgs->updatedDoc));
-        opCtx->recoveryUnit()->onCommit(
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
                 analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerUpdate(parsedDoc);
             });
@@ -98,7 +100,7 @@ void QueryAnalysisOpObserverConfigSvr::onDelete(OperationContext* opCtx,
     } else if (ns == MongosType::ConfigNS) {
         invariant(!doc.isEmpty());
         const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(doc));
-        opCtx->recoveryUnit()->onCommit(
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
                 analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerDelete(parsedDoc);
             });

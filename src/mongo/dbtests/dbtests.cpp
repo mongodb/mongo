@@ -66,6 +66,7 @@
 #include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/dbtests/framework.h"
@@ -156,8 +157,11 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
                            collection,
                            spec,
                            [opCtx](const std::vector<BSONObj>& specs) -> Status {
-                               if (opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
-                                   return opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1));
+                               if (shard_role_details::getRecoveryUnit(opCtx)
+                                       ->getCommitTimestamp()
+                                       .isNull()) {
+                                   return shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
+                                       Timestamp(1, 1));
                                }
                                return Status::OK();
                            })
@@ -195,7 +199,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
                                  collection.getWritableCollection(opCtx),
                                  MultiIndexBlock::kNoopOnCreateEachFn,
                                  MultiIndexBlock::kNoopOnCommitFn));
-        ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
+        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(Timestamp(1, 1)));
         wunit.commit();
     }
     abortOnExit.dismiss();

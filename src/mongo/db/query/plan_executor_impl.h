@@ -46,7 +46,6 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_result.h"
@@ -60,6 +59,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -81,7 +81,7 @@ MONGO_WARN_UNUSED_RESULT_FUNCTION PlanStage::StageState handlePlanStageYield(
     auto opCtx = expCtx->opCtx;
     invariant(opCtx);
     invariant(shard_role_details::getLocker(opCtx));
-    invariant(opCtx->recoveryUnit());
+    invariant(shard_role_details::getRecoveryUnit(opCtx));
     invariant(!expCtx->getTemporarilyUnavailableException());
 
     try {

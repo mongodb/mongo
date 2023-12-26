@@ -65,6 +65,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -99,7 +100,7 @@ void openCallback(OperationContext* opCtx, const CollectionPtr& collection) {
     // the cursor. Also call abandonSnapshot to make sure that we are using a fresh
     // storage engine snapshot while waiting. Otherwise, we will end up reading from the
     // snapshot where the oplog entries are not yet visible even after the wait.
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     collection->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 }
 

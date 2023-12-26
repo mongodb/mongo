@@ -60,7 +60,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/skipped_record_tracker.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -84,6 +83,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -316,7 +316,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         // On rollback in init(), cleans up _indexes so that ~MultiIndexBlock doesn't try to clean
         // up _indexes manually (since the changes were already rolled back). Due to this, it is
         // thus legal to call init() again after it fails.
-        opCtx->recoveryUnit()->onRollback([this](OperationContext*) {
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback([this](OperationContext*) {
             _indexes.clear();
             _buildIsCleanedUp = true;
         });
@@ -457,7 +457,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             index.filterExpression = indexCatalogEntry->getFilterExpression();
         }
 
-        opCtx->recoveryUnit()->onCommit(
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [ns = collection->ns(), this](OperationContext*, boost::optional<Timestamp> commitTs) {
                 if (!_buildUUID) {
                     return;
@@ -556,13 +556,13 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         hangAfterSettingUpIndexBuildUnlocked.pauseWhileSet();
 
         shard_role_details::getLocker(opCtx)->restoreLockState(opCtx, lockInfo);
-        opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
         collection.restore();
     }
 
     // Hint to the storage engine that this collection scan should not keep data in the cache.
     bool readOnce = useReadOnceCursorsForIndexBuilds.load();
-    opCtx->recoveryUnit()->setReadOnce(readOnce);
+    shard_role_details::getRecoveryUnit(opCtx)->setReadOnce(readOnce);
 
     size_t numScanRestarts = 0;
     bool restartCollectionScan = false;
@@ -585,8 +585,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                       "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()),
                       "phase"_attr = IndexBuildPhase_serializer(_phase),
                       "collectionScanPosition"_attr = _lastRecordIdInserted,
-                      "readSource"_attr =
-                          RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
+                      "readSource"_attr = RecoveryUnit::toString(
+                          shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()),
                       "error"_attr = ex);
 
         _lastRecordIdInserted = boost::none;
@@ -622,15 +622,15 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                   "collectionUUID"_attr = _collectionUUID,
                   logAttrs(collection->ns()),
                   "totalRecords"_attr = progress.get(WithLock::withoutLock())->hits(),
-                  "readSource"_attr =
-                      RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
+                  "readSource"_attr = RecoveryUnit::toString(
+                      shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()),
                   "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()));
         } catch (const ExceptionFor<ErrorCodes::ReadConcernMajorityNotAvailableYet>& ex) {
             restart(ex);
         } catch (const ExceptionFor<ErrorCodes::CappedPositionLost>& ex) {
             restart(ex);
         } catch (DBException& ex) {
-            auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+            auto readSource = shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
             LOGV2(4984704,
                   "Index build: collection scan stopped",
                   "buildUUID"_attr = _buildUUID,
@@ -674,7 +674,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 
         if (isBackgroundBuilding()) {
             shard_role_details::getLocker(opCtx)->restoreLockState(opCtx, lockInfo);
-            opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
         } else {
             invariant(false,
                       "the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off for "
@@ -1138,7 +1138,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     }
 
     CollectionQueryInfo::get(collection).clearQueryCache(opCtx, CollectionPtr(collection));
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this](OperationContext*, boost::optional<Timestamp>) { _buildIsCleanedUp = true; });
 
     return Status::OK();

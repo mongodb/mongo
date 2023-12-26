@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/uncommitted_multikey.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -42,7 +43,7 @@ const auto getUncommittedMultikey =
 }  // namespace
 
 UncommittedMultikey& UncommittedMultikey::get(OperationContext* opCtx) {
-    return getUncommittedMultikey(opCtx->recoveryUnit()->getSnapshot());
+    return getUncommittedMultikey(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
 }
 
 }  // namespace mongo

@@ -50,7 +50,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -66,6 +65,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/framework.h"
@@ -143,7 +143,7 @@ Status insertBSON(OperationContext* opCtx, const NamespaceString& nss, RecordId 
     WriteUnitOfWork wuow(opCtx);
 
     auto cappedObserver = coll->getCappedVisibilityObserver();
-    cappedObserver->registerWriter(opCtx->recoveryUnit());
+    cappedObserver->registerWriter(shard_role_details::getRecoveryUnit(opCtx));
 
     coll->registerCappedInsert(opCtx, id);
     auto status =
@@ -158,7 +158,7 @@ Status insertBSON(OperationContext* opCtx, const NamespaceString& nss, RecordId 
 Status _insertBSON(OperationContext* opCtx, const CollectionPtr& coll, RecordId id) {
     BSONObj obj = BSON("a" << 1);
     auto cappedObserver = coll->getCappedVisibilityObserver();
-    cappedObserver->registerWriter(opCtx->recoveryUnit());
+    cappedObserver->registerWriter(shard_role_details::getRecoveryUnit(opCtx));
     coll->registerCappedInsert(opCtx, id);
     return collection_internal::insertDocument(opCtx, coll, InsertStatement(obj, id), nullptr);
 }
@@ -386,7 +386,7 @@ TEST_F(CappedCollectionTest, OplogOrder) {
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
         coll.yield();
         earlyCursor->save();
-        earlyCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(earlyCtx.get())->abandonSnapshot();
 
         auto [c1, t1] = makeClientAndCtx("t1");
         AutoGetCollection ac1(t1.get(), nss, MODE_IX);
@@ -477,7 +477,7 @@ TEST_F(CappedCollectionTest, OplogOrder) {
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
         coll.yield();
         earlyCursor->save();
-        earlyCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(earlyCtx.get())->abandonSnapshot();
 
         auto [c1, t1] = makeClientAndCtx("t1");
         AutoGetCollection ac1(t1.get(), nss, MODE_IX);
@@ -656,7 +656,7 @@ TEST_F(CappedCollectionTest, SeekNearOplogWithReadTimestamp) {
     {
         auto [c2, t2] = makeClientAndCtx("t2");
         AutoGetCollectionForReadLockFree acr(t2.get(), nss);
-        t2->recoveryUnit()->setOplogVisibilityTs(boost::none);
+        shard_role_details::getRecoveryUnit(t2.get())->setOplogVisibilityTs(boost::none);
         auto cursor = acr.getCollection()->getCursor(t2.get());
         checkSeekNear(cursor, 1, 2);
         checkSeekNear(cursor, 2, 2);
@@ -686,10 +686,10 @@ TEST_F(CappedCollectionTest, SeekNearOplogWithReadTimestamp) {
     // Forward, existing read timestamp.
     {
         auto [c2, t2] = makeClientAndCtx("t2");
-        t2->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(1, 6));
+        shard_role_details::getRecoveryUnit(t2.get())->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kProvided, Timestamp(1, 6));
         AutoGetCollectionForReadLockFree acr(t2.get(), nss);
-        t2->recoveryUnit()->setOplogVisibilityTs(boost::none);
+        shard_role_details::getRecoveryUnit(t2.get())->setOplogVisibilityTs(boost::none);
         auto cursor = acr.getCollection()->getCursor(t2.get());
         checkSeekNear(cursor, 1, 2);
         checkSeekNear(cursor, 2, 2);
@@ -704,8 +704,8 @@ TEST_F(CappedCollectionTest, SeekNearOplogWithReadTimestamp) {
     // Backward, existing read timestamp.
     {
         auto [c2, t2] = makeClientAndCtx("t2");
-        t2->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(1, 6));
+        shard_role_details::getRecoveryUnit(t2.get())->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kProvided, Timestamp(1, 6));
         AutoGetCollectionForReadLockFree acr(t2.get(), nss);
         auto cursor = acr.getCollection()->getCursor(t2.get(), false);
         checkSeekNear(cursor, 1, 2);
@@ -721,10 +721,10 @@ TEST_F(CappedCollectionTest, SeekNearOplogWithReadTimestamp) {
     // Forward, non-existing read timestamp.
     {
         auto [c2, t2] = makeClientAndCtx("t2");
-        t2->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(1, 7));
+        shard_role_details::getRecoveryUnit(t2.get())->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kProvided, Timestamp(1, 7));
         AutoGetCollectionForReadLockFree acr(t2.get(), nss);
-        t2->recoveryUnit()->setOplogVisibilityTs(boost::none);
+        shard_role_details::getRecoveryUnit(t2.get())->setOplogVisibilityTs(boost::none);
         auto cursor = acr.getCollection()->getCursor(t2.get());
         checkSeekNear(cursor, 1, 2);
         checkSeekNear(cursor, 2, 2);
@@ -739,8 +739,8 @@ TEST_F(CappedCollectionTest, SeekNearOplogWithReadTimestamp) {
     // Backward, non-existing read timestamp.
     {
         auto [c2, t2] = makeClientAndCtx("t2");
-        t2->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(1, 7));
+        shard_role_details::getRecoveryUnit(t2.get())->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kProvided, Timestamp(1, 7));
         AutoGetCollectionForReadLockFree acr(t2.get(), nss);
         auto cursor = acr.getCollection()->getCursor(t2.get(), false);
         checkSeekNear(cursor, 1, 2);

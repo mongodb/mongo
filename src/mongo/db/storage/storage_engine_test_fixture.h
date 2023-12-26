@@ -43,6 +43,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -109,7 +110,7 @@ public:
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)->getCatalogId();
         std::string indexIdent =
             _storageEngine->getCatalog()->getIndexIdent(opCtx, catalogId, indexName);
-        return dropIdent(opCtx->recoveryUnit(), indexIdent);
+        return dropIdent(shard_role_details::getRecoveryUnit(opCtx), indexIdent);
     }
 
     Status dropIdent(RecoveryUnit* ru, StringData ident) {

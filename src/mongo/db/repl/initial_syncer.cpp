@@ -81,6 +81,7 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
@@ -834,7 +835,7 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
     auto opCtx = makeOpCtx();
     // This code can make untimestamped writes (deletes) to the _mdb_catalog on top of existing
     // timestamped updates.
-    opCtx->recoveryUnit()->allowAllUntimestampedWrites();
+    shard_role_details::getRecoveryUnit(opCtx.get())->allowAllUntimestampedWrites();
 
     // We are not replicating nor validating these writes.
     UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx.get());

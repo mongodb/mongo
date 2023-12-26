@@ -35,12 +35,12 @@
 #include <boost/none.hpp>
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -66,7 +66,7 @@ WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, bool groupOplogEntries
 
     shard_role_details::getLocker(_opCtx)->beginWriteUnitOfWork();
     if (_toplevel) {
-        _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx->readOnly());
+        shard_role_details::getRecoveryUnit(_opCtx)->beginUnitOfWork(_opCtx->readOnly());
         _opCtx->_ruState = RecoveryUnitState::kActiveUnitOfWork;
     }
     // Make sure we don't silently proceed after a previous WriteUnitOfWork under the same parent
@@ -80,15 +80,15 @@ WriteUnitOfWork::~WriteUnitOfWork() {
         if (!_opCtx->readOnly()) {
             if (_toplevel) {
                 // Abort unit of work and execute rollback handlers
-                _opCtx->recoveryUnit()->abortUnitOfWork();
+                shard_role_details::getRecoveryUnit(_opCtx)->abortUnitOfWork();
                 _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
             } else {
                 _opCtx->_ruState = RecoveryUnitState::kFailedUnitOfWork;
             }
         } else {
             // Clear the readOnly state and execute rollback handlers in readOnly mode.
-            _opCtx->recoveryUnit()->endReadOnlyUnitOfWork();
-            _opCtx->recoveryUnit()->abortRegisteredChanges();
+            shard_role_details::getRecoveryUnit(_opCtx)->endReadOnlyUnitOfWork();
+            shard_role_details::getRecoveryUnit(_opCtx)->abortRegisteredChanges();
         }
         shard_role_details::getLocker(_opCtx)->endWriteUnitOfWork();
     }
@@ -127,7 +127,7 @@ void WriteUnitOfWork::prepare() {
     invariant(_toplevel);
     invariant(_opCtx->_ruState == RecoveryUnitState::kActiveUnitOfWork);
 
-    _opCtx->recoveryUnit()->prepareUnitOfWork();
+    shard_role_details::getRecoveryUnit(_opCtx)->prepareUnitOfWork();
     _prepared = true;
 }
 
@@ -148,14 +148,14 @@ void WriteUnitOfWork::commit() {
 
         // Execute preCommit hooks before committing the transaction. This is an opportunity to
         // throw or do any last changes before committing.
-        _opCtx->recoveryUnit()->runPreCommitHooks(_opCtx);
+        shard_role_details::getRecoveryUnit(_opCtx)->runPreCommitHooks(_opCtx);
         if (!_opCtx->readOnly()) {
             // Commit unit of work and execute commit or rollback handlers depending on whether the
             // commit was successful.
-            _opCtx->recoveryUnit()->commitUnitOfWork();
+            shard_role_details::getRecoveryUnit(_opCtx)->commitUnitOfWork();
         } else {
             // Just execute commit handlers in readOnly mode
-            _opCtx->recoveryUnit()->commitRegisteredChanges(boost::none);
+            shard_role_details::getRecoveryUnit(_opCtx)->commitRegisteredChanges(boost::none);
         }
 
         _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;

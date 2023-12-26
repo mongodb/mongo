@@ -41,6 +41,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -54,7 +55,7 @@ const RecoveryUnit::Snapshot::Decoration<OpenedCollections> getOpenedCollections
 }  // namespace
 
 UncommittedCatalogUpdates& UncommittedCatalogUpdates::get(OperationContext* opCtx) {
-    return getUncommittedCatalogUpdates(opCtx->recoveryUnit()->getSnapshot());
+    return getUncommittedCatalogUpdates(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
 }
 
 UncommittedCatalogUpdates::CollectionLookupResult UncommittedCatalogUpdates::lookupCollection(
@@ -204,12 +205,13 @@ void UncommittedCatalogUpdates::replaceViewsForDatabase(const DatabaseName& dbNa
 }
 
 void UncommittedCatalogUpdates::addView(OperationContext* opCtx, const NamespaceString& nss) {
-    opCtx->recoveryUnit()->registerPreCommitHook([nss](OperationContext* opCtx) {
-        CollectionCatalog::write(opCtx, [opCtx, nss](CollectionCatalog& catalog) {
-            catalog.registerUncommittedView(opCtx, nss);
+    shard_role_details::getRecoveryUnit(opCtx)->registerPreCommitHook(
+        [nss](OperationContext* opCtx) {
+            CollectionCatalog::write(opCtx, [opCtx, nss](CollectionCatalog& catalog) {
+                catalog.registerUncommittedView(opCtx, nss);
+            });
         });
-    });
-    opCtx->recoveryUnit()->onRollback([nss](OperationContext* opCtx) {
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback([nss](OperationContext* opCtx) {
         CollectionCatalog::write(
             opCtx, [&](CollectionCatalog& catalog) { catalog.deregisterUncommittedView(nss); });
     });
@@ -250,7 +252,7 @@ bool UncommittedCatalogUpdates::isCreatedCollection(OperationContext* opCtx,
 }
 
 OpenedCollections& OpenedCollections::get(OperationContext* opCtx) {
-    return getOpenedCollections(opCtx->recoveryUnit()->getSnapshot());
+    return getOpenedCollections(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
 }
 
 boost::optional<std::shared_ptr<const Collection>> OpenedCollections::lookupByNamespace(

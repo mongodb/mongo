@@ -61,6 +61,7 @@
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -117,10 +118,10 @@ boost::optional<Document> NonShardServerProcessInterface::lookupSingleDocument(
         // Speculative majority reads are required to use the 'kNoOverlap' read source.
         // Storage engine operations require at least Global IS.
         Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
-        invariant(expCtx->opCtx->recoveryUnit()->getTimestampReadSource() ==
+        invariant(shard_role_details::getRecoveryUnit(expCtx->opCtx)->getTimestampReadSource() ==
                   RecoveryUnit::ReadSource::kNoOverlap);
-        boost::optional<Timestamp> readTs =
-            expCtx->opCtx->recoveryUnit()->getPointInTimeReadTimestamp(expCtx->opCtx);
+        boost::optional<Timestamp> readTs = shard_role_details::getRecoveryUnit(expCtx->opCtx)
+                                                ->getPointInTimeReadTimestamp(expCtx->opCtx);
         invariant(readTs);
         speculativeMajorityReadInfo.setSpeculativeReadTimestampForward(*readTs);
     }

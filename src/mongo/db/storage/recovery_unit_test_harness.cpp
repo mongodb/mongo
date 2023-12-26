@@ -41,12 +41,12 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -76,7 +76,7 @@ public:
     void setUp() override {
         harnessHelper = newRecoveryUnitHarnessHelper();
         opCtx = harnessHelper->newOperationContext();
-        ru = opCtx->recoveryUnit();
+        ru = shard_role_details::getRecoveryUnit(opCtx.get());
     }
 
     std::unique_ptr<RecoveryUnitHarnessHelper> harnessHelper;
@@ -258,24 +258,25 @@ TEST_F(RecoveryUnitTestHarness, FlipReadOnly) {
 
 DEATH_TEST_F(RecoveryUnitTestHarness, RegisterChangeMustBeInUnitOfWork, "invariant") {
     int count = 0;
-    opCtx->recoveryUnit()->registerChange(std::make_unique<TestChange>(&count));
+    shard_role_details::getRecoveryUnit(opCtx.get())
+        ->registerChange(std::make_unique<TestChange>(&count));
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, CommitMustBeInUnitOfWork, "invariant") {
-    opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(opCtx.get())->commitUnitOfWork();
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, AbortMustBeInUnitOfWork, "invariant") {
-    opCtx->recoveryUnit()->abortUnitOfWork();
+    shard_role_details::getRecoveryUnit(opCtx.get())->abortUnitOfWork();
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, CannotHaveUnfinishedUnitOfWorkOnExit, "invariant") {
-    opCtx->recoveryUnit()->beginUnitOfWork(opCtx->readOnly());
+    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(opCtx->readOnly());
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, PrepareMustBeInUnitOfWork, "invariant") {
     try {
-        opCtx->recoveryUnit()->prepareUnitOfWork();
+        shard_role_details::getRecoveryUnit(opCtx.get())->prepareUnitOfWork();
     } catch (const ExceptionFor<ErrorCodes::CommandNotSupported>&) {
         bool prepareCommandSupported = false;
         invariant(prepareCommandSupported);
@@ -283,23 +284,23 @@ DEATH_TEST_F(RecoveryUnitTestHarness, PrepareMustBeInUnitOfWork, "invariant") {
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, WaitUntilDurableMustBeOutOfUnitOfWork, "invariant") {
-    opCtx->recoveryUnit()->beginUnitOfWork(opCtx->readOnly());
-    opCtx->recoveryUnit()->waitUntilDurable(opCtx.get());
+    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(opCtx->readOnly());
+    shard_role_details::getRecoveryUnit(opCtx.get())->waitUntilDurable(opCtx.get());
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, AbandonSnapshotMustBeOutOfUnitOfWork, "invariant") {
-    opCtx->recoveryUnit()->beginUnitOfWork(opCtx->readOnly());
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(opCtx->readOnly());
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, CommitInReadOnly, "invariant") {
-    opCtx->recoveryUnit()->beginUnitOfWork(/*readOnly=*/true);
-    opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(/*readOnly=*/true);
+    shard_role_details::getRecoveryUnit(opCtx.get())->commitUnitOfWork();
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, AbortInReadOnly, "invariant") {
-    opCtx->recoveryUnit()->beginUnitOfWork(/*readOnly=*/true);
-    opCtx->recoveryUnit()->abortUnitOfWork();
+    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(/*readOnly=*/true);
+    shard_role_details::getRecoveryUnit(opCtx.get())->abortUnitOfWork();
 }
 
 }  // namespace

@@ -272,7 +272,7 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
 
             // We might replay a prepared transaction behind oldest timestamp.
-            opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
+            shard_role_details::getRecoveryUnit(opCtx)->setRoundUpPreparedTimestamps(true);
 
             BSONObjBuilder resultWeDontCareAbout;
 
@@ -281,7 +281,7 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
                 // If the transaction was empty then we have no locks, ensure at least Global
                 // IX.
                 Lock::GlobalLock lk(opCtx, MODE_IX);
-                opCtx->recoveryUnit()->setPrepareTimestamp(commitTimestamp);
+                shard_role_details::getRecoveryUnit(opCtx)->setPrepareTimestamp(commitTimestamp);
                 wunit.prepare();
 
                 // Calls setCommitTimestamp() to set commit timestamp of the transaction and
@@ -289,7 +289,7 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
                 // scope. It is necessary that we clear the commit timestamp because there can
                 // be another transaction in the same recovery unit calling setTimestamp().
                 TimestampBlock tsBlock(opCtx, commitTimestamp);
-                opCtx->recoveryUnit()->setDurableTimestamp(durableTimestamp);
+                shard_role_details::getRecoveryUnit(opCtx)->setDurableTimestamp(durableTimestamp);
                 wunit.commit();
             }
         });
@@ -472,7 +472,7 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
     bool isTransactionWithCommand = false;
     // Ensure future transactions read without a timestamp.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              opCtx->recoveryUnit()->getTimestampReadSource());
+              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 
     std::vector<OplogEntry> ops;
 
@@ -649,12 +649,12 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
             // prepare conflict if we query for an incomplete key and an adjacent key is
             // prepared. We ignore prepare conflicts on recovering nodes because they may
             // may encounter prepare conflicts that did not occur on the primary.
-            opCtx->recoveryUnit()->setPrepareConflictBehavior(
+            shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
                 PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
             // We might replay a prepared transaction behind oldest timestamp.
             if (repl::OplogApplication::inRecovering(mode) ||
                 mode == repl::OplogApplication::Mode::kInitialSync) {
-                opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
+                shard_role_details::getRecoveryUnit(opCtx)->setRoundUpPreparedTimestamps(true);
             }
 
             // Release WUOW, transaction lock resources and abort storage transaction
@@ -820,7 +820,7 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
 
     // Ensure future transactions read without a timestamp.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              opCtx->recoveryUnit()->getTimestampReadSource());
+              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 
     DBDirectClient client(opCtx);
     FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};

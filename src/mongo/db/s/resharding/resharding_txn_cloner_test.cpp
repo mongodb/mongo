@@ -65,7 +65,6 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
@@ -97,6 +96,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -500,7 +500,7 @@ protected:
             auto opTime = repl::getNextOpTime(opCtx);
             wuow.release();
 
-            opCtx->recoveryUnit()->abortUnitOfWork();
+            shard_role_details::getRecoveryUnit(opCtx)->abortUnitOfWork();
             shard_role_details::getLocker(opCtx)->endWriteUnitOfWork();
 
             return opTime;

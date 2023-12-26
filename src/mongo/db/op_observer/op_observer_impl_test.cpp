@@ -63,7 +63,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
@@ -106,6 +105,7 @@
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
@@ -215,7 +215,7 @@ std::vector<repl::OpTime> reserveOpTimesInSideTransaction(OperationContext* opCt
     auto reservedSlots = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, count);
     wuow.release();
 
-    opCtx->recoveryUnit()->abortUnitOfWork();
+    shard_role_details::getRecoveryUnit(opCtx)->abortUnitOfWork();
     shard_role_details::getLocker(opCtx)->endWriteUnitOfWork();
 
     return reservedSlots;
@@ -273,8 +273,9 @@ protected:
                NamespaceString nss,
                boost::optional<UUID> uuid = boost::none) const {
         writeConflictRetry(opCtx, "deleteAll", nss, [&] {
-            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-            opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kNoTimestamp);
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection collRaii(opCtx, nss, MODE_X);
@@ -1323,7 +1324,8 @@ protected:
                                     getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
                                     /*prepare=*/true);
         opObserver().preTransactionPrepare(opCtx(), *txnOps, applyOpsAssignment, currentTime);
-        opCtx()->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
+        shard_role_details::getRecoveryUnit(opCtx())->setPrepareTimestamp(
+            prepareOpTime.getTimestamp());
 
         // Don't write oplog entry on secondaries.
         if (opCtx()->writesAreReplicated()) {
@@ -1490,7 +1492,8 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
     prepareTransaction(reservedSlots, prepareOpTime);
 
-    ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
+    ASSERT_EQ(prepareOpTime.getTimestamp(),
+              shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
 
     txnParticipant.stashTransactionResources(opCtx());
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
@@ -1708,7 +1711,8 @@ TEST_F(OpObserverTransactionTest,
         txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
         prepareTransaction({prepareOpTime}, prepareOpTime);
     }
-    ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
+    ASSERT_EQ(prepareOpTime.getTimestamp(),
+              shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
 
     txnParticipant.stashTransactionResources(opCtx());
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
@@ -1741,7 +1745,8 @@ TEST_F(OpObserverTransactionTest, PreparingTransactionWritesToTransactionTable) 
         prepareTransaction({slot}, prepareOpTime);
     }
 
-    ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
+    ASSERT_EQ(prepareOpTime.getTimestamp(),
+              shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
     txnParticipant.stashTransactionResources(opCtx());
     assertTxnRecord(txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared);
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
@@ -3830,7 +3835,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertPrepareTest) {
     txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
     prepareTransaction(reservedSlots, prepareOpTime);
 
-    ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
+    ASSERT_EQ(prepareOpTime.getTimestamp(),
+              shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
     ASSERT_EQ(prepareOpTime, txnParticipant.getLastWriteOpTime());
 
     txnParticipant.stashTransactionResources(opCtx());
@@ -3920,7 +3926,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
     txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
     prepareTransaction(reservedSlots, prepareOpTime);
 
-    ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
+    ASSERT_EQ(prepareOpTime.getTimestamp(),
+              shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
     ASSERT_EQ(prepareOpTime, txnParticipant.getLastWriteOpTime());
 
     txnParticipant.stashTransactionResources(opCtx());
@@ -3984,7 +3991,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeletePrepareTest) {
     txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
     prepareTransaction(reservedSlots, prepareOpTime);
 
-    ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
+    ASSERT_EQ(prepareOpTime.getTimestamp(),
+              shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
     ASSERT_EQ(prepareOpTime, txnParticipant.getLastWriteOpTime());
 
     txnParticipant.stashTransactionResources(opCtx());
@@ -4062,7 +4070,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
 
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
     const auto prepareTimestamp = prepareOpTime.getTimestamp();
-    ASSERT_EQ(prepareTimestamp, opCtx()->recoveryUnit()->getPrepareTimestamp());
+    ASSERT_EQ(prepareTimestamp,
+              shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
 
     // Reserve oplog entry for the commit oplog entry.
     OplogSlot commitSlot = reserveOpTimeInSideTransaction(opCtx());
@@ -4147,7 +4156,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
     assertTxnRecord(txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared);
     assertTxnRecordStartOpTime(startOpTime);
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
-    ASSERT_EQ(prepareTimestamp, opCtx()->recoveryUnit()->getPrepareTimestamp());
+    ASSERT_EQ(prepareTimestamp,
+              shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp());
 
     // Mimic aborting the transaction by resetting the WUOW.
     opCtx()->setWriteUnitOfWork(nullptr);

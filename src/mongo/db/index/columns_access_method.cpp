@@ -57,6 +57,7 @@
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -293,7 +294,7 @@ void ColumnStoreAccessMethod::_visitCellsForIndexInsert(
         bsonRecords,
         [&](StringData path, const BsonRecord& rec, const column_keygen::UnencodedCellView& cell) {
             if (!rec.ts.isNull()) {
-                uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(rec.ts));
+                uassertStatusOK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(rec.ts));
             }
             buf.reset();
             column_keygen::writeEncodedCell(cell, &buf);
@@ -557,19 +558,19 @@ Status ColumnStoreAccessMethod::applyIndexBuildSideWrite(OperationContext* opCtx
         case IndexBuildInterceptor::Op::kInsert:
             cursor->insert(path, rid.getLong(), cell);
             inc(keysInserted);
-            opCtx->recoveryUnit()->onRollback(
+            shard_role_details::getRecoveryUnit(opCtx)->onRollback(
                 [keysInserted](OperationContext*) { dec(keysInserted); });
             break;
         case IndexBuildInterceptor::Op::kDelete:
             cursor->remove(path, rid.getLong());
             inc(keysDeleted);
-            opCtx->recoveryUnit()->onRollback(
+            shard_role_details::getRecoveryUnit(opCtx)->onRollback(
                 [keysDeleted](OperationContext*) { dec(keysDeleted); });
             break;
         case IndexBuildInterceptor::Op::kUpdate:
             cursor->update(path, rid.getLong(), cell);
             inc(keysInserted);
-            opCtx->recoveryUnit()->onRollback(
+            shard_role_details::getRecoveryUnit(opCtx)->onRollback(
                 [keysInserted](OperationContext*) { dec(keysInserted); });
             break;
     }

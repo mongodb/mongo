@@ -61,6 +61,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -667,7 +668,7 @@ void PreImagesTruncateManager::updateMarkersOnInsert(OperationContext* opCtx,
     auto wallTime = preImage.getOperationTime();
     auto recordId = change_stream_pre_image_util::toRecordId(preImage.getId());
 
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this,
          tenantId = std::move(tenantId),
          nsUuid = std::move(nsUuid),
@@ -762,7 +763,7 @@ void PreImagesTruncateManager::_registerAndInitialiseMarkersForTenant(
     //      (iii) There aren't any other inserts into NsUUID1. The highest wall time and RecordId
     //      for NsUUID1 MUST be updated so the markers track PreImage100, and know to eventually
     //      truncate it.
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
     NsUUIDToSamplesMap highestRecordIdAndWallTimeSamples;

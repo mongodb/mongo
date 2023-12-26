@@ -76,7 +76,6 @@
 #include "mongo/db/index/s2_bucket_access_method.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -89,6 +88,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -272,7 +272,7 @@ Status SortedDataIndexAccessMethod::insert(OperationContext* opCtx,
         invariant(bsonRecord.id != RecordId());
 
         if (!bsonRecord.ts.isNull()) {
-            Status status = opCtx->recoveryUnit()->setTimestamp(bsonRecord.ts);
+            Status status = shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(bsonRecord.ts);
             if (!status.isOK())
                 return status;
         }
@@ -789,7 +789,7 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
         }
 
         *keysInserted += numInserted;
-        opCtx->recoveryUnit()->onRollback(
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [keysInserted, numInserted](OperationContext*) { *keysInserted -= numInserted; });
     } else {
         invariant(opType == IndexBuildInterceptor::Op::kDelete);
@@ -800,7 +800,7 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
         }
 
         *keysDeleted += numDeleted;
-        opCtx->recoveryUnit()->onRollback(
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [keysDeleted, numDeleted](OperationContext*) { *keysDeleted -= numDeleted; });
     }
     return Status::OK();
@@ -830,7 +830,7 @@ const IndexCatalogEntry* IndexAccessMethod::BulkBuilder::yield(OperationContext*
     const std::string indexIdent = entry->getIdent();
 
     // Releasing locks means a new snapshot should be acquired when restored.
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     collection.yield();
 
     auto locker = shard_role_details::getLocker(opCtx);

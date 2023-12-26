@@ -43,7 +43,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/explain_options.h"

@@ -70,7 +70,6 @@
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/s2_bucket_access_method.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -98,6 +97,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update_index_data.h"
@@ -278,7 +278,7 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 !collection->isCapped()) {
                 if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
-                    opCtx->recoveryUnit()->onCommit(
+                    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                         [svcCtx = opCtx->getServiceContext(),
                          uuid = collection->uuid(),
                          indexName,
@@ -1365,7 +1365,8 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
     // Drop the ident if it exists. The storage engine will return OK if the ident is not found.
     auto engine = opCtx->getServiceContext()->getStorageEngine();
     const std::string ident = released->getIdent();
-    Status status = engine->getEngine()->dropIdent(opCtx->recoveryUnit(), ident);
+    Status status =
+        engine->getEngine()->dropIdent(shard_role_details::getRecoveryUnit(opCtx), ident);
     if (!status.isOK()) {
         return status;
     }
@@ -1880,7 +1881,8 @@ Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
         return Status::OK();
     }
 
-    if (Status status = opCtx->recoveryUnit()->setTimestamp(bsonRecords[0].ts); !status.isOK()) {
+    if (Status status = shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(bsonRecords[0].ts);
+        !status.isOK()) {
         return status;
     }
 

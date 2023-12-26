@@ -32,9 +32,9 @@
 #include <fmt/format.h>
 
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/db/transaction_resources.h"
 
 namespace mongo {
 

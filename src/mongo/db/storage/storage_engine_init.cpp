@@ -61,6 +61,7 @@
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/ticketholder_manager.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -316,13 +317,14 @@ StorageEngine::LastShutdownState reinitializeStorageEngine(
     StorageEngineInitFlags initFlags,
     std::function<void()> changeConfigurationCallback) {
     auto service = opCtx->getServiceContext();
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     shutdownGlobalStorageEngineCleanly(
         service,
         {ErrorCodes::InterruptedDueToStorageChange, "The storage engine is being reinitialized."},
         /*forRestart=*/true);
-    opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    shard_role_details::setRecoveryUnit(opCtx,
+                                        std::make_unique<RecoveryUnitNoop>(),
+                                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     changeConfigurationCallback();
     auto lastShutdownState =
         initializeStorageEngine(opCtx, initFlags | StorageEngineInitFlags::kForRestart);

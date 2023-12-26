@@ -49,6 +49,7 @@
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -70,7 +71,8 @@ const auto deletedDocumentDecoration = OplogDeleteEntryArgs::declareDecoration<B
 void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
                                                       const RangeDeletionTask& rdt) {
 
-    opCtx->recoveryUnit()->onCommit([rdt](OperationContext* opCtx, boost::optional<Timestamp>) {
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit([rdt](OperationContext* opCtx,
+                                                               boost::optional<Timestamp>) {
         try {
             AutoGetCollection autoColl(opCtx, rdt.getNss(), MODE_IS);
             auto waitForActiveQueriesToComplete =
@@ -169,21 +171,22 @@ void RangeDeleterServiceOpObserver::onDelete(OperationContext* opCtx,
                                              const OplogDeleteEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        opCtx->recoveryUnit()->onCommit([deletedDoc = deletedDocumentDecoration(args)](
-                                            OperationContext* opCtx, boost::optional<Timestamp>) {
-            auto deletionTask = RangeDeletionTask::parse(
-                IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);
-            try {
-                RangeDeleterService::get(opCtx)->deregisterTask(deletionTask.getCollectionUuid(),
-                                                                deletionTask.getRange());
-            } catch (const DBException& ex) {
-                dassert(ex.code() == ErrorCodes::NotYetInitialized,
-                        str::stream()
-                            << "No error different from `NotYetInitialized` is expected "
-                               "to be propagated to the range deleter observer. Got error: "
-                            << ex.toStatus());
-            }
-        });
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [deletedDoc = deletedDocumentDecoration(args)](OperationContext* opCtx,
+                                                           boost::optional<Timestamp>) {
+                auto deletionTask = RangeDeletionTask::parse(
+                    IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);
+                try {
+                    RangeDeleterService::get(opCtx)->deregisterTask(
+                        deletionTask.getCollectionUuid(), deletionTask.getRange());
+                } catch (const DBException& ex) {
+                    dassert(ex.code() == ErrorCodes::NotYetInitialized,
+                            str::stream()
+                                << "No error different from `NotYetInitialized` is expected "
+                                   "to be propagated to the range deleter observer. Got error: "
+                                << ex.toStatus());
+                }
+            });
     }
 }
 

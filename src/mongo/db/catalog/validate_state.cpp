@@ -53,6 +53,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/views/view.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -184,13 +185,13 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
                             "is no checkpoint yet",
                             _nss.toStringForErrorMsg()));
         }
-        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                      *_validateTs);
+        shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kProvided, *_validateTs);
 
         _globalLock.emplace(opCtx, MODE_IS);
 
         try {
-            opCtx->recoveryUnit()->preallocateSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
         } catch (const ExceptionFor<ErrorCodes::SnapshotTooOld>&) {
             // This will throw SnapshotTooOld to indicate we cannot find an available snapshot at
             // the provided timestamp. This is likely because minSnapshotHistoryWindowInSeconds has

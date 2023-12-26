@@ -51,6 +51,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -97,8 +98,10 @@ public:
 
         {
             _opCtx = cc().makeOperationContext();
-            _opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitMock>(),
-                                    WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+            shard_role_details::setRecoveryUnit(
+                _opCtx.get(),
+                std::make_unique<RecoveryUnitMock>(),
+                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
             StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
 
@@ -168,8 +171,8 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectReadsAndWrites) {
 
     // Snapshot read concern.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kSnapshotReadConcern);
-    opCtx()->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                    Timestamp(1, 1));
+    shard_role_details::getRecoveryUnit(opCtx())->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, Timestamp(1, 1));
     ASSERT_THROWS_CODE(mtab.getCanRunCommandFuture(opCtx(), "find").get(),
                        DBException,
                        ErrorCodes::IllegalOperation);

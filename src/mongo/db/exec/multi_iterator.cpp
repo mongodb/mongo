@@ -39,6 +39,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -89,7 +90,8 @@ PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
     *out = _ws->allocate();
     WorkingSetMember* member = _ws->get(*out);
     member->recordId = std::move(record->id);
-    member->resetDocument(opCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson());
+    member->resetDocument(shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId(),
+                          record->data.releaseToBson());
     _ws->transitionToRecordIdAndObj(*out);
     return PlanStage::ADVANCED;
 }

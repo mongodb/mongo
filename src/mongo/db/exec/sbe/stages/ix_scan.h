@@ -54,7 +54,6 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/trial_run_tracker.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -63,6 +62,7 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo::sbe {
@@ -176,9 +176,9 @@ protected:
     value::OwnedValueAccessor _indexIdentAccessor;
     value::ViewOfValueAccessor _indexIdentViewAccessor;
 
-    // This field holds the latest snapshot ID that we've received from _opCtx->recoveryUnit().
-    // This field gets initialized by prepare(), and it gets updated each time doRestoreState() is
-    // called.
+    // This field holds the latest snapshot ID that we've received from the recovery unit of the
+    // operation. This field gets initialized by prepare(), and it gets updated each time
+    // doRestoreState() is called.
     uint64_t _latestSnapshotId{0};
 
     // One accessor and slot for each key component that this stage will bind from an index entry's

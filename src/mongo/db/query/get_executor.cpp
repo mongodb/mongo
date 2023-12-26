@@ -167,6 +167,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/logv2/log.h"
@@ -2102,8 +2103,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     // TODO (SERVER-64506): support change streams' pre- and post-images.
     // TODO (SERVER-66079): allow batched deletions in the config.* namespace.
     const bool batchDelete = gBatchUserMultiDeletes.load() &&
-        (opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kInactive ||
-         opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kActiveNotInUnitOfWork) &&
+        (shard_role_details::getRecoveryUnit(opCtx)->getState() == RecoveryUnit::State::kInactive ||
+         shard_role_details::getRecoveryUnit(opCtx)->getState() ==
+             RecoveryUnit::State::kActiveNotInUnitOfWork) &&
         !opCtx->inMultiDocumentTransaction() && !opCtx->isRetryableWrite() &&
         !collectionPtr->isChangeStreamPreAndPostImagesEnabled() &&
         !collectionPtr->ns().isConfigDB() && deleteStageParams->isMulti &&

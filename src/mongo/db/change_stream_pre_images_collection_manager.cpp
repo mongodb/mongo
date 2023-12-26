@@ -62,7 +62,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
@@ -257,9 +256,10 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
             insertionStatus != ErrorCodes::DuplicateKey);
     uassertStatusOK(insertionStatus);
 
-    opCtx->recoveryUnit()->onCommit([this](OperationContext* opCtx, boost::optional<Timestamp>) {
-        _docsInserted.fetchAndAddRelaxed(1);
-    });
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [this](OperationContext* opCtx, boost::optional<Timestamp>) {
+            _docsInserted.fetchAndAddRelaxed(1);
+        });
 
     if (useUnreplicatedTruncates()) {
         // This is a no-op until the 'tenantId' is registered with the 'truncateManager' in the

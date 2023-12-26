@@ -52,6 +52,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -276,12 +277,13 @@ void handleDirectWrite(OperationContext* opCtx, const NamespaceString& ns, const
 
     // Then register callbacks so we can let the BucketCatalog know that we are done with our direct
     // write after the actual write takes place (or is abandoned), and allow reopening.
-    opCtx->recoveryUnit()->onCommit([svcCtx = opCtx->getServiceContext(), resolvedNs, bucketId](
-                                        OperationContext*, boost::optional<Timestamp>) {
-        auto& bucketCatalog = BucketCatalog::get(svcCtx);
-        directWriteFinish(bucketCatalog.bucketStateRegistry, resolvedNs, bucketId);
-    });
-    opCtx->recoveryUnit()->onRollback(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [svcCtx = opCtx->getServiceContext(), resolvedNs, bucketId](OperationContext*,
+                                                                    boost::optional<Timestamp>) {
+            auto& bucketCatalog = BucketCatalog::get(svcCtx);
+            directWriteFinish(bucketCatalog.bucketStateRegistry, resolvedNs, bucketId);
+        });
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [svcCtx = opCtx->getServiceContext(), resolvedNs, bucketId](OperationContext*) {
             auto& bucketCatalog = BucketCatalog::get(svcCtx);
             directWriteFinish(bucketCatalog.bucketStateRegistry, resolvedNs, bucketId);

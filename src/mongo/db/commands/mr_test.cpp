@@ -77,6 +77,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
@@ -566,7 +567,8 @@ TEST_F(MapReduceCommandTest, PrimaryStepDownPreventsTemporaryCollectionDrops) {
 
     // Temporary collections should still be present because the server will not accept writes after
     // stepping down.
-    _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kLastApplied);
+    shard_role_details::getRecoveryUnit(_opCtx.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kLastApplied);
     for (const auto& tempNss : _opObserver->tempNamespaces) {
         ASSERT_OK(_storage.getCollectionCount(_opCtx.get(), tempNss).getStatus())
             << "missing mapReduce temporary collection: " << tempNss.toStringForErrorMsg();

@@ -55,7 +55,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/repl/tenant_file_importer_service.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
@@ -73,6 +72,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -241,11 +241,12 @@ void onShardMergeRecipientsNssInsert(OperationContext* opCtx,
                 ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
                     .acquireLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
                                  migrationId);
-                opCtx->recoveryUnit()->onRollback([migrationId](OperationContext* opCtx) {
-                    ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                        .releaseLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
-                                     migrationId);
-                });
+                shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+                    [migrationId](OperationContext* opCtx) {
+                        ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
+                            .releaseLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
+                                         migrationId);
+                    });
 
                 auto& registry =
                     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
@@ -254,15 +255,16 @@ void onShardMergeRecipientsNssInsert(OperationContext* opCtx,
                                  std::make_shared<TenantMigrationRecipientAccessBlocker>(
                                      opCtx->getServiceContext(), migrationId));
                 }
-                opCtx->recoveryUnit()->onRollback([migrationId](OperationContext* opCtx) {
-                    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                        .removeAccessBlockersForMigration(
-                            migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
-                });
+                shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+                    [migrationId](OperationContext* opCtx) {
+                        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                            .removeAccessBlockersForMigration(
+                                migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+                    });
 
                 const auto& startAtOpTimeOptional = recipientStateDoc.getStartAtOpTime();
                 invariant(startAtOpTimeOptional);
-                opCtx->recoveryUnit()->onCommit(
+                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                     [migrationId, startAtOpTime = *startAtOpTimeOptional](OperationContext* opCtx,
                                                                           auto _) {
                         repl::TenantFileImporterService::get(opCtx)->startMigration(migrationId,
@@ -323,7 +325,7 @@ void assertStateTransitionIsValid(ShardMergeRecipientStateEnum prevState,
 
 void onTransitioningToLearnedFilenames(OperationContext* opCtx,
                                        const ShardMergeRecipientDocument& recipientStateDoc) {
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [migrationId = recipientStateDoc.getId()](OperationContext* opCtx, auto _) {
             repl::TenantFileImporterService::get(opCtx)->learnedAllFilenames(migrationId);
         });
@@ -333,17 +335,18 @@ void onTransitioningToConsistent(OperationContext* opCtx,
                                  const ShardMergeRecipientDocument& recipientStateDoc) {
     assertImportDoneMarkerLocalCollExistsOnMergeConsistent(opCtx, recipientStateDoc.getId());
     if (recipientStateDoc.getRejectReadsBeforeTimestamp()) {
-        opCtx->recoveryUnit()->onCommit([recipientStateDoc](OperationContext* opCtx, auto _) {
-            auto mtabVector =
-                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .getRecipientAccessBlockersForMigration(recipientStateDoc.getId());
-            invariant(!mtabVector.empty());
-            for (auto& mtab : mtabVector) {
-                invariant(mtab);
-                mtab->startRejectingReadsBefore(
-                    recipientStateDoc.getRejectReadsBeforeTimestamp().get());
-            }
-        });
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [recipientStateDoc](OperationContext* opCtx, auto _) {
+                auto mtabVector =
+                    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                        .getRecipientAccessBlockersForMigration(recipientStateDoc.getId());
+                invariant(!mtabVector.empty());
+                for (auto& mtab : mtabVector) {
+                    invariant(mtab);
+                    mtab->startRejectingReadsBefore(
+                        recipientStateDoc.getRejectReadsBeforeTimestamp().get());
+                }
+            });
     }
 }
 
@@ -355,7 +358,8 @@ void onTransitioningToCommitted(OperationContext* opCtx,
     repl::TenantFileImporterService::get(opCtx)->interruptMigration(migrationId);
 
     if (markedGCAfterMigrationStart(recipientStateDoc)) {
-        opCtx->recoveryUnit()->onCommit([migrationId](OperationContext* opCtx, auto _) {
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit([migrationId](OperationContext* opCtx,
+                                                                           auto _) {
             auto mtabVector = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                                   .getRecipientAccessBlockersForMigration(migrationId);
             invariant(!mtabVector.empty());
@@ -394,18 +398,19 @@ void onTransitioningToAborted(OperationContext* opCtx,
         }
         deleteTenantDataWhenMergeAborts(recipientStateDoc);
     } else {
-        opCtx->recoveryUnit()->onCommit([migrationId](OperationContext* opCtx, auto _) {
-            // Remove access blocker and release locks to allow faster migration retry.
-            // (Note: Not needed to unblock TTL deletions as we would have already dropped all
-            // imported donor collections immediately on transitioning to `kAborted`).
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .removeAccessBlockersForMigration(
-                    migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [migrationId](OperationContext* opCtx, auto _) {
+                // Remove access blocker and release locks to allow faster migration retry.
+                // (Note: Not needed to unblock TTL deletions as we would have already dropped all
+                // imported donor collections immediately on transitioning to `kAborted`).
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .removeAccessBlockersForMigration(
+                        migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
 
-            ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                .releaseLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
-                             migrationId);
-        });
+                ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
+                    .releaseLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
+                                 migrationId);
+            });
 
         repl::TenantFileImporterService::get(opCtx)->resetMigration(migrationId);
         dropTempFilesAndCollsIfAny(opCtx, migrationId);
@@ -532,14 +537,15 @@ void ShardMergeRecipientOpObserver::onDelete(OperationContext* opCtx,
     }
 
     if (auto tmi = tenantMigrationInfo(opCtx)) {
-        opCtx->recoveryUnit()->onCommit([migrationId = tmi->uuid](OperationContext* opCtx, auto _) {
-            LOGV2_INFO(7339765,
-                       "Removing expired recipient access blocker",
-                       "migrationId"_attr = migrationId);
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .removeAccessBlockersForMigration(
-                    migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
-        });
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [migrationId = tmi->uuid](OperationContext* opCtx, auto _) {
+                LOGV2_INFO(7339765,
+                           "Removing expired recipient access blocker",
+                           "migrationId"_attr = migrationId);
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .removeAccessBlockersForMigration(
+                        migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+            });
     }
 }
 

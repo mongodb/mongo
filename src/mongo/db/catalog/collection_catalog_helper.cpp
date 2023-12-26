@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/fail_point.h"
@@ -96,7 +97,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
         while (auto nss = catalog->lookupNSSByUUID(opCtx, uuid)) {
             // Get a fresh snapshot for each locked collection to see any catalog changes.
             clk.emplace(opCtx, *nss, collLockMode);
-            opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             catalog = CollectionCatalog::get(opCtx);
 
             if (catalog->lookupNSSByUUID(opCtx, uuid) == nss) {

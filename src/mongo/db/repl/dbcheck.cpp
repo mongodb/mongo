@@ -64,6 +64,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
@@ -308,7 +309,7 @@ const md5_byte_t* md5Cast(const T* ptr) {
 
 PrepareConflictBehavior swapPrepareConflictBehavior(
     OperationContext* opCtx, PrepareConflictBehavior prepareConflictBehavior) {
-    auto ru = opCtx->recoveryUnit();
+    auto ru = shard_role_details::getRecoveryUnit(opCtx);
     auto prevBehavior = ru->getPrepareConflictBehavior();
     ru->setPrepareConflictBehavior(prepareConflictBehavior);
     return prevBehavior;
@@ -316,7 +317,7 @@ PrepareConflictBehavior swapPrepareConflictBehavior(
 
 DataCorruptionDetectionMode swapDataCorruptionMode(OperationContext* opCtx,
                                                    DataCorruptionDetectionMode dataCorruptionMode) {
-    auto ru = opCtx->recoveryUnit();
+    auto ru = shard_role_details::getRecoveryUnit(opCtx);
     auto prevMode = ru->getDataCorruptionDetectionMode();
     ru->setDataCorruptionDetectionMode(dataCorruptionMode);
     return prevMode;
@@ -345,7 +346,7 @@ DbCheckAcquisition::DbCheckAcquisition(OperationContext* opCtx,
               opCtx, nss, AcquisitionPrerequisites::OperationType::kRead))) {}
 
 DbCheckAcquisition::~DbCheckAcquisition() {
-    _opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
     swapDataCorruptionMode(_opCtx, prevDataCorruptionMode);
     swapPrepareConflictBehavior(_opCtx, prevPrepareConflictBehavior);
 }

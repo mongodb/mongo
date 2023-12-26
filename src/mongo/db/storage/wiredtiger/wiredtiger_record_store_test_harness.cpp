@@ -53,6 +53,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 
 namespace mongo {
@@ -88,7 +89,8 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     const std::string& ns, const CollectionOptions& collOptions, KeyFormat keyFormat) {
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    WiredTigerRecoveryUnit* ru = checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
+    WiredTigerRecoveryUnit* ru =
+        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
     std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
     StringData ident = ns;
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
@@ -139,7 +141,8 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    WiredTigerRecoveryUnit* ru = checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
+    WiredTigerRecoveryUnit* ru =
+        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
     std::string ident = NamespaceString::kRsOplogNamespace.ns().toString();
     std::string uri = WiredTigerKVEngine::kTableUriPrefix + ident;
 

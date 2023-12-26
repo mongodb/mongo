@@ -38,6 +38,7 @@
 #include "mongo/db/s/query_analysis_op_observer.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/util/future.h"
@@ -54,11 +55,12 @@ void QueryAnalysisOpObserver::insertInConfigQueryAnalyzersNamespaceImpl(
     for (auto it = begin; it != end; ++it) {
         auto parsedDoc = QueryAnalyzerDocument::parse(
             IDLParserContext("QueryAnalysisOpObserver::onInserts"), it->doc);
-        opCtx->recoveryUnit()->onCommit([parsedDoc = std::move(parsedDoc)](
-                                            OperationContext* opCtx, boost::optional<Timestamp>) {
-            analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationInsert(
-                parsedDoc);
-        });
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [parsedDoc = std::move(parsedDoc)](OperationContext* opCtx,
+                                               boost::optional<Timestamp>) {
+                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationInsert(
+                    parsedDoc);
+            });
     }
 }
 
@@ -66,10 +68,11 @@ void QueryAnalysisOpObserver::updateToConfigQueryAnalyzersNamespaceImpl(
     OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
     auto parsedDoc = QueryAnalyzerDocument::parse(
         IDLParserContext("QueryAnalysisOpObserver::onUpdate"), args.updateArgs->updatedDoc);
-    opCtx->recoveryUnit()->onCommit([parsedDoc = std::move(parsedDoc)](OperationContext* opCtx,
-                                                                       boost::optional<Timestamp>) {
-        analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationUpdate(parsedDoc);
-    });
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [parsedDoc = std::move(parsedDoc)](OperationContext* opCtx, boost::optional<Timestamp>) {
+            analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationUpdate(
+                parsedDoc);
+        });
 }
 
 void QueryAnalysisOpObserver::updateWithSampleIdImpl(OperationContext* opCtx,
@@ -87,10 +90,11 @@ void QueryAnalysisOpObserver::deleteFromConfigQueryAnalyzersNamespaceImpl(
     OperationContext* opCtx, const OplogDeleteEntryArgs& args, const BSONObj& doc) {
     auto parsedDoc =
         QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisOpObserver::onDelete"), doc);
-    opCtx->recoveryUnit()->onCommit([parsedDoc = std::move(parsedDoc)](OperationContext* opCtx,
-                                                                       boost::optional<Timestamp>) {
-        analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationDelete(parsedDoc);
-    });
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [parsedDoc = std::move(parsedDoc)](OperationContext* opCtx, boost::optional<Timestamp>) {
+            analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationDelete(
+                parsedDoc);
+        });
 }
 
 }  // namespace analyze_shard_key

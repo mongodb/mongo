@@ -40,9 +40,9 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/s/sharding_api_d_params_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"

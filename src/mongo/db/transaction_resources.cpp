@@ -72,6 +72,24 @@ void assertReadConcernsAreEquivalent(const repl::ReadConcernArgs& rc1,
 
 }  // namespace
 
+void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker) {
+    opCtx->setLockState_DO_NOT_USE(std::move(locker));
+}
+
+std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx) {
+    return opCtx->releaseRecoveryUnit_DO_NOT_USE();
+}
+
+std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit(OperationContext* opCtx) {
+    return opCtx->releaseAndReplaceRecoveryUnit_DO_NOT_USE();
+}
+
+WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(OperationContext* opCtx,
+                                                   std::unique_ptr<RecoveryUnit> unit,
+                                                   WriteUnitOfWork::RecoveryUnitState state) {
+    return opCtx->setRecoveryUnit_DO_NOT_USE(std::move(unit), state);
+}
+
 TransactionResources::TransactionResources() = default;
 
 TransactionResources::~TransactionResources() {

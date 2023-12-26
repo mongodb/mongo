@@ -62,7 +62,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/global_settings.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
@@ -271,7 +270,7 @@ void OpObserverMock::onPreparedTransactionCommit(
     const std::vector<repl::ReplOperation>& statements) noexcept {
     ASSERT_FALSE(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     // The 'commitTimestamp' must be cleared before we write the oplog entry.
-    ASSERT(opCtx->recoveryUnit()->getCommitTimestamp().isNull());
+    ASSERT(shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull());
 
     OpObserverNoop::onPreparedTransactionCommit(
         opCtx, commitOplogEntryOpTime, commitTimestamp, statements);
@@ -577,7 +576,7 @@ TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
 
 TEST_F(TxnParticipantTest, StashAndUnstashResources) {
     Locker* originalLocker = shard_role_details::getLocker(opCtx());
-    RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
+    RecoveryUnit* originalRecoveryUnit = shard_role_details::getRecoveryUnit(opCtx());
     ASSERT(originalLocker);
     ASSERT(originalRecoveryUnit);
 
@@ -595,14 +594,14 @@ TEST_F(TxnParticipantTest, StashAndUnstashResources) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "find");
     ASSERT_EQUALS(originalLocker, shard_role_details::getLocker(opCtx()));
-    ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
+    ASSERT_EQUALS(originalRecoveryUnit, shard_role_details::getRecoveryUnit(opCtx()));
     ASSERT(opCtx()->getWriteUnitOfWork());
     ASSERT(shard_role_details::getLocker(opCtx())->isLocked());
 
     // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
     txnParticipant.stashTransactionResources(opCtx());
     ASSERT_NOT_EQUALS(originalLocker, shard_role_details::getLocker(opCtx()));
-    ASSERT_NOT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
+    ASSERT_NOT_EQUALS(originalRecoveryUnit, shard_role_details::getRecoveryUnit(opCtx()));
     ASSERT(!opCtx()->getWriteUnitOfWork());
 
     // Unset the read concern on the OperationContext. This is needed to unstash.
@@ -612,7 +611,7 @@ TEST_F(TxnParticipantTest, StashAndUnstashResources) {
     // OperationContext.
     txnParticipant.unstashTransactionResources(opCtx(), "find");
     ASSERT_EQUALS(originalLocker, shard_role_details::getLocker(opCtx()));
-    ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
+    ASSERT_EQUALS(originalRecoveryUnit, shard_role_details::getRecoveryUnit(opCtx()));
     ASSERT(opCtx()->getWriteUnitOfWork());
 
     // Commit the transaction. This allows us to release locks.
@@ -836,11 +835,11 @@ TEST_F(TxnParticipantTest, CommitTransactionSetsCommitTimestampOnPreparedTransac
     txnParticipant.commitPreparedTransaction(opCtx(), commitTS, {});
 
     // The recovery unit is reset on commit.
-    ASSERT(opCtx()->recoveryUnit()->getCommitTimestamp().isNull());
+    ASSERT(shard_role_details::getRecoveryUnit(opCtx())->getCommitTimestamp().isNull());
 
     txnParticipant.stashTransactionResources(opCtx());
     ASSERT_TRUE(txnParticipant.transactionIsCommitted());
-    ASSERT(opCtx()->recoveryUnit()->getCommitTimestamp().isNull());
+    ASSERT(shard_role_details::getRecoveryUnit(opCtx())->getCommitTimestamp().isNull());
 }
 
 TEST_F(TxnParticipantTest, CommitTransactionWithCommitTimestampFailsOnUnpreparedTransaction) {
@@ -864,7 +863,7 @@ TEST_F(TxnParticipantTest, CommitTransactionDoesNotSetCommitTimestampOnUnprepare
     _opObserver->onUnpreparedTransactionCommitFn =
         [&](const std::vector<repl::ReplOperation>& statements) {
             originalFn(statements);
-            ASSERT(opCtx()->recoveryUnit()->getCommitTimestamp().isNull());
+            ASSERT(shard_role_details::getRecoveryUnit(opCtx())->getCommitTimestamp().isNull());
             ASSERT(statements.empty());
         };
 
@@ -875,11 +874,11 @@ TEST_F(TxnParticipantTest, CommitTransactionDoesNotSetCommitTimestampOnUnprepare
     { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     txnParticipant.commitUnpreparedTransaction(opCtx());
 
-    ASSERT(opCtx()->recoveryUnit()->getCommitTimestamp().isNull());
+    ASSERT(shard_role_details::getRecoveryUnit(opCtx())->getCommitTimestamp().isNull());
 
     txnParticipant.stashTransactionResources(opCtx());
     ASSERT_TRUE(txnParticipant.transactionIsCommitted());
-    ASSERT(opCtx()->recoveryUnit()->getCommitTimestamp().isNull());
+    ASSERT(shard_role_details::getRecoveryUnit(opCtx())->getCommitTimestamp().isNull());
 }
 
 TEST_F(TxnParticipantTest, CommitTransactionWithoutCommitTimestampFailsOnPreparedTransaction) {
@@ -1057,9 +1056,9 @@ TEST_F(TxnParticipantTest, StashedRollbackDoesntHoldClientLock) {
     unittest::Barrier finishRollback(2);
 
     // Rollback changes are executed in reverse order.
-    opCtx()->recoveryUnit()->onRollback(
+    shard_role_details::getRecoveryUnit(opCtx())->onRollback(
         [&](OperationContext*) { finishRollback.countDownAndWait(); });
-    opCtx()->recoveryUnit()->onRollback(
+    shard_role_details::getRecoveryUnit(opCtx())->onRollback(
         [&](OperationContext*) { startedRollback.countDownAndWait(); });
 
     auto future = stdx::async(stdx::launch::async, [&] {
@@ -1527,7 +1526,7 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
     _opObserver->postTransactionPrepareFn = [&]() {
         originalFn();
 
-        ruPrepareTimestamp = opCtx()->recoveryUnit()->getPrepareTimestamp();
+        ruPrepareTimestamp = shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp();
         ASSERT_FALSE(ruPrepareTimestamp.isNull());
     };
 
@@ -1655,7 +1654,7 @@ TEST_F(TxnParticipantTest, TransactionExceedsSizeParameterStmtIdsField) {
 TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
     auto outerScopedSession = checkOutSession();
     Locker* originalLocker = shard_role_details::getLocker(opCtx());
-    RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
+    RecoveryUnit* originalRecoveryUnit = shard_role_details::getRecoveryUnit(opCtx());
     ASSERT(originalLocker);
     ASSERT(originalRecoveryUnit);
 
@@ -1672,7 +1671,7 @@ TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "find");
     ASSERT_EQUALS(originalLocker, shard_role_details::getLocker(opCtx()));
-    ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
+    ASSERT_EQUALS(originalRecoveryUnit, shard_role_details::getRecoveryUnit(opCtx()));
     ASSERT(opCtx()->getWriteUnitOfWork());
 
     {
@@ -1683,7 +1682,7 @@ TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
         // The stash was a noop, so the locker, RecoveryUnit, and WriteUnitOfWork on the
         // OperationContext are unaffected.
         ASSERT_EQUALS(originalLocker, shard_role_details::getLocker(opCtx()));
-        ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
+        ASSERT_EQUALS(originalRecoveryUnit, shard_role_details::getRecoveryUnit(opCtx()));
         ASSERT(opCtx()->getWriteUnitOfWork());
     }
 }
@@ -3140,7 +3139,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     const bool autocommit = false;
 
     ASSERT(shard_role_details::getLocker(opCtx()));
-    ASSERT(opCtx()->recoveryUnit());
+    ASSERT(shard_role_details::getRecoveryUnit(opCtx()));
 
     auto sessionCheckout = checkOutSession();
 
@@ -3239,7 +3238,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
     ClockSourceMock{}.reset(startTime);
 
     ASSERT(shard_role_details::getLocker(opCtx()));
-    ASSERT(opCtx()->recoveryUnit());
+    ASSERT(shard_role_details::getRecoveryUnit(opCtx()));
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(
@@ -3303,7 +3302,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
 
 TEST_F(TransactionsMetricsTest, ReportUnstashedResourcesForARetryableWrite) {
     ASSERT(shard_role_details::getLocker(opCtx()));
-    ASSERT(opCtx()->recoveryUnit());
+    ASSERT(shard_role_details::getRecoveryUnit(opCtx()));
 
     auto clientOwned = getServiceContext()->getService()->makeClient("client");
     AlternativeClientRegion acr(clientOwned);
@@ -3338,7 +3337,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResourcesForARetryableWrite) {
 
 TEST_F(TransactionsMetricsTest, UseAPIParametersOnOpCtxForARetryableWrite) {
     ASSERT(shard_role_details::getLocker(opCtx()));
-    ASSERT(opCtx()->recoveryUnit());
+    ASSERT(shard_role_details::getRecoveryUnit(opCtx()));
 
     APIParameters firstAPIParameters = APIParameters();
     firstAPIParameters.setAPIVersion("2");
@@ -6091,19 +6090,22 @@ TEST_F(TxnParticipantTest,
 class OneOffRead {
 public:
     OneOffRead(OperationContext* opCtx, const Timestamp& ts) : _opCtx(opCtx) {
-        if (_opCtx->recoveryUnit()->isActive()) {
-            _opCtx->recoveryUnit()->abandonSnapshot();
+        if (shard_role_details::getRecoveryUnit(_opCtx)->isActive()) {
+            shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
         }
         if (ts.isNull()) {
-            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+            shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kNoTimestamp);
         } else {
-            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, ts);
+            shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kProvided, ts);
         }
     }
 
     ~OneOffRead() {
-        _opCtx->recoveryUnit()->abandonSnapshot();
-        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kNoTimestamp);
     }
 
 private:
@@ -6426,7 +6428,7 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     // Reading at the prepare timestamp should not see anything.
     {
         OneOffRead oor(opCtx, prepTs);
-        opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
             PrepareConflictBehavior::kIgnoreConflicts);
         ASSERT_BSONOBJ_EQ(
             BSONObj::kEmptyObject,

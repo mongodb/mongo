@@ -50,7 +50,6 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/generic_cursor_gen.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"

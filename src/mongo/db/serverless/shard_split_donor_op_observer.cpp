@@ -48,6 +48,7 @@
 #include "mongo/db/serverless/shard_split_utils.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -168,7 +169,7 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
 
     ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
         .acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, donorStateDoc.getId());
-    opCtx->recoveryUnit()->onRollback(
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [migrationId = donorStateDoc.getId()](OperationContext* opCtx) {
             ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
                 .releaseLock(ServerlessOperationLockRegistry::LockType::kShardSplit, migrationId);
@@ -182,12 +183,12 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
                                                                          donorStateDoc.getId()));
     }
 
-    opCtx->recoveryUnit()->onRollback([migrationId =
-                                           donorStateDoc.getId()](OperationContext* opCtx) {
-        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-            .removeAccessBlockersForMigration(migrationId,
-                                              TenantMigrationAccessBlocker::BlockerType::kDonor);
-    });
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+        [migrationId = donorStateDoc.getId()](OperationContext* opCtx) {
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                .removeAccessBlockersForMigration(
+                    migrationId, TenantMigrationAccessBlocker::BlockerType::kDonor);
+        });
 }
 
 /**
@@ -388,7 +389,7 @@ void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
             break;
         case ShardSplitDonorStateEnum::kCommitted:
         case ShardSplitDonorStateEnum::kAborted:
-            opCtx->recoveryUnit()->registerChange(
+            shard_role_details::getRecoveryUnit(opCtx)->registerChange(
                 std::make_unique<TenantMigrationDonorCommitOrAbortHandler>(donorStateDoc));
             break;
         default:
@@ -443,7 +444,8 @@ void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx, boost::optional<Timestamp>) {
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit([](OperationContext* opCtx,
+                                                            boost::optional<Timestamp>) {
         // Donor access blockers are removed from donor nodes via the shard split op observer.
         // Donor access blockers are removed from recipient nodes when the node applies the
         // recipient config. When the recipient primary steps up it will delete its state
@@ -468,13 +470,14 @@ repl::OpTime ShardSplitDonorOpObserver::onDropCollection(OperationContext* opCtx
                                                          const CollectionDropType dropType,
                                                          bool markFromMigrate) {
     if (collectionName == NamespaceString::kShardSplitDonorsNamespace) {
-        opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx, boost::optional<Timestamp>) {
-            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [](OperationContext* opCtx, boost::optional<Timestamp>) {
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
 
-            ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                .onDropStateCollection(ServerlessOperationLockRegistry::LockType::kShardSplit);
-        });
+                ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
+                    .onDropStateCollection(ServerlessOperationLockRegistry::LockType::kShardSplit);
+            });
     }
 
     return {};

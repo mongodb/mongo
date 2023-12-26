@@ -72,6 +72,7 @@
 #include "mongo/db/shutdown_in_progress_quiesce_info.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -694,7 +695,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
 
     // Ensure future transactions read without a timestamp.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              opCtx->recoveryUnit()->getTimestampReadSource());
+              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 
     // Rollback is a synchronous operation that uses the task executor and may not be
     // executed inside the fetcher callback.
@@ -900,7 +901,7 @@ void BackgroundSync::start(OperationContext* opCtx) {
 
     // Ensure future transactions read without a timestamp.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              opCtx->recoveryUnit()->getTimestampReadSource());
+              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 
     do {
         lastAppliedOpTime = _readLastAppliedOpTime(opCtx);

@@ -34,6 +34,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -86,7 +87,7 @@ void handleTemporarilyUnavailableException(
     size_t& writeConflictAttempts) {
     CurOp::get(opCtx)->debug().additiveMetrics.incrementTemporarilyUnavailableErrors(1);
 
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     temporarilyUnavailableErrors.increment(1);
 
     // Internal operations cannot escape a TUE to the client. Convert it to a write conflict
@@ -163,7 +164,7 @@ void handleTransactionTooLargeForCacheException(
     logWriteConflictAndBackoff(
         writeConflictAttempts, opStr, e.reason(), NamespaceStringOrUUID(nssOrUUID));
     ++writeConflictAttempts;
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 }
 
 }  // namespace mongo

@@ -35,9 +35,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/dump_lock_manager.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {

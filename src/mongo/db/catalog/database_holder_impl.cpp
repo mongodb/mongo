@@ -52,7 +52,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -61,6 +60,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -246,7 +246,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
     // close() is called as part of the onCommit handler as it frees the memory pointed to by 'db'.
     // We need to keep this memory valid until the transaction successfully commits.
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this, name = name](OperationContext* opCtx, boost::optional<Timestamp>) {
             close(opCtx, name);
         });

@@ -70,7 +70,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -90,6 +89,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -256,7 +256,7 @@ Status _createView(OperationContext* opCtx,
 
         // If the view creation rolls back, ensure that the Top entry created for the view is
         // deleted.
-        opCtx->recoveryUnit()->onRollback(
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [nss, serviceContext = opCtx->getServiceContext()](OperationContext*) {
                 Top::get(serviceContext).collectionDropped(nss);
             });
@@ -479,7 +479,7 @@ Status _createTimeseries(OperationContext* opCtx,
 
         // If the buckets collection and time-series view creation roll back, ensure that their
         // Top entries are deleted.
-        opCtx->recoveryUnit()->onRollback(
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [serviceContext = opCtx->getServiceContext(), bucketsNs](OperationContext*) {
                 Top::get(serviceContext).collectionDropped(bucketsNs);
             });
@@ -587,7 +587,7 @@ Status _createTimeseries(OperationContext* opCtx,
 
         // If the buckets collection and time-series view creation roll back, ensure that their
         // Top entries are deleted.
-        opCtx->recoveryUnit()->onRollback(
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [serviceContext = opCtx->getServiceContext(), ns](OperationContext*) {
                 Top::get(serviceContext).collectionDropped(ns);
             });
@@ -702,7 +702,7 @@ Status _createCollection(
 
         // If the collection creation rolls back, ensure that the Top entry created for the
         // collection is deleted.
-        opCtx->recoveryUnit()->onRollback(
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [nss, serviceContext = opCtx->getServiceContext()](OperationContext*) {
                 Top::get(serviceContext).collectionDropped(nss);
             });

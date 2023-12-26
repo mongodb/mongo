@@ -65,7 +65,6 @@
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_build_entry_helpers.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/cloner_utils.h"
@@ -89,6 +88,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -302,7 +302,7 @@ void onCommitIndexBuild(OperationContext* opCtx,
     // check if the node is currently a primary before attempting to write to the oplog.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (!replCoord->canAcceptWritesFor(opCtx, nss)) {
-        invariant(!opCtx->recoveryUnit()->getCommitTimestamp().isNull(),
+        invariant(!shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull(),
                   str::stream() << "commitIndexBuild: " << buildUUID);
         return;
     }
@@ -412,7 +412,7 @@ void updateCurOpForCommitOrAbort(OperationContext* opCtx, StringData fieldName, 
  */
 repl::OpTime getLatestOplogOpTime(OperationContext* opCtx) {
     // Reset the snapshot so that it is ensured to see the latest oplog entries.
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     // Helpers::getLast will bypass the oplog visibility rules by doing a backwards collection
     // scan.
@@ -1184,7 +1184,7 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
             str::stream()
                 << "No commit timestamp set while applying commitIndexBuild operation. Build UUID: "
                 << buildUUID,
-            !opCtx->recoveryUnit()->getCommitTimestamp().isNull());
+            !shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull());
 
     // There is a possibility that we cannot find an active index build with the given build UUID.
     // This can be the case when:
@@ -1299,7 +1299,7 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
             str::stream()
                 << "No commit timestamp set while applying abortIndexBuild operation. Build UUID: "
                 << buildUUID,
-            !opCtx->recoveryUnit()->getCommitTimestamp().isNull());
+            !shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull());
 
     std::string abortReason(str::stream()
                             << "abortIndexBuild oplog entry encountered: " << *oplogEntry.cause);
@@ -1845,7 +1845,7 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
 
                 // Some of the checks might have opened a snapshot. Abandon it before acquiring
                 // MODE_X lock during abort.
-                opCtx->recoveryUnit()->abandonSnapshot();
+                shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
                 // All other errors must be due to key generation. Abort the build now, instead of
                 // failing later during the commit phase retry.
@@ -2256,11 +2256,11 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
     const UUID& buildUUID) {
     NamespaceStringOrUUID nssOrUuid{dbName, collectionUUID};
 
-    if (opCtx->recoveryUnit()->isActive()) {
+    if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
         // This function is shared by multiple callers. Some of which have opened a transaction to
         // perform reads. This function may make mixed-mode writes. Mixed-mode assertions can only
         // be suppressed when beginning a fresh transaction.
-        opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     }
     // Don't use the AutoGet helpers because they require an open database, which may not be the
     // case when an index build is restarted during recovery.
@@ -2868,7 +2868,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
 
         // Index builds can safely ignore prepare conflicts and perform writes. On secondaries,
         // prepare operations wait for index builds to complete.
-        opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
             PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
         if (resumeInfo) {
@@ -3112,7 +3112,8 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
     // Since we waited for all the writes before the interceptors were established to be majority
     // committed, if we read at the majority commit point for the collection scan, then none of the
     // documents put into the sorter can be rolled back.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
+    shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kMajorityCommitted);
 }
 
 void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
@@ -3131,7 +3132,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     // Read without a timestamp. When we commit, we block writes which guarantees all writes are
     // visible.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              opCtx->recoveryUnit()->getTimestampReadSource());
+              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
     // The collection scan might read with a kMajorityCommitted read source, but will restore
     // kNoTimestamp afterwards.
     _scanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
@@ -3161,7 +3162,8 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
         indexBuildsSSS.scanCollection.addAndFetch(1);
 
         ScopeGuard scopeGuard([&] {
-            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+            shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kNoTimestamp);
         });
 
         // Wait for the last optime before the interceptors are established to be majority committed

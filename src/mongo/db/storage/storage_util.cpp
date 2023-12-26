@@ -46,6 +46,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -133,7 +134,7 @@ void removeIndex(OperationContext* opCtx,
     //
     // Index creation (and deletion) are allowed in multi-document transactions that use the same
     // RecoveryUnit throughout but not the same OperationContext.
-    auto recoveryUnit = opCtx->recoveryUnit();
+    auto recoveryUnit = shard_role_details::getRecoveryUnit(opCtx);
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
     const bool isTwoPhaseDrop =
@@ -147,7 +148,7 @@ void removeIndex(OperationContext* opCtx,
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successfully committed.
-    opCtx->recoveryUnit()->onCommitForTwoPhaseDrop(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommitForTwoPhaseDrop(
         [svcCtx = opCtx->getServiceContext(),
          recoveryUnit,
          storageEngine,
@@ -217,13 +218,13 @@ Status dropCollection(OperationContext* opCtx,
     //
     // Create (and drop) collection are allowed in multi-document transactions that use the same
     // RecoveryUnit throughout but not the same OperationContext.
-    auto recoveryUnit = opCtx->recoveryUnit();
+    auto recoveryUnit = shard_role_details::getRecoveryUnit(opCtx);
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successfully committed.
-    opCtx->recoveryUnit()->onCommitForTwoPhaseDrop(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommitForTwoPhaseDrop(
         [svcCtx = opCtx->getServiceContext(), recoveryUnit, storageEngine, nss, ident](
             OperationContext*, boost::optional<Timestamp> commitTimestamp) {
             StorageEngine::DropIdentCallback onDrop =

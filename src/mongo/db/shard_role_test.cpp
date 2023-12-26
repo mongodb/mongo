@@ -54,7 +54,6 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/member_state.h"
@@ -74,6 +73,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
@@ -904,7 +904,7 @@ TEST_F(ShardRoleTest, WritesOnMultiDocTransactionsUseLatestCatalog) {
 
     {
         opCtx()->setInMultiDocumentTransaction();
-        opCtx()->recoveryUnit()->preallocateSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx())->preallocateSnapshot();
         CollectionCatalog::stash(opCtx(), CollectionCatalog::get(opCtx()));
     }
 
@@ -1237,7 +1237,7 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithLocks) {
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isDbLockedForMode(nss.dbName(), MODE_IX));
     ASSERT_FALSE(shard_role_details::getLocker(opCtx())->isCollectionLockedForMode(nss, MODE_IX));
@@ -1270,7 +1270,7 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     ASSERT_FALSE(
         shard_role_details::getLocker(opCtx())->isLockHeldForMode(resourceIdGlobal, MODE_IS));
@@ -1295,7 +1295,7 @@ TEST_F(ShardRoleTest,
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     // Placement changes
     const auto newShardVersion = [&]() {
@@ -1344,7 +1344,7 @@ TEST_F(ShardRoleTest, RestoreForWriteInvalidatesAcquisitionIfPlacementConcernDbV
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     // Placement changes
     const auto newDbVersion = dbVersionTestDb.makeUpdated();
@@ -1385,7 +1385,7 @@ TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     // Placement changes
     const auto newShardVersion = [&]() {
@@ -1420,7 +1420,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionBecomesCreated(
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     // Create the collection
     createTestCollection(opCtx(), nss);
@@ -1449,7 +1449,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionNoLongerExists(
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     // Drop the collection
     {
@@ -1480,7 +1480,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     // Rename the collection.
     {
@@ -1518,7 +1518,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionDroppedAndRecreated(
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     // Drop the collection and create a new one with the same nss.
     {
@@ -1561,7 +1561,7 @@ TEST_F(ShardRoleTest, RestoreForReadSucceedsEvenIfPlacementHasChanged) {
 
         // Yield the resources
         auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-        opCtx()->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
         ASSERT_FALSE(ongoingQueriesCompletionFuture.isReady());
         ASSERT_TRUE(acquisition.getShardingFilter().has_value());
@@ -1624,9 +1624,9 @@ void ShardRoleTest::testRestoreFailsIfCollectionIsNowAView(
 
     // Yield the resources.
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     // Drop collection and create a view in its place.
     {
@@ -1656,7 +1656,7 @@ TEST_F(ShardRoleTest, ReadSourceDoesNotChangeOnSecondary) {
                   ->setFollowerMode(repl::MemberState::RS_SECONDARY));
 
     ASSERT_EQUALS(RecoveryUnit::ReadSource::kNoTimestamp,
-                  opCtx()->recoveryUnit()->getTimestampReadSource());
+                  shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource());
 
     opCtx()->setEnforceConstraints(false);
 
@@ -1671,7 +1671,7 @@ TEST_F(ShardRoleTest, ReadSourceDoesNotChangeOnSecondary) {
     ASSERT_TRUE(coll.exists());
 
     ASSERT_EQUALS(RecoveryUnit::ReadSource::kNoTimestamp,
-                  opCtx()->recoveryUnit()->getTimestampReadSource());
+                  shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource());
 }
 
 TEST_F(ShardRoleTest, RestoreChangesReadSourceAfterStepUp) {
@@ -1684,7 +1684,7 @@ TEST_F(ShardRoleTest, RestoreChangesReadSourceAfterStepUp) {
 
     // Initially we start with kNoTimestamp as our ReadSource.
     ASSERT_EQUALS(RecoveryUnit::ReadSource::kNoTimestamp,
-                  opCtx()->recoveryUnit()->getTimestampReadSource());
+                  shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource());
 
     PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
     const auto acquisitions =
@@ -1698,11 +1698,11 @@ TEST_F(ShardRoleTest, RestoreChangesReadSourceAfterStepUp) {
 
     // Our read source should have been updated to kLastApplied.
     ASSERT_EQUALS(RecoveryUnit::ReadSource::kLastApplied,
-                  opCtx()->recoveryUnit()->getTimestampReadSource());
+                  shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource());
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     // Step up.
     ASSERT_OK(repl::ReplicationCoordinator::get(getGlobalServiceContext())
@@ -1713,7 +1713,7 @@ TEST_F(ShardRoleTest, RestoreChangesReadSourceAfterStepUp) {
 
     // Our read source should have been updated to kNoTimestamp.
     ASSERT_EQUALS(RecoveryUnit::ReadSource::kNoTimestamp,
-                  opCtx()->recoveryUnit()->getTimestampReadSource());
+                  shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource());
 }
 
 TEST_F(ShardRoleTest, RestoreCollectionCreatedUnderScopedLocalCatalogWriteFence) {
@@ -1890,7 +1890,7 @@ TEST_F(ShardRoleTest, ReadSourceChangesOnSecondary) {
 
     // Initially we start with kNoTimestamp as our ReadSource.
     ASSERT_EQUALS(RecoveryUnit::ReadSource::kNoTimestamp,
-                  opCtx()->recoveryUnit()->getTimestampReadSource());
+                  shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource());
 
     PlacementConcern placementConcern = PlacementConcern{{}, shardVersionShardedCollection1};
     std::vector<NamespaceStringOrUUID> requests = {{nss}};
@@ -1900,7 +1900,7 @@ TEST_F(ShardRoleTest, ReadSourceChangesOnSecondary) {
 
     // Our read source should have been updated to kLastApplied.
     ASSERT_EQUALS(RecoveryUnit::ReadSource::kLastApplied,
-                  opCtx()->recoveryUnit()->getTimestampReadSource());
+                  shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource());
 
     snapshotAttempt.openStorageSnapshot();
     ASSERT_TRUE(snapshotAttempt.getConsistentCatalog());
@@ -2076,7 +2076,7 @@ DEATH_TEST_F(ShardRoleTest,
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    opCtx()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
 
     // Placement changes
     const auto newShardVersion = [&]() {

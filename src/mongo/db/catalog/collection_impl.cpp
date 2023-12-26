@@ -67,7 +67,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/doc_validation_util.h"
 #include "mongo/db/matcher/expression.h"
@@ -93,6 +92,7 @@
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -378,7 +378,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
             auto svcCtx = opCtx->getClient()->getServiceContext();
             auto uuid = *collectionOptions.uuid;
             if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
-                opCtx->recoveryUnit()->onCommit(
+                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                     [svcCtx, uuid](OperationContext*, boost::optional<Timestamp>) {
                         TTLCollectionCache::get(svcCtx).registerTTLInfo(
                             uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
@@ -525,7 +525,7 @@ bool CollectionImpl::requiresIdIndex() const {
 std::unique_ptr<SeekableRecordCursor> CollectionImpl::getCursor(OperationContext* opCtx,
                                                                 bool forward) const {
     if (usesCappedSnapshots() && forward) {
-        if (opCtx->recoveryUnit()->isActive()) {
+        if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
             auto snapshot =
                 CappedSnapshots::get(opCtx).getSnapshot(_shared->_recordStore->getIdent());
             invariant(
@@ -549,7 +549,8 @@ bool CollectionImpl::findDoc(OperationContext* opCtx,
     RecordData rd;
     if (!_shared->_recordStore->findRecord(opCtx, loc, &rd))
         return false;
-    *out = Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(), rd.releaseToBson());
+    *out = Snapshotted<BSONObj>(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
+                                rd.releaseToBson());
     return true;
 }
 
@@ -959,8 +960,9 @@ std::vector<RecordId> CollectionImpl::reserveCappedRecordIds(OperationContext* o
     // By registering ourselves as a writer, we inform the capped visibility system that we may be
     // in the process of committing uncommitted records.
     auto cappedObserver = getCappedVisibilityObserver();
-    cappedObserver->registerWriter(
-        opCtx->recoveryUnit(), [this]() { _shared->_recordStore->notifyCappedWaitersIfNeeded(); });
+    cappedObserver->registerWriter(shard_role_details::getRecoveryUnit(opCtx), [this]() {
+        _shared->_recordStore->notifyCappedWaitersIfNeeded();
+    });
 
     std::vector<RecordId> ids;
     ids.reserve(count);
@@ -1700,7 +1702,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
     if (!hasSetMultikey)
         return false;
 
-    opCtx->recoveryUnit()->onRollback(
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [this, uncommittedMultikeys](OperationContext*) { uncommittedMultikeys->erase(this); });
 
     DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *metadata);
@@ -1735,12 +1737,12 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
 
     // Mark this index that there is an ongoing multikey write. This forces readers to read from the
     // durable catalog to determine if the index is multikey or not.
-    opCtx->recoveryUnit()->registerPreCommitHook(
+    shard_role_details::getRecoveryUnit(opCtx)->registerPreCommitHook(
         [concurrentWriteTracker](OperationContext*) { concurrentWriteTracker->preCommit(); });
 
     // Capture a reference to 'concurrentWriteTracker' to extend the lifetime of this object until
     // commiting/rolling back the transaction is fully complete.
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this, uncommittedMultikeys, setMultikey = std::move(setMultikey), concurrentWriteTracker](
             OperationContext*, boost::optional<Timestamp>) {
             // Merge in changes to this index, other indexes may have been updated since we made our
@@ -1795,12 +1797,12 @@ void CollectionImpl::forceSetIndexIsMultikey(OperationContext* opCtx,
     }
     forceSetMultikey(*metadata);
 
-    opCtx->recoveryUnit()->onRollback(
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [this, uncommittedMultikeys](OperationContext*) { uncommittedMultikeys->erase(this); });
 
     DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *metadata);
 
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this, uncommittedMultikeys, forceSetMultikey = std::move(forceSetMultikey)](
             OperationContext*, boost::optional<Timestamp>) {
             // Merge in changes to this index, other indexes may have been updated since we made our

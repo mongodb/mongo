@@ -51,7 +51,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_format.h"
@@ -62,6 +61,7 @@
 #include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -328,7 +328,8 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_addEntry(
     stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
     invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
     _catalogIdToEntryMap[res.getValue()] = {res.getValue(), ident, nss};
-    opCtx->recoveryUnit()->registerChange(std::make_unique<AddIdentChange>(this, res.getValue()));
+    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+        std::make_unique<AddIdentChange>(this, res.getValue()));
 
     LOGV2_DEBUG(22207,
                 1,
@@ -352,7 +353,8 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_importEntry(Operati
     stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
     invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
     _catalogIdToEntryMap[res.getValue()] = {res.getValue(), ident, nss};
-    opCtx->recoveryUnit()->registerChange(std::make_unique<AddIdentChange>(this, res.getValue()));
+    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+        std::make_unique<AddIdentChange>(this, res.getValue()));
 
     LOGV2_DEBUG(5095101, 1, "imported meta data", logAttrs(nss), "metadata"_attr = res.getValue());
     return {{res.getValue(), ident, nss}};
@@ -479,10 +481,11 @@ Status DurableCatalog::_removeEntry(OperationContext* opCtx, const RecordId& cat
         return Status(ErrorCodes::NamespaceNotFound, "collection not found");
     }
 
-    opCtx->recoveryUnit()->onRollback([this, catalogId, entry = it->second](OperationContext*) {
-        stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
-        _catalogIdToEntryMap[catalogId] = entry;
-    });
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+        [this, catalogId, entry = it->second](OperationContext*) {
+            stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+            _catalogIdToEntryMap[catalogId] = entry;
+        });
 
     LOGV2_DEBUG(22212,
                 1,
@@ -551,7 +554,8 @@ StatusWith<std::string> DurableCatalog::newOrphanedIdent(OperationContext* opCtx
     stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
     invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
     _catalogIdToEntryMap[res.getValue()] = EntryIdentifier(res.getValue(), ident, nss);
-    opCtx->recoveryUnit()->registerChange(std::make_unique<AddIdentChange>(this, res.getValue()));
+    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+        std::make_unique<AddIdentChange>(this, res.getValue()));
 
     LOGV2_DEBUG(22213,
                 1,
@@ -588,11 +592,12 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalog::cr
     if (!status.isOK())
         return status;
 
-    auto ru = opCtx->recoveryUnit();
-    opCtx->recoveryUnit()->onRollback([ru, catalog = this, ident = entry.ident](OperationContext*) {
-        // Intentionally ignoring failure
-        catalog->_engine->getEngine()->dropIdent(ru, ident).ignore();
-    });
+    auto ru = shard_role_details::getRecoveryUnit(opCtx);
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+        [ru, catalog = this, ident = entry.ident](OperationContext*) {
+            // Intentionally ignoring failure
+            catalog->_engine->getEngine()->dropIdent(ru, ident).ignore();
+        });
 
     auto rs = _engine->getEngine()->getRecordStore(opCtx, nss, entry.ident, options);
     invariant(rs);
@@ -612,8 +617,9 @@ Status DurableCatalog::createIndex(OperationContext* opCtx,
         ? kvEngine->createColumnStore(opCtx, nss, collOptions, ident, spec)
         : kvEngine->createSortedDataInterface(opCtx, nss, collOptions, ident, spec);
     if (status.isOK()) {
-        opCtx->recoveryUnit()->onRollback(
-            [this, ident, recoveryUnit = opCtx->recoveryUnit()](OperationContext*) {
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+            [this, ident, recoveryUnit = shard_role_details::getRecoveryUnit(opCtx)](
+                OperationContext*) {
                 // Intentionally ignoring failure.
                 auto kvEngine = _engine->getEngine();
                 kvEngine->dropIdent(recoveryUnit, ident).ignore();
@@ -692,7 +698,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
         return swEntry.getStatus();
     EntryIdentifier& entry = swEntry.getValue();
 
-    opCtx->recoveryUnit()->onRollback(
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [catalog = this, ident = entry.ident, indexIdents = indexIdents](OperationContext* opCtx) {
             catalog->_engine->getEngine()->dropIdentForImport(opCtx, ident);
             for (const auto& indexIdent : indexIdents) {
@@ -743,12 +749,13 @@ Status DurableCatalog::renameCollection(OperationContext* opCtx,
 
     NamespaceString fromName = it->second.nss;
     it->second.nss = toNss;
-    opCtx->recoveryUnit()->onRollback([this, catalogId, fromName](OperationContext*) {
-        stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
-        const auto it = _catalogIdToEntryMap.find(catalogId);
-        invariant(it != _catalogIdToEntryMap.end());
-        it->second.nss = fromName;
-    });
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+        [this, catalogId, fromName](OperationContext*) {
+            stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+            const auto it = _catalogIdToEntryMap.find(catalogId);
+            invariant(it != _catalogIdToEntryMap.end());
+            it->second.nss = fromName;
+        });
 
     return Status::OK();
 }

@@ -41,10 +41,10 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/locker_api.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"

@@ -94,6 +94,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -822,7 +823,7 @@ public:
                     }
                     // Reset the snapshot because we have released locks and need a fresh snapshot
                     // if we reacquire the locks again later.
-                    opCtx->recoveryUnit()->abandonSnapshot();
+                    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
                     // This is a bit racy since we are not holding a lock across discovering an
                     // in-progress build and starting to listen for completion. It is good enough,
                     // however: we can only wait longer than needed, not less.

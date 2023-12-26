@@ -54,6 +54,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -71,8 +72,10 @@ public:
         Operation() = default;
         Operation(ServiceContext::UniqueClient client, RecoveryUnit* ru)
             : _client(std::move(client)), _opCtx(_client->makeOperationContext()) {
-            _opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(ru),
-                                    WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+            shard_role_details::setRecoveryUnit(
+                _opCtx.get(),
+                std::unique_ptr<RecoveryUnit>(ru),
+                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         }
 
 
@@ -91,6 +94,10 @@ public:
         }
 
         OperationContext* operator->() const {
+            return _opCtx.get();
+        }
+
+        OperationContext* get() const {
             return _opCtx.get();
         }
 
@@ -135,7 +142,7 @@ public:
         auto op = makeOperation();
         Lock::GlobalLock globalLock(op, MODE_IX);
         WriteUnitOfWork wuow(op);
-        ASSERT_OK(op->recoveryUnit()->setTimestamp(_counter));
+        ASSERT_OK(shard_role_details::getRecoveryUnit(op.get())->setTimestamp(_counter));
         ASSERT_OK(rs->updateRecord(op, id, contents.c_str(), contents.length() + 1));
         wuow.commit();
     }
@@ -144,7 +151,7 @@ public:
         auto op = makeOperation();
         Lock::GlobalLock globalLock(op, MODE_IX);
         WriteUnitOfWork wuow(op);
-        ASSERT_OK(op->recoveryUnit()->setTimestamp(_counter));
+        ASSERT_OK(shard_role_details::getRecoveryUnit(op.get())->setTimestamp(_counter));
         rs->deleteRecord(op, id);
         wuow.commit();
     }
@@ -164,14 +171,17 @@ public:
 
     int itCountCommitted() {
         auto op = makeOperation();
-        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-        ASSERT_OK(op->recoveryUnit()->majorityCommittedSnapshotAvailable());
+        shard_role_details::getRecoveryUnit(op.get())->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kMajorityCommitted);
+        ASSERT_OK(
+            shard_role_details::getRecoveryUnit(op.get())->majorityCommittedSnapshotAvailable());
         return itCountOn(op);
     }
 
     int itCountLastApplied() {
         auto op = makeOperation();
-        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+        shard_role_details::getRecoveryUnit(op.get())->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kNoOverlap);
         return itCountOn(op);
     }
 
@@ -186,8 +196,10 @@ public:
     boost::optional<Record> readRecordCommitted(RecordId id) {
         auto op = makeOperation();
         Lock::GlobalLock globalLock(op, MODE_IS);
-        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-        ASSERT_OK(op->recoveryUnit()->majorityCommittedSnapshotAvailable());
+        shard_role_details::getRecoveryUnit(op.get())->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kMajorityCommitted);
+        ASSERT_OK(
+            shard_role_details::getRecoveryUnit(op.get())->majorityCommittedSnapshotAvailable());
         return readRecordOn(op, id);
     }
 
@@ -199,7 +211,8 @@ public:
 
     boost::optional<Record> readRecordLastApplied(RecordId id) {
         auto op = makeOperation();
-        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+        shard_role_details::getRecoveryUnit(op.get())->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kNoOverlap);
         return readRecordOn(op, id);
     }
 
@@ -241,7 +254,7 @@ TEST_F(SnapshotManagerTests, ConsistentIfNotSupported) {
         return;  // This test is only for engines that DON'T support SnapshotManagers.
 
     auto op = makeOperation();
-    auto ru = op->recoveryUnit();
+    auto ru = shard_role_details::getRecoveryUnit(op.get());
     auto readSource = ru->getTimestampReadSource();
     ASSERT(readSource != RecoveryUnit::ReadSource::kMajorityCommitted);
     ASSERT(!ru->getPointInTimeReadTimestamp(op));
@@ -252,8 +265,9 @@ TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {
         return;  // This test is only for engines that DO support SnapshotManagers.
 
     auto op = makeOperation();
-    auto ru = op->recoveryUnit();
-    op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
+    auto ru = shard_role_details::getRecoveryUnit(op.get());
+    shard_role_details::getRecoveryUnit(op.get())->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kMajorityCommitted);
 
     // Before first snapshot is created.
     ASSERT_EQ(ru->majorityCommittedSnapshotAvailable(),
@@ -279,7 +293,8 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
         return;  // This test is only for engines that DO support SnapshotManagers.
 
     auto op = makeOperation();
-    op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
+    shard_role_details::getRecoveryUnit(op.get())->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kMajorityCommitted);
 
     // Hold the outer most global lock throughout the test to avoid getting snapshots abandoned when
     // inner global locks are destructed.
@@ -288,7 +303,7 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
     // Start an operation using a committed snapshot.
     auto snap = fetchAndIncrementTimestamp();
     snapshotManager->setCommittedSnapshot(snap);
-    ASSERT_OK(op->recoveryUnit()->majorityCommittedSnapshotAvailable());
+    ASSERT_OK(shard_role_details::getRecoveryUnit(op.get())->majorityCommittedSnapshotAvailable());
     ASSERT_EQ(itCountOn(op), 0);  // acquires a snapshot.
 
     // Everything still works until we abandon our snapshot.
@@ -296,7 +311,7 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
     ASSERT_EQ(itCountOn(op), 0);
 
     // Now it doesn't.
-    op->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(op.get())->abandonSnapshot();
     ASSERT_THROWS_CODE(
         itCountOn(op), AssertionException, ErrorCodes::ReadConcernMajorityNotAvailableYet);
 }
@@ -342,8 +357,10 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
     // snapshot until abandoned.
     auto longOp = makeOperation();
     Lock::GlobalLock globalLock(longOp, MODE_IS);
-    longOp->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-    ASSERT_OK(longOp->recoveryUnit()->majorityCommittedSnapshotAvailable());
+    shard_role_details::getRecoveryUnit(longOp.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
+    ASSERT_OK(
+        shard_role_details::getRecoveryUnit(longOp.get())->majorityCommittedSnapshotAvailable());
     ASSERT_EQ(itCountOn(longOp), 3);
 
     // If this fails, the snapshot contains writes that were rolled back.
@@ -354,7 +371,7 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
     ASSERT_EQ(itCountOn(longOp), 3);
 
     // If this fails, longOp didn't get a new snapshot when it should have.
-    longOp->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(longOp.get())->abandonSnapshot();
     ASSERT_EQ(itCountOn(longOp), 4);
 }
 
@@ -401,7 +418,7 @@ TEST_F(SnapshotManagerTests, InsertAndReadOnLastAppliedSnapshot) {
 
     // Not reading on the last applied timestamp returns the most recent data.
     auto op = makeOperation();
-    auto ru = op->recoveryUnit();
+    auto ru = shard_role_details::getRecoveryUnit(op.get());
     ru->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
     ASSERT_EQ(itCountOn(op), 1);
     ASSERT(readRecordOn(op, id));
@@ -437,7 +454,7 @@ TEST_F(SnapshotManagerTests, UpdateAndDeleteOnLocalSnapshot) {
 
     // Not reading on the last local timestamp returns the most recent data.
     auto op = makeOperation();
-    auto ru = op->recoveryUnit();
+    auto ru = shard_role_details::getRecoveryUnit(op.get());
     ru->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
     ASSERT_EQ(itCountOn(op), 1);
     auto record = readRecordOn(op, id);

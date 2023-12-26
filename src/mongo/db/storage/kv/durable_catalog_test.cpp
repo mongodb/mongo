@@ -88,6 +88,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -654,9 +655,9 @@ public:
             // Register a onCommit that will block until the main thread has committed its multikey
             // write. This onCommit handler is registered before any writes and will thus be
             // performed first, blocking all other onCommit handlers.
-            opCtx->recoveryUnit()->onCommit(
-                [&mutex, &cv, &numMultikeyCalls](OperationContext*,
-                                                 boost::optional<Timestamp> commitTime) {
+            shard_role_details::getRecoveryUnit(opCtx.get())
+                ->onCommit([&mutex, &cv, &numMultikeyCalls](OperationContext*,
+                                                            boost::optional<Timestamp> commitTime) {
                     stdx::unique_lock lock(mutex);
 
                     // Let the main thread now we have committed to the storage engine

@@ -42,7 +42,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/service_context.h"
@@ -53,6 +52,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
@@ -65,9 +65,10 @@ namespace {
 class CappedDeleteSideTxn {
 public:
     CappedDeleteSideTxn(OperationContext* opCtx, const CollectionPtr& collection) : _opCtx(opCtx) {
-        _originalRecoveryUnit = _opCtx->releaseRecoveryUnit().release();
+        _originalRecoveryUnit = shard_role_details::releaseRecoveryUnit(_opCtx).release();
         invariant(_originalRecoveryUnit);
-        _originalRecoveryUnitState = _opCtx->setRecoveryUnit(
+        _originalRecoveryUnitState = shard_role_details::setRecoveryUnit(
+            _opCtx,
             std::unique_ptr<RecoveryUnit>(
                 _opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
@@ -78,13 +79,15 @@ public:
             // come sequentially after any uncommitted records, which could mean we aren't actually
             // deleting the oldest entry as we should. This is mostly a technicality and would only
             // be an observable problem on capped collections with small limits.
-            CappedSnapshots::get(opCtx->recoveryUnit()).establish(opCtx, collection);
+            CappedSnapshots::get(shard_role_details::getRecoveryUnit(opCtx))
+                .establish(opCtx, collection);
         }
     }
 
     ~CappedDeleteSideTxn() {
-        _opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(_originalRecoveryUnit),
-                                _originalRecoveryUnitState);
+        shard_role_details::setRecoveryUnit(_opCtx,
+                                            std::unique_ptr<RecoveryUnit>(_originalRecoveryUnit),
+                                            _originalRecoveryUnitState);
     }
 
 private:
@@ -234,10 +237,11 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         // Update the next record to be deleted. The next record must exist as we're using the same
         // snapshot the insert was performed on and we can't delete newly inserted records.
         invariant(record);
-        opCtx->recoveryUnit()->onCommit([&ccs, recordId = std::move(record->id)](
-                                            OperationContext*, boost::optional<Timestamp>) {
-            ccs.cappedFirstRecord = std::move(recordId);
-        });
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [&ccs, recordId = std::move(record->id)](OperationContext*,
+                                                     boost::optional<Timestamp>) {
+                ccs.cappedFirstRecord = std::move(recordId);
+            });
     }
 
     wuow.commit();

@@ -84,6 +84,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -174,7 +175,7 @@ public:
           _oplogApplicationEndPoint(oplogApplicationEndPoint) {}
 
     void startup(OperationContext* opCtx) final {
-        invariant(opCtx->recoveryUnit()->getTimestampReadSource() ==
+        invariant(shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource() ==
                   RecoveryUnit::ReadSource::kNoTimestamp);
 
         _client = std::make_unique<DBDirectClient>(opCtx);
@@ -641,7 +642,8 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
     // timestamp to determine where to play oplog forward from. As this method shows, when a
     // recovery timestamp does not exist, the applied through is used to determine where to start
     // playing oplog entries from.
-    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx, /*stableCheckpoint*/ true);
+    shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
+        opCtx, /*stableCheckpoint*/ true);
 
     // Now that we have set the initial data timestamp and taken an unstable checkpoint with the
     // appliedThrough being the topOfOplog, it is safe to clear the appliedThrough. This minValid
@@ -793,8 +795,9 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
             // timestamp to this last applied timestamp later and we require the stable timestamp to
             // be less than or equal to the all_durable timestamp.
             WriteUnitOfWork wunit(opCtx);
-            uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(applyThroughOpTime.getTimestamp()));
-            opCtx->recoveryUnit()->setOrderedCommit(false);
+            uassertStatusOK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
+                applyThroughOpTime.getTimestamp()));
+            shard_role_details::getRecoveryUnit(opCtx)->setOrderedCommit(false);
             wunit.commit();
         } else {
             _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);

@@ -49,6 +49,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -96,8 +97,8 @@ void doLoadAllTenantParametersFromCollection(OperationContext* opCtx,
 
     // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise
     // abandon the snapshot when exiting the function.
-    ScopeGuard scopeGuard([&] { opCtx->recoveryUnit()->abandonSnapshot(); });
-    if (opCtx->recoveryUnit()->isActive()) {
+    ScopeGuard scopeGuard([&] { shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot(); });
+    if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
         scopeGuard.dismiss();
     }
 

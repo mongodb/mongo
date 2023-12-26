@@ -71,6 +71,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/stdx/thread.h"
@@ -353,7 +354,8 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
     auto newDoc = BSON("_id" << 1 << "a" << 5);
     {
         WriteUnitOfWork wuow(opCtx);
-        Snapshotted<BSONObj> oldSnap(opCtx->recoveryUnit()->getSnapshotId(), oldDoc);
+        Snapshotted<BSONObj> oldSnap(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
+                                     oldDoc);
         CollectionUpdateArgs args{oldDoc};
         collection_internal::updateDocument(opCtx,
                                             coll,
@@ -404,7 +406,8 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
     auto damagesOutput = doc_diff::computeDamages(oldDoc, *diff, false);
     {
         WriteUnitOfWork wuow(opCtx);
-        Snapshotted<BSONObj> oldSnap(opCtx->recoveryUnit()->getSnapshotId(), oldDoc);
+        Snapshotted<BSONObj> oldSnap(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
+                                     oldDoc);
         CollectionUpdateArgs args{oldDoc};
         auto newDocStatus =
             collection_internal::updateDocumentWithDamages(opCtx,
@@ -971,7 +974,7 @@ TEST_F(CollectionTest, CappedCursorRollover) {
     auto cursor = rs->getCursor(otherOpCtx.get());
     ASSERT(cursor->next());
     cursor->save();
-    otherOpCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(otherOpCtx.get())->abandonSnapshot();
 
     // Insert 10 documents which causes a rollover.
     {
@@ -1014,7 +1017,7 @@ TEST_F(CatalogTestFixture, CappedCursorYieldFirst) {
 
     // See that things work if you yield before you first call next().
     cursor->save();
-    operationContext()->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
 
     ASSERT_TRUE(cursor->restore());
 

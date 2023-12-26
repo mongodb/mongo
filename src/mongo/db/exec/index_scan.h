@@ -44,7 +44,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -54,6 +53,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {

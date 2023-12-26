@@ -60,7 +60,6 @@
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_build_interceptor_gen.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -70,6 +69,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -206,7 +206,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         // Note that index builds will only "resume" once. A second resume results in the index
         // build starting from scratch. A "resumed" index build does not use a majority read
         // concern. And thus will observe data that can be rolled back via replication.
-        opCtx->recoveryUnit()->allowOneUntimestampedWrite();
+        shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
         WriteUnitOfWork wuow(opCtx);
 
         int32_t batchSize = 0;
@@ -372,7 +372,7 @@ void IndexBuildInterceptor::_yield(OperationContext* opCtx,
                                    const IndexCatalogEntry* indexCatalogEntry,
                                    const Yieldable* yieldable) {
     // Releasing locks means a new snapshot should be acquired when restored.
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     yieldable->yield();
 
     auto locker = shard_role_details::getLocker(opCtx);
@@ -456,7 +456,7 @@ Status IndexBuildInterceptor::_finishSideWrite(OperationContext* opCtx,
     // This insert may roll back, but not necessarily from inserting into this table. If other write
     // operations outside this table and in the same transaction are rolled back, this counter also
     // needs to be rolled back.
-    opCtx->recoveryUnit()->onRollback(
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [sharedCounter = _sideWritesCounter, size = toInsert.size()](OperationContext*) {
             sharedCounter->fetchAndSubtract(size);
         });

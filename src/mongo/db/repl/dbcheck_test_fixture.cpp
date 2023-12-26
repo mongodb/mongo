@@ -48,6 +48,7 @@
 #include "mongo/db/repl/dbcheck_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/db/transaction_resources.h"
 
 namespace mongo {
 
@@ -213,7 +214,7 @@ void DbCheckTest::dropIndex(OperationContext* opCtx, const std::string& indexNam
     ASSERT_OK(writableCollection->getIndexCatalog()->dropIndexEntry(
         opCtx, collection.getWritableCollection(opCtx), writableEntry));
 
-    ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(
+    ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
         repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp() + 1));
 
     wuow.commit();

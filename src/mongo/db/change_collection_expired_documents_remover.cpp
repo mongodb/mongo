@@ -51,7 +51,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"

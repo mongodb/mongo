@@ -423,6 +423,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/task_executor_mock',
         '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/s/mongos_server_parameters',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         '$BUILD_DIR/mongo/s/vector_clock_mongos',

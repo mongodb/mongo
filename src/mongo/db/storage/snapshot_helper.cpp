@@ -37,12 +37,12 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_helper.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -138,8 +138,9 @@ bool changeReadSourceIfNeeded(OperationContext* opCtx,
         return readAtLastApplied;
     }
 
-    const auto originalReadSource = opCtx->recoveryUnit()->getTimestampReadSource();
-    if (opCtx->recoveryUnit()->isReadSourcePinned()) {
+    const auto originalReadSource =
+        shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
+    if (shard_role_details::getRecoveryUnit(opCtx)->isReadSourcePinned()) {
         LOGV2_DEBUG(5863601,
                     2,
                     "Not changing readSource as it is pinned",
@@ -160,7 +161,7 @@ bool changeReadSourceIfNeeded(OperationContext* opCtx,
     // Helper to set read source to the recovery unit and remember our current setting
     auto currentReadSource = originalReadSource;
     auto setReadSource = [&](RecoveryUnit::ReadSource readSource) {
-        opCtx->recoveryUnit()->setTimestampReadSource(readSource);
+        shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(readSource);
         currentReadSource = readSource;
     };
 
@@ -210,18 +211,22 @@ bool changeReadSourceIfNeeded(OperationContext* opCtx,
     // All done, log if we made a change to the read source
     if (originalReadSource == RecoveryUnit::ReadSource::kNoTimestamp &&
         currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
-        LOGV2_DEBUG(4452901,
-                    2,
-                    "Changed ReadSource to kLastApplied",
-                    "namespace"_attr = nss,
-                    "ts"_attr = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
+        LOGV2_DEBUG(
+            4452901,
+            2,
+            "Changed ReadSource to kLastApplied",
+            "namespace"_attr = nss,
+            "ts"_attr =
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx));
     } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
                currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
-        LOGV2_DEBUG(6730500,
-                    2,
-                    "ReadSource kLastApplied updated timestamp",
-                    "namespace"_attr = nss,
-                    "ts"_attr = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
+        LOGV2_DEBUG(
+            6730500,
+            2,
+            "ReadSource kLastApplied updated timestamp",
+            "namespace"_attr = nss,
+            "ts"_attr =
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx));
     } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
                currentReadSource == RecoveryUnit::ReadSource::kNoTimestamp) {
         LOGV2_DEBUG(4452902,

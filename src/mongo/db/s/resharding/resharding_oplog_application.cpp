@@ -45,7 +45,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/delete_request_gen.h"
@@ -210,7 +209,7 @@ void ReshardingOplogApplicationRules::_applyInsertOrUpdate(
             MONGO_UNREACHABLE;
     }
 
-    if (opCtx->recoveryUnit()->isTimestamped()) {
+    if (shard_role_details::getRecoveryUnit(opCtx)->isTimestamped()) {
         // Resharding oplog application does two kinds of writes:
         //
         // 1) The (obvious) write for applying oplog entries to documents being resharded.
@@ -460,7 +459,7 @@ void ReshardingOplogApplicationRules::_applyDelete(
 
             _applierMetrics->onWriteToStashCollections();
 
-            invariant(opCtx->recoveryUnit()->isTimestamped());
+            invariant(shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
             wuow.commit();
 
             return;

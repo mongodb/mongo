@@ -1384,10 +1384,11 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
 
         WriteUnitOfWork wuow(opCtx.get());
 
-        opCtx->recoveryUnit()->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
-            stdx::lock_guard<Latch> lk(_mutex);
-            _completionPromise.emplaceValue();
-        });
+        shard_role_details::getRecoveryUnit(opCtx.get())
+            ->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
+                stdx::lock_guard<Latch> lk(_mutex);
+                _completionPromise.emplaceValue();
+            });
 
         deleteObjects(opCtx.get(),
                       coll,

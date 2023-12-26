@@ -47,7 +47,6 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor_impl.h"
@@ -58,6 +57,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -192,7 +192,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     // are not yet visible even after the wait.
                     invariant(!_params.tailable && collPtr->ns().isOplog());
 
-                    opCtx()->recoveryUnit()->abandonSnapshot();
+                    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
                     collPtr->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx());
                 }
 
@@ -295,7 +295,8 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
     member->recordId = std::move(record->id);
-    member->resetDocument(opCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson());
+    member->resetDocument(shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId(),
+                          record->data.releaseToBson());
     _workingSet->transitionToRecordIdAndObj(id);
 
     return returnIfMatches(member, id, out);
@@ -309,7 +310,8 @@ void CollectionScan::setLatestOplogEntryTimestampToReadTimestamp() {
         return;
     }
 
-    const auto readTimestamp = opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(opCtx());
+    const auto readTimestamp =
+        shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp(opCtx());
 
     // If we don't have a read timestamp, we take no action here.
     if (!readTimestamp) {

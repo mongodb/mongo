@@ -70,6 +70,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/uuid.h"
@@ -163,7 +164,7 @@ public:
     bool requiresIdIndex() const final;
 
     Snapshotted<BSONObj> docFor(OperationContext* opCtx, const RecordId& loc) const final {
-        return Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(),
+        return Snapshotted<BSONObj>(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
                                     _shared->_recordStore->dataFor(opCtx, loc).releaseToBson());
     }
 

@@ -51,7 +51,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -66,6 +65,7 @@
 #include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -99,7 +99,7 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
     // operation flag set.
     return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
         !shard_role_details::getLocker(opCtx)->isWriteLocked() &&
-        !(opCtx->recoveryUnit()->isActive() && !opCtx->isLockFreeReadsOp());
+        !(shard_role_details::getRecoveryUnit(opCtx)->isActive() && !opCtx->isLockFreeReadsOp());
 }
 
 /**
@@ -375,8 +375,9 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     const bool shouldReadAtLastApplied =
         SnapshotHelper::changeReadSourceIfNeeded(opCtx, _resolvedNss);
     // Update readSource in case it was updated.
-    const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
-    const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+    const auto readSource = shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
+    const auto readTimestamp =
+        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
 
     // Check that the collections are all safe to use. First acquire collection from our catalog
     // compatible with the specified 'readTimestamp'. Creates and places a compatible PIT collection
@@ -428,7 +429,9 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
         auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         assertReadConcernSupported(
-            _coll, readConcernArgs, opCtx->recoveryUnit()->getTimestampReadSource());
+            _coll,
+            readConcernArgs,
+            shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 
         checkInvariantsForReadOptions(_coll->ns(),
                                       readConcernArgs.getArgsAfterClusterTime(),
@@ -619,10 +622,12 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         // catalog.
         establishCappedSnapshotIfNeeded(opCtx, catalogBeforeSnapshot, nsOrUUID);
 
-        opCtx->recoveryUnit()->preallocateSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
 
-        const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
-        const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+        const auto readSource =
+            shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
+        const auto readTimestamp =
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
 
         checkInvariantsForReadOptions(nss,
                                       readConcernArgs.getArgsAfterClusterTime(),
@@ -645,7 +650,7 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
             return {
                 catalogBeforeSnapshot, isAnySecondaryNssShardedOrAView, readSource, readTimestamp};
         } else {
-            opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
             CurOp::get(opCtx)->yielded();
         }
@@ -681,7 +686,7 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
         // The Catalog instance and replication state after opening a snapshot will be compared with
         // the previously acquired state. If either does not match, then this loop will retry lock
         // acquisition and read source selection until there is a match.
-        opCtx->recoveryUnit()->preallocateSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
 
         // Verify that the catalog has not changed while we opened the storage snapshot. If the
         // catalog is unchanged, then the requested Collection is also guaranteed to be the same.
@@ -702,7 +707,7 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
                     3,
                     "Retrying acquiring state for lock-free read because collection, catalog or "
                     "replication state changed.");
-        opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     }
 }
 
@@ -783,7 +788,7 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
         // namespace (or the oplog), then we should retry the setup after resetting the read source
         // here using the resolved namespace. This only needs to be done once.
         if (nsOrUUID.isUUID() && !collection->ns().isReplicated() && !needsRetry) {
-            opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             [[maybe_unused]] bool shouldReadAtLastApplied =
                 SnapshotHelper::changeReadSourceIfNeeded(opCtx, collection->ns());
             needsRetry = true;
@@ -828,7 +833,7 @@ const Collection* AutoGetCollectionForReadLockFree::_restoreFromYield(OperationC
 
 AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID, AutoGetCollection::Options options)
-    : _originalReadSource(opCtx->recoveryUnit()->getTimestampReadSource()),
+    : _originalReadSource(shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()),
       _isLockFreeReadSubOperation(opCtx->isLockFreeReadsOp()),  // This has to come before LFRBlock.
       _lockFreeReadsBlock(opCtx),
       _globalLock(opCtx,
@@ -844,8 +849,9 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     // Supported lock-free reads should only ever have an open storage snapshot prior to
     // calling this helper if it is a nested lock-free operation. The storage snapshot and
     // in-memory state used across lock=free reads must be consistent.
-    invariant(supportsLockFreeRead(opCtx) &&
-              (!opCtx->recoveryUnit()->isActive() || _isLockFreeReadSubOperation));
+    invariant(
+        supportsLockFreeRead(opCtx) &&
+        (!shard_role_details::getRecoveryUnit(opCtx)->isActive() || _isLockFreeReadSubOperation));
 
     DatabaseShardingState::assertMatchingDbVersion(opCtx, nsOrUUID.dbName());
     if (nsOrUUID.isNamespaceString()) {
@@ -858,12 +864,12 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         // we do need to set up the Collection reference.
         auto catalog = CollectionCatalog::get(opCtx);
 
-        auto [resolvedNss, collection, view] =
-            getCollectionForLockFreeRead(opCtx,
-                                         catalog,
-                                         opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx),
-                                         nsOrUUID,
-                                         _options);
+        auto [resolvedNss, collection, view] = getCollectionForLockFreeRead(
+            opCtx,
+            catalog,
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx),
+            nsOrUUID,
+            _options);
         _resolvedNss = resolvedNss;
         _resolvedDbName = _resolvedNss.dbName();
         _view = view;
@@ -906,7 +912,9 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
 
     if (_collectionPtr) {
         assertReadConcernSupported(
-            _collectionPtr, readConcernArgs, opCtx->recoveryUnit()->getTimestampReadSource());
+            _collectionPtr,
+            readConcernArgs,
+            shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {

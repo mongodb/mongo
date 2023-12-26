@@ -53,7 +53,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/error_labels.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"

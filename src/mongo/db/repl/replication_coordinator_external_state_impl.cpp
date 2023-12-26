@@ -65,7 +65,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
@@ -482,8 +481,8 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         _storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 
         // Take an unstable checkpoint to ensure that the FCV document is persisted to disk.
-        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,
-                                                                 false /* stableCheckpoint */);
+        shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
+            opCtx, false /* stableCheckpoint */);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

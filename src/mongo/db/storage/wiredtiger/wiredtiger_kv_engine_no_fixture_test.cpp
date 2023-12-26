@@ -57,6 +57,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"  // for WiredTigerSession
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -96,8 +97,10 @@ public:
     void onCreateClient(Client* client) override {}
     void onDestroyClient(Client* client) override {}
     void onCreateOperationContext(OperationContext* opCtx) {
-        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(_kvEngine->newRecoveryUnit()),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        shard_role_details::setRecoveryUnit(
+            opCtx,
+            std::unique_ptr<RecoveryUnit>(_kvEngine->newRecoveryUnit()),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
     void onDestroyOperationContext(OperationContext* opCtx) override {}
 
@@ -140,7 +143,7 @@ void commitWriteUnitOfWork(OperationContext* opCtx,
                            WriteUnitOfWork& wuow,
                            Timestamp expectedCommitTimestamp) {
     bool isCommitted = false;
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [&](OperationContext*, boost::optional<Timestamp> commitTimestamp) {
             ASSERT(commitTimestamp) << "Storage transaction committed without timestamp";
             ASSERT_EQ(*commitTimestamp, expectedCommitTimestamp);
@@ -254,14 +257,14 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
         WriteUnitOfWork wuow(opCtx.get());
 
         Timestamp updateTimestamp(tsSecs, 1000U);
-        ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(updateTimestamp));
+        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx.get())->setTimestamp(updateTimestamp));
         ASSERT_OK(rs->updateRecord(opCtx.get(), rid1, valueD.c_str(), valueD.size()));
         ASSERT_OK(rs->updateRecord(opCtx.get(), rid3, valueD.c_str(), valueD.size()));
 
         bool isCommitted = false;
-        opCtx->recoveryUnit()->onCommit(
-            [expectedCommitTimestamp = updateTimestamp,
-             &isCommitted](OperationContext*, boost::optional<Timestamp> commitTimestamp) {
+        shard_role_details::getRecoveryUnit(opCtx.get())
+            ->onCommit([expectedCommitTimestamp = updateTimestamp, &isCommitted](
+                           OperationContext*, boost::optional<Timestamp> commitTimestamp) {
                 ASSERT(commitTimestamp) << "Storage transaction committed without timestamp";
                 ASSERT_EQ(*commitTimestamp, expectedCommitTimestamp);
                 isCommitted = true;
@@ -286,7 +289,7 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
         WriteUnitOfWork wuow(opCtx.get());
 
         Timestamp updateTimestamp(tsSecs, i);
-        ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(updateTimestamp));
+        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx.get())->setTimestamp(updateTimestamp));
         auto valueBWithISuffix = valueB + std::to_string(i);
         ASSERT_OK(rs->updateRecord(
             opCtx.get(), rid2, valueBWithISuffix.c_str(), valueBWithISuffix.size()));
@@ -327,7 +330,7 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
         WriteUnitOfWork wuow(opCtx.get());
 
         Timestamp updateTimestamp(tsSecs, 500U);
-        ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(updateTimestamp));
+        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx.get())->setTimestamp(updateTimestamp));
         ASSERT_OK(rs->updateRecord(opCtx.get(), rid2, valueC.c_str(), valueC.size()));
 
         commitWriteUnitOfWork(opCtx.get(), wuow, /*expectedCommitTimestamp=*/updateTimestamp);

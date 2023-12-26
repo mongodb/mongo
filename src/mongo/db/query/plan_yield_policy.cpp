@@ -34,11 +34,11 @@
 
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -144,12 +144,12 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                 // flag for the duration of yield will force any calls to abandonSnapshot() to
                 // commit the transaction, rather than abort it, in order to leave the cursors
                 // valid.
-                opCtx->recoveryUnit()->setAbandonSnapshotMode(
+                shard_role_details::getRecoveryUnit(opCtx)->setAbandonSnapshotMode(
                     RecoveryUnit::AbandonSnapshotMode::kCommit);
                 exitGuard.emplace([&] {
-                    invariant(opCtx->recoveryUnit()->abandonSnapshotMode() ==
+                    invariant(shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshotMode() ==
                               RecoveryUnit::AbandonSnapshotMode::kCommit);
-                    opCtx->recoveryUnit()->setAbandonSnapshotMode(
+                    shard_role_details::getRecoveryUnit(opCtx)->setAbandonSnapshotMode(
                         RecoveryUnit::AbandonSnapshotMode::kAbort);
                 });
             }
@@ -158,7 +158,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                 // This yield policy doesn't release locks, but it does relinquish our storage
                 // snapshot.
                 invariant(!opCtx->isLockFreeReadsOp());
-                opCtx->recoveryUnit()->abandonSnapshot();
+                shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             } else {
                 if (usesCollectionAcquisitions()) {
                     performYieldWithAcquisitions(opCtx, whileYieldingFn);
@@ -210,7 +210,7 @@ void PlanYieldPolicy::performYield(OperationContext* opCtx,
 
     // Release any storage engine resources. This requires holding a global lock to correctly
     // synchronize with states such as shutdown and rollback.
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     // Check for interrupt before releasing locks. This avoids the complexities of having to
     // re-acquire locks to clean up when we are interrupted. This is the main interrupt check during
@@ -250,7 +250,7 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
 
     // Release any storage engine resources. This requires holding a global lock to correctly
     // synchronize with states such as shutdown and rollback.
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     // Check for interrupt before releasing locks. This avoids the complexities of having to
     // re-acquire locks to clean up when we are interrupted. This is the main interrupt check during

@@ -68,6 +68,7 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_util.h"
@@ -316,7 +317,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                     &indexesAffected,
                     _params.opDebug,
                     &args));
-                invariant(oldObj.snapshotId() == opCtx()->recoveryUnit()->getSnapshotId());
+                invariant(oldObj.snapshotId() ==
+                          shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId());
                 wunit.commit();
             }
         } else {
@@ -347,7 +349,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                     &indexesAffected,
                     _params.opDebug,
                     &args);
-                invariant(oldObj.snapshotId() == opCtx()->recoveryUnit()->getSnapshotId());
+                invariant(oldObj.snapshotId() ==
+                          shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId());
                 wunit.commit();
             }
         }
@@ -559,7 +562,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         // Set member's obj to be the doc we want to return.
         if (_params.request->shouldReturnAnyDocs()) {
             if (_params.request->shouldReturnNewDocs()) {
-                member->resetDocument(opCtx()->recoveryUnit()->getSnapshotId(), newObj);
+                member->resetDocument(shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId(),
+                                      newObj);
             } else {
                 invariant(_params.request->shouldReturnOldDocs());
                 member->resetDocument(oldSnapshot, oldObj);

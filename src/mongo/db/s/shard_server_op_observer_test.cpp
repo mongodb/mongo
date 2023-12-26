@@ -38,6 +38,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -80,8 +81,9 @@ protected:
                NamespaceString nss,
                boost::optional<UUID> uuid = boost::none) const {
         writeConflictRetry(opCtx, "deleteAll", nss, [&] {
-            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-            opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kNoTimestamp);
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection collRaii(opCtx, nss, MODE_X);

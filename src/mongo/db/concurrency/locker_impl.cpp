@@ -55,6 +55,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/ticketholder_manager.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -412,7 +413,7 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
         // Acquiring a ticket is a potentially blocking operation. This must not be called after a
         // transaction timestamp has been set, indicating this transaction has created an oplog
         // hole.
-        invariant(!opCtx->recoveryUnit()->isTimestamped());
+        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
 
         if (auto ticket = holder->waitForTicketUntil(
                 _uninterruptibleLocksRequested ? nullptr : opCtx, &_admCtx, deadline)) {
@@ -900,7 +901,7 @@ LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, Loc
     if (!shouldAllowLockAcquisitionOnTimestampedUnitOfWork() && resType != RESOURCE_METADATA &&
         resType != RESOURCE_MUTEX && resType != RESOURCE_DDL_DATABASE &&
         resType != RESOURCE_DDL_COLLECTION) {
-        invariant(!opCtx->recoveryUnit()->isTimestamped(),
+        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isTimestamped(),
                   str::stream()
                       << "Operation holding open an oplog hole tried to acquire locks. ResourceId: "
                       << resId << ", mode: " << modeName(mode));
@@ -992,7 +993,7 @@ void LockerImpl::_lockComplete(OperationContext* opCtx,
     if (!shouldAllowLockAcquisitionOnTimestampedUnitOfWork() && resType != RESOURCE_METADATA &&
         resType != RESOURCE_MUTEX && resType != RESOURCE_DDL_DATABASE &&
         resType != RESOURCE_DDL_COLLECTION) {
-        invariant(!opCtx->recoveryUnit()->isTimestamped(),
+        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isTimestamped(),
                   str::stream()
                       << "Operation holding open an oplog hole tried to acquire locks. ResourceId: "
                       << resId << ", mode: " << modeName(mode));
@@ -1106,7 +1107,7 @@ void LockerImpl::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode
         // Acquiring a ticket is a potentially blocking operation. This must not be called after a
         // transaction timestamp has been set, indicating this transaction has created an oplog
         // hole.
-        invariant(!opCtx->recoveryUnit()->isTimestamped());
+        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
         ticketholder->getTicket(opCtx, &_flowControlStats);
     }
 }

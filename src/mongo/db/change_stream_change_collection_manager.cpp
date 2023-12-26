@@ -64,7 +64,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
@@ -85,6 +84,7 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -815,7 +815,7 @@ void ChangeStreamChangeCollectionManager::_removeExpiredMarkers(
         }
 
         writeConflictRetry(opCtx, "truncate change collection", dbAndUUID, [&] {
-            opCtx->recoveryUnit()->allowOneUntimestampedWrite();
+            shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
             auto changeCollection = acquireChangeCollectionForWrite(opCtx, dbAndUUID);
             WriteUnitOfWork wuow(opCtx);
 

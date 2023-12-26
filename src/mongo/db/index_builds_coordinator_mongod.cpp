@@ -60,7 +60,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -74,6 +73,7 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -444,7 +444,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
     // If this index build was started during secondary batch application, it will have a commit
     // timestamp that must be copied over to timestamp the write to initialize the index build.
-    const auto startTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
+    const auto startTimestamp = shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp();
 
     // Use a promise-future pair to wait until the index build has been started. This future will
     // only return when the index build thread has started and the initial catalog write has been

@@ -69,6 +69,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -104,7 +105,8 @@ protected:
     ClientAndCtx makeClientAndCtx(const std::string& clientName) {
         auto client = getGlobalServiceContext()->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        opCtx->setRecoveryUnit(
+        shard_role_details::setRecoveryUnit(
+            opCtx.get(),
             std::unique_ptr<RecoveryUnit>(helper->getEngine()->newRecoveryUnit()),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return {std::move(client), std::move(opCtx)};
@@ -155,8 +157,10 @@ class KVEngineTestHarness : public ServiceContextTest {
 protected:
     ServiceContext::UniqueOperationContext _makeOperationContext(KVEngine* engine) {
         auto opCtx = makeOperationContext();
-        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        shard_role_details::setRecoveryUnit(
+            opCtx.get(),
+            std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return opCtx;
     }
 
@@ -170,8 +174,10 @@ protected:
             auto client = getServiceContext()->getService()->makeClient(std::to_string(i));
 
             auto opCtx = client->makeOperationContext();
-            opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
-                                   WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+            shard_role_details::setRecoveryUnit(
+                opCtx.get(),
+                std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
+                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
             opCtxs.emplace_back(std::move(client), std::move(opCtx));
         }
 
@@ -383,7 +389,7 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
         engine->checkpoint();
 
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(engine->dropIdent(opCtx->recoveryUnit(), ident));
+        ASSERT_OK(engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()), ident));
         wuow.commit();
     }
 }
@@ -486,15 +492,15 @@ TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
     uow1.commit();
 
     RecordData rd;
-    opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(15, 15));
+    shard_role_details::getRecoveryUnit(opCtx1)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, Timestamp(15, 15));
 
     auto opCtx2 = opCtxs[1].second.get();
     Lock::GlobalLock globalLk2(opCtx2, MODE_IX);
     WriteUnitOfWork uow2(opCtx2);
 
     ASSERT(rs->findRecord(opCtx1, rid, &rd));
-    ASSERT_OK(opCtx2->recoveryUnit()->setTimestamp(Timestamp(20, 20)));
+    ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx2)->setTimestamp(Timestamp(20, 20)));
     ASSERT_OK(rs->updateRecord(opCtx2, rid, "updated", 8));
 
     ASSERT(rs->findRecord(opCtx1, rid, &rd));
@@ -502,13 +508,13 @@ TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
 
     uow2.commit();
 
-    opCtx1->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx1)->abandonSnapshot();
     ASSERT(rs->findRecord(opCtx1, rid, &rd));
     ASSERT_EQUALS(std::string("abc"), rd.data());
 
 
-    opCtx2->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(15, 15));
+    shard_role_details::getRecoveryUnit(opCtx2)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, Timestamp(15, 15));
     ASSERT(rs->findRecord(opCtx2, rid, &rd));
     ASSERT_EQUALS(std::string("abc"), rd.data());
 }
@@ -642,8 +648,8 @@ TEST_F(KVEngineTestHarness, BasicTimestampSingle) {
     auto opCtx1 = opCtxs[0].second.get();
     Lock::GlobalLock globalLk(opCtx1, MODE_IS);
 
-    opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   kReadTimestamp);
+    shard_role_details::getRecoveryUnit(opCtx1)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, kReadTimestamp);
     ASSERT(!rs->findRecord(opCtx1, RecordId::minLong(), nullptr));
 
     // Insert a record at a later time.
@@ -661,13 +667,13 @@ TEST_F(KVEngineTestHarness, BasicTimestampSingle) {
     // Should not see the record, even if we abandon the snapshot as the read timestamp is still
     // earlier than the insert timestamp.
     ASSERT(!rs->findRecord(opCtx1, rid, nullptr));
-    opCtx1->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx1)->abandonSnapshot();
     ASSERT(!rs->findRecord(opCtx1, rid, nullptr));
 
 
-    opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   kInsertTimestamp);
-    opCtx1->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx1)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, kInsertTimestamp);
+    shard_role_details::getRecoveryUnit(opCtx1)->abandonSnapshot();
     RecordData rd;
     ASSERT(rs->findRecord(opCtx1, rid, &rd));
     ASSERT_EQ(std::string("abc"), rd.data());
@@ -724,7 +730,7 @@ TEST_F(KVEngineTestHarness, BasicTimestampMultiple) {
         rid = swRid.getValue();
 
         // Update a record at a later time.
-        ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(t20));
+        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx.get())->setTimestamp(t20));
         auto res = rs->updateRecord(opCtx.get(), rid, "updated", 8);
         ASSERT_OK(res);
         wuow.commit();
@@ -733,12 +739,14 @@ TEST_F(KVEngineTestHarness, BasicTimestampMultiple) {
     RecordData rd;
     auto opCtx = _makeOperationContext(engine);
     Lock::GlobalLock globalLk(opCtx.get(), MODE_S);
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t10);
+    shard_role_details::getRecoveryUnit(opCtx.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t10);
     ASSERT(rs->findRecord(opCtx.get(), rid, &rd));
     ASSERT_EQUALS(std::string("abc"), rd.data());
 
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t20);
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t20);
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
     ASSERT(rs->findRecord(opCtx.get(), rid, &rd));
     ASSERT_EQUALS(std::string("updated"), rd.data());
 }
@@ -787,8 +795,8 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness, SnapshotHidesVisibility, ".*item not fou
     // Snapshot was taken before the insert and will not find the record even after the commit.
     auto opCtx2 = opCtxs[1].second.get();
     Lock::GlobalLock globalLk2(opCtx2, MODE_IX);
-    opCtx2->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                   Timestamp(9, 9));
+    shard_role_details::getRecoveryUnit(opCtx2)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, Timestamp(9, 9));
     RecordData rd;
     ASSERT(!rs->findRecord(opCtx2, loc, &rd));
 
@@ -873,12 +881,14 @@ TEST_F(KVEngineTestHarness, SingleReadWithConflictWithOplog) {
 
     auto opCtx = _makeOperationContext(engine);
     Lock::GlobalLock globalLk(opCtx.get(), MODE_S);
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t9);
+    shard_role_details::getRecoveryUnit(opCtx.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t9);
     ASSERT(!collectionRs->findRecord(opCtx.get(), locCollection, &rd));
     ASSERT(!oplogRs->findRecord(opCtx.get(), locOplog, &rd));
 
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t10);
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t10);
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
     ASSERT(collectionRs->findRecord(opCtx.get(), locCollection, &rd));
     ASSERT(oplogRs->findRecord(opCtx.get(), locOplog, &rd));
 }
@@ -925,13 +935,13 @@ TEST_F(KVEngineTestHarness, PinningOldestTimestampWithReadConflict) {
     uow.commit();
 
     RecordData rd;
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                  Timestamp(15, 15));
+    shard_role_details::getRecoveryUnit(opCtx.get())
+        ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, Timestamp(15, 15));
     ASSERT(rs->findRecord(opCtx.get(), rid, &rd));
 
     engine->setOldestTimestamp(Timestamp(20, 20), false);
 
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
     ASSERT_THROWS_CODE(
         rs->findRecord(opCtx.get(), rid, &rd), DBException, ErrorCodes::SnapshotTooOld);
 }
@@ -1061,7 +1071,7 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
         // in the collection any longer. 'numRecords' will still show two as it's the fast count and
         // doesn't get reflected during the rollback.
         RecordData rd;
-        opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
         ASSERT(rs->findRecord(opCtx.get(), ridA, &rd));
         ASSERT_EQ(std::string("abc"), rd.data());
         ASSERT_FALSE(rs->findRecord(opCtx.get(), ridB, nullptr));

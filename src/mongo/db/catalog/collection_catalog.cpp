@@ -61,7 +61,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/resource_catalog.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
@@ -74,6 +73,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -293,9 +293,9 @@ public:
         if (uncommittedCatalogUpdates.hasRegisteredWithRecoveryUnit())
             return;
 
-        opCtx->recoveryUnit()->registerPreCommitHook(
+        shard_role_details::getRecoveryUnit(opCtx)->registerPreCommitHook(
             [](OperationContext* opCtx) { PublishCatalogUpdates::preCommit(opCtx); });
-        opCtx->recoveryUnit()->registerChangeForCatalogVisibility(
+        shard_role_details::getRecoveryUnit(opCtx)->registerChangeForCatalogVisibility(
             std::make_unique<PublishCatalogUpdates>(uncommittedCatalogUpdates));
         uncommittedCatalogUpdates.markRegisteredWithRecoveryUnit();
     }
@@ -542,7 +542,7 @@ public:
             ongoingBatchedWOUWCollectionWrite = batchedWrite.get();
 
             // Register commit/rollback handlers _if_ we are in an WUOW.
-            opCtx->recoveryUnit()->registerChange(std::move(batchedWrite));
+            shard_role_details::getRecoveryUnit(opCtx)->registerChange(std::move(batchedWrite));
         }
 
         // Push this instance to the set of collections cloned in this WUOW.
@@ -636,7 +636,7 @@ std::shared_ptr<const CollectionCatalog> CollectionCatalog::latest(ServiceContex
 }
 
 std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(OperationContext* opCtx) {
-    const auto& stashed = stashedCatalog(opCtx->recoveryUnit()->getSnapshot());
+    const auto& stashed = stashedCatalog(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
     if (stashed)
         return stashed;
 
@@ -660,7 +660,7 @@ std::shared_ptr<const CollectionCatalog> CollectionCatalog::latest(OperationCont
 
 void CollectionCatalog::stash(OperationContext* opCtx,
                               std::shared_ptr<const CollectionCatalog> catalog) {
-    stashedCatalog(opCtx->recoveryUnit()->getSnapshot()) = std::move(catalog);
+    stashedCatalog(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot()) = std::move(catalog);
 }
 
 void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {

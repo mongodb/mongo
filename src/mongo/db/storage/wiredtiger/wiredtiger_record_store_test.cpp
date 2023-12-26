@@ -62,6 +62,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
@@ -547,7 +548,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_UpdateRecord) {
 
         WriteUnitOfWork wuow(opCtx.get());
         // Explicitly sets the timestamp to ensure ordered writes.
-        ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 3)));
+        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx.get())->setTimestamp(Timestamp(1, 3)));
         ASSERT_OK(
             rs->updateRecord(opCtx.get(), RecordId(1, 1), changed1.objdata(), changed1.objsize()));
         ASSERT_OK(
@@ -1345,7 +1346,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     {
         WriteUnitOfWork uow(opCtx.get());
         WiredTigerRecoveryUnit* ru =
-            checked_cast<WiredTigerRecoveryUnit*>(opCtx.get()->recoveryUnit());
+            checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
         WT_SESSION* s = ru->getSession()->getSession();
         invariantWTOK(s->create(s, uri.c_str(), config.c_str()), s);
         uow.commit();
@@ -1431,9 +1432,9 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
         WriteUnitOfWork txn(ctx.get());
         // Registered changes are executed in reverse order.
         rs->deleteRecord(ctx.get(), rid);
-        ctx.get()->recoveryUnit()->onRollback(
+        shard_role_details::getRecoveryUnit(ctx.get())->onRollback(
             [&](OperationContext*) { deleted->countDownAndWait(); });
-        ctx.get()->recoveryUnit()->onRollback(
+        shard_role_details::getRecoveryUnit(ctx.get())->onRollback(
             [&](OperationContext*) { aborted->countDownAndWait(); });
     });
 

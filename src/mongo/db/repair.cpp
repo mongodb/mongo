@@ -47,7 +47,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/validate_results.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/rebuild_indexes.h"
@@ -59,6 +58,7 @@
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -75,11 +75,11 @@ using namespace fmt::literals;
 Status rebuildIndexesForNamespace(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   StorageEngine* engine) {
-    if (opCtx->recoveryUnit()->isActive()) {
+    if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
         // This function is shared by multiple callers. Some of which have opened a transaction to
         // perform reads. This function may make mixed-mode writes. Mixed-mode assertions can only
         // be suppressed when beginning a fresh transaction.
-        opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     }
 
     opCtx->checkForInterrupt();

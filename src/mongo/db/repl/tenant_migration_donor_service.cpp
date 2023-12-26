@@ -626,7 +626,8 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                        const auto originalRecordId = Helpers::findOne(
                            opCtx, collection.getCollection(), originalStateDocBson);
                        const auto originalSnapshot = Snapshotted<BSONObj>(
-                           opCtx->recoveryUnit()->getSnapshotId(), originalStateDocBson);
+                           shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
+                           originalStateDocBson);
                        invariant(!originalRecordId.isNull());
 
                        if (nextState == TenantMigrationDonorStateEnum::kBlocking) {
@@ -641,11 +642,12 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                                mtab->startBlockingWrites();
                            }
 
-                           opCtx->recoveryUnit()->onRollback([mtabVector](OperationContext*) {
-                               for (auto& mtab : mtabVector) {
-                                   mtab->rollBackStartBlocking();
-                               }
-                           });
+                           shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+                               [mtabVector](OperationContext*) {
+                                   for (auto& mtab : mtabVector) {
+                                       mtab->rollBackStartBlocking();
+                                   }
+                               });
                        }
 
                        // Reserve an opTime for the write.
@@ -1329,7 +1331,7 @@ TenantMigrationDonorService::Instance::_waitUntilStartMigrationDonorTimestampIsC
                auto opCtx = opCtxHolder.get();
                auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
                if (storageEngine->getLastStableRecoveryTimestamp() < startMigrationDonorTimestamp) {
-                   opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(
+                   shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
                        opCtx,
                        /*stableCheckpoint*/ true);
                }

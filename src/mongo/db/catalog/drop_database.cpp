@@ -54,7 +54,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -65,6 +64,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -266,7 +266,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                 // Abandon the snapshot as the index catalog will compare the in-memory state to the
                 // disk state, which may have changed when we released the collection lock
                 // temporarily.
-                opCtx->recoveryUnit()->abandonSnapshot();
+                shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
                 status = _checkNssAndReplState(opCtx, db, dbName);
                 if (!status.isOK()) {
@@ -304,15 +304,16 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
         auto systemProfilePtr = catalog->lookupCollectionByNamespace(
             opCtx, NamespaceString::makeSystemDotProfileNamespace(dbName));
         if (systemProfilePtr) {
-            const Timestamp commitTs = opCtx->recoveryUnit()->getCommitTimestamp();
+            const Timestamp commitTs =
+                shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp();
             if (!commitTs.isNull()) {
-                opCtx->recoveryUnit()->clearCommitTimestamp();
+                shard_role_details::getRecoveryUnit(opCtx)->clearCommitTimestamp();
             }
 
             // Ensure this block exits with the same commit timestamp state that it was called with.
             ScopeGuard addCommitTimestamp([&opCtx, commitTs] {
                 if (!commitTs.isNull()) {
-                    opCtx->recoveryUnit()->setCommitTimestamp(commitTs);
+                    shard_role_details::getRecoveryUnit(opCtx)->setCommitTimestamp(commitTs);
                 }
             });
 

@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/health_log_gen.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_index_cursor_generic.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/testing_proctor.h"
@@ -1242,7 +1242,7 @@ protected:
         // find a key that compares greater than the search key. The same principle applies to
         // reverse cursors. See SERVER-56839.
         const bool enforcingPrepareConflicts =
-            _opCtx->recoveryUnit()->getPrepareConflictBehavior() ==
+            shard_role_details::getRecoveryUnit(_opCtx)->getPrepareConflictBehavior() ==
             PrepareConflictBehavior::kEnforce;
         WT_ITEM curKey;
         while (_forward ? cmp < 0 : cmp > 0) {

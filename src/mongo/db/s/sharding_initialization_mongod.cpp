@@ -64,7 +64,6 @@
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_client_sharded.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

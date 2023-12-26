@@ -54,6 +54,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -68,9 +69,9 @@ class MongoProcessInterfaceForTest : public StubMongoProcessInterface {
 public:
     std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const override {
-        expCtx->opCtx->recoveryUnit()->abandonSnapshot();
-        expCtx->opCtx->recoveryUnit()->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+        shard_role_details::getRecoveryUnit(expCtx->opCtx)->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(expCtx->opCtx)
+            ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
         return expCtx->opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
             expCtx->opCtx, keyFormat);
     }

@@ -37,11 +37,11 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -119,13 +119,14 @@ void JournalFlusher::run() {
     while (true) {
         pauseJournalFlusherBeforeFlush.pauseWhileSet();
         try {
-            _uniqueCtx->get()->recoveryUnit()->waitUntilDurable(_uniqueCtx->get());
+            shard_role_details::getRecoveryUnit(_uniqueCtx->get())
+                ->waitUntilDurable(_uniqueCtx->get());
 
             // Signal the waiters that a round completed.
             _currentSharedPromise->emplaceValue();
 
             // Release snapshot before we start the next round.
-            _uniqueCtx->get()->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(_uniqueCtx->get())->abandonSnapshot();
         } catch (const AssertionException& e) {
             {
                 // Reset opCtx if we get an error.

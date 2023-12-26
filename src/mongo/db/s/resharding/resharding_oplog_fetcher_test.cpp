@@ -63,7 +63,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -89,6 +88,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -119,17 +119,20 @@ namespace {
 class OneOffRead {
 public:
     OneOffRead(OperationContext* opCtx, const Timestamp& ts) : _opCtx(opCtx) {
-        _opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
         if (ts.isNull()) {
-            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+            shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kNoTimestamp);
         } else {
-            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, ts);
+            shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kProvided, ts);
         }
     }
 
     ~OneOffRead() {
-        _opCtx->recoveryUnit()->abandonSnapshot();
-        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kNoTimestamp);
     }
 
 private:
@@ -272,8 +275,9 @@ public:
                 shard_role_details::getLocker(_opCtx));
             AutoGetDb autoDb(_opCtx, nss.dbName(), LockMode::MODE_X);
             WriteUnitOfWork wunit(_opCtx);
-            if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
-                ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
+            if (shard_role_details::getRecoveryUnit(_opCtx)->getCommitTimestamp().isNull()) {
+                ASSERT_OK(
+                    shard_role_details::getRecoveryUnit(_opCtx)->setTimestamp(Timestamp(1, 1)));
             }
 
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE

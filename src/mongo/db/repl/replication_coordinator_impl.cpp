@@ -76,7 +76,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/dump_lock_manager.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/prepare_conflict_tracker.h"
@@ -124,6 +123,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern_options.h"
@@ -4442,8 +4442,9 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
         // Will call _setStableTimestampForStorage() on success.
         _advanceCommitPoint(
             lk, lastAppliedOpTimeAndWallTime, false /* fromSyncSource */, true /* forInitiate */);
-        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,
-                                                                 /*stableCheckpoint*/ true);
+        shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
+            opCtx,
+            /*stableCheckpoint*/ true);
     }
 
     _finishReplSetInitiate(opCtx, newConfig, myIndex.getValue());

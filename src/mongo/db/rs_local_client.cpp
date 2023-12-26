@@ -41,7 +41,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -49,6 +48,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rs_local_client.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
@@ -126,22 +126,27 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
         invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
         // Resets to the original read source at the end of this operation.
-        auto originalReadSource = opCtx->recoveryUnit()->getTimestampReadSource();
+        auto originalReadSource =
+            shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
         boost::optional<Timestamp> originalReadTimestamp;
         if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
-            originalReadTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+            originalReadTimestamp =
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
         }
         readSourceGuard.emplace([opCtx, originalReadSource, originalReadTimestamp] {
             if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
-                opCtx->recoveryUnit()->setTimestampReadSource(originalReadSource,
-                                                              originalReadTimestamp);
+                shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                    originalReadSource, originalReadTimestamp);
             } else {
-                opCtx->recoveryUnit()->setTimestampReadSource(originalReadSource);
+                shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                    originalReadSource);
             }
         });
         // Sets up operation context with majority read snapshot so correct optime can be retrieved.
-        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-        Status status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
+        shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kMajorityCommitted);
+        Status status =
+            shard_role_details::getRecoveryUnit(opCtx)->majorityCommittedSnapshotAvailable();
         if (!status.isOK()) {
             return status;
         }
@@ -155,7 +160,7 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
 
         // Informs the storage engine to read from the committed snapshot for the rest of this
         // operation.
-        status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
+        status = shard_role_details::getRecoveryUnit(opCtx)->majorityCommittedSnapshotAvailable();
         if (!status.isOK()) {
             return status;
         }
@@ -233,18 +238,19 @@ Status RSLocalClient::runAggregation(
     }
     // saving original read source and read concern
     auto originalRCA = repl::ReadConcernArgs::get(opCtx);
-    auto originalReadSource = opCtx->recoveryUnit()->getTimestampReadSource();
+    auto originalReadSource = shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
     boost::optional<Timestamp> originalReadTimestamp;
     if (originalReadSource == RecoveryUnit::ReadSource::kProvided)
-        originalReadTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+        originalReadTimestamp =
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
 
     ON_BLOCK_EXIT([&]() {
         repl::ReadConcernArgs::get(opCtx) = originalRCA;
         if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
-            opCtx->recoveryUnit()->setTimestampReadSource(originalReadSource,
-                                                          originalReadTimestamp);
+            shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                originalReadSource, originalReadTimestamp);
         } else {
-            opCtx->recoveryUnit()->setTimestampReadSource(originalReadSource);
+            shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(originalReadSource);
         }
     });
 

@@ -76,7 +76,6 @@
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -93,6 +92,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/dbtests/storage_debug_util.h"
 #include "mongo/unittest/assert.h"
@@ -196,10 +196,12 @@ protected:
     ValidateResults runValidate() {
         // validate() will set a kProvided read source. Callers continue to do operations after
         // running validate, so we must reset the read source back to normal before returning.
-        auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
+        auto originalReadSource =
+            shard_role_details::getRecoveryUnit(&_opCtx)->getTimestampReadSource();
         ON_BLOCK_EXIT([&] {
-            _opCtx.recoveryUnit()->abandonSnapshot();
-            _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
+            shard_role_details::getRecoveryUnit(&_opCtx)->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(&_opCtx)->setTimestampReadSource(
+                originalReadSource);
         });
 
         auto mode = [&] {
@@ -3525,10 +3527,12 @@ public:
             // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
-            auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
+            auto originalReadSource =
+                shard_role_details::getRecoveryUnit(&_opCtx)->getTimestampReadSource();
             ON_BLOCK_EXIT([&] {
-                _opCtx.recoveryUnit()->abandonSnapshot();
-                _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
+                shard_role_details::getRecoveryUnit(&_opCtx)->abandonSnapshot();
+                shard_role_details::getRecoveryUnit(&_opCtx)->setTimestampReadSource(
+                    originalReadSource);
             });
             forceCheckpoint(_background);
             ASSERT_OK(CollectionValidation::validate(&_opCtx,
@@ -4368,10 +4372,12 @@ public:
             // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
-            auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
+            auto originalReadSource =
+                shard_role_details::getRecoveryUnit(&_opCtx)->getTimestampReadSource();
             ON_BLOCK_EXIT([&] {
-                _opCtx.recoveryUnit()->abandonSnapshot();
-                _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
+                shard_role_details::getRecoveryUnit(&_opCtx)->abandonSnapshot();
+                shard_role_details::getRecoveryUnit(&_opCtx)->setTimestampReadSource(
+                    originalReadSource);
             });
             forceCheckpoint(_background);
             ASSERT_OK(CollectionValidation::validate(&_opCtx,
@@ -4483,10 +4489,12 @@ public:
             // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
-            auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
+            auto originalReadSource =
+                shard_role_details::getRecoveryUnit(&_opCtx)->getTimestampReadSource();
             ON_BLOCK_EXIT([&] {
-                _opCtx.recoveryUnit()->abandonSnapshot();
-                _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
+                shard_role_details::getRecoveryUnit(&_opCtx)->abandonSnapshot();
+                shard_role_details::getRecoveryUnit(&_opCtx)->setTimestampReadSource(
+                    originalReadSource);
             });
             forceCheckpoint(_background);
             ASSERT_OK(CollectionValidation::validate(&_opCtx,
@@ -4595,10 +4603,12 @@ public:
             // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
-            auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
+            auto originalReadSource =
+                shard_role_details::getRecoveryUnit(&_opCtx)->getTimestampReadSource();
             ON_BLOCK_EXIT([&] {
-                _opCtx.recoveryUnit()->abandonSnapshot();
-                _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
+                shard_role_details::getRecoveryUnit(&_opCtx)->abandonSnapshot();
+                shard_role_details::getRecoveryUnit(&_opCtx)->setTimestampReadSource(
+                    originalReadSource);
             });
             forceCheckpoint(_background);
             ASSERT_OK(CollectionValidation::validate(&_opCtx,
@@ -4636,10 +4646,12 @@ public:
             // validate() will set a kProvided read source. Callers continue to do operations
             // after running validate, so we must reset the read source back to normal before
             // returning.
-            auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
+            auto originalReadSource =
+                shard_role_details::getRecoveryUnit(&_opCtx)->getTimestampReadSource();
             ON_BLOCK_EXIT([&] {
-                _opCtx.recoveryUnit()->abandonSnapshot();
-                _opCtx.recoveryUnit()->setTimestampReadSource(originalReadSource);
+                shard_role_details::getRecoveryUnit(&_opCtx)->abandonSnapshot();
+                shard_role_details::getRecoveryUnit(&_opCtx)->setTimestampReadSource(
+                    originalReadSource);
             });
             forceCheckpoint(_background);
             ASSERT_OK(CollectionValidation::validate(&_opCtx,

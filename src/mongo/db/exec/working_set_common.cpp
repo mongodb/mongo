@@ -66,6 +66,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -126,14 +127,14 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
         // not ignoring prepare conflicts, then this definitely indicates an error.
         std::vector<IndexKeyDatum>::iterator keyDataIt;
         if (member->getState() == WorkingSetMember::RID_AND_IDX &&
-            opCtx->recoveryUnit()->getPrepareConflictBehavior() ==
+            shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior() ==
                 PrepareConflictBehavior::kEnforce &&
-            (keyDataIt = std::find_if(member->keyData.begin(),
-                                      member->keyData.end(),
-                                      [currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId()](
-                                          const auto& keyDatum) {
-                                          return keyDatum.snapshotId == currentSnapshotId;
-                                      })) != member->keyData.end()) {
+            (keyDataIt = std::find_if(
+                 member->keyData.begin(),
+                 member->keyData.end(),
+                 [currentSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId()](
+                     const auto& keyDatum) { return keyDatum.snapshotId == currentSnapshotId; })) !=
+                member->keyData.end()) {
             auto indexKeyEntryToObjFn = [](const IndexKeyDatum& ikd) {
                 BSONObjBuilder builder;
                 // Rehydrate the index key fields to prevent duplicate "" fields from being logged.
@@ -168,7 +169,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             HealthLogInterface::get(opCtx)->log(entry);
 
             auto options = [&] {
-                if (opCtx->recoveryUnit()->getDataCorruptionDetectionMode() ==
+                if (shard_role_details::getRecoveryUnit(opCtx)->getDataCorruptionDetectionMode() ==
                     DataCorruptionDetectionMode::kThrow) {
                     return logv2::LogOptions{
                         logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)};
@@ -189,7 +190,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
         return false;
     }
 
-    auto currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
+    auto currentSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
     member->resetDocument(currentSnapshotId, record->data.releaseToBson());
 
     // Make sure that all of the keyData is still valid for this copy of the document.  This ensures

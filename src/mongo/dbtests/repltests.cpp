@@ -300,7 +300,7 @@ protected:
                 for (auto& stmt : stmts) {
                     ops.push_back(ApplierOperation(&stmt));
                 }
-                _opCtx.releaseAndReplaceRecoveryUnit();
+                shard_role_details::releaseAndReplaceRecoveryUnit(&_opCtx);
                 uassertStatusOK(
                     OplogApplierUtils::applyOplogBatchCommon(&_opCtx,
                                                              &ops,
@@ -316,7 +316,8 @@ protected:
                                        ->getMyLastAppliedOpTime()
                                        .getTimestamp();
                 auto nextTimestamp = std::max(lastApplied + 1, Timestamp(1, 1));
-                ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
+                ASSERT_OK(
+                    shard_role_details::getRecoveryUnit(&_opCtx)->setTimestamp(nextTimestamp));
                 const bool dataIsConsistent = true;
                 uassertStatusOK(applyOperation_inlock(&_opCtx,
                                                       coll,
@@ -349,7 +350,7 @@ protected:
             auto nextTimestamp = std::max(lastApplied + 1, Timestamp(1, 1));
 
             repl::UnreplicatedWritesBlock uwb(&_opCtx);
-            ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
+            ASSERT_OK(shard_role_details::getRecoveryUnit(&_opCtx)->setTimestamp(nextTimestamp));
             ASSERT_OK(coll->truncate(&_opCtx));
             wunit.commit();
         });
@@ -381,7 +382,7 @@ protected:
             collection_internal::insertDocument(
                 &_opCtx, coll, InsertStatement(o), nullOpDebug, true)
                 .transitional_ignore();
-            ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
+            ASSERT_OK(shard_role_details::getRecoveryUnit(&_opCtx)->setTimestamp(nextTimestamp));
             wunit.commit();
             return;
         }
@@ -395,7 +396,7 @@ protected:
         collection_internal::insertDocument(
             &_opCtx, coll, InsertStatement(b.obj()), nullOpDebug, true)
             .transitional_ignore();
-        ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
+        ASSERT_OK(shard_role_details::getRecoveryUnit(&_opCtx)->setTimestamp(nextTimestamp));
         wunit.commit();
     }
     static BSONObj wid(const char* json) {

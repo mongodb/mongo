@@ -40,8 +40,8 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"

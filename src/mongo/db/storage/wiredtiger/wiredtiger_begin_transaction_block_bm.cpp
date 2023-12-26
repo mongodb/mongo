@@ -82,7 +82,8 @@ public:
     WiredTigerTestHelper()
         : _threadClient(getServiceContext()->getService()),
           _opCtxHolder(_threadClient->makeOperationContext()) {
-        _opCtxHolder->setRecoveryUnit(
+        shard_role_details::setRecoveryUnit(
+            _opCtxHolder.get(),
             std::make_unique<WiredTigerRecoveryUnit>(&_sessionCache, &_oplogManager),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         auto ru = WiredTigerRecoveryUnit::get(_opCtxHolder.get());

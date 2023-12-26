@@ -40,6 +40,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/clock_source.h"
@@ -97,7 +98,8 @@ std::unique_ptr<Notifier> getCappedInsertNotifier(OperationContext* opCtx,
     //
     // We can only wait on the capped collection insert notifier if the collection is present,
     // otherwise we should retry immediately when we hit EOF.
-    if (opCtx->recoveryUnit()->getTimestampReadSource() == RecoveryUnit::kMajorityCommitted) {
+    if (shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource() ==
+        RecoveryUnit::kMajorityCommitted) {
         return std::make_unique<MajorityCommittedPointNotifier>();
     } else {
         auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);

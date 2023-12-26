@@ -70,7 +70,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
@@ -79,6 +78,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -554,18 +554,23 @@ Status validate(OperationContext* opCtx,
     // Repair mode cannot use ignore-prepare because it needs to be able to do writes, and there is
     // no danger of deadlock for this mode anyway since it is only used at startup (or in standalone
     // mode where prepared transactions are prohibited.)
-    auto oldPrepareConflictBehavior = opCtx->recoveryUnit()->getPrepareConflictBehavior();
+    auto oldPrepareConflictBehavior =
+        shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior();
     ON_BLOCK_EXIT([&] {
-        opCtx->recoveryUnit()->abandonSnapshot();
-        opCtx->recoveryUnit()->setPrepareConflictBehavior(oldPrepareConflictBehavior);
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
+            oldPrepareConflictBehavior);
     });
 
     // Relax corruption detection so that we log and continue scanning instead of failing early.
-    auto oldDataCorruptionMode = opCtx->recoveryUnit()->getDataCorruptionDetectionMode();
-    opCtx->recoveryUnit()->setDataCorruptionDetectionMode(
+    auto oldDataCorruptionMode =
+        shard_role_details::getRecoveryUnit(opCtx)->getDataCorruptionDetectionMode();
+    shard_role_details::getRecoveryUnit(opCtx)->setDataCorruptionDetectionMode(
         DataCorruptionDetectionMode::kLogAndContinue);
-    ON_BLOCK_EXIT(
-        [&] { opCtx->recoveryUnit()->setDataCorruptionDetectionMode(oldDataCorruptionMode); });
+    ON_BLOCK_EXIT([&] {
+        shard_role_details::getRecoveryUnit(opCtx)->setDataCorruptionDetectionMode(
+            oldDataCorruptionMode);
+    });
 
     if (validateState.fixErrors()) {
         // Note: cannot set PrepareConflictBehavior here, since the validate command with repair
@@ -576,7 +581,7 @@ Status validate(OperationContext* opCtx,
     } else if (!validateState.isBackground()) {
         // Foreground validation may perform writes to fix up inconsistencies that are not
         // correctness errors.
-        opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
             PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
     } else {
         // isBackground().

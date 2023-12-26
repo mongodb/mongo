@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -146,23 +147,24 @@ void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
     const RecordId& highestInsertedRecordId,
     Date_t wallTime,
     int64_t countInserted) {
-    opCtx->recoveryUnit()->onCommit([collectionMarkers = shared_from_this(),
-                                     bytesInserted,
-                                     recordId = highestInsertedRecordId,
-                                     wallTime,
-                                     countInserted](OperationContext* opCtx, auto) {
-        invariant(bytesInserted >= 0);
-        invariant(recordId.isValid());
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [collectionMarkers = shared_from_this(),
+         bytesInserted,
+         recordId = highestInsertedRecordId,
+         wallTime,
+         countInserted](OperationContext* opCtx, auto) {
+            invariant(bytesInserted >= 0);
+            invariant(recordId.isValid());
 
-        collectionMarkers->_currentRecords.addAndFetch(countInserted);
-        int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
-        if (wallTime != Date_t() && newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
-            // When other transactions commit concurrently, an uninitialized wallTime may delay
-            // the creation of a new marker. This delay is limited to the number of concurrently
-            // running transactions, so the size difference should be inconsequential.
-            collectionMarkers->createNewMarkerIfNeeded(recordId, wallTime);
-        }
-    });
+            collectionMarkers->_currentRecords.addAndFetch(countInserted);
+            int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
+            if (wallTime != Date_t() && newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
+                // When other transactions commit concurrently, an uninitialized wallTime may delay
+                // the creation of a new marker. This delay is limited to the number of concurrently
+                // running transactions, so the size difference should be inconsequential.
+                collectionMarkers->createNewMarkerIfNeeded(recordId, wallTime);
+            }
+        });
 }
 
 void CollectionTruncateMarkers::setMinBytesPerMarker(int64_t size) {
@@ -478,7 +480,7 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterIns
     const RecordId& highestInsertedRecordId,
     Date_t wallTime,
     int64_t countInserted) {
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [collectionMarkers =
              std::static_pointer_cast<CollectionTruncateMarkersWithPartialExpiration>(
                  shared_from_this()),

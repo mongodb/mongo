@@ -33,8 +33,8 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/embedded/index_builds_coordinator_embedded.h"
 #include "mongo/util/assert_util.h"
 

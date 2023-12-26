@@ -67,7 +67,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/parsed_delete.h"
@@ -635,7 +634,7 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
         const auto& collection = *collectionResult.getValue();
 
         WriteUnitOfWork wunit(opCtx);
-        auto tsResult = opCtx->recoveryUnit()->setTimestamp(ts);
+        auto tsResult = shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts);
         if (!tsResult.isOK()) {
             return tsResult;
         }
@@ -1021,8 +1020,8 @@ Status _updateWithQuery(OperationContext* opCtx,
 
         WriteUnitOfWork wuow(opCtx);
         if (!ts.isNull()) {
-            uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(ts));
-            opCtx->recoveryUnit()->setOrderedCommit(false);
+            uassertStatusOK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts));
+            shard_role_details::getRecoveryUnit(opCtx)->setOrderedCommit(false);
         }
 
         auto planExecutorResult = mongo::getExecutorUpdate(
@@ -1272,7 +1271,7 @@ Timestamp StorageInterfaceImpl::getEarliestOplogTimestamp(OperationContext* opCt
     // level (above the storage engine) logic to fetch the earliest oplog entry timestamp.
     if (statusWithTimestamp.getStatus() == ErrorCodes::OplogOperationUnsupported) {
         // Reset the snapshot so that it is ensured to see the latest oplog entries.
-        opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
         BSONObj oplogEntryBSON;
         tassert(5869100,
@@ -1310,7 +1309,7 @@ Timestamp StorageInterfaceImpl::getLatestOplogTimestamp(OperationContext* opCtx)
     // level (above the storage engine) logic to fetch the latest oplog entry timestamp.
     if (statusWithTimestamp.getStatus() == ErrorCodes::OplogOperationUnsupported) {
         // Reset the snapshot so that it is ensured to see the latest oplog entries.
-        opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
         // Helpers::getLast will bypass the oplog visibility rules by doing a backwards collection
         // scan.
@@ -1523,7 +1522,8 @@ Timestamp StorageInterfaceImpl::getAllDurableTimestamp(ServiceContext* serviceCt
 }
 
 Timestamp StorageInterfaceImpl::getPointInTimeReadTimestamp(OperationContext* opCtx) const {
-    auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+    auto readTimestamp =
+        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
     invariant(readTimestamp);
     return *readTimestamp;
 }

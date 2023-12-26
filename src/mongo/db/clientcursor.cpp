@@ -45,7 +45,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/cursor_server_params.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -53,6 +52,7 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/background.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -358,16 +358,16 @@ void ClientCursorPin::unstashResourcesOntoOperationContext() {
 
     if (auto& ru = _cursor->_stashedRecoveryUnit) {
         _shouldSaveRecoveryUnit = true;
-        invariant(!_opCtx->recoveryUnit()->isActive());
-        _opCtx->setRecoveryUnit(std::move(ru),
-                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        invariant(!shard_role_details::getRecoveryUnit(_opCtx)->isActive());
+        shard_role_details::setRecoveryUnit(
+            _opCtx, std::move(ru), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
 }
 
 void ClientCursorPin::stashResourcesFromOperationContext() {
     // Move the recovery unit from the operation context onto the cursor and create a new RU for
     // the current OperationContext.
-    _cursor->stashRecoveryUnit(_opCtx->releaseAndReplaceRecoveryUnit());
+    _cursor->stashRecoveryUnit(shard_role_details::releaseAndReplaceRecoveryUnit(_opCtx));
 }
 
 namespace {

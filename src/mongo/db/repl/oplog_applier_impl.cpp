@@ -59,7 +59,6 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/initial_syncer.h"
@@ -80,6 +79,7 @@
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -155,7 +155,8 @@ Status finishAndLogApply(OperationContext* opCtx,
 
             // Obtain storage specific statistics and log them if they exist.
             CurOp::get(opCtx)->debug().storageStats =
-                opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
+                shard_role_details::getRecoveryUnit(opCtx)
+                    ->computeOperationStatisticsSinceLastCall();
             CurOp::get(opCtx)->debug().reportStorageStats(&attrs);
 
             LOGV2(51801, "Applied op", attrs);
@@ -400,7 +401,7 @@ void _setOplogApplicationWorkerOpCtxStates(OperationContext* opCtx) {
     // incomplete key and an adjacent key is prepared.
     // We ignore prepare conflicts on secondaries because they may encounter prepare conflicts that
     // did not occur on the primary.
-    opCtx->recoveryUnit()->setPrepareConflictBehavior(
+    shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
         PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
     // Applying an Oplog batch is crucial to the stability of the Replica Set. We
@@ -411,7 +412,7 @@ void _setOplogApplicationWorkerOpCtxStates(OperationContext* opCtx) {
 
     // Ensure future transactions read without a timestamp.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              opCtx->recoveryUnit()->getTimestampReadSource());
+              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 }
 }  // namespace
 

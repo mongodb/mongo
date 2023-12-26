@@ -73,7 +73,6 @@
 #include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/rebuild_indexes.h"
@@ -457,8 +456,8 @@ void cleanupChangeCollectionAfterUncleanShutdown(OperationContext* opCtx,
                 "tenantId"_attr = tenantId);
 
             // Exclusively truncate based on the most recent WT snapshot.
-            opCtx->recoveryUnit()->abandonSnapshot();
-            opCtx->recoveryUnit()->allowOneUntimestampedWrite();
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
 
             WriteUnitOfWork wuow(opCtx);
 

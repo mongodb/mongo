@@ -56,7 +56,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -69,6 +68,7 @@
 #include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -215,8 +215,9 @@ void verifyDbAndCollection(OperationContext* opCtx,
                                                       << "' due to catalog changes; please "
                                                          "retry the operation");
         }
-        if (opCtx->recoveryUnit()->isActive()) {
-            const auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+        if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
+            const auto mySnapshot =
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
             if (mySnapshot && *mySnapshot < coll->getMinimumValidSnapshot()) {
                 throwWriteConflictException(str::stream()
                                             << "Unable to write to collection '"
@@ -252,7 +253,8 @@ std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalC
     const AcquisitionPrerequisites& prerequisites) {
     const auto& nss = prerequisites.nss;
 
-    auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+    auto readTimestamp =
+        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
     auto coll = CollectionPtr(
         catalog.establishConsistentCollection(opCtx, NamespaceStringOrUUID(nss), readTimestamp));
     checkCollectionUUIDMismatch(opCtx, catalog, nss, coll, prerequisites.uuid);
@@ -266,7 +268,9 @@ std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalC
         // concern for the user (snapshot).
         if (prerequisites.operationType == AcquisitionPrerequisites::kRead) {
             assertReadConcernSupported(
-                coll, prerequisites.readConcern, opCtx->recoveryUnit()->getTimestampReadSource());
+                coll,
+                prerequisites.readConcern,
+                shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
         }
 
         return coll;
@@ -516,7 +520,7 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
     //   * if a storage txn is already open w/o the lock-free reads operation flag set.
     return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
         !shard_role_details::getLocker(opCtx)->isWriteLocked() &&
-        !(opCtx->recoveryUnit()->isActive() && !opCtx->isLockFreeReadsOp());
+        !(shard_role_details::getRecoveryUnit(opCtx)->isActive() && !opCtx->isLockFreeReadsOp());
 }
 
 }  // namespace
@@ -849,7 +853,8 @@ void SnapshotAttempt::changeReadSourceForSecondaryReads() {
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             invariant(nsOrUUID.isUUID());
 
-            const auto readSource = _opCtx->recoveryUnit()->getTimestampReadSource();
+            const auto readSource =
+                shard_role_details::getRecoveryUnit(_opCtx)->getTimestampReadSource();
             if (readSource == RecoveryUnit::ReadSource::kNoTimestamp ||
                 readSource == RecoveryUnit::ReadSource::kLastApplied) {
                 throw;
@@ -893,8 +898,8 @@ void SnapshotAttempt::openStorageSnapshot() {
         establishCappedSnapshotIfNeeded(_opCtx, *_catalogBeforeSnapshot, nssOrUUID);
     }
 
-    if (!_opCtx->recoveryUnit()->isActive()) {
-        _opCtx->recoveryUnit()->preallocateSnapshot();
+    if (!shard_role_details::getRecoveryUnit(_opCtx)->isActive()) {
+        shard_role_details::getRecoveryUnit(_opCtx)->preallocateSnapshot();
         _openedSnapshot = true;
     }
 }
@@ -920,7 +925,7 @@ SnapshotAttempt::~SnapshotAttempt() {
     }
 
     if (_openedSnapshot && !shard_role_details::getLocker(_opCtx)->inAWriteUnitOfWork()) {
-        _opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
     }
     CurOp::get(_opCtx)->yielded();
 }
@@ -933,7 +938,8 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
         lockFreeReadsResources) {
     ResolvedNamespaceOrViewAcquisitionRequestsMap sortedAcquisitionRequests;
 
-    auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+    auto readTimestamp =
+        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
 
     int counter = 0;
     for (const auto& ar : acquisitionRequests) {
@@ -974,7 +980,8 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
 
     // We shouldn't have an open snapshot unless a previous lock-free acquisition opened and
     // stashed it already.
-    invariant(!opCtx->recoveryUnit()->isActive() || opCtx->isLockFreeReadsOp());
+    invariant(!shard_role_details::getRecoveryUnit(opCtx)->isActive() ||
+              opCtx->isLockFreeReadsOp());
 
     auto lockFreeReadsResources = takeGlobalLock(opCtx, acquisitionRequests);
 
@@ -989,7 +996,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
     checkShardingPlacement(opCtx, acquisitionRequests);
 
     // Open a consistent catalog snapshot if needed.
-    bool openSnapshot = !opCtx->recoveryUnit()->isActive();
+    bool openSnapshot = !shard_role_details::getRecoveryUnit(opCtx)->isActive();
     auto catalog = openSnapshot ? stashConsistentCatalog(opCtx, acquisitionRequests)
                                 : CollectionCatalog::get(opCtx);
 
@@ -1003,7 +1010,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
             opCtx, *catalog, std::move(sortedAcquisitionRequests));
     } catch (...) {
         if (openSnapshot && !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork())
-            opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
         throw;
     }
 }
@@ -1102,7 +1109,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
         }
 
         // Open a consistent catalog snapshot if needed.
-        bool openSnapshot = !opCtx->recoveryUnit()->isActive();
+        bool openSnapshot = !shard_role_details::getRecoveryUnit(opCtx)->isActive();
         auto catalog = openSnapshot ? stashConsistentCatalog(opCtx, acquisitionRequests)
                                     : CollectionCatalog::get(opCtx);
 
@@ -1111,7 +1118,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
                 opCtx, *catalog, std::move(sortedAcquisitionRequests));
         } catch (...) {
             if (openSnapshot && !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork())
-                opCtx->recoveryUnit()->abandonSnapshot();
+                shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             throw;
         }
     }
@@ -1432,7 +1439,7 @@ void restoreTransactionResourcesToOperationContext(
                     // repeatedly failing due to StaleConfig and exhausting the mongos retry
                     // attempts. Yield the locks.
                     Locker::LockSnapshot lockSnapshot;
-                    opCtx->recoveryUnit()->abandonSnapshot();
+                    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
                     shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
                     transactionResources.yielded.emplace(
                         TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});

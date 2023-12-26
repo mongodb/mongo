@@ -38,8 +38,8 @@
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/transaction_resources.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 

@@ -61,6 +61,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/logv2/log.h"
@@ -201,7 +202,7 @@ void importCollectionAndItsIndexesInMainWTInstance(OperationContext* opCtx,
 
         // If the collection creation rolls back, ensure that the Top entry created for the
         // collection is deleted.
-        opCtx->recoveryUnit()->onRollback(
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [nss, serviceContext = opCtx->getServiceContext()](OperationContext*) {
                 Top::get(serviceContext).collectionDropped(nss);
             });
@@ -238,7 +239,7 @@ void importCollectionAndItsIndexesInMainWTInstance(OperationContext* opCtx,
             .store(true);
 
         // Update the number of records and data size on commit.
-        opCtx->recoveryUnit()->registerChange(
+        shard_role_details::getRecoveryUnit(opCtx)->registerChange(
             makeCountsChange(ownedCollection->getRecordStore(), metadata));
 
         CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, ownedCollection);
@@ -530,8 +531,9 @@ void TenantFileImporterService::_handleEvents(const UUID& migrationId) {
                 createImportDoneMarkerLocalCollection(opCtx, migrationId);
                 // Take a stable checkpoint to persist both the imported donor collections and the
                 // marker collection to disk.
-                opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,
-                                                                         /*stableCheckpoint*/ true);
+                shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
+                    opCtx,
+                    /*stableCheckpoint*/ true);
                 _voteImportedFiles(opCtx, migrationId);
                 return;
             }
@@ -628,8 +630,9 @@ void TenantFileImporterService::_waitUntilStartMigrationTimestampIsCheckpointed(
 
         // Sleep a bit so we do not keep hammering the system.
         opCtx->sleepFor(Milliseconds(100));
-        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,
-                                                                 /*stableCheckpoint*/ true);
+        shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
+            opCtx,
+            /*stableCheckpoint*/ true);
     }
 }
 

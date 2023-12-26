@@ -47,6 +47,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -150,7 +151,7 @@ bool ensureStillMatches(const CollectionPtr& collection,
     // If the snapshot changed, then we have to make sure we have the latest copy of the doc and
     // that it still matches.
     WorkingSetMember* member = ws->get(id);
-    if (opCtx->recoveryUnit()->getSnapshotId() != member->doc.snapshotId()) {
+    if (shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId() != member->doc.snapshotId()) {
         std::unique_ptr<SeekableRecordCursor> cursor(collection->getCursor(opCtx));
 
         if (!WorkingSetCommon::fetch(opCtx, ws, id, cursor.get(), collection, collection->ns())) {

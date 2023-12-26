@@ -38,6 +38,7 @@
 #include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
 #include "mongo/db/transaction/transaction_metrics_observer.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
@@ -199,7 +200,7 @@ void TransactionMetricsObserver::onTransactionOperation(OperationContext* opCtx,
     // WiredTiger doesn't let storage statistics be collected when transaction is prepared.
     if (!isPrepared) {
         std::unique_ptr<StorageStats> storageStats =
-            opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
+            shard_role_details::getRecoveryUnit(opCtx)->computeOperationStatisticsSinceLastCall();
         if (storageStats) {
             if (!_singleTransactionStats.getOpDebug()->storageStats) {
                 _singleTransactionStats.getOpDebug()->storageStats = storageStats->clone();

@@ -54,6 +54,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
@@ -90,15 +91,15 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         const auto& coll = autoColl->getCollection();
         // Do not refer to 'idx' within this commit handler as it may be be invalidated by
         // IndexCatalog::refreshEntry().
-        opCtx->recoveryUnit()->onCommit([ttlCache,
-                                         uuid = coll->uuid(),
-                                         indexName = idx->indexName()](OperationContext*,
-                                                                       boost::optional<Timestamp>) {
-            // We assume the expireAfterSeconds field is valid, because we've already done
-            // validation of this field.
-            ttlCache->registerTTLInfo(
-                uuid, TTLCollectionCache::Info{indexName, /*isExpireAfterSecondsInvalid=*/false});
-        });
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](
+                OperationContext*, boost::optional<Timestamp>) {
+                // We assume the expireAfterSeconds field is valid, because we've already done
+                // validation of this field.
+                ttlCache->registerTTLInfo(
+                    uuid,
+                    TTLCollectionCache::Info{indexName, /*isExpireAfterSecondsInvalid=*/false});
+            });
 
         // Change the value of "expireAfterSeconds" on disk.
         autoColl->getWritableCollection(opCtx)->updateTTLSetting(
@@ -126,7 +127,7 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         // try to fix up the TTL index during the next step-up.
         auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
         const auto& coll = autoColl->getCollection();
-        opCtx->recoveryUnit()->onCommit(
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](
                 OperationContext*, boost::optional<Timestamp>) {
                 ttlCache->unsetTTLIndexExpireAfterSecondsInvalid(uuid, indexName);
@@ -306,41 +307,42 @@ void processCollModIndexRequest(OperationContext* opCtx,
     autoColl->getWritableCollection(opCtx)->getIndexCatalog()->refreshEntry(
         opCtx, autoColl->getWritableCollection(opCtx), idx, flags);
 
-    opCtx->recoveryUnit()->onCommit([oldExpireSecs,
-                                     newExpireSecs,
-                                     oldHidden,
-                                     newHidden,
-                                     newUnique,
-                                     oldPrepareUnique,
-                                     newPrepareUnique,
-                                     newForceNonUnique,
-                                     result](OperationContext*, boost::optional<Timestamp>) {
-        // add the fields to BSONObjBuilder result
-        if (oldExpireSecs) {
-            result->append("expireAfterSeconds_old", *oldExpireSecs);
-        }
-        if (newExpireSecs) {
-            result->append("expireAfterSeconds_new", *newExpireSecs);
-        }
-        if (newHidden) {
-            invariant(oldHidden);
-            result->append("hidden_old", *oldHidden);
-            result->append("hidden_new", *newHidden);
-        }
-        if (newUnique) {
-            invariant(*newUnique);
-            result->appendBool("unique_new", true);
-        }
-        if (newPrepareUnique) {
-            invariant(oldPrepareUnique);
-            result->append("prepareUnique_old", *oldPrepareUnique);
-            result->append("prepareUnique_new", *newPrepareUnique);
-        }
-        if (newForceNonUnique) {
-            invariant(*newForceNonUnique);
-            result->appendBool("forceNonUnique_new", true);
-        }
-    });
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [oldExpireSecs,
+         newExpireSecs,
+         oldHidden,
+         newHidden,
+         newUnique,
+         oldPrepareUnique,
+         newPrepareUnique,
+         newForceNonUnique,
+         result](OperationContext*, boost::optional<Timestamp>) {
+            // add the fields to BSONObjBuilder result
+            if (oldExpireSecs) {
+                result->append("expireAfterSeconds_old", *oldExpireSecs);
+            }
+            if (newExpireSecs) {
+                result->append("expireAfterSeconds_new", *newExpireSecs);
+            }
+            if (newHidden) {
+                invariant(oldHidden);
+                result->append("hidden_old", *oldHidden);
+                result->append("hidden_new", *newHidden);
+            }
+            if (newUnique) {
+                invariant(*newUnique);
+                result->appendBool("unique_new", true);
+            }
+            if (newPrepareUnique) {
+                invariant(oldPrepareUnique);
+                result->append("prepareUnique_old", *oldPrepareUnique);
+                result->append("prepareUnique_new", *newPrepareUnique);
+            }
+            if (newForceNonUnique) {
+                invariant(*newForceNonUnique);
+                result->appendBool("forceNonUnique_new", true);
+            }
+        });
 
     if (MONGO_unlikely(assertAfterIndexUpdate.shouldFail())) {
         LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled");

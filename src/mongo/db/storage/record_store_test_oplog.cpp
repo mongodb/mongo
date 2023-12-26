@@ -52,6 +52,7 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/str.h"
@@ -325,7 +326,8 @@ std::string stringifyForDebug(OperationContext* opCtx,
                               SeekableRecordCursor* cursor) {
     str::stream output;
 
-    auto optOplogReadTimestampInt = opCtx->recoveryUnit()->getOplogVisibilityTs();
+    auto optOplogReadTimestampInt =
+        shard_role_details::getRecoveryUnit(opCtx)->getOplogVisibilityTs();
     if (optOplogReadTimestampInt) {
         output << "Latest oplog visibility timestamp: "
                << Timestamp(optOplogReadTimestampInt.value());
@@ -388,7 +390,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         auto earlyCursor = rs->getCursor(earlyReader.get());
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
         earlyCursor->save();
-        earlyReader->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(earlyReader.get())->abandonSnapshot();
 
         auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
@@ -482,7 +484,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         auto earlyCursor = rs->getCursor(earlyReader.get());
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
         earlyCursor->save();
-        earlyReader->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(earlyReader.get())->abandonSnapshot();
 
         auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());

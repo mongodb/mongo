@@ -67,7 +67,6 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -99,6 +98,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -257,15 +257,17 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
         switch (rcArgs.getMajorityReadMechanism()) {
             case repl::ReadConcernArgs::MajorityReadMechanism::kMajoritySnapshot: {
                 // Make sure we read from the majority snapshot.
-                opCtx->recoveryUnit()->setTimestampReadSource(
+                shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
                     RecoveryUnit::ReadSource::kMajorityCommitted);
-                uassertStatusOK(opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable());
+                uassertStatusOK(shard_role_details::getRecoveryUnit(opCtx)
+                                    ->majorityCommittedSnapshotAvailable());
                 break;
             }
             case repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative: {
                 // Mark the operation as speculative and select the correct read source.
                 repl::SpeculativeMajorityReadInfo::get(opCtx).setIsSpeculativeRead();
-                opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+                shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                    RecoveryUnit::ReadSource::kNoOverlap);
                 break;
             }
         }
@@ -275,8 +277,8 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
         !opCtx->inMultiDocumentTransaction()) {
         auto atClusterTime = rcArgs.getArgsAtClusterTime();
         invariant(atClusterTime && *atClusterTime != LogicalTime::kUninitialized);
-        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                      atClusterTime->asTimestamp());
+        shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kProvided, atClusterTime->asTimestamp());
     }
 
     // For cursor commands that take locks internally, the read concern on the
@@ -638,7 +640,7 @@ public:
             if (cq && cq->getFindCommandRequest().getReadOnce()) {
                 // The readOnce option causes any storage-layer cursors created during plan
                 // execution to assume read data will not be needed again and need not be cached.
-                opCtx->recoveryUnit()->setReadOnce(true);
+                shard_role_details::getRecoveryUnit(opCtx)->setReadOnce(true);
             }
             exec->reattachToOperationContext(opCtx);
             exec->restoreState(readLock ? &readLock->getCollection() : nullptr);

@@ -39,9 +39,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/resource_catalog.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -176,7 +176,7 @@ Lock::GlobalLock::~GlobalLock() {
         // prevent lock release.
         const bool willReleaseLock = _isOutermostLock && !locker->inAWriteUnitOfWork();
         if (willReleaseLock) {
-            _opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
         }
         _unlock();
     }

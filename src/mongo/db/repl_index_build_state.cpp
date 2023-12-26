@@ -39,7 +39,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -49,6 +48,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -280,7 +280,7 @@ bool ReplIndexBuildState::canVoteForAbort() const {
 
 void ReplIndexBuildState::commit(OperationContext* opCtx) {
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this, skipCheck](OperationContext*, boost::optional<Timestamp>) {
             stdx::lock_guard lk(_mutex);
             _indexBuildState.setState(IndexBuildState::kCommitted, skipCheck);
@@ -461,7 +461,7 @@ bool ReplIndexBuildState::tryCommit(OperationContext* opCtx) {
 
     _indexBuildState.setState(IndexBuildState::kApplyCommitOplogEntry,
                               skipCheck,
-                              opCtx->recoveryUnit()->getCommitTimestamp());
+                              shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp());
     // Promise can be set only once.
     // We can't skip signaling here if a signal is already set because the previous commit or
     // abort signal might have been sent to handle for primary case.
@@ -538,9 +538,9 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
     LOGV2(4656003, "Aborting index build", "buildUUID"_attr = buildUUID, "error"_attr = reason);
 
     // Set the state on replState. Once set, the calling thread must complete the abort process.
-    auto abortTimestamp =
-        boost::make_optional<Timestamp>(!opCtx->recoveryUnit()->getCommitTimestamp().isNull(),
-                                        opCtx->recoveryUnit()->getCommitTimestamp());
+    auto abortTimestamp = boost::make_optional<Timestamp>(
+        !shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull(),
+        shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp());
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
     Status abortStatus = signalAction == IndexBuildAction::kTenantMigrationAbort
         ? tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName)

@@ -42,6 +42,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -77,7 +78,7 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
         auto& doc = it->doc;
         auto tenantId = coll->ns().dbName().tenantId();
         cluster_parameters::validateParameter(opCtx, doc, tenantId);
-        opCtx->recoveryUnit()->onCommit(
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [doc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
                 cluster_parameters::updateParameter(opCtx, doc, kOplog, tenantId);
             });
@@ -94,7 +95,7 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
 
     auto tenantId = args.coll->ns().dbName().tenantId();
     cluster_parameters::validateParameter(opCtx, updatedDoc, tenantId);
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [updatedDoc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
             cluster_parameters::updateParameter(opCtx, updatedDoc, kOplog, tenantId);
         });
@@ -123,17 +124,18 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
     }
 
     // Store the tenantId associated with the doc to be deleted.
-    opCtx->recoveryUnit()->onCommit([doc = doc.getOwned(), tenantId = nss.dbName().tenantId()](
-                                        OperationContext* opCtx, boost::optional<Timestamp>) {
-        cluster_parameters::clearParameter(opCtx, doc[kIdField].valueStringData(), tenantId);
-    });
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [doc = doc.getOwned(), tenantId = nss.dbName().tenantId()](OperationContext* opCtx,
+                                                                   boost::optional<Timestamp>) {
+            cluster_parameters::clearParameter(opCtx, doc[kIdField].valueStringData(), tenantId);
+        });
 }
 
 void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,
                                                       const DatabaseName& dbName) {
     if (dbName.isConfigDB()) {
         // Entire config DB deleted, reset to default state.
-        opCtx->recoveryUnit()->onCommit(
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [tenantId = dbName.tenantId()](OperationContext* opCtx, boost::optional<Timestamp>) {
                 cluster_parameters::clearAllTenantParameters(opCtx, tenantId);
             });
@@ -149,10 +151,11 @@ repl::OpTime ClusterServerParameterOpObserver::onDropCollection(
     bool markFromMigrate) {
     if (isConfigNamespace(collectionName)) {
         // Entire collection deleted, reset to default state.
-        opCtx->recoveryUnit()->onCommit([tenantId = collectionName.dbName().tenantId()](
-                                            OperationContext* opCtx, boost::optional<Timestamp>) {
-            cluster_parameters::clearAllTenantParameters(opCtx, tenantId);
-        });
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [tenantId = collectionName.dbName().tenantId()](OperationContext* opCtx,
+                                                            boost::optional<Timestamp>) {
+                cluster_parameters::clearAllTenantParameters(opCtx, tenantId);
+            });
     }
 
     return {};

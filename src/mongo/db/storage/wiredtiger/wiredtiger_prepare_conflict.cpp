@@ -41,12 +41,12 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -90,7 +90,7 @@ void wiredTigerPrepareConflictOplogResourceLog() {
 }
 
 int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx, std::function<int()> func) {
-    if (opCtx->recoveryUnit()->isTimestamped()) {
+    if (shard_role_details::getRecoveryUnit(opCtx)->isTimestamped()) {
         // This transaction is holding a resource in the form of an oplog slot. Committed
         // transactions that get a later oplog slot will be unable to replicate until this resource
         // is released (in the form of this transaction committing or aborting). For this case, we

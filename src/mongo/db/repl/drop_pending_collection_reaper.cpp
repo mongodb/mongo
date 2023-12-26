@@ -38,12 +38,12 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -109,7 +109,7 @@ void DropPendingCollectionReaper::addDropPendingNamespace(
 
     _dropPendingNamespaces.insert(std::make_pair(dropOpTime, dropPendingNamespace));
     if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
-        opCtx->recoveryUnit()->onRollback(
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [this, dropPendingNamespace, dropOpTime](OperationContext*) {
                 stdx::lock_guard<Latch> lock(_mutex);
 

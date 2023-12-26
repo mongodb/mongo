@@ -43,7 +43,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
@@ -53,6 +52,7 @@
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -415,12 +415,15 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
 
     // Temporarily allow writes if kIgnoreConflicts is set on the recovery unit so the truncate
     // point can be updated. The kIgnoreConflicts setting only allows reads.
-    auto originalBehavior = opCtx->recoveryUnit()->getPrepareConflictBehavior();
+    auto originalBehavior =
+        shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior();
     if (originalBehavior == PrepareConflictBehavior::kIgnoreConflicts) {
-        opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
             PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
     }
-    ON_BLOCK_EXIT([&] { opCtx->recoveryUnit()->setPrepareConflictBehavior(originalBehavior); });
+    ON_BLOCK_EXIT([&] {
+        shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(originalBehavior);
+    });
 
     // Exempt waiting for storage ticket acquisition in order to avoid starving upstream requests
     // waiting for durability. SERVER-60682 is an example with more pending prepared transactions
@@ -460,7 +463,7 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     }
 
     // Reset the snapshot so that it is ensured to see the latest oplog entries.
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     // Fetch the oplog entry <= timestamp. all_durable may be set to a value between oplog entries.
     // We need an oplog entry in order to return term and wallclock time for an OpTimeAndWallTime

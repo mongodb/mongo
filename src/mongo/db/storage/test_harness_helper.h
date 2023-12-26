@@ -37,6 +37,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/transaction_resources.h"
 
 namespace mongo {
 
@@ -56,8 +57,8 @@ public:
 
     virtual ServiceContext::UniqueOperationContext newOperationContext(Client* const client) {
         auto opCtx = client->makeOperationContext();
-        opCtx->setRecoveryUnit(newRecoveryUnit(),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        shard_role_details::setRecoveryUnit(
+            opCtx.get(), newRecoveryUnit(), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return opCtx;
     }
 

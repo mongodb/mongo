@@ -56,7 +56,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -71,6 +70,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -516,7 +516,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
 
         // Abandon the snapshot as the index catalog will compare the in-memory state to the
         // disk state, which may have changed when we released the lock temporarily.
-        opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
         // Take an exclusive lock on the collection now to be able to perform index catalog
         // writes when removing ready indexes from disk.

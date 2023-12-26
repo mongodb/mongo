@@ -34,6 +34,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -64,13 +65,13 @@ TEST_F(CappedVisibilityTest, BasicRecordIdHole) {
     ClientAndOpCtx cando1(getServiceContext(), "Client1");
     ClientAndOpCtx cando2(getServiceContext(), "Client2");
 
-    auto writer1 = observer.registerWriter(cando1.opCtx->recoveryUnit());
-    auto writer2 = observer.registerWriter(cando2.opCtx->recoveryUnit());
+    auto writer1 = observer.registerWriter(shard_role_details::getRecoveryUnit(cando1.opCtx.get()));
+    auto writer2 = observer.registerWriter(shard_role_details::getRecoveryUnit(cando2.opCtx.get()));
 
     writer1->registerRecordId(RecordId(2));
     writer2->registerRecordId(RecordId(3));
 
-    cando2.opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando2.opCtx.get())->commitUnitOfWork();
 
     // Only RecordId 1 should be visible.
     {
@@ -80,7 +81,7 @@ TEST_F(CappedVisibilityTest, BasicRecordIdHole) {
         ASSERT_FALSE(snapshot.isRecordVisible(RecordId(3)));
     }
 
-    cando1.opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando1.opCtx.get())->commitUnitOfWork();
 
     // All RecordIds should be visible now.
     {
@@ -97,7 +98,7 @@ TEST_F(CappedVisibilityTest, RollBack) {
     observer.setRecordImmediatelyVisible(RecordId(1));
 
     ClientAndOpCtx cando1(getServiceContext(), "Client1");
-    auto writer1 = observer.registerWriter(cando1.opCtx->recoveryUnit());
+    auto writer1 = observer.registerWriter(shard_role_details::getRecoveryUnit(cando1.opCtx.get()));
     writer1->registerRecordId(RecordId(2));
 
     // Only RecordId 1 should be visible.
@@ -107,7 +108,7 @@ TEST_F(CappedVisibilityTest, RollBack) {
         ASSERT_FALSE(snapshot.isRecordVisible(RecordId(2)));
     }
 
-    cando1.opCtx->recoveryUnit()->abortUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando1.opCtx.get())->abortUnitOfWork();
 
     {
         auto snapshot = observer.makeSnapshot();
@@ -124,12 +125,12 @@ TEST_F(CappedVisibilityTest, RollBackHole) {
 
     ClientAndOpCtx cando1(getServiceContext(), "Client1");
     ClientAndOpCtx cando2(getServiceContext(), "Client2");
-    auto writer1 = observer.registerWriter(cando1.opCtx->recoveryUnit());
-    auto writer2 = observer.registerWriter(cando2.opCtx->recoveryUnit());
+    auto writer1 = observer.registerWriter(shard_role_details::getRecoveryUnit(cando1.opCtx.get()));
+    auto writer2 = observer.registerWriter(shard_role_details::getRecoveryUnit(cando2.opCtx.get()));
 
     writer1->registerRecordId(RecordId(2));
     writer2->registerRecordId(RecordId(3));
-    cando2.opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando2.opCtx.get())->commitUnitOfWork();
 
     // Only RecordId 1 should be visible.
     {
@@ -139,7 +140,7 @@ TEST_F(CappedVisibilityTest, RollBackHole) {
         ASSERT_FALSE(snapshot.isRecordVisible(RecordId(3)));
     }
 
-    cando1.opCtx->recoveryUnit()->abortUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando1.opCtx.get())->abortUnitOfWork();
 
     // All committed RecordIds should be visible now.
     {
@@ -159,8 +160,8 @@ TEST_F(CappedVisibilityTest, UnregisteredRecords) {
 
     ClientAndOpCtx cando1(getServiceContext(), "Client1");
     ClientAndOpCtx cando2(getServiceContext(), "Client2");
-    auto writer1 = observer.registerWriter(cando1.opCtx->recoveryUnit());
-    auto writer2 = observer.registerWriter(cando2.opCtx->recoveryUnit());
+    auto writer1 = observer.registerWriter(shard_role_details::getRecoveryUnit(cando1.opCtx.get()));
+    auto writer2 = observer.registerWriter(shard_role_details::getRecoveryUnit(cando2.opCtx.get()));
 
     writer1->registerRecordId(RecordId(2));
 
@@ -182,7 +183,7 @@ TEST_F(CappedVisibilityTest, UnregisteredRecords) {
         ASSERT_FALSE(snapshot.isRecordVisible(RecordId(3)));
     }
 
-    cando1.opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando1.opCtx.get())->commitUnitOfWork();
 
     // RecordIds except for 3 should be visible.
     {
@@ -192,7 +193,7 @@ TEST_F(CappedVisibilityTest, UnregisteredRecords) {
         ASSERT_FALSE(snapshot.isRecordVisible(RecordId(3)));
     }
 
-    cando2.opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando2.opCtx.get())->commitUnitOfWork();
 
     // All RecordIds should be visible now.
     {
@@ -210,8 +211,8 @@ TEST_F(CappedVisibilityTest, RegisterRange) {
 
     ClientAndOpCtx cando1(getServiceContext(), "Client1");
     ClientAndOpCtx cando2(getServiceContext(), "Client2");
-    auto writer1 = observer.registerWriter(cando1.opCtx->recoveryUnit());
-    auto writer2 = observer.registerWriter(cando2.opCtx->recoveryUnit());
+    auto writer1 = observer.registerWriter(shard_role_details::getRecoveryUnit(cando1.opCtx.get()));
+    auto writer2 = observer.registerWriter(shard_role_details::getRecoveryUnit(cando2.opCtx.get()));
 
     writer1->registerRecordIds(RecordId(2), RecordId(5));
     writer2->registerRecordIds(RecordId(6), RecordId(10));
@@ -225,7 +226,7 @@ TEST_F(CappedVisibilityTest, RegisterRange) {
         ASSERT_FALSE(snapshot.isRecordVisible(RecordId(10)));
     }
 
-    cando2.opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando2.opCtx.get())->commitUnitOfWork();
 
     // The highest visible record should be 1.
     {
@@ -236,7 +237,7 @@ TEST_F(CappedVisibilityTest, RegisterRange) {
         ASSERT_FALSE(snapshot.isRecordVisible(RecordId(10)));
     }
 
-    cando1.opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando1.opCtx.get())->commitUnitOfWork();
 
     // All records should be visible.
     {
@@ -254,8 +255,8 @@ TEST_F(CappedVisibilityTest, MultiRegistration) {
 
     ClientAndOpCtx cando1(getServiceContext(), "Client1");
     ClientAndOpCtx cando2(getServiceContext(), "Client2");
-    auto writer1 = observer.registerWriter(cando1.opCtx->recoveryUnit());
-    auto writer2 = observer.registerWriter(cando2.opCtx->recoveryUnit());
+    auto writer1 = observer.registerWriter(shard_role_details::getRecoveryUnit(cando1.opCtx.get()));
+    auto writer2 = observer.registerWriter(shard_role_details::getRecoveryUnit(cando2.opCtx.get()));
 
     writer1->registerRecordId(RecordId(2));
     writer2->registerRecordId(RecordId(3));
@@ -272,7 +273,7 @@ TEST_F(CappedVisibilityTest, MultiRegistration) {
         ASSERT_FALSE(snapshot.isRecordVisible(RecordId(5)));
     }
 
-    cando2.opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando2.opCtx.get())->commitUnitOfWork();
 
     // The highest visible record should still be 1.
     {
@@ -284,7 +285,7 @@ TEST_F(CappedVisibilityTest, MultiRegistration) {
         ASSERT_FALSE(snapshot.isRecordVisible(RecordId(5)));
     }
 
-    cando1.opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando1.opCtx.get())->commitUnitOfWork();
 
     // All records should be visible.
     {
@@ -329,11 +330,11 @@ TEST_F(CappedVisibilityTest, MultiCollection) {
     ClientAndOpCtx cando1(getServiceContext(), "Client1");
     ClientAndOpCtx cando2(getServiceContext(), "Client2");
 
-    coll1.insertRecord(cando1.opCtx->recoveryUnit(), RecordId(2));
-    coll1.insertRecord(cando2.opCtx->recoveryUnit(), RecordId(3));
+    coll1.insertRecord(shard_role_details::getRecoveryUnit(cando1.opCtx.get()), RecordId(2));
+    coll1.insertRecord(shard_role_details::getRecoveryUnit(cando2.opCtx.get()), RecordId(3));
 
-    coll2.insertRecord(cando1.opCtx->recoveryUnit(), RecordId(12));
-    coll2.insertRecord(cando2.opCtx->recoveryUnit(), RecordId(13));
+    coll2.insertRecord(shard_role_details::getRecoveryUnit(cando1.opCtx.get()), RecordId(12));
+    coll2.insertRecord(shard_role_details::getRecoveryUnit(cando2.opCtx.get()), RecordId(13));
 
     // Only the first record should be visible to both collections.
     {
@@ -350,7 +351,7 @@ TEST_F(CappedVisibilityTest, MultiCollection) {
         ASSERT_FALSE(snapshot.isRecordVisible(RecordId(13)));
     }
 
-    cando2.opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando2.opCtx.get())->commitUnitOfWork();
 
     // Nothing should become newly visible
     {
@@ -367,7 +368,7 @@ TEST_F(CappedVisibilityTest, MultiCollection) {
         ASSERT_FALSE(snapshot.isRecordVisible(RecordId(13)));
     }
 
-    cando1.opCtx->recoveryUnit()->commitUnitOfWork();
+    shard_role_details::getRecoveryUnit(cando1.opCtx.get())->commitUnitOfWork();
 
     // All RecordIds should be visible now.
     {

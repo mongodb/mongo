@@ -268,8 +268,9 @@ public:
         storageGlobalParams.ephemeral = false;
 
         auto uniqueOpCtx = _svcCtx->makeOperationContext(&cc());
-        uniqueOpCtx->setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
-                                     WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        shard_role_details::setRecoveryUnit(uniqueOpCtx.get(),
+                                            std::make_unique<RecoveryUnitNoop>(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         initializeStorageEngine(uniqueOpCtx.get(),
                                 StorageEngineInitFlags::kAllowNoLockFile |
                                     StorageEngineInitFlags::kSkipMetadataFile |

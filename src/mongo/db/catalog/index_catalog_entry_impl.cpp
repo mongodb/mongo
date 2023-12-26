@@ -52,7 +52,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -71,6 +70,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -347,7 +347,7 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
                 // document that enables multikey hasn't enabled it yet but is present in the
                 // collection. In other words, the index is not set for multikey but there is
                 // already data present that relies on it.
-                auto status = opCtx->recoveryUnit()->setTimestamp(std::max(
+                auto status = shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(std::max(
                     {recoveryPrepareOpTime.getTimestamp(),
                      opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
                      opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp() + 1}));

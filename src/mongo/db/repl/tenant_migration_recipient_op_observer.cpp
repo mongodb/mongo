@@ -50,6 +50,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -143,12 +144,13 @@ void TenantMigrationRecipientOpObserver::onInserts(
                 ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
                     .acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient,
                                  recipientStateDoc.getId());
-                opCtx->recoveryUnit()->onRollback([migrationId = recipientStateDoc.getId()](
-                                                      OperationContext* opCtx) {
-                    ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                        .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient,
-                                     migrationId);
-                });
+                shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+                    [migrationId = recipientStateDoc.getId()](OperationContext* opCtx) {
+                        ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
+                            .releaseLock(
+                                ServerlessOperationLockRegistry::LockType::kTenantRecipient,
+                                migrationId);
+                    });
             }
         }
     }
@@ -162,7 +164,7 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
         auto recipientStateDoc = TenantMigrationRecipientDocument::parse(
             IDLParserContext("recipientStateDoc"), args.updateArgs->updatedDoc);
 
-        opCtx->recoveryUnit()->onCommit(
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [recipientStateDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
                 if (recipientStateDoc.getExpireAt()) {
                     ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
@@ -248,7 +250,7 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
         }
 
         auto migrationId = tmi->uuid;
-        opCtx->recoveryUnit()->onCommit(
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [migrationId](OperationContext* opCtx, boost::optional<Timestamp>) {
                 LOGV2_INFO(6114101,
                            "Removing expired migration access blocker",
@@ -268,7 +270,8 @@ repl::OpTime TenantMigrationRecipientOpObserver::onDropCollection(
     const CollectionDropType dropType,
     bool markFromMigrate) {
     if (collectionName == NamespaceString::kTenantMigrationRecipientsNamespace) {
-        opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx, boost::optional<Timestamp>) {
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit([](OperationContext* opCtx,
+                                                                boost::optional<Timestamp>) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .removeAll(TenantMigrationAccessBlocker::BlockerType::kRecipient);
 

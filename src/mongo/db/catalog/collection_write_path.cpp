@@ -60,7 +60,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -74,6 +73,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -137,7 +137,8 @@ std::vector<OplogSlot> reserveOplogSlotsForRetryableFindAndModify(OperationConte
     // entries and set the timestamp for these synthetic entries to be TS - 1.
     auto oplogInfo = LocalOplogInfo::get(opCtx);
     auto slots = oplogInfo->getNextOpTimes(opCtx, 2);
-    uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(slots.back().getTimestamp()));
+    uassertStatusOK(
+        shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(slots.back().getTimestamp()));
     return slots;
 }
 
@@ -327,9 +328,10 @@ Status insertDocumentsImpl(OperationContext* opCtx,
         opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
         // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
         if (!opCtx->inMultiDocumentTransaction()) {
-            opCtx->recoveryUnit()->onRollback([opDebug, keysInserted](OperationContext*) {
-                opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
-            });
+            shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+                [opDebug, keysInserted](OperationContext*) {
+                    opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
+                });
         }
     }
 
@@ -418,10 +420,11 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
     // Capture the recordStore here instead of the CollectionPtr object itself, because the record
     // store's lifetime is controlled by the collection IX lock held on the write paths, whereas the
     // CollectionPtr is just a front to the collection and its lifetime is shorter
-    opCtx->recoveryUnit()->onCommit([recordStore = collection->getRecordStore()](
-                                        OperationContext*, boost::optional<Timestamp>) {
-        recordStore->notifyCappedWaitersIfNeeded();
-    });
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [recordStore = collection->getRecordStore()](OperationContext*,
+                                                     boost::optional<Timestamp>) {
+            recordStore->notifyCappedWaitersIfNeeded();
+        });
 
     return loc.getStatus();
 }
@@ -468,21 +471,22 @@ Status insertDocuments(OperationContext* opCtx,
         }
     }
 
-    const SnapshotId sid = opCtx->recoveryUnit()->getSnapshotId();
+    const SnapshotId sid = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
 
     status = insertDocumentsImpl(opCtx, collection, begin, end, opDebug, fromMigrate);
     if (!status.isOK()) {
         return status;
     }
-    invariant(sid == opCtx->recoveryUnit()->getSnapshotId());
+    invariant(sid == shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
 
     // Capture the recordStore here instead of the CollectionPtr object itself, because the record
     // store's lifetime is controlled by the collection IX lock held on the write paths, whereas the
     // CollectionPtr is just a front to the collection and its lifetime is shorter
-    opCtx->recoveryUnit()->onCommit([recordStore = collection->getRecordStore()](
-                                        OperationContext*, boost::optional<Timestamp>) {
-        recordStore->notifyCappedWaitersIfNeeded();
-    });
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [recordStore = collection->getRecordStore()](OperationContext*,
+                                                     boost::optional<Timestamp>) {
+            recordStore->notifyCappedWaitersIfNeeded();
+        });
 
     hangAfterCollectionInserts.executeIf(
         [&](const BSONObj& data) {
@@ -583,7 +587,7 @@ void updateDocument(OperationContext* opCtx,
 
     dassert(
         shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_IX));
-    invariant(oldDoc.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
+    invariant(oldDoc.snapshotId() == shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
     invariant(newDoc.isOwned());
 
     if (collection->needsCappedLock()) {
@@ -591,7 +595,7 @@ void updateDocument(OperationContext* opCtx,
             opCtx, ResourceId(RESOURCE_METADATA, collection->ns()), MODE_X};
     }
 
-    SnapshotId sid = opCtx->recoveryUnit()->getSnapshotId();
+    SnapshotId sid = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
 
     BSONElement oldId = oldDoc.value()["_id"];
     // We accept equivalent _id according to the collation defined in the collection. 'foo' and
@@ -651,7 +655,7 @@ void updateDocument(OperationContext* opCtx,
             opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
             // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
             if (!opCtx->inMultiDocumentTransaction()) {
-                opCtx->recoveryUnit()->onRollback(
+                shard_role_details::getRecoveryUnit(opCtx)->onRollback(
                     [opDebug, keysInserted, keysDeleted](OperationContext*) {
                         opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
                         opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
@@ -660,7 +664,7 @@ void updateDocument(OperationContext* opCtx,
         }
     }
 
-    invariant(sid == opCtx->recoveryUnit()->getSnapshotId());
+    invariant(sid == shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
     args->updatedDoc = newDoc;
 
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
@@ -678,7 +682,7 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
                                               CollectionUpdateArgs* args) {
     dassert(
         shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_IX));
-    invariant(oldDoc.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
+    invariant(oldDoc.snapshotId() == shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
     invariant(collection->updateWithDamagesSupported());
 
     OplogUpdateEntryArgs onUpdateArgs(args, collection);
@@ -735,7 +739,7 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
             opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
             // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
             if (!opCtx->inMultiDocumentTransaction()) {
-                opCtx->recoveryUnit()->onRollback(
+                shard_role_details::getRecoveryUnit(opCtx)->onRollback(
                     [opDebug, keysInserted, keysDeleted](OperationContext*) {
                         opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
                         opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
@@ -827,9 +831,10 @@ void deleteDocument(OperationContext* opCtx,
         opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
         // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
         if (!opCtx->inMultiDocumentTransaction()) {
-            opCtx->recoveryUnit()->onRollback([opDebug, keysDeleted](OperationContext*) {
-                opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
-            });
+            shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+                [opDebug, keysDeleted](OperationContext*) {
+                    opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
+                });
         }
     }
 }

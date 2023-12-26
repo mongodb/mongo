@@ -45,7 +45,6 @@
 #include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -64,6 +63,7 @@
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -245,8 +245,8 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockCompatibleXCollectionExi
     ASSERT(shard_role_details::getLocker(client1.second.get())
                ->isDbLockedForMode(nss.dbName(), MODE_IX));
     auto opCtx = client2.second.get();
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                  Timestamp(1, 2));
+    shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+        RecoveryUnit::ReadSource::kProvided, Timestamp(1, 2));
 
     // We can instantiate AutoGetCollectionForRead but not find a collection at the provided
     // timestamp
@@ -321,7 +321,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedConflict) {
     // We can perform the lock acquisition even though lastApplied is earlier than the minimum valid
     // time on the namespace.
     AutoGetCollectionForRead coll(client1.second.get(), nss);
-    ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(client1.second.get())->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kLastApplied);
 }
 
@@ -345,10 +345,10 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedUnavailable) {
     client1.first->setInDirectClient(true);
     AutoGetCollectionForRead coll(client1.second.get(), nss);
 
-    ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(client1.second.get())->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kLastApplied);
-    ASSERT_FALSE(
-        client1.second.get()->recoveryUnit()->getPointInTimeReadTimestamp(client1.second.get()));
+    ASSERT_FALSE(shard_role_details::getRecoveryUnit(client1.second.get())
+                     ->getPointInTimeReadTimestamp(client1.second.get()));
 }
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadOplogOnSecondary) {
@@ -358,7 +358,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadOplogOnSecondary) {
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
 
     // Ensure the default ReadSource is used.
-    ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(client1.second.get())->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kNoTimestamp);
 
     // Don't call into the ReplicationCoordinator to update lastApplied because it is only a mock
@@ -372,7 +372,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadOplogOnSecondary) {
     client1.first->setInDirectClient(true);
     AutoGetCollectionForRead coll(client1.second.get(), NamespaceString::kRsOplogNamespace);
 
-    ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(client1.second.get())->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kLastApplied);
 }
 
@@ -392,7 +392,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadUsesLastAppliedOnSecondary) {
 
     // The collection scan should use the default ReadSource on a primary.
     ASSERT_EQ(RecoveryUnit::ReadSource::kNoTimestamp,
-              opCtx->recoveryUnit()->getTimestampReadSource());
+              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 
     // When the tailable query recovers from its yield, it should discover that the node is
     // secondary and change its read source.
@@ -405,7 +405,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadUsesLastAppliedOnSecondary) {
     // After restoring, the collection scan should now be reading with kLastApplied, the default on
     // secondaries.
     ASSERT_EQ(RecoveryUnit::ReadSource::kLastApplied,
-              opCtx->recoveryUnit()->getTimestampReadSource());
+              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
     ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&unused, nullptr));
 }
 
@@ -427,7 +427,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadChangedReadSourceAfterStepUp) 
 
     // The collection scan should use the default ReadSource on a secondary.
     ASSERT_EQ(RecoveryUnit::ReadSource::kLastApplied,
-              opCtx->recoveryUnit()->getTimestampReadSource());
+              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 
     // When the tailable query recovers from its yield, it should discover that the node is primary
     // and change its ReadSource.
@@ -440,7 +440,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadChangedReadSourceAfterStepUp) 
     // After restoring, the collection scan should now be reading with kUnset, the default on
     // primaries.
     ASSERT_EQ(RecoveryUnit::ReadSource::kNoTimestamp,
-              opCtx->recoveryUnit()->getTimestampReadSource());
+              shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
     ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&unused, nullptr));
 }
 
@@ -450,13 +450,13 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadSecondaryReadSource) {
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, {}));
     ASSERT_OK(
         repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_SECONDARY));
-    ASSERT_EQ(opCtx->recoveryUnit()->getTimestampReadSource(),
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kNoTimestamp);
 
     AutoGetCollectionForRead autoColl(opCtx, nss);
 
     // The AutoGetCollectionForRead changes the read source to be last applied.
-    ASSERT_EQ(opCtx->recoveryUnit()->getTimestampReadSource(),
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kLastApplied);
 }
 
@@ -466,7 +466,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadSecondaryReadSourceNotEnforcin
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, {}));
     ASSERT_OK(
         repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_SECONDARY));
-    ASSERT_EQ(opCtx->recoveryUnit()->getTimestampReadSource(),
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kNoTimestamp);
 
     opCtx->setEnforceConstraints(false);
@@ -474,7 +474,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadSecondaryReadSourceNotEnforcin
 
     // The AutoGetCollectionForRead does not change the read source since we are not enforcing
     // constraints.
-    ASSERT_EQ(opCtx->recoveryUnit()->getTimestampReadSource(),
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kNoTimestamp);
 }
 

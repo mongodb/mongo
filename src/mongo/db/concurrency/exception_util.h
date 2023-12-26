@@ -38,10 +38,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -155,7 +155,7 @@ auto writeConflictRetry(OperationContext* opCtx,
                         boost::optional<size_t> retryLimit = boost::none) {
     invariant(opCtx);
     invariant(shard_role_details::getLocker(opCtx));
-    invariant(opCtx->recoveryUnit());
+    invariant(shard_role_details::getRecoveryUnit(opCtx));
 
     // This failpoint disables exception handling for write conflicts. Only allow this exception to
     // escape user operations. Do not allow exceptions to escape internal threads, which may rely on
@@ -185,7 +185,7 @@ auto writeConflictRetry(OperationContext* opCtx,
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             logWriteConflictAndBackoff(writeConflictAttempts, opStr, e.reason(), nssOrUUID);
             ++writeConflictAttempts;
-            opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             if (MONGO_unlikely(retryLimit && writeConflictAttempts > *retryLimit)) {
                 LOGV2_ERROR(7677402,
                             "Got too many write conflicts, the server may run into problems.");

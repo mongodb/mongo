@@ -984,7 +984,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                            invariant(mtab);
                            mtab->startBlockingWrites();
 
-                           opCtx->recoveryUnit()->onRollback(
+                           shard_role_details::getRecoveryUnit(opCtx)->onRollback(
                                [mtab](OperationContext*) { mtab->rollBackStartBlocking(); });
                        }
                    }
@@ -1046,7 +1046,8 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                                             collection.getCollectionPtr(),
                                             BSON("_id" << originalStateDocBson["_id"]));
                        const auto originalSnapshot = Snapshotted<BSONObj>(
-                           opCtx->recoveryUnit()->getSnapshotId(), originalStateDocBson);
+                           shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
+                           originalStateDocBson);
                        invariant(!originalRecordId.isNull());
 
                        CollectionUpdateArgs args{originalSnapshot.value()};

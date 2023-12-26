@@ -96,7 +96,6 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/skipped_record_tracker.h"
 #include "mongo/db/index_build_entry_helpers.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
@@ -217,19 +216,21 @@ Status createIndexFromSpec(OperationContext* opCtx,
     CollectionWriter collection(opCtx, nss);
     ScopeGuard abortOnExit(
         [&] { indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
-    Status status = indexer
-                        .init(opCtx,
-                              collection,
-                              spec,
-                              [opCtx, clock](const std::vector<BSONObj>& specs) -> Status {
-                                  if (opCtx->writesAreReplicated() &&
-                                      opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
-                                      return opCtx->recoveryUnit()->setTimestamp(
-                                          clock->tickClusterTime(1).asTimestamp());
-                                  }
-                                  return Status::OK();
-                              })
-                        .getStatus();
+    Status status =
+        indexer
+            .init(
+                opCtx,
+                collection,
+                spec,
+                [opCtx, clock](const std::vector<BSONObj>& specs) -> Status {
+                    if (opCtx->writesAreReplicated() &&
+                        shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull()) {
+                        return shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
+                            clock->tickClusterTime(1).asTimestamp());
+                    }
+                    return Status::OK();
+                })
+            .getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
     }
@@ -255,7 +256,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
                              MultiIndexBlock::kNoopOnCommitFn));
     if (opCtx->writesAreReplicated()) {
         LogicalTime indexTs = clock->tickClusterTime(1);
-        ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(indexTs.asTimestamp()));
+        ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(indexTs.asTimestamp()));
     }
     wunit.commit();
     abortOnExit.dismiss();
@@ -268,17 +269,20 @@ Status createIndexFromSpec(OperationContext* opCtx,
 class OneOffRead {
 public:
     OneOffRead(OperationContext* opCtx, const Timestamp& ts) : _opCtx(opCtx) {
-        _opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
         if (ts.isNull()) {
-            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+            shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kNoTimestamp);
         } else {
-            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, ts);
+            shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kProvided, ts);
         }
     }
 
     ~OneOffRead() {
-        _opCtx->recoveryUnit()->abandonSnapshot();
-        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kNoTimestamp);
     }
 
 private:
@@ -288,14 +292,15 @@ private:
 class IgnorePrepareBlock {
 public:
     IgnorePrepareBlock(OperationContext* opCtx) : _opCtx(opCtx) {
-        _opCtx->recoveryUnit()->abandonSnapshot();
-        _opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(_opCtx)->setPrepareConflictBehavior(
             PrepareConflictBehavior::kIgnoreConflicts);
     }
 
     ~IgnorePrepareBlock() {
-        _opCtx->recoveryUnit()->abandonSnapshot();
-        _opCtx->recoveryUnit()->setPrepareConflictBehavior(PrepareConflictBehavior::kEnforce);
+        shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(_opCtx)->setPrepareConflictBehavior(
+            PrepareConflictBehavior::kEnforce);
     }
 
 private:
@@ -418,7 +423,7 @@ public:
 
     void dumpOplog() {
         OneOffRead oor(_opCtx, Timestamp::min());
-        _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx->readOnly());
+        shard_role_details::getRecoveryUnit(_opCtx)->beginUnitOfWork(_opCtx->readOnly());
         LOGV2(8423335, "Dumping oplog collection");
         AutoGetCollectionForRead oplogRaii(_opCtx, NamespaceString::kRsOplogNamespace);
         const CollectionPtr& oplogColl = oplogRaii.getCollection();
@@ -433,13 +438,14 @@ public:
                 break;
             }
         }
-        _opCtx->recoveryUnit()->abortUnitOfWork();
+        shard_role_details::getRecoveryUnit(_opCtx)->abortUnitOfWork();
     }
 
     void create(NamespaceString nss) const {
         ::mongo::writeConflictRetry(_opCtx, "deleteAll", nss, [&] {
-            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-            _opCtx->recoveryUnit()->abandonSnapshot();
+            shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kNoTimestamp);
+            shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
             AutoGetCollection collRaii(_opCtx, nss, LockMode::MODE_X);
             // Only creating new namespaces is supported. We restart the storage engine across all
             // tests. If a test wants to remove data from existing collections, care must be taken
@@ -450,8 +456,9 @@ public:
             auto db = autoColl.ensureDbExists(_opCtx);
             WriteUnitOfWork wunit(_opCtx);
             if (_opCtx->writesAreReplicated() &&
-                _opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
-                ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
+                shard_role_details::getRecoveryUnit(_opCtx)->getCommitTimestamp().isNull()) {
+                ASSERT_OK(
+                    shard_role_details::getRecoveryUnit(_opCtx)->setTimestamp(Timestamp(1, 1)));
             }
             invariant(db->createCollection(_opCtx, nss));
             wunit.commit();
@@ -1165,7 +1172,7 @@ TEST_F(StorageTimestampTest, SecondaryInsertToUpsert) {
     ASSERT(result["results"].Array()[1].Bool());
 
     // Reading at `insertTime` should show the original document, `{_id: 0, field: 0}`.
-    auto recoveryUnit = _opCtx->recoveryUnit();
+    auto recoveryUnit = shard_role_details::getRecoveryUnit(_opCtx);
     recoveryUnit->abandonSnapshot();
     recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                          insertTime.asTimestamp());
@@ -2069,7 +2076,7 @@ public:
                             _opCtx, nss, coll->uuid(), indexSpec, false);
                     } else {
                         const auto currentTime = _clock->getTime();
-                        ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(
+                        ASSERT_OK(shard_role_details::getRecoveryUnit(_opCtx)->setTimestamp(
                             currentTime.clusterTime().asTimestamp()));
                     }
                 },
@@ -3192,7 +3199,8 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
             _opCtx,
             collection.get(),
             record->id,
-            Snapshotted<BSONObj>(_opCtx->recoveryUnit()->getSnapshotId(), oldObj),
+            Snapshotted<BSONObj>(shard_role_details::getRecoveryUnit(_opCtx)->getSnapshotId(),
+                                 oldObj),
             newObj,
             collection_internal::kUpdateNoIndexes,
             nullptr /* indexesAffected */,
@@ -3240,7 +3248,8 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
     args.retryableWrite = true;
 
     {
-        Snapshotted<BSONObj> objSnapshot(_opCtx->recoveryUnit()->getSnapshotId(), oldObj);
+        Snapshotted<BSONObj> objSnapshot(
+            shard_role_details::getRecoveryUnit(_opCtx)->getSnapshotId(), oldObj);
         auto cursor = collection->getCursor(_opCtx);
         auto record = cursor->next();
         invariant(record);
@@ -3279,7 +3288,8 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyDelete) {
     const auto bsonObj = BSON("_id" << 0 << "a" << 1);
 
     {
-        Snapshotted<BSONObj> objSnapshot(_opCtx->recoveryUnit()->getSnapshotId(), oldObj);
+        Snapshotted<BSONObj> objSnapshot(
+            shard_role_details::getRecoveryUnit(_opCtx)->getSnapshotId(), oldObj);
         auto cursor = collection->getCursor(_opCtx);
         auto record = cursor->next();
         invariant(record);

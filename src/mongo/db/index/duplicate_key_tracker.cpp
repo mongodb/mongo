@@ -41,7 +41,6 @@
 #include "mongo/db/index/duplicate_key_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
@@ -49,6 +48,7 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -119,7 +119,7 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
         return status.getStatus();
 
     auto numDuplicates = _duplicateCounter.addAndFetch(1);
-    opCtx->recoveryUnit()->onRollback(
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [this](OperationContext*) { _duplicateCounter.fetchAndAdd(-1); });
 
     if (numDuplicates % 1000 == 0) {

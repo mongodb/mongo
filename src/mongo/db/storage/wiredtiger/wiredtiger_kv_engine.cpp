@@ -44,6 +44,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/storage/backup_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
@@ -95,7 +96,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -122,6 +122,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/background.h"
@@ -1934,7 +1935,8 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
 void WiredTigerKVEngine::dropIdentForImport(OperationContext* opCtx, StringData ident) {
     const std::string uri = _uri(ident);
 
-    WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
+    WiredTigerRecoveryUnit* wtRu =
+        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx));
     wtRu->getSessionNoTxn()->closeAllCursors(uri);
     _sessionCache->closeAllCursors(uri);
 
@@ -2585,7 +2587,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
         // If we've moved the pin and are in a `WriteUnitOfWork`, assume the caller has a write that
         // should be atomic with this pin request. If the `WriteUnitOfWork` is rolled back, either
         // unpin the oldest timestamp or repin the previous value.
-        opCtx->recoveryUnit()->onRollback(
+        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [this, svcName = requestingServiceName, previousTimestamp](OperationContext*) {
                 if (previousTimestamp.isNull()) {
                     unpinOldestTimestamp(svcName);
@@ -2782,7 +2784,7 @@ Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
     }
 
     WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
-    opCtx->recoveryUnit()->abandonSnapshot();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     StringBuilder config;
     if (options.enable) {

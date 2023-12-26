@@ -33,7 +33,6 @@
 #include <vector>
 
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
@@ -54,6 +53,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"

@@ -57,7 +57,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
@@ -293,7 +292,7 @@ bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const Namespa
     // 1. A timestamp is already set -- replication application sets a timestamp ahead of time.
     // This could include the phase of initial sync where it applies oplog entries.  Also,
     // primaries performing an index build via `applyOps` may have a wrapping commit timestamp.
-    if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull())
+    if (!shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull())
         return false;
 
     // 2. If the node is initial syncing, we do not set a timestamp.
@@ -1648,7 +1647,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         // Because of this, such transactions will set multiple timestamps, violating the
         // multi timestamp constraint. It's safe to ignore the multi timestamp constraints here
         // as additional rollback logic is in place for this case. See SERVER-48771.
-        opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
+        shard_role_details::getRecoveryUnit(opCtx)->ignoreAllMultiTimestampConstraints();
     }
 
     auto logApplyOpsForUnpreparedTransaction =
@@ -1744,7 +1743,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
         // the same WriteUnitOfWork. Because of this, such batched writes will set multiple
         // timestamps, violating the multi timestamp constraint. It's safe to ignore the multi
         // timestamp constraints here.
-        opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
+        shard_role_details::getRecoveryUnit(opCtx)->ignoreAllMultiTimestampConstraints();
     }
 
     // Storage transaction commit is the last place inside a transaction that can throw an
@@ -1876,7 +1875,7 @@ void OpObserverImpl::onTransactionPrepare(
             // timestamps, violating the multi timestamp constraint. It's safe to ignore
             // the multi timestamp constraints here as additional rollback logic is in
             // place for this case. See SERVER-48771.
-            opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
+            shard_role_details::getRecoveryUnit(opCtx)->ignoreAllMultiTimestampConstraints();
         }
 
         // This is set for every oplog entry, except for the last one, in the applyOps

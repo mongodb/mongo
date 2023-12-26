@@ -304,7 +304,7 @@ env.Library(
         'key_string',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         'storage_options',
     ],
 )
@@ -332,7 +332,7 @@ env.Library(
         'sorted_data_interface_test_harness',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         'storage_options',
     ],
 )
@@ -345,7 +345,7 @@ bmEnv.Library(
         'sorted_data_interface_bm_cursor.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/third_party/shim_benchmark',
         'sorted_data_interface_test_harness',
     ],
@@ -370,9 +370,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/update/update_document_diff',
@@ -386,8 +386,8 @@ env.Library(
         'recovery_unit_test_harness.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/unittest/unittest',
         'record_store_base',
     ],
@@ -423,9 +423,9 @@ env.Library(
     ],
     LIBDEPS=[],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/exec/scoped_timer',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         'storage_change_lock',
         'storage_control',
@@ -561,9 +561,9 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/fail_point',
         'flow_control_parameters',
@@ -694,8 +694,8 @@ env.Library(
         'backup_block.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         'storage_options',
     ],
 )

@@ -83,6 +83,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -489,9 +490,10 @@ void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
                                      const RecordId& rid,
                                      const NamespaceString& nss) {
     // Having a recordId but no record is only an issue when we are not ignoring prepare conflicts.
-    if (opCtx->recoveryUnit()->getPrepareConflictBehavior() == PrepareConflictBehavior::kEnforce) {
+    if (shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior() ==
+        PrepareConflictBehavior::kEnforce) {
         tassert(5113700, "Should have snapshot id accessor", snapshotIdAccessor);
-        auto currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
+        auto currentSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
         auto [snapshotIdTag, snapshotIdVal] = snapshotIdAccessor->getViewOfValue();
         const auto msgSnapshotIdTag = snapshotIdTag;
         tassert(5113701,
@@ -570,7 +572,7 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
                                       const Record& nextRecord) {
     // The index consistency check is only performed when 'snapshotIdAccessor' is set.
     if (snapshotIdAccessor) {
-        auto currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
+        auto currentSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
         auto [snapshotIdTag, snapshotIdVal] = snapshotIdAccessor->getViewOfValue();
         const auto msgSnapshotIdTag = snapshotIdTag;
         tassert(5290704,

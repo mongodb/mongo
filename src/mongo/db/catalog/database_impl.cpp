@@ -62,7 +62,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -89,6 +88,7 @@
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/system_index.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
@@ -469,7 +469,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     if (serviceContext->getStorageEngine()->supportsPendingDrops()) {
         _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection(opCtx));
 
-        auto commitTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
+        auto commitTimestamp = shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp();
         LOGV2(20314,
               "dropCollection: storage engine will take ownership of drop-pending "
               "collection",

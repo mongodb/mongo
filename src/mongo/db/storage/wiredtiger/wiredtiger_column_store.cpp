@@ -42,7 +42,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -57,6 +56,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -422,7 +422,7 @@ private:
         // (a) is unlikely to change, but (b) is incidental behavior. To avoid relying on this, we
         // iterate the cursor until we find a value that is greater than or equal to the search key.
         const bool enforcingPrepareConflicts =
-            _opCtx->recoveryUnit()->getPrepareConflictBehavior() ==
+            shard_role_details::getRecoveryUnit(_opCtx)->getPrepareConflictBehavior() ==
             PrepareConflictBehavior::kEnforce;
         WT_ITEM curKey;
         while (cmp < 0) {

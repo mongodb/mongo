@@ -69,6 +69,7 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -202,11 +203,14 @@ public:
                 replClient.setLastOp(
                     opCtx, std::max({prepareOpTime, lastAppliedOpTime, replClient.getLastOp()}));
 
-                invariant(
-                    opCtx->recoveryUnit()->getPrepareTimestamp() == prepareOpTime.getTimestamp(),
-                    str::stream() << "recovery unit prepareTimestamp: "
-                                  << opCtx->recoveryUnit()->getPrepareTimestamp().toString()
-                                  << " participant prepareOpTime: " << prepareOpTime.toString());
+                invariant(shard_role_details::getRecoveryUnit(opCtx)->getPrepareTimestamp() ==
+                              prepareOpTime.getTimestamp(),
+                          str::stream()
+                              << "recovery unit prepareTimestamp: "
+                              << shard_role_details::getRecoveryUnit(opCtx)
+                                     ->getPrepareTimestamp()
+                                     .toString()
+                              << " participant prepareOpTime: " << prepareOpTime.toString());
 
                 if (MONGO_unlikely(participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic
                                        .shouldFail())) {

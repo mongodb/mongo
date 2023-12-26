@@ -56,7 +56,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -66,6 +65,7 @@
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine_feature_flags_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/redaction.h"
@@ -571,8 +571,8 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
                                     Date_t::now() + Milliseconds(500),
                                     Lock::InterruptBehavior::kThrow,
                                     Lock::GlobalLockSkipOptions{.skipRSTLLock = true});
-                _debug.storageStats =
-                    opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
+                _debug.storageStats = shard_role_details::getRecoveryUnit(opCtx)
+                                          ->computeOperationStatisticsSinceLastCall();
             } catch (const DBException& ex) {
                 LOGV2_WARNING_OPTIONS(20526,
                                       logOptions,

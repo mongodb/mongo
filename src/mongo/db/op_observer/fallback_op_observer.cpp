@@ -52,6 +52,7 @@
 #include "mongo/db/session/session_killer.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/views/util.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/idl/idl_parser.h"
@@ -124,7 +125,7 @@ void FallbackOpObserver::onInserts(OperationContext* opCtx,
         for (auto it = first; it != last; it++) {
             auto externalKey =
                 ExternalKeysCollectionDocument::parse(IDLParserContext("externalKey"), it->doc);
-            opCtx->recoveryUnit()->onCommit(
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                 [this, externalKey = std::move(externalKey)](OperationContext* opCtx,
                                                              boost::optional<Timestamp>) mutable {
                     auto validator = LogicalTimeValidator::get(opCtx);

@@ -44,12 +44,12 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
@@ -265,8 +265,11 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
     member->recordId = std::move(kv->loc);
-    member->keyData.push_back(IndexKeyDatum(
-        _keyPattern, kv->key, workingSetIndexId(), opCtx()->recoveryUnit()->getSnapshotId()));
+    member->keyData.push_back(
+        IndexKeyDatum(_keyPattern,
+                      kv->key,
+                      workingSetIndexId(),
+                      shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId()));
     _workingSet->transitionToRecordIdAndIdx(id);
 
     if (_addKeyMetadata) {

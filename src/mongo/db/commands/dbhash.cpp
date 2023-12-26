@@ -70,6 +70,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
@@ -94,12 +95,12 @@ std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(Operati
     // implementation of dbHash which skips acquiring database and collection locks.
     while (true) {
         auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
-        opCtx->recoveryUnit()->preallocateSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
         const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
         if (catalogBeforeSnapshot == catalogAfterSnapshot) {
             return catalogBeforeSnapshot;
         }
-        opCtx->recoveryUnit()->abandonSnapshot();
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     }
 }
 
@@ -245,17 +246,19 @@ public:
             // The $_internalReadAtClusterTime option causes any storage-layer cursors created
             // during plan execution to read from a consistent snapshot of data at the supplied
             // clusterTime, even across yields.
-            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
-                                                          targetClusterTime);
+            shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kProvided, targetClusterTime);
 
             // The $_internalReadAtClusterTime option also causes any storage-layer cursors created
             // during plan execution to block on prepared transactions. Since the dbhash command
             // ignores prepare conflicts by default, change the behavior.
-            opCtx->recoveryUnit()->setPrepareConflictBehavior(PrepareConflictBehavior::kEnforce);
+            shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
+                PrepareConflictBehavior::kEnforce);
         }
 
         const bool isPointInTimeRead =
-            opCtx->recoveryUnit()->getTimestampReadSource() == RecoveryUnit::ReadSource::kProvided;
+            shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource() ==
+            RecoveryUnit::ReadSource::kProvided;
 
         // We take the global lock here as dbHash runs lock-free with point-in-time catalog lookups.
         Lock::GlobalLock globalLock(opCtx, MODE_IS);
@@ -349,7 +352,8 @@ public:
                 collection = coll;
 
                 if (auto readTimestamp =
-                        opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx)) {
+                        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(
+                            opCtx)) {
                     auto minSnapshot = coll->getMinimumValidSnapshot();
                     uassert(ErrorCodes::SnapshotUnavailable,
                             str::stream()
@@ -364,7 +368,7 @@ public:
                 collection = catalog->establishConsistentCollection(
                     opCtx,
                     {dbName, uuid},
-                    opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
+                    shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx));
 
                 if (!collection) {
                     // The collection did not exist at the read timestamp with the given UUID.

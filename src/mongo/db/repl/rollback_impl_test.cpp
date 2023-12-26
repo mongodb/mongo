@@ -83,6 +83,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -281,7 +282,8 @@ protected:
         ASSERT_OK(_insertOplogEntry(makeDeleteOplogEntry(time, id.wrap(), nss.ns_forTest(), uuid)));
         WriteUnitOfWork wuow{_opCtx.get()};
         ASSERT_OK(_storageInterface->deleteById(_opCtx.get(), nss, id));
-        ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(time, time)));
+        ASSERT_OK(
+            shard_role_details::getRecoveryUnit(_opCtx.get())->setTimestamp(Timestamp(time, time)));
         wuow.commit();
     }
 

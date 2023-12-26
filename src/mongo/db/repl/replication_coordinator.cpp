@@ -34,6 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
@@ -85,7 +86,7 @@ bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
         return true;
     }
 
-    fassert(28626, opCtx->recoveryUnit());
+    fassert(28626, shard_role_details::getRecoveryUnit(opCtx));
 
     return false;
 }

@@ -387,7 +387,8 @@ public:
 
                 auto ws = std::make_unique<WorkingSet>();
                 auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
-                auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+                auto readTimestamp =
+                    shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
 
                 if (DatabaseHolder::get(opCtx)->dbExists(opCtx, dbName)) {
                     if (auto collNames = _getExactNameMatches(matcher.get())) {

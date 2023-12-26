@@ -467,7 +467,7 @@ void OperationContext::setTxnRetryCounter(TxnRetryCounter txnRetryCounter) {
     _txnRetryCounter = txnRetryCounter;
 }
 
-std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit() {
+std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit_DO_NOT_USE() {
     if (_recoveryUnit) {
         _recoveryUnit->setOperationContext(nullptr);
     }
@@ -475,21 +475,21 @@ std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit() {
     return std::move(_recoveryUnit);
 }
 
-std::unique_ptr<RecoveryUnit> OperationContext::releaseAndReplaceRecoveryUnit() {
-    auto ru = releaseRecoveryUnit();
-    setRecoveryUnit(
+std::unique_ptr<RecoveryUnit> OperationContext::releaseAndReplaceRecoveryUnit_DO_NOT_USE() {
+    auto ru = releaseRecoveryUnit_DO_NOT_USE();
+    setRecoveryUnit_DO_NOT_USE(
         std::unique_ptr<RecoveryUnit>(getServiceContext()->getStorageEngine()->newRecoveryUnit()),
         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     return ru;
 }
 
-void OperationContext::replaceRecoveryUnit() {
-    setRecoveryUnit(
+void OperationContext::replaceRecoveryUnit_DO_NOT_USE() {
+    setRecoveryUnit_DO_NOT_USE(
         std::unique_ptr<RecoveryUnit>(getServiceContext()->getStorageEngine()->newRecoveryUnit()),
         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 }
 
-WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit(
+WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit_DO_NOT_USE(
     std::unique_ptr<RecoveryUnit> unit, WriteUnitOfWork::RecoveryUnitState state) {
     _recoveryUnit = std::move(unit);
     if (_recoveryUnit) {

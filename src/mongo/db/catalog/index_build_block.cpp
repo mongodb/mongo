@@ -47,7 +47,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/skipped_record_tracker.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -58,6 +57,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -250,7 +250,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                           "IndexBuildSucceeded",
                           ErrorCodes::OK);
 
-    opCtx->recoveryUnit()->onCommit(
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [svcCtx,
          indexName = _indexName,
          spec = _spec,
