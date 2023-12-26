@@ -1181,10 +1181,12 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
     return keyBuilder.str();
 }
 
-std::string encodeSBE(const CanonicalQuery& cq) {
-    tassert(6142104,
-            "attempting to encode SBE plan cache key for SBE-incompatible query",
-            cq.isSbeCompatible());
+std::string encodeSBE(const CanonicalQuery& cq, const bool requiresSbeCompatibility) {
+    if (requiresSbeCompatibility) {
+        tassert(6142104,
+                "attempting to encode SBE plan cache key for SBE-incompatible query",
+                cq.isSbeCompatible());
+    }
 
     const auto& filter = cq.getQueryObj();
     const auto& proj = cq.getFindCommandRequest().getProjection();
