@@ -58,6 +58,10 @@ runTest(() => {
         autocommit: false,
     }));
 
+    // Refresh the routing table on router1 before running other commands. Since the transaction
+    // hasn't committed yet there are no documents seen by router1.
+    assert.eq(0, router1.getDB(dbName)[collName].find().itcount());
+
     // Try to start a new transaction with the same transaction number on router 1 by inserting
     // a document onto each shard.
     assert.commandFailedWithCode(router1.getDB(dbName).runCommand({
