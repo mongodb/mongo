@@ -73,17 +73,13 @@ compare_backups(int i)
      * directory.
      */
     if (i == 0)
-        (void)snprintf(buf, sizeof(buf), "../../wt -R -h %s dump main > %s.%d", home, full_out, i);
+        testutil_system("../../wt -R -h %s dump main > %s.%d", home, full_out, i);
     else
-        (void)snprintf(
-          buf, sizeof(buf), "../../wt -R -h %s.%d dump main > %s.%d", home_full, i, full_out, i);
-    error_check(system(buf));
+        testutil_system("../../wt -R -h %s.%d dump main > %s.%d", home_full, i, full_out, i);
     /*
      * Now run dump on the incremental directory.
      */
-    (void)snprintf(
-      buf, sizeof(buf), "../../wt -R -h %s.%d dump main > %s.%d", home_incr, i, incr_out, i);
-    error_check(system(buf));
+    testutil_system("../../wt -R -h %s.%d dump main > %s.%d", home_incr, i, incr_out, i);
 
     /*
      * Compare the files.
@@ -103,9 +99,8 @@ compare_backups(int i)
      * If they compare successfully, clean up.
      */
     if (i != 0) {
-        (void)snprintf(buf, sizeof(buf), "rm -rf %s.%d %s.%d %s.%d %s.%d", home_full, i, home_incr,
-          i, full_out, i, incr_out, i);
-        error_check(system(buf));
+        testutil_system(
+          "rm -rf %s.%d %s.%d %s.%d %s.%d", home_full, i, home_incr, i, full_out, i, incr_out, i);
     }
     return (ret);
 }
@@ -119,24 +114,19 @@ static void
 setup_directories(void)
 {
     int i;
-    char buf[1024];
 
     for (i = 0; i < MAX_ITERATIONS; i++) {
         /*
          * For incremental backups we need 0-N. The 0 incremental directory will compare with the
          * original at the end.
          */
-        (void)snprintf(buf, sizeof(buf), "rm -rf %s.%d && mkdir -p %s.%d/%s", home_incr, i,
-          home_incr, i, logpath);
-        error_check(system(buf));
+        testutil_system("rm -rf %s.%d && mkdir -p %s.%d/%s", home_incr, i, home_incr, i, logpath);
         if (i == 0)
             continue;
         /*
          * For full backups we need 1-N.
          */
-        (void)snprintf(buf, sizeof(buf), "rm -rf %s.%d && mkdir -p %s.%d/%s", home_full, i,
-          home_full, i, logpath);
-        error_check(system(buf));
+        testutil_system("rm -rf %s.%d && mkdir -p %s.%d/%s", home_full, i, home_full, i, logpath);
     }
 }
 
@@ -179,7 +169,6 @@ static int
 finalize_files(FILELIST *flistp, size_t count)
 {
     size_t i;
-    char buf[512];
 
     /*
      * Process files that were removed. Any file that is not marked in the previous list as existing
@@ -190,10 +179,9 @@ finalize_files(FILELIST *flistp, size_t count)
         if (last_flist[i].name == NULL)
             break;
         if (!last_flist[i].exist) {
-            (void)snprintf(buf, sizeof(buf), "rm WT_BLOCK_LOG_*/%s%s",
+            testutil_system("rm WT_BLOCK_LOG_*/%s%s",
               strncmp(last_flist[i].name, WTLOG, WTLOGLEN) == 0 ? "logpath/" : "",
               last_flist[i].name);
-            error_check(system(buf));
         }
         free((void *)last_flist[i].name);
     }
@@ -295,21 +283,19 @@ take_full_backup(WT_SESSION *session, int i)
              */
             for (j = 0; j < MAX_ITERATIONS; j++) {
                 (void)snprintf(h, sizeof(h), "%s.%d", home_incr, j);
-                (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, f, h, f);
+                testutil_system("cp %s/%s %s/%s", home, f, h, f);
 #if 0
                 printf("FULL: Copy: %s\n", buf);
 #endif
-                error_check(system(buf));
             }
         else {
 #if 0
             (void)snprintf(h, sizeof(h), "%s.%d", home_full, i);
 #endif
-            (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, f, hdir, f);
+            testutil_system("cp %s/%s %s/%s", home, f, hdir, f);
 #if 0
             printf("FULL %d: Copy: %s\n", i, buf);
 #endif
-            error_check(system(buf));
         }
     }
     scan_end_check(ret == WT_NOTFOUND);
@@ -355,14 +341,12 @@ take_incr_backup(WT_SESSION *session, int i)
         error_check(process_file(&flist, &count, &alloc, filename));
         (void)snprintf(h, sizeof(h), "%s.0", home_incr);
         if (strncmp(filename, WTLOG, WTLOGLEN) == 0)
-            (void)snprintf(buf, sizeof(buf), "cp %s/%s/%s %s/%s/%s", home, logpath, filename, h,
-              logpath, filename);
+            testutil_system("cp %s/%s/%s %s/%s/%s", home, logpath, filename, h, logpath, filename);
         else
-            (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
+            testutil_system("cp %s/%s %s/%s", home, filename, h, filename);
 #if 0
         printf("Copying backup: %s\n", buf);
 #endif
-        error_check(system(buf));
         first = true;
 
         (void)snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename);
@@ -413,14 +397,13 @@ take_incr_backup(WT_SESSION *session, int i)
                 testutil_assert(first == true);
                 rfd = wfd = -1;
                 if (strncmp(filename, WTLOG, WTLOGLEN) == 0)
-                    (void)snprintf(buf, sizeof(buf), "cp %s/%s/%s %s/%s/%s", home, logpath,
-                      filename, h, logpath, filename);
+                    testutil_system(
+                      "cp %s/%s/%s %s/%s/%s", home, logpath, filename, h, logpath, filename);
                 else
-                    (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
+                    testutil_system("cp %s/%s %s/%s", home, filename, h, filename);
 #if 0
                 printf("Incremental: Whole file copy: %s\n", buf);
 #endif
-                error_check(system(buf));
             }
         }
         scan_end_check(ret == WT_NOTFOUND);
@@ -440,11 +423,10 @@ take_incr_backup(WT_SESSION *session, int i)
         for (j = i; j < MAX_ITERATIONS; j++) {
             (void)snprintf(h, sizeof(h), "%s.%d", home_incr, j);
             if (strncmp(filename, WTLOG, WTLOGLEN) == 0)
-                (void)snprintf(buf, sizeof(buf), "cp %s/%s/%s %s/%s/%s", home, logpath, filename, h,
-                  logpath, filename);
+                testutil_system(
+                  "cp %s/%s/%s %s/%s/%s", home, logpath, filename, h, logpath, filename);
             else
-                (void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s", home, filename, h, filename);
-            error_check(system(buf));
+                testutil_system("cp %s/%s %s/%s", home, filename, h, filename);
         }
     }
     scan_end_check(ret == WT_NOTFOUND);
@@ -468,8 +450,7 @@ main(int argc, char *argv[])
     (void)argc; /* Unused variable */
     (void)testutil_set_progname(argv);
 
-    (void)snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s && mkdir -p %s/%s", home, home, logpath);
-    error_check(system(cmd_buf));
+    testutil_system("rm -rf %s && mkdir -p %s/%s", home, home, logpath);
     error_check(wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn));
 
     setup_directories();

@@ -1132,8 +1132,6 @@ pack_ops(WT_SESSION *session)
 static void
 backup(WT_SESSION *session)
 {
-    char buf[1024];
-
     WT_CURSOR *dup_cursor;
     /*! [backup]*/
     WT_CURSOR *cursor;
@@ -1149,9 +1147,7 @@ backup(WT_SESSION *session)
     /* Copy the list of files. */
     while ((ret = cursor->next(cursor)) == 0) {
         error_check(cursor->get_key(cursor, &filename));
-        (void)snprintf(
-          buf, sizeof(buf), "cp /path/database/%s /path/database.backup/%s", filename, filename);
-        error_check(system(buf));
+        testutil_system("cp /path/database/%s /path/database.backup/%s", filename, filename);
     }
     scan_end_check(ret == WT_NOTFOUND);
 

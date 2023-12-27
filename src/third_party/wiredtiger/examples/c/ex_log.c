@@ -247,16 +247,14 @@ main(int argc, char *argv[])
     WT_CURSOR *cursor;
     WT_SESSION *session;
     int count_min, i, record_count;
-    char cmd_buf[256], k[32], v[32];
+    char k[32], v[32];
 
     (void)argc; /* Unused variable */
     (void)testutil_set_progname(argv);
 
     count_min = 0;
 
-    (void)snprintf(
-      cmd_buf, sizeof(cmd_buf), "rm -rf %s %s && mkdir %s %s", home1, home2, home1, home2);
-    error_check(system(cmd_buf));
+    testutil_system("rm -rf %s %s && mkdir %s %s", home1, home2, home1, home2);
     error_check(wiredtiger_open(home1, NULL, CONN_CONFIG, &wt_conn));
 
     error_check(wt_conn->open_session(wt_conn, NULL, NULL, &session));

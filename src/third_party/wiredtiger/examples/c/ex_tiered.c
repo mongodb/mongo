@@ -118,7 +118,7 @@ main(int argc, char *argv[])
     WT_CONNECTION *conn;
     WT_SESSION *session;
     const char *home;
-    char buf[1024], config[1024];
+    char config[1024];
 
     if (!platform_supported()) {
         fprintf(stderr, "**** Warning: %s is not supported on this platform\n", argv[0]);
@@ -147,9 +147,7 @@ main(int argc, char *argv[])
       BUCKET_NAME, STORAGE_SOURCE, BUILD_DIR, STORAGE_SOURCE, STORAGE_SOURCE);
 
     /* Create the home directory, and the bucket directory underneath it. */
-    (void)snprintf(
-      buf, sizeof(buf), "rm -rf %s && mkdir %s && mkdir %s/%s", home, home, home, BUCKET_NAME);
-    error_check(system(buf));
+    testutil_system("rm -rf %s && mkdir %s && mkdir %s/%s", home, home, home, BUCKET_NAME);
 
     /* Configure the connection to use tiered storage. */
     error_check(wiredtiger_open(home, NULL, config, &conn));
