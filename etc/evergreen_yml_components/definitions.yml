@@ -39,6 +39,9 @@ variables:
       resmoke_args: --help
       resmoke_jobs_max: 0  # No cap on number of jobs.
 
+# THIS HAS COPIES IN
+# - etc/evergreen_yml_components/definitions.yml
+# - etc/evergreen_yml_components/tasks/components/replication/resmoke_tasks.yml
 - &gen_task_template
   name: gen_task_template
   depends_on:
@@ -6600,111 +6603,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: bulk_write_replica_sets_jscore_passthrough_gen
-  tags: ["bulk_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: bulk_write_replica_sets_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["bulk_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: bulk_write_replica_sets_multi_stmt_txn_kill_stepdown_terminate_jscore_passthrough_gen
-  tags: ["bulk_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: bulk_write_replica_sets_kill_stepdown_terminate_jscore_passthrough_gen
-  tags: ["bulk_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: bulk_write_causally_consistent_jscore_passthrough_gen
-  tags: ["bulk_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: bulk_write_multi_op_causally_consistent_jscore_passthrough_gen
-  tags: ["bulk_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: bulk_write_targeted_override_gen
-  tags: ["bulk_write"]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: bulk_write_sharded_collections_jscore_passthrough_gen
-  tags: ["bulk_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: bulk_write_sharded_causally_consistent_jscore_passthrough_gen
-  tags: ["bulk_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: bulk_write_sharded_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["bulk_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: bulk_write_multi_op_sharded_collections_jscore_passthrough_gen
-  tags: ["bulk_write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: concurrency_replication_bulk_write_gen
-  tags: ["bulk_write"]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: concurrency_sharded_replication_bulk_write_gen
-  tags: ["bulk_write"]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        use_large_distro: "true"
-        resmoke_jobs_max: 1
 
 - <<: *gen_task_template
   name: shard_split_jscore_passthrough_gen

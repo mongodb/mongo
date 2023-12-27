@@ -1,0 +1,131 @@
+#######################################
+#             Variable                #
+#######################################
+variables:
+# THIS HAS COPIES IN
+# - etc/evergreen_yml_components/definitions.yml
+# - etc/evergreen_yml_components/tasks/components/replication/resmoke_tasks.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &gen_task_template
+  name: gen_task_template
+  depends_on:
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+  - name: archive_dist_test_debug
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_args: --help
+
+
+#######################################
+#               Tasks                 #
+#######################################
+tasks:
+- <<: *gen_task_template
+  name: bulk_write_replica_sets_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_replica_sets_multi_stmt_txn_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_replica_sets_multi_stmt_txn_kill_stepdown_terminate_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_replica_sets_kill_stepdown_terminate_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_causally_consistent_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_multi_op_causally_consistent_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_targeted_override_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_sharded_collections_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_sharded_causally_consistent_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_sharded_multi_stmt_txn_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_multi_op_sharded_collections_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: concurrency_replication_bulk_write_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: concurrency_sharded_replication_bulk_write_gen
+  tags: ["assigned_to_component_replication", "bulk_write"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        use_large_distro: "true"
+        resmoke_jobs_max: 1
