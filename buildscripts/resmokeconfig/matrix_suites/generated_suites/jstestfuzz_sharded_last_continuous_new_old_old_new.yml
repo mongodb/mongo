@@ -26,12 +26,16 @@ executor:
       set_parameters:
         disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
       verbose: ''
     mongos_options:
       set_parameters:
         enableTestCommands: 1
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
       verbose: ''
     num_rs_nodes_per_shard: 2
     num_shards: 2

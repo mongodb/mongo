@@ -26,6 +26,8 @@ executor:
       set_parameters:
         disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
       verbose: ''
