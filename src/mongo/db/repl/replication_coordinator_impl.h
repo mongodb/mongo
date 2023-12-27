@@ -232,8 +232,12 @@ public:
     virtual void setMyLastWrittenOpTimeAndWallTimeForward(
         const OpTimeAndWallTime& opTimeAndWallTime);
     virtual void setMyLastAppliedOpTimeAndWallTimeForward(
-        const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp = true);
+        const OpTimeAndWallTime& opTimeAndWallTime);
     virtual void setMyLastDurableOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime);
+    virtual void setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime);
+    virtual void setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(
         const OpTimeAndWallTime& opTimeAndWallTime);
 
     virtual void resetMyLastOpTimes();
@@ -1208,6 +1212,12 @@ private:
     void _setMyLastDurableOpTimeAndWallTime(WithLock lk,
                                             const OpTimeAndWallTime& opTimeAndWallTime,
                                             bool isRollbackAllowed);
+    // The return bool value means whether the corresponding timestamp is advanced in these
+    // functions.
+    bool _setMyLastAppliedOpTimeAndWallTimeForward(WithLock lk,
+                                                   const OpTimeAndWallTime& opTimeAndWallTime);
+    bool _setMyLastDurableOpTimeAndWallTimeForward(WithLock lk,
+                                                   const OpTimeAndWallTime& opTimeAndWallTime);
 
     /**
      * Schedules a heartbeat using this node's "replSetName" to be sent to "target" at "when".

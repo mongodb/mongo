@@ -211,11 +211,21 @@ void ReplicationCoordinatorEmbedded::setMyLastWrittenOpTimeAndWallTimeForward(
 }
 
 void ReplicationCoordinatorEmbedded::setMyLastAppliedOpTimeAndWallTimeForward(
-    const OpTimeAndWallTime&, bool) {
+    const OpTimeAndWallTime&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
 void ReplicationCoordinatorEmbedded::setMyLastDurableOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime&) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+void ReplicationCoordinatorEmbedded::setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime&) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+void ReplicationCoordinatorEmbedded::setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(
     const OpTimeAndWallTime&) {
     UASSERT_NOT_IMPLEMENTED;
 }

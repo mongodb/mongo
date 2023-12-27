@@ -159,6 +159,7 @@ namespace repl {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
+MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 
 // The count of items in the buffer
 OplogBuffer::Counters bufferGauge("repl.buffer");
@@ -1284,7 +1285,7 @@ JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken(Operati
     if (auto truncatePoint = repl::ReplicationProcess::get(opCtx)
                                  ->getConsistencyMarkers()
                                  ->refreshOplogTruncateAfterPointIfPrimary(opCtx)) {
-        return *truncatePoint;
+        return {*truncatePoint, true /*isPrimary*/};
     }
 
     // All other repl states use the 'lastApplied'.
@@ -1299,12 +1300,27 @@ JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken(Operati
     // divergent 'lastApplied' value is present. The JournalFlusher will start up again in
     // ROLLBACK and never transition from non-ROLLBACK to ROLLBACK with a divergent
     // 'lastApplied' value.
-    return repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTimeAndWallTime(
-        /*rollbackSafe=*/true);
+    return {repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTimeAndWallTime(
+                /*rollbackSafe=*/true),
+            false /*isPrimary*/};
 }
 
 void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::Token& token) {
-    repl::ReplicationCoordinator::get(_service)->setMyLastDurableOpTimeAndWallTimeForward(token);
+    if (MONGO_unlikely(skipDurableTimestampUpdates.shouldFail())) {
+        return;
+    }
+    // The second value in the token means whether this token was acquired when this node was a
+    // primary. On primary, the lastWritten OpTime is updated by the storage transaction's
+    // onCommit() hook, which has a chance to be called later than this onDurable(). In that case,
+    // we want to advance lastWritten here as well to maintain the property that lastWritten >=
+    // lastDurable. However, on secondary, we should always have lastWritten being advanced first.
+    if (token.second) {
+        repl::ReplicationCoordinator::get(_service)
+            ->setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(token.first);
+    } else {
+        repl::ReplicationCoordinator::get(_service)->setMyLastDurableOpTimeAndWallTimeForward(
+            token.first);
+    }
 }
 
 void ReplicationCoordinatorExternalStateImpl::startNoopWriter(OpTime opTime) {

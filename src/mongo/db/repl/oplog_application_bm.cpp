@@ -542,7 +542,7 @@ public:
 
             // Advance timestamps.
             _testSvcCtx->getReplCoordMock()->setMyLastAppliedOpTimeAndWallTimeForward(
-                {lastOpTimeInBatch, lastWallTimeInBatch}, true);
+                {lastOpTimeInBatch, lastWallTimeInBatch});
             _testSvcCtx->getReplCoordMock()->setMyLastDurableOpTimeAndWallTimeForward(
                 {lastOpTimeInBatch, lastWallTimeInBatch});
             repl::StorageInterface::get(opCtx)->setStableTimestamp(

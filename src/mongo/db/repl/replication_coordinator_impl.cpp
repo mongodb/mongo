@@ -179,7 +179,6 @@ MONGO_FAIL_POINT_DEFINE(waitForHelloResponse);
 MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForHelloResponse);
 // Will cause a hello request to hang after it times out waiting for a topology change.
 MONGO_FAIL_POINT_DEFINE(hangAfterWaitingForTopologyChangeTimesOut);
-MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 // Skip sending heartbeats to pre-check that a quorum is available before a reconfig.
 MONGO_FAIL_POINT_DEFINE(omitConfigQuorumCheck);
 // Will cause signal drain complete to hang right before acquiring the RSTL.
@@ -706,8 +705,10 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
                     1,
                     "Setting this node's last applied and durable opTimes to the top of the oplog");
         bool isRollbackAllowed = false;
+        _setMyLastWrittenOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
         _setMyLastAppliedOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
         _setMyLastDurableOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
+
         _reportUpstream_inlock(std::move(lock));  // unlocks _mutex.
     } else {
         lock.unlock();
@@ -1435,42 +1436,25 @@ void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
 void ReplicationCoordinatorImpl::setMyLastWrittenOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime) {
     stdx::unique_lock<Latch> lock(_mutex);
-    _setMyLastWrittenOpTimeAndWallTime(lock, opTimeAndWallTime, false);
-    _reportUpstream_inlock(std::move(lock));
+
+    if (opTimeAndWallTime.opTime > _getMyLastWrittenOpTime_inlock()) {
+        _setMyLastWrittenOpTimeAndWallTime(lock, opTimeAndWallTime, false);
+        _reportUpstream_inlock(std::move(lock));
+    }
 }
 
 void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeAndWallTimeForward(
-    const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp) {
+    const OpTimeAndWallTime& opTimeAndWallTime) {
     // Update the global timestamp before setting the last applied opTime forward so the last
     // applied optime is never greater than the latest cluster time in the logical clock.
-    const auto opTime = opTimeAndWallTime.opTime;
-
-    // The caller may have already advanced the global timestamp, so they may request that we skip
-    // this step.
-    if (advanceGlobalTimestamp) {
-        _externalState->setGlobalTimestamp(getServiceContext(), opTime.getTimestamp());
-    }
-
+    _externalState->setGlobalTimestamp(getServiceContext(),
+                                       opTimeAndWallTime.opTime.getTimestamp());
     stdx::unique_lock<Latch> lock(_mutex);
-    auto myLastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
-    if (opTime > myLastAppliedOpTime) {
-        _setMyLastAppliedOpTimeAndWallTime(lock, opTimeAndWallTime, false);
-        _reportUpstream_inlock(std::move(lock));
-    } else {
-        if (opTime != myLastAppliedOpTime) {
-            // In pv1, oplog entries are ordered by non-decreasing term and strictly increasing
-            // timestamp. So, in pv1, its not possible for us to get opTime with lower term and
-            // timestamp higher than or equal to our current lastAppliedOptime.
-            invariant(opTime.getTerm() == OpTime::kUninitializedTerm ||
-                      myLastAppliedOpTime.getTerm() == OpTime::kUninitializedTerm ||
-                      opTime.getTimestamp() < myLastAppliedOpTime.getTimestamp());
-        }
 
-        if (_readWriteAbility->canAcceptNonLocalWrites(lock) && _rsConfig.getWriteMajority() == 1) {
-            // Single vote primaries may have a lagged stable timestamp due to paring back the
-            // stable timestamp to the all committed timestamp.
-            _setStableTimestampForStorage(lock);
-        }
+    // TODO(SERVER-83573): Enable this invariant.
+    // invariant(opTimeAndWallTime.opTime <= _getMyLastWrittenOpTime_inlock());
+    if (_setMyLastAppliedOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
+        _reportUpstream_inlock(std::move(lock));
     }
 }
 
@@ -1478,12 +1462,44 @@ void ReplicationCoordinatorImpl::setMyLastDurableOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime) {
     stdx::unique_lock<Latch> lock(_mutex);
 
-    if (MONGO_unlikely(skipDurableTimestampUpdates.shouldFail())) {
-        return;
+    // TODO(SERVER-83573): Enable this invariant.
+    // invariant(opTimeAndWallTime.opTime <= _getMyLastWrittenOpTime_inlock());
+    if (_setMyLastDurableOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
+        _reportUpstream_inlock(std::move(lock));
     }
+}
 
-    if (opTimeAndWallTime.opTime > _getMyLastDurableOpTime_inlock()) {
-        _setMyLastDurableOpTimeAndWallTime(lock, opTimeAndWallTime, false);
+void ReplicationCoordinatorImpl::setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime& opTimeAndWallTime) {
+    // As an optimization, we skip advancing the global timestamp. This function is used on the
+    // primary write path and the caller will have already advanced the clock to at least this value
+    // when allocating the timestamp.
+    stdx::unique_lock<Latch> lock(_mutex);
+
+    // Note: Technically _reportUpstream_inlock() should be called either when supplied opTime >
+    // lastApplied OR opTime > lastWritten, however we only call it when supplied opTime >
+    // lastApplied. This is okay because we should always have lastWritten >= lastApplied so if
+    // opTime > lastWritten, then opTime > lastApplied is also true.
+    if (opTimeAndWallTime.opTime > _getMyLastWrittenOpTime_inlock()) {
+        _setMyLastWrittenOpTimeAndWallTime(lock, opTimeAndWallTime, false);
+    }
+    if (_setMyLastAppliedOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
+        _reportUpstream_inlock(std::move(lock));
+    }
+}
+
+void ReplicationCoordinatorImpl::setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime& opTimeAndWallTime) {
+    stdx::unique_lock<Latch> lock(_mutex);
+
+    // Note: Technically _reportUpstream_inlock() should be called either when supplied opTime >
+    // lastDurable OR opTime > lastWritten, however we only call it when supplied opTime >
+    // lastDurable. This is okay because we should always have lastWritten >= lastDurable so if
+    // opTime > lastWritten, then opTime > lastDurable is also true.
+    if (opTimeAndWallTime.opTime > _getMyLastWrittenOpTime_inlock()) {
+        _setMyLastWrittenOpTimeAndWallTime(lock, opTimeAndWallTime, false);
+    }
+    if (_setMyLastDurableOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
         _reportUpstream_inlock(std::move(lock));
     }
 }
@@ -1587,6 +1603,42 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTime(
     // There could be replication waiters waiting for our lastDurable for {j: true}, wake up those
     // that now have their write concern satisfied.
     _wakeReadyWaiters(lk, opTimeAndWallTime.opTime);
+}
+
+bool ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTimeForward(
+    WithLock lk, const OpTimeAndWallTime& opTimeAndWallTime) {
+    const auto opTime = opTimeAndWallTime.opTime;
+    auto myLastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
+    if (opTime > myLastAppliedOpTime) {
+        _setMyLastAppliedOpTimeAndWallTime(lk, opTimeAndWallTime, false);
+        return true;
+    }
+
+    if (opTime != myLastAppliedOpTime) {
+        // In pv1, oplog entries are ordered by non-decreasing term and strictly increasing
+        // timestamp. So, in pv1, its not possible for us to get opTime with lower term and
+        // timestamp higher than or equal to our current lastAppliedOptime.
+        invariant(opTime.getTerm() == OpTime::kUninitializedTerm ||
+                  myLastAppliedOpTime.getTerm() == OpTime::kUninitializedTerm ||
+                  opTime.getTimestamp() < myLastAppliedOpTime.getTimestamp());
+    }
+
+    if (_readWriteAbility->canAcceptNonLocalWrites(lk) && _rsConfig.getWriteMajority() == 1) {
+        // Single vote primaries may have a lagged stable timestamp due to paring back the
+        // stable timestamp to the all committed timestamp.
+        _setStableTimestampForStorage(lk);
+    }
+
+    return false;
+}
+
+bool ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTimeForward(
+    WithLock lk, const OpTimeAndWallTime& opTimeAndWallTime) {
+    if (opTimeAndWallTime.opTime > _getMyLastDurableOpTime_inlock()) {
+        _setMyLastDurableOpTimeAndWallTime(lk, opTimeAndWallTime, false);
+        return true;
+    }
+    return false;
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastWrittenOpTime() const {

@@ -185,8 +185,12 @@ public:
     virtual void setMyLastWrittenOpTimeAndWallTimeForward(
         const OpTimeAndWallTime& opTimeAndWallTime);
     virtual void setMyLastAppliedOpTimeAndWallTimeForward(
-        const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp = true);
+        const OpTimeAndWallTime& opTimeAndWallTime);
     virtual void setMyLastDurableOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime);
+    virtual void setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime);
+    virtual void setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(
         const OpTimeAndWallTime& opTimeAndWallTime);
 
     virtual void resetMyLastOpTimes();

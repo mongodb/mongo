@@ -6355,7 +6355,6 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
         replCoordSetMyLastAppliedOpTime(opTimeToWait, Date_t() + Seconds(100));
         replCoordSetMyLastDurableOpTime(opTimeToWait, Date_t() + Seconds(100));
     });
-
     ASSERT_OK(getReplCoord()->waitUntilOpTimeForRead(
         opCtx.get(), ReadConcernArgs(opTimeToWait, ReadConcernLevel::kMajorityReadConcern)));
     pseudoLogOp.get();
@@ -7177,10 +7176,10 @@ TEST_F(ReplCoordTest,
 
     replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(100));
     ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
-    replCoordSetMyLastAppliedOpTimeForward(time3, Date_t() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(time3, Date_t() + Seconds(100));
     ASSERT_EQUALS(time3, getReplCoord()->getMyLastAppliedOpTime());
-    replCoordSetMyLastAppliedOpTimeForward(time2, Date_t() + Seconds(100));
-    replCoordSetMyLastDurableOpTimeForward(time2, Date_t() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(time2, Date_t() + Seconds(100));
     ASSERT_EQUALS(time3, getReplCoord()->getMyLastAppliedOpTime());
 }
 
@@ -7203,7 +7202,7 @@ DEATH_TEST_F(ReplCoordTest,
     ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
     // Since in pv1, oplog entries are ordered by non-decreasing
     // term and strictly increasing timestamp, it leads to invariant failure.
-    replCoordSetMyLastAppliedOpTimeForward(time2, Date_t() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
 }
 
 DEATH_TEST_F(ReplCoordTest,
@@ -7225,7 +7224,7 @@ DEATH_TEST_F(ReplCoordTest,
     ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
     // Since in pv1, oplog entries are ordered by non-decreasing
     // term and strictly increasing timestamp, it leads to invariant failure.
-    replCoordSetMyLastAppliedOpTimeForward(time2, Date_t() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
 }
 
 DEATH_TEST_F(ReplCoordTest,
@@ -7247,7 +7246,7 @@ DEATH_TEST_F(ReplCoordTest,
     ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
     // Since in pv1, oplog entries are ordered by non-decreasing
     // term and strictly increasing timestamp, it leads to invariant failure.
-    replCoordSetMyLastAppliedOpTimeForward(time2, Date_t() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
 }
 
 DEATH_TEST_F(ReplCoordTest,
@@ -7269,7 +7268,7 @@ DEATH_TEST_F(ReplCoordTest,
     ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
     // Since in pv1, oplog entries are ordered by non-decreasing
     // term and strictly increasing timestamp, it leads to invariant failure.
-    replCoordSetMyLastAppliedOpTimeForward(time2, Date_t() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
 }
 
 TEST_F(ReplCoordTest, OnlyForwardSyncProgressForOtherNodesWhenTheNodesAreBelievedToBeUp) {
@@ -8516,8 +8515,62 @@ TEST_F(ReplCoordTest, LastWrittenGetterSetterBasic) {
     ASSERT_EQUALS(time2, getReplCoord()->getMyLastWrittenOpTimeAndWallTime().opTime);
     ASSERT_EQUALS(Date_t() + Seconds(200),
                   getReplCoord()->getMyLastWrittenOpTimeAndWallTime().wallTime);
+    replCoordSetMyLastWrittenOpTime(time1, Date_t() + Seconds(100));
+    ASSERT_EQUALS(time2, getReplCoord()->getMyLastWrittenOpTime());
+    ASSERT_EQUALS(time2, getReplCoord()->getMyLastWrittenOpTimeAndWallTime().opTime);
+    ASSERT_EQUALS(Date_t() + Seconds(200),
+                  getReplCoord()->getMyLastWrittenOpTimeAndWallTime().wallTime);
 }
 
+TEST_F(ReplCoordTest, LastWrittenCombinedGetterSetterBasic) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+
+    auto term = getTopoCoord().getTerm();
+    OpTime time0(Timestamp(100, 1), term);
+    OpTime time1(Timestamp(100, 2), term);
+    OpTime time2(Timestamp(100, 3), term);
+    replCoordSetMyLastWrittenOpTime(time0, Date_t() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(time0, Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(time0, Date_t() + Seconds(100));
+    ASSERT_EQUALS(time0, getReplCoord()->getMyLastWrittenOpTime());
+    ASSERT_EQUALS(time0, getReplCoord()->getMyLastAppliedOpTime());
+    ASSERT_EQUALS(time0, getReplCoord()->getMyLastDurableOpTime());
+    replCoordSetMyLastDurableAndLastWrittenOpTime(time1, Date_t() + Seconds(200));
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastWrittenOpTime());
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastDurableOpTime());
+    ASSERT_EQUALS(time0, getReplCoord()->getMyLastAppliedOpTime());
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastWrittenOpTimeAndWallTime().opTime);
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastDurableOpTimeAndWallTime().opTime);
+    ASSERT_EQUALS(time0, getReplCoord()->getMyLastAppliedOpTimeAndWallTime().opTime);
+    ASSERT_EQUALS(Date_t() + Seconds(200),
+                  getReplCoord()->getMyLastWrittenOpTimeAndWallTime().wallTime);
+    ASSERT_EQUALS(Date_t() + Seconds(200),
+                  getReplCoord()->getMyLastDurableOpTimeAndWallTime().wallTime);
+    ASSERT_EQUALS(Date_t() + Seconds(100),
+                  getReplCoord()->getMyLastAppliedOpTimeAndWallTime().wallTime);
+    // We need to manually setGlobalTimestamp here because setMyLastAppliedAndLastWritten won't
+    // advance globalTimestamp.
+    getExternalState()->setGlobalTimestamp(getServiceContext(), time2.getTimestamp());
+    replCoordSetMyLastAppliedAndLastWrittenOpTime(time2, Date_t() + Seconds(300));
+    ASSERT_EQUALS(time2, getReplCoord()->getMyLastWrittenOpTime());
+    ASSERT_EQUALS(time2, getReplCoord()->getMyLastAppliedOpTime());
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastDurableOpTime());
+    ASSERT_EQUALS(time2, getReplCoord()->getMyLastWrittenOpTimeAndWallTime().opTime);
+    ASSERT_EQUALS(time2, getReplCoord()->getMyLastAppliedOpTimeAndWallTime().opTime);
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastDurableOpTimeAndWallTime().opTime);
+    ASSERT_EQUALS(Date_t() + Seconds(300),
+                  getReplCoord()->getMyLastWrittenOpTimeAndWallTime().wallTime);
+    ASSERT_EQUALS(Date_t() + Seconds(300),
+                  getReplCoord()->getMyLastAppliedOpTimeAndWallTime().wallTime);
+    ASSERT_EQUALS(Date_t() + Seconds(200),
+                  getReplCoord()->getMyLastDurableOpTimeAndWallTime().wallTime);
+}
 // TODO(schwerin): Unit test election id updating
 }  // namespace
 }  // namespace repl

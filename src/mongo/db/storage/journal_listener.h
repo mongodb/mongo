@@ -48,7 +48,9 @@ class OperationContext;
  */
 class JournalListener {
 public:
-    using Token = repl::OpTimeAndWallTime;
+    // The second bool value is used to identify whether this token is acquired on primary or
+    // secondary. It is used to drive the onDurable() hook to call different lastDurable setters.
+    using Token = std::pair<repl::OpTimeAndWallTime, bool>;
     virtual ~JournalListener() = default;
     virtual Token getToken(OperationContext* opCtx) = 0;
     virtual void onDurable(const Token& token) = 0;

@@ -166,11 +166,14 @@ public:
 
     void setMyLastWrittenOpTimeAndWallTimeForward(
         const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
-    void setMyLastAppliedOpTimeAndWallTimeForward(const repl::OpTimeAndWallTime& opTimeAndWallTime,
-                                                  bool advanceGlobalTime) override;
+    void setMyLastAppliedOpTimeAndWallTimeForward(
+        const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
     void setMyLastDurableOpTimeAndWallTimeForward(
         const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
-
+    void setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward(
+        const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
+    void setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(
+        const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
 
     void resetMyLastOpTimes() override;
 

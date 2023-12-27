@@ -371,43 +371,55 @@ public:
 
     /**
      * Updates our internal tracking of the last OpTime that an oplog entry is written into memory
-     * on this node.
+     * on this node if the supplied optime is later than the current lastWritten OpTime.
      */
     virtual void setMyLastWrittenOpTimeAndWallTimeForward(
         const OpTimeAndWallTime& opTimeAndWallTime) = 0;
 
     /**
-     * Updates our internal tracking of the last OpTime applied to this node, but only
-     * if the supplied optime is later than the current last OpTime known to the replication
+     * Updates our internal tracking of the last OpTime applied to this node, but only if the
+     * supplied optime is later than the current lastApplied OpTime known to the replication
      * coordinator.
      *
-     * This function is used by logOp() on a primary, since the ops in the oplog do not
-     * necessarily commit in sequential order. It is also used when we finish oplog batch
-     * application on secondaries, to avoid any potential race conditions around setting the
-     * applied optime from more than one thread.
+     * This function is only used on secondary and the caller needs to make sure the input opTime is
+     * not greater than the current lastWritten timestamp.
      *
      * Since the last applied op time and wall time might not be visible (i.e. there may be
      * "oplog holes" from oplog entries with earlier timestamps which commit after this one)
      * this method does not notify oplog waiters.  Callers which know the new lastApplied is at
      * a no-holes point should call signalOplogWaiters after calling this method.
-     *
-     * If advanceGlobalTimestamp is false, we will not advance the global OpTime. The caller takes
-     * responsibility for doing this instead.
      */
     virtual void setMyLastAppliedOpTimeAndWallTimeForward(
-        const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp = true) = 0;
+        const OpTimeAndWallTime& opTimeAndWallTime) = 0;
 
     /**
-     * Updates our internal tracking of the last OpTime durable to this node, but only
-     * if the supplied optime is later than the current last OpTime known to the replication
+     * Updates our internal tracking of the last OpTime durable to this node, but only if the
+     * supplied optime is later than the current lastDurable OpTime known to the replication
      * coordinator. Also updates the wall clock time corresponding to that operation.
      *
-     * This function is used by logOp() on a primary, since the ops in the oplog do not
-     * necessarily commit in sequential order.
+     * This function is used by onDurable() hook on secondary, while primary should use
+     * setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward() instead. The caller needs to make
+     * sure the input opTime is not greater than the current lastWritten timestamp.
      */
     virtual void setMyLastDurableOpTimeAndWallTimeForward(
         const OpTimeAndWallTime& opTimeAndWallTime) = 0;
-    // virtual void setMyLastDurableOpTimeForward(const OpTimeAndWallTime& opTimeAndWallTime) = 0;
+
+    /**
+     * Update lastApplied and lastWritten under the same lock guard. This is used by the oplog
+     * onCommit() hook on the primary.
+     */
+    virtual void setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime) = 0;
+
+    /**
+     * Update lastDurable and lastWritten under the same lock guard. This should only be used on
+     * primary due to an edge case that the onCommit() hook is stuck at somewhere and lastWritten
+     * has not been updated yet. On secondary, we always write oplog into in-memory collection first
+     * before journal flush, which means that lastWritten should already be updated, so we should
+     * use setMyLastDurableOpTimeAndWallTimeForward() instead.
+     */
+    virtual void setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime) = 0;
 
     /**
      * Same as above, but used during places we need to zero our last optime.
