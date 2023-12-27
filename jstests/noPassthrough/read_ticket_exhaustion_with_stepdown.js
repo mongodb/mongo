@@ -14,27 +14,22 @@
  * between the main thread of the test and all the readers via writes to specific
  * documents. One side will wait until the document appears.
  *
- * Two types of Parallel Shells:
- * There are two sets of readers - queued and new - meant to saturate the ticketing
- * system before and after the sleep operation that holds the global X lock. This
- * dual system of readers ensures that enqueued/blocked readers as well as newly
- * arriving reads are serviced without deadlocking.
- * queuedLongReadsFunc - Issues long read commands until told to stop.
- *    newLongReadsFunc - When told to begin, issues long read commands until told
- *                       to stop.
- *
  * Test Steps:
  * 0) Start ReplSet with special params:
  *     - lower read ticket concurrency
  *     - increase yielding
- * 1) Insert 1000 documents.
- * 2) Kick off parallel readers that perform long collection scans, subject to yields.
- * 3) Sleep with global X Lock (including RSTL), thus queuing up reads.
- * 4) Signal new readers that will be received after the global lock is released.
- * 5) Initiate step down while queue is working its way down to ensure there is a mix of
- *     enqueued readers from the global X lock and new readers initiated afterwards.
- * <<Should have deadlocked by now for this scenario>>
- * 6) Stop Readers.
+ * 1) Insert kNumDocs documents.
+ * 2) Kick off many parallel readers that perform long collection scans that are subject to yields.
+ * 3) Wait for many parallel read shells to run.
+ * 4) Hold tickets before they're given back to the pool. This is what ensures that we're holding
+ *    all of the read tickets before the stepdown so that one of the readers has to yield.
+ * 5) Wait for many parallel readers to run.
+ * 6) Ensure that there are no available read tickets.
+ * 7) Hold stepDown so that we know that upon release, it will need a read ticket ~immediately.
+ * 8) Initiate stepDown.
+ * 9) Hold tickets again, verify state, unlock, and proceed with stepDown.
+ *    <<Should deadlock here for this scenario>>
+ * 10) Stop readers and clean up.
  *
  * @tags: [
  *   multiversion_incompatible,
@@ -42,8 +37,13 @@
  *   requires_wiredtiger,
  * ]
  */
+
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
+(function() {
+"use strict";
+
+const kNumDocs = 1000;
 const kNumReadTickets = 5;
 const replTest = new ReplSetTest({
     name: jsTestName(),
@@ -51,7 +51,6 @@ const replTest = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             // This test seeks the minimum amount of concurrency to force ticket exhaustion.
-            storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
             storageEngineConcurrentReadTransactions: kNumReadTickets,
             // Make yielding more common.
             internalQueryExecYieldPeriodMS: 1,
@@ -63,76 +62,34 @@ const replTest = new ReplSetTest({
 const dbName = jsTestName();
 const collName = "testcoll";
 let nQueuedReaders = 20;
-let nNewReaders = 10;
+// Ensure that when read tickets are released, we have enough reads queued right behind to take the
+// tickets again, ensuring that stepDown competes with reads and a read must yield.
+assert.gte(nQueuedReaders, kNumReadTickets * 2);
 TestData.dbName = dbName;
 TestData.collName = collName;
 
 // Issues long read commands until told to stop.
 // Should be run in a parallel shell via startParallelShell() with a unique id.
 function queuedLongReadsFunc(id) {
-    jsTestLog("Starting Queued Reader [" + id + "]");
-
+    jsTestLog("Starting queued reader [" + id + "]");
+    db.getMongo().setSecondaryOk();
+    db.getSiblingDB(TestData.dbName)
+        .timing_coordination.insert({_id: id, msg: "queued reader started"});
     try {
         for (let i = 0;
              db.getSiblingDB(TestData.dbName).timing_coordination.findOne({_id: "stop reading"}) ==
              null;
              i++) {
-            jsTestLog("queuedLongReadsFunc on " + TestData.dbName + "." + TestData.collName +
-                      " read (" + i + ") beg. Reader id:" + id);
             try {
                 db.getSiblingDB(TestData.dbName)[TestData.collName].aggregate([{"$count": "x"}]);
             } catch (e) {
-                jsTestLog("ignoring failed read, possible due to stepdown", e);
+                jsTestLog("Ignoring failed read that may be due to stepdown [" + id + "]", e);
             }
-            jsTestLog("queuedLongReadsFunc read (" + i + ") end. Reader id:" + id);
         }
     } catch (e) {
         jsTestLog("Exiting reader [" + id + "] early due to:" + e);
     }
     jsTestLog("Queued Reader complete [" + id + "]");
-}
-
-// When told to begin, issues long read commands until told to stop.
-// Should be run in a parallel shell via startParallelShell() with a unique id.
-function newLongReadsFunc(id) {
-    jsTestLog("Starting New Reader [" + id + "]");
-
-    // Coordinate all readers to begin at the same time.
-    assert.soon(() => db.getSiblingDB(TestData.dbName).timing_coordination.findOne({
-        _id: "begin new readers"
-    }) !== null,
-                "Expected main test thread to insert a document.");
-
-    try {
-        for (let i = 0;
-             db.getSiblingDB(TestData.dbName).timing_coordination.findOne({_id: "stop reading"}) ==
-             null;
-             i++) {
-            jsTestLog("newLongReadsFunc on " + TestData.dbName + "." + TestData.collName +
-                      " read (" + i + ") beg. Reader id:" + id);
-            try {
-                db.getSiblingDB(TestData.dbName)[TestData.collName].aggregate([{"$count": "x"}]);
-            } catch (e) {
-                jsTestLog("ignoring failed read, possible due to stepdown", e);
-            }
-            jsTestLog("newLongReadsFunc read (" + i + ") end. Reader id:" + id);
-        }
-    } catch (e) {
-        jsTestLog("Exiting reader [" + id + "] early due to:" + e);
-    }
-    jsTestLog("New Reader complete [" + id + "]");
-}
-
-function runStepDown() {
-    jsTestLog("Making primary step down.");
-    let stats = db.runCommand({serverStatus: 1});
-    jsTestLog(stats.locks);
-    jsTestLog(stats.wiredTiger.concurrentTransactions);
-    // Force primary to step down, then unfreeze and allow it to step up.
-    assert.commandWorked(
-        primaryAdmin.runCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
-    assert.commandWorked(primaryAdmin.runCommand({replSetFreeze: 0}));
-    return replTest.getPrimary();
 }
 
 /****************************************************/
@@ -147,67 +104,136 @@ let db = primary.getDB(dbName);
 let primaryAdmin = primary.getDB("admin");
 let primaryColl = db[collName];
 let queuedReaders = [];
-let newReaders = [];
 
-// 1) Insert 1000 documents.
-jsTestLog("Fill collection [" + dbName + "." + collName + "] with 1000 docs");
-for (let i = 0; i < 1000; i++) {
+// 1) Insert kNumDocs documents.
+jsTestLog("Fill collection [" + dbName + "." + collName + "] with " + kNumDocs + " docs");
+for (let i = 0; i < kNumDocs; i++) {
     assert.commandWorked(primaryColl.insert({"x": i}));
 }
-jsTestLog("1000 inserts done");
+jsTestLog(kNumDocs + " inserts done");
 
-// 2) Kick off parallel readers that perform long collection scans, subject to yields.
+// 2) Kick off many parallel readers that perform long collection scans that are subject to yields.
 for (let i = 0; i < nQueuedReaders; i++) {
     queuedReaders.push(startParallelShell(funWithArgs(queuedLongReadsFunc, i), primary.port));
     jsTestLog("queued reader " + queuedReaders.length + " initiated");
 }
 
-for (let i = 0; i < newReaders; i++) {
-    newReaders.push(startParallelShell(funWithArgs(newLongReadsFunc, i), primary.port));
-    jsTestLog("new reader " + newReaders.length + " initiated");
-}
+// 3) Wait for many parallel read shells to run.
+jsTestLog("Wait for many parallel reader shells to run");
+assert.soon(() => db.getSiblingDB(TestData.dbName).timing_coordination.count({
+    msg: "queued reader started"
+}) >= nQueuedReaders,
+            "Expected at least " + nQueuedReaders + " queued readers to start.");
 
-// 3) Sleep with global X Lock (including RSTL), thus queuing up reads.
-let ns = dbName + "." + collName;
-jsTestLog("Sleeping with Global X Lock on " + ns);
-db.adminCommand({
-    sleep: 1,
-    secs: 5,
-    lock: "w",  // MODE_X lock.
-    $comment: "Global lock sleep"
-});
-jsTestLog("Done sleeping with Global X Lock on " + ns);
+// 4) Hold tickets before they're given back to the pool. This is what ensures that we're holding
+//    all of the read tickets before the stepdown so that one of the readers has to yield.
+jsTestLog("Hold tickets");
+assert.commandWorked(db.adminCommand({configureFailPoint: 'hangTicketRelease', mode: 'alwaysOn'}));
 
-// 4) Signal new readers that will be received after the global lock is released.
-assert.commandWorked(
-    db.getSiblingDB(dbName).timing_coordination.insertOne({_id: "begin new readers"}));
-
-// 5) Initiate step down while queue is working its way down to ensure there is a mix of
-//     enqueued readers from the global X lock and new readers initiated afterwards.
+// 5) Wait for many parallel readers to run.
+jsTestLog("Wait for many parallel readers to run");
 assert.soon(
     () => db.getSiblingDB("admin")
               .aggregate([{$currentOp: {}}, {$match: {"command.aggregate": TestData.collName}}])
               .toArray()
               .length >= kNumReadTickets,
-    "Expected more readers than read tickets.");
+    "Expected at least as many operations as queued readers.");
 
-primary = runStepDown();
+// 6) Ensure that there are no available read tickets.
+jsTestLog("Wait for no available read tickets");
+assert.soon(() => {
+    let stats = db.runCommand({serverStatus: 1});
+    jsTestLog(stats.wiredTiger.concurrentTransactions);
+    return stats.wiredTiger.concurrentTransactions.read.available == 0;
+}, "Expected to have no available read tickets.");
 
-// 6) Stop Readers.
-jsTestLog("Stopping Readers");
+// 7) Hold stepDown so that we know that upon release, it will need a read ticket ~immediately.
+let stats = assert.commandWorked(db.runCommand({serverStatus: 1}));
+jsTestLog(stats.locks);
+jsTestLog(stats.wiredTiger.concurrentTransactions);
+
+stats = db.adminCommand({
+    configureFailPoint: 'stepdownHangBeforeRSTLEnqueue',
+    mode: 'off' /* Don't change the value; just get the counts. */
+});
+assert.eq(1, stats.ok);
+assert.eq(0, stats.count);  // No process has entered this block yet.
+
+jsTestLog("Hold stepDown");
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: 'stepdownHangBeforeRSTLEnqueue', mode: 'alwaysOn'}));
+
+// 8) Initiate stepDown.
+jsTestLog("Make primary step down");
+const stepDownSecs = 10;
+const stepDownShell = startParallelShell(
+    funWithArgs(function(stepDownSecs) {
+        jsTestLog("Run replSetStepDown");
+        assert.commandWorked(
+            db.getSiblingDB(TestData.dbName).timing_coordination.createIndex({a: 1}));
+
+        assert.commandWorked(
+            db.getSiblingDB("admin").runCommand({"replSetStepDown": stepDownSecs, "force": true}));
+    }, stepDownSecs), primary.port);
+
+// Ensure that the parallel shell is up so that we know that the stepDown has begun. Since we
+// can't share state between the main thread and the parallel shell, the "right" way to do this
+// is to write something from within the parallel shell and check it here. However, even if we
+// wrote something, we wouldn't be able to read it back because we locked reads! Therefore,
+// we'll create an index. We can count the indexes via serverStatus without doing a "read," so
+// it's observable. The index doesn't affect the correctness of this test.
+assert.soon(() => {
+    let stats = db.runCommand({serverStatus: 1});
+    return stats.metrics.commands.createIndexes.total > 0;
+}, "Expected stepDown shell to be ready.");
+
+jsTestLog("Allow tickets to be released so that we can get stuck at stepdownHangBeforeRSTLEnqueue");
+assert.commandWorked(db.adminCommand({configureFailPoint: 'hangTicketRelease', mode: 'off'}));
+
+jsTestLog("Verify that we're stuck at stepdownHangBeforeRSTLEnqueue");
+assert.commandWorked(db.adminCommand({
+    waitForFailPoint: 'stepdownHangBeforeRSTLEnqueue',
+    timesEntered: 1,
+    maxTimeMS: 10 * 1000,
+}));
+
+// 9) Hold tickets again, verify state, unlock, and proceed with stepDown.
+jsTestLog("Hold tickets again so that we can verify that there are competing readers");
+assert.commandWorked(db.adminCommand({configureFailPoint: 'hangTicketRelease', mode: 'alwaysOn'}));
+assert.soon(() => {
+    let stats = db.runCommand({serverStatus: 1});
+    jsTestLog(stats.wiredTiger.concurrentTransactions);
+    return stats.wiredTiger.concurrentTransactions.read.available == 0;
+}, "Expected to have no available read tickets.");
+
+jsTestLog("Allow stepDown to proceed");
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: 'stepdownHangBeforeRSTLEnqueue', mode: 'off'}));
+
+jsTestLog("Allow tickets to be released");
+assert.commandWorked(db.adminCommand({configureFailPoint: 'hangTicketRelease', mode: 'off'}));
+
+jsTestLog("Wait for SECONDARY state");
+replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
+
+// Enforce the replSetStepDown timer.
+sleep(stepDownSecs * 1000);
+
+jsTestLog("Wait for PRIMARY state");
+replTest.waitForState(primary, ReplSetTest.State.PRIMARY);
+replTest.getPrimary();
+
+// 10) Stop readers and clean up.
+jsTestLog("Stop readers");
 assert.commandWorked(db.getSiblingDB(dbName).timing_coordination.insertOne({_id: "stop reading"}));
 
 for (let i = 0; i < queuedReaders.length; i++) {
     const awaitQueuedReader = queuedReaders[i];
     awaitQueuedReader();
-    jsTestLog("queued reader " + i + " done");
+    jsTestLog("Queued reader [" + i + "] done");
 }
-for (let i = 0; i < newReaders.length; i++) {
-    const awaitNewReader = newReaders[i];
-    awaitNewReader();
-    jsTestLog("new reader " + i + " done");
-}
-queuedReaders = [];
-newReaders = [];
+
+stepDownShell();
 
 replTest.stopSet();
+})();

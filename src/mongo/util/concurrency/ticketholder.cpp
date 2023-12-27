@@ -42,12 +42,15 @@
 #include "mongo/db/storage/storage_engine_feature_flags_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangTicketRelease);
 
 namespace {
 void updateQueueStatsOnRelease(ServiceContext* serviceContext,
@@ -96,6 +99,12 @@ void TicketHolder::appendStats(BSONObjBuilder& b) const {
 }
 
 void TicketHolder::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
+    if (MONGO_unlikely(hangTicketRelease.shouldFail())) {
+        LOGV2(8435300,
+              "Hanging hangTicketRelease in _releaseToTicketPool() due to 'hangTicketRelease' "
+              "failpoint");
+        hangTicketRelease.pauseWhileSet();
+    }
     auto& queueStats = _getQueueStatsToUse(admCtx);
     updateQueueStatsOnRelease(_serviceContext, queueStats, admCtx);
     _releaseToTicketPoolImpl(admCtx);
