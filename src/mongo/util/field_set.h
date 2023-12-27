@@ -80,17 +80,18 @@ public:
 
     FieldSet() = default;
 
-    FieldSet(const std::vector<std::string>& fieldList, FieldListScope scope)
-        : _list(fieldList), _set(_list.begin(), _list.end()), _scope(scope) {}
+    FieldSet(const std::vector<std::string>& fieldList, FieldListScope scope);
 
-    FieldSet(std::vector<std::string>&& fieldList, FieldListScope scope)
-        : _list(std::move(fieldList)), _set(_list.begin(), _list.end()), _scope(scope) {}
+    FieldSet(std::vector<std::string>&& fieldList, FieldListScope scope);
 
     template <typename ListT>
-    FieldSet(const ListT& fieldList, FieldListScope scope)
-        : _list(fieldList.begin(), fieldList.end()),
-          _set(_list.begin(), _list.end()),
-          _scope(scope) {}
+    FieldSet(const ListT& fieldList, FieldListScope scope) : _scope(scope) {
+        for (const auto& field : fieldList) {
+            if (_set.insert(field).second) {
+                _list.emplace_back(field);
+            }
+        }
+    }
 
     inline bool count(StringData field) const {
         bool scopeIsClosed = _scope == FieldListScope::kClosed;

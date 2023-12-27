@@ -34,6 +34,63 @@
 namespace mongo {
 
 namespace {
+template <typename FieldListT>
+inline void constructFieldSetImpl(FieldListT&& inList,
+                                  std::vector<std::string>& outList,
+                                  StringSet& outSet) {
+    bool hasDuplicates = false;
+    auto scanIt = inList.begin();
+    auto scanEndIt = inList.end();
+    // Scan 'inList' and build 'outSet'.
+    for (; scanIt != scanEndIt; ++scanIt) {
+        if (MONGO_unlikely(!outSet.insert(*scanIt).second)) {
+            hasDuplicates = true;
+            break;
+        }
+    }
+    // If there were no duplicates, we can simply copy/move 'inList' into 'outList' and return.
+    if (!hasDuplicates) {
+        outList = std::forward<FieldListT>(inList);
+        return;
+    }
+    // If there were duplicates, we take the slow path. We start by creating either 3 normal
+    // iterator variables or 3 move iterator variables (depending on whether 'inList' was passed
+    // by const reference).
+    auto makeIter = [](auto&& it) {
+        if constexpr (!std::is_const_v<std::remove_reference_t<FieldListT>>) {
+            return std::make_move_iterator(it);
+        } else {
+            return it;
+        }
+    };
+    auto it = makeIter(inList.begin());
+    auto midIt = makeIter(scanIt);
+    auto endIt = makeIter(scanEndIt);
+    // 'midIt' points to the first duplicate we encountered where the initial scan stopped.
+    // Take all the values from the range [it, midIt) and copy/move them to 'outList'.
+    for (; it != midIt; ++it) {
+        outList.emplace_back(*it);
+    }
+    // Pick up where the initial scan left off and finish building 'outSet' and 'outList'
+    // and then return.
+    for (; it != endIt; ++it) {
+        if (outSet.insert(*it).second) {
+            outList.emplace_back(*it);
+        }
+    }
+}
+}  // namespace
+
+FieldSet::FieldSet(const std::vector<std::string>& fieldList, FieldListScope scope)
+    : _scope(scope) {
+    constructFieldSetImpl(fieldList, _list, _set);
+}
+
+FieldSet::FieldSet(std::vector<std::string>&& fieldList, FieldListScope scope) : _scope(scope) {
+    constructFieldSetImpl(std::move(fieldList), _list, _set);
+}
+
+namespace {
 void unionInPlaceImpl(std::vector<std::string>& lhsList,
                       StringSet& lhsSet,
                       const std::vector<std::string>& rhs) {
