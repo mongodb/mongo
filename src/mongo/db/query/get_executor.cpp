@@ -1400,8 +1400,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     }
 
     // Prepare the SBE tree for execution.
-    stage_builder::prepareSlotBasedExecutableTree(
-        opCtx, root.get(), &data, *cq, collections, yieldPolicy.get(), true);
+    stage_builder::prepareSlotBasedExecutableTree(opCtx,
+                                                  root.get(),
+                                                  &data,
+                                                  *cq,
+                                                  collections,
+                                                  yieldPolicy.get(),
+                                                  planningResult->isRecoveredFromPlanCache());
 
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),
