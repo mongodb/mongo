@@ -16,8 +16,8 @@ const dbName = "test";
 
 var st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st, dbName, "moveChunkHangAtStep3", false /* shouldMakeMigrationFailToCommitOnConfig */);

@@ -162,8 +162,8 @@ function setupCluster(withAuth) {
         assert(adminDB.auth(authUser.user, authUser.pwd));
     }
 
-    assert.commandWorked(adminDB.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(adminDB.adminCommand({movePrimary: dbName, to: coordinator.shardName}));
+    assert.commandWorked(
+        adminDB.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
     assert.commandWorked(adminDB.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(adminDB.adminCommand({split: ns, middle: {_id: 0}}));
     assert.commandWorked(

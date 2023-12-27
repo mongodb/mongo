@@ -10,6 +10,8 @@ const st = new ShardingTest({name: "union_with_read_pref", mongos: 1, shards: 2,
 const dbName = jsTestName() + "_db";
 st.s0.setCausalConsistency(true);
 const mongosDB = st.s0.getDB(dbName);
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 
 const mongosColl = mongosDB[jsTestName()];
 const unionedColl = mongosDB.union_target;
@@ -19,7 +21,6 @@ st.shardColl(mongosColl, {_id: 1}, {_id: 0}, {_id: 0});
 // Shard the union's target collection on _id with the same chunks, but moving the negative chunk
 // off the primary shard so their distributions are flipped.
 st.shardColl(unionedColl, {_id: 1}, {_id: 0}, {_id: -1});
-assert.commandWorked(mongosDB.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
 
 // Turn on the profiler.
 for (let rs of [st.rs0, st.rs1]) {

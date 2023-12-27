@@ -49,7 +49,6 @@ setup();
 validate(true);
 
 // 2. Sharded collection in a DB.
-assert.commandWorked(st.s.adminCommand({movePrimary: 'test', to: st.shard0.name}));
 assert.commandWorked(s.adminCommand({shardCollection: 'test.test', key: {_id: 1}}));
 assert.commandWorked(s.adminCommand({shardCollection: 'test.dummy', key: {_id: 1}}));
 validate(true);

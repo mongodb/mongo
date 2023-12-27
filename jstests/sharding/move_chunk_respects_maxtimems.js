@@ -16,8 +16,8 @@ let testDB = st.s.getDB(dbName);
 let testColl = testDB.foo;
 
 // Create a sharded collection with one chunk on shard0.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
 // Enable failpoint which will cause moveChunk to hang indefinitely.

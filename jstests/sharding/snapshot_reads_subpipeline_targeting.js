@@ -29,6 +29,9 @@ const db = st.s.getDB(dbName);
 const local = db.local
 const foreign = db.foreign
 
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+
 // Create local collection, shard it and distribute among shards.
 CreateShardedCollectionUtil.shardCollectionWithChunks(local, {_id: 1}, [
     {min: {_id: MinKey}, max: {_id: 0}, shard: st.shard0.shardName},
@@ -44,8 +47,6 @@ assert.commandWorked(local.insert({_id: 5}, {writeConcern: {w: "majority"}}));
 
 assert.commandWorked(foreign.insert({a: -5}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(foreign.insert({a: 5}, {writeConcern: {w: "majority"}}));
-
-assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
 
 const pipeline = [
     {$lookup: {from: "foreign", localField: "_id", foreignField: "a", as: "f"}},

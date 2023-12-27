@@ -35,8 +35,8 @@ const refinedShardKeyValueInChunk = {
 
 function setUp(st) {
     // Create a sharded collection with two chunk on shard0, split at key {x: -1}.
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: originalShardKey}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: -1}}));
     // Insert documents into the collection, which contains two chunks. Insert documents only

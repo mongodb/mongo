@@ -32,10 +32,10 @@ const st = new ShardingTest({
 
 jsTest.log("Create two databases on different primary shards.");
 // enableSharding creates the databases.
-assert.commandWorked(st.s.adminCommand({enableSharding: db1Name}));
-assert.commandWorked(st.s.adminCommand({enableSharding: db2Name}));
-assert.commandWorked(st.s.adminCommand({movePrimary: db1Name, to: st.shard0.shardName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: db2Name, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db1Name, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db2Name, primaryShard: st.shard1.shardName}));
 
 jsTest.log("Insert data on both shards.");
 // This ensures all nodes refresh their routing caches.

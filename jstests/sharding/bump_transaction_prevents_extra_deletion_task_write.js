@@ -13,8 +13,8 @@ const dbName = "test";
 // Create 2 shards with 3 replicas each.
 let st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 function getNewNs(dbName) {
     if (typeof getNewNs.counter == 'undefined') {

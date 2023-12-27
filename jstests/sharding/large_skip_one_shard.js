@@ -10,8 +10,9 @@ var collSharded = mongos.getCollection("testdb.collSharded");
 var collUnSharded = mongos.getCollection("testdb.collUnSharded");
 
 // Set up a sharded and unsharded collection
-assert(admin.runCommand({enableSharding: collSharded.getDB() + ""}).ok);
-printjson(admin.runCommand({movePrimary: collSharded.getDB() + "", to: st.shard0.shardName}));
+assert(
+    admin.runCommand({enableSharding: collSharded.getDB() + "", primaryShard: st.shard0.shardName})
+        .ok);
 assert(admin.runCommand({shardCollection: collSharded + "", key: {_id: 1}}).ok);
 assert(admin.runCommand({split: collSharded + "", middle: {_id: 0}}).ok);
 assert(admin.runCommand({moveChunk: collSharded + "", find: {_id: 0}, to: st.shard1.shardName}).ok);

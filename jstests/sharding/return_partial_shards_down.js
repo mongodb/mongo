@@ -25,9 +25,8 @@ var admin = mongos.getDB("admin");
 var collOneShard = mongos.getCollection("foo.collOneShard");
 var collAllShards = mongos.getCollection("foo.collAllShards");
 
-assert.commandWorked(admin.runCommand({enableSharding: collOneShard.getDB() + ""}));
-assert.commandWorked(
-    admin.runCommand({movePrimary: collOneShard.getDB() + "", to: st.shard0.shardName}));
+assert.commandWorked(admin.runCommand(
+    {enableSharding: collOneShard.getDB() + "", primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(admin.runCommand({shardCollection: collOneShard + "", key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({shardCollection: collAllShards + "", key: {_id: 1}}));

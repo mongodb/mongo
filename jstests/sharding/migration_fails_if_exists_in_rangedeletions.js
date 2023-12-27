@@ -13,12 +13,13 @@ const ns = dbName + "." + collName;
 let st =
     new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}, other: {enableBalancer: false}});
 
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+
 (() => {
     jsTestLog("Test simple shard key");
 
     // Create a sharded collection with one chunk and a single-field shard key.
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
     // Pause range deletion on shard0.
@@ -48,8 +49,6 @@ let st =
     jsTestLog("Test hashed shard key");
 
     // Create a sharded collection with one chunk and a hashed shard key.
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 'hashed'}}));
 
     // Make sure the chunk is on shard0.
@@ -83,8 +82,6 @@ let st =
     jsTestLog("Test compound shard key");
 
     // Create a sharded collection with one chunk and a compound shard key.
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1, y: 1}}));
 
     // Pause range deletion on shard0.

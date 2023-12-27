@@ -15,8 +15,8 @@ const ns = dbName + "." + collName;
 
 const st = new ShardingTest({shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 0}));
 assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 1}));

@@ -5,8 +5,8 @@ var mongos = st.s0;
 var coll = mongos.getCollection("foo.bar");
 var admin = mongos.getDB("admin");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName()}));
-printjson(admin.runCommand({movePrimary: coll.getDB().getName(), to: st.shard0.shardName}));
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 
 assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: {_id: 0}}));

@@ -6,18 +6,16 @@ var mongos = st.s;
 var staleMongos = st.s1;
 var admin = mongos.getDB("admin");
 
-var collSh = mongos.getCollection(jsTestName() + ".collSharded");
-var collUn = mongos.getCollection(jsTestName() + ".collUnsharded");
+const dbName = jsTestName();
+var collSh = mongos.getCollection(dbName + ".collSharded");
+var collUn = mongos.getCollection(dbName + ".collUnsharded");
 
 jsTest.log('Checking write to config collections...');
 assert.commandWorked(admin.TestColl.insert({SingleDoc: 1}));
 
 jsTest.log("Setting up collections...");
 
-assert.commandWorked(
-    admin.runCommand({enableSharding: collSh.getDB() + "", primaryShard: st.shard0.shardName}));
-
-assert.commandWorked(admin.runCommand({movePrimary: collUn.getDB() + "", to: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 
 printjson(collSh.createIndex({ukey: 1}, {unique: true}));
 printjson(collUn.createIndex({ukey: 1}, {unique: true}));

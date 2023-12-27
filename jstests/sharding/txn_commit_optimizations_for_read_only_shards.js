@@ -86,8 +86,8 @@ let st = new ShardingTest({
 });
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 
 // Create a "dummy" collection for doing noop writes to advance shard's last applied OpTimes.
 assert.commandWorked(st.s.getDB(dbName).getCollection("dummy").insert({dummy: 1}));

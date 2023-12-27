@@ -14,8 +14,8 @@ const collName = "update_orphan_shard_key";
 const collection = st.s.getDB(dbName).getCollection(collName);
 
 // Create a sharded collection with two chunks on shard0, split at the key {x: -1}.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: collection.getFullName(), key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: collection.getFullName(), middle: {x: -1}}));
 

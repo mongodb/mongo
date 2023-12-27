@@ -103,8 +103,7 @@ function validateShowSystemEventsFalse() {
     });
 }
 
-assert.commandWorked(db.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(db.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 validateCreateEventsFromChunkMigration();
 validateShowSystemEventsFalse();

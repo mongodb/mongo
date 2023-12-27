@@ -11,8 +11,7 @@ var admin = mongos.getDB("admin");
 var shards = mongos.getCollection("config.shards").find().toArray();
 var shardAdmin = st.shard0.getDB("admin");
 
-assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
-printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: shards[0]._id}));
+assert(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: shards[0]._id}).ok);
 assert(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}).ok);
 assert(admin.runCommand({split: coll + "", middle: {_id: 0}}).ok);
 

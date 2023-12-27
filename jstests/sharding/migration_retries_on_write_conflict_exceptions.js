@@ -12,8 +12,8 @@ const ns = dbName + "." + collName;
 let st = new ShardingTest({shards: 2});
 
 // Create a sharded collection with two chunks: [-inf, 50), [50, inf)
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 50}}));
 

@@ -41,8 +41,6 @@ st.configRS.awaitLastOpCommitted();
 
 jsTest.log("Re-enabling sharding with a different key...");
 
-assert.commandWorked(
-    st.s.adminCommand({movePrimary: coll.getDB().getName(), to: st.shard1.shardName}));
 assert.commandWorked(coll.createIndex({notId: 1}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {notId: 1}}));
 

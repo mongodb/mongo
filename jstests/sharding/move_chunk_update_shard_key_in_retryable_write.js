@@ -40,8 +40,8 @@ let mongos1TestDB = st.s1.getDB(dbName);
 
 // Create a sharded collection with three chunks:
 //     [-inf, -10), [-10, 10), [10, inf)
-assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s0.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: -10}}));
 assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 10}}));

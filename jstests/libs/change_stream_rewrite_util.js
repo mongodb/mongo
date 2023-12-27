@@ -157,14 +157,14 @@ export function assertNumMatchingOplogEventsForShard(stats, shardName, expectedT
 
 // Returns a newly created sharded collection sharded by caller provided shard key.
 export function createShardedCollection(shardingTest, shardKey, dbName, collName, splitAt) {
+    assert.commandWorked(shardingTest.s.adminCommand(
+        {enableSharding: dbName, primaryShard: shardingTest.shard0.name}));
+
     const db = shardingTest.s.getDB(dbName);
     assertDropAndRecreateCollection(db, collName);
 
     const coll = db.getCollection(collName);
     assert.commandWorked(coll.createIndex({[shardKey]: 1}));
-
-    assert.commandWorked(
-        shardingTest.s.adminCommand({movePrimary: dbName, to: shardingTest.shard0.name}));
 
     // Shard the test collection and split it into two chunks: one that contains all {shardKey: <lt
     // splitAt>} documents and one that contains all {shardKey: <gte splitAt>} documents.

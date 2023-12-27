@@ -43,8 +43,6 @@ function dropTestDatabase() {
     db.runCommand({dropDatabase: 1});
     db.extra.insert({a: 1});
     coll = db[collName];
-    assert.commandWorked(
-        mongos.adminCommand({movePrimary: db.toString(), to: st.shard0.shardName}));
     assert.eq(0, coll.find().itcount(), "test collection not empty");
     assert.eq(1, db.extra.find().itcount(), "extra collection should have 1 document");
 }
@@ -72,8 +70,6 @@ commands.push({
     req: {createIndexes: collName, indexes: [{key: {'type': 1}, name: 'type_index'}]},
     setupFunc: function() {
         coll.insert({type: 'oak'});
-        assert.commandWorked(
-            mongos.adminCommand({movePrimary: db.toString(), to: st.shard0.shardName}));
         assert.eq(coll.getIndexes().length, 1);
     },
     confirmFunc: function() {
@@ -102,8 +98,6 @@ commands.push({
         db = db.getSiblingDB("renameCollWC");
         // Ensure that database is created.
         db.leaves.insert({type: 'oak'});
-        assert.commandWorked(
-            mongos.adminCommand({movePrimary: db.toString(), to: st.shard0.shardName}));
         db.leaves.drop();
         db.pine_needles.drop();
         db.leaves.insert({type: 'oak'});

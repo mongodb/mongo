@@ -7,7 +7,6 @@ const s2 = s.s1;
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
 
-// Ensure that the second mongos will see the movePrimary
 s.configRS.awaitLastOpCommitted();
 
 assert(s.getBalancerState(), "A1");

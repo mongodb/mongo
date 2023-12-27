@@ -9,8 +9,7 @@ var mongos = st.s0;
 var admin = mongos.getDB("admin");
 var coll = mongos.getCollection("foo.bar");
 
-assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
-printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));
+assert(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}).ok);
 assert(admin.runCommand({shardCollection: coll + "", key: {skey: 1}}).ok);
 assert(admin.runCommand({split: coll + "", middle: {skey: 0}}).ok);
 assert(admin.runCommand({moveChunk: coll + "", find: {skey: 0}, to: st.shard1.shardName}).ok);

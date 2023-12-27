@@ -19,8 +19,8 @@ const configDB = st.s.getDB("config");
 // Resets database dbName and enables sharding and establishes shard0 as primary, test case agnostic
 function setUpDatabaseAndEnableSharding(dbName) {
     assert.commandWorked(st.s.getDB(dbName).dropDatabase());
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
     return dbName;
 }

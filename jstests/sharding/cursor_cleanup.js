@@ -10,8 +10,7 @@ var coll = mongos.getCollection("foo.bar");
 var collUnsharded = mongos.getCollection("foo.baz");
 
 // Shard collection
-printjson(admin.runCommand({enableSharding: coll.getDB() + ""}));
-printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));
+printjson(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 printjson(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 printjson(admin.runCommand({split: coll + "", middle: {_id: 0}}));
 printjson(admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));

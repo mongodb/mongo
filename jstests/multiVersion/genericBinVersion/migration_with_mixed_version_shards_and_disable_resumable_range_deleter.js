@@ -32,8 +32,8 @@ const st = new ShardingTest({
     shards: {rs0: {nodes: [{binVersion: "latest"}]}, rs1: {nodes: [{binVersion: "last-lts"}]}},
     other: {mongosOptions: {binVersion: "last-lts"}}
 });
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 const vLatestShard = st.rs0;
 const v44shard = st.rs1;

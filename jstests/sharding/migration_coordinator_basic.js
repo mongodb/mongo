@@ -21,8 +21,8 @@ const dbName = "test";
 
 var st = new ShardingTest({shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 function getCollectionUuidAndEpoch(ns) {
     const collectionDoc = st.s.getDB("config").getCollection("collections").findOne({_id: ns});

@@ -31,8 +31,7 @@ function runShardingTestExists(shardDistribution) {
     const namespace = dbName + "." + collName;
 
     /* Shard the collection. */
-    assert.commandWorked(admin.runCommand({enableSharding: dbName}));
-    assert.commandWorked(admin.runCommand({movePrimary: dbName, to: shards[0]._id}));
+    assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: shards[0]._id}));
     assert.commandWorked(admin.runCommand({shardCollection: namespace, key: {a: 1}}));
 
     const coll = mongos.getCollection(namespace);

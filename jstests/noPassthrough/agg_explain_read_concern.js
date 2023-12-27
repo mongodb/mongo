@@ -56,9 +56,8 @@ const runTest = (db, coll) => {
     const db = st.s.getDB("test");
     const coll = db.agg_explain_read_concern;
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
-    assert.commandWorked(
-        st.s.adminCommand({movePrimary: "test", to: config.shards.find().toArray()[0]._id}));
+    assert.commandWorked(st.s.adminCommand(
+        {enableSharding: "test", primaryShard: config.shards.find().toArray()[0]._id}));
     assert.commandWorked(
         st.s.adminCommand({shardCollection: "test.agg_explain_read_concern", key: {_id: 1}}));
 

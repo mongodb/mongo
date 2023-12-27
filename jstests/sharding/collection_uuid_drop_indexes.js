@@ -10,8 +10,8 @@ const st = new ShardingTest({shards: 2});
 const mongos = st.s;
 
 const db = mongos.getDB(jsTestName());
-assert.commandWorked(mongos.adminCommand({enableSharding: db.getName()}));
-assert.commandWorked(mongos.adminCommand({movePrimary: db.getName(), to: st.shard0.name}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.name}));
 
 const shardedColl = db.sharded;
 const unshardedColl = db.unsharded;

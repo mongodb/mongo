@@ -22,8 +22,8 @@ const metaField = 'hostid';
 const st = new ShardingTest({shards: 2});
 const sDB = st.s.getDB(dbName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 const primaryShard = st.getPrimaryShard(dbName);
 const otherShard = st.getOther(primaryShard);
 

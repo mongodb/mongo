@@ -32,16 +32,15 @@ assert.commandWorked(admin.runCommand({setParameter: 1, traceExceptions: true}))
 var collSharded = mongos.getCollection("fooSharded.barSharded");
 var collUnsharded = mongos.getCollection("fooUnsharded.barUnsharded");
 
-// Create the unsharded database
+// Create the database for the unsharded collection
+assert.commandWorked(admin.runCommand(
+    {enableSharding: collUnsharded.getDB().toString(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(collUnsharded.insert({some: "doc"}));
 assert.commandWorked(collUnsharded.remove({}));
-assert.commandWorked(
-    admin.runCommand({movePrimary: collUnsharded.getDB().toString(), to: st.shard0.shardName}));
 
-// Create the sharded database
-assert.commandWorked(admin.runCommand({enableSharding: collSharded.getDB().toString()}));
-assert.commandWorked(
-    admin.runCommand({movePrimary: collSharded.getDB().toString(), to: st.shard0.shardName}));
+// Create the database for the sharded collection
+assert.commandWorked(admin.runCommand(
+    {enableSharding: collSharded.getDB().toString(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: collSharded.toString(), key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: collSharded.toString(), middle: {_id: 0}}));
 assert.commandWorked(
