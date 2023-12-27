@@ -165,7 +165,6 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
                 if (_participantsDurable)
                     return Future<repl::OpTime>::makeReady(repl::OpTime());
             }
-
             return txn::persistParticipantsList(
                 *_sendPrepareScheduler, _lsid, _txnNumber, *_participants);
         })
