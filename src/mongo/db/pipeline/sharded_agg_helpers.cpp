@@ -1436,10 +1436,10 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
 
     BSONObjBuilder shardExplains(result->subobjStart("shards"));
     for (const auto& shardResult : dispatchResults.remoteExplainOutput) {
-        invariant(shardResult.shardHostAndPort);
-
         uassertStatusOK(shardResult.swResponse.getStatus());
         uassertStatusOK(getStatusFromCommandResult(shardResult.swResponse.getValue().data));
+
+        invariant(shardResult.shardHostAndPort);
 
         auto shardId = shardResult.shardId.toString();
         const auto& data = shardResult.swResponse.getValue().data;
