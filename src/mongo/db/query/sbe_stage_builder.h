@@ -1105,7 +1105,7 @@ private:
         long long amount,
         boost::optional<sbe::value::SlotId>& slot);
     std::unique_ptr<sbe::EExpression> buildLimitSkipSumExpression(
-        LimitSkipParameterization canBeParameterized, long long limitSkipSum);
+        LimitSkipParameterization canBeParameterized, size_t limitSkipSum);
 
     /**
      * Returns a CollectionPtr corresponding to the collection that we are currently building a

@@ -1732,20 +1732,25 @@ std::unique_ptr<sbe::EExpression> SlotBasedStageBuilder::buildLimitSkipAmountExp
 }
 
 std::unique_ptr<sbe::EExpression> SlotBasedStageBuilder::buildLimitSkipSumExpression(
-    LimitSkipParameterization canBeParameterized, long long limitSkipSum) {
+    LimitSkipParameterization canBeParameterized, size_t limitSkipSum) {
     if (canBeParameterized == LimitSkipParameterization::Disabled) {
-        return makeConstant(sbe::value::TypeTags::NumberInt64,
-                            sbe::value::bitcastFrom<long long>(limitSkipSum));
+        // SBE doesn't have unsigned 64-bit integers, so we cap the limit at
+        // std::numeric_limits<int64_t>::max() to handle the pathological edge case where the
+        // unsigned value is larger than than the maximum possible signed value.
+        return makeInt64Constant(
+            std::min(limitSkipSum, static_cast<size_t>(std::numeric_limits<int64_t>::max())));
     }
 
     boost::optional<int64_t> limit = _cq.getFindCommandRequest().getLimit();
     boost::optional<int64_t> skip = _cq.getFindCommandRequest().getSkip();
     tassert(8349207, "expected limit to be present", limit);
-    int64_t sum = -1;
-    bool hasOverflowed = overflow::add(limit.value_or(0), skip.value_or(0), &sum);
+    size_t sum = static_cast<size_t>(*limit) + static_cast<size_t>(skip.value_or(0));
     tassert(8349208,
-            "expected sum of find command request parameters to be equal to provided value",
-            !hasOverflowed && sum == limitSkipSum);
+            str::stream() << "expected sum of find command request limit and skip parameters to be "
+                             "equal to the provided value. Limit: "
+                          << limit << ", skip: " << skip << ", sum: " << sum
+                          << ", provided value: " << limitSkipSum,
+            sum == limitSkipSum);
     if (!skip) {
         return buildLimitSkipAmountExpression(
             canBeParameterized, *limit, _data->limitSkipSlots.limit);
