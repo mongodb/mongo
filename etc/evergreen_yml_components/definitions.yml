@@ -31,6 +31,7 @@ variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &task_template
   name: template
@@ -46,6 +47,7 @@ variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/replication/resmoke_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &gen_task_template
@@ -119,6 +121,7 @@ variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_config_vars
   is_jstestfuzz: true
@@ -143,6 +146,7 @@ variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_template
   name: jstestfuzz_template
@@ -4505,21 +4509,6 @@ tasks:
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
-## Standalone generational fuzzer for checking optimized and unoptimized change stream pipelines ##
-- <<: *jstestfuzz_template
-  name: change_stream_optimization_fuzzer_gen
-  tags: ["change_stream_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --diffTestingMode optimization
-      npm_command: change-stream-fuzzer
-      suite: generational_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
 ## jstestfuzz standalone fuzzer for checking find and aggregate equivalence ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_standalone_gen
@@ -5338,73 +5327,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
 
-- <<: *task_template
-  name: change_streams
-  tags: ["change_streams"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: change_streams_multiversion_gen
-  tags: ["multiversion", "multiversion_passthrough"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      change_streams_last_continuous_new_new_old: last_continuous
-      change_streams_last_continuous_new_old_new: last_continuous
-      change_streams_last_continuous_old_new_new: last_continuous
-      change_streams_last_lts_new_new_old: last_lts
-      change_streams_last_lts_new_old_new: last_lts
-      change_streams_last_lts_old_new_new: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      suite: change_streams
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: change_streams_downgrade_gen
-  tags: ["multiversion_passthrough", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      change_streams_downgrade_last_continuous_new_old_old_new: last_continuous
-      change_streams_downgrade_last_lts_new_old_old_new: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      run_no_feature_flag_tests: "true"
-
-- <<: *task_template
-  name: change_streams_mongos_sessions_passthrough
-  tags: ["change_streams"]
-  depends_on:
-  - name: change_streams
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_secondary_reads_sharded_collections
-  tags: ["change_streams", "secondary_reads"]
-  depends_on:
-  - name: change_streams
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: change_streams_sharded_collections_multiversion_gen
-  tags: ["multiversion_passthrough", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      change_streams_sharded_collections_passthrough_last_continuous_new_old_old_new: last_continuous
-      change_streams_sharded_collections_passthrough_last_lts_new_old_old_new: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      suite: change_streams_sharded_collections_passthrough
-      run_no_feature_flag_tests: "true"
-
 - <<: *gen_task_template
   name: multiversion_future_git_tag_gen
   tags: ["multiversion", "no_multiversion_generate_tasks", "multiversion_future_git_tag"]
@@ -5420,90 +5342,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: multiversion_auth_future_git_tag
-
-- <<: *task_template
-  name: change_streams_whole_db_passthrough
-  tags: ["change_streams"]
-  depends_on:
-  - name: change_streams
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_whole_db_secondary_reads_sharded_collections
-  tags: ["change_streams", "secondary_reads"]
-  depends_on:
-  - name: change_streams_secondary_reads_sharded_collections
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_whole_cluster_passthrough
-  tags: ["change_streams"]
-  depends_on:
-  - name: change_streams
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_whole_cluster_secondary_reads_sharded_collections
-  tags: ["change_streams", "secondary_reads"]
-  depends_on:
-  - name: change_streams_secondary_reads_sharded_collections
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_multi_stmt_txn_passthrough
-  tags: ["change_streams"]
-  depends_on:
-  - name: change_streams
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_multi_stmt_txn_mongos_passthrough
-  tags: ["change_streams"]
-  depends_on:
-  - name: change_streams
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_multi_stmt_txn_sharded_collections_passthrough
-  tags: ["change_streams"]
-  depends_on:
-  - name: change_streams
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_per_shard_cursor_passthrough
-  tags: ["change_streams"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_multitenant_passthrough
-  tags: []  # TODO SERVER-57866: Add the "change_streams" tag here.
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: change_streams_multitenant_sharded_collections_passthrough
-  tags: []  # TODO SERVER-57866: Add the "change_streams" tag here.
-  commands:
-  - func: "do setup"
-  - func: "run tests"
 
 - <<: *task_template
   name: disk_wiredtiger
@@ -5955,30 +5793,6 @@ tasks:
 
 - <<: *gen_task_template
   name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
-  tags: []
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-  tags: []
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
-  tags: []
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough_gen
-  tags: []
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"
