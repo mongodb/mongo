@@ -529,7 +529,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     // Initialize curOp information.
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        if (req.getIsTimeseriesNamespace()) {
+        if (req.getIsTimeseriesNamespace() && nsString.isTimeseriesBucketsCollection()) {
             auto viewNss = nsString.getTimeseriesViewNamespace();
             curOp.setNS_inlock(viewNss);
             curOp.setOpDescription_inlock(timeseries::timeseriesViewCommand(
