@@ -1251,6 +1251,9 @@ static const char *const __stats_connection_desc[] = {
   "cache: pages written from cache",
   "cache: pages written requiring in-memory restoration",
   "cache: percentage overhead",
+  "cache: skip dirty pages during a running checkpoint",
+  "cache: skip pages that are written with transactions greater than the last running",
+  "cache: skip pages that previously failed eviction and likely will again",
   "cache: the number of times full update inserted to history store",
   "cache: the number of times reverse modify inserted to history store",
   "cache: total milliseconds spent inside reentrant history store evictions in a reconciliation",
@@ -1819,6 +1822,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_write = 0;
     stats->cache_write_restore = 0;
     /* not clearing cache_overhead */
+    stats->cache_eviction_server_skip_dirty_pages_during_checkpoint = 0;
+    stats->cache_eviction_server_skip_pages_last_running = 0;
+    stats->cache_eviction_server_skip_pages_retry = 0;
     stats->cache_hs_insert_full_update = 0;
     stats->cache_hs_insert_reverse_modify = 0;
     /* not clearing cache_reentry_hs_eviction_milliseconds */
@@ -2390,6 +2396,12 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_write += WT_STAT_READ(from, cache_write);
     to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);
     to->cache_overhead += WT_STAT_READ(from, cache_overhead);
+    to->cache_eviction_server_skip_dirty_pages_during_checkpoint +=
+      WT_STAT_READ(from, cache_eviction_server_skip_dirty_pages_during_checkpoint);
+    to->cache_eviction_server_skip_pages_last_running +=
+      WT_STAT_READ(from, cache_eviction_server_skip_pages_last_running);
+    to->cache_eviction_server_skip_pages_retry +=
+      WT_STAT_READ(from, cache_eviction_server_skip_pages_retry);
     to->cache_hs_insert_full_update += WT_STAT_READ(from, cache_hs_insert_full_update);
     to->cache_hs_insert_reverse_modify += WT_STAT_READ(from, cache_hs_insert_reverse_modify);
     to->cache_reentry_hs_eviction_milliseconds +=

@@ -516,6 +516,9 @@ struct __wt_connection_stats {
     int64_t cache_write;
     int64_t cache_write_restore;
     int64_t cache_overhead;
+    int64_t cache_eviction_server_skip_dirty_pages_during_checkpoint;
+    int64_t cache_eviction_server_skip_pages_last_running;
+    int64_t cache_eviction_server_skip_pages_retry;
     int64_t cache_hs_insert_full_update;
     int64_t cache_hs_insert_reverse_modify;
     int64_t cache_reentry_hs_eviction_milliseconds;
