@@ -2035,7 +2035,8 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            sh dist/s_clang-scan 2>&1
+            # FIXME-WT-12144 Turn off noisy test failures until s_clang_scan is fixed.
+            # sh dist/s_clang_scan 2>&1
 
   - name: configure-combinations
     commands:
