@@ -1129,6 +1129,10 @@ __txn_resolve_prepared_update_chain(WT_SESSION_IMPL *session, WT_UPDATE *upd, bo
 
     /* Resolve the prepared update to be a committed update. */
     __txn_resolve_prepared_update(session, upd);
+
+    /* Sleep for 100ms in the prepared resolution path if configured. */
+    if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_PREPARE_RESOLUTION_2))
+        __wt_sleep(0, 100000);
     WT_STAT_CONN_INCR(session, txn_prepared_updates_committed);
 }
 

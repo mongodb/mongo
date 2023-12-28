@@ -164,9 +164,9 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
-    "\"prepare_resolution\",\"split_1\",\"split_2\",\"split_3\","
-    "\"split_4\",\"split_5\",\"split_6\",\"split_7\","
-    "\"tiered_flush_finish\"]",
+    "\"prepare_resolution\",\"prepare_resolution_2\",\"split_1\","
+    "\"split_2\",\"split_3\",\"split_4\",\"split_5\",\"split_6\","
+    "\"split_7\",\"tiered_flush_finish\"]",
     NULL, 0},
   {"verbose", "list", NULL,
     "choices=[\"api\",\"backup\",\"block\",\"block_cache\","
@@ -907,9 +907,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
-    "\"prepare_resolution\",\"split_1\",\"split_2\",\"split_3\","
-    "\"split_4\",\"split_5\",\"split_6\",\"split_7\","
-    "\"tiered_flush_finish\"]",
+    "\"prepare_resolution\",\"prepare_resolution_2\",\"split_1\","
+    "\"split_2\",\"split_3\",\"split_4\",\"split_5\",\"split_6\","
+    "\"split_7\",\"tiered_flush_finish\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -993,9 +993,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
-    "\"prepare_resolution\",\"split_1\",\"split_2\",\"split_3\","
-    "\"split_4\",\"split_5\",\"split_6\",\"split_7\","
-    "\"tiered_flush_finish\"]",
+    "\"prepare_resolution\",\"prepare_resolution_2\",\"split_1\","
+    "\"split_2\",\"split_3\",\"split_4\",\"split_5\",\"split_6\","
+    "\"split_7\",\"tiered_flush_finish\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -1077,9 +1077,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
-    "\"prepare_resolution\",\"split_1\",\"split_2\",\"split_3\","
-    "\"split_4\",\"split_5\",\"split_6\",\"split_7\","
-    "\"tiered_flush_finish\"]",
+    "\"prepare_resolution\",\"prepare_resolution_2\",\"split_1\","
+    "\"split_2\",\"split_3\",\"split_4\",\"split_5\",\"split_6\","
+    "\"split_7\",\"tiered_flush_finish\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},
@@ -1159,9 +1159,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"history_store_checkpoint_delay\",\"history_store_search\","
     "\"history_store_sweep_race\",\"prepare_checkpoint_delay\","
-    "\"prepare_resolution\",\"split_1\",\"split_2\",\"split_3\","
-    "\"split_4\",\"split_5\",\"split_6\",\"split_7\","
-    "\"tiered_flush_finish\"]",
+    "\"prepare_resolution\",\"prepare_resolution_2\",\"split_1\","
+    "\"split_2\",\"split_3\",\"split_4\",\"split_5\",\"split_6\","
+    "\"split_7\",\"tiered_flush_finish\"]",
     NULL, 0},
   {"transaction_sync", "category", NULL, NULL, confchk_wiredtiger_open_transaction_sync_subconfigs,
     2},

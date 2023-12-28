@@ -944,6 +944,7 @@ conn_dsrc_stats = [
     TxnStat('txn_checkpoint_obsolete_applied', 'transaction checkpoints due to obsolete pages'),
     TxnStat('txn_checkpoint_snapshot_acquired', 'checkpoint has acquired a snapshot for its transaction'),
     TxnStat('txn_read_race_prepare_update', 'race to read prepared update retry'),
+    TxnStat('txn_read_race_prepare_commit', 'a reader raced with a prepared transaction commit and skipped an update or updates'),
     TxnStat('txn_rts_delete_rle_skipped', 'rollback to stable skipping delete rle'),
     TxnStat('txn_rts_hs_removed', 'rollback to stable updates removed from history store'),
     TxnStat('txn_rts_hs_restore_updates', 'rollback to stable restored updates from history store'),
