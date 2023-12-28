@@ -1175,7 +1175,8 @@ protected:
                                    plan_cache_util::buildDebugInfo(*scopedCq, std::move(decision)));
         CachedSolution cachedSoln(*entry);
 
-        auto statusWithQs = QueryPlanner::planFromCache(*scopedCq, params, cachedSoln);
+        auto statusWithQs =
+            QueryPlanner::planFromCache(*scopedCq, params, *cachedSoln.cachedPlan.get());
         ASSERT_OK(statusWithQs.getStatus());
         return std::move(statusWithQs.getValue());
     }

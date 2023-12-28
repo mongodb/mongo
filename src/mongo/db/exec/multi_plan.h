@@ -88,6 +88,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
+    const plan_ranker::CandidatePlan& getCandidate(size_t candidateIdx) const;
     boost::optional<double> getCandidateScore(size_t candidateIdx) const;
 
     /**

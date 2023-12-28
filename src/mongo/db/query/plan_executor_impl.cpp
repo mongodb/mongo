@@ -134,14 +134,15 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    VariantCollectionPtrOrAcquisition collection,
                                    bool returnOwnedBson,
                                    NamespaceString nss,
-                                   PlanYieldPolicy::YieldPolicy yieldPolicy)
+                                   PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                   boost::optional<size_t> cachedPlanHash)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _expCtx(_cq ? _cq->getExpCtx() : expCtx),
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
-      _planExplainer(plan_explainer_factory::make(_root.get())),
+      _planExplainer(plan_explainer_factory::make(_root.get(), cachedPlanHash)),
       _mustReturnOwnedBson(returnOwnedBson),
       _nss(std::move(nss)) {
     invariant(!_expCtx || _expCtx->opCtx == _opCtx);
@@ -186,11 +187,12 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
     uassertStatusOK(_pickBestPlan());
 
     if (_qs) {
+        _planExplainer->setQuerySolution(_qs.get());
         _planExplainer->updateEnumeratorExplainInfo(_qs->_enumeratorExplainInfo);
     } else if (const MultiPlanStage* mps = getMultiPlanStage()) {
         const QuerySolution* soln = mps->bestSolution();
+        _planExplainer->setQuerySolution(soln);
         _planExplainer->updateEnumeratorExplainInfo(soln->_enumeratorExplainInfo);
-
     } else if (auto subplan = getStageByType(_root.get(), STAGE_SUBPLAN)) {
         auto subplanStage = static_cast<SubplanStage*>(subplan);
         _planExplainer->updateEnumeratorExplainInfo(

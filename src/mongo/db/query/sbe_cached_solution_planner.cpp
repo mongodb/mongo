@@ -129,6 +129,7 @@ CandidatePlans CachedSolutionPlanner::plan(
                                                   {},    /* rejectedCandidates */
                                                   false, /* isMultiPlan */
                                                   true,  /* isFromPlanCache */
+                                                  true,  /* matchesCachedPlan */
                                                   candidate.data.stageData.debugInfo);
 
     if (!candidate.status.isOK()) {

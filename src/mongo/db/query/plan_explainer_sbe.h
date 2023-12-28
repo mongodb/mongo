@@ -68,16 +68,17 @@ public:
                      std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                      bool isMultiPlan,
                      bool isCachedPlan,
+                     bool matchesCachedPlan,
                      std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
                      RemoteExplainVector* remoteExplains = nullptr)
         : PlanExplainer{solution},
           _root{root},
           _rootData{data},
-          _solution{solution},
           _optimizerData(std::move(optimizerData)),
           _rejectedCandidates{std::move(rejectedCandidates)},
           _isMultiPlan{isMultiPlan},
           _isFromPlanCache{isCachedPlan},
+          _matchesCachedPlan{matchesCachedPlan},
           _debugInfo{debugInfo},
           _remoteExplains{remoteExplains} {
         tassert(5968203, "_debugInfo should not be null", _debugInfo);
@@ -115,13 +116,13 @@ private:
     // These fields are are owned elsewhere (e.g. the PlanExecutor or CandidatePlan).
     const sbe::PlanStage* _root{nullptr};
     const stage_builder::PlanStageData* _rootData{nullptr};
-    const QuerySolution* _solution{nullptr};
 
     const std::unique_ptr<optimizer::AbstractABTPrinter> _optimizerData;
 
     const std::vector<sbe::plan_ranker::CandidatePlan> _rejectedCandidates;
     const bool _isMultiPlan{false};
     const bool _isFromPlanCache{false};
+    const bool _matchesCachedPlan{false};
     // Pre-computed debugging info so we don't necessarily have to collect them from QuerySolution.
     // All plans recovered from the same cached entry share the same debug info.
     const std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> _debugInfo;

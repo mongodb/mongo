@@ -126,7 +126,7 @@ public:
     static StatusWith<std::unique_ptr<QuerySolution>> planFromCache(
         const CanonicalQuery& query,
         const QueryPlannerParams& params,
-        const CachedSolution& cachedSoln);
+        const SolutionCacheData& solnCacheData);
 
     /**
      * Plan each branch of the rooted $or query independently, and return the resulting

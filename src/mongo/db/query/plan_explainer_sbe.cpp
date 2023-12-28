@@ -465,7 +465,8 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const boost::optional<BSONObj>& optimizerExplain,
     const boost::optional<std::string>& planSummary,
     const boost::optional<BSONArray>& remotePlanInfo,
-    ExplainOptions::Verbosity verbosity) {
+    ExplainOptions::Verbosity verbosity,
+    bool isCached) {
     BSONObjBuilder bob;
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -494,8 +495,10 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     }
 
     if (optimizerExplain) {
+        // TODO SERVER-84429 Implement "isCached" field for Bonsai.
         plan.append("queryPlan", *optimizerExplain);
     } else {
+        plan.append("isCached", isCached);
         plan.append("queryPlan", bob.obj());
     }
 
@@ -582,7 +585,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
                                  buildCascadesPlan(),
                                  planSummary,
                                  buildRemotePlanInfo(),
-                                 verbosity);
+                                 verbosity,
+                                 _matchesCachedPlan);
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() const {
@@ -598,7 +602,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() con
             boost::none /* optimizerExplain */,
             boost::none, /* planSummary */
             boost::none /* remotePlanInfo */,
-            ExplainOptions::Verbosity::kExecAllPlans);
+            ExplainOptions::Verbosity::kExecAllPlans,
+            _matchesCachedPlan);
     }
     return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
 }
@@ -625,7 +630,8 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
                                             boost::none /* optimizerExplain */,
                                             boost::none, /* planSummary */
                                             boost::none /* remotePlanInfo */,
-                                            verbosity));
+                                            verbosity,
+                                            candidate.matchesCachedPlan));
     }
     return res;
 }

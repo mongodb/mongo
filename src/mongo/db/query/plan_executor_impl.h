@@ -136,7 +136,8 @@ public:
                      VariantCollectionPtrOrAcquisition collection,
                      bool returnOwnedBson,
                      NamespaceString nss,
-                     PlanYieldPolicy::YieldPolicy yieldPolicy);
+                     PlanYieldPolicy::YieldPolicy yieldPolicy,
+                     boost::optional<size_t> cachedPlanHash = boost::none);
 
     virtual ~PlanExecutorImpl();
     CanonicalQuery* getCanonicalQuery() const final;

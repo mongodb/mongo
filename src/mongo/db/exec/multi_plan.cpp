@@ -469,6 +469,14 @@ const SpecificStats* MultiPlanStage::getSpecificStats() const {
     return &_specificStats;
 }
 
+const plan_ranker::CandidatePlan& MultiPlanStage::getCandidate(size_t candidateIdx) const {
+    tassert(8223800,
+            str::stream() << "Invalid candidate plan index: " << candidateIdx
+                          << ", size: " << _candidates.size(),
+            candidateIdx < _candidates.size());
+    return _candidates[candidateIdx];
+}
+
 boost::optional<double> MultiPlanStage::getCandidateScore(size_t candidateIdx) const {
     tassert(5408301,
             str::stream() << "Invalid candidate plan index: " << candidateIdx

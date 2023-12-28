@@ -1178,6 +1178,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> makeExecFromPar
                                        execArgs.nss,
                                        std::move(execArgs.yieldPolicy),
                                        execArgs.planIsFromCache,
+                                       false, /* matchesCachedPlan */
                                        execArgs.generatedByBonsai);
 }
 }  // namespace mongo

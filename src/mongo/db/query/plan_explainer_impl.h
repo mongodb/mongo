@@ -57,7 +57,8 @@ class PlanExplainerImpl final : public PlanExplainer {
 public:
     PlanExplainerImpl(PlanStage* root, const PlanEnumeratorExplainInfo& explainInfo)
         : PlanExplainer{explainInfo}, _root{root} {}
-    PlanExplainerImpl(PlanStage* root) : _root{root} {}
+    PlanExplainerImpl(PlanStage* root, boost::optional<size_t> cachedPlanHash)
+        : _root{root}, _cachedPlanHash(cachedPlanHash) {}
     const ExplainVersion& getVersion() const final;
     bool isMultiPlan() const final;
     std::string getPlanSummary() const final;
@@ -71,6 +72,7 @@ public:
 
 private:
     PlanStage* const _root;
+    boost::optional<size_t> _cachedPlanHash;
 };
 
 /**

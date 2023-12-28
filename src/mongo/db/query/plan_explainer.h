@@ -60,8 +60,9 @@ public:
 
     PlanExplainer() {}
     PlanExplainer(const QuerySolution* solution)
-        : _enumeratorExplainInfo{solution ? solution->_enumeratorExplainInfo
-                                          : PlanEnumeratorExplainInfo{}} {}
+        : _solution(solution),
+          _enumeratorExplainInfo{_solution ? _solution->_enumeratorExplainInfo
+                                           : PlanEnumeratorExplainInfo{}} {}
     PlanExplainer(const PlanEnumeratorExplainInfo& info) : _enumeratorExplainInfo{info} {}
 
     virtual ~PlanExplainer() = default;
@@ -133,7 +134,12 @@ public:
         _enumeratorExplainInfo.merge(other);
     }
 
+    void setQuerySolution(const QuerySolution* qs) {
+        _solution = qs;
+    }
+
 protected:
+    const QuerySolution* _solution{nullptr};
     PlanEnumeratorExplainInfo _enumeratorExplainInfo;
 };
 }  // namespace mongo

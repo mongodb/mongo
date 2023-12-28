@@ -365,6 +365,10 @@ public:
         return _isSearchQuery;
     }
 
+    bool isExplainAndCacheIneligible() const {
+        return getExplain() && !getExpCtxRaw()->inLookup;
+    }
+
 private:
     void initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
                 std::unique_ptr<ParsedFindCommand> parsedFind,

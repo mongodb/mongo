@@ -211,7 +211,13 @@ struct BaseCandidatePlan {
     // non-OK status.
     Status status{Status::OK()};
     // Indicates whether this candidate plan was retrieved from the cache.
-    bool isCachedCandidate{false};
+    bool fromPlanCache{false};
+    // Indicates whether this candidate plan matches the one in the plan cache. Note that during
+    // explain, we do not fetch plans from the plan cache, but the plans we output can still match
+    // the cached plan. So this field is different from the "fromPlanCache" field, which indicates
+    // whether the plan was retrieved from the cache. So it may be the case that a plan is not
+    // retrieved from the cache, yet it matches the cache entry.
+    bool matchesCachedPlan{false};
     // Any results produced during the plan's execution prior to scoring are retained here.
     std::deque<ResultType> results;
     // This is used to track the original plan with clean PlanStage tree and the auxiliary data.

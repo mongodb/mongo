@@ -977,29 +977,24 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
 StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
-    const CachedSolution& cachedSoln) {
-    invariant(cachedSoln.cachedPlan);
-
+    const SolutionCacheData& solnCacheData) {
     // A query not suitable for caching should not have made its way into the cache.
-    invariant(shouldCacheQuery(query));
+    dassert(shouldCacheQuery(query));
 
-    // Look up winning solution in cached solution's array.
-    const auto& winnerCacheData = *cachedSoln.cachedPlan;
-
-    if (SolutionCacheData::WHOLE_IXSCAN_SOLN == winnerCacheData.solnType) {
+    if (SolutionCacheData::WHOLE_IXSCAN_SOLN == solnCacheData.solnType) {
         // The solution can be constructed by a scan over the entire index.
         auto soln = buildWholeIXSoln(
-            *winnerCacheData.tree->entry, query, params, winnerCacheData.wholeIXSolnDir);
+            *solnCacheData.tree->entry, query, params, solnCacheData.wholeIXSolnDir);
         if (!soln) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "plan cache error: soln that uses index to provide sort");
         } else {
             return {std::move(soln)};
         }
-    } else if (SolutionCacheData::COLLSCAN_SOLN == winnerCacheData.solnType) {
+    } else if (SolutionCacheData::COLLSCAN_SOLN == solnCacheData.solnType) {
         // The cached solution is a collection scan. We don't cache collscans
         // with tailable==true, hence the false below.
-        auto soln = buildEofOrCollscanSoln(query, false, params, winnerCacheData.wholeIXSolnDir);
+        auto soln = buildEofOrCollscanSoln(query, false, params, solnCacheData.wholeIXSolnDir);
         if (!soln) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "plan cache error: collection scan soln");
@@ -1019,7 +1014,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
                 5,
                 "Tagging the match expression according to cache data",
                 "filter"_attr = redact(clone->debugString()),
-                "cacheData"_attr = redact(winnerCacheData.toString()));
+                "cacheData"_attr = redact(solnCacheData.toString()));
 
     RelevantFieldIndexMap fields;
     QueryPlannerIXSelect::getFields(query.getPrimaryMatchExpression(), &fields);
@@ -1041,7 +1036,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
                     "id"_attr = ie.identifier);
     }
 
-    Status s = tagAccordingToCache(clone.get(), winnerCacheData.tree.get(), indexMap);
+    Status s = tagAccordingToCache(clone.get(), solnCacheData.tree.get(), indexMap);
     if (!s.isOK()) {
         return s;
     }
@@ -1742,7 +1737,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
     }
 
-    invariant(out.size() > 0);
+    invariant(!out.empty());
     return {std::move(out)};
 }  // QueryPlanner::plan
 

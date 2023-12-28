@@ -87,7 +87,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions,
     NamespaceString nss = NamespaceString::kEmpty,
-    std::unique_ptr<QuerySolution> qs = nullptr);
+    std::unique_ptr<QuerySolution> qs = nullptr,
+    boost::optional<size_t> cachedPlanHash = boost::none);
 
 /**
  * This overload is provided for executors that do not need a CanonicalQuery. For example, the
@@ -116,7 +117,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     VariantCollectionPtrOrAcquisition collection,
     size_t plannerOptions,
     NamespaceString nss,
-    PlanYieldPolicy::YieldPolicy yieldPolicy);
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    boost::optional<size_t> cachedPlanHash = boost::none);
 
 /**
  * Constructs a PlanExecutor for the query 'cq' which will execute the SBE plan 'root'. A yield
@@ -134,6 +136,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     bool isFromPlanCache,
+    bool matchesCachedPlan,
     bool generatedByBonsai,
     std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr,
     std::unique_ptr<RemoteExplainVector> remoteExplains = nullptr);

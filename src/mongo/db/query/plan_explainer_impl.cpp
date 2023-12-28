@@ -205,7 +205,8 @@ void statsToBSON(const PlanStageStats& stats,
                  ExplainOptions::Verbosity verbosity,
                  const boost::optional<size_t> planIdx,
                  BSONObjBuilder* bob,
-                 BSONObjBuilder* topLevelBob) {
+                 BSONObjBuilder* topLevelBob,
+                 boost::optional<bool> isCached = boost::none) {
     invariant(bob);
     invariant(topLevelBob);
 
@@ -218,8 +219,12 @@ void statsToBSON(const PlanStageStats& stats,
     if (STAGE_MULTI_PLAN == stats.stageType) {
         tassert(3420003, "Invalid child plan index", planIdx && planIdx < stats.children.size());
         const PlanStageStats* childStage = stats.children[*planIdx].get();
-        statsToBSON(*childStage, verbosity, planIdx, bob, topLevelBob);
+        statsToBSON(*childStage, verbosity, planIdx, bob, topLevelBob, isCached);
         return;
+    }
+
+    if (isCached) {
+        bob->append("isCached", *isCached);
     }
 
     // Stage name.
@@ -814,8 +819,10 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
         return {std::move(stats), boost::none};
     }();
 
+
+    bool isCached = _cachedPlanHash && _solution && (*_cachedPlanHash == _solution->hash());
     BSONObjBuilder bob;
-    statsToBSON(*stats, verbosity, winningPlanIdx, &bob, &bob);
+    statsToBSON(*stats, verbosity, winningPlanIdx, &bob, &bob, isCached);
     return {bob.obj(), std::move(summary)};
 }
 
@@ -838,9 +845,12 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
     // Get the stats from the trial period for all the plans.
     for (size_t i = 0; i < mpsStats->children.size(); ++i) {
         if (i != *bestPlanIdx) {
+            const auto& candidate = mps->getCandidate(i);
+            bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidate.solution->hash());
+
             BSONObjBuilder bob;
             auto stats = _root->getStats();
-            statsToBSON(*stats, verbosity, i, &bob, &bob);
+            statsToBSON(*stats, verbosity, i, &bob, &bob, isCached);
             auto summary = [&]() -> boost::optional<PlanSummaryStats> {
                 if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
                     auto summary = collectExecutionStatsSummary(stats.get(), i);

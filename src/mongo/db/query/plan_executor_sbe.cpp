@@ -147,7 +147,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         _yieldPolicy->registerPlan(_root.get());
     }
     const auto isMultiPlan = candidates.plans.size() > 1;
-    const auto isCachedCandidate = candidates.winner().isCachedCandidate;
+    const auto isCachedCandidate = candidates.winner().fromPlanCache;
+    const auto matchesCachedPlan = candidates.winner().matchesCachedPlan;
     if (!_cq || !_cq->getExpCtx()->explain) {
         // If we're not in explain mode, there is no need to keep rejected candidate plans around.
         candidates.plans.clear();
@@ -159,7 +160,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     if (_solution) {
         _secondaryNssVector = _solution->getAllSecondaryNamespaces(_nss);
     }
-
     _planExplainer = plan_explainer_factory::make(_root.get(),
                                                   &_rootData,
                                                   _solution.get(),
@@ -167,6 +167,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   std::move(candidates.plans),
                                                   isMultiPlan,
                                                   isCachedCandidate,
+                                                  matchesCachedPlan,
                                                   _rootData.debugInfo,
                                                   _remoteExplains.get());
     _cursorType = _rootData.staticData->cursorType;

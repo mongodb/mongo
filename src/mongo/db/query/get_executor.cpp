@@ -748,7 +748,7 @@ public:
     void setRecoveredFromPlanCache(bool val) {
         _fromPlanCache = val;
     }
-    bool isRecoveredFromPlanCache() {
+    bool isRecoveredFromPlanCache() const {
         return _fromPlanCache;
     }
 
@@ -756,11 +756,21 @@ public:
         return _cacheInfo;
     }
 
+    void setCachedPlanHash(boost::optional<size_t> cachedPlanHash) {
+        _cachedPlanHash = cachedPlanHash;
+    }
+
+    boost::optional<size_t> cachedPlanHash() const {
+        return _cachedPlanHash;
+    }
+
 private:
     std::unique_ptr<PlanStage> _root;
     std::unique_ptr<QuerySolution> _solution;
     bool _fromPlanCache{false};
     PlanCacheInfo _cacheInfo;
+    // If there is a matching cache entry, this is the hash of the cached plan.
+    boost::optional<size_t> _cachedPlanHash;
 };
 
 /**
@@ -849,6 +859,14 @@ public:
         _recoveredPinnedCacheEntry = pinnedEntry;
     }
 
+    void setCachedPlanHash(boost::optional<size_t> cachedPlanHash) {
+        _cachedPlanHash = cachedPlanHash;
+    }
+
+    boost::optional<size_t> cachedPlanHash() const {
+        return _cachedPlanHash;
+    }
+
     void setRecoveredFromPlanCache(bool val) {
         _fromPlanCache = val;
     }
@@ -869,6 +887,8 @@ private:
     bool _recoveredPinnedCacheEntry{false};
     bool _fromPlanCache{false};
     PlanCacheInfo _cacheInfo;
+    // If there is a matching cache entry, this is the hash of that plan.
+    boost::optional<size_t> _cachedPlanHash;
 };
 
 /**
@@ -948,10 +968,27 @@ public:
         getResult()->planCacheInfo().queryHash = planCacheKey.queryHash();
         getResult()->planCacheInfo().planCacheKey = planCacheKey.planCacheKeyHash();
 
-        if (auto result = buildCachedPlan(planCacheKey)) {
-            return {std::move(result)};
+        // In each plan cache entry, we store the hash of the cached plan. We use this to indicate
+        // whether a plan is cached in explain, by matching the QuerySolution hash to the cached
+        // hash.
+        boost::optional<size_t> cachedPlanHash = boost::none;
+        if (auto cacheResult = buildCachedPlan(planCacheKey); cacheResult) {
+            return {std::move(cacheResult)};
+        } else if (MONGO_unlikely(_cq->isExplainAndCacheIneligible())) {
+            // If we are processing an explain, get the cached plan hash if there is one. This is
+            // used for the "isCached" field.
+            cachedPlanHash = getCachedPlanHash(planCacheKey);
         }
 
+        // Finish preparing, then set the cachedPlanHash on the result.
+        auto result = finishPrepare();
+        if (result.isOK()) {
+            result.getValue()->setCachedPlanHash(cachedPlanHash);
+        }
+        return result;
+    }
+
+    StatusWith<std::unique_ptr<ResultType>> finishPrepare() {
         initializePlannerParamsIfNeeded();
         if (SubplanStage::needsSubplanning(*_cq)) {
             LOGV2_DEBUG(20924,
@@ -962,7 +999,6 @@ public:
         }
 
         auto statusWithMultiPlanSolns = QueryPlanner::plan(*_cq, _plannerParams);
-
         if (!statusWithMultiPlanSolns.isOK()) {
             return statusWithMultiPlanSolns.getStatus().withContext(
                 str::stream() << "error processing query: " << _cq->toStringForErrorMsg()
@@ -990,8 +1026,8 @@ public:
             }
         }
 
-        // Force multiplanning (and therefore caching) if forcePlanCache is set. We could manually
-        // update the plan cache instead without multiplanning but this is simpler.
+        // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
+        // manually update the plan cache instead without multiplanning but this is simpler.
         if (1 == solutions.size() && !_cq->getExpCtxRaw()->forcePlanCache) {
             // Only one possible plan. Build the stages from the solution.
             auto result = releaseResult();
@@ -1074,6 +1110,10 @@ protected:
      * be constructed.
      */
     virtual std::unique_ptr<ResultType> buildCachedPlan(const KeyType& planCacheKey) = 0;
+
+    // If there is a matching cache entry, retrieves the hash of the cached plan. Otherwise returns
+    // boost::none.
+    virtual boost::optional<size_t> getCachedPlanHash(const KeyType& planCacheKey) = 0;
 
     /**
      * Constructs a special PlanStage tree for rooted $or queries. Each clause of the $or is planned
@@ -1228,7 +1268,8 @@ protected:
                 planCacheCounters.incrementClassicHitsCounter();
 
                 // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
-                auto statusWithQs = QueryPlanner::planFromCache(*_cq, _plannerParams, *cs);
+                auto statusWithQs =
+                    QueryPlanner::planFromCache(*_cq, _plannerParams, *cs->cachedPlan.get());
 
                 if (statusWithQs.isOK()) {
                     auto querySolution = std::move(statusWithQs.getValue());
@@ -1261,6 +1302,15 @@ protected:
 
         planCacheCounters.incrementClassicMissesCounter();
         return nullptr;
+    }
+
+    boost::optional<size_t> getCachedPlanHash(const PlanCacheKey& planCacheKey) final {
+        if (auto cs = CollectionQueryInfo::get(getMainCollection())
+                          .getPlanCache()
+                          ->getCacheEntryIfActive(planCacheKey)) {
+            return cs->cachedPlan->solutionHash;
+        }
+        return boost::none;
     }
 
     std::unique_ptr<ClassicPrepareExecutionResult> buildSubPlan() final {
@@ -1370,6 +1420,14 @@ protected:
         return nullptr;
     }
 
+    boost::optional<size_t> getCachedPlanHash(const sbe::PlanCacheKey& planCacheKey) final {
+        auto&& planCache = sbe::getPlanCache(_opCtx);
+        if (auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey); cacheEntry) {
+            return cacheEntry->cachedPlan->solutionHash;
+        }
+        return boost::none;
+    }
+
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildSubPlan() final {
         // Nothing to be done here, all planning and stage building will be done by a SubPlanner.
         auto result = releaseResult();
@@ -1420,7 +1478,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
                                        yieldPolicy,
                                        plannerParams.options,
                                        {},
-                                       std::move(solution));
+                                       std::move(solution),
+                                       result->cachedPlanHash());
 }
 
 /**
@@ -1529,6 +1588,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                                          planStageData)) {
         // Do the runtime planning and pick the best candidate plan.
         auto candidates = runTimePlanner->plan(std::move(solutions), std::move(roots));
+        for (auto& candidate : candidates.plans) {
+            candidate.matchesCachedPlan = planningResult->cachedPlanHash() &&
+                (*planningResult->cachedPlanHash() == candidate.solution->hash());
+        }
 
         return plan_executor_factory::make(opCtx,
                                            std::move(cq),
@@ -1574,6 +1637,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                                   planningResult->isRecoveredFromPlanCache(),
                                                   remoteCursors.get());
 
+    bool matchesCachedPlan = planningResult->cachedPlanHash() &&
+        (*planningResult->cachedPlanHash() == solutions[0]->hash());
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),
                                        nullptr /*pipeline*/,
@@ -1584,6 +1649,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(nss),
                                        std::move(yieldPolicy),
                                        planningResult->isRecoveredFromPlanCache(),
+                                       matchesCachedPlan,
                                        false /* generatedByBonsai */,
                                        std::move(remoteCursors),
                                        std::move(remoteExplains));
@@ -1882,6 +1948,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
                                        cq.nss(),
                                        std::move(sbeYieldPolicy),
                                        false /* planIsFromCache */,
+                                       false /* matchesCachedPlan */,
                                        false /* generatedByBonsai */,
                                        std::move(remoteCursors));
 }
@@ -2150,7 +2217,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                                        policy,
                                        defaultPlannerOptions,
                                        NamespaceString::kEmpty,
-                                       std::move(querySolution));
+                                       std::move(querySolution),
+                                       executionResult.getValue()->cachedPlanHash());
 }
 
 //
@@ -2349,7 +2417,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                                        policy,
                                        defaultPlannerOptions,
                                        NamespaceString::kEmpty,
-                                       std::move(querySolution));
+                                       std::move(querySolution),
+                                       executionResult.getValue()->cachedPlanHash());
 }
 
 //
@@ -2705,7 +2774,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
                                        yieldPolicy,
                                        plannerOptions,
                                        NamespaceString::kEmpty,
-                                       std::move(querySolution));
+                                       std::move(querySolution),
+                                       executionResult.getValue()->cachedPlanHash());
 }
 
 //

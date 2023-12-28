@@ -173,7 +173,7 @@ bool shouldCacheQuery(const CanonicalQuery& query) {
     // document on the outer side. To ensure that the 'executionTime' value is accurate for $lookup,
     // we allow the inner side to use the cache even if the query is an explain.
     tassert(6497600, "expCtx is null", query.getExpCtxRaw());
-    if (query.getExplain() && !query.getExpCtxRaw()->inLookup) {
+    if (query.isExplainAndCacheIneligible()) {
         return false;
     }
 
