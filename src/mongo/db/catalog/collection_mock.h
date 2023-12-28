@@ -289,7 +289,7 @@ public:
     }
 
     long long numRecords(OperationContext* opCtx) const {
-        MONGO_UNREACHABLE;
+        return 0LL;
     }
 
     long long dataSize(OperationContext* opCtx) const {
@@ -321,7 +321,7 @@ public:
     }
 
     boost::optional<TimeseriesOptions> getTimeseriesOptions() const {
-        MONGO_UNREACHABLE;
+        return boost::none;
     }
 
     void setTimeseriesOptions(OperationContext* opCtx, const TimeseriesOptions& tsOptions) {
