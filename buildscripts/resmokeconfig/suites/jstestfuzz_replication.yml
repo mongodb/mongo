@@ -19,7 +19,6 @@ executor:
           # Other fuzzers test commands against replica sets with logical session ids.
           disableImplicitSessions: true
   hooks:
-  - class: RunQueryStats
   - class: FuzzerRestoreSettings
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
@@ -43,7 +42,5 @@ executor:
         enableTestCommands: 1
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
-        internalQueryStatsRateLimit: -1
-        internalQueryStatsErrorsAreCommandFatal: true
       verbose: ''
     num_nodes: 2
