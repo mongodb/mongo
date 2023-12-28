@@ -1151,10 +1151,8 @@ __hs_delete_record(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ITEM *key, WT_UPDATE *upd, WT_UPDATE *tombstone)
 {
     WT_DECL_RET;
-    bool hs_read_committed;
-#ifdef HAVE_DIAGNOSTIC
     WT_TIME_WINDOW *hs_tw;
-#endif
+    bool hs_read_committed;
 
     if (r->hs_cursor == NULL)
         WT_RET(__wt_curhs_open(session, NULL, &r->hs_cursor));
@@ -1170,11 +1168,22 @@ __hs_delete_record(
     WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_before(session, r->hs_cursor), true);
     /* It's possible the value in the history store becomes obsolete concurrently. */
     if (ret == WT_NOTFOUND) {
+        /*
+         * The history store update may not exist even if there is no tombstone associated with it
+         * as this update may have already been removed by rollback to stable.
+         */
         WT_ASSERT(session, tombstone != NULL && __wt_txn_upd_visible_all(session, tombstone));
         ret = 0;
     } else {
-#ifdef HAVE_DIAGNOSTIC
+        /*
+         * We have found a record that is not obsolete. However, we only want to delete a record if
+         * it has a stop timestamp greater than the start timestamp of the update.
+         */
         __wt_hs_upd_time_window(r->hs_cursor, &hs_tw);
+        if (hs_tw->stop_ts <= upd->start_ts)
+            goto done;
+
+#ifdef HAVE_DIAGNOSTIC
         WT_ASSERT(session, hs_tw->start_txn == WT_TXN_NONE || hs_tw->start_txn == upd->txnid);
         WT_ASSERT(session, hs_tw->start_ts == WT_TS_NONE || hs_tw->start_ts == upd->start_ts);
         WT_ASSERT(session,
@@ -1202,7 +1211,7 @@ err:
 
 /*
  * __wt_hs_delete_updates --
- *     Delete the updates from the history store
+ *     Delete the updates from the history store.
  */
 int
 __wt_hs_delete_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r)
