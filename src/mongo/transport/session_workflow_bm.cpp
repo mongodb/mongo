@@ -67,6 +67,7 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
@@ -86,7 +87,7 @@ constexpr bool enableInstrumentation = false;
 /** Benchmarks can't do this with command line flags like unit tests can. */
 void initializeInstrumentation() {
     constexpr auto kLogLevel =
-        enableInstrumentation ? logv2::LogSeverity::Debug(4) : logv2::LogSeverity::Error();
+        enableInstrumentation ? logv2::LogSeverity::Debug(4) : logv2::LogSeverity::Warning();
     std::array components = {
         std::pair{logv2::LogComponent::kExecutor, kLogLevel},
         std::pair{logv2::LogComponent::kNetwork, kLogLevel},
@@ -241,11 +242,13 @@ public:
         auto sm = std::make_unique<AsioSessionManager>(svcCtx);
         _sessionManager = sm.get();
         auto tl = std::make_unique<test::TransportLayerMockWithReactor>(std::move(sm));
+        _tl = tl.get();
         svcCtx->setTransportLayerManager(
             std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
         LOGV2_DEBUG(7015136, 3, "About to start sep");
         invariant(svcCtx->getTransportLayerManager()->setup());
         invariant(svcCtx->getTransportLayerManager()->start());
+        transport::ServiceExecutor::startupAll(svcCtx);
     }
 
     AsioSessionManager* sessionManager() const {
@@ -259,6 +262,7 @@ public:
             return;
         LOGV2_DEBUG(7015138, 3, "TearDown (last)");
         getGlobalServiceContext()->getTransportLayerManager()->shutdown();
+        transport::ServiceExecutor::shutdownAll(getGlobalServiceContext(), Seconds(1));
         setGlobalServiceContext({});
         _savedDefaultReserved.reset();
         _savedUseDedicated.reset();
@@ -269,9 +273,13 @@ public:
             LOGV2_DEBUG(7015139, 3, "run: iteration start");
             auto session = _coordinator->makeSession();
             invariant(session);
+            session->getTransportLayerCb = [this]() {
+                return _tl;
+            };
             Future<void> ended = session->observeEnd();
-            sessionManager()->startSession(std::move(session));
+            sessionManager()->startSession(session);
             ended.get();
+            ASSERT_EQ(session->rounds(), 0);
         }
         LOGV2_DEBUG(7015140, 3, "run: all iterations finished");
         invariant(sessionManager()->waitForNoSessions(Seconds{1}));
@@ -284,6 +292,7 @@ private:
     boost::optional<ScopedValueOverride<bool>> _savedUseDedicated;
     std::unique_ptr<MockCoordinator> _coordinator;
     AsioSessionManager* _sessionManager;
+    TransportLayer* _tl;
 };
 
 /**
