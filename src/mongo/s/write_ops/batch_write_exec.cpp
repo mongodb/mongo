@@ -702,21 +702,6 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
         }
     }
 
-    if (targeter.hasStaleShardResponse()) {
-        // If there were any stale shard responses, we will need to retry the whole batch and hence
-        // we cancel all writes.
-        for (auto& targetedWriteBatchMap : pendingBatches) {
-            auto& targetedWrite = targetedWriteBatchMap.second->getWrites().front();
-            auto& writeOp = batchOp.getWriteOp(targetedWrite->writeOpRef.first);
-            // If we are here due to a stale shard/db and n=1 response, we don't need to retry.
-            if (writeOp.getWriteState() != WriteOpState_Completed) {
-                writeOp.resetWriteToReady();
-            }
-            // Since all targeted writes belong to one writeOp we can break the loop.
-            break;
-        }
-    }
-
     hangBeforeCompletingWriteWithoutShardKeyWithId.pauseWhileSet();
 }
 

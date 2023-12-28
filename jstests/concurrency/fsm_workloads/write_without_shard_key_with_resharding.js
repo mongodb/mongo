@@ -76,23 +76,47 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         init: {
             reshardCollection: 0.2,
             reshardCollectionSameKey: 0.1,
-            updateOne: 0.3,
-            deleteOne: 0.2,
-            findAndModify: 0.2
+            updateOne: 0.15,
+            deleteOne: 0.1,
+            updateOneWithId: 0.15,
+            deleteOneWithId: 0.1,
+            findAndModify: 0.1
         },
         updateOne: {
             reshardCollection: 0.2,
             reshardCollectionSameKey: 0.1,
-            updateOne: 0.3,
-            deleteOne: 0.2,
-            findAndModify: 0.2
+            updateOne: 0.15,
+            deleteOne: 0.1,
+            updateOneWithId: 0.15,
+            deleteOneWithId: 0.1,
+            findAndModify: 0.1
         },
         deleteOne: {
             reshardCollection: 0.2,
             reshardCollectionSameKey: 0.1,
-            updateOne: 0.3,
-            deleteOne: 0.2,
-            findAndModify: 0.2
+            updateOne: 0.15,
+            deleteOne: 0.1,
+            updateOneWithId: 0.15,
+            deleteOneWithId: 0.1,
+            findAndModify: 0.1
+        },
+        updateOneWithId: {
+            reshardCollection: 0.2,
+            reshardCollectionSameKey: 0.1,
+            updateOne: 0.15,
+            deleteOne: 0.1,
+            updateOneWithId: 0.15,
+            deleteOneWithId: 0.1,
+            findAndModify: 0.1
+        },
+        deleteOneWithId: {
+            reshardCollection: 0.2,
+            reshardCollectionSameKey: 0.1,
+            updateOne: 0.15,
+            deleteOne: 0.1,
+            updateOneWithId: 0.15,
+            deleteOneWithId: 0.1,
+            findAndModify: 0.1
         },
         findAndModify: {
             reshardCollection: 0.2,
@@ -104,16 +128,20 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         reshardCollection: {
             reshardCollection: 0.2,
             reshardCollectionSameKey: 0.1,
-            updateOne: 0.3,
-            deleteOne: 0.2,
-            findAndModify: 0.2
+            updateOne: 0.15,
+            deleteOne: 0.1,
+            updateOneWithId: 0.15,
+            deleteOneWithId: 0.1,
+            findAndModify: 0.1
         },
         reshardCollectionSameKey: {
             reshardCollection: 0.2,
             reshardCollectionSameKey: 0.1,
-            updateOne: 0.3,
-            deleteOne: 0.2,
-            findAndModify: 0.2
+            updateOne: 0.15,
+            deleteOne: 0.1,
+            updateOneWithId: 0.15,
+            deleteOneWithId: 0.1,
+            findAndModify: 0.1
         },
     };
 

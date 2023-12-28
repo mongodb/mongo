@@ -14,13 +14,15 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 10;
     $config.iterations = 50;
     $config.startState = "init";  // Inherited from random_moveChunk_base.js.
-    $config.data.partitionSize = 50;
+    $config.data.partitionSize = 100;
     $config.data.secondaryDocField = 'y';
+    $config.data.idField = '_id';
     $config.data.tertiaryDocField = 'tertiaryField';
     $config.data.runningWithStepdowns =
         TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
@@ -42,10 +44,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     /**
      * Generates a random document.
      */
-    $config.data.generateRandomDocument = function generateRandomDocument(tid, partition) {
+    $config.data.generateRandomDocument = function generateRandomDocument(tid, partition, idVal) {
         const val = this.generateRandomInt(partition.lower, partition.upper - 1);
         return {
-            _id: UUID(),
+            _id: idVal,
             tid: tid,
             [this.defaultShardKeyField]: val,
             [this.secondaryDocField]: val
@@ -59,9 +61,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const ns = db.getName() + "." + collName;
         const partition = this.makePartition(ns, tid, this.partitionSize);
         let bulk = db.getCollection(collName).initializeUnorderedBulkOp();
+        let val = partition.lower;
         for (let i = 0; i < this.partitionSize; ++i) {
-            const doc = this.generateRandomDocument(tid, partition);
+            const doc = this.generateRandomDocument(tid, partition, val);
             bulk.insert(doc);
+            val++;
         }
         assert.commandWorked(bulk.execute());
     };
@@ -71,7 +75,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * partition for this thread id. The chunks could be distributed among multiple shards, which
      * mean the query could target a variable number of shards.
      */
-    $config.data.generateRandomQuery = function generateRandomQuery(db, collName) {
+    $config.data.generateRandomQuery = function generateRandomQuery() {
         const queryType = this.generateRandomInt(0, 3);
         if (queryType === 0 /* Range query on shard key field. */) {
             return {
@@ -96,7 +100,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.data.generateAndRunRandomUpdateOp = function generateAndRunRandomUpdateOp(db,
                                                                                       collName) {
-        const query = this.generateRandomQuery(db, collName);
+        const query = this.generateRandomQuery();
         const newValue = this.generateRandomInt(this.partition.lower, this.partition.upper - 1);
         const updateType = this.generateRandomInt(0, 2);
         const doShardKeyUpdate = this.generateRandomInt(0, 1);
@@ -162,6 +166,53 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 // Clean up, remove upserted document.
                 assert.commandWorked(db[collName].deleteOne({"_id": res.upsertedId}));
             }
+        }
+
+        assert.contains(res.modifiedCount, [0, 1], res);
+
+        // In case the modification results in no change to the document, matched may be higher
+        // than modified.
+        assert.gte(res.matchedCount, res.modifiedCount, res);
+    };
+
+    /**
+     * Randomly generates and runs an update operator document update without shard key with ID,
+     * replacement update, or an aggregation pipeline update.
+     */
+    $config.data.generateAndRunRandomUpdateOpWithId = function generateAndRunRandomUpdateOpWithId(
+        db, collName) {
+        const query = {
+            _id: {
+                $eq: this.generateRandomInt(this.partition.lower - this.partitionSize / 4,
+                                            this.partition.upper + this.partitionSize / 4)
+            },
+            tid: this.tid
+        };
+        const newValue = this.generateRandomInt(this.partition.lower, this.partition.upper - 1);
+        const updateType = this.generateRandomInt(0, 1);
+
+        // Used for validation after running the write operation.
+        const containsMatchedDocs = db[collName].findOne(query) != null;
+
+        jsTestLog("updateOneWithId state running with the following parameters: \n" +
+                  "query: " + tojson(query) + "\n" +
+                  "updateType: " + updateType + "\n" +
+                  "containsMatchedDocs: " + containsMatchedDocs);
+
+        let res;
+        if (updateType === 0 /* Update operator document */) {
+            const update = {[this.secondaryDocField]: newValue};
+            res = db[collName].updateOne(query, {$set: update});
+        } else { /* Aggregation pipeline update */
+            const update = {[this.secondaryDocField]: newValue};
+            res = db[collName].updateOne(query, [{$set: update}]);
+        }
+        assert.commandWorked(res);
+
+        if (containsMatchedDocs) {
+            assert.eq(res.matchedCount, 1, query);
+        } else {
+            assert.eq(res.matchedCount, 0, res);
         }
 
         assert.contains(res.modifiedCount, [0, 1], res);
@@ -267,7 +318,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.data.generateAndRunRandomFindAndModifyOp = function generateAndRunRandomFindAndModifyOp(
         db, collName) {
-        const query = this.generateRandomQuery(db, collName);
+        const query = this.generateRandomQuery();
 
         // Used for validation after running the write operation.
         const containsMatchedDocs = db[collName].findOne(query) != null;
@@ -391,15 +442,30 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
     };
 
+    $config.states.init = function init(db, collName, connCache) {
+        $super.states.init.apply(this, arguments);
+        this.featureFlagUpdateWithIdWithoutShardKey =
+            FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'UpdateOneWithIdWithoutShardKey');
+    };
+
     $config.states.updateOne = function updateOne(db, collName, connCache) {
         jsTestLog("Running updateOne state");
         this.generateAndRunRandomUpdateOp(db, collName);
         jsTestLog("Finished updateOne state");
     };
 
+    $config.states.updateOneWithId = function updateOneWithId(db, collName, connCache) {
+        if (!this.featureFlagUpdateWithIdWithoutShardKey) {
+            return;
+        }
+        jsTestLog("Running updateOneWithId state");
+        this.generateAndRunRandomUpdateOpWithId(db, collName);
+        jsTestLog("Finished updateOneWithId state");
+    };
+
     $config.states.deleteOne = function deleteOne(db, collName, connCache) {
         jsTestLog("Running deleteOne state");
-        const query = this.generateRandomQuery(db, collName);
+        const query = this.generateRandomQuery();
 
         // Used for validation after running the write operation.
         const containsMatchedDocs = db[collName].findOne(query) != null;
@@ -423,6 +489,43 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             assert.eq(numMatchedDocsAfter, numMatchedDocsBefore);
         }
         jsTestLog("Finished deleteOne state");
+    };
+
+    $config.states.deleteOneWithId = function deleteOneWithId(db, collName, connCache) {
+        if (!this.featureFlagUpdateWithIdWithoutShardKey) {
+            return;
+        }
+        jsTestLog("Running deleteOneWithId state");
+        const query = {
+            _id: {
+                $eq: this.generateRandomInt(this.partition.lower - this.partitionSize / 4,
+                                            this.partition.upper + this.partitionSize / 4)
+            },
+            tid: this.tid
+        };
+
+        // Used for validation after running the write operation.
+        const containsMatchedDocs = db[collName].findOne(query) != null;
+        const numMatchedDocsBefore = db[collName].find(query).itcount();
+
+        jsTestLog("deleteOneWithId state running with query: " + tojson(query) + "\n" +
+                  "containsMatchedDocs: " + containsMatchedDocs + "\n" +
+                  "numMatchedDocsBefore: " + numMatchedDocsBefore);
+
+        let res = assert.commandWorked(db[collName].deleteOne(query));
+
+        const numMatchedDocsAfter = db[collName].find(query).itcount();
+
+        if (containsMatchedDocs) {
+            assert.eq(res.deletedCount, 1, res);
+            assert.eq(numMatchedDocsAfter, numMatchedDocsBefore - 1);
+        } else {
+            assert.eq(res.deletedCount, 0, res);
+
+            // The count should both be 0.
+            assert.eq(numMatchedDocsAfter, numMatchedDocsBefore);
+        }
+        jsTestLog("Finished deleteOneWithId state");
     };
 
     $config.states.findAndModify = function findAndModify(db, collName, connCache) {
@@ -482,10 +585,48 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.transitions = {
-        init: {updateOne: 0.3, deleteOne: 0.3, findAndModify: 0.4},
-        updateOne: {updateOne: 0.3, deleteOne: 0.3, findAndModify: 0.4},
-        deleteOne: {updateOne: 0.3, deleteOne: 0.3, findAndModify: 0.4},
-        findAndModify: {updateOne: 0.3, deleteOne: 0.3, findAndModify: 0.4}
+        init: {
+            updateOne: 0.175,
+            deleteOne: 0.175,
+            updateOneWithId: 0.175,
+            deleteOneWithId: 0.175,
+            findAndModify: 0.3
+        },
+        updateOne: {
+            updateOne: 0.175,
+            deleteOne: 0.175,
+            updateOneWithId: 0.175,
+            deleteOneWithId: 0.175,
+            findAndModify: 0.3
+        },
+        deleteOne: {
+            updateOne: 0.175,
+            deleteOne: 0.175,
+            updateOneWithId: 0.175,
+            deleteOneWithId: 0.175,
+            findAndModify: 0.3
+        },
+        updateOneWithId: {
+            updateOne: 0.175,
+            deleteOne: 0.175,
+            updateOneWithId: 0.175,
+            deleteOneWithId: 0.175,
+            findAndModify: 0.3
+        },
+        deleteOneWithId: {
+            updateOne: 0.175,
+            deleteOne: 0.175,
+            updateOneWithId: 0.175,
+            deleteOneWithId: 0.175,
+            findAndModify: 0.3
+        },
+        findAndModify: {
+            updateOne: 0.175,
+            deleteOne: 0.175,
+            updateOneWithId: 0.175,
+            deleteOneWithId: 0.175,
+            findAndModify: 0.3
+        }
     };
 
     return $config;
