@@ -201,6 +201,17 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
         return ChunkVersion::UNSHARDED();
     }
 
+    // The persisted cached collection metadata can be missing the 'uuid' field if it was written
+    // before v3.6. In this case throw away the cache so that we'll perform a full refresh from the
+    // configsvr, where the 'uuid' field will exist and will be recovered.
+    if (!cachedCollection.getUuid()) {
+        LOGV2(8212900,
+              "Dropping persisted collection metadata cache because it is missing the uuid field",
+              "nss"_attr = nss);
+        uassertStatusOK(dropChunksAndDeleteCollectionsEntry(opCtx, nss));
+        return ChunkVersion::UNSHARDED();
+    }
+
     auto statusWithChunk = shardmetadatautil::readShardChunks(opCtx,
                                                               nss,
                                                               BSONObj(),
@@ -233,6 +244,19 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
     ShardCollectionType shardCollectionEntry =
         uassertStatusOK(readShardCollectionsEntry(opCtx, nss));
 
+    // At this point the persisted metadata should always have the 'uuid' because:
+    // - On primary nodes, earlier in the refresh '_schedulePrimaryGetChunksSince' (by means of
+    //   'getPersistedMaxChunkVersion') would have already discarded the persisted cache if the
+    //   'uuid' was missing.
+    // - On secondary nodes, '_getCompletePersistedMetadataForSecondarySinceVersion' is only called
+    //   after having asked the primary node to refresh and having waited for this node replicate
+    //   it. The primary should then have recovered the 'uuid'. Note that due to multi-version
+    //   scenarios (where the primary might be running an older version without the fix for
+    //   SERVER-82129) we cannot make this assertion stronger than a uassert.
+    uassert(8212901,
+            "Persisted ShardServerCatalogCacheLoader metadata is missing the uuid field",
+            shardCollectionEntry.getUuid());
+
     // If the persisted epoch doesn't match what the CatalogCache requested, read everything.
     // If the epochs are the same we can safely take the timestamp from the shard coll entry.
     ChunkVersion startingVersion = (shardCollectionEntry.getEpoch() == version.epoch())
@@ -254,7 +278,7 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
 
     return CollectionAndChangedChunks{shardCollectionEntry.getEpoch(),
                                       shardCollectionEntry.getTimestamp(),
-                                      shardCollectionEntry.getUuid(),
+                                      *shardCollectionEntry.getUuid(),
                                       shardCollectionEntry.getKeyPattern().toBSON(),
                                       shardCollectionEntry.getDefaultCollation(),
                                       shardCollectionEntry.getUnique(),

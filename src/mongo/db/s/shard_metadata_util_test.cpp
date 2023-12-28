@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional/optional_io.hpp>
+
 #include "mongo/db/s/shard_metadata_util.h"
 
 #include "mongo/base/status.h"

@@ -112,8 +112,11 @@ structs:
             uuid:
                 type: uuid
                 description: "The UUID that will be used to create the local collection on each of
-                              the shards which have chunks."
-                optional: false
+                              the shards which have chunks. In practice this field must always be
+                              present except in the case where pre-3.6 chunks temporarily existed on
+                              shards, but got moved off of these shards before the mandatory UUID
+                              upgrade step in 3.6 (see SERVER-82129 for more detail)."
+                optional: true
             key:
                 cpp_name: keyPattern
                 type: KeyPattern

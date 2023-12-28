@@ -129,6 +129,8 @@ last-continuous:
     ticket: SERVER-82883
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     ticket: SERVER-77506
+  - test_file: jstests/sharding/fcv_upgrade_succeeds_when_persisted_collection_cache_missing_uuid_field.js
+    ticket: SERVER-82129
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -320,6 +322,8 @@ last-lts:
     ticket: SERVER-82883
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     ticket: SERVER-77506
+  - test_file: jstests/sharding/fcv_upgrade_succeeds_when_persisted_collection_cache_missing_uuid_field.js
+    ticket: SERVER-82129
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

@@ -31,8 +31,10 @@
 
 #include <boost/optional/optional_io.hpp>
 
+#include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/s/type_shard_collection.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
@@ -613,6 +615,50 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDbMetadat
     newDbType = _shardLoader->getDatabase(dbName).get();
     ASSERT_EQUALS(dbType.getVersion().getUuid(), newDbType.getVersion().getUuid());
     ASSERT_EQUALS(dbType.getVersion().getTimestamp(), newDbType.getVersion().getTimestamp());
+}
+
+// Test that when a persisted entry on config.cache.collections is missing the 'uuid' field (which
+// can happen if it had been created before v3.6), the next primary refresh will reconcile the
+// persisted cache with the authoritative data on the configsvr and persist the 'uuid'.
+TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadWhenPersistedMetadataIsMissingUUID) {
+    // First set up the shard chunk loader as sharded.
+    auto collAndChunks = setUpChunkLoaderWithFiveChunks();
+    auto& chunks = collAndChunks.second;
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+
+    // Simulate leftover config.cache.collections entries missing the 'uuid' field (as if they had
+    // been before on v3.6).
+    ASSERT_OK(shardmetadatautil::updateShardCollectionsEntry(
+        operationContext(),
+        BSON("_id" << kNss.ns()),
+        BSON("$unset" << BSON(ShardCollectionType::kUuidFieldName << 1)),
+        false /*upsert*/));
+    const auto persistedCollMetadata =
+        uassertStatusOK(shardmetadatautil::readShardCollectionsEntry(operationContext(), kNss));
+    ASSERT_FALSE(persistedCollMetadata.getUuid());
+
+    // Then set up the remote loader to return a single document we've already seen -- indicates
+    // there's nothing new.
+    vector<ChunkType> lastChunk;
+    lastChunk.push_back(chunks.back());
+    _remoteLoaderMock->setChunkRefreshReturnValue(lastChunk);
+
+    // Check that refresh works even though the persisted metadata is missing the 'uuid' field.
+    auto collAndChunksRes = _shardLoader->getChunksSince(kNss, chunks.back().getVersion()).get();
+
+    // Check that refreshing from the latest version returned a single document matching that
+    // version.
+    ASSERT_EQUALS(collAndChunksRes.epoch, chunks.back().getVersion().epoch());
+    ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 1UL);
+    ASSERT_BSONOBJ_EQ(collAndChunksRes.changedChunks.back().toShardBSON(),
+                      chunks.back().toShardBSON());
+
+    // Assert that the persisted config.cache.collections entry has the 'uuid' field.
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+    const auto newPersistedCollMetadata =
+        uassertStatusOK(shardmetadatautil::readShardCollectionsEntry(operationContext(), kNss));
+    ASSERT_TRUE(newPersistedCollMetadata.getUuid());
+    ASSERT_EQ(*newPersistedCollMetadata.getUuid(), collAndChunksRes.uuid);
 }
 
 TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedOnSSCCL) {
