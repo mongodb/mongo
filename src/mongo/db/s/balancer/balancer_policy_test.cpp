@@ -453,13 +453,13 @@ TEST(BalancerPolicy, JumboChunksNotMovedRandom) {
          {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
 
     // construct a new chunk map where all the chunks are jumbo except this one
-    const auto jumboChunkIdx = _random.nextInt64(cluster.second[kShardId0].size());
-    const auto& jumboChunk = cluster.second[kShardId0][jumboChunkIdx];
+    const auto nonJumboChunkIdx = _random.nextInt64(cluster.second[kShardId0].size());
+    const auto& nonJumboChunk = cluster.second[kShardId0][nonJumboChunkIdx];
 
     std::vector<ChunkType> chunks;
     cm->forEachChunk([&](const auto& chunk) {
         ChunkType ct{kNamespace, chunk.getRange(), chunk.getLastmod(), chunk.getShardId()};
-        if (chunk.getLastmod() == jumboChunk.getVersion())
+        if (chunk.getLastmod() == nonJumboChunk.getVersion())
             ct.setJumbo(false);
         else
             ct.setJumbo(true);
@@ -467,13 +467,13 @@ TEST(BalancerPolicy, JumboChunksNotMovedRandom) {
         return true;
     });
 
-    const auto migrations(
-        balanceChunks(cluster.first, makeDistStatus(makeChunkManager(chunks)), false, false));
+    auto newCm = makeChunkManager(chunks);
+    const auto migrations(balanceChunks(cluster.first, makeDistStatus(newCm), false, false));
     ASSERT_EQ(1U, migrations.size());
     ASSERT_EQ(kShardId0, migrations[0].from);
     ASSERT_EQ(kShardId1, migrations[0].to);
-    ASSERT_BSONOBJ_EQ(jumboChunk.getMin(), migrations[0].minKey);
-    ASSERT_BSONOBJ_EQ(jumboChunk.getMax(), migrations[0].maxKey);
+    ASSERT_BSONOBJ_EQ(nonJumboChunk.getMin(), migrations[0].minKey);
+    ASSERT_BSONOBJ_EQ(nonJumboChunk.getMax(), migrations[0].maxKey);
     ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[0].reason);
 }
 
