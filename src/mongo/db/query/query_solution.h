@@ -2026,7 +2026,11 @@ struct UnpackTsBucketNode : public QuerySolutionNode {
         return children[0]->sortedByDiskLoc();
     }
 
-    // TODO SERVER-79700: Return the sort set which should be translated from the child's sort set.
+    // The inputs to 'UnpackTsBucketNode' are buckets that might be sorted on bucket-level fields
+    // such as metaField, timeField or any of the control fields. When unpacking, only sort order on
+    // the metaField is preserved (as the field's value is the same for all docs in a bucket).
+    // TODO SERVER-83621: Consider checking the provided sort of the child stage and returning the
+    // meta field here, if appropriate.
     const ProvidedSortSet& providedSorts() const final {
         return kEmptySet;
     }
