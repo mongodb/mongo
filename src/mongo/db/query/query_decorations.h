@@ -42,6 +42,7 @@ public:
     bool getSbeDisableGroupPushdownForOp();
     bool getSbeDisableLookupPushdownForOp();
     bool getSbeDisableTimeSeriesForOp();
+    size_t getMaxScansToExplodeForOp();
 
 private:
     void _tryToSetAllValues();
@@ -51,5 +52,6 @@ private:
     bool _sbeDisableLookupPushdownValue;
     bool _sbeDisableTimeSeriesValue;
     QueryFrameworkControlEnum _queryFrameworkControlValue;
+    size_t _maxScansToExplodeValue;
 };
 }  // namespace mongo
