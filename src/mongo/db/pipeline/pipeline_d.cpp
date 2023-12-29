@@ -643,99 +643,6 @@ std::unique_ptr<FindCommandRequest> createFindCommand(
     return findCommand;
 }
 
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    const MultipleCollectionAccessor& collections,
-    const NamespaceString& nss,
-    std::unique_ptr<FindCommandRequest> findCommand,
-    const QueryMetadataBitSet& metadataRequested,
-    const GroupFromFirstDocumentTransformation* groupForDistinctScan,
-    const QueryPlannerParams& plannerOpts,
-    const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-    Pipeline* pipeline,
-    bool isCountLike) {
-    // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially
-    // allow SBE to execute the portion of the query that's pushed down, even if the portion of
-    // the query that is not pushed down contains expressions not supported by SBE.
-    expCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
-
-    auto cq = CanonicalQuery::make(
-        {.expCtx = expCtx,
-         .parsedFind =
-             ParsedFindCommandParams{
-                 .findCommand = std::move(findCommand),
-                 .extensionsCallback = ExtensionsCallbackReal(expCtx->opCtx, &nss),
-                 .allowedFeatures = matcherFeatures,
-                 .projectionPolicies = ProjectionPolicies::aggregateProjectionPolicies()},
-         .explain = static_cast<bool>(expCtx->explain),
-         .isCountLike = isCountLike,
-         .isSearchQuery = PipelineD::isSearchPresentAndEligibleForSbe(pipeline)});
-
-    if (!cq.isOK()) {
-        // Return an error instead of uasserting, since there are cases where the combination of
-        // sort and projection will result in a bad query, but when we try with a different
-        // combination it will be ok. e.g. a sort by {$meta: 'textScore'}, without any projection
-        // will fail, but will succeed when the corresponding '$meta' projection is passed in
-        // another attempt.
-        return {cq.getStatus()};
-    }
-
-    // Mark the metadata that's requested by the pipeline on the CQ.
-    cq.getValue()->requestAdditionalMetadata(metadataRequested);
-
-    // Attempt to get a plan executor that uses a DISTINCT_SCAN to scan exactly one document for
-    // each group. It's the caller's responsibility to deal with an error to create such a plan.
-    if (groupForDistinctScan) {
-        CanonicalDistinct canonicalDistinct(std::move(cq.getValue()),
-                                            groupForDistinctScan->groupId());
-
-        // If the GroupFromFirst transformation was generated for the $last case, we will need to
-        // flip the direction of any generated DISTINCT_SCAN to preserve the semantics of the query.
-        const bool flipDistinctScanDirection = groupForDistinctScan->expectedInput() ==
-            GroupFromFirstDocumentTransformation::ExpectedInput::kLastDocument;
-
-        // We have to request a "strict" distinct plan because:
-        // 1) $group with distinct semantics doesn't de-duplicate the results.
-        // 2) Non-strict parameter would allow use of multikey indexes for DISTINCT_SCAN, which
-        //    means that for {a: [1, 2]} two distinct values would be returned, but for group keys
-        //    arrays shouldn't be traversed.
-        return tryGetExecutorDistinct(&collections.getMainCollection(),
-                                      plannerOpts.options |
-                                          QueryPlannerParams::STRICT_DISTINCT_ONLY,
-                                      &canonicalDistinct,
-                                      flipDistinctScanDirection);
-    }
-
-    // Queries that can use SBE may push down compatible pipeline stages. 'getExecutorFind' will
-    // call this lambda in two phases: 1) determine compatible stages and attach them to the
-    // canonical query, and 2) finalize the push down and trim the pushed-down stages from the
-    // original pipeline.
-    auto extractAndAttachPipelineStages = [&collections, &pipeline, needsMerge{expCtx->needsMerge}](
-                                              auto* canonicalQuery, bool attachOnly) {
-        if (attachOnly) {
-            std::vector<boost::intrusive_ptr<DocumentSource>> stagesForPushdown;
-            bool allStagesPushedDown = findSbeCompatibleStagesForPushdown(
-                collections, canonicalQuery, needsMerge, pipeline, stagesForPushdown);
-            canonicalQuery->setCqPipeline(std::move(stagesForPushdown), allStagesPushedDown);
-        } else {
-            trimPipelineStages(pipeline, canonicalQuery->cqPipeline().size());
-        }
-    };
-
-    // For performance, we pass a null callback instead of 'extractAndAttachPipelineStages' when
-    // 'pipeline' is empty. The 'extractAndAttachPipelineStages' is a no-op when there are no
-    // pipeline stages, so we can save some work by skipping it. The 'getExecutorFind()' function is
-    // responsible for checking that the callback is non-null before calling it.
-    return getExecutorFind(expCtx->opCtx,
-                           collections,
-                           std::move(cq.getValue()),
-                           !pipeline->getSources().empty()
-                               ? std::move(extractAndAttachPipelineStages)
-                               : std::function<void(CanonicalQuery*, bool)>{},
-                           true /* permitYield */,
-                           plannerOpts);
-}
-
 /**
  * Examines the indexes in 'collection' and returns the field name of a geo-indexed field suitable
  * for use in $geoNear. 2d indexes are given priority over 2dsphere indexes.
@@ -1261,38 +1168,32 @@ void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
 namespace {
 
 /**
- * Look for $sort, $group at the beginning of the pipeline, potentially returning either or both.
- * Returns nullptr for any of the stages that are not found. Note that we are not looking for the
- * opposite pattern ($group, $sort). In that case, this function will return only the $group stage.
- *
- * This function will not return the $group in the case that there is an initial $sort with
- * intermediate stages that separate it from the $group (e.g.: $sort, $limit, $group). That includes
- * the case of a $sort with a non-null value for getLimitSrc(), indicating that there was previously
- * a $limit stage that was optimized away.
+ * Check for $group or $sort+$group at the beginning of the pipeline that could qualify for the
+ * DISTINCT_SCAN plan that visits the first document in each group (SERVER-9507). If found, return
+ * the stage that would replace them in the pipeline on top of DISTINCT_SCAN.
  */
-std::pair<boost::intrusive_ptr<DocumentSourceSort>, boost::intrusive_ptr<DocumentSourceGroupBase>>
-getSortAndGroupStagesFromPipeline(const Pipeline::SourceContainer& sources) {
-    boost::intrusive_ptr<DocumentSourceSort> sortStage = nullptr;
-    boost::intrusive_ptr<DocumentSourceGroupBase> groupStage = nullptr;
-
+std::unique_ptr<GroupFromFirstDocumentTransformation> tryDistinctGroupRewrite(
+    const Pipeline::SourceContainer& sources) {
     auto sourcesIt = sources.begin();
     if (sourcesIt != sources.end()) {
-        sortStage = dynamic_cast<DocumentSourceSort*>(sourcesIt->get());
+        auto sortStage = dynamic_cast<DocumentSourceSort*>(sourcesIt->get());
         if (sortStage) {
             if (!sortStage->hasLimit()) {
                 ++sourcesIt;
             } else {
-                // This $sort stage was previously followed by a $limit stage.
-                sourcesIt = sources.end();
+                // This $sort stage was previously followed by a $limit stage which disqualifies it
+                // from DISTINCT_SCAN.
+                return nullptr;
             }
         }
     }
 
-    if (sourcesIt != sources.end()) {
-        groupStage = dynamic_cast<DocumentSourceGroupBase*>(sourcesIt->get());
+    if (sourcesIt == sources.end()) {
+        return nullptr;
     }
 
-    return std::make_pair(sortStage, groupStage);
+    auto groupStage = dynamic_cast<DocumentSourceGroupBase*>(sourcesIt->get());
+    return groupStage ? groupStage->rewriteGroupAsTransformOnFirstDocument() : nullptr;
 }
 
 boost::optional<long long> extractSkipForPushdown(Pipeline* pipeline) {
@@ -1405,6 +1306,269 @@ auto buildProjectionForPushdown(const DepsTracker& deps,
     // Case 4: no projection to push down
     return BSONObj();
 }
+
+// Does the last-minute analysis of the pipeline to see if any sort, skip and limit stages could be
+// pushed down into the PlanStage layer and creates a CanonicalQuery that represents the plan.
+StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    Pipeline* pipeline,
+    QueryMetadataBitSet unavailableMetadata,
+    const BSONObj& queryObj,
+    const AggregateCommandRequest* aggRequest,
+    const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
+    bool timeseriesBoundedSortOptimization,
+    bool* shouldProduceEmptyDocs) {
+    invariant(shouldProduceEmptyDocs);
+
+    // =============================================================================================
+    // Do a few last-minute optimizations that push some of the stages from the pipeline into the
+    // PlanStage layer.
+    // =============================================================================================
+    // We check for sort before we might push down and remove skip and limit from the pipeline
+    // because... this is how it's been done historically.
+    boost::intrusive_ptr<DocumentSourceSort> sortStage =
+        dynamic_cast<DocumentSourceSort*>(pipeline->peekFront());
+
+    // If there is a $limit or $skip stage (or multiple of them) that could be pushed down into
+    // the PlanStage layer, obtain the value of the limit and skip and remove the $limit and $skip
+    // stages from the pipeline.
+    //
+    // This analysis is done here rather than in 'optimizePipeline()' because swapping $limit before
+    // stages such as $project is not always useful, and can sometimes defeat other optimizations.
+    // In particular, in a sharded scenario a pipeline such as [$project, $limit] is preferable to
+    // [$limit, $project]. The former permits the execution of the projection operation to be
+    // parallelized across all targeted shards, whereas the latter would bring all of the data to a
+    // merging shard first, and then apply the projection serially. See SERVER-24981 for a more
+    // detailed discussion.
+    //
+    // This only handles the case in which the $limit or $skip can logically be swapped to the front
+    // of the pipeline. Note, that these cannot be swapped with $sort but if there was a $limit
+    // after a $sort it should have been handled already (in the case 'sortStage' would have
+    // hasLimit() set on it).
+    auto skipThenLimit = extractSkipAndLimitForPushdown(pipeline);
+
+    // If there is a sort stage eligible for pushdown, serialize its SortPattern to a BSONObj. The
+    // BSONObj format is currently necessary to request that the sort is computed by the query layer
+    // inside the inner PlanExecutor. We also remove the $sort stage from the Pipeline, since it
+    // will be handled instead by PlanStage execution.
+    BSONObj sortObj;
+    if (sortStage) {
+        sortObj = sortStage->getSortKeyPattern()
+                      .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
+                      .toBson();
+
+        pipeline->popFrontWithName(DocumentSourceSort::kStageName);
+
+        // Since all $limit stages were already incorporated into the sort stage, we are only
+        // looking for $skip stages.
+        auto skip = extractSkipForPushdown(pipeline);
+
+        // Since the limit from $sort is going before the extracted $skip stages, we construct
+        // 'LimitThenSkip' object and then convert it 'SkipThenLimit'.
+        skipThenLimit = LimitThenSkip(sortStage->getLimit(), skip).flip();
+    }
+    // =============================================================================================
+    // The end of last-minute pipeline optimizations.
+    // =============================================================================================
+
+    // Perform dependency analysis. In order to minimize the dependency set, we only analyze the
+    // stages that remain in the pipeline after pushdown. In particular, any dependencies for a
+    // $match or $sort pushed down into the query layer will not be reflected here.
+    auto deps = pipeline->getDependencies(unavailableMetadata);
+    *shouldProduceEmptyDocs = deps.hasNoRequirements();
+
+    BSONObj projObj;
+    if (!*shouldProduceEmptyDocs) {
+        // Build a BSONObj representing a projection eligible for pushdown. If there is an inclusion
+        // projection at the front of the pipeline, it will be removed and handled by the PlanStage
+        // layer. If a projection cannot be pushed down, an empty BSONObj will be returned.
+        //
+        // In most cases .find() behaves as if it evaluates in a predictable order:
+        //     predicate, sort, skip, limit, projection.
+        // But there is at least one case where it runs the projection before the sort/skip/limit:
+        // when the predicate has a rooted $or.  (In that case we plan each branch of the $or
+        // separately, using Subplan, and include the projection on each branch.)
+        //
+        // To work around this behavior, don't allow pushing down expressions if we are also going
+        // to push down a sort, skip or limit. We don't want the expressions to be evaluated on any
+        // documents that the sort/skip/limit would have filtered out. (The sort stage can be a
+        // top-k sort, which both sorts and limits.)
+        const bool allowExpressions =
+            !sortStage && !skipThenLimit.getSkip() && !skipThenLimit.getLimit();
+        projObj = buildProjectionForPushdown(
+            deps, pipeline, allowExpressions, timeseriesBoundedSortOptimization);
+    }
+
+    std::unique_ptr<FindCommandRequest> findCommand =
+        createFindCommand(expCtx, nss, queryObj, projObj, sortObj, skipThenLimit, aggRequest);
+
+    // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially
+    // allow SBE to execute the portion of the query that's pushed down, even if the portion of
+    // the query that is not pushed down contains expressions not supported by SBE.
+    expCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
+
+    StatusWith<std::unique_ptr<CanonicalQuery>> cq = CanonicalQuery::make(
+        {.expCtx = expCtx,
+         .parsedFind =
+             ParsedFindCommandParams{
+                 .findCommand = std::move(findCommand),
+                 .extensionsCallback = ExtensionsCallbackReal(expCtx->opCtx, &nss),
+                 .allowedFeatures = matcherFeatures,
+                 .projectionPolicies = ProjectionPolicies::aggregateProjectionPolicies()},
+         .explain = static_cast<bool>(expCtx->explain),
+         .isCountLike = *shouldProduceEmptyDocs,
+         .isSearchQuery = PipelineD::isSearchPresentAndEligibleForSbe(pipeline)});
+
+    if (cq.isOK()) {
+        cq.getValue()->requestAdditionalMetadata(deps.metadataDeps());
+    }
+    return cq;
+}
+
+/**
+ * Creates a PlanExecutor to be used in the initial cursor source. This function will try to push
+ * down the $sort, $project, $match and $limit stages into the PlanStage layer whenever possible. In
+ * this case, these stages will be incorporated into the PlanExecutor. Note that this function takes
+ * a 'MultipleCollectionAccessor' because certain $lookup stages that reference multiple collections
+ * may be eligible for pushdown in the PlanExecutor.
+ *
+ * Sets the 'shouldProduceEmptyDocs' out-parameter based on whether the dependency set is both
+ * finite and empty. In this case, the query has count semantics.
+ */
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const MultipleCollectionAccessor& collections,
+    const NamespaceString& nss,
+    Pipeline* pipeline,
+    QueryMetadataBitSet unavailableMetadata,
+    const BSONObj& queryObj,
+    const AggregateCommandRequest* aggRequest,
+    const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
+    bool* shouldProduceEmptyDocs,
+    bool timeseriesBoundedSortOptimization,
+    QueryPlannerParams plannerOpts = QueryPlannerParams{}) {
+
+    // See if could use DISTINCT_SCAN with the pipeline (SERVER-9507). We must do this check before
+    // creating the CQ which might modify the pipeline.
+    std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage =
+        tryDistinctGroupRewrite(pipeline->getSources());
+
+    StatusWith<std::unique_ptr<CanonicalQuery>> cqWithStatus =
+        createCanonicalQuery(expCtx,
+                             nss,
+                             pipeline,
+                             unavailableMetadata,
+                             queryObj,
+                             aggRequest,
+                             matcherFeatures,
+                             timeseriesBoundedSortOptimization,
+                             shouldProduceEmptyDocs);
+    if (!cqWithStatus.isOK()) {
+        // Return an error instead of uasserting, since there are cases where the combination of
+        // sort and projection will result in a bad query, but when we try with a different
+        // combination it will be ok. e.g. a sort by {$meta: 'textScore'}, without any projection
+        // will fail, but will succeed when the corresponding '$meta' projection is passed in
+        // another attempt.
+        return {cqWithStatus.getStatus()};
+    }
+    std::unique_ptr<CanonicalQuery> cq = std::move(cqWithStatus.getValue());
+
+    if (!*shouldProduceEmptyDocs) {
+        plannerOpts.options |= QueryPlannerParams::RETURN_OWNED_DATA;
+    }
+
+    // If this pipeline is a change stream, then the cursor must use the simple collation, so we
+    // temporarily switch the collator on the ExpressionContext to nullptr. We do this here because
+    // by this point, all the necessary pipeline analyses and optimizations have already been
+    // performed. Note that 'collatorStash' restores the original collator when it leaves scope.
+    const bool isChangeStream =
+        pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
+    std::unique_ptr<CollatorInterface> collatorForCursor = nullptr;
+    auto collatorStash =
+        isChangeStream ? expCtx->temporarilyChangeCollator(std::move(collatorForCursor)) : nullptr;
+
+    if (rewrittenGroupStage) {
+        CanonicalDistinct canonicalDistinct(std::move(cq), rewrittenGroupStage->groupId());
+
+        // If the GroupFromFirst transformation was generated for the $last case, we will need to
+        // flip the direction of any generated DISTINCT_SCAN to preserve the semantics of the query.
+        const bool flipDistinctScanDirection =
+            (rewrittenGroupStage->expectedInput() ==
+             GroupFromFirstDocumentTransformation::ExpectedInput::kLastDocument);
+
+        // We have to request a "strict" distinct plan because:
+        // 1) $group with distinct semantics doesn't de-duplicate the results.
+        // 2) Non-strict parameter would allow use of multikey indexes for DISTINCT_SCAN, which
+        //    means that for {a: [1, 2]} two distinct values would be returned, but for group keys
+        //    arrays shouldn't be traversed.
+        StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> swExecutorGrouped =
+            tryGetExecutorDistinct(&collections.getMainCollection(),
+                                   plannerOpts.options | QueryPlannerParams::STRICT_DISTINCT_ONLY,
+                                   &canonicalDistinct,
+                                   flipDistinctScanDirection);
+
+        if (swExecutorGrouped.isOK()) {
+            pipeline->popFrontWithName(rewrittenGroupStage->originalStageName());
+
+            boost::intrusive_ptr<DocumentSource> groupTransform(
+                new DocumentSourceSingleDocumentTransformation(
+                    expCtx,
+                    std::move(rewrittenGroupStage),
+                    "$groupByDistinctScan",
+                    false /* independentOfAnyCollection */));
+            pipeline->addInitialSource(groupTransform);
+
+            return swExecutorGrouped;
+        } else if (swExecutorGrouped != ErrorCodes::NoQueryExecutionPlans) {
+            return swExecutorGrouped.getStatus().withContext(
+                "Failed to determine whether query system can provide a DISTINCT_SCAN grouping");
+        } else {
+            // Couldn't find a viable DISTINCT_SCAN plan for the query. Fallthrough to execute the
+            // original pipeline using whatever executor is appropriate for it.
+            cq = canonicalDistinct.releaseQuery();
+        }
+    }
+
+    // Queries that can use SBE may push down compatible pipeline stages. 'getExecutorFind' will
+    // call this lambda in two phases: 1) determine compatible stages and attach them to the
+    // canonical query, and 2) finalize the push down and trim the pushed-down stages from the
+    // original pipeline.
+    auto extractAndAttachPipelineStages = [&collections, &pipeline, needsMerge{expCtx->needsMerge}](
+                                              auto* canonicalQuery, bool attachOnly) {
+        if (attachOnly) {
+            std::vector<boost::intrusive_ptr<DocumentSource>> stagesForPushdown;
+            bool allStagesPushedDown = findSbeCompatibleStagesForPushdown(
+                collections, canonicalQuery, needsMerge, pipeline, stagesForPushdown);
+            canonicalQuery->setCqPipeline(std::move(stagesForPushdown), allStagesPushedDown);
+        } else {
+            trimPipelineStages(pipeline, canonicalQuery->cqPipeline().size());
+        }
+    };
+
+    // For performance, we pass a null callback instead of 'extractAndAttachPipelineStages' when
+    // 'pipeline' is empty. The 'extractAndAttachPipelineStages' is a no-op when there are no
+    // pipeline stages, so we can save some work by skipping it. The 'getExecutorFind()' function is
+    // responsible for checking that the callback is non-null before calling it.
+    auto executor = getExecutorFind(expCtx->opCtx,
+                                    collections,
+                                    std::move(cq),
+                                    !pipeline->getSources().empty()
+                                        ? std::move(extractAndAttachPipelineStages)
+                                        : std::function<void(CanonicalQuery*, bool)>{},
+                                    true /* permitYield */,
+                                    plannerOpts);
+
+    // While constructing the executor, some stages might have been lowered from the 'pipeline' into
+    // the executor, so we need to recheck whether the executor's layer can still produce an empty
+    // document.
+    *shouldProduceEmptyDocs = pipeline->getDependencies(unavailableMetadata).hasNoRequirements();
+    if (executor.isOK()) {
+        executor.getValue()->setReturnOwnedData(!*shouldProduceEmptyDocs);
+    }
+
+    return executor;
+}  // prepareExecutor
 }  // namespace
 
 boost::optional<std::pair<PipelineD::IndexSortOrderAgree, PipelineD::IndexOrderedByMinTime>>
@@ -1727,29 +1891,6 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
         }
     }
 
-    auto&& [sortStage, groupStage] = getSortAndGroupStagesFromPipeline(pipeline->_sources);
-    std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage;
-    if (groupStage) {
-        rewrittenGroupStage = groupStage->rewriteGroupAsTransformOnFirstDocument();
-    }
-
-    // If there is a $limit or $skip stage (or multiple of them) that could be pushed down into the
-    // PlanStage layer, obtain the value of the limit and skip and remove the $limit and $skip
-    // stages from the pipeline.
-    //
-    // This analysis is done here rather than in 'optimizePipeline()' because swapping $limit before
-    // stages such as $project is not always useful, and can sometimes defeat other optimizations.
-    // In particular, in a sharded scenario a pipeline such as [$project, $limit] is preferable to
-    // [$limit, $project]. The former permits the execution of the projection operation to be
-    // parallelized across all targeted shards, whereas the latter would bring all of the data to a
-    // merging shard first, and then apply the projection serially. See SERVER-24981 for a more
-    // detailed discussion.
-    //
-    // This only handles the case in which the the $limit or $skip can logically be swapped to the
-    // front of the pipeline. We can also push down a $limit which comes after a $sort into the
-    // PlanStage layer, but that is handled elsewhere.
-    const auto skipThenLimit = extractSkipAndLimitForPushdown(pipeline);
-
     auto unavailableMetadata = DocumentSourceMatch::isTextQuery(queryObj)
         ? DepsTracker::kDefaultUnavailableMetadata & ~DepsTracker::kOnlyTextScore
         : DepsTracker::kDefaultUnavailableMetadata;
@@ -1788,17 +1929,28 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
         }
     }
 
+    const bool isChangeStream =
+        pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
+    if (isChangeStream) {
+        invariant(expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData);
+        plannerOpts.options |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
+                                QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
+    }
+
+    // The $_requestReshardingResumeToken parameter is only valid for an oplog scan.
+    if (aggRequest && aggRequest->getRequestReshardingResumeToken()) {
+        plannerOpts.options |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
+                                QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
+    }
+
     // Create the PlanExecutor.
     bool shouldProduceEmptyDocs = false;
     auto exec = uassertStatusOK(prepareExecutor(expCtx,
                                                 collections,
                                                 nss,
                                                 pipeline,
-                                                sortStage,
-                                                std::move(rewrittenGroupStage),
                                                 unavailableMetadata,
                                                 queryObj,
-                                                skipThenLimit,
                                                 aggRequest,
                                                 Pipeline::kAllowedMatcherFeatures,
                                                 &shouldProduceEmptyDocs,
@@ -2061,11 +2213,8 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
                         collections,
                         nss,
                         pipeline,
-                        nullptr, /* sortStage */
-                        nullptr, /* rewrittenGroupStage */
                         DepsTracker::kDefaultUnavailableMetadata & ~DepsTracker::kAllGeoNearData,
                         fullQuery,
-                        SkipThenLimit{boost::none, boost::none},
                         aggRequest,
                         Pipeline::kGeoNearMatcherFeatures,
                         &shouldProduceEmptyDocs,
@@ -2089,172 +2238,6 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
     // Remove the initial $geoNear; it will be replaced by $geoNearCursor.
     sources.pop_front();
     return {std::move(exec), std::move(attachExecutorCallback), {}};
-}
-
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prepareExecutor(
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    const MultipleCollectionAccessor& collections,
-    const NamespaceString& nss,
-    Pipeline* pipeline,
-    const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
-    std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
-    QueryMetadataBitSet unavailableMetadata,
-    const BSONObj& queryObj,
-    SkipThenLimit skipThenLimit,
-    const AggregateCommandRequest* aggRequest,
-    const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-    bool* shouldProduceEmptyDocs,
-    bool timeseriesBoundedSortOptimization,
-    QueryPlannerParams plannerOpts) {
-    invariant(shouldProduceEmptyDocs);
-
-    bool isChangeStream =
-        pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
-    if (isChangeStream) {
-        invariant(expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData);
-        plannerOpts.options |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
-                                QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
-    }
-
-    // The $_requestReshardingResumeToken parameter is only valid for an oplog scan.
-    if (aggRequest && aggRequest->getRequestReshardingResumeToken()) {
-        plannerOpts.options |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
-                                QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
-    }
-
-    // If there is a sort stage eligible for pushdown, serialize its SortPattern to a BSONObj. The
-    // BSONObj format is currently necessary to request that the sort is computed by the query layer
-    // inside the inner PlanExecutor. We also remove the $sort stage from the Pipeline, since it
-    // will be handled instead by PlanStage execution.
-    BSONObj sortObj;
-    if (sortStage) {
-        sortObj = sortStage->getSortKeyPattern()
-                      .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
-                      .toBson();
-
-        pipeline->popFrontWithName(DocumentSourceSort::kStageName);
-
-        // Now that we've pushed down the sort, see if there is a $limit and $skip to push down
-        // also. We should not already have a limit or skip here, otherwise it would be incorrect
-        // for the caller to pass us a sort stage to push down, since the order matters.
-        invariant(!skipThenLimit.getLimit());
-        invariant(!skipThenLimit.getSkip());
-
-        // Since all $limit stages were already pushdowned to the sort stage, we are only looking
-        // for $skip stages.
-        auto skip = extractSkipForPushdown(pipeline);
-
-        // Since the limit from $sort is going before the extracted $skip stages, we construct
-        // 'LimitThenSkip' object and then convert it 'SkipThenLimit'.
-        skipThenLimit = LimitThenSkip(sortStage->getLimit(), skip).flip();
-    }
-
-    // Perform dependency analysis. In order to minimize the dependency set, we only analyze the
-    // stages that remain in the pipeline after pushdown. In particular, any dependencies for a
-    // $match or $sort pushed down into the query layer will not be reflected here.
-    auto deps = pipeline->getDependencies(unavailableMetadata);
-    *shouldProduceEmptyDocs = deps.hasNoRequirements();
-
-    BSONObj projObj;
-    if (!*shouldProduceEmptyDocs) {
-        // Build a BSONObj representing a projection eligible for pushdown. If there is an inclusion
-        // projection at the front of the pipeline, it will be removed and handled by the PlanStage
-        // layer. If a projection cannot be pushed down, an empty BSONObj will be returned.
-
-        // In most cases .find() behaves as if it evaluates in a predictable order:
-        //     predicate, sort, skip, limit, projection.
-        // But there is at least one case where it runs the projection before the sort/skip/limit:
-        // when the predicate has a rooted $or.  (In that case we plan each branch of the $or
-        // separately, using Subplan, and include the projection on each branch.)
-
-        // To work around this behavior, don't allow pushing down expressions if we are also going
-        // to push down a sort, skip or limit. We don't want the expressions to be evaluated on any
-        // documents that the sort/skip/limit would have filtered out. (The sort stage can be a
-        // top-k sort, which both sorts and limits.)
-        bool allowExpressions = !sortStage && !skipThenLimit.getSkip() && !skipThenLimit.getLimit();
-        projObj = buildProjectionForPushdown(
-            deps, pipeline, allowExpressions, timeseriesBoundedSortOptimization);
-
-        plannerOpts.options |= QueryPlannerParams::RETURN_OWNED_DATA;
-    }
-
-    if (rewrittenGroupStage) {
-        // See if the query system can handle the $group and $sort stage using a DISTINCT_SCAN
-        // (SERVER-9507).
-        auto swExecutorGrouped =
-            attemptToGetExecutor(expCtx,
-                                 collections,
-                                 nss,
-                                 createFindCommand(expCtx,
-                                                   nss,
-                                                   queryObj,
-                                                   projObj,
-                                                   sortObj,
-                                                   SkipThenLimit{boost::none, boost::none},
-                                                   aggRequest),
-                                 deps.metadataDeps(),
-                                 rewrittenGroupStage.get(),
-                                 plannerOpts,
-                                 matcherFeatures,
-                                 pipeline,
-                                 *shouldProduceEmptyDocs /* isCountLike */);
-
-        if (swExecutorGrouped.isOK()) {
-            // Any $limit stage before the $group stage should make the pipeline ineligible for this
-            // optimization.
-            invariant(!sortStage || !sortStage->hasLimit());
-
-            // We remove the $sort and $group stages that begin the pipeline, because the executor
-            // will handle the sort, and the groupTransform (added below) will handle the $group
-            // stage.
-            pipeline->popFrontWithName(DocumentSourceSort::kStageName);
-            pipeline->popFrontWithName(rewrittenGroupStage->originalStageName());
-
-            boost::intrusive_ptr<DocumentSource> groupTransform(
-                new DocumentSourceSingleDocumentTransformation(
-                    expCtx,
-                    std::move(rewrittenGroupStage),
-                    "$groupByDistinctScan",
-                    false /* independentOfAnyCollection */));
-            pipeline->addInitialSource(groupTransform);
-
-            return swExecutorGrouped;
-        } else if (swExecutorGrouped != ErrorCodes::NoQueryExecutionPlans) {
-            return swExecutorGrouped.getStatus().withContext(
-                "Failed to determine whether query system can provide a "
-                "DISTINCT_SCAN grouping");
-        }
-    }
-
-    // If this pipeline is a change stream, then the cursor must use the simple collation, so we
-    // temporarily switch the collator on the ExpressionContext to nullptr. We do this here because
-    // by this point, all the necessary pipeline analyses and optimizations have already been
-    // performed. Note that 'collatorStash' restores the original collator when it leaves scope.
-    std::unique_ptr<CollatorInterface> collatorForCursor = nullptr;
-    auto collatorStash =
-        isChangeStream ? expCtx->temporarilyChangeCollator(std::move(collatorForCursor)) : nullptr;
-
-    auto executor = attemptToGetExecutor(
-        expCtx,
-        collections,
-        nss,
-        createFindCommand(expCtx, nss, queryObj, projObj, sortObj, skipThenLimit, aggRequest),
-        deps.metadataDeps(),
-        nullptr, /* groupForDistinctScan */
-        plannerOpts,
-        matcherFeatures,
-        pipeline,
-        *shouldProduceEmptyDocs /* isCountLike */);
-
-    // While constructing the executor, some stages might have been lowered from the 'pipeline' into
-    // the executor, so we need to recheck whether the executor's layer can still produce an empty
-    // document.
-    *shouldProduceEmptyDocs = pipeline->getDependencies(unavailableMetadata).hasNoRequirements();
-    if (executor.isOK()) {
-        executor.getValue()->setReturnOwnedData(!*shouldProduceEmptyDocs);
-    }
-
-    return executor;
 }
 
 Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {

@@ -189,36 +189,6 @@ private:
         Pipeline* pipeline);
 
     /**
-     * Creates a PlanExecutor to be used in the initial cursor source. This function will try to
-     * push down the $sort, $project, $match and $limit stages into the PlanStage layer whenever
-     * possible. In this case, these stages will be incorporated into the PlanExecutor. Note that
-     * this function takes a 'MultipleCollectionAccessor' because certain $lookup stages that
-     * reference multiple collections may be eligible for pushdown in the PlanExecutor.
-     *
-     * Set 'rewrittenGroupStage' when the pipeline uses $match+$sort+$group stages that are
-     * compatible with a DISTINCT_SCAN plan that visits the first document in each group
-     * (SERVER-9507).
-     *
-     * Sets the 'hasNoRequirements' out-parameter based on whether the dependency set is both finite
-     * and empty. In this case, the query has count semantics.
-     */
-    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const MultipleCollectionAccessor& collections,
-        const NamespaceString& nss,
-        Pipeline* pipeline,
-        const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
-        std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
-        QueryMetadataBitSet metadataAvailable,
-        const BSONObj& queryObj,
-        SkipThenLimit skipThenLimit,
-        const AggregateCommandRequest* aggRequest,
-        const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-        bool* hasNoRequirements,
-        bool timeseriesBoundedSortOptimization,
-        QueryPlannerParams plannerOpts = QueryPlannerParams{});
-
-    /**
      * Build a PlanExecutor and prepare a callback to create a special DocumentSourceGeoNearCursor
      * for the 'pipeline'. Unlike 'buildInnerQueryExecutorGeneric()', throws if the main collection
      * defined on 'collections' does not exist, as the $geoNearCursor requires a 2d or 2dsphere
