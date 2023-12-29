@@ -6,7 +6,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/*/jstests/search/ssl/*.js
+  - jstests/with_mongot/search_mocked/ssl/*.js
 
 executor:
   config:

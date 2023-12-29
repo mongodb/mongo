@@ -8,7 +8,6 @@
  *   not_allowed_with_signed_security_token,
  * ]
  */
-// TODO SERVER-83292 move this test alongside $search tests
 const coll = db.searchCollector;
 coll.drop();
 const buildInfo = assert.commandWorked(db.runCommand({"buildInfo": 1}));

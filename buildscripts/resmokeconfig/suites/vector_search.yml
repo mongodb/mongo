@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/*/jstests/vector_search/*.js
+  - jstests/with_mongot/vector_search_mocked/*.js
   exclude_with_any_tags:
   - requires_auth
 
