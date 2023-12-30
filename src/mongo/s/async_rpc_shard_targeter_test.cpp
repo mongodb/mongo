@@ -54,7 +54,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/async_rpc_shard_targeter.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"

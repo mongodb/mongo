@@ -83,15 +83,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
-
-using std::cout;
-using std::endl;
-using std::numeric_limits;
-using std::string;
-using std::stringstream;
-using std::vector;
 
 namespace dps = ::mongo::dotted_path_support;
 
@@ -135,17 +127,16 @@ BSONObj dotted2nested(const BSONObj& obj) {
     return b.obj();
 }
 
-
 // {a: {b:1}} -> {a.b:1}
-void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const string& base = "") {
+void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const std::string& base = "") {
     BSONObjIterator it(obj);
     while (it.more()) {
         BSONElement e = it.next();
         if (e.type() == Object) {
-            string newbase = base + e.fieldName() + ".";
+            std::string newbase = base + e.fieldName() + ".";
             nested2dotted(b, e.embeddedObject(), newbase);
         } else {
-            string newbase = base + e.fieldName();
+            std::string newbase = base + e.fieldName();
             b.appendAs(e, newbase);
         }
     }
@@ -157,8 +148,8 @@ BSONObj nested2dotted(const BSONObj& obj) {
     return b.obj();
 }
 
-FieldCompareResult compareDottedFieldNames(const string& l,
-                                           const string& r,
+FieldCompareResult compareDottedFieldNames(const std::string& l,
+                                           const std::string& r,
                                            const str::LexNumCmp& cmp) {
     static int maxLoops = 1024 * 1024;
 
@@ -169,11 +160,11 @@ FieldCompareResult compareDottedFieldNames(const string& l,
         size_t a = l.find('.', lstart);
         size_t b = r.find('.', rstart);
 
-        size_t lend = a == string::npos ? l.size() : a;
-        size_t rend = b == string::npos ? r.size() : b;
+        size_t lend = a == std::string::npos ? l.size() : a;
+        size_t rend = b == std::string::npos ? r.size() : b;
 
-        const string& c = l.substr(lstart, lend - lstart);
-        const string& d = r.substr(rstart, rend - rstart);
+        const std::string& c = l.substr(lstart, lend - lstart);
+        const std::string& d = r.substr(rstart, rend - rstart);
 
         int x = cmp.cmp(c.c_str(), d.c_str());
 
@@ -201,7 +192,6 @@ FieldCompareResult compareDottedFieldNames(const string& l,
     MONGO_verify(0);
     return SAME;  // will never get here
 }
-}  // namespace mongo
 
 namespace JsobjTests {
 
@@ -265,7 +255,7 @@ protected:
         b.append(name, val);
         return b.obj();
     }
-    static BSONObj basic(const char* name, vector<int> val) {
+    static BSONObj basic(const char* name, std::vector<int> val) {
         BSONObjBuilder b;
         b.append(name, val);
         return b.obj();
@@ -343,15 +333,14 @@ public:
 class WoCompareEmbeddedArray : public Base {
 public:
     void run() {
-        vector<int> i;
+        std::vector<int> i;
         i.push_back(1);
         i.push_back(2);
-        vector<double> d;
+        std::vector<double> d;
         d.push_back(1);
         d.push_back(2);
         ASSERT(basic("a", i).woCompare(basic("a", d)) == 0);
-
-        vector<int> j;
+        std::vector<int> j;
         j.push_back(1);
         j.push_back(3);
         ASSERT(basic("a", i).woCompare(basic("a", j)) < 0);
@@ -500,9 +489,9 @@ public:
 class Nan : public Base {
 public:
     void run() {
-        double inf = numeric_limits<double>::infinity();
-        double nan = numeric_limits<double>::quiet_NaN();
-        double nan2 = numeric_limits<double>::signaling_NaN();
+        double inf = std::numeric_limits<double>::infinity();
+        double nan = std::numeric_limits<double>::quiet_NaN();
+        double nan2 = std::numeric_limits<double>::signaling_NaN();
         ASSERT(std::isnan(nan));
         ASSERT(std::isnan(nan2));
         ASSERT(!std::isnan(inf));
@@ -672,7 +661,7 @@ public:
             c.append("z", true);
             BSONObj C = c.obj();
 
-            // test that nulls are ok within bson strings
+            // test that nulls are ok within bson std::strings
             ASSERT_BSONOBJ_NE(A, B);
             ASSERT_BSONOBJ_GT(A, B);
 
@@ -685,12 +674,12 @@ public:
 
         BSONObjBuilder b;
         b.append("a", "a\0b", 4);
-        string z("a\0b", 3);
+        std::string z("a\0b", 3);
         b.append("b", z);
         b.appendAs(b.asTempObj()["a"], "c");
         BSONObj o = b.obj();
 
-        stringstream ss;
+        std::stringstream ss;
         ss << 'a' << '\0' << 'b';
 
         ASSERT_EQUALS(o["a"].valuestrsize(), 3 + 1);
@@ -733,7 +722,7 @@ public:
     void run() {
         BSONObj nestedBSON;
         StringBuilder s;
-        string nestedBSONString;
+        std::string nestedBSONString;
         size_t found;
 
         // recursion depth one less than max allowed-- do not shorten the string
@@ -742,7 +731,7 @@ public:
         nestedBSONString = s.str();
         found = nestedBSONString.find("...");
         // did not find the "..." pattern
-        ASSERT_EQUALS(found != string::npos, false);
+        ASSERT_EQUALS(found != std::string::npos, false);
 
         // recursion depth is equal to max allowed  -- do not shorten the string
         nestedBSON = recursiveBSON(BSONObj::maxToStringRecursionDepth);
@@ -750,7 +739,7 @@ public:
         nestedBSONString = s.str();
         found = nestedBSONString.find("...");
         // did not find the "..." pattern
-        ASSERT_EQUALS(found != string::npos, false);
+        ASSERT_EQUALS(found != std::string::npos, false);
 
         // recursion depth - one greater than max allowed -- shorten the string
         nestedBSON = recursiveBSON(BSONObj::maxToStringRecursionDepth + 1);
@@ -758,7 +747,7 @@ public:
         nestedBSONString = s.str();
         found = nestedBSONString.find("...");
         // found the "..." pattern
-        ASSERT_EQUALS(found != string::npos, true);
+        ASSERT_EQUALS(found != std::string::npos, true);
 
         /* recursion depth - one greater than max allowed but with full=true
          * should fail with an assertion
@@ -771,11 +760,11 @@ public:
 class StringWithNull {
 public:
     void run() {
-        const string input = string("a") + '\0' + 'b';
+        const std::string input = std::string("a") + '\0' + 'b';
         ASSERT_EQUALS(input.size(), 3U);
 
         BSONObj obj = BSON("str" << input);
-        const string output = obj.firstElement().String();
+        const std::string output = obj.firstElement().String();
         ASSERT_EQUALS(str::escape(output), str::escape(input));  // for better failure output
         ASSERT_EQUALS(output, input);
     }
@@ -1279,8 +1268,8 @@ public:
 
         ASSERT_EQUALS(objTypeOf(""), String);
         ASSERT_EQUALS(arrTypeOf(""), String);
-        ASSERT_EQUALS(objTypeOf(string()), String);
-        ASSERT_EQUALS(arrTypeOf(string()), String);
+        ASSERT_EQUALS(objTypeOf(std::string()), String);
+        ASSERT_EQUALS(arrTypeOf(std::string()), String);
         ASSERT_EQUALS(objTypeOf(StringData("")), String);
         ASSERT_EQUALS(arrTypeOf(StringData("")), String);
 
@@ -1440,9 +1429,9 @@ public:
 
     void run() {
         for (int t = 1; t < JSTypeMax; t++) {
-            stringstream ss;
+            std::stringstream ss;
             ss << "type: " << t;
-            string s = ss.str();
+            std::string s = ss.str();
             ASSERT(min(t).woCompare(max(t)) <= 0);
             ASSERT(max(t).woCompare(min(t)) >= 0);
             ASSERT(min(t).woCompare(min(t)) == 0);
@@ -1453,10 +1442,10 @@ public:
 
 class ComparatorTest {
 public:
-    BSONObj one(string s) {
+    BSONObj one(std::string s) {
         return BSON("x" << s);
     }
-    BSONObj two(string x, string y) {
+    BSONObj two(std::string x, std::string y) {
         BSONObjBuilder b;
         b.append("x", x);
         if (y.size())
@@ -1473,8 +1462,8 @@ public:
         bool got = bsonCmp.makeLessThan()(l, r);
         if (got == wanted)
             return;
-        cout << " order: " << order << " l: " << l << "r: " << r << " wanted: " << wanted
-             << " got: " << got << endl;
+        std::cout << " order: " << order << " l: " << l << "r: " << r << " wanted: " << wanted
+                  << " got: " << got << std::endl;
     }
 
     void lt(BSONObj order, BSONObj l, BSONObj r) {
@@ -1522,7 +1511,7 @@ public:
 
 class CompareDottedFieldNamesTest {
 public:
-    void t(FieldCompareResult res, const string& l, const string& r) {
+    void t(FieldCompareResult res, const std::string& l, const std::string& r) {
         str::LexNumCmp cmp(true);
         ASSERT_EQUALS(res, compareDottedFieldNames(l, r, cmp));
         ASSERT_EQUALS(-1 * res, compareDottedFieldNames(r, l, cmp));
@@ -1543,7 +1532,7 @@ public:
 
 class CompareDottedArrayFieldNamesTest {
 public:
-    void t(FieldCompareResult res, const string& l, const string& r) {
+    void t(FieldCompareResult res, const std::string& l, const std::string& r) {
         str::LexNumCmp cmp(false);  // Specify numeric comparison for array field names.
         ASSERT_EQUALS(res, compareDottedFieldNames(l, r, cmp));
         ASSERT_EQUALS(-1 * res, compareDottedFieldNames(r, l, cmp));
@@ -1598,8 +1587,8 @@ struct BSONArrayBuilderTest {
         objb << fieldNameGenerator() << "Hello";
         arrb << "Hello";
 
-        objb << fieldNameGenerator() << string("World");
-        arrb << string("World");
+        objb << fieldNameGenerator() << std::string("World");
+        arrb << std::string("World");
 
         objb << fieldNameGenerator()
              << BSON("a" << 1 << "b"
@@ -1679,7 +1668,7 @@ public:
     void run() {
         BSONObj o = BSON("z" << 1 << "a" << 2 << "m" << 3 << "c" << 4);
         BSONObjIteratorSorted i(o);
-        stringstream ss;
+        std::stringstream ss;
         while (i.more())
             ss << i.next().fieldName();
         ASSERT_EQUALS("acmz", ss.str());
@@ -1702,7 +1691,7 @@ public:
                           << "b");
         BSONObjIteratorSorted i2(o2);
         // First field in sorted order should be "11" due use of a lexical comparison.
-        ASSERT_EQUALS("11", string(i2.next().fieldName()));
+        ASSERT_EQUALS("11", std::string(i2.next().fieldName()));
     }
 };
 
@@ -1720,7 +1709,7 @@ public:
         mongo::BSONArrayIteratorSorted sorted(arr);
         while (unsorted.more()) {
             ASSERT(sorted.more());
-            ASSERT_EQUALS(string(unsorted.next().fieldName()), sorted.next().fieldName());
+            ASSERT_EQUALS(std::string(unsorted.next().fieldName()), sorted.next().fieldName());
         }
         ASSERT(!sorted.more());
     }
@@ -1728,24 +1717,24 @@ public:
 
 class checkForStorageTests {
 public:
-    void good(string s) {
+    void good(std::string s) {
         good(fromjson(s));
     }
 
     void good(BSONObj o) {
         if (o.storageValidEmbedded().isOK())
             return;
-        uasserted(12528, (string) "should be ok for storage:" + o.toString());
+        uasserted(12528, std::string("should be ok for storage:") + o.toString());
     }
 
-    void bad(string s) {
+    void bad(std::string s) {
         bad(fromjson(s));
     }
 
     void bad(BSONObj o) {
         if (!o.storageValidEmbedded().isOK())
             return;
-        uasserted(12529, (string) "should NOT be ok for storage:" + o.toString());
+        uasserted(12529, std::string("should NOT be ok for storage:") + o.toString());
     }
 
     void run() {
@@ -1931,7 +1920,7 @@ public:
 
         int count = 0;
         BSONForEach(e, obj) {
-            ASSERT_EQUALS(e.fieldName(), string("a"));
+            ASSERT_EQUALS(e.fieldName(), std::string("a"));
             count += e.Int();
         }
 
@@ -1966,7 +1955,7 @@ public:
             BSONObjBuilder outer;
             BSONObjBuilder inner(outer.subobjStart("inner"));
 
-            string bigStr(1000, 'x');
+            std::string bigStr(1000, 'x');
             while (true) {
                 ASSERT_LESS_THAN_OR_EQUALS(inner.len(), BufferMaxSize);
                 inner.append("", bigStr);
@@ -1980,7 +1969,7 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("jsobj") {}
 
@@ -2075,6 +2064,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> myall;
+unittest::OldStyleSuiteInitializer<All> myall;
 
 }  // namespace JsobjTests
+}  // namespace mongo

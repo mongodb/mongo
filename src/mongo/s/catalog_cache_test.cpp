@@ -62,7 +62,7 @@
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -82,7 +82,6 @@ protected:
         ShardingTestFixture::setUp();
 
         // Setup dummy config server
-        setRemote(kConfigHostAndPort);
         configTargeter()->setFindHostReturnValue(kConfigHostAndPort);
 
         // Setup catalogCache with mock loader

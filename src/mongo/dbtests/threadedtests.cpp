@@ -63,13 +63,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
+namespace mongo {
 namespace ThreadedTests {
-
-using std::cout;
-using std::endl;
-using std::string;
-using std::unique_ptr;
 
 template <int nthreads_param = 10>
 class ThreadedTest {
@@ -199,10 +194,10 @@ private:
     virtual void validate() {
         if (once++ == 0) {
             // <= 1.35 we use a different rwmutex impl so worth noting
-            cout << "Boost version : " << BOOST_VERSION << endl;
+            std::cout << "Boost version : " << BOOST_VERSION << std::endl;
         }
-        cout << typeid(whichmutex).name() << " Slack useful work fraction: " << ((double)a) / b
-             << " locks:" << locks << endl;
+        std::cout << typeid(whichmutex).name() << " Slack useful work fraction: " << ((double)a) / b
+                  << " locks:" << locks << std::endl;
     }
     void watch() {
         while (1) {
@@ -298,7 +293,7 @@ private:
     Hotel _hotel;
 
     virtual void subthread(int x) {
-        string threadName = (str::stream() << "ticketHolder" << x);
+        std::string threadName = (str::stream() << "ticketHolder" << x);
         Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
@@ -334,7 +329,7 @@ protected:
     std::unique_ptr<TicketHolder> _tickets;
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("threading") {}
 
@@ -357,5 +352,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> myall;
+unittest::OldStyleSuiteInitializer<All> myall;
+
 }  // namespace ThreadedTests
+}  // namespace mongo

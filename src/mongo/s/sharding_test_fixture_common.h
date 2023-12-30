@@ -71,7 +71,6 @@ protected:
     ~ShardingTestFixtureCommon();
 
     void setUp() override;
-
     void tearDown() override;
 
     OperationContext* operationContext() const {
@@ -107,26 +106,6 @@ protected:
     void onFindCommand(executor::NetworkTestEnv::OnFindCommandFunction func);
     void onFindWithMetadataCommand(
         executor::NetworkTestEnv::OnFindCommandWithMetadataFunction func);
-
-    /**
-     * Waits for an operation which creates a capped config collection with the specified name and
-     * capped size.
-     */
-    void expectConfigCollectionCreate(const HostAndPort& configHost,
-                                      StringData collName,
-                                      int cappedSize,
-                                      const BSONObj& response);
-
-    /**
-     * Wait for a single insert in one of the change or action log collections with the specified
-     * contents and return a successful response.
-     */
-    void expectConfigCollectionInsert(const HostAndPort& configHost,
-                                      StringData collName,
-                                      Date_t timestamp,
-                                      const std::string& what,
-                                      const NamespaceString& ns,
-                                      const BSONObj& detail);
 
     virtual std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() {
         return nullptr;

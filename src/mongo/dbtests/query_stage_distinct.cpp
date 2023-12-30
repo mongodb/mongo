@@ -67,6 +67,7 @@
  * This file tests db/exec/distinct.cpp
  */
 
+namespace mongo {
 namespace QueryStageDistinct {
 
 static const NamespaceString nss =
@@ -327,7 +328,7 @@ public:
 // XXX: add a test case with bounds where skipping to the next key gets us a result that's not
 // valid w.r.t. our query.
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_distinct") {}
 
@@ -338,6 +339,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> queryStageDistinctAll;
+unittest::OldStyleSuiteInitializer<All> queryStageDistinctAll;
 
 }  // namespace QueryStageDistinct
+}  // namespace mongo

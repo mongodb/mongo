@@ -78,7 +78,7 @@ namespace {
  * This test suite directly invokes the sharding initialization code and validates its behaviour and
  * proper state transitions.
  */
-class ShardingInitializationMongoDTest : public ShardingMongodTestFixture {
+class ShardingInitializationMongoDTest : public ShardingMongoDTestFixture {
 public:
     const std::string kShardName{"TestShard"};
     const ShardIdentity kShardIdentityDoc{
@@ -87,7 +87,7 @@ public:
 protected:
     void setUp() override {
         serverGlobalParams.clusterRole = ClusterRole::None;
-        ShardingMongodTestFixture::setUp();
+        ShardingMongoDTestFixture::setUp();
 
         // When sharding initialization is triggered, initialize sharding state as a shard server.
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
@@ -125,7 +125,7 @@ protected:
 
         CatalogCacheLoader::clearForTests(getServiceContext());
 
-        ShardingMongodTestFixture::tearDown();
+        ShardingMongoDTestFixture::tearDown();
     }
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {

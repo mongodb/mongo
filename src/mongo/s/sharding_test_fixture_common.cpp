@@ -45,10 +45,8 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_test_fixture_common.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -59,7 +57,6 @@
 namespace mongo {
 
 using executor::NetworkTestEnv;
-using executor::RemoteCommandRequest;
 using unittest::assertGet;
 
 ShardingTestFixtureCommon::ShardingTestFixtureCommon() : _tempDir("sharding_test_fixture_common") {
@@ -108,82 +105,6 @@ void ShardingTestFixtureCommon::onFindCommand(NetworkTestEnv::OnFindCommandFunct
 void ShardingTestFixtureCommon::onFindWithMetadataCommand(
     NetworkTestEnv::OnFindCommandWithMetadataFunction func) {
     _networkTestEnv->onFindWithMetadataCommand(func);
-}
-
-void ShardingTestFixtureCommon::expectConfigCollectionCreate(const HostAndPort& configHost,
-                                                             StringData collName,
-                                                             int cappedSize,
-                                                             const BSONObj& response) {
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS(DatabaseName::kConfig, request.dbname);
-
-        BSONObj expectedCreateCmd =
-            BSON("create" << collName << "capped" << true << "size" << cappedSize << "writeConcern"
-                          << BSON("w"
-                                  << "majority"
-                                  << "wtimeout" << 60000)
-                          << "maxTimeMS" << 30000);
-        ASSERT_BSONOBJ_EQ(expectedCreateCmd, request.cmdObj);
-
-        return response;
-    });
-}
-
-void ShardingTestFixtureCommon::expectConfigCollectionInsert(const HostAndPort& configHost,
-                                                             StringData collName,
-                                                             Date_t timestamp,
-                                                             const std::string& what,
-                                                             const NamespaceString& ns,
-                                                             const BSONObj& detail) {
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS(DatabaseName::kConfig, request.dbname);
-
-        const auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        const auto batchRequest(BatchedCommandRequest::parseInsert(opMsg));
-        const auto& insertReq(batchRequest.getInsertRequest());
-
-        ASSERT_EQ(DatabaseName::kConfig.db(), insertReq.getNamespace().db_forTest());
-        ASSERT_EQ(collName, insertReq.getNamespace().coll());
-
-        const auto& inserts = insertReq.getDocuments();
-        ASSERT_EQUALS(1U, inserts.size());
-
-        const ChangeLogType& actualChangeLog = assertGet(ChangeLogType::fromBSON(inserts.front()));
-
-        ASSERT_EQUALS(operationContext()->getClient()->clientAddress(true),
-                      actualChangeLog.getClientAddr());
-        ASSERT_BSONOBJ_EQ(detail, actualChangeLog.getDetails());
-        ASSERT_EQUALS(ns, actualChangeLog.getNS());
-        const std::string expectedServer = network()->getHostName();
-        ASSERT_EQUALS(expectedServer, actualChangeLog.getServer());
-        ASSERT_EQUALS(timestamp, actualChangeLog.getTime());
-        ASSERT_EQUALS(what, actualChangeLog.getWhat());
-
-        // Handle changeId specially because there's no way to know what OID was generated
-        std::string changeId = actualChangeLog.getChangeId();
-        size_t firstDash = changeId.find('-');
-        size_t lastDash = changeId.rfind('-');
-
-        const std::string serverPiece = changeId.substr(0, firstDash);
-        const std::string timePiece = changeId.substr(firstDash + 1, lastDash - firstDash - 1);
-        const std::string oidPiece = changeId.substr(lastDash + 1);
-
-        const std::string expectedServerPiece =
-            Grid::get(operationContext())->getNetwork()->getHostName();
-        ASSERT_EQUALS(expectedServerPiece, serverPiece);
-        ASSERT_EQUALS(timestamp.toString(), timePiece);
-
-        OID generatedOID;
-        // Just make sure this doesn't throws and assume the OID is valid
-        generatedOID.init(oidPiece);
-
-        BatchedCommandResponse response;
-        response.setStatus(Status::OK());
-
-        return response.toBSON();
-    });
 }
 
 }  // namespace mongo

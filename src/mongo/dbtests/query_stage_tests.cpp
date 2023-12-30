@@ -74,9 +74,8 @@
  * This file tests db/exec/index_scan.cpp
  */
 
+namespace mongo {
 namespace QueryStageTests {
-
-using std::unique_ptr;
 
 class IndexScanBase {
 public:
@@ -111,10 +110,10 @@ public:
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterObj, _expCtx);
         MONGO_verify(statusWithMatcher.isOK());
-        unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
+        std::unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
-        unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-        unique_ptr<IndexScan> ix = std::make_unique<IndexScan>(
+        auto ws = std::make_unique<WorkingSet>();
+        auto ix = std::make_unique<IndexScan>(
             _expCtx.get(), &ctx.getCollection(), params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor =
@@ -254,7 +253,7 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_tests") {}
 
@@ -267,6 +266,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> queryStageTestsAll;
+unittest::OldStyleSuiteInitializer<All> queryStageTestsAll;
 
 }  // namespace QueryStageTests
+}  // namespace mongo

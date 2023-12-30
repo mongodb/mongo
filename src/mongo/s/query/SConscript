@@ -28,6 +28,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 
@@ -53,6 +54,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/query/query_settings/utils',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         'async_results_merger',
         'cqf_utils',
     ],
@@ -167,7 +169,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/session/logical_session_id",
         "$BUILD_DIR/mongo/db/shared_request_handling",
         "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
-        "$BUILD_DIR/mongo/s/sharding_router_test_fixture",
+        "$BUILD_DIR/mongo/s/sharding_mongos_test_fixture",
         "$BUILD_DIR/mongo/s/vector_clock_mongos",
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "async_results_merger",

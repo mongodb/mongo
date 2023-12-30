@@ -87,6 +87,8 @@
 namespace mongo {
 namespace {
 
+using unittest::assertGet;
+
 std::string makeJsonEquvalent(const std::string& json) {
     boost::property_tree::ptree tree;
 

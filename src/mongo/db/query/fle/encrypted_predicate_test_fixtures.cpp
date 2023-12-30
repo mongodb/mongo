@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,44 +27,12 @@
  *    it in the license file.
  */
 
-/**
- * sock.{h,cpp} unit tests.
- */
+#include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 
-#include <string>
-#include <vector>
+namespace mongo::fle {
 
-#include "mongo/base/string_data.h"
-#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/socket_utils.h"
+EncryptedPredicateRewriteTest::EncryptedPredicateRewriteTest() = default;
 
-namespace mongo {
-namespace SockTests {
+EncryptedPredicateRewriteTest::~EncryptedPredicateRewriteTest() = default;
 
-class HostByName {
-public:
-    void run() {
-        ASSERT_EQUALS("127.0.0.1", hostbyname("localhost"));
-        ASSERT_EQUALS("127.0.0.1", hostbyname("127.0.0.1"));
-        // ASSERT_EQUALS( "::1", hostbyname( "::1" ) ); // IPv6 disabled at runtime by default.
-
-        HostAndPort h("asdfasdfasdf_no_such_host");
-        ASSERT_EQUALS("", hostbyname("asdfasdfasdf_no_such_host"));
-    }
-};
-
-class All : public unittest::OldStyleSuiteSpecification {
-public:
-    All() : OldStyleSuiteSpecification("sock") {}
-    void setupTests() {
-        add<HostByName>();
-    }
-};
-
-unittest::OldStyleSuiteInitializer<All> myall;
-
-}  // namespace SockTests
-}  // namespace mongo
+}  // namespace mongo::fle

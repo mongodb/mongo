@@ -110,6 +110,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/session/sessions_collection',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 
@@ -572,13 +573,13 @@ if env.TargetOSIs('windows'):
     )
 
     env.Alias('generated-sources', generatedServerManifest)
-    env.Depends("mongos.res", generatedServerManifest)
+    env.Depends('mongos.res', generatedServerManifest)
 
 env.Program(
     target='mongos',
     source=[
         'mongos.cpp',
-    ] + env.WindowsResourceFile("mongos.rc"),
+    ] + env.WindowsResourceFile('mongos.rc'),
     LIBDEPS=[
         # NOTE: Do not add new libdeps (public or private) here unless
         # required by the linker to satisfy symbol dependencies from
@@ -589,15 +590,15 @@ env.Program(
         '$BUILD_DIR/mongo/db/server_base',
         'mongos_main',
     ],
-    AIB_COMPONENT="mongos",
+    AIB_COMPONENT='mongos',
     AIB_COMPONENTS_EXTRA=[
-        "core",
-        "default",
-        "devcore",
-        "dist",
-        "dist-test",
-        "integration-tests",
-        "servers",
+        'core',
+        'default',
+        'devcore',
+        'dist',
+        'dist-test',
+        'integration-tests',
+        'servers',
     ],
 )
 
@@ -619,14 +620,15 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
     ],
 )
 
 env.Library(
-    target='sharding_router_test_fixture',
+    target='sharding_mongos_test_fixture',
     source=[
         'catalog_cache_test_fixture.cpp',
-        'sharding_router_test_fixture.cpp',
+        'sharding_mongos_test_fixture.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_mock',
@@ -727,7 +729,7 @@ env.CppUnitTest(
         'mongos_topology_coordinator',
         'sessions_collection_sharded',
         'sharding_api',
-        'sharding_router_test_fixture',
+        'sharding_mongos_test_fixture',
         'sharding_task_executor',
         'vector_clock_mongos',
     ],

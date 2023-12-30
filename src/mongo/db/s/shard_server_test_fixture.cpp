@@ -52,7 +52,7 @@ namespace mongo {
 const HostAndPort ShardServerTestFixture::kConfigHostAndPort("dummy", 123);
 
 ShardServerTestFixture::ShardServerTestFixture(Options options, bool setUpMajorityReads)
-    : ShardingMongodTestFixture(std::move(options), setUpMajorityReads) {}
+    : ShardingMongoDTestFixture(std::move(options), setUpMajorityReads) {}
 
 ShardServerTestFixture::~ShardServerTestFixture() = default;
 
@@ -61,7 +61,7 @@ std::shared_ptr<RemoteCommandTargeterMock> ShardServerTestFixture::configTargete
 }
 
 void ShardServerTestFixture::setUp() {
-    ShardingMongodTestFixture::setUp();
+    ShardingMongoDTestFixture::setUp();
 
     replicationCoordinator()->alwaysAllowWrites(true);
 
@@ -95,7 +95,7 @@ void ShardServerTestFixture::setCatalogCacheLoader(std::unique_ptr<CatalogCacheL
 }
 
 void ShardServerTestFixture::tearDown() {
-    ShardingMongodTestFixture::tearDown();
+    ShardingMongoDTestFixture::tearDown();
     CatalogCacheLoader::clearForTests(getServiceContext());
 }
 

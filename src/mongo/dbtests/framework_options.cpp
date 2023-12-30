@@ -67,13 +67,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-
 namespace mongo {
-
-using std::cout;
-using std::endl;
-using std::string;
-using std::vector;
 
 FrameworkGlobalParams frameworkGlobalParams;
 
@@ -106,11 +100,11 @@ bool handlePreValidationTestFrameworkOptions(const moe::Environment& params,
 Status storeTestFrameworkOptions(const moe::Environment& params,
                                  const std::vector<std::string>& args) {
     if (params.count("dbpath")) {
-        frameworkGlobalParams.dbpathSpec = params["dbpath"].as<string>();
+        frameworkGlobalParams.dbpathSpec = params["dbpath"].as<std::string>();
     }
 
     if (params.count("debug") || params.count("verbose")) {
-        setMinimumLoggedSeverity(logv2::LogSeverity::Debug(1));
+        unittest::setMinimumLoggedSeverity(logv2::LogSeverity::Debug(1));
     }
 
     boost::filesystem::path p(frameworkGlobalParams.dbpathSpec);
@@ -141,10 +135,10 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     if (kDebugBuild)
         LOGV2(22491, "DEBUG build");
 
-    string dbpathString = p.string();
+    std::string dbpathString = p.string();
     storageGlobalParams.dbpath = dbpathString.c_str();
 
-    storageGlobalParams.engine = params["storage.engine"].as<string>();
+    storageGlobalParams.engine = params["storage.engine"].as<std::string>();
     gFlowControlEnabled.store(params["enableFlowControl"].as<bool>());
 
     if (gFlowControlEnabled.load()) {
@@ -188,4 +182,5 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
 
     return Status::OK();
 }
+
 }  // namespace mongo

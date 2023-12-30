@@ -84,11 +84,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
+namespace mongo {
 namespace QueryStageUpdate {
-
-using std::make_unique;
-using std::unique_ptr;
-using std::vector;
 
 static const NamespaceString nss =
     NamespaceString::createNamespaceString_forTest("unittests.QueryStageUpdate");
@@ -118,7 +115,7 @@ public:
         return _client.count(nss, query, 0, 0, 0);
     }
 
-    unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
+    std::unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(query);
         return std::make_unique<CanonicalQuery>(
@@ -145,14 +142,14 @@ public:
      * Uses a forward collection scan stage to get the docs, and populates 'out' with
      * the results.
      */
-    void getCollContents(const CollectionPtr& collection, vector<BSONObj>* out) {
+    void getCollContents(const CollectionPtr& collection, std::vector<BSONObj>* out) {
         WorkingSet ws;
 
         CollectionScanParams params;
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(
+        std::unique_ptr<CollectionScan> scan(
             new CollectionScan(_expCtx.get(), &collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
@@ -167,14 +164,14 @@ public:
 
     void getRecordIds(const CollectionPtr& collection,
                       CollectionScanParams::Direction direction,
-                      vector<RecordId>* out) {
+                      std::vector<RecordId>* out) {
         WorkingSet ws;
 
         CollectionScanParams params;
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(
+        std::unique_ptr<CollectionScan> scan(
             new CollectionScan(_expCtx.get(), &collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
@@ -190,7 +187,7 @@ public:
     /**
      * Asserts that 'objs' contains 'expectedDoc'.
      */
-    void assertHasDoc(const vector<BSONObj>& objs, const BSONObj& expectedDoc) {
+    void assertHasDoc(const std::vector<BSONObj>& objs, const BSONObj& expectedDoc) {
         bool foundDoc = false;
         for (size_t i = 0; i < objs.size(); i++) {
             if (0 == objs[i].woCompare(expectedDoc)) {
@@ -253,13 +250,13 @@ public:
 
             // Setup update params.
             UpdateStageParams params(&request, &driver, opDebug);
-            unique_ptr<CanonicalQuery> cq(canonicalize(query));
+            std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
             params.canonicalQuery = cq.get();
 
-            auto ws = make_unique<WorkingSet>();
-            auto eofStage = make_unique<EOFStage>(_expCtx.get());
+            auto ws = std::make_unique<WorkingSet>();
+            auto eofStage = std::make_unique<EOFStage>(_expCtx.get());
 
-            auto updateStage = make_unique<UpsertStage>(
+            auto updateStage = std::make_unique<UpsertStage>(
                 _expCtx.get(), params, ws.get(), collection, eofStage.release());
 
             runUpdate(updateStage.get());
@@ -269,7 +266,7 @@ public:
         {
             AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
-            vector<BSONObj> objs;
+            std::vector<BSONObj> objs;
             getCollContents(collection.getCollection(), &objs);
 
             // Expect a single document, {_id: 0, x: 1, y: 2}.
@@ -305,7 +302,7 @@ public:
             UpdateDriver driver(_expCtx);
 
             // Get the RecordIds that would be returned by an in-order scan.
-            vector<RecordId> recordIds;
+            std::vector<RecordId> recordIds;
             getRecordIds(collection.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
 
             auto request = UpdateRequest();
@@ -334,17 +331,17 @@ public:
 
             // Configure the update.
             UpdateStageParams updateParams(&request, &driver, opDebug);
-            unique_ptr<CanonicalQuery> cq(canonicalize(query));
+            std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
             updateParams.canonicalQuery = cq.get();
 
-            auto ws = make_unique<WorkingSet>();
-            auto cs = make_unique<CollectionScan>(_expCtx.get(),
-                                                  collection,
-                                                  collScanParams,
-                                                  ws.get(),
-                                                  cq->getPrimaryMatchExpression());
+            auto ws = std::make_unique<WorkingSet>();
+            auto cs = std::make_unique<CollectionScan>(_expCtx.get(),
+                                                       collection,
+                                                       collScanParams,
+                                                       ws.get(),
+                                                       cq->getPrimaryMatchExpression());
 
-            auto updateStage = make_unique<UpdateStage>(
+            auto updateStage = std::make_unique<UpdateStage>(
                 _expCtx.get(), updateParams, ws.get(), collection, cs.release());
 
             const UpdateStats* stats =
@@ -383,7 +380,7 @@ public:
         {
             AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
-            vector<BSONObj> objs;
+            std::vector<BSONObj> objs;
             getCollContents(collection.getCollection(), &objs);
 
             // Verify that the collection now has 9 docs (one was deleted).
@@ -425,11 +422,11 @@ public:
         UpdateDriver driver(_expCtx);
         const int targetDocIndex = 0;  // We'll be working with the first doc in the collection.
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
-        const auto ws = make_unique<WorkingSet>();
-        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
+        const auto ws = std::make_unique<WorkingSet>();
+        const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> recordIds;
+        std::vector<RecordId> recordIds;
         getRecordIds(collection.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
 
         // Populate the request.
@@ -448,7 +445,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
-        auto qds = make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
+        auto qds = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
@@ -461,7 +458,7 @@ public:
         UpdateStageParams updateParams(&request, &driver, opDebug);
         updateParams.canonicalQuery = cq.get();
 
-        const auto updateStage = make_unique<UpdateStage>(
+        const auto updateStage = std::make_unique<UpdateStage>(
             _expCtx.get(), updateParams, ws.get(), collection, qds.release());
 
         // Should return advanced.
@@ -485,7 +482,7 @@ public:
 
         // Should have done the update.
         BSONObj newDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex << "x" << 0);
-        vector<BSONObj> objs;
+        std::vector<BSONObj> objs;
         getCollContents(collection.getCollectionPtr(), &objs);
         ASSERT_BSONOBJ_EQ(objs[targetDocIndex], newDoc);
 
@@ -520,11 +517,11 @@ public:
         UpdateDriver driver(_expCtx);
         const int targetDocIndex = 10;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
-        const auto ws = make_unique<WorkingSet>();
-        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
+        const auto ws = std::make_unique<WorkingSet>();
+        const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> recordIds;
+        std::vector<RecordId> recordIds;
         getRecordIds(collection.getCollectionPtr(), CollectionScanParams::FORWARD, &recordIds);
 
         // Populate the request.
@@ -543,7 +540,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
-        auto qds = make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
+        auto qds = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
@@ -556,7 +553,7 @@ public:
         UpdateStageParams updateParams(&request, &driver, opDebug);
         updateParams.canonicalQuery = cq.get();
 
-        auto updateStage = make_unique<UpdateStage>(
+        auto updateStage = std::make_unique<UpdateStage>(
             _expCtx.get(), updateParams, ws.get(), collection, qds.release());
 
         // Should return advanced.
@@ -580,7 +577,7 @@ public:
         ASSERT_BSONOBJ_EQ(resultMember->doc.value().toBson(), newDoc);
 
         // Should have done the update.
-        vector<BSONObj> objs;
+        std::vector<BSONObj> objs;
         getCollContents(collection.getCollectionPtr(), &objs);
         ASSERT_BSONOBJ_EQ(objs[targetDocIndex], newDoc);
 
@@ -590,7 +587,7 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_update") {}
 
@@ -603,6 +600,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> all;
+unittest::OldStyleSuiteInitializer<All> all;
 
 }  // namespace QueryStageUpdate
+}  // namespace mongo

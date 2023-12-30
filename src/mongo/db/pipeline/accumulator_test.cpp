@@ -73,12 +73,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
+namespace mongo {
 namespace AccumulatorTests {
-
-using boost::intrusive_ptr;
-using std::numeric_limits;
-using std::string;
 
 /**
  * Takes a list of pairs of arguments and expected results, and creates an AccumulatorState using
@@ -86,10 +82,12 @@ using std::string;
  * the expected results.
  */
 using OperationsType = std::vector<std::pair<std::vector<Value>, Value>>;
+
 static void assertExpectedResults(
     ExpressionContext* const expCtx,
     OperationsType operations,
-    std::function<intrusive_ptr<AccumulatorState>(ExpressionContext* const)> initializeAccumulator,
+    std::function<boost::intrusive_ptr<AccumulatorState>(ExpressionContext* const)>
+        initializeAccumulator,
     bool skipMerging = false) {
     for (auto&& op : operations) {
         try {
@@ -149,7 +147,7 @@ static void assertExpectedResults(
     bool skipMerging = false,
     boost::optional<Value> newGroupValue = boost::none) {
     auto initializeAccumulator =
-        [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+        [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
         auto accum = AccName::create(expCtx);
         if (newGroupValue) {
             accum->startNewGroup(*newGroupValue);
@@ -191,11 +189,12 @@ TEST(Accumulators, Avg) {
             {{Value(1), Value(2LL), Value(6.0)}, Value(3.0)},
 
             // Unlike $sum, two ints do not overflow in the 'total' portion of the average.
-            {{Value(numeric_limits<int>::max()), Value(numeric_limits<int>::max())},
-             Value(static_cast<double>(numeric_limits<int>::max()))},
+            {{Value(std::numeric_limits<int>::max()), Value(std::numeric_limits<int>::max())},
+             Value(static_cast<double>(std::numeric_limits<int>::max()))},
             // Two longs do overflow in the 'total' portion of the average.
-            {{Value(numeric_limits<long long>::max()), Value(numeric_limits<long long>::max())},
-             Value(static_cast<double>(numeric_limits<long long>::max()))},
+            {{Value(std::numeric_limits<long long>::max()),
+              Value(std::numeric_limits<long long>::max())},
+             Value(static_cast<double>(std::numeric_limits<long long>::max()))},
 
             // Averaging two decimals.
             {{Value(Decimal128("-1234567890.1234567889")),
@@ -546,7 +545,8 @@ TEST(Accumulators, Sum) {
          // A non integer valued double.
          {{Value(7.5)}, Value(7.5)},
          // A nan double.
-         {{Value(numeric_limits<double>::quiet_NaN())}, Value(numeric_limits<double>::quiet_NaN())},
+         {{Value(std::numeric_limits<double>::quiet_NaN())},
+          Value(std::numeric_limits<double>::quiet_NaN())},
 
          // Two ints are summed.
          {{Value(4), Value(5)}, Value(9)},
@@ -578,38 +578,40 @@ TEST(Accumulators, Sum) {
          {{Value(5LL), Value(-6)}, Value(-1LL)},
 
          // Two ints do not overflow.
-         {{Value(numeric_limits<int>::max()), Value(10)}, Value(numeric_limits<int>::max() + 10LL)},
+         {{Value(std::numeric_limits<int>::max()), Value(10)},
+          Value(std::numeric_limits<int>::max() + 10LL)},
          // Two negative ints do not overflow.
-         {{Value(-numeric_limits<int>::max()), Value(-10)},
-          Value(-numeric_limits<int>::max() - 10LL)},
+         {{Value(-std::numeric_limits<int>::max()), Value(-10)},
+          Value(-std::numeric_limits<int>::max() - 10LL)},
          // An int and a long do not trigger an int overflow.
-         {{Value(numeric_limits<int>::max()), Value(1LL)},
-          Value(static_cast<long long>(numeric_limits<int>::max()) + 1)},
+         {{Value(std::numeric_limits<int>::max()), Value(1LL)},
+          Value(static_cast<long long>(std::numeric_limits<int>::max()) + 1)},
          // An int and a double do not trigger an int overflow.
-         {{Value(numeric_limits<int>::max()), Value(1.0)},
-          Value(static_cast<long long>(numeric_limits<int>::max()) + 1.0)},
+         {{Value(std::numeric_limits<int>::max()), Value(1.0)},
+          Value(static_cast<long long>(std::numeric_limits<int>::max()) + 1.0)},
          // An int and a long overflow into a double.
-         {{Value(1), Value(numeric_limits<long long>::max())},
-          Value(-static_cast<double>(numeric_limits<long long>::min()))},
+         {{Value(1), Value(std::numeric_limits<long long>::max())},
+          Value(-static_cast<double>(std::numeric_limits<long long>::min()))},
          // Two longs overflow into a double.
-         {{Value(numeric_limits<long long>::max()), Value(numeric_limits<long long>::max())},
-          Value(static_cast<double>(numeric_limits<long long>::max()) * 2)},
+         {{Value(std::numeric_limits<long long>::max()),
+           Value(std::numeric_limits<long long>::max())},
+          Value(static_cast<double>(std::numeric_limits<long long>::max()) * 2)},
          // A long and a double do not trigger a long overflow.
-         {{Value(numeric_limits<long long>::max()), Value(1.0)},
-          Value(numeric_limits<long long>::max() + 1.0)},
+         {{Value(std::numeric_limits<long long>::max()), Value(1.0)},
+          Value(std::numeric_limits<long long>::max() + 1.0)},
          // Two doubles overflow to infinity.
-         {{Value(numeric_limits<double>::max()), Value(numeric_limits<double>::max())},
-          Value(numeric_limits<double>::infinity())},
+         {{Value(std::numeric_limits<double>::max()), Value(std::numeric_limits<double>::max())},
+          Value(std::numeric_limits<double>::infinity())},
          // Two large integers do not overflow if a double is added later.
-         {{Value(numeric_limits<long long>::max()),
-           Value(numeric_limits<long long>::max()),
+         {{Value(std::numeric_limits<long long>::max()),
+           Value(std::numeric_limits<long long>::max()),
            Value(1.0)},
-          Value(static_cast<double>(numeric_limits<long long>::max()) +
-                static_cast<double>(numeric_limits<long long>::max()))},
+          Value(static_cast<double>(std::numeric_limits<long long>::max()) +
+                static_cast<double>(std::numeric_limits<long long>::max()))},
 
          // An int and a NaN double.
-         {{Value(4), Value(numeric_limits<double>::quiet_NaN())},
-          Value(numeric_limits<double>::quiet_NaN())},
+         {{Value(4), Value(std::numeric_limits<double>::quiet_NaN())},
+          Value(std::numeric_limits<double>::quiet_NaN())},
          // Null values are ignored.
          {{Value(5), Value(BSONNULL)}, Value(5)},
          // Missing values are ignored.
@@ -631,52 +633,54 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
         {{mkdoc(Value("abc"_sd)), mkdoc(Value("cba"_sd)), mkdoc(Value("cca"_sd))},
          Value(std::vector<Value>{Value("cca"_sd), Value("abc"_sd)})}};
 
-    assertExpectedResults(expCtx.get(),
-                          bottomCasesAscending,
-                          [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
-                              auto acc =
-                                  AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
-                                      expCtx, BSON("a" << 1));
-                              acc->startNewGroup(n);
-                              return acc;
-                          });
+    assertExpectedResults(
+        expCtx.get(),
+        bottomCasesAscending,
+        [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
+            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+                expCtx, BSON("a" << 1));
+            acc->startNewGroup(n);
+            return acc;
+        });
 
     OperationsType bottomCasesDescending{
         {{mkdoc(Value("abc"_sd)), mkdoc(Value("cba"_sd)), mkdoc(Value("cca"_sd))},
          Value(std::vector<Value>{Value("cca"_sd), Value("cba"_sd)})}};
-    assertExpectedResults(expCtx.get(),
-                          bottomCasesDescending,
-                          [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
-                              auto acc =
-                                  AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
-                                      expCtx, BSON("a" << -1));
-                              acc->startNewGroup(n);
-                              return acc;
-                          });
+    assertExpectedResults(
+        expCtx.get(),
+        bottomCasesDescending,
+        [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
+            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+                expCtx, BSON("a" << -1));
+            acc->startNewGroup(n);
+            return acc;
+        });
 
     OperationsType topCasesAscending{
         {{mkdoc(Value("abc"_sd)), mkdoc(Value("cba"_sd)), mkdoc(Value("cca"_sd))},
          Value(std::vector<Value>{Value("cba"_sd), Value("cca"_sd)})}};
-    assertExpectedResults(expCtx.get(),
-                          topCasesAscending,
-                          [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
-                              auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
-                                  expCtx, BSON("a" << 1));
-                              acc->startNewGroup(n);
-                              return acc;
-                          });
+    assertExpectedResults(
+        expCtx.get(),
+        topCasesAscending,
+        [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
+            auto acc =
+                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << 1));
+            acc->startNewGroup(n);
+            return acc;
+        });
 
     OperationsType topCasesDescending{
         {{mkdoc(Value("abc"_sd)), mkdoc(Value("cba"_sd)), mkdoc(Value("cca"_sd))},
          Value(std::vector<Value>{Value("abc"_sd), Value("cca"_sd)})}};
-    assertExpectedResults(expCtx.get(),
-                          topCasesDescending,
-                          [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
-                              auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
-                                  expCtx, BSON("a" << -1));
-                              acc->startNewGroup(n);
-                              return acc;
-                          });
+    assertExpectedResults(
+        expCtx.get(),
+        topCasesDescending,
+        [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
+            auto acc =
+                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << -1));
+            acc->startNewGroup(n);
+            return acc;
+        });
 }
 
 TEST(Accumulators, TopNDescendingBottomNAscending) {
@@ -757,7 +761,8 @@ TEST(Accumulators, TopNDescendingBottomNAscending) {
          {Value(std::vector<Value>{Value(3), Value(4), Value(5)})}}};
 
     try {
-        auto accumInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+        auto accumInit =
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
             auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
                 expCtx, BSON("a" << 1));
             acc->startNewGroup(n3);
@@ -803,7 +808,8 @@ TEST(Accumulators, TopNDescendingBottomNAscending) {
                                          mkdoc2(1, Value(2))},
                                         {Value(std::vector<Value>{Value(3), Value(4), Value(5)})}}};
     try {
-        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+        auto accInit =
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
             auto acc =
                 AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << -1));
             acc->startNewGroup(n3);
@@ -903,7 +909,8 @@ TEST(Accumulators, TopNAscendingBottomNDescending) {
          {Value(std::vector<Value>{Value(5), Value(1), Value(2)})}}};
 
     try {
-        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+        auto accInit =
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
             auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
                 expCtx, BSON("a" << -1));
             acc->startNewGroup(n3);
@@ -949,7 +956,8 @@ TEST(Accumulators, TopNAscendingBottomNDescending) {
                                     {Value(std::vector<Value>{Value(3), Value(4), Value(5)})}}};
 
     try {
-        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+        auto accInit =
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
             auto acc =
                 AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << 1));
             acc->startNewGroup(n3);
@@ -1002,7 +1010,8 @@ TEST(Accumulators, TopBottomNMultiSortPattern) {
          {Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL), Value(BSONNULL)})}}};
 
     try {
-        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+        auto accInit =
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
             auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
                 expCtx, BSON("a" << -1 << "b" << -1));
             acc->startNewGroup(n);
@@ -1023,7 +1032,8 @@ TEST(Accumulators, TopBottomNMultiSortPattern) {
     }
 
     try {
-        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+        auto accInit =
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
             auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
                 expCtx, BSON("a" << 1 << "b" << 1));
             acc->startNewGroup(n);
@@ -1042,7 +1052,8 @@ void runTopBottomAccumulatorTest(ExpressionContext* const expCtx,
                                  Value n,
                                  OperationsType cases) {
     try {
-        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+        auto accInit =
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
             auto acc = AccumulatorTopBottomN<Sense, false>::create(expCtx, BSON("a" << dir));
             acc->startNewGroup(n);
             return acc;
@@ -1100,7 +1111,9 @@ void testSingle(OperationsType cases, ExpressionContext* const expCtx, const BSO
     try {
         // n = 1 single = true should return 1 non array value.
         assertExpectedResults(
-            expCtx, cases, [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            expCtx,
+            cases,
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
                 auto acc = AccumulatorTopBottomN<s, true>::create(expCtx, sortPattern);
                 acc->startNewGroup(Value(1));
                 return acc;
@@ -1140,7 +1153,7 @@ TEST(Accumulators, TopBottomSingle) {
         assertExpectedResults(
             expCtx.get(),
             bottomAscTopDescCases,
-            [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
                 auto acc =
                     AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(expCtx, ascSort);
                 acc->startNewGroup(n);
@@ -1156,7 +1169,7 @@ TEST(Accumulators, TopBottomSingle) {
         assertExpectedResults(
             expCtx.get(),
             bottomAscTopDescCases,
-            [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
                 auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
                     expCtx, BSON("a" << -1));
                 acc->startNewGroup(n);
@@ -1183,7 +1196,7 @@ TEST(Accumulators, TopBottomSingle) {
         assertExpectedResults(
             expCtx.get(),
             bottomDescTopAscCases,
-            [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
                 auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
                     expCtx, BSON("a" << -1));
                 acc->startNewGroup(n);
@@ -1200,7 +1213,7 @@ TEST(Accumulators, TopBottomSingle) {
         assertExpectedResults(
             expCtx.get(),
             bottomDescTopAscCases,
-            [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
                 auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
                     expCtx, BSON("a" << 1));
                 acc->startNewGroup(n);
@@ -1266,7 +1279,7 @@ struct TopBottomNRemoveTest : public AggregationContextFixture {
         ASSERT_EQ(usageBefore, usageAfter);
     }
 
-    intrusive_ptr<T> _acc = nullptr;
+    boost::intrusive_ptr<T> _acc = nullptr;
     std::queue<Value> _q;
 };
 
@@ -1794,17 +1807,17 @@ TEST(Accumulators, CovarianceEdgeCases) {
 
     // This is actually an "undefined" case because NaN/Inf is not counted.
     const std::vector<Value> nonFiniteOnly = {
-        Value(std::vector<Value>({Value(numeric_limits<double>::quiet_NaN()),
-                                  Value(numeric_limits<double>::quiet_NaN())})),
-        Value(std::vector<Value>({Value(numeric_limits<double>::infinity()),
-                                  Value(numeric_limits<double>::infinity())})),
+        Value(std::vector<Value>({Value(std::numeric_limits<double>::quiet_NaN()),
+                                  Value(std::numeric_limits<double>::quiet_NaN())})),
+        Value(std::vector<Value>({Value(std::numeric_limits<double>::infinity()),
+                                  Value(std::numeric_limits<double>::infinity())})),
     };
 
     const std::vector<Value> mixedPoints = {
-        Value(std::vector<Value>({Value(numeric_limits<double>::quiet_NaN()),
-                                  Value(numeric_limits<double>::quiet_NaN())})),
-        Value(std::vector<Value>({Value(numeric_limits<double>::infinity()),
-                                  Value(numeric_limits<double>::infinity())})),
+        Value(std::vector<Value>({Value(std::numeric_limits<double>::quiet_NaN()),
+                                  Value(std::numeric_limits<double>::quiet_NaN())})),
+        Value(std::vector<Value>({Value(std::numeric_limits<double>::infinity()),
+                                  Value(std::numeric_limits<double>::infinity())})),
         Value(std::vector<Value>({Value(0), Value(1)})),
         Value(std::vector<Value>({Value(1), Value(2)})),
     };
@@ -1815,7 +1828,7 @@ TEST(Accumulators, CovarianceEdgeCases) {
             {{}, Value(BSONNULL)},
             {singlePoint, Value(0.0)},
             {nonFiniteOnly, Value(BSONNULL)},
-            {mixedPoints, Value(numeric_limits<double>::quiet_NaN())},
+            {mixedPoints, Value(std::numeric_limits<double>::quiet_NaN())},
         },
         true /* Covariance accumulator can't be merged */);
 
@@ -1825,7 +1838,7 @@ TEST(Accumulators, CovarianceEdgeCases) {
             {{}, Value(BSONNULL)},
             {singlePoint, Value(BSONNULL)},
             {nonFiniteOnly, Value(BSONNULL)},
-            {mixedPoints, Value(numeric_limits<double>::quiet_NaN())},
+            {mixedPoints, Value(std::numeric_limits<double>::quiet_NaN())},
         },
         true /* Covariance accumulator can't be merged */);
 }
@@ -2117,5 +2130,5 @@ TEST(AccumulatorMergeObjects, MergingWithEmptyDocumentShouldIgnore) {
     assertExpectedResults<AccumulatorMergeObjects>(&expCtx, {{{first, second}, expected}});
 }
 
-
 }  // namespace AccumulatorTests
+}  // namespace mongo

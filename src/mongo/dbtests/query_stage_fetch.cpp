@@ -75,11 +75,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
+namespace mongo {
 namespace QueryStageFetch {
-
-using std::set;
-using std::shared_ptr;
-using std::unique_ptr;
 
 class QueryStageFetchBase {
 public:
@@ -89,7 +86,7 @@ public:
         _client.dropCollection(nss());
     }
 
-    void getRecordIds(set<RecordId>* out, const CollectionPtr& coll) {
+    void getRecordIds(std::set<RecordId>* out, const CollectionPtr& coll) {
         auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
@@ -141,7 +138,7 @@ public:
 
         // Add an object to the DB.
         insert(BSON("foo" << 5));
-        set<RecordId> recordIds;
+        std::set<RecordId> recordIds;
         getRecordIds(&recordIds, coll);
         ASSERT_EQUALS(size_t(1), recordIds.size());
 
@@ -208,7 +205,7 @@ public:
 
         // Add an object to the DB.
         insert(BSON("foo" << 5));
-        set<RecordId> recordIds;
+        std::set<RecordId> recordIds;
         getRecordIds(&recordIds, coll);
         ASSERT_EQUALS(size_t(1), recordIds.size());
 
@@ -233,7 +230,7 @@ public:
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterObj, _expCtx);
         MONGO_verify(statusWithMatcher.isOK());
-        unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
+        std::unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         // Matcher requires that foo==6 but we only have data with foo==5.
         auto fetchStage = std::make_unique<FetchStage>(
@@ -253,7 +250,7 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_fetch") {}
 
@@ -263,6 +260,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> queryStageFetchAll;
+unittest::OldStyleSuiteInitializer<All> queryStageFetchAll;
 
 }  // namespace QueryStageFetch
+}  // namespace mongo

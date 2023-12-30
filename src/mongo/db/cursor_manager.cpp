@@ -71,10 +71,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-
-constexpr int CursorManager::kNumPartitions;
-
 namespace {
+
+constexpr int kNumPartitions = 16;
 
 const auto serviceCursorManager =
     ServiceContext::declareDecoration<std::unique_ptr<CursorManager>>();
@@ -84,6 +83,7 @@ ServiceContext::ConstructorActionRegisterer cursorManagerRegisterer{
         auto cursorManager = std::make_unique<CursorManager>(svcCtx->getPreciseClockSource());
         CursorManager::set(svcCtx, std::move(cursorManager));
     }};
+
 }  // namespace
 
 CursorManager* CursorManager::get(ServiceContext* svcCtx) {
@@ -115,10 +115,10 @@ std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
 }
 
 CursorManager::CursorManager(ClockSource* preciseClockSource)
-    : _random(std::make_unique<PseudoRandom>(SecureRandom().nextInt64())),
+    : _preciseClockSource(preciseClockSource),
+      _random(std::make_unique<PseudoRandom>(SecureRandom().nextInt64())),
       _cursorMap(std::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>(
-          kNumPartitions)),
-      _preciseClockSource(preciseClockSource) {}
+          kNumPartitions)) {}
 
 CursorManager::~CursorManager() {
     auto allPartitions = _cursorMap->lockAllPartitions();
