@@ -279,6 +279,14 @@ auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
     if (params[kOptimizeExecutor]) {
         context.data().executor->optimize();
     }
+    if (!params[kNotInclusionOnly]) {
+        auto executorPtr =
+            dynamic_cast<InclusionProjectionExecutor*>(context.data().executor.get());
+        tassert(8058001,
+                "Only 'InclusionProjectionExecutor' can have an InclusionOnly attribute",
+                executorPtr);
+        executorPtr->setIsInclusionOnly(true);
+    }
     return std::move(context.data().executor);
 }
 }  // namespace
@@ -294,6 +302,8 @@ std::unique_ptr<ProjectionExecutor> buildProjectionExecutor(
         case kInclusion: {
             if (!projection->isInclusionOnly()) {
                 params.reset(kAllowFastPath);
+            } else {
+                params.reset(kNotInclusionOnly);
             }
             return buildProjectionExecutor<InclusionProjectionExecutor>(
                 expCtx, projection->root(), policies, params);

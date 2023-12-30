@@ -26,7 +26,7 @@ function verifyOptimizerStats(statType, checkCostBasedEstimates) {
         coll.insert({a: i, b: Math.random(0, 100)});
     }
 
-    const cur = coll.find({}, {b: 1});
+    const cur = coll.find({}, {a: 1, b: 1});
     cur.next();
 
     assert.commandWorked(

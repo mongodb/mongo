@@ -114,7 +114,7 @@ function runTest(conn) {
             assert.commandWorked(
                 db.setProfilingLevel(isMongos ? 0 : 1, {filter: {[field]: {$exists: true}}}));
             const comment = 'profile_filter_input_has_field_' + field;
-            assert.eq(100, coll.find({}, {a: 1}).comment(comment).itcount());
+            assert.eq(100, coll.find({}, {a: 1, b: 1}).comment(comment).itcount());
             // If the profile filter's input didn't contain `field`, then this operation wouldn't be
             // profiled.
             assert(db.system.profile.findOne({'command.comment': comment}),

@@ -351,8 +351,17 @@ public:
         return _root->extractComputedProjectionsInProject(oldName, newName, reservedNames);
     }
 
+    bool isInclusionOnly() const {
+        return _isInclusionOnly;
+    }
+
+    void setIsInclusionOnly(bool isInclusionOnly) {
+        _isInclusionOnly = isInclusionOnly;
+    }
+
 private:
     // The InclusionNode tree does most of the execution work once constructed.
     std::unique_ptr<InclusionNode> _root;
+    bool _isInclusionOnly = false;
 };
 }  // namespace mongo::projection_executor

@@ -70,6 +70,13 @@ enum BuilderParams : char {
     kAllowFastPath,
 
     /**
+     * Indicates whether the projection executor is for inclusion only projection or not. The
+     * semantics of this flag should be consistent with the same flag in the
+     * 'InclusionProjectionExecutor'.
+     */
+    kNotInclusionOnly,
+
+    /**
      * An internal value holding the total number of projection executor builder parameters.
      * New parameters must be added before the kNumParams sentinel.
      */

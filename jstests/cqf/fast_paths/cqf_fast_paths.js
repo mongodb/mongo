@@ -4,7 +4,7 @@
  *  requires_fcv_73,
  * ]
  */
-import {isBonsaiFastPathPlan} from "jstests/libs/analyze_plan.js";
+import {getWinningSBEPlanFromExplain, isBonsaiFastPathPlan} from "jstests/libs/analyze_plan.js";
 import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
@@ -17,8 +17,19 @@ const coll = db[jsTestName()];
 coll.drop();
 
 assert.commandWorked(coll.insertMany([...Array(numRecords).keys()].map(i => {
-    return {_id: i, a: 1, undefinedValue: undefined};
+    return {_id: i, a: 1, x: {y: i, z: i}, undefinedValue: undefined};
 })));
+
+// Helper used by tests for empty queries with a simple projection.
+function assertProjectedDocAndExplain(doc, explain, expectedStage, entireDocProjected) {
+    assert(doc.hasOwnProperty('x'), doc);
+    assert(doc['x'].hasOwnProperty('y'), doc);
+    assert.eq(doc['x'].hasOwnProperty('z'), entireDocProjected, doc);
+    assert(doc.hasOwnProperty('_id'), doc);
+
+    const sbeStages = getWinningSBEPlanFromExplain(explain).stages;
+    assert(sbeStages.includes(expectedStage), sbeStages);
+}
 
 {
     // Empty find should use the fast path.
@@ -38,6 +49,150 @@ assert.commandWorked(coll.insertMany([...Array(numRecords).keys()].map(i => {
     assert(isBonsaiFastPathPlan(db, explain));
     assert.eq(numRecords, explain.executionStats.nReturned);
 }
+
+//
+// Tests for empty queries with a simple projection.
+//
+{
+    // Empty find with simple top-level-field inclusion projection should use fast path.
+    const explain = assert.commandWorked(coll.explain("executionStats").find({}, {x: 1}).finish());
+    assert(isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+
+    const doc = coll.find({}, {'x': 1}).toArray()[0];
+    // Simple top-level-field inclusion projection should use a 'mkbson' stage rather than
+    // 'project' stage.
+    assertProjectedDocAndExplain(doc, explain, "mkbson", true);
+}
+{
+    // Empty find with dotted-field inclusion projection should use fast path.
+    const explain =
+        assert.commandWorked(coll.explain("executionStats").find({}, {"x.y": 1}).finish());
+    assert(isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+
+    const doc = coll.find({}, {'x.y': 1}).toArray()[0];
+    // Dotted-field inclusion projection cannot use the 'mkbson' stage.
+    assertProjectedDocAndExplain(doc, explain, "project", false);
+}
+{
+    // Empty find with dotted-field and '_id' inclusion projection should use fast path.
+    const explain = assert.commandWorked(
+        coll.explain("executionStats").find({}, {"x.y": 1, "_id": 1}).finish());
+    assert(isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+
+    const doc = coll.find({}, {'x.y': 1}).toArray()[0];
+    // Dotted-field inclusion projection cannot use the 'mkbson' stage.
+    assertProjectedDocAndExplain(doc, explain, "project", false);
+}
+{
+    // Empty find with inclusion projection excluding '_id' field should use fast path.
+    const explain = assert.commandWorked(
+        coll.explain("executionStats").find({}, {"x.y": 1, "_id": 0}).finish());
+    assert(isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+
+    const doc = coll.find({}, {'x.y': 1, "_id": 0}).toArray()[0];
+    assert(doc.hasOwnProperty('x'), doc);
+    assert(doc['x'].hasOwnProperty('y'), doc);
+    assert(!doc['x'].hasOwnProperty('z'), doc);
+    assert(!doc.hasOwnProperty('_id'), doc);
+
+    const sbeStages = getWinningSBEPlanFromExplain(explain).stages;
+    assert(sbeStages.includes("project"), sbeStages);
+}
+{
+    // Single $project aggregate with dotted-field inclusion projection should use fast path.
+    let explain = assert.commandWorked(
+        coll.explain("executionStats").aggregate([{"$match": {}}, {"$project": {"x.y": 1}}]));
+    assert(isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+
+    let doc = coll.aggregate([{"$match": {}}, {"$project": {"x.y": 1}}]).toArray()[0];
+    assertProjectedDocAndExplain(doc, explain, "project", false);
+
+    doc = coll.aggregate([{"$project": {"x.y": 1}}, {"$match": {}}]).toArray()[0];
+    assertProjectedDocAndExplain(doc, explain, "project", false);
+
+    explain = coll.explain("executionStats").aggregate([{"$project": {"x.y": 1}}]);
+    assert(isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+
+    doc = coll.aggregate([{"$project": {"x.y": 1}}, {"$match": {}}]).toArray()[0];
+    assertProjectedDocAndExplain(doc, explain, "project", false);
+}
+{
+    // Empty filter aggregate with dotted-field inclusion projection should use fast path.
+    const explain = assert.commandWorked(
+        coll.explain("executionStats").aggregate([{"$match": {}}, {"$project": {"x.y": 1}}]));
+    assert(isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+
+    const doc = coll.aggregate([{"$match": {}}, {"$project": {"x.y": 1}}]).toArray()[0];
+    assertProjectedDocAndExplain(doc, explain, "project", false);
+}
+{
+    // Empty find with multiple-field inclusion projection cannot use fast path.
+    let explain =
+        assert.commandWorked(coll.explain("executionStats").find({}, {x: 1, y: 1}).finish());
+    assert(!isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+
+    // Empty find with exclusion projection cannot use fast path.
+    explain = assert.commandWorked(coll.explain("executionStats").find({}, {x: 0}).finish());
+    assert(!isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+}
+{
+    // Empty find with non-simple inclusion projection cannot use fast path.
+    let explain =
+        assert.commandWorked(coll.explain("executionStats").find({}, {"x.$": 1}).finish());
+    assert(!isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+
+    explain = assert.commandWorked(
+        coll.explain("executionStats").aggregate([{"$match": {}}, {"$project": {"x": "$y"}}]));
+    assert(!isBonsaiFastPathPlan(db, explain));
+    assert.eq(numRecords, explain.executionStats.nReturned);
+}
+{
+    // Ineligible aggregates with $project cannot use fast path.
+    let explain =
+        assert.commandWorked(coll.explain("executionStats")
+                                 .aggregate([{"$project": {"x": "$y"}}, {"$match": {"x": 1}}]));
+    assert(!isBonsaiFastPathPlan(db, explain), explain);
+
+    explain = assert.commandWorked(
+        coll.explain("executionStats").aggregate([{"$project": {"x": 1}}, {"$sort": {"x": 1}}]));
+    assert(!isBonsaiFastPathPlan(db, explain), explain);
+
+    explain =
+        assert.commandWorked(coll.explain("executionStats").aggregate([{"$project": {"x": "$y"}}]));
+    assert(!isBonsaiFastPathPlan(db, explain), explain);
+
+    explain = assert.commandWorked(
+        coll.explain("executionStats").aggregate([{"$match": {}}, {"$project": {"x": "$y"}}]));
+    assert(!isBonsaiFastPathPlan(db, explain), explain);
+
+    explain =
+        assert.commandWorked(coll.explain("executionStats")
+                                 .aggregate([{"$project": {"x": 1}}, {"$group": {"_id": null}}]));
+    assert(!isBonsaiFastPathPlan(db, explain));
+
+    explain = assert.commandWorked(
+        coll.explain("executionStats").aggregate([{"$match": {"x": 1}}, {"$project": {"x": 1}}]));
+    assert(!isBonsaiFastPathPlan(db, explain));
+
+    explain = assert.commandWorked(
+        coll.explain("executionStats").aggregate([{"$match": {"x": 1}}, {"$sort": {"x": 1}}]));
+    assert(!isBonsaiFastPathPlan(db, explain));
+
+    explain =
+        assert.commandWorked(coll.explain("executionStats").aggregate([{"$project": {"x": 0}}]));
+    assert(!isBonsaiFastPathPlan(db, explain));
+}
+
 {
     // Find with predicates should not use a fast path.
     const explain =
@@ -70,7 +225,7 @@ assert.commandWorked(coll.insertMany([...Array(numRecords).keys()].map(i => {
 {
     // Find with equality check on a top-level field should use fast path.
     let explain = assert.commandWorked(coll.explain("executionStats").find({a: 1}).finish());
-    assert(isBonsaiFastPathPlan(db, explain));
+    assert(isBonsaiFastPathPlan(db, explain), explain);
     assert.eq(numRecords, explain.executionStats.nReturned);
 
     explain = assert.commandWorked(coll.explain("executionStats").find({nonexistent: 1}).finish());

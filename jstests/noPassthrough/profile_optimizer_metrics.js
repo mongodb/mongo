@@ -65,11 +65,11 @@ assert.commandWorked(db.setProfilingLevel(0));
 assert(db.system.profile.drop());
 assert.commandWorked(db.setProfilingLevel(2, 0));
 
-const cur = coll.find({}, {b: 1}).comment(findComment);
+const cur = coll.find({}, {b: 1, c: 1}).comment(findComment);
 cur.next();
 verifyProfilerLog(findProfilerFilter, findComment);
 
-const res = coll.explain().find({}, {b: 1}).comment(explainComment).finish();
+const res = coll.explain().find({}, {b: 1, c: 1}).comment(explainComment).finish();
 verifyProfilerLog(commandProfilerFilter, explainComment);
 
 MongoRunner.stopMongod(conn);

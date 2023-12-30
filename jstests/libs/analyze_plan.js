@@ -86,17 +86,22 @@ export function getWinningPlan(queryPlanner) {
                                                                 : queryPlanner.winningPlan;
 }
 
+export function getWinningSBEPlan(queryPlanner) {
+    assert(queryPlanner.winningPlan.hasOwnProperty("slotBasedPlan"), queryPlanner)
+    return queryPlanner.winningPlan.slotBasedPlan;
+}
+
 /**
  * Returns the winning plan from the corresponding sub-node of classic/SBE explain output. Takes
  * into account that the plan may or may not have agg stages.
  *
  * This helper function can be used for any optimizer.
  */
-export function getWinningPlanFromExplain(explain) {
+export function getWinningPlanFromExplain(explain, isSBEPlan = false) {
     if ("shards" in explain) {
         for (const shardName in explain.shards) {
             let queryPlanner = getQueryPlanner(explain.shards[shardName]);
-            return getWinningPlan(queryPlanner);
+            return isSBEPlan ? getWinningSBEPlan(queryPlanner) : getWinningPlan(queryPlanner);
         }
     }
 
@@ -106,14 +111,44 @@ export function getWinningPlanFromExplain(explain) {
         // 1. When in single node, as a single object array
         // 2. When in sharded, as an object.
         if (pipeline.constructor === Array) {
-            return getWinningPlanFromExplain(pipeline[0].$cursor);
+            return getWinningPlanFromExplain(pipeline[0].$cursor, isSBEPlan);
         } else {
-            return getWinningPlanFromExplain(pipeline);
+            return getWinningPlanFromExplain(pipeline, isSBEPlan);
         }
     }
 
     let queryPlanner = getQueryPlanner(explain);
-    return getWinningPlan(queryPlanner);
+    return isSBEPlan ? getWinningSBEPlan(queryPlanner) : getWinningPlan(queryPlanner);
+}
+
+/**
+ * Returns the winning SBE plan from the corresponding sub-node of classic/SBE explain output. Takes
+ * into account that the plan may or may not have agg stages.
+ *
+ * This helper function can be used for any optimizer.
+ */
+export function getWinningSBEPlanFromExplain(explain) {
+    if ("shards" in explain) {
+        for (const shardName in explain.shards) {
+            let queryPlanner = getQueryPlanner(explain.shards[shardName]);
+            return getWinningSBEPlan(queryPlanner);
+        }
+    }
+
+    if (explain.hasOwnProperty("pipeline")) {
+        const pipeline = explain.pipeline;
+        // Pipeline stages' explain output come in two shapes:
+        // 1. When in single node, as a single object array
+        // 2. When in sharded, as an object.
+        if (pipeline.constructor === Array) {
+            return getWinningSBEPlanFromExplain(pipeline[0].$cursor);
+        } else {
+            return getWinningSBEPlanFromExplain(pipeline);
+        }
+    }
+
+    let queryPlanner = getQueryPlanner(explain);
+    return getWinningSBEPlan(queryPlanner);
 }
 
 /**

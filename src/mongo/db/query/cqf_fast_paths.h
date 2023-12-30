@@ -59,6 +59,11 @@ struct ExecTreeGeneratorParams {
     const UUID collectionUuid;
     PlanYieldPolicy* yieldPolicy;
     const BSONObj& filter;
+    const std::vector<FieldRef> projectFields;
+    // If 'true' there is a projection then skip all fast paths but 'EmptyQueryExecTreeGenerator'.
+    const bool projExists;
+    // If 'false' there exists a non-simple projection. Shortcut for 'EmptyQueryExecTreeGenerator'.
+    const bool projSupported;
 };
 
 using ExecTreeResult = std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>;

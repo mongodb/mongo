@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/query/cqf_fast_paths.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -43,14 +44,20 @@ namespace mongo::optimizer::fast_path {
 namespace {
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/exec/sbe"};
 
-ExecTreeGeneratorParams makeParams(const BSONObj& filter) {
+ExecTreeGeneratorParams makeParams(const BSONObj& filter,
+                                   std::vector<FieldRef> fields,
+                                   const bool projExists,
+                                   const bool projSupported) {
     const auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
-    return {collUuid, nullptr, filter};
+    return {collUuid, nullptr, filter, std::move(fields), projExists, projSupported};
 }
 
 void verifySbePlan(unittest::GoldenTestContext& gctx,
                    const std::string& name,
-                   const BSONObj& filter) {
+                   const BSONObj& filter,
+                   std::vector<FieldRef> fields = {},
+                   const bool projExists = false,
+                   const bool projSupported = true) {
     auto& stream = gctx.outStream();
 
     stream << std::endl;
@@ -59,7 +66,7 @@ void verifySbePlan(unittest::GoldenTestContext& gctx,
     stream << "filter = " << filter.toString() << std::endl;
     stream << "-- OUTPUT:" << std::endl;
 
-    auto params = makeParams(filter);
+    auto params = makeParams(filter, std::move(fields), projExists, projSupported);
     auto [sbePlan, data] = getFastPathExecTreeForTest(std::move(params));
 
     sbe::DebugPrinter printer;
@@ -171,6 +178,81 @@ TEST(FastPathPlanGeneration, SinglePredicateOnTopLevelField) {
     {
         auto filter = BSON("a" << BSON("$lte" << MAXKEY));
         verifySbePlan(gctx, "$lte MaxKey", filter);
+    }
+}
+
+TEST(FastPathPlanGeneration, EmptyQueryWithProjection) {
+    unittest::GoldenTestContext gctx{&goldenTestConfig};
+    gctx.printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
+
+    FieldRef idFieldRef{"_id"_sd};
+    FieldRef topLevelFieldRef{"x"_sd};
+    FieldRef dottedFieldRef{"x.y"_sd};
+    FieldRef deeplyNestedFieldRef{"x.y.z.a.b.c"_sd};
+
+    {
+        auto filter = fromjson(R"({})");
+        std::vector<FieldRef> fields{topLevelFieldRef};
+        verifySbePlan(
+            gctx, "Empty query with top-lv projection", filter, std::move(fields), true, true);
+    }
+
+    {
+        auto filter = fromjson(R"({})");
+        std::vector<FieldRef> fields{idFieldRef};
+        verifySbePlan(
+            gctx, "Empty query with _id projection", filter, std::move(fields), true, true);
+    }
+
+    {
+        auto filter = fromjson(R"({})");
+        std::vector<FieldRef> fields{idFieldRef, topLevelFieldRef};
+        verifySbePlan(
+            gctx, "Empty query with top-lv-id projection", filter, std::move(fields), true, true);
+    }
+
+    {
+        auto filter = fromjson(R"({})");
+        std::vector<FieldRef> fields{dottedFieldRef};
+        verifySbePlan(gctx,
+                      "Empty query with dotted-field projection",
+                      filter,
+                      std::move(fields),
+                      true,
+                      true);
+    }
+
+    {
+        auto filter = fromjson(R"({})");
+        std::vector<FieldRef> fields{dottedFieldRef, idFieldRef};
+        verifySbePlan(gctx,
+                      "Empty query with dotted-field-id projection",
+                      filter,
+                      std::move(fields),
+                      true,
+                      true);
+    }
+
+    {
+        auto filter = fromjson(R"({})");
+        std::vector<FieldRef> fields{deeplyNestedFieldRef};
+        verifySbePlan(gctx,
+                      "Empty query with long-dotted-field projection",
+                      filter,
+                      std::move(fields),
+                      true,
+                      true);
+    }
+
+    {
+        auto filter = fromjson(R"({})");
+        std::vector<FieldRef> fields{deeplyNestedFieldRef, idFieldRef};
+        verifySbePlan(gctx,
+                      "Empty query with long-dotted-field-id projection",
+                      filter,
+                      std::move(fields),
+                      true,
+                      true);
     }
 }
 
