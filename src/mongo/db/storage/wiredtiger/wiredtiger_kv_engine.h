@@ -347,6 +347,11 @@ public:
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
     // held by this class
     int reconfigure(const char* str);
+    
+    // wiredtiger specific
+    // Calls WT_CONNECTION::get_configuration on the underlying WT_CONNECTION
+    // held by this class
+    const char* get_configuration();
 
     WT_CONNECTION* getConnection() {
         return _conn;

@@ -2155,6 +2155,10 @@ int WiredTigerKVEngine::reconfigure(const char* str) {
     return _conn->reconfigure(_conn, str);
 }
 
+const char * WiredTigerKVEngine::get_configuration() {
+    return _conn->get_configuration(_conn);
+}
+
 void WiredTigerKVEngine::_ensureIdentPath(StringData ident) {
     size_t start = 0;
     size_t idx;
