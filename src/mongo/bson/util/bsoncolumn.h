@@ -511,6 +511,20 @@ concept Appendable =
 /**
  * Interface to accept elements decoded from BSONColumn and materialize them
  * as Elements of user-defined type.
+ *
+ * This class will be used with decompress() and other methods of BSONColumn to efficiently produce
+ * values of the desired type (e.g., SBE values or BSONElements). The methods provided by
+ * implementors of this concept will be called from the main decompression loop, so they should be
+ * inlineable, and avoid branching and memory allocations when possible.
+ *
+ * The data types passed to the materialize() methods could be referencing memory on the stack
+ * (e.g., the pointer in a StringData instance) and so implementors should assume this data is
+ * ephemeral. The provided Allocator can be used to allocate memory with the lifetime of the
+ * BSONColumn instance.
+ *
+ * The exception to this rule is that BSONElements passed to the materialize() methods may be
+ * assumed to appear in decompressed form as-is in the BSONColumn binary data. As such they will
+ * have the same lifetime as the BSONColumn with no additional allocations required.
  */
 template <class T>
 concept Materializer = requires(T& t,

@@ -269,6 +269,7 @@ env.CppUnitTest(
         'sbe_window_test.cpp',
         'util/stage_results_printer_test.cpp',
         "values/block_test.cpp",
+        "values/bsoncolumn_materializer_test.cpp",
         'values/slot_printer_test.cpp',
         'values/row_test.cpp',
         "values/ts_block_test.cpp",
