@@ -139,7 +139,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 MONGO_FAIL_POINT_DEFINE(failAtCommitCreateCollectionCoordinator);
-
+MONGO_FAIL_POINT_DEFINE(hangBeforeCommitOnShardingCatalog);
 
 namespace mongo {
 
@@ -1770,6 +1770,11 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
     auto* opCtx = opCtxHolder.get();
     getForwardableOpMetadata().setOn(opCtx);
 
+    if (MONGO_unlikely(hangBeforeCommitOnShardingCatalog.shouldFail())) {
+        LOGV2(8363100, "Hanging due to hangBeforeCommitOnShardingCatalog fail point");
+        hangBeforeCommitOnShardingCatalog.pauseWhileSet();
+    }
+
     if (!_firstExecution) {
         _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
 
@@ -1805,14 +1810,15 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
                 _request.getDataShard(),
                 _doc.getShardIds());
             _initialChunks = createChunks(opCtx, shardKeyPattern, _uuid, splitPolicy, nss());
-        } catch (const DBException&) {
-            // If there is any error when re-calculating the initial chunk distribution, only create
-            // one chunk on the primary shard.
-            _initialChunks = createChunks(opCtx,
-                                          shardKeyPattern,
-                                          _uuid,
-                                          std::make_unique<SingleChunkOnPrimarySplitPolicy>(),
-                                          nss());
+        } catch (const DBException& ex) {
+            // If there is any error when re-calculating the initial chunk distribution, rollback
+            // the create collection coordinator. If an error happens during this pre-stage,
+            // although we are on a phase that we must always make progress, there is no way to
+            // commit with a corrupted chunk distribution. This situation is triggered by executing
+            // addZone and/or addShard violating the actual set of involved shards or the shard key
+            // selected.
+            triggerCleanup(opCtx, ex.toStatus());
+            MONGO_UNREACHABLE;
         }
     }
 
