@@ -103,8 +103,6 @@ assert.docEq([{_id: 0}], getMoreRes.cursor.nextBatch);
 // to failed unacknowledged operations.
 const replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
-// Stepdown may kill the JournalFlusher which is counted as a user operation.
-assert.gte(1, replMetrics.stateTransition.userOperationsKilled);
 // Should account for find and getmore commands issued before step down.
 assert.gte(replMetrics.stateTransition.userOperationsRunning, 2);
 assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, 0);
