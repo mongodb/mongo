@@ -1,5 +1,13 @@
 // Test --host with a replica set.
 // @tags: [requires_replication]
+if (_isWindows()) {
+    // Windows is prone to slow DNS resolution issues, which causes this test to fail
+    // even if the shell should eventually connect to the server. Since we are testing
+    // valid/invalid legacy shell options, it should be sufficient to test on other
+    // variants and reduce noise on Windows.
+    jsTest.log("Skipping test on Windows");
+    quit();
+}
 
 const replSetName = 'hostTestReplSetName';
 
