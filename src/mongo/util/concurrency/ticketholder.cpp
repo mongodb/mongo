@@ -40,9 +40,12 @@
 #include <iostream>
 
 #include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangTicketRelease);
 
 TicketHolder::~TicketHolder() = default;
 
@@ -144,6 +147,12 @@ boost::optional<Ticket> SemaphoreTicketHolder::waitForTicketUntil(OperationConte
 }
 
 void SemaphoreTicketHolder::release(AdmissionContext* admCtx, Ticket&& ticket) {
+    if (MONGO_unlikely(hangTicketRelease.shouldFail())) {
+        LOGV2(8435300,
+              "Hanging hangTicketRelease in release() due to 'hangTicketRelease' "
+              "failpoint");
+        hangTicketRelease.pauseWhileSet();
+    }
     check(sem_post(&_sem));
     ticket.release();
 }
@@ -241,6 +250,12 @@ boost::optional<Ticket> SemaphoreTicketHolder::waitForTicketUntil(OperationConte
 }
 
 void SemaphoreTicketHolder::release(AdmissionContext* admCtx, Ticket&& ticket) {
+    if (MONGO_unlikely(hangTicketRelease.shouldFail())) {
+        LOGV2(8435301,
+              "Hanging hangTicketRelease in release() due to 'hangTicketRelease' "
+              "failpoint");
+        hangTicketRelease.pauseWhileSet();
+    }
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _num++;
