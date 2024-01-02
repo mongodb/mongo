@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from helper import simulate_crash_restart
 from wtbackup import backup_base
 
 # test_backup18.py
@@ -111,6 +112,23 @@ class test_backup18(backup_base):
         config = 'incremental=(force_stop=true)'
         bkup_c = self.session.open_cursor('backup:', None, config)
         bkup_c.close()
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda:self.assertEquals(self.session.open_cursor('backup:query_id',
+            None, None), 0), msg)
+
+        # Open up an incremental backup cursor again.
+        config = 'incremental=(enabled,this_id="ID1")'
+        bkup_c = self.session.open_cursor('backup:', None, config)
+        bkup_c.close()
+        expect = ["ID1"]
+        self.id_check(expect)
+
+        # Force stop, and then simulate a crash. On restart, the incremental should not be
+        # configured.
+        config = 'incremental=(force_stop=true)'
+        bkup_c = self.session.open_cursor('backup:', None, config)
+        bkup_c.close()
+        simulate_crash_restart(self, ".", "RESTART")
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.assertEquals(self.session.open_cursor('backup:query_id',
             None, None), 0), msg)
