@@ -740,7 +740,10 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     AuthorizationSession::get(newClient.get())->grantInternalAuthorization(newClient.get());
     AlternativeClientRegion acr(newClient);
 
-    auto newOpCtxHolder = cc().makeOperationContext();
+    auto newOpCtxHolder = CancelableOperationContext(
+        cc().makeOperationContext(),
+        opCtx->getCancellationToken(),
+        Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
     auto newOpCtx = newOpCtxHolder.get();
     newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
