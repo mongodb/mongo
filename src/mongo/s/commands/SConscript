@@ -299,7 +299,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
         '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
-        '$BUILD_DIR/mongo/s/sharding_mongos_test_fixture',
+        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         '$BUILD_DIR/mongo/s/vector_clock_mongos',
         '$BUILD_DIR/mongo/transport/service_executor',
         'cluster_commands',

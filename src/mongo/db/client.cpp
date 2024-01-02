@@ -199,26 +199,6 @@ Client* ThreadClient::get() const {
     return &cc();
 }
 
-AlternativeClientRegion::AlternativeClientRegion(ServiceContext::UniqueClient& clientToUse)
-    : _alternateClient(&clientToUse) {
-    invariant(clientToUse);
-    if (Client::getCurrent()) {
-        _originalClient = Client::releaseCurrent();
-    }
-    Client::setCurrent(std::move(*_alternateClient));
-}
-
-AlternativeClientRegion::~AlternativeClientRegion() {
-    *_alternateClient = Client::releaseCurrent();
-    if (_originalClient) {
-        Client::setCurrent(std::move(_originalClient));
-    }
-}
-
-Client* AlternativeClientRegion::get() const {
-    return &cc();
-}
-
 void Client::setTags(TagMask tagsToSet) {
     mutateTags([tagsToSet](TagMask originalTags) { return (originalTags | tagsToSet); });
 }

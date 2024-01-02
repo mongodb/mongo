@@ -54,7 +54,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/sharding_mongos_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"

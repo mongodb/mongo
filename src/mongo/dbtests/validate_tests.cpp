@@ -4813,7 +4813,7 @@ private:
     const bool _withSecondaryIndex;
 };
 
-class ValidateTests : public unittest::OldStyleSuiteSpecification {
+class ValidateTests : public OldStyleSuiteSpecification {
 public:
     ValidateTests() : OldStyleSuiteSpecification("validate_tests") {}
 
@@ -4895,7 +4895,7 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<ValidateTests> validateTests;
+OldStyleSuiteInitializer<ValidateTests> validateTests;
 
 }  // namespace ValidateTests
 }  // namespace mongo

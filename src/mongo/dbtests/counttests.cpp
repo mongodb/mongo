@@ -185,7 +185,7 @@ public:
     }
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("count") {}
 
@@ -197,7 +197,7 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace CountTests
 }  // namespace mongo

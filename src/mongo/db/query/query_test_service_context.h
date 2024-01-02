@@ -31,6 +31,8 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 
 namespace mongo {
 
@@ -44,14 +46,15 @@ public:
     QueryTestServiceContext();
     ~QueryTestServiceContext();
 
-    ServiceContext* getServiceContext() const;
-
-    Client* getClient() const;
-
     ServiceContext::UniqueOperationContext makeOperationContext();
 
+    ServiceContext::UniqueOperationContext makeOperationContext(LogicalSessionId lsid);
+
+    Client* getClient() const;
+    ServiceContext* getServiceContext();
+
 private:
-    ServiceContext::UniqueServiceContext _serviceContext;
+    ServiceContext::UniqueServiceContext _service;
     ServiceContext::UniqueClient _client;
 };
 

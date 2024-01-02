@@ -55,7 +55,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/query/establish_cursors.h"
-#include "mongo/s/sharding_mongos_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/framework.h"

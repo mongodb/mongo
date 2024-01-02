@@ -91,8 +91,10 @@
  * This file tests db/exec/sort.cpp
  */
 
-namespace mongo {
 namespace QueryStageSortTests {
+
+using std::set;
+using std::unique_ptr;
 
 namespace dps = ::mongo::dotted_path_support;
 
@@ -114,7 +116,7 @@ public:
         _client.insert(nss(), obj);
     }
 
-    void getRecordIds(std::set<RecordId>* out, const CollectionPtr& coll) {
+    void getRecordIds(set<RecordId>* out, const CollectionPtr& coll) {
         auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
@@ -125,10 +127,10 @@ public:
      * We feed a mix of (key, unowned, owned) data to the sort stage.
      */
     void insertVarietyOfObjects(WorkingSet* ws, QueuedDataStage* ms, const CollectionPtr& coll) {
-        std::set<RecordId> recordIds;
+        set<RecordId> recordIds;
         getRecordIds(&recordIds, coll);
 
-        std::set<RecordId>::iterator it = recordIds.begin();
+        set<RecordId>::iterator it = recordIds.begin();
 
         for (int i = 0; i < numObj(); ++i, ++it) {
             ASSERT_FALSE(it == recordIds.end());
@@ -148,7 +150,7 @@ public:
      * Wraps a sort stage with a QueuedDataStage in a plan executor. Returns the plan executor,
      * which is owned by the caller.
      */
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutorWithSortStage(
+    unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutorWithSortStage(
         const CollectionPtr& coll) {
         // Build the mock scan stage which feeds the data.
         auto ws = std::make_unique<WorkingSet>();
@@ -396,7 +398,7 @@ public:
         fillData();
 
         // The data we're going to later invalidate.
-        std::set<RecordId> recordIds;
+        set<RecordId> recordIds;
         getRecordIds(&recordIds, coll);
 
         auto exec = makePlanExecutorWithSortStage(coll);
@@ -423,7 +425,7 @@ public:
         // We should have read in the first 'firstRead' recordIds.  Invalidate the first one.
         // Since it's in the WorkingSet, the updates should not be reflected in the output.
         exec->saveState();
-        std::set<RecordId>::iterator it = recordIds.begin();
+        set<RecordId>::iterator it = recordIds.begin();
         Snapshotted<BSONObj> oldDoc = coll->docFor(&_opCtx, *it);
 
         const OID updatedId = oldDoc.value().getField("_id").OID();
@@ -528,7 +530,7 @@ public:
         fillData();
 
         // The data we're going to later invalidate.
-        std::set<RecordId> recordIds;
+        set<RecordId> recordIds;
         getRecordIds(&recordIds, coll);
 
         auto exec = makePlanExecutorWithSortStage(coll);
@@ -554,9 +556,8 @@ public:
 
         // We should have read in the first 'firstRead' recordIds.  Invalidate the first.
         exec->saveState();
-
         OpDebug* const nullOpDebug = nullptr;
-        std::set<RecordId>::iterator it = recordIds.begin();
+        set<RecordId>::iterator it = recordIds.begin();
         {
             WriteUnitOfWork wuow(&_opCtx);
             collection_internal::deleteDocument(
@@ -687,7 +688,7 @@ public:
     }
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_sort") {}
 
@@ -707,7 +708,6 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> queryStageSortTest;
+OldStyleSuiteInitializer<All> queryStageSortTest;
 
 }  // namespace QueryStageSortTests
-}  // namespace mongo

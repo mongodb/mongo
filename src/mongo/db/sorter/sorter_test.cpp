@@ -977,9 +977,9 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
 };
 }  // namespace SorterTests
 
-class SorterSuite : public unittest::OldStyleSuiteSpecification {
+class SorterSuite : public mongo::unittest::OldStyleSuiteSpecification {
 public:
-    SorterSuite() : unittest::OldStyleSuiteSpecification("sorter") {}
+    SorterSuite() : mongo::unittest::OldStyleSuiteSpecification("sorter") {}
 
     template <typename T>
     static constexpr uint64_t kMaxAsU64 = std::numeric_limits<T>::max();
@@ -1021,7 +1021,7 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<SorterSuite> extSortTests;
+mongo::unittest::OldStyleSuiteInitializer<SorterSuite> extSortTests;
 
 /**
  * This suite includes test cases for resumable index builds where the Sorter is reconstructed from

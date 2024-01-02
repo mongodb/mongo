@@ -1405,7 +1405,7 @@ public:
     }
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("repl") {}
 
@@ -1465,7 +1465,7 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace ReplTests
 }  // namespace repl

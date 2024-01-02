@@ -58,8 +58,10 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo {
 namespace DirectClientTests {
+
+using std::unique_ptr;
+using std::vector;
 
 const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
 
@@ -70,7 +72,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        std::vector<BSONObj> objs;
+        vector<BSONObj> objs;
         objs.push_back(BSON("_id" << 1));
         objs.push_back(BSON("_id" << 1));
         objs.push_back(BSON("_id" << 2));
@@ -176,7 +178,7 @@ public:
     }
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("directclient") {}
     void setupTests() {
@@ -190,7 +192,5 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> myall;
-
+OldStyleSuiteInitializer<All> myall;
 }  // namespace DirectClientTests
-}  // namespace mongo

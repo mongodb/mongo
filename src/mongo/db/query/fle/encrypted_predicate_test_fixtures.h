@@ -53,7 +53,7 @@ public:
     }
     EncryptedCollScanMode getEncryptedCollScanMode() const override {
         return _mode;
-    }
+    };
     ExpressionContext* getExpressionContext() const {
         return _expCtx.get();
     }
@@ -64,10 +64,11 @@ public:
 
     FLETagQueryInterface* getTagQueryInterface() const override {
         return nullptr;
-    }
+    };
     const NamespaceString& getESCNss() const override {
         return _mockNss;
     }
+
 
 private:
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
@@ -78,8 +79,11 @@ private:
 
 class EncryptedPredicateRewriteTest : public unittest::Test {
 public:
-    EncryptedPredicateRewriteTest();
-    ~EncryptedPredicateRewriteTest();
+    EncryptedPredicateRewriteTest() {}
+
+    void setUp() override {}
+
+    void tearDown() override {}
 
     static std::unique_ptr<MatchExpression> makeInExpr(StringData fieldname,
                                                        BSONArray disjunctions) {

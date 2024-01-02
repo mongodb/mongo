@@ -49,7 +49,16 @@
 #include "mongo/unittest/test_info.h"
 #include "mongo/unittest/unittest.h"
 
+using namespace mongo;
+using namespace mongo::unittest;
+
 namespace mongo {
+
+class BSONObj;
+class OperationContext;
+class Status;
+class StringData;
+
 namespace dbtests {
 
 /**

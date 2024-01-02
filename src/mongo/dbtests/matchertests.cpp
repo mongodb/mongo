@@ -62,8 +62,11 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
 
-namespace mongo {
 namespace MatcherTests {
+
+using std::cout;
+using std::endl;
+using std::string;
 
 class CollectionBase {
 public:
@@ -234,7 +237,7 @@ public:
         ASSERT(matcher.matches(fromjson("{ a:[ { b:1 } ] }"), &details));
         // The '0' entry of the 'a' array is matched.
         ASSERT(details.hasElemMatchKey());
-        ASSERT_EQUALS(std::string("0"), details.elemMatchKey());
+        ASSERT_EQUALS(string("0"), details.elemMatchKey());
     }
 };
 
@@ -285,8 +288,8 @@ public:
         long all =
             TimingBase<M>::dotime(BSON("x" << BSON("$all" << BSON_ARRAY(5))), BSON("x" << 5));
 
-        std::cout << "AllTiming " << demangleName(typeid(M)) << " normal: " << normal
-                  << " all: " << all << std::endl;
+        cout << "AllTiming " << demangleName(typeid(M)) << " normal: " << normal << " all: " << all
+             << endl;
     }
 };
 
@@ -321,7 +324,7 @@ public:
     }
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("matcher") {}
 
@@ -346,7 +349,6 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> dball;
+OldStyleSuiteInitializer<All> dball;
 
 }  // namespace MatcherTests
-}  // namespace mongo

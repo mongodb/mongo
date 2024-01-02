@@ -48,7 +48,6 @@
 #include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/timer.h"
 
-namespace mongo {
 namespace BasicTests {
 
 using std::cout;
@@ -340,7 +339,7 @@ public:
     }
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("basic") {}
 
@@ -366,7 +365,6 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace BasicTests
-}  // namespace mongo

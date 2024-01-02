@@ -65,6 +65,7 @@ env.Program(
         'clienttests.cpp',
         'commandtests.cpp',
         'counttests.cpp',
+        'cursor_manager_test.cpp',
         'dbhelper_tests.cpp',
         'dbtests.cpp',
         'deferred_writer.cpp',

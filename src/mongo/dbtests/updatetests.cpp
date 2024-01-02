@@ -61,8 +61,13 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
-namespace mongo {
 namespace UpdateTests {
+
+using std::numeric_limits;
+using std::string;
+using std::stringstream;
+using std::unique_ptr;
+using std::vector;
 
 namespace dps = ::mongo::dotted_path_support;
 
@@ -434,8 +439,8 @@ public:
 
 class MultiInc : public SetBase {
 public:
-    std::string s() {
-        std::stringstream ss;
+    string s() {
+        stringstream ss;
         FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setSort(BSON("_id" << 1));
         std::unique_ptr<DBClientCursor> cc = _client.find(std::move(findRequest));
@@ -1468,7 +1473,7 @@ public:
         objs[1] = fromjson("{a:3, b:1}");
         objs[2] = fromjson("{a:2, b:3}");
 
-        std::vector<BSONObj> workArea;
+        vector<BSONObj> workArea;
         for (int i = 0; i < 3; i++) {
             workArea.push_back(objs[i]);
         }
@@ -1489,7 +1494,7 @@ public:
         objs[1] = fromjson("{a:3, b:2}");
         objs[2] = fromjson("{b:3, a:2}");
 
-        std::vector<BSONObj> workArea;
+        vector<BSONObj> workArea;
         for (int i = 0; i < 3; i++) {
             workArea.push_back(objs[i]);
         }
@@ -1510,7 +1515,7 @@ public:
         objs[1] = fromjson("{c:1, a:3, b:2}");
         objs[2] = fromjson("{b:3, a:2}");
 
-        std::vector<BSONObj> workArea;
+        vector<BSONObj> workArea;
         for (int i = 0; i < 3; i++) {
             workArea.push_back(objs[i]);
         }
@@ -1531,7 +1536,7 @@ public:
         objs[1] = fromjson("{a:1}");
         objs[2] = fromjson("{a:3, b:3, c:3}");
 
-        std::vector<BSONObj> workArea;
+        vector<BSONObj> workArea;
         for (int i = 0; i < 3; i++) {
             workArea.push_back(objs[i]);
         }
@@ -1552,7 +1557,7 @@ public:
         objs[1] = fromjson("{a:{b:{c:1, d:2}}}");
         objs[2] = fromjson("{a:{b:{c:3, d:1}}}");
 
-        std::vector<BSONObj> workArea;
+        vector<BSONObj> workArea;
         for (int i = 0; i < 3; i++) {
             workArea.push_back(objs[i]);
         }
@@ -2009,8 +2014,8 @@ class inc6 : public Base {
     }
 
     void dotest() {
-        long long start = std::numeric_limits<int>::max() - 5;
-        long long max = std::numeric_limits<int>::max() + 5ll;
+        long long start = numeric_limits<int>::max() - 5;
+        long long max = numeric_limits<int>::max() + 5ll;
 
         _client.insert(nss(), BSON("x" << (int)start));
         ASSERT(findOne()["x"].type() == NumberInt);
@@ -2069,7 +2074,8 @@ class setswitchint : public Base {
 };
 }  // namespace basic
 
-class All : public unittest::OldStyleSuiteSpecification {
+
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("update") {}
     void setupTests() {
@@ -2189,7 +2195,6 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace UpdateTests
-}  // namespace mongo

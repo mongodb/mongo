@@ -63,14 +63,18 @@ namespace mongo {
  * ServiceContextMongoDTest inherit from ServiceContextTest, which overrides the global service
  * context.
  */
-class ShardingMongoDTestFixture : public ShardingTestFixtureCommon,
+class ShardingMongodTestFixture : public ShardingTestFixtureCommon,
                                   public ServiceContextMongoDTest {
 protected:
-    ShardingMongoDTestFixture(Options options = {}, bool allowMajorityReads = true);
-    ~ShardingMongoDTestFixture();
+    ShardingMongodTestFixture(Options options = {}, bool allowMajorityReads = true);
+    ~ShardingMongodTestFixture();
 
     void setUp() override;
     void tearDown() override;
+
+    // Set a catalog cache to be used when initializing the Grid. Must be called before
+    // initializeGlobalShardingStateForMongodForTest() in order to take effect.
+    void setCatalogCache(std::unique_ptr<CatalogCache> cache);
 
     /**
      * Initializes sharding components according to the cluster role in

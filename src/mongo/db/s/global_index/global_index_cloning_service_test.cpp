@@ -83,7 +83,6 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
-#include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -139,14 +138,21 @@ public:
                                                true /* allowMigrations */,
                                                chunks);
 
-        return ChunkManager(
-            _someDonorId,
-            DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-            ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rt)),
-            boost::none /* clusterTime */);
+        return ChunkManager(_someDonorId,
+                            DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
+                            _makeStandaloneRoutingTableHistory(std::move(rt)),
+                            boost::none /* clusterTime */);
     }
 
 private:
+    RoutingTableHistoryValueHandle _makeStandaloneRoutingTableHistory(
+        RoutingTableHistory rt) const {
+        const auto version = rt.getVersion();
+        return RoutingTableHistoryValueHandle(
+            std::make_shared<RoutingTableHistory>(std::move(rt)),
+            ComparableChunkVersion::makeComparableChunkVersion(version));
+    }
+
     const UUID _sourceUUID{UUID::gen()};
     const ShardId _someDonorId{"otherShardId"};
 };

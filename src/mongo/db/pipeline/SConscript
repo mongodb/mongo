@@ -77,12 +77,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/query/query_settings/query_settings',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/write_concern_options',
         'document_sources_idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -793,7 +791,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/s/query/router_exec_stage',
-        '$BUILD_DIR/mongo/s/sharding_mongos_test_fixture',
+        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'abt_translation',
         'accumulator',

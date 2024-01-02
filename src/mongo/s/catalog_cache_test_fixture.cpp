@@ -86,6 +86,7 @@ BSONObj makeCollectionAndIndexesAggregationResponse(const CollectionType& coll,
 
 void CoreCatalogCacheTestFixture::setUp() {
     ShardingTestFixture::setUp();
+    setRemote(HostAndPort("FakeRemoteClient:34567"));
     configTargeter()->setFindHostReturnValue(kConfigHostAndPort);
 
     CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());

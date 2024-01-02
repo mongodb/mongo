@@ -58,11 +58,11 @@ ScopedGlobalServiceContextForTest::~ScopedGlobalServiceContextForTest() {
     setGlobalServiceContext({});
 }
 
-ServiceContext* ScopedGlobalServiceContextForTest::getServiceContext() const {
+ServiceContext* ScopedGlobalServiceContextForTest::getServiceContext() {
     return getGlobalServiceContext();
 }
 
-Service* ScopedGlobalServiceContextForTest::getService() const {
+Service* ScopedGlobalServiceContextForTest::getService() {
     auto sc = getServiceContext();
     // Just pick any service. Giving priority to Shard.
     if (auto srv = sc->getService(ClusterRole::ShardServer))

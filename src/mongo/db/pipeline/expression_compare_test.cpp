@@ -507,7 +507,7 @@ class OptimizeGteReverse : public FieldRangeOptimize {
 
 }  // namespace Compare
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("expression") {}
 
@@ -557,7 +557,7 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> compareAll;
+OldStyleSuiteInitializer<All> compareAll;
 
 }  // namespace
 }  // namespace ExpressionTests

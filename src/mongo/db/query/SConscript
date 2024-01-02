@@ -338,7 +338,8 @@ env.Library(
         'query_test_service_context.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/session/logical_session_id',
         'collation/collator_factory_mock',
     ],
     LIBDEPS_PRIVATE=[

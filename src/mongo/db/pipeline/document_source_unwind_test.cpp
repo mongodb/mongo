@@ -844,7 +844,7 @@ TEST_F(UnwindStageTest, Redaction) {
         redact(*docSource));
 }
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("DocumentSourceUnwindTests") {}
 
@@ -871,7 +871,7 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace
 }  // namespace mongo

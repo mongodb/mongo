@@ -41,7 +41,6 @@ env.Library(
     target='lock_manager',
     source=[
         'd_concurrency.cpp',
-        'fill_locker_info.cpp',
         'lock_manager.cpp',
         'lock_manager_defs.cpp',
         'lock_stats.cpp',
@@ -80,7 +79,6 @@ env.CppUnitTest(
     target='lock_manager_test',
     source=[
         'fast_map_noalloc_test.cpp',
-        'fill_locker_info_test.cpp',
         'lock_manager_test.cpp',
         'lock_stats_test.cpp',
         'locker_impl_test.cpp',

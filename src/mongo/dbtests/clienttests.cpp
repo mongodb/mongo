@@ -61,12 +61,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 
-namespace mongo {
 namespace ClientTests {
+
+using std::string;
+using std::unique_ptr;
+using std::vector;
 
 class Base {
 public:
-    Base(std::string coll) : _nss(NamespaceString::createNamespaceString_forTest("test." + coll)) {
+    Base(string coll) : _nss(NamespaceString::createNamespaceString_forTest("test." + coll)) {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
@@ -174,7 +177,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        const std::string longs(770, 'c');
+        const string longs(770, 'c');
         for (int i = 0; i < 1111; ++i) {
             db.insert(nss(), BSON("a" << i << "b" << longs));
         }
@@ -183,7 +186,7 @@ public:
 
         FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setSort(BSON("a" << 1 << "b" << 1));
-        std::unique_ptr<DBClientCursor> c = db.find(std::move(findRequest));
+        unique_ptr<DBClientCursor> c = db.find(std::move(findRequest));
         ASSERT_EQUALS(1111, c->itcount());
     }
 };
@@ -261,7 +264,7 @@ public:
             ConnectionString s("a/b,c,d", ConnectionString::ConnectionType::kReplicaSet);
             ASSERT_EQUALS(ConnectionString::ConnectionType::kReplicaSet, s.type());
             ASSERT_EQUALS("a", s.getSetName());
-            std::vector<HostAndPort> v = s.getServers();
+            vector<HostAndPort> v = s.getServers();
             ASSERT_EQUALS(3U, v.size());
             ASSERT_EQUALS("b", v[0].host());
             ASSERT_EQUALS("c", v[1].host());
@@ -402,7 +405,7 @@ public:
     }
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("client") {}
 
@@ -425,7 +428,5 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> all;
-
+OldStyleSuiteInitializer<All> all;
 }  // namespace ClientTests
-}  // namespace mongo

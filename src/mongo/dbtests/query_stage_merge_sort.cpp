@@ -81,8 +81,12 @@
  * This file tests db/exec/merge_sort.cpp
  */
 
-namespace mongo {
 namespace QueryStageMergeSortTests {
+
+using std::make_unique;
+using std::set;
+using std::string;
+using std::unique_ptr;
 
 class QueryStageMergeSortTestBase {
 public:
@@ -128,7 +132,7 @@ public:
         _client.update(nss(), predicate, update);
     }
 
-    void getRecordIds(std::set<RecordId>* out, const CollectionPtr& coll) {
+    void getRecordIds(set<RecordId>* out, const CollectionPtr& coll) {
         auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
@@ -195,7 +199,7 @@ public:
         addIndex(secondIndex);
         CollectionPtr coll = ctx.getCollection();
 
-        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
@@ -209,7 +213,7 @@ public:
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
 
-        std::unique_ptr<FetchStage> fetchStage =
+        unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
         // Must fetch if we want to easily pull out an obj.
         auto statusWithPlanExecutor =
@@ -264,7 +268,7 @@ public:
         addIndex(secondIndex);
         auto coll = ctx.getCollection();
 
-        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
@@ -277,8 +281,8 @@ public:
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
-        std::unique_ptr<FetchStage> fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+        unique_ptr<FetchStage> fetchStage =
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -331,7 +335,7 @@ public:
         addIndex(secondIndex);
         auto coll = ctx.getCollection();
 
-        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.dedup = false;
@@ -345,8 +349,8 @@ public:
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
-        std::unique_ptr<FetchStage> fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+        unique_ptr<FetchStage> fetchStage =
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -402,7 +406,7 @@ public:
         addIndex(secondIndex);
         auto coll = ctx.getCollection();
 
-        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:-1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << -1);
@@ -419,8 +423,8 @@ public:
         params.bounds.startKey = objWithMaxKey(1);
         params.bounds.endKey = objWithMinKey(1);
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
-        std::unique_ptr<FetchStage> fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+        unique_ptr<FetchStage> fetchStage =
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -474,7 +478,7 @@ public:
         addIndex(secondIndex);
         auto coll = ctx.getCollection();
 
-        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
@@ -489,8 +493,8 @@ public:
         params.bounds.startKey = BSON("" << 51 << "" << MinKey);
         params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
-        std::unique_ptr<FetchStage> fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+        unique_ptr<FetchStage> fetchStage =
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -527,7 +531,7 @@ public:
             wuow.commit();
         }
 
-        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by foo:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("foo" << 1);
@@ -538,7 +542,7 @@ public:
 
         for (int i = 0; i < numIndices; ++i) {
             // 'a', 'b', ...
-            std::string index(1, 'a' + i);
+            string index(1, 'a' + i);
             insert(BSON(index << 1 << "foo" << i));
 
             indexSpec[i] = BSON(index << 1 << "foo" << 1);
@@ -550,8 +554,8 @@ public:
             ms->addChild(
                 std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
         }
-        std::unique_ptr<FetchStage> fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
+        unique_ptr<FetchStage> fetchStage =
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -567,7 +571,7 @@ public:
             BSONObj obj;
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
             ASSERT_EQUALS(i, obj["foo"].numberInt());
-            std::string index(1, 'a' + i);
+            string index(1, 'a' + i);
             ASSERT_EQUALS(1, obj[index].numberInt());
         }
 
@@ -592,7 +596,7 @@ public:
         // Sort by foo:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("foo" << 1);
-        auto ms = std::make_unique<MergeSortStage>(_expCtx.get(), msparams, &ws);
+        auto ms = make_unique<MergeSortStage>(_expCtx.get(), msparams, &ws);
 
         // Index 'a'+i has foo equal to 'i'.
 
@@ -600,7 +604,7 @@ public:
         BSONObj indexSpec[numIndices];
         for (int i = 0; i < numIndices; ++i) {
             // 'a', 'b', ...
-            std::string index(1, 'a' + i);
+            string index(1, 'a' + i);
             insert(BSON(index << 1 << "foo" << i));
 
             indexSpec[i] = BSON(index << 1 << "foo" << 1);
@@ -613,10 +617,10 @@ public:
             ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, &ws, nullptr));
         }
 
-        std::set<RecordId> recordIds;
+        set<RecordId> recordIds;
         getRecordIds(&recordIds, coll);
 
-        std::set<RecordId>::iterator it = recordIds.begin();
+        set<RecordId>::iterator it = recordIds.begin();
 
         // Get 10 results.  Should be getting results in order of 'recordIds'.
         int count = 0;
@@ -630,7 +634,7 @@ public:
             WorkingSetMember* member = ws.get(id);
             ASSERT_EQUALS(member->recordId, *it);
             BSONElement elt;
-            std::string index(1, 'a' + count);
+            string index(1, 'a' + count);
             ASSERT(member->getFieldDotted(index, &elt));
             ASSERT_EQUALS(1, elt.numberInt());
             ASSERT(member->getFieldDotted("foo", &elt));
@@ -659,7 +663,7 @@ public:
             ASSERT_EQ(member->getState(), WorkingSetMember::RID_AND_IDX);
             ASSERT(member->hasRecordId());
             ASSERT(!member->hasObj());
-            std::string index(1, 'a' + count);
+            string index(1, 'a' + count);
             BSONElement elt;
             ASSERT_TRUE(member->getFieldDotted(index, &elt));
             ASSERT_EQUALS(1, elt.numberInt());
@@ -687,7 +691,7 @@ public:
             WorkingSetMember* member = ws.get(id);
             ASSERT_EQUALS(member->recordId, *it);
             BSONElement elt;
-            std::string index(1, 'a' + count);
+            string index(1, 'a' + count);
             ASSERT_TRUE(member->getFieldDotted(index, &elt));
             ASSERT_EQUALS(1, elt.numberInt());
             ASSERT(member->getFieldDotted("foo", &elt));
@@ -720,7 +724,7 @@ public:
 
         std::set<RecordId> rids;
         getRecordIds(&rids, coll);
-        std::set<RecordId>::iterator it = rids.begin();
+        set<RecordId>::iterator it = rids.begin();
 
         WorkingSet ws;
         WorkingSetMember* member;
@@ -827,7 +831,7 @@ public:
         addIndex(secondIndex);
         auto coll = ctx.getCollection();
 
-        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1, d:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1 << "d" << 1);
@@ -898,7 +902,7 @@ public:
         addIndex(secondIndex);
         auto coll = ctx.getCollection();
 
-        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         // Sort by c:1, d:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1 << "d" << 1);
@@ -949,7 +953,7 @@ public:
     }
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_merge_sort_test") {}
 
@@ -967,7 +971,6 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> queryStageMergeSortTest;
+OldStyleSuiteInitializer<All> queryStageMergeSortTest;
 
 }  // namespace QueryStageMergeSortTests
-}  // namespace mongo

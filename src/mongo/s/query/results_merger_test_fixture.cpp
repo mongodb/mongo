@@ -53,6 +53,8 @@ const NamespaceString ResultsMergerTestFixture::kTestNss =
 void ResultsMergerTestFixture::setUp() {
     ShardingTestFixture::setUp();
 
+    setRemote(HostAndPort("ClientHost", 12345));
+
     configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
     std::vector<ShardType> shards;

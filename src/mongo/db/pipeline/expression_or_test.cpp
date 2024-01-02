@@ -394,7 +394,7 @@ class NestedOne : public OptimizeBase {
     }
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("expression") {}
 
@@ -426,7 +426,7 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> myAll;
+OldStyleSuiteInitializer<All> myAll;
 
 }  // namespace Or
 }  // namespace

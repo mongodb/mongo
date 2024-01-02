@@ -710,7 +710,7 @@ public:
     }
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_plan_ranking") {}
 
@@ -731,7 +731,7 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> planRankingAll;
+OldStyleSuiteInitializer<All> planRankingAll;
 
 }  // namespace PlanRankingTests
 }  // namespace mongo

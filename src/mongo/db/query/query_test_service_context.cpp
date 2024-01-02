@@ -39,24 +39,30 @@
 namespace mongo {
 
 QueryTestServiceContext::QueryTestServiceContext()
-    : _serviceContext(ServiceContext::make()),
-      _client(_serviceContext->getService()->makeClient("query_test")) {
-    ShardingState::create(getServiceContext());
+    : _service(ServiceContext::make()), _client(_service->getService()->makeClient("query_test")) {
     CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());
+    ShardingState::create(getServiceContext());
 }
 
 QueryTestServiceContext::~QueryTestServiceContext() = default;
 
-ServiceContext* QueryTestServiceContext::getServiceContext() const {
-    return _serviceContext.get();
+ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationContext() {
+    return getClient()->makeOperationContext();
+}
+
+ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationContext(
+    LogicalSessionId lsid) {
+    auto opCtx = makeOperationContext();
+    opCtx->setLogicalSessionId(lsid);
+    return opCtx;
 }
 
 Client* QueryTestServiceContext::getClient() const {
     return _client.get();
 }
 
-ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationContext() {
-    return getClient()->makeOperationContext();
+ServiceContext* QueryTestServiceContext::getServiceContext() {
+    return _service.get();
 }
 
 }  // namespace mongo

@@ -50,142 +50,139 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
+
 namespace {
 
-class SortKeyGeneratorStageTest : public unittest::Test {
-protected:
-    SortKeyGeneratorStageTest() {
-        ASSERT(haveClient());
+Value extractKeyFromKeyGenStage(SortKeyGeneratorStage* sortKeyGen, WorkingSet* workingSet) {
+    WorkingSetID wsid;
+    PlanStage::StageState state = PlanStage::NEED_TIME;
+    while (state == PlanStage::NEED_TIME) {
+        state = sortKeyGen->work(&wsid);
     }
 
-    Value extractKeyFromKeyGenStage(SortKeyGeneratorStage* sortKeyGen, WorkingSet* workingSet) {
-        WorkingSetID wsid;
-        PlanStage::StageState state = PlanStage::NEED_TIME;
-        while (state == PlanStage::NEED_TIME) {
-            state = sortKeyGen->work(&wsid);
-        }
+    ASSERT_EQ(state, PlanStage::ADVANCED);
+    auto wsm = workingSet->get(wsid);
+    return wsm->metadata().getSortKey();
+}
 
-        ASSERT_EQ(state, PlanStage::ADVANCED);
-        auto wsm = workingSet->get(wsid);
-        return wsm->metadata().getSortKey();
-    }
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
-    const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
+/**
+ * Given a JSON string 'sortSpec' representing a sort pattern, returns the corresponding sort key
+ * from 'doc', a JSON string representation of a user document. Does so using the SORT_KEY_GENERATOR
+ * stage.
+ *
+ * The 'collator' is used to specify the string comparison semantics that should be used when
+ * generating the sort key.
+ */
+Value extractSortKey(const char* sortSpec,
+                     const char* doc,
+                     std::unique_ptr<CollatorInterface> collator = nullptr) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    boost::intrusive_ptr<ExpressionContext> pExpCtx(
+        new ExpressionContext(opCtx.get(), std::move(collator), kTestNss));
 
-    /**
-     * Given a JSON string 'sortSpec' representing a sort pattern, returns the corresponding sort
-     * key from 'doc', a JSON string representation of a user document. Does so using the
-     * SORT_KEY_GENERATOR stage.
-     *
-     * The 'collator' is used to specify the string comparison semantics that should be used when
-     * generating the sort key.
-     */
-    Value extractSortKey(const char* sortSpec,
-                         const char* doc,
-                         std::unique_ptr<CollatorInterface> collator = nullptr) {
-        auto opCtx = cc().makeOperationContext();
-        boost::intrusive_ptr<ExpressionContext> pExpCtx(
-            new ExpressionContext(opCtx.get(), std::move(collator), kTestNss));
+    WorkingSet workingSet;
 
-        WorkingSet workingSet;
+    auto mockStage = std::make_unique<QueuedDataStage>(pExpCtx.get(), &workingSet);
+    auto wsid = workingSet.allocate();
+    auto wsm = workingSet.get(wsid);
+    wsm->doc = {SnapshotId(), Document{fromjson(doc)}};
+    wsm->transitionToOwnedObj();
+    mockStage->pushBack(wsid);
 
-        auto mockStage = std::make_unique<QueuedDataStage>(pExpCtx.get(), &workingSet);
-        auto wsid = workingSet.allocate();
-        auto wsm = workingSet.get(wsid);
-        wsm->doc = {SnapshotId(), Document{fromjson(doc)}};
-        wsm->transitionToOwnedObj();
-        mockStage->pushBack(wsid);
+    BSONObj sortPattern = fromjson(sortSpec);
+    SortKeyGeneratorStage sortKeyGen{
+        pExpCtx, std::move(mockStage), &workingSet, std::move(sortPattern)};
+    return extractKeyFromKeyGenStage(&sortKeyGen, &workingSet);
+}
 
-        BSONObj sortPattern = fromjson(sortSpec);
-        SortKeyGeneratorStage sortKeyGen{
-            pExpCtx, std::move(mockStage), &workingSet, std::move(sortPattern)};
-        return extractKeyFromKeyGenStage(&sortKeyGen, &workingSet);
-    }
+/**
+ * Given a JSON string 'sortSpec' representing a sort pattern, returns the corresponding sort key
+ * from the index key 'ikd'. Does so using the SORT_KEY_GENERATOR stage.
+ *
+ * The 'collator' is used to specify the string comparison semantics that should be used when
+ * generating the sort key.
+ */
+Value extractSortKeyCovered(const char* sortSpec,
+                            const IndexKeyDatum& ikd,
+                            std::unique_ptr<CollatorInterface> collator = nullptr) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    boost::intrusive_ptr<ExpressionContext> pExpCtx(
+        new ExpressionContext(opCtx.get(), std::move(collator), kTestNss));
 
-    /**
-     * Given a JSON string 'sortSpec' representing a sort pattern, returns the corresponding sort
-     * key from the index key 'ikd'. Does so using the SORT_KEY_GENERATOR stage.
-     *
-     * The 'collator' is used to specify the string comparison semantics that should be used when
-     * generating the sort key.
-     */
-    Value extractSortKeyCovered(const char* sortSpec,
-                                const IndexKeyDatum& ikd,
-                                std::unique_ptr<CollatorInterface> collator = nullptr) {
-        auto opCtx = cc().makeOperationContext();
-        boost::intrusive_ptr<ExpressionContext> pExpCtx(
-            new ExpressionContext(opCtx.get(), std::move(collator), kTestNss));
+    WorkingSet workingSet;
 
-        WorkingSet workingSet;
+    auto mockStage = std::make_unique<QueuedDataStage>(pExpCtx.get(), &workingSet);
+    auto wsid = workingSet.allocate();
+    auto wsm = workingSet.get(wsid);
+    wsm->keyData.push_back(ikd);
+    workingSet.transitionToRecordIdAndIdx(wsid);
+    mockStage->pushBack(wsid);
 
-        auto mockStage = std::make_unique<QueuedDataStage>(pExpCtx.get(), &workingSet);
-        auto wsid = workingSet.allocate();
-        auto wsm = workingSet.get(wsid);
-        wsm->keyData.push_back(ikd);
-        workingSet.transitionToRecordIdAndIdx(wsid);
-        mockStage->pushBack(wsid);
+    BSONObj sortPattern = fromjson(sortSpec);
+    SortKeyGeneratorStage sortKeyGen{
+        pExpCtx, std::move(mockStage), &workingSet, std::move(sortPattern)};
+    return extractKeyFromKeyGenStage(&sortKeyGen, &workingSet);
+}
 
-        BSONObj sortPattern = fromjson(sortSpec);
-        SortKeyGeneratorStage sortKeyGen{
-            pExpCtx, std::move(mockStage), &workingSet, std::move(sortPattern)};
-        return extractKeyFromKeyGenStage(&sortKeyGen, &workingSet);
-    }
-};
-
-TEST_F(SortKeyGeneratorStageTest, SortKeyNormal) {
+TEST(SortKeyGeneratorStageTest, SortKeyNormal) {
     Value actualOut = extractSortKey("{a: 1}", "{_id: 0, a: 5}", nullptr);
     Value expectedOut(5);
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyNormal2) {
+TEST(SortKeyGeneratorStageTest, SortKeyNormal2) {
     Value actualOut = extractSortKey("{a: 1}", "{_id: 0, z: 10, a: 6, b: 16}", nullptr);
     Value expectedOut(6);
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyString) {
+TEST(SortKeyGeneratorStageTest, SortKeyString) {
     Value actualOut =
         extractSortKey("{a: 1}", "{_id: 0, z: 'thing1', a: 'thing2', b: 16}", nullptr);
     Value expectedOut("thing2"_sd);
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyCompound) {
+TEST(SortKeyGeneratorStageTest, SortKeyCompound) {
     Value actualOut =
         extractSortKey("{a: 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", nullptr);
     Value expectedOut(std::vector<Value>{Value(99), Value(16)});
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyEmbedded) {
+TEST(SortKeyGeneratorStageTest, SortKeyEmbedded) {
     Value actualOut = extractSortKey(
         "{'c.a': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", nullptr);
     Value expectedOut = Value(std::vector<Value>{Value(4), Value(16)});
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyArray) {
+TEST(SortKeyGeneratorStageTest, SortKeyArray) {
     Value actualOut = extractSortKey(
         "{'c': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: [2, 4, 1], b: 16}", nullptr);
     Value expectedOut(std::vector<Value>{Value(1), Value(16)});
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyCoveredNormal) {
+TEST(SortKeyGeneratorStageTest, SortKeyCoveredNormal) {
     Value actualOut = extractSortKeyCovered(
         "{a: 1}", IndexKeyDatum(BSON("a" << 1), BSON("" << 5), 0, SnapshotId{}));
     Value expectedOut({Value(5)});
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyCoveredEmbedded) {
+TEST(SortKeyGeneratorStageTest, SortKeyCoveredEmbedded) {
     Value actualOut = extractSortKeyCovered(
         "{'a.c': 1}",
         IndexKeyDatum(BSON("a.c" << 1 << "c" << 1), BSON("" << 5 << "" << 6), 0, SnapshotId{}));
@@ -193,7 +190,7 @@ TEST_F(SortKeyGeneratorStageTest, SortKeyCoveredEmbedded) {
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyCoveredCompound) {
+TEST(SortKeyGeneratorStageTest, SortKeyCoveredCompound) {
     Value actualOut = extractSortKeyCovered(
         "{a: 1, c: 1}",
         IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), 0, SnapshotId{}));
@@ -201,7 +198,7 @@ TEST_F(SortKeyGeneratorStageTest, SortKeyCoveredCompound) {
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyCoveredCompound2) {
+TEST(SortKeyGeneratorStageTest, SortKeyCoveredCompound2) {
     Value actualOut = extractSortKeyCovered("{a: 1, b: 1}",
                                             IndexKeyDatum(BSON("a" << 1 << "b" << 1 << "c" << 1),
                                                           BSON("" << 5 << "" << 6 << "" << 4),
@@ -211,7 +208,7 @@ TEST_F(SortKeyGeneratorStageTest, SortKeyCoveredCompound2) {
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyCoveredCompound3) {
+TEST(SortKeyGeneratorStageTest, SortKeyCoveredCompound3) {
     Value actualOut =
         extractSortKeyCovered("{b: 1, c: 1}",
                               IndexKeyDatum(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1),
@@ -222,7 +219,7 @@ TEST_F(SortKeyGeneratorStageTest, SortKeyCoveredCompound3) {
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, ExtractStringSortKeyWithCollatorUsesComparisonKey) {
+TEST(SortKeyGeneratorStageTest, ExtractStringSortKeyWithCollatorUsesComparisonKey) {
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     Value actualOut =
@@ -231,7 +228,7 @@ TEST_F(SortKeyGeneratorStageTest, ExtractStringSortKeyWithCollatorUsesComparison
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, CollatorHasNoEffectWhenExtractingNonStringSortKey) {
+TEST(SortKeyGeneratorStageTest, CollatorHasNoEffectWhenExtractingNonStringSortKey) {
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     Value actualOut = extractSortKey("{a: 1}", "{_id: 0, z: 10, a: 6, b: 16}", std::move(collator));
@@ -239,7 +236,7 @@ TEST_F(SortKeyGeneratorStageTest, CollatorHasNoEffectWhenExtractingNonStringSort
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, CollatorAppliesWhenExtractingCoveredSortKeyString) {
+TEST(SortKeyGeneratorStageTest, CollatorAppliesWhenExtractingCoveredSortKeyString) {
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     Value actualOut = extractSortKeyCovered("{b: 1}",
@@ -253,13 +250,13 @@ TEST_F(SortKeyGeneratorStageTest, CollatorAppliesWhenExtractingCoveredSortKeyStr
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyGenerationForArraysChoosesCorrectKey) {
+TEST(SortKeyGeneratorStageTest, SortKeyGenerationForArraysChoosesCorrectKey) {
     Value actualOut = extractSortKey("{a: -1}", "{_id: 0, a: [1, 2, 3, 4]}", nullptr);
     Value expectedOut(4);
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, EnsureSortKeyGenerationForArraysRespectsCollation) {
+TEST(SortKeyGeneratorStageTest, EnsureSortKeyGenerationForArraysRespectsCollation) {
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     Value actualOut =
@@ -268,7 +265,7 @@ TEST_F(SortKeyGeneratorStageTest, EnsureSortKeyGenerationForArraysRespectsCollat
     ASSERT_VALUE_EQ(actualOut, expectedOut);
 }
 
-TEST_F(SortKeyGeneratorStageTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
+TEST(SortKeyGeneratorStageTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
     Value actualOut = extractSortKey("{'a.b': 1, 'a.c': -1}",
                                      "{_id: 0, a: [{b: 1, c: 0}, {b: 0, c: 3}, {b: 0, c: 1}]}",
                                      nullptr);

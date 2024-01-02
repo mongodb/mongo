@@ -48,7 +48,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/sharding_mongos_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 

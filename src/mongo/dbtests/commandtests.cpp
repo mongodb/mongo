@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -63,7 +64,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-namespace mongo {
+
+using namespace mongo;
+
 namespace CommandTests {
 
 TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
@@ -339,7 +342,7 @@ public:
     }
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("commands") {}
 
@@ -357,7 +360,5 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> all;
-
+OldStyleSuiteInitializer<All> all;
 }  // namespace CommandTests
-}  // namespace mongo

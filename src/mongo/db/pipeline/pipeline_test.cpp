@@ -156,7 +156,7 @@ void assertPipelineOptimizesAndSerializesTo(std::string inputPipeJson,
     boost::intrusive_ptr<ExpressionContextForTest> ctx =
         new ExpressionContextForTest(opCtx.get(), request);
     ctx->mongoProcessInterface = std::make_shared<StubExplainInterface>();
-    unittest::TempDir tempDir("PipelineTest");
+    TempDir tempDir("PipelineTest");
     ctx->tempDir = tempDir.path();
 
     // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
@@ -3598,7 +3598,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> getOptimizedPipeline(const BSONObj in
     boost::intrusive_ptr<ExpressionContextForTest> ctx =
         new ExpressionContextForTest(opCtx.get(), request);
     ctx->mongoProcessInterface = std::make_shared<StubExplainInterface>();
-    unittest::TempDir tempDir("PipelineTest");
+    TempDir tempDir("PipelineTest");
     ctx->tempDir = tempDir.path();
 
     auto outputPipe = Pipeline::parse(request.getPipeline(), ctx);
@@ -3746,7 +3746,7 @@ public:
         }
         AggregateCommandRequest request(kTestNss, rawPipeline);
         boost::intrusive_ptr<ExpressionContextForTest> ctx = createExpressionContext(request);
-        unittest::TempDir tempDir("PipelineTest");
+        TempDir tempDir("PipelineTest");
         ctx->tempDir = tempDir.path();
         ctx->mongoProcessInterface =
             std::make_shared<Sharded::ShardMergerMongoProcessInterface>(getCatalogCacheMock());

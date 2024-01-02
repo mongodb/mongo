@@ -44,7 +44,7 @@
 #include "mongo/s/index_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/s/sharding_mongos_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/unittest/assert.h"

@@ -307,7 +307,7 @@ private:
     repl::ReplicationCoordinatorMock* _coordinatorMock;
 };
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("dbhelpers") {}
     void setupTests() {
@@ -316,7 +316,7 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> myall;
+OldStyleSuiteInitializer<All> myall;
 
 }  // namespace
 }  // namespace mongo

@@ -72,7 +72,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/sharding_mongos_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"

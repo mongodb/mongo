@@ -227,6 +227,7 @@ public:
     }
 
 private:
+    static constexpr int kNumPartitions = 16;
     friend class ClientCursorPin;
 
     // deregisterAndDestroyCursor deregisters the cursor from the manager's cursorMap, then safely
@@ -257,8 +258,6 @@ private:
         map->erase(cursor->cursorid());
     }
 
-    ClockSource* _preciseClockSource;
-
     // A CursorManager holds a pointer to all open ClientCursors. ClientCursors are owned by the
     // CursorManager, except when they are in use by a ClientCursorPin. When in use by a pin, an
     // unowned pointer remains to ensure they still receive kill notifications while in use.
@@ -283,6 +282,7 @@ private:
     // registering a cursor.
     mutable Mutex _opKeyMutex = MONGO_MAKE_LATCH("CursorManager::_opKeyMutex");
     stdx::unordered_map<OperationKey, CursorId, UUID::Hash> _opKeyMap;
-};
 
+    ClockSource* _preciseClockSource;
+};
 }  // namespace mongo

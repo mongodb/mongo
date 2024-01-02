@@ -74,7 +74,7 @@
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_gen.h"
-#include "mongo/s/sharding_mongos_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/assert.h"

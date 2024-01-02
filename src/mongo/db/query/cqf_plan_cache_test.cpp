@@ -31,10 +31,12 @@
  * This file contains tests for mongo/db/query/cqf_get_executor.h
  */
 
+
+#include "mongo/db/query/cqf_get_executor.h"
+
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/index_catalog_mock.h"
 #include "mongo/db/query/canonical_query_test_util.h"
-#include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -45,7 +47,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
-namespace {
 
 using namespace optimizer;
 
@@ -71,6 +72,9 @@ public:
 
 protected:
     void setUp() override {
+        _pushedServiceContext = hasGlobalServiceContext() ? getGlobalServiceContext() : nullptr;
+        setGlobalServiceContext(ServiceContext::make());
+
         shard_role_details::getLocker(opCtx())->lockGlobal(opCtx(), LockMode::MODE_X);
         CollectionCatalog::write(opCtx(), [this](CollectionCatalog& catalog) {
             catalog.registerCollection(
@@ -96,6 +100,8 @@ protected:
             catalog.deregisterCollection(opCtx(), _uuid, false, boost::none);
         });
         shard_role_details::getLocker(opCtx())->unlockGlobal();
+
+        setGlobalServiceContext(ServiceContext::UniqueServiceContext{_pushedServiceContext});
     }
 
     /**
@@ -111,6 +117,7 @@ private:
     CollectionPtr _collectionPtr;
     QueryHints _queryHints;
     RAIIServerParameterControllerForTest _featureFlagController;
+    ServiceContext* _pushedServiceContext;
 };
 
 TEST_F(CqfPlanCacheTest, CqfPlanCacheInsertTest) {
@@ -124,5 +131,4 @@ TEST_F(CqfPlanCacheTest, CqfPlanCacheInsertTest) {
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
 }
 
-}  // namespace
 }  // namespace mongo

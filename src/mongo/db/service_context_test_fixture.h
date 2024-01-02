@@ -79,10 +79,11 @@ class ScopedGlobalServiceContextForTest {
 public:
     /**
      * Returns a service context, which is only valid for this instance of the test.
+     * Must not be called before setUp or after tearDown.
      */
-    ServiceContext* getServiceContext() const;
+    ServiceContext* getServiceContext();
 
-    Service* getService() const;
+    Service* getService();
 
 protected:
     ScopedGlobalServiceContextForTest();
@@ -110,7 +111,6 @@ protected:
 private:
     ThreadClient _threadClient;
 };
-
 }  // namespace service_context_test
 
 using service_context_test::ScopedGlobalServiceContextForTest;

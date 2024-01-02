@@ -38,10 +38,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/concurrency/fill_locker_info.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
@@ -49,7 +49,6 @@
 
 namespace mongo {
 namespace {
-
 using LockerInfo = Locker::LockerInfo;
 using OneLock = Locker::OneLock;
 

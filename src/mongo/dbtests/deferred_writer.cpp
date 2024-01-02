@@ -394,7 +394,7 @@ private:
     static const int kDocsPerWorker = 100;
 };
 
-class DeferredWriterTests : public unittest::OldStyleSuiteSpecification {
+class DeferredWriterTests : public OldStyleSuiteSpecification {
 public:
     DeferredWriterTests() : OldStyleSuiteSpecification("deferred_writer_tests") {}
 
@@ -408,7 +408,7 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<DeferredWriterTests> deferredWriterTests;
+OldStyleSuiteInitializer<DeferredWriterTests> deferredWriterTests;
 
 }  // namespace deferred_writer_tests
 }  // namespace mongo

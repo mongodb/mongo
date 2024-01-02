@@ -163,14 +163,14 @@ private:
     bool _doThrow{false};
 };
 
-class ReshardingOplogApplierTest : public ShardingMongoDTestFixture {
+class ReshardingOplogApplierTest : public ShardingMongodTestFixture {
 public:
     const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
     const std::string kOriginalShardKey = "sk";
     const BSONObj kOriginalShardKeyPattern{BSON(kOriginalShardKey << 1)};
 
     void setUp() override {
-        ShardingMongoDTestFixture::setUp();
+        ShardingMongodTestFixture::setUp();
 
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         ShardingState::get(getServiceContext())
@@ -231,7 +231,7 @@ public:
         _cancelableOpCtxExecutor->shutdown();
         _cancelableOpCtxExecutor->join();
 
-        ShardingMongoDTestFixture::tearDown();
+        ShardingMongodTestFixture::tearDown();
     }
 
     class StaticCatalogClient final : public ShardingCatalogClientMock {

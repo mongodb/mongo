@@ -504,19 +504,20 @@ private:
  */
 class AlternativeClientRegion {
 public:
-    explicit AlternativeClientRegion(ServiceContext::UniqueClient& clientToUse);
-
-    ~AlternativeClientRegion();
-    AlternativeClientRegion(const AlternativeClientRegion&) = delete;
-    AlternativeClientRegion(AlternativeClientRegion&&) = delete;
-    void operator=(const AlternativeClientRegion&) = delete;
-
-    Client* get() const;
-    Client* operator->() const {
-        return get();
+    explicit AlternativeClientRegion(ServiceContext::UniqueClient& clientToUse)
+        : _alternateClient(&clientToUse) {
+        invariant(clientToUse);
+        if (Client::getCurrent()) {
+            _originalClient = Client::releaseCurrent();
+        }
+        Client::setCurrent(std::move(*_alternateClient));
     }
-    Client& operator*() const {
-        return *get();
+
+    ~AlternativeClientRegion() {
+        *_alternateClient = Client::releaseCurrent();
+        if (_originalClient) {
+            Client::setCurrent(std::move(_originalClient));
+        }
     }
 
 private:
@@ -524,9 +525,9 @@ private:
     ServiceContext::UniqueClient* const _alternateClient;
 };
 
+
 /** get the Client object for this thread. */
 Client& cc();
 
 bool haveClient();
-
 }  // namespace mongo

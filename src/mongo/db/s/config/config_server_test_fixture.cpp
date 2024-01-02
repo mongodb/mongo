@@ -99,7 +99,7 @@ ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly);
 }  // namespace
 
 ConfigServerTestFixture::ConfigServerTestFixture(Options options, bool setUpMajorityReads)
-    : ShardingMongoDTestFixture(std::move(options), setUpMajorityReads) {}
+    : ShardingMongodTestFixture(std::move(options), setUpMajorityReads) {}
 
 ConfigServerTestFixture::~ConfigServerTestFixture() = default;
 
@@ -111,7 +111,7 @@ void ConfigServerTestFixture::setUpAndInitializeConfigDb() {
 }
 
 void ConfigServerTestFixture::setUp() {
-    ShardingMongoDTestFixture::setUp();
+    ShardingMongodTestFixture::setUp();
 
     // TODO: SERVER-26919 set the flag on the mock repl coordinator just for the window where it
     // actually needs to bypass the op observer.
@@ -152,7 +152,7 @@ void ConfigServerTestFixture::tearDown() {
 
     CatalogCacheLoader::clearForTests(getServiceContext());
 
-    ShardingMongoDTestFixture::tearDown();
+    ShardingMongodTestFixture::tearDown();
 }
 
 std::unique_ptr<ShardingCatalogClient> ConfigServerTestFixture::makeShardingCatalogClient() {

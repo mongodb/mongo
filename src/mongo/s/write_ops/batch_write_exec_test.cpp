@@ -78,7 +78,7 @@
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/s/sharding_mongos_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
@@ -296,6 +296,7 @@ public:
 
     void setUp() override {
         ShardingTestFixture::setUp();
+        setRemote(HostAndPort("ClientHost", 12345));
 
         // Set up the RemoteCommandTargeter for the config shard
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
@@ -3173,6 +3174,7 @@ public:
 
     void setUp() override {
         ShardingTestFixture::setUp();
+        setRemote(HostAndPort("ClientHost", 12345));
 
         // Set up the RemoteCommandTargeter for the config shard
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
@@ -3306,6 +3308,8 @@ public:
 
     void setUp() override {
         BatchWriteExecTest::setUp();
+
+        setRemote(HostAndPort("ClientHost", 12345));
 
         // Set up the RemoteCommandTargeter for the config shard
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
@@ -3469,6 +3473,8 @@ public:
 
     void setUp() override {
         BatchWriteExecTest::setUp();
+
+        setRemote(HostAndPort("ClientHost", 12345));
 
         // Set up the RemoteCommandTargeter for the config shard
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);

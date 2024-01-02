@@ -15,10 +15,19 @@ env.SConscript(
 )
 
 env.Library(
-    target='collection_options',
+    target='clustered_collection_options',
     source=[
         'clustered_collection_options.idl',
         'clustered_collection_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
+
+env.Library(
+    target='collection_options',
+    source=[
         'collection_options.cpp',
         'collection_options.idl',
         'collection_options_validation.cpp',
@@ -27,6 +36,7 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_pre_and_post_images_options',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
+        'clustered_collection_options',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/common',
@@ -170,7 +180,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
@@ -182,6 +191,7 @@ env.Library(
         'index_catalog_entry.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
     ],

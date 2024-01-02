@@ -32,6 +32,7 @@
  * fetch so we cannot test it outside of a dbtest.
  */
 
+
 #include <cstddef>
 #include <memory>
 #include <set>
@@ -83,8 +84,11 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
-namespace mongo {
 namespace QueryStageAnd {
+
+using std::set;
+using std::shared_ptr;
+using std::unique_ptr;
 
 class QueryStageAndBase {
 public:
@@ -119,7 +123,7 @@ public:
         return params;
     }
 
-    void getRecordIds(std::set<RecordId>* out, const CollectionPtr& coll) {
+    void getRecordIds(set<RecordId>* out, const CollectionPtr& coll) {
         auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
@@ -247,10 +251,10 @@ public:
 
         // Save state and delete one of the read objects.
         ah->saveState();
-        std::set<RecordId> data;
+        set<RecordId> data;
         getRecordIds(&data, coll);
         size_t memUsageBefore = ah->getMemUsage();
-        for (std::set<RecordId>::const_iterator it = data.begin(); it != data.end(); ++it) {
+        for (set<RecordId>::const_iterator it = data.begin(); it != data.end(); ++it) {
             if (coll->docFor(&_opCtx, *it).value()["foo"].numberInt() == 15) {
                 remove(coll->docFor(&_opCtx, *it).value());
                 break;
@@ -334,7 +338,7 @@ public:
         // Delete 'deletedObj' from the collection.
         BSONObj deletedObj = BSON("_id" << 20 << "foo" << 20 << "bar" << 20 << "baz" << 20);
         ah->saveState();
-        std::set<RecordId> data;
+        set<RecordId> data;
         getRecordIds(&data, coll);
 
         size_t memUsageBefore = ah->getMemUsage();
@@ -974,7 +978,7 @@ public:
         ah->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, &ws, nullptr));
 
         // Get the set of RecordIds in our collection to use later.
-        std::set<RecordId> data;
+        set<RecordId> data;
         getRecordIds(&data, coll);
 
         // We're making an assumption here that happens to be true because we clear out the
@@ -1265,7 +1269,7 @@ public:
         CollectionPtr coll = ctx.getCollection();
 
         WorkingSet ws;
-        std::unique_ptr<AndSortedStage> as = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
+        unique_ptr<AndSortedStage> as = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
 
         // Scan over foo == 1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
@@ -1318,7 +1322,7 @@ public:
         CollectionPtr coll = ctx.getCollection();
 
         WorkingSet ws;
-        std::unique_ptr<AndSortedStage> as = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
+        unique_ptr<AndSortedStage> as = std::make_unique<AndSortedStage>(_expCtx.get(), &ws);
 
         // Scan over foo == 1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(BSON("foo" << 1), coll));
@@ -1347,7 +1351,7 @@ public:
 };
 
 
-class All : public unittest::OldStyleSuiteSpecification {
+class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_and") {}
 
@@ -1374,7 +1378,6 @@ public:
     }
 };
 
-unittest::OldStyleSuiteInitializer<All> queryStageAndAll;
+OldStyleSuiteInitializer<All> queryStageAndAll;
 
 }  // namespace QueryStageAnd
-}  // namespace mongo

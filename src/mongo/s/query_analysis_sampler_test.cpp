@@ -56,7 +56,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
-#include "mongo/s/sharding_mongos_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/stdx/future.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -421,6 +421,7 @@ public:
     void setUp() override {
         ShardingTestFixture::setUp();
         serverGlobalParams.clusterRole = ClusterRole::RouterServer;
+        setRemote(HostAndPort("ClientHost", 12345));
 
         // Set up the RemoteCommandTargeter for the config shard.
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);

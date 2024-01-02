@@ -65,10 +65,10 @@ const std::string kShardName("TestShard");
  * include the ShardingMongodOpObserver), writes to the 'admin.system.version' collection (and the
  * shardIdentity document specifically) will invoke the sharding initialization code.
  */
-class ShardingInitializationOpObserverTest : public ShardingMongoDTestFixture {
+class ShardingInitializationOpObserverTest : public ShardingMongodTestFixture {
 public:
     void setUp() override {
-        ShardingMongoDTestFixture::setUp();
+        ShardingMongodTestFixture::setUp();
 
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 

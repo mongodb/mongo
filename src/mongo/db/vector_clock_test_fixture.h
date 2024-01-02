@@ -47,9 +47,9 @@ class VectorClockMutable;
 /**
  * A test fixture that installs a VectorClock instance with a TimeProofService onto a service
  * context, in addition to the mock storage engine, network, and OpObserver provided by
- * ShardingMongoDTestFixture.
+ * ShardingMongodTestFixture.
  */
-class VectorClockTestFixture : public ShardingMongoDTestFixture {
+class VectorClockTestFixture : public ShardingMongodTestFixture {
 protected:
     VectorClockTestFixture();
     ~VectorClockTestFixture();

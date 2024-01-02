@@ -67,16 +67,16 @@ namespace {
 
 /**
  * Even though these tests are to exercise logic for plain replica set members, it uses
- * ShardingMongoDTestFixture as a convenient way to get the necessary support infrastructure (such
+ * ShardingMongodTestFixture as a convenient way to get the necessary support infrastructure (such
  * as a TaskExecutor with pool), while still being neither "config server" nor "shard server".
  */
-class VectorClockMongoDTest : public ShardingMongoDTestFixture {
+class VectorClockMongoDTest : public ShardingMongodTestFixture {
 protected:
     VectorClockMongoDTest()
-        : ShardingMongoDTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+        : ShardingMongodTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
 
     void setUp() override {
-        ShardingMongoDTestFixture::setUp();
+        ShardingMongodTestFixture::setUp();
 
         auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>(
             !getServiceContext()->getStorageEngine()->supportsReadConcernMajority());
@@ -97,7 +97,7 @@ protected:
     void tearDown() override {
         LogicalTimeValidator::get(getServiceContext())->shutDown();
 
-        ShardingMongoDTestFixture::tearDown();
+        ShardingMongodTestFixture::tearDown();
     }
 
     /**
