@@ -126,6 +126,7 @@ public:
 
     static GeoSpecifier parseGeoSpecifier(const BSONElement& elem);
     static GeoJSONType parseGeoJSONType(const BSONObj& obj);
+    static GeoJSONType geoJSONTypeStringToEnum(StringData type);
 
     // Legacy points can contain extra data as extra fields - these are valid to index
     // e.g. { x: 1, y: 1, z: 1 }

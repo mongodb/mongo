@@ -822,20 +822,23 @@ GeoParser::GeoJSONType GeoParser::parseGeoJSONType(const BSONObj& obj) {
     if (String != type.type()) {
         return GeoParser::GEOJSON_UNKNOWN;
     }
-    const string& typeString = type.String();
-    if (GEOJSON_TYPE_POINT == typeString) {
+    return geoJSONTypeStringToEnum(type.checkAndGetStringData());
+}
+
+GeoParser::GeoJSONType GeoParser::geoJSONTypeStringToEnum(StringData type) {
+    if (GEOJSON_TYPE_POINT == type) {
         return GeoParser::GEOJSON_POINT;
-    } else if (GEOJSON_TYPE_LINESTRING == typeString) {
+    } else if (GEOJSON_TYPE_LINESTRING == type) {
         return GeoParser::GEOJSON_LINESTRING;
-    } else if (GEOJSON_TYPE_POLYGON == typeString) {
+    } else if (GEOJSON_TYPE_POLYGON == type) {
         return GeoParser::GEOJSON_POLYGON;
-    } else if (GEOJSON_TYPE_MULTI_POINT == typeString) {
+    } else if (GEOJSON_TYPE_MULTI_POINT == type) {
         return GeoParser::GEOJSON_MULTI_POINT;
-    } else if (GEOJSON_TYPE_MULTI_LINESTRING == typeString) {
+    } else if (GEOJSON_TYPE_MULTI_LINESTRING == type) {
         return GeoParser::GEOJSON_MULTI_LINESTRING;
-    } else if (GEOJSON_TYPE_MULTI_POLYGON == typeString) {
+    } else if (GEOJSON_TYPE_MULTI_POLYGON == type) {
         return GeoParser::GEOJSON_MULTI_POLYGON;
-    } else if (GEOJSON_TYPE_GEOMETRY_COLLECTION == typeString) {
+    } else if (GEOJSON_TYPE_GEOMETRY_COLLECTION == type) {
         return GeoParser::GEOJSON_GEOMETRY_COLLECTION;
     }
     return GeoParser::GEOJSON_UNKNOWN;

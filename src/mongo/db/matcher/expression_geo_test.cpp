@@ -500,6 +500,10 @@ TEST(ExpressionGeoTest, RoundTripSerializeGeoExpressions) {
 
     assertRepresentativeGeoShapeIsStable(fromjson("{$geoIntersects: {$geometry: [0, 0]}}"),
                                          fromjson("{$geoIntersects: {$geometry: [1, 1]}}"));
+    // Test scenario with new $geometry query not specifying the geometry type.
+    assertRepresentativeGeoNearShapeIsStable(
+        fromjson("{$geoNear: { $geometry: {coordinates: [0, 10]}}}"),
+        fromjson("{$geoNear: { $geometry: {coordinates: [1, 1]}}}"));
 }
 
 }  // namespace mongo
