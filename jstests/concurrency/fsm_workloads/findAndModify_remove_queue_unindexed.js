@@ -10,6 +10,11 @@
  * trying to remove the same document from the queue.
  *
  * This workload was designed to reproduce SERVER-21434.
+ *
+ * @tags: [
+ *   # PM-1632 was delivered in 7.1.
+ *   requires_fcv_71,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {

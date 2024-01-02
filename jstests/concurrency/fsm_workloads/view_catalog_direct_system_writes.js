@@ -5,8 +5,10 @@
  * does so via direct writes to system.views instead of using the collMod or drop commands. Each
  * worker operates on their own view, built on a shared underlying collection.
  * @tags: [
- *  # `applyOps` is not supported in serverless.
- *  command_not_supported_in_serverless
+ *   # `applyOps` is not supported in serverless.
+ *   command_not_supported_in_serverless,
+ *   # Inserts directly into system.views using applyOps, which is not available on mongos.
+ *   assumes_against_mongod_not_mongos,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

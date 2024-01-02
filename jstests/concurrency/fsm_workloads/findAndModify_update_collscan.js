@@ -7,6 +7,11 @@
  * using either the $min or $max operator.
  *
  * Attempts to force a collection scan by not creating an index.
+ *
+ * @tags: [
+ *   # PM-1632 was delivered in 7.1.
+ *   requires_fcv_71
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/findAndModify_update.js";

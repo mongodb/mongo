@@ -13,7 +13,14 @@
  * but that only the _id index remains after (re-)converting
  * to a capped collection.
  *
- * @tags: [requires_collstats, requires_capped]
+ * @tags: [
+ *   # convertToCapped can't be run on sharded collections.
+ *   assumes_unsharded_collection,
+ *   # convertToCapped requires a global lock and any background operations on the database causes
+ *   # it to fail due to not finishing quickly enough.
+ *   incompatible_with_concurrency_simultaneous,
+ *   requires_collstats, requires_capped
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {

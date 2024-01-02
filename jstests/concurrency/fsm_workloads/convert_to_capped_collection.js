@@ -9,7 +9,15 @@
  * MongoDB raises the storage size of a capped collection
  * to an integer multiple of 256.
  *
- * @tags: [requires_collstats, requires_capped]
+ * @tags: [
+ *   # convertToCapped can't be run on sharded collections.
+ *   assumes_unsharded_collection,
+ *   # convertToCapped requires a global lock and any background operations on the database causes
+ *   # it to fail due to not finishing quickly enough.
+ *   incompatible_with_concurrency_simultaneous,
+ *   requires_collstats,
+ *   requires_capped
+ * ]
  */
 export const $config = (function() {
     // TODO: This workload may fail if an iteration multiplier is specified.

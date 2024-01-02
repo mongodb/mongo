@@ -5,16 +5,6 @@ selector:
   - jstests/concurrency/fsm_workloads/**/*.js
   - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
-  # SERVER-13116 distinct isn't sharding aware
-  - jstests/concurrency/fsm_workloads/distinct.js
-  - jstests/concurrency/fsm_workloads/distinct_noindex.js
-  - jstests/concurrency/fsm_workloads/distinct_projection.js
-
-  # Disabled due to SERVER-33753, '.count() without a predicate can be wrong on sharded
-  # collections'. This bug is problematic for these workloads because they assert on count()
-  # values:
-  - jstests/concurrency/fsm_workloads/agg_match.js
-
   # Disabled because MapReduce can lose cursors if the primary steps down.
   - jstests/concurrency/fsm_workloads/map_reduce_inline.js
   - jstests/concurrency/fsm_workloads/map_reduce_interrupt.js
@@ -42,20 +32,6 @@ selector:
   - jstests/concurrency/fsm_workloads/compact.js
   - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
-  # convertToCapped can't be run on mongos processes
-  - jstests/concurrency/fsm_workloads/convert_to_capped_collection.js
-  - jstests/concurrency/fsm_workloads/convert_to_capped_collection_index.js
-
-  # findAndModify requires a shard key
-  - jstests/concurrency/fsm_workloads/findAndModify_mixed_queue_unindexed.js
-  - jstests/concurrency/fsm_workloads/findAndModify_remove_queue_unindexed.js
-  - jstests/concurrency/fsm_workloads/findAndModify_update_collscan.js
-  - jstests/concurrency/fsm_workloads/findAndModify_update_queue.js
-  - jstests/concurrency/fsm_workloads/findAndModify_update_queue_unindexed.js
-
-  # remove cannot be {} for findAndModify
-  - jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js
-
   # can cause OOM kills on test hosts
   - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
 
@@ -70,16 +46,6 @@ selector:
   # The WTWriteConflictException failpoint is not supported on mongos.
   - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
-  # our .remove(query, {justOne: true}) calls lack shard keys
-  - jstests/concurrency/fsm_workloads/remove_single_document.js
-
-  # cannot use upsert command with $where with sharded collections
-  - jstests/concurrency/fsm_workloads/upsert_where.js
-
-  # stagedebug can only be run against a standalone mongod
-  - jstests/concurrency/fsm_workloads/yield_and_hashed.js
-  - jstests/concurrency/fsm_workloads/yield_and_sorted.js
-
   # TODO Undenylist (SERVER-38852).
   - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
   - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
@@ -90,9 +56,6 @@ selector:
   # Uses the same transaction id across different routers, which is not allowed because when either
   # router tries to commit, it may not know the full participant list.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
-
-  # Inserts directly into system.views using applyOps, which is not available on mongos.
-  - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
 
   # Time-series collections are not supported on mongos.
   - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
@@ -162,7 +125,6 @@ selector:
   - jstests/concurrency/fsm_workloads/view_catalog.js
   - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
   - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
-  - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
 
   # The auto_retry_on_network_error.js override needs to overwrite the response from drop on
   # NamespaceNotFound, and since this workload only creates and drops collections there isn't
@@ -193,6 +155,7 @@ selector:
 
   exclude_with_any_tags:
   - requires_non_retryable_writes
+  - assumes_against_mongod_not_mongos
   - assumes_balancer_off
   # Curop requires readConcern local.
   - uses_curop_agg_stage

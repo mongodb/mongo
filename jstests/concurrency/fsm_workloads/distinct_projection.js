@@ -4,6 +4,11 @@
  * Runs distinct, with a projection on an indexed field, and verifies the result.
  * The indexed field contains unique values.
  * Each thread operates on a separate collection.
+ *
+ * @tags: [
+ *   # TODO SERVER-13116: distinct isn't sharding aware
+ *   assumes_balancer_off,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/distinct.js";

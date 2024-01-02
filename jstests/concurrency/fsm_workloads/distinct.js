@@ -4,6 +4,11 @@
  * Runs distinct on an indexed field and verifies the result.
  * The indexed field contains unique values.
  * Each thread operates on a separate collection.
+ *
+ * @tags: [
+ *   # TODO SERVER-13116: distinct isn't sharding aware
+ *   assumes_balancer_off,
+ * ]
  */
 export const $config = (function() {
     var data = {numDocs: 1000, prefix: 'distinct_fsm', shardKey: {i: 1}};

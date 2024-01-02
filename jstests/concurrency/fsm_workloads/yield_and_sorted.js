@@ -3,6 +3,11 @@
  *
  * Intersperse queries which use the AND_SORTED stage with updates and deletes of documents they
  * may match.
+ *
+ * @tags: [
+ *   # stagedebug can only be run against a standalone mongod
+ *   assumes_against_mongod_not_mongos,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield_rooted_or.js";

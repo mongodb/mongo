@@ -2,6 +2,12 @@
  * agg_match.js
  *
  * Runs an aggregation with a $match that returns half the documents.
+ * @tags: [
+ *   # SERVER-33753, '.count() without a predicate can be wrong on sharded
+ *   # collections'. This bug is problematic for these workloads because they assert on count()
+ *   # values
+ *   assumes_unsharded_collection
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/agg_base.js";

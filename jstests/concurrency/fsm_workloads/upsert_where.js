@@ -4,8 +4,10 @@
  * Bulk inserts documents in batches of 100, randomly selects a document that doesn't exist and
  * updates it, and queries by the thread that created the documents to verify counts.
  * @tags: [
- *  # Uses $where operator
- *  requires_scripting,
+ *   # cannot use upsert command with $where with sharded collections
+ *   assumes_unsharded_collection,
+ *   # Uses $where operator
+ *   requires_scripting,
  * ]
  */
 

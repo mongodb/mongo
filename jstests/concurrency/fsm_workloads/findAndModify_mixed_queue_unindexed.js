@@ -12,6 +12,11 @@
  * write conflict because each is trying to update or remove the same document.
  *
  * This workload was designed to reproduce SERVER-21434.
+ *
+ * @tags: [
+ *   # PM-1632 was delivered in 7.1.
+ *   requires_fcv_71,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
