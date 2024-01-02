@@ -56,7 +56,6 @@ buildvariants:
   - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
-  - name: .timeseries_crud
     distros:
     - rhel80-medium
   - name: .resharding_fuzzer

@@ -56,4 +56,3 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: .ssl
   - name: .resharding_fuzzer
-  - name: .timeseries_crud
