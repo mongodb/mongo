@@ -1682,6 +1682,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         cpp_type = cpp_type_info.get_type_name()
 
         self._writer.write_line('std::vector<%s> values;' % (cpp_type))
+        self._writer.write_line('values.reserve(sequence.objs.size());')
         self._writer.write_empty_line()
 
         # TODO: add support for sequence length checks, today we allow an empty document sequence
