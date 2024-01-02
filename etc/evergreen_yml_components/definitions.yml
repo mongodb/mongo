@@ -2692,6 +2692,23 @@ tasks:
         ${additional_compile_targets|}
       task_compile_flags: >-
         PREFIX=dist-test
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/record_mongodb_server_version.sh"
+      - "./build/install/dist-test/bin/mongod"
+      - "./version_info_mongod.txt"
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/version_info_mongod.txt
+      remote_file: ${project}/${build_variant}/${version_id}/version-info-mongod-${task_id}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: mongod --version output
 
 - <<: *compile_dist_test
   name: compile_dist_test_future_git_tag_multiversion
