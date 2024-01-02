@@ -2409,6 +2409,7 @@ env.Program(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/signal_handlers',
         'traffic_reader',

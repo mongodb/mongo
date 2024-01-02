@@ -46,14 +46,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-
 namespace mongo {
-
-using std::string;
-
 namespace unittest {
-namespace moe = mongo::optionenvironment;
-
 namespace {
 boost::filesystem::path tempPathRoot;
 
@@ -113,7 +107,7 @@ TempDir::~TempDir() {
     }
 }
 
-void TempDir::setTempPath(string tempPath) {
+void TempDir::setTempPath(std::string tempPath) {
     setTempPathRoot(std::move(tempPath));
 }
 
