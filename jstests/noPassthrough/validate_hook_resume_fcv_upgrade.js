@@ -48,13 +48,12 @@ function runValidateHook(testCase) {
     }, testCase.conn.port);
 
     awaitShell();
-    const output = rawMongoProgramOutput();
 
     // We terminate the processes to ensure that the next call to rawMongoProgramOutput()
     // will return all of their output.
     testCase.teardown();
 
-    return output;
+    return rawMongoProgramOutput();
 }
 
 function testStandalone(additionalSetupFn, {
