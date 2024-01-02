@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/rpc/write_concern_error_gen.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/util/fail_point.h"
@@ -2414,8 +2415,7 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatch) 
     requests.emplace_back(&updateRequest);
     requests.emplace_back(&deleteRequest);
 
-    FailPoint* fp =
-        globalFailPointRegistry().find("hangBeforeCompletingWriteWithoutShardKeyWithId");
+    FailPoint* fp = globalFailPointRegistry().find("hangAfterCompletingWriteWithoutShardKeyWithId");
 
     for (auto bcRequest : requests) {
         auto timesEntered = fp->setMode(FailPoint::alwaysOn, 0);
@@ -2666,22 +2666,6 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatchRetr
                                  isNonTargetedWriteWithoutShardKeyWithExactId,
                                  chunkRange);
         }
-
-        void noteStaleShardResponse(OperationContext* opCtx,
-                                    const ShardEndpoint& endpoint,
-                                    const StaleConfigInfo& staleInfo) override {
-            _hasStaleShardResponse = true;
-        }
-
-        bool hasStaleShardResponse() override {
-            auto val = _hasStaleShardResponse;
-            // Mimics the targeter refresh before retry of batch.
-            _hasStaleShardResponse = false;
-            return val;
-        }
-
-    private:
-        bool _hasStaleShardResponse{false};
     };
 
     MultiShardTargeter multiShardNSTargeter(
@@ -2791,7 +2775,6 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatchRetr
         ASSERT_EQ(0, response.getN());
     }
 }
-
 
 /**
  * Tests the scenario where 1st shard returns non-retryable error, 2nd shard returns n = 1, 3rd
@@ -2912,8 +2895,7 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchNo
     requests.emplace_back(&updateRequest);
     requests.emplace_back(&deleteRequest);
 
-    FailPoint* fp =
-        globalFailPointRegistry().find("hangBeforeCompletingWriteWithoutShardKeyWithId");
+    FailPoint* fp = globalFailPointRegistry().find("hangAfterCompletingWriteWithoutShardKeyWithId");
 
     for (auto bcRequest : requests) {
         auto timesEntered = fp->setMode(FailPoint::alwaysOn, 0);
@@ -3040,22 +3022,6 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchRe
                                  isNonTargetedWriteWithoutShardKeyWithExactId,
                                  chunkRange);
         }
-
-        void noteStaleShardResponse(OperationContext* opCtx,
-                                    const ShardEndpoint& endpoint,
-                                    const StaleConfigInfo& staleInfo) override {
-            _hasStaleShardResponse = true;
-        }
-
-        bool hasStaleShardResponse() override {
-            bool val = _hasStaleShardResponse;
-            // Mimics the targeter refresh before retry of batch.
-            _hasStaleShardResponse = false;
-            return val;
-        }
-
-    private:
-        bool _hasStaleShardResponse{false};
     };
 
     MultiShardTargeter multiShardNSTargeter(
@@ -3161,6 +3127,120 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchRe
         ASSERT_FALSE(response.isErrDetailsSet());
         ASSERT_EQ(1, response.getN());
     }
+}
+
+/**
+ * Tests the scenario where all shards return non-retryable errors.
+ */
+TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyNonRetryableError) {
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithIdWithoutShardKey", true};
+
+    const static OID epoch = OID::gen();
+    const static Timestamp timestamp{2};
+
+    const NamespaceString kNss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        std::vector<ShardEndpoint> targetWriteOp(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
+            std::set<ChunkRange>* chunkRange = nullptr) const {
+            invariant(chunkRange == nullptr);
+            *isNonTargetedWriteWithoutShardKeyWithExactId = true;
+            return std::vector{ShardEndpoint(kShardName1,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {100, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                                             boost::none),
+                               ShardEndpoint(kShardName2,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {101, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                                             boost::none)};
+        }
+
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            return targetWriteOp(opCtx,
+                                 itemRef,
+                                 useTwoPhaseWriteProtocol,
+                                 isNonTargetedWriteWithoutShardKeyWithExactId,
+                                 chunkRange);
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        kNss,
+        {MockRange(ShardEndpoint(
+                       kShardName1,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {100, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none),
+                   BSON("x" << MINKEY),
+                   BSON("x" << 0)),
+         MockRange(ShardEndpoint(
+                       kShardName2,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {101, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none),
+                   BSON("x" << 0),
+                   BSON("x" << 100))});
+
+    BatchedCommandRequest updateRequest([&] {
+        write_ops::UpdateCommandRequest updateOp(kNss);
+        // Op style update.
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON("_id" << 1));
+        entry.setU(
+            write_ops::UpdateModification::parseFromClassicUpdate(BSON("$inc" << BSON("a" << 1))));
+        entry.setMulti(false);
+        updateOp.setUpdates({entry});
+        return updateOp;
+    }());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), multiShardNSTargeter, updateRequest, &response, &stats);
+
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+        ASSERT_EQUALS("update", request.cmdObj.firstElement().fieldNameStringData());
+        BatchedCommandResponse response;
+        response.addToErrDetails(
+            write_ops::WriteError(0, {ErrorCodes::UnknownError, "mock non-retryable error"}));
+        response.setStatus(Status::OK());
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+        ASSERT_EQUALS("update", request.cmdObj.firstElement().fieldNameStringData());
+        BatchedCommandResponse response;
+        response.addToErrDetails(
+            write_ops::WriteError(0, {ErrorCodes::UnknownError, "mock non-retryable error"}));
+        response.setStatus(Status::OK());
+        return response.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_TRUE(response.isErrDetailsSet());
+    ASSERT_EQ(0, response.getN());
 }
 
 /**

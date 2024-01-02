@@ -146,11 +146,6 @@ public:
         OperationContext* optCtx, const CannotImplicitlyCreateCollectionInfo& createInfo) override;
 
     /**
-     * Returns if _lastError is StaleConfig type.
-     */
-    bool hasStaleShardResponse() override;
-
-    /**
      * Replaces the targeting information with the latest information from the cache.  If this
      * information is stale WRT the noted stale responses or a remote refresh is needed due
      * to a targeting failure, will contact the config servers to reload the metadata.

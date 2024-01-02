@@ -144,8 +144,6 @@ public:
                                      const ShardEndpoint& endpoint,
                                      const StaleDbRoutingVersion& staleInfo) = 0;
 
-    virtual bool hasStaleShardResponse() = 0;
-
     /**
      * Informs the targeter of CannotImplicitlyCreateCollection responses for this collection from
      * an endpoint, with further information available in the returned createInfo.

@@ -54,6 +54,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangAfterCompletingWriteWithoutShardKeyWithId);
+
 bool isRetryErrCode(int errCode) {
     return errCode == ErrorCodes::StaleConfig || errCode == ErrorCodes::StaleDbVersion ||
         errCode == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
@@ -379,6 +381,9 @@ void WriteOp::noteWriteWithoutShardKeyWithIdResponse(
             }
         }
         noteWriteComplete(targetedWrite, bulkWriteReplyItem);
+        if (MONGO_unlikely(hangAfterCompletingWriteWithoutShardKeyWithId.shouldFail())) {
+            hangAfterCompletingWriteWithoutShardKeyWithId.pauseWhileSet();
+        }
     }
 }
 

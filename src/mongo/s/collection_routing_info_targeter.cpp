@@ -898,12 +898,6 @@ void CollectionRoutingInfoTargeter::noteCannotImplicitlyCreateCollectionResponse
     }
 }
 
-bool CollectionRoutingInfoTargeter::hasStaleShardResponse() {
-    return _lastError &&
-        (_lastError.value() == LastErrorType::kStaleShardVersion ||
-         _lastError.value() == LastErrorType::kStaleDbVersion);
-}
-
 bool CollectionRoutingInfoTargeter::refreshIfNeeded(OperationContext* opCtx) {
     // Did we have any stale config or targeting errors at all?
     if (!_lastError) {

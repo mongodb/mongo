@@ -142,11 +142,6 @@ public:
         // No-op
     }
 
-    bool hasStaleShardResponse() override {
-        // No-op
-        return false;
-    }
-
     bool refreshIfNeeded(OperationContext* opCtx) override {
         // No-op
         return false;
