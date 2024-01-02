@@ -321,7 +321,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
-        '$BUILD_DIR/mongo/client/sdam/sdam_test',
+        '$BUILD_DIR/mongo/client/sdam/sdam_test_util',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
@@ -375,7 +375,7 @@ if wiredtiger:
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/client/sdam/sdam',
-            '$BUILD_DIR/mongo/client/sdam/sdam_test',
+            '$BUILD_DIR/mongo/client/sdam/sdam_test_util',
             '$BUILD_DIR/mongo/db/auth/authmocks',
             '$BUILD_DIR/mongo/db/service_context_test_fixture',
             '$BUILD_DIR/mongo/db/write_concern_options',

@@ -551,7 +551,7 @@ public:
 
 }  // namespace FieldPath
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("expression") {}
 
@@ -579,7 +579,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> fieldPathAll;
+unittest::OldStyleSuiteInitializer<All> fieldPathAll;
 
 }  // namespace
 }  // namespace ExpressionTests

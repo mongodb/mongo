@@ -70,21 +70,21 @@ env.Library(
 sortExecutorEnv = env.Clone()
 sortExecutorEnv.InjectThirdParty(libraries=['snappy'])
 sortExecutorEnv.Library(
-    target="sort_executor",
+    target='sort_executor',
     source=[
-        "sort_executor.cpp",
-        "sort_key_comparator.cpp",
+        'sort_executor.cpp',
+        'sort_key_comparator.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/sort_pattern',
         '$BUILD_DIR/mongo/db/sorter/sorter_stats',
-        '$BUILD_DIR/mongo/db/storage/encryption_hooks',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/third_party/shim_snappy',
         'working_set',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/sorter/sorter_base',
+        '$BUILD_DIR/mongo/db/storage/encryption_hooks',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/third_party/shim_snappy',
     ],
 )
 

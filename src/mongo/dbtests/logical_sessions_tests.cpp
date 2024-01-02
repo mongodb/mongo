@@ -277,7 +277,7 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("logical_sessions") {}
 
@@ -288,7 +288,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> all;
+unittest::OldStyleSuiteInitializer<All> all;
 
 }  // namespace
 }  // namespace mongo

@@ -24,6 +24,7 @@ env.CppUnitTest(
         'cost_model_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
         '$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils',
         'query_cost_model',

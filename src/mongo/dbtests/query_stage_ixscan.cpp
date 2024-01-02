@@ -350,7 +350,7 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_ixscan") {}
 
@@ -363,7 +363,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> aueryStageIxscanAll;
+unittest::OldStyleSuiteInitializer<All> aueryStageIxscanAll;
 
 }  // namespace QueryStageIxscan
 }  // namespace mongo

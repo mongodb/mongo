@@ -278,7 +278,7 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_delete") {}
 
@@ -289,7 +289,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> all;
+unittest::OldStyleSuiteInitializer<All> all;
 
 }  // namespace QueryStageDelete
 }  // namespace mongo

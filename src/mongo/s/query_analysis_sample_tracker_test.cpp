@@ -39,9 +39,9 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
-#include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/clock_source.h"
@@ -58,15 +58,22 @@ const NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("tes
 
 static const std::string kCurrentOpDescFieldValue{"query analyzer"};
 
-class QueryAnalysisSampleTrackerTest : public ShardingTestFixtureCommon {
-public:
+class QueryAnalysisSampleTrackerTest : public ServiceContextTest {
+protected:
+    QueryAnalysisSampleTrackerTest() {
+        _opCtxHolder = makeOperationContext();
+    }
+
     /**
      * Run through sample counters refreshConfiguration and increment functions depending on
      * whether process is mongod or mongos.
      */
     void testRefreshConfigIncrementAndReport();
 
-protected:
+    OperationContext* operationContext() const {
+        return _opCtxHolder.get();
+    }
+
     Date_t now() {
         return getServiceContext()->getFastClockSource()->now();
     }
@@ -77,6 +84,9 @@ protected:
         NamespaceString::createNamespaceString_forTest("testDb", "testColl1");
     const UUID collUuid0 = UUID::gen();
     const UUID collUuid1 = UUID::gen();
+
+private:
+    ServiceContext::UniqueOperationContext _opCtxHolder;
 };
 
 void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {

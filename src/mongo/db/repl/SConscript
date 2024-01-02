@@ -626,6 +626,7 @@ env.Benchmark(
         'oplog_entry_bm.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         'oplog_entry',
     ],
 )

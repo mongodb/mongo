@@ -49,12 +49,12 @@
 namespace mongo {
 
 VectorClockTestFixture::VectorClockTestFixture()
-    : ShardingMongodTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+    : ShardingMongoDTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
 
 VectorClockTestFixture::~VectorClockTestFixture() = default;
 
 void VectorClockTestFixture::setUp() {
-    ShardingMongodTestFixture::setUp();
+    ShardingMongoDTestFixture::setUp();
 
     auto service = getServiceContext();
 
@@ -67,7 +67,7 @@ void VectorClockTestFixture::setUp() {
 
 void VectorClockTestFixture::tearDown() {
     _dbDirectClient.reset();
-    ShardingMongodTestFixture::tearDown();
+    ShardingMongoDTestFixture::tearDown();
 }
 
 VectorClockMutable* VectorClockTestFixture::resetClock() {

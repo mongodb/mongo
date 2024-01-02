@@ -177,6 +177,7 @@ env.CppUnitTest(
         'deadline_monitor_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         'scripting_common',
     ],
 )

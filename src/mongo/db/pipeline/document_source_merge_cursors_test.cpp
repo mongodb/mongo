@@ -83,7 +83,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -123,12 +123,10 @@ public:
 
     void setUp() override {
         ShardingTestFixture::setUp();
-        setRemote(HostAndPort("ClientHost", 12345));
+        configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
         _expCtx = makeExpCtx();
         _expCtx->mongoProcessInterface = std::make_shared<StubMongoProcessInterface>(executor());
-
-        configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
         std::vector<ShardType> shards;
         for (size_t i = 0; i < kTestShardIds.size(); i++) {

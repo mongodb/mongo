@@ -183,10 +183,11 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='optimizer_failure_test',
     source=[
-        "optimizer_failure_test.cpp",
+        'optimizer_failure_test.cpp',
     ],
     LIBDEPS=[
-        "unit_test_utils",
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        'unit_test_utils',
     ],
 )
 
@@ -196,6 +197,7 @@ env.Benchmark(
         'rewrites/path_lower_bm.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/unittest/unittest',
         'optimizer_rewrites',
         'unit_test_utils',

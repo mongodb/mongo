@@ -77,6 +77,8 @@ namespace mongo {
 namespace RollbackTests {
 namespace {
 
+using unittest::assertGet;
+
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
@@ -719,8 +721,7 @@ public:
     }
 };
 
-
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("rollback") {}
 
@@ -763,7 +764,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> all;
+unittest::OldStyleSuiteInitializer<All> all;
 
 }  // namespace RollbackTests
 }  // namespace mongo

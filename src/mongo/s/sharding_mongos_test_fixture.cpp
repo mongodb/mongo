@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/sharding_mongos_test_fixture.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -124,8 +124,7 @@ std::unique_ptr<ShardingTaskExecutor> makeShardingTestExecutor(
 ShardingTestFixture::ShardingTestFixture()
     : ShardingTestFixture(false /* withMockCatalogCache */) {}
 
-ShardingTestFixture::ShardingTestFixture(bool withMockCatalogCache)
-    : _transportSession(transport::MockSession::create(nullptr)) {
+ShardingTestFixture::ShardingTestFixture(bool withMockCatalogCache) {
     const auto service = getServiceContext();
 
     // Configure the service context
@@ -413,10 +412,6 @@ void ShardingTestFixture::expectFindSendBSONObjVector(const HostAndPort& configH
         ASSERT_EQ(request.dbname, DatabaseName::kConfig);
         return obj;
     });
-}
-
-void ShardingTestFixture::setRemote(const HostAndPort& remote) {
-    _transportSession = transport::MockSession::create(remote, SockAddr(), SockAddr(), nullptr);
 }
 
 void ShardingTestFixture::checkReadConcern(const BSONObj& cmdObj,

@@ -47,9 +47,9 @@ namespace mongo {
 
 /**
  * Test fixture for shard components, as opposed to config or mongos components. Provides a mock
- * network via ShardingMongodTestFixture.
+ * network via ShardingMongoDTestFixture.
  */
-class ShardServerTestFixture : public ShardingMongodTestFixture {
+class ShardServerTestFixture : public ShardingMongoDTestFixture {
 protected:
     ShardServerTestFixture(Options options = {}, bool setUpMajorityReads = true);
     ~ShardServerTestFixture();

@@ -101,7 +101,6 @@ env.Library(
     LIBDEPS=[
         'catalog/cannot_convert_index_to_unique_info',
         'repl/tenant_migration_errors',
-        'write_concern_options',
     ],
     LIBDEPS_PRIVATE=[
         'catalog/collection_uuid_mismatch_info',
@@ -393,17 +392,17 @@ env.Library(
         'mongod_options_storage.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
-        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
-        '$BUILD_DIR/mongo/db/repl/repl_settings',
-        '$BUILD_DIR/mongo/db/repl/replica_set_messages',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'auth/cluster_auth_mode',
         'global_settings',
+        'repl/repl_server_parameters',
+        'repl/repl_settings',
+        'repl/replica_set_messages',
         'server_base',
         'server_options_base',
         'server_options_servers',
+        'storage/storage_options',
     ],
 )
 
@@ -797,6 +796,7 @@ env.CppUnitTest(
         'client_out_of_line_executor_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         'client_out_of_line_executor',
     ],
 )
@@ -807,6 +807,7 @@ env.CppUnitTest(
         'mongod_options_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'mongod_options',
         'server_base',
@@ -1015,12 +1016,12 @@ env.CppUnitTest(
         'replica_set_endpoint_util_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/s/sharding_catalog_manager',
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        'auth/authmocks',
         'commands',
         'commands_test_example',
+        's/sharding_catalog_manager',
         'service_context_d_test_fixture',
         'shard_role_api',
     ],
@@ -1050,21 +1051,22 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
-        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/transaction/transaction_api',
+        'ops/write_ops_parsers',
+        'pipeline/pipeline',
+        'query/command_request_response',
+        'transaction/transaction_api',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/fle_crypto',
-        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
-        '$BUILD_DIR/mongo/db/query/query_request',
-        '$BUILD_DIR/mongo/db/session/logical_session_id',
         '$BUILD_DIR/mongo/executor/inline_executor',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         'dbdirectclient',
+        'query/collation/collator_factory_interface',
+        'query/query_request',
         'query_expressions',
+        'session/logical_session_id',
     ],
 )
 
@@ -1408,7 +1410,6 @@ env.Library(
         'repl/read_concern_args',
         'repl/speculative_majority_read_info',
         'stats/timer_stats',
-        'storage/storage_options',
     ],
     LIBDEPS_PRIVATE=[
         'commands/server_status_core',
@@ -1688,7 +1689,6 @@ execEnv.Library(
         'shared_request_handling',
         'stats/latency_server_stats',
         'stats/serveronly_stats',
-        'storage/storage_options',
         'update/update_driver',
     ],
     LIBDEPS_PRIVATE=[
@@ -1720,6 +1720,7 @@ execEnv.Library(
         'sorter/sorter_stats',
         'stats/resource_consumption_metrics',
         'storage/record_store_base',
+        'storage/storage_options',
         'timeseries/bucket_catalog/bucket_catalog',
         'timeseries/timeseries_conversion_util',
         'timeseries/timeseries_options',
@@ -2715,7 +2716,6 @@ env.Library(
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/mongo/transport/session_manager',
         '$BUILD_DIR/mongo/unittest/unittest',
@@ -2726,6 +2726,7 @@ env.Library(
         'catalog/database_holder',
         'op_observer/op_observer',
         'repl/replmocks',
+        'server_base',
         'service_context_d',
         'stats/top',
         'storage/storage_control',
@@ -2733,23 +2734,6 @@ env.Library(
         'storage/wiredtiger/storage_wiredtiger',
     ],
 )
-
-# TODO(SERVER-45266) This could be part of db_unittest_test but it needs to mutate
-# storageGlobalParams.
-env.CppUnitTest(
-    target='op_msg_fuzzer_fixture_test',
-    source=[
-        'op_msg_fuzzer_fixture_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/rpc/rpc',
-        'op_msg_fuzzer_fixture',
-    ],
-)
-
-envWithAsio = env.Clone()
-envWithAsio.InjectThirdParty(libraries=['asio'])
 
 env.Library(
     target='commands_test_example',
@@ -2762,6 +2746,23 @@ env.Library(
         'server_base',
     ],
 )
+
+# TODO(SERVER-45266) This could be part of db_unittest_test but it needs to mutate
+# storageGlobalParams.
+env.CppUnitTest(
+    target='op_msg_fuzzer_fixture_test',
+    source=[
+        'op_msg_fuzzer_fixture_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/rpc/rpc',
+        'op_msg_fuzzer_fixture',
+        'server_base',
+    ],
+)
+
+envWithAsio = env.Clone()
+envWithAsio.InjectThirdParty(libraries=['asio'])
 
 if wiredtiger:
     envWithAsio.CppUnitTest(
@@ -2776,6 +2777,7 @@ if wiredtiger:
             'collection_index_usage_tracker_test.cpp',
             'commands_test.cpp',
             'curop_test.cpp',
+            'cursor_manager_test.cpp',
             'd_concurrency_test.cpp',
             'database_name_test.cpp',
             'db_raii_multi_collection_test.cpp',
@@ -2804,6 +2806,7 @@ if wiredtiger:
             'operation_id_test.cpp',
             'operation_time_tracker_test.cpp',
             'persistent_task_store_test.cpp',
+            'query/fle/encrypted_predicate_test_fixtures.cpp',
             'query/fle/equality_predicate_test.cpp',
             'query/fle/query_rewriter_test.cpp',
             'query/fle/range_predicate_test.cpp',
@@ -2906,7 +2909,6 @@ if wiredtiger:
             'snapshot_window_options',
             'startup_recovery',
             'startup_warnings_mongod',
-            'stats/fill_locker_info',
             'storage/wiredtiger/storage_wiredtiger',
             'ttl_collection_cache',
             'ttl_d',

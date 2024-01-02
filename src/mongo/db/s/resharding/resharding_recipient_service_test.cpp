@@ -89,6 +89,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
+#include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -152,10 +153,11 @@ public:
                 "randomKey_1", BSON("randomKey" << 1), BSONObj(), Timestamp(1, 0), _sourceUUID));
 
         return CollectionRoutingInfo{
-            ChunkManager(_someDonorId,
-                         DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                         _makeStandaloneRoutingTableHistory(std::move(rt)),
-                         boost::none /* clusterTime */),
+            ChunkManager(
+                _someDonorId,
+                DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
+                ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rt)),
+                boost::none /* clusterTime */),
             ShardingIndexesCatalogCache(CollectionIndexes(_sourceUUID, Timestamp(1, 0)),
                                         std::move(shardingIndexesCatalogMap))};
     }
@@ -201,13 +203,6 @@ public:
                                 const NamespaceString& tempReshardingNss) override {}
 
 private:
-    RoutingTableHistoryValueHandle _makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {
-        const auto version = rt.getVersion();
-        return RoutingTableHistoryValueHandle(
-            std::make_shared<RoutingTableHistory>(std::move(rt)),
-            ComparableChunkVersion::makeComparableChunkVersion(version));
-    }
-
     const StringData _currentShardKey = "oldKey";
 
     const NamespaceString _sourceNss =

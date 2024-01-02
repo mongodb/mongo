@@ -88,10 +88,9 @@
 namespace mongo {
 namespace dbtests {
 namespace {
-const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
-}  // namespace
 
-namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+
 ServiceContext::ConstructorActionRegisterer registerWireSpec{
     "RegisterWireSpec", [](ServiceContext* service) {
         WireSpec::Specification spec;
@@ -111,7 +110,8 @@ ServiceContext::ConstructorActionRegisterer registerWireSpec{
 
         WireSpec::getWireSpec(service).initialize(std::move(spec));
     }};
-}
+
+}  // namespace
 
 Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, bool unique) {
     BSONObjBuilder specBuilder;
@@ -220,10 +220,6 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
     invariant(db == _clientContext->db());
 }
 
-}  // namespace dbtests
-}  // namespace mongo
-
-
 int dbtestsMain(int argc, char** argv) {
     ::mongo::setTestCommandsEnabled(true);
     ::mongo::TestingProctor::instance().setEnabled(true);
@@ -274,6 +270,9 @@ int dbtestsMain(int argc, char** argv) {
     return mongo::dbtests::runDbTests(argc, argv);
 }
 
+}  // namespace dbtests
+}  // namespace mongo
+
 #if defined(_WIN32)
 // In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
 // as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
@@ -281,10 +280,11 @@ int dbtestsMain(int argc, char** argv) {
 // and makes them available through the argv() and envp() members.  This enables dbtestsMain()
 // to process UTF-8 encoded arguments and environment variables without regard to platform.
 int wmain(int argc, wchar_t* argvW[]) {
-    quickExit(dbtestsMain(argc, WindowsCommandLine(argc, argvW).argv()));
+    mongo::quickExit(
+        mongo::dbtests::dbtestsMain(argc, mongo::WindowsCommandLine(argc, argvW).argv()));
 }
 #else
 int main(int argc, char* argv[]) {
-    quickExit(dbtestsMain(argc, argv));
+    mongo::quickExit(mongo::dbtests::dbtestsMain(argc, argv));
 }
 #endif

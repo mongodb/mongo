@@ -180,6 +180,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/auth/security_token',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/service_context',
@@ -199,6 +200,7 @@ env.Benchmark(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/rpc/message',

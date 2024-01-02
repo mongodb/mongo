@@ -49,20 +49,10 @@
 #include "mongo/s/catalog_cache_mock.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_test_fixture_common.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-
-class BSONObj;
-class ShardingCatalogClient;
-class CollectionType;
-class ShardRegistry;
-
-namespace transport {
-class TransportLayerMock;
-}  // namespace transport
 
 /**
  * Sets up the mocked out objects for testing the replica-set backed catalog manager and catalog
@@ -144,8 +134,6 @@ protected:
 
     void shutdownExecutor();
 
-    void setRemote(const HostAndPort& remote);
-
     /**
      * Checks that the given command has the expected settings for read after opTime.
      */
@@ -166,8 +154,6 @@ protected:
 
 private:
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;
-
-    std::shared_ptr<transport::Session> _transportSession;
 
     // For the Grid's fixed executor.
     std::shared_ptr<executor::TaskExecutor> _fixedExecutor;

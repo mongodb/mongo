@@ -410,7 +410,7 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_count") {}
 
@@ -425,7 +425,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> queryStageCountAll;
+unittest::OldStyleSuiteInitializer<All> queryStageCountAll;
 
 }  // namespace QueryStageCount
 }  // namespace mongo

@@ -211,6 +211,7 @@ if ssl_provider == 'openssl':
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/concurrency/lock_manager',
             '$BUILD_DIR/mongo/util/net/openssl_init',
             'jwt',
         ],
@@ -222,6 +223,8 @@ env.Benchmark(
         'crypto_bm.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/server_base',
         'fle_crypto',
         'sha_block_${MONGO_CRYPTO}',
     ],

@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/update/update_driver.h"
-
 #include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
 #include <map>
@@ -54,8 +52,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/update/update_driver.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/str.h"
@@ -63,7 +62,6 @@
 namespace mongo {
 namespace {
 
-using str::stream;
 using unittest::assertGet;
 
 write_ops::UpdateModification makeUpdateMod(const BSONObj& bson) {
@@ -214,11 +212,10 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
 // NONGOAL: Testing all query parsing and nesting combinations
 //
 
-class CreateFromQueryFixture : public mongo::unittest::Test {
+class CreateFromQueryFixture : public ServiceContextTest {
 public:
     CreateFromQueryFixture()
-        : _opCtx(_serviceContext.makeOperationContext()),
-          _driverOps(new UpdateDriver(new ExpressionContext(
+        : _driverOps(new UpdateDriver(new ExpressionContext(
               _opCtx.get(), nullptr, NamespaceString::createNamespaceString_forTest("foo")))),
           _driverRepl(new UpdateDriver(new ExpressionContext(
               _opCtx.get(), nullptr, NamespaceString::createNamespaceString_forTest("foo")))) {
@@ -243,8 +240,8 @@ public:
     }
 
 private:
-    QueryTestServiceContext _serviceContext;
-    ServiceContext::UniqueOperationContext _opCtx;
+    ServiceContext::UniqueOperationContext _opCtx{makeOperationContext()};
+
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> _arrayFilters;
     std::unique_ptr<UpdateDriver> _driverOps;
     std::unique_ptr<UpdateDriver> _driverRepl;
@@ -264,12 +261,12 @@ static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
                                  &simpleStringDataComparator);
     if (elA.type() != elB.type() || (!elA.isABSONObj() && eltCmp.evaluate(elA != elB))) {
-        FAIL(stream() << "element " << elA << " not equal to " << elB);
+        FAIL(str::stream() << "element " << elA << " not equal to " << elB);
     } else if (elA.type() == mongo::Array) {
         std::vector<BSONElement> elsA = elA.Array();
         std::vector<BSONElement> elsB = elB.Array();
         if (elsA.size() != elsB.size())
-            FAIL(stream() << "element " << elA << " not equal to " << elB);
+            FAIL(str::stream() << "element " << elA << " not equal to " << elB);
 
         std::vector<BSONElement>::iterator arrItA = elsA.begin();
         std::vector<BSONElement>::iterator arrItB = elsB.begin();
@@ -287,7 +284,7 @@ static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
  */
 static void assertSameFields(const BSONObj& docA, const BSONObj& docB) {
     if (docA.nFields() != docB.nFields())
-        FAIL(stream() << "document " << docA << " has different fields than " << docB);
+        FAIL(str::stream() << "document " << docA << " has different fields than " << docB);
 
     std::map<StringData, BSONElement> docAMap;
     BSONObjIterator itA(docA);
@@ -303,7 +300,7 @@ static void assertSameFields(const BSONObj& docA, const BSONObj& docB) {
         std::map<StringData, BSONElement>::iterator seenIt =
             docAMap.find(elB.fieldNameStringData());
         if (seenIt == docAMap.end())
-            FAIL(stream() << "element " << elB << " not found in " << docA);
+            FAIL(str::stream() << "element " << elB << " not found in " << docA);
 
         BSONElement elA = seenIt->second;
         assertSameElements(elA, elB);
@@ -573,7 +570,7 @@ TEST_F(CreateFromQuery, NotFullShardKeyRepl) {
         driverRepl().populateDocumentWithQueryFields(opCtx(), query, immutablePaths, doc()));
 }
 
-class ModifiedPathsTestFixture : public mongo::unittest::Test {
+class ModifiedPathsTestFixture : public unittest::Test {
 public:
     void runUpdate(mutablebson::Document* doc,
                    const write_ops::UpdateModification& updateSpec,

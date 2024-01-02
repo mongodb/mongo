@@ -28,14 +28,13 @@
  */
 
 
-#include "mongo/db/stats/fill_locker_info.h"
+#include "mongo/db/concurrency/fill_locker_info.h"
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <vector>
-
 
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_stats.h"

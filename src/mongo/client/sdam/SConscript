@@ -5,36 +5,28 @@ Import('env')
 env = env.Clone()
 
 env.Library(
-    target='sdam_configuration_parameters',
-    source=[
-        'sdam_configuration_parameters.idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
-    ],
-)
-
-env.Library(
     target='sdam',
     source=[
         'sdam_configuration.cpp',
+        'sdam_configuration_parameters.idl',
         'sdam_datatypes.cpp',
         'server_description.cpp',
+        'server_selector.cpp',
         'topology_description.cpp',
         'topology_listener.cpp',
-        'topology_state_machine.cpp',
         'topology_manager.cpp',
-        'server_selector.cpp',
+        'topology_state_machine.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/util/clock_sources',
-        'sdam_configuration_parameters',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -43,14 +35,14 @@ sdam_json_test = env.Program(
     source=[
         'sdam_json_test_runner.cpp',
     ],
-    AIB_COMPONENT="sdam-json-test",
+    AIB_COMPONENT='sdam-json-test',
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'json_test',
         'sdam',
-        'sdam_configuration_parameters',
-        'sdam_test',
+        'sdam_test_util',
     ],
 )[0]
 
@@ -59,14 +51,13 @@ server_selection_json_test = env.Program(
     source=[
         'server_selection_json_test_runner.cpp',
     ],
-    AIB_COMPONENT="server-selection-json-test",
+    AIB_COMPONENT='server-selection-json-test',
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'json_test',
         'sdam',
-        'sdam_configuration_parameters',
-        'sdam_test',
+        'sdam_test_util',
     ],
 )[0]
 
@@ -84,7 +75,7 @@ env.Library(
 )
 
 env.Library(
-    target='sdam_test',
+    target='sdam_test_util',
     source=[
         'mock_topology_manager.cpp',
         'server_description_builder.cpp',
@@ -98,49 +89,22 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='topology_description_test',
-    source=['topology_description_test.cpp'],
-    LIBDEPS=['sdam', 'sdam_test'],
-)
-
-env.CppUnitTest(
-    target='server_description_test',
-    source=['server_description_test.cpp'],
-    LIBDEPS=['sdam', 'sdam_test'],
-)
-
-env.CppUnitTest(
-    target='topology_manager_test',
-    source=['topology_manager_test.cpp'],
-    LIBDEPS=['sdam', 'sdam_test'],
-)
-
-env.CppUnitTest(
-    target='topology_listener_test',
-    source=['topology_listener_test.cpp'],
+    target='sdam_test',
+    source=[
+        'election_id_set_version_pair_test.cpp',
+        'server_description_test.cpp',
+        'server_selector_test.cpp',
+        'topology_description_test.cpp',
+        'topology_listener_test.cpp',
+        'topology_manager_test.cpp',
+        'topology_state_machine_test.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/client/replica_set_monitor_protocol_test_util',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         'sdam',
-        'sdam_test',
+        'sdam_test_util',
     ],
-)
-
-env.CppUnitTest(
-    target='server_selector_test',
-    source=['server_selector_test.cpp'],
-    LIBDEPS=[
-        'sdam',
-        'sdam_test',
-    ],
-)
-
-env.CppUnitTest(
-    target='topology_state_machine_test',
-    source=[
-        'election_id_set_version_pair_test.cpp',
-        'topology_state_machine_test.cpp',
-    ],
-    LIBDEPS=['sdam', 'sdam_test'],
 )

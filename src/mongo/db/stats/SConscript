@@ -130,17 +130,6 @@ env.Library(
 )
 
 env.Library(
-    target='fill_locker_info',
-    source=[
-        'fill_locker_info.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-    ],
-)
-
-env.Library(
     target='serveronly_stats',
     source=[
         'lock_server_status_section.cpp',
@@ -156,7 +145,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog',
-        'fill_locker_info',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         'top',
     ],
 )
@@ -174,7 +163,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog',
-        'fill_locker_info',
         'top',
     ],
 )
@@ -183,7 +171,6 @@ env.CppUnitTest(
     target='db_stats_test',
     source=[
         'api_version_metrics_test.cpp',
-        'fill_locker_info_test.cpp',
         'operation_latency_histogram_test.cpp',
         'resource_consumption_metrics_test.cpp',
         'timer_stats_test.cpp',
@@ -198,7 +185,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/shared_request_handling',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'api_version_metrics',
-        'fill_locker_info',
         'resource_consumption_metrics',
         'timer_stats',
         'top',

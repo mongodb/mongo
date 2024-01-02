@@ -56,6 +56,7 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
+namespace mongo {
 namespace IndexCatalogTests {
 namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
@@ -207,7 +208,7 @@ public:
     }
 };
 
-class IndexCatalogTests : public OldStyleSuiteSpecification {
+class IndexCatalogTests : public unittest::OldStyleSuiteSpecification {
 public:
     IndexCatalogTests() : OldStyleSuiteSpecification("indexcatalogtests") {}
     void setupTests() {
@@ -216,5 +217,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<IndexCatalogTests> indexCatalogTests;
+unittest::OldStyleSuiteInitializer<IndexCatalogTests> indexCatalogTests;
+
 }  // namespace IndexCatalogTests
+}  // namespace mongo

@@ -31,7 +31,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
-#include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"

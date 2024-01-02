@@ -710,7 +710,7 @@ public:
     }
 };
 
-class IndexUpdateTests : public OldStyleSuiteSpecification {
+class IndexUpdateTests : public unittest::OldStyleSuiteSpecification {
 public:
     IndexUpdateTests() : OldStyleSuiteSpecification("indexupdate") {}
 
@@ -751,7 +751,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<IndexUpdateTests> indexUpdateTests;
+unittest::OldStyleSuiteInitializer<IndexUpdateTests> indexUpdateTests;
 
 }  // namespace IndexUpdateTests
 }  // namespace mongo

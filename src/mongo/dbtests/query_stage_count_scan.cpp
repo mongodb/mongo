@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <memory>
 #include <string>
 #include <vector>
@@ -58,9 +57,8 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/intrusive_counter.h"
 
+namespace mongo {
 namespace QueryStageCountScan {
-
-using std::shared_ptr;
 
 class CountBase {
 public:
@@ -629,7 +627,7 @@ public:
     }
 };
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_count_scan") {}
 
@@ -647,6 +645,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> queryStageCountScanAll;
+unittest::OldStyleSuiteInitializer<All> queryStageCountScanAll;
 
 }  // namespace QueryStageCountScan
+}  // namespace mongo
