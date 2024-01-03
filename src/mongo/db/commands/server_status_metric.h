@@ -35,9 +35,14 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
+class Atomic64Metric;
+
+template <>
+struct BSONObjAppendFormat<Atomic64Metric> : FormatKind<NumberLong> {};
 
 class ServerStatusMetric {
 public:
@@ -227,6 +232,38 @@ public:
 
 private:
     Counter64& _counter;
+};
+
+/**
+ * Atomic wrapper for long long type for Metrics.  This is for values which are set rather than
+ * just incremented or decremented; if you want a counter, use Counter64 above.
+ */
+class Atomic64Metric {
+public:
+    /** Set _value to the max of the current or newMax. */
+    void setIfMax(long long newMax) {
+        /*  Note: compareAndSwap will load into val most recent value. */
+        for (long long val = _value.load(); val < newMax && !_value.compareAndSwap(&val, newMax);) {
+        }
+    }
+
+    /** store val into value. */
+    void set(long long val) {
+        _value.storeRelaxed(val);
+    }
+
+    /** Return the current value. */
+    long long get() const {
+        return _value.loadRelaxed();
+    }
+
+    /** TODO: SERVER-73806 Avoid implicit conversion to long long */
+    operator long long() const {
+        return get();
+    }
+
+private:
+    mongo::AtomicWord<long long> _value;
 };
 
 /**
