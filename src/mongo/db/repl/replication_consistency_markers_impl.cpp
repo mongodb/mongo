@@ -483,11 +483,10 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // entry (it can be momentarily between oplog entry timestamps), _lastNoHolesOplogTimestamp
     // tracks the oplog entry so as to ensure we send out all updates before desisting until new
     // operations occur.
-    OpTime opTime = fassert(4455502, OpTime::parseFromOplogEntry(truncateOplogEntryBSON.value()));
-    _lastNoHolesOplogTimestamp = opTime.getTimestamp();
     _lastNoHolesOplogOpTimeAndWallTime = fassert(
         4455501,
         OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(truncateOplogEntryBSON.value()));
+    _lastNoHolesOplogTimestamp = _lastNoHolesOplogOpTimeAndWallTime->opTime.getTimestamp();
 
     // Pass the _lastNoHolesOplogTimestamp timestamp down to the storage layer to prevent oplog
     // history lte to oplogTruncateAfterPoint from being entirely deleted. There should always be a

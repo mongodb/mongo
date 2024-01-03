@@ -114,20 +114,16 @@ BSONObj OpTime::asQuery() const {
 StatusWith<OpTimeAndWallTime> OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(
     const BSONObj& obj) {
 
-    auto opTimeStatus = OpTime::parseFromOplogEntry(obj);
+    try {
+        auto base = OpTimeAndWallTimeBase::parse(IDLParserContext("OpTimeAndWallTimeBase"), obj);
 
-    if (!opTimeStatus.isOK()) {
-        return opTimeStatus.getStatus();
+        auto opTime =
+            OpTime(base.getTimestamp(), base.getTerm().value_or(OpTime::kUninitializedTerm));
+
+        return OpTimeAndWallTime(opTime, base.getWall());
+    } catch (...) {
+        return exceptionToStatus();
     }
-
-    BSONElement wall;
-    auto wallStatus = bsonExtractTypedField(obj, kWallClockTimeFieldName, BSONType::Date, &wall);
-
-    if (!wallStatus.isOK()) {
-        return wallStatus;
-    }
-
-    return OpTimeAndWallTime(opTimeStatus.getValue(), wall.Date());
 }
 
 OpTimeAndWallTime OpTimeAndWallTime::parse(const BSONObj& obj) {

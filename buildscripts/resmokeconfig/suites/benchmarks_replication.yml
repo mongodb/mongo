@@ -8,6 +8,7 @@ selector:
   - build/install/bin/oplog_application_bm*
   - build/install/bin/oplog_applier_utils_bm*
   - build/install/bin/oplog_entry_bm*
+  - build/install/bin/replication_consistency_markers_impl_bm*
 
 executor:
   config: {}

@@ -49,3 +49,15 @@ structs:
                 type: long
                 optional: true # The term will no longer be optional, see SERVER-42258.
                 description: "The term of the primary that created the oplog entry"
+
+    OpTimeAndWallTimeBase:
+        description: "A document that stores OpTimeBase and wall clock time when the oplog entry was created"
+        strict: false
+        # Oplog Entries are checked by the oplogentry parser
+        unsafe_dangerous_disable_extra_field_duplicate_checks: true
+        chained_structs:
+            OpTimeBase: OpTimeBase
+        fields:
+            wall:
+                type: date
+                description: "The wall clock time when the oplog entry was created"
