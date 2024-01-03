@@ -401,7 +401,7 @@ void postVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
 
                 if (!spec->actions[i].isDrop()) {
                     auto typedSlot = ctx.slots->get(std::make_pair(PlanStageSlots::kField, name));
-                    funcArgs.emplace_back(typedSlot.slotId);
+                    funcArgs.emplace_back(typedSlot);
                 } else {
                     // If this field is a top-level drop, then we pass Nothing for the input field.
                     funcArgs.emplace_back(b.makeNothingConstant());

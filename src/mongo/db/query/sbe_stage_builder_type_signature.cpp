@@ -33,8 +33,17 @@ namespace mongo::stage_builder {
 
 TypeSignature getTypeSignature(sbe::value::TypeTags type) {
     uint8_t tagIndex = static_cast<uint8_t>(type);
-    return TypeSignature{1LL << tagIndex};
+    return TypeSignature{1ull << tagIndex};
 }
+
+TypeSignature TypeSignature::kAnyType = TypeSignature{TypeSignature::AllTypesTag{}};
+
+TypeSignature TypeSignature::kBlockType = getTypeSignature(sbe::value::TypeTags::valueBlock);
+
+TypeSignature TypeSignature::kCellType = getTypeSignature(sbe::value::TypeTags::cellBlock);
+
+TypeSignature TypeSignature::kAnyScalarType = TypeSignature::kAnyType.exclude(
+    getTypeSignature(sbe::value::TypeTags::cellBlock, sbe::value::TypeTags::valueBlock));
 
 // This constant signature holds all the types that have a BSON counterpart and can
 // represent a value stored in the database, excluding all the TypeTags that describe
@@ -68,15 +77,12 @@ TypeSignature TypeSignature::kAnyBSONType = getTypeSignature(sbe::value::TypeTag
                                                              sbe::value::TypeTags::bsonJavascript,
                                                              sbe::value::TypeTags::bsonDBPointer,
                                                              sbe::value::TypeTags::bsonCodeWScope);
-TypeSignature TypeSignature::kAnyScalarType = TypeSignature{~0}.exclude(
-    getTypeSignature(sbe::value::TypeTags::cellBlock, sbe::value::TypeTags::valueBlock));
+
 TypeSignature TypeSignature::kArrayType = getTypeSignature(sbe::value::TypeTags::Array,
                                                            sbe::value::TypeTags::ArraySet,
                                                            sbe::value::TypeTags::ArrayMultiSet,
                                                            sbe::value::TypeTags::bsonArray);
-TypeSignature TypeSignature::kBlockType = getTypeSignature(sbe::value::TypeTags::valueBlock);
 TypeSignature TypeSignature::kBooleanType = getTypeSignature(sbe::value::TypeTags::Boolean);
-TypeSignature TypeSignature::kCellType = getTypeSignature(sbe::value::TypeTags::cellBlock);
 TypeSignature TypeSignature::kDateTimeType =
     getTypeSignature(sbe::value::TypeTags::Date, sbe::value::TypeTags::Timestamp);
 TypeSignature TypeSignature::kNothingType = getTypeSignature(sbe::value::TypeTags::Nothing);
@@ -113,7 +119,7 @@ bool TypeSignature::canCompareWith(TypeSignature other) const {
 std::vector<sbe::value::TypeTags> getBSONTypesFromSignature(TypeSignature signature) {
     signature = signature.intersect(TypeSignature::kAnyBSONType);
     std::vector<sbe::value::TypeTags> tags;
-    for (size_t i = 0; i < sizeof(size_t) * 8; i++) {
+    for (size_t i = 0; i < sizeof(TypeSignature::typesMask) * 8; i++) {
         auto tag = static_cast<sbe::value::TypeTags>(i);
         if (getTypeSignature(tag).isSubset(signature)) {
             tags.push_back(tag);

@@ -47,7 +47,6 @@
 
 namespace mongo::stage_builder {
 class PlanStageSlots;
-struct TypedSlot;
 
 /**
  * This function generates an SbExpr that implements the filter expression represented by 'root'.

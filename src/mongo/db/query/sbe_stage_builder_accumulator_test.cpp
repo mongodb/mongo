@@ -2185,7 +2185,7 @@ public:
         auto exprs = stage_builder::buildCombinePartialAggregates(
             accStatement, {_inputSlotId}, boost::none, _state);
         ASSERT_EQ(exprs.size(), 1u);
-        _expr = exprs[0].extractExpr(_state).expr;
+        _expr = exprs[0].extractExpr(_state);
 
         return compileAggExpression(*_expr, &_aggAccessor);
     }
@@ -2572,7 +2572,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinWithCollation) 
     auto exprs = stage_builder::buildCombinePartialAggregates(
         accStatement, {_inputSlotId}, {_collatorSlotId}, _state);
     ASSERT_EQ(exprs.size(), 1u);
-    auto expr = exprs[0].extractExpr(_state).expr;
+    auto expr = exprs[0].extractExpr(_state);
 
     CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kReverseString};
     _collatorAccessor.reset(false,
@@ -2611,7 +2611,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxWithCollation) 
     auto exprs = stage_builder::buildCombinePartialAggregates(
         accStatement, {_inputSlotId}, {_collatorSlotId}, _state);
     ASSERT_EQ(exprs.size(), 1u);
-    auto expr = exprs[0].extractExpr(_state).expr;
+    auto expr = exprs[0].extractExpr(_state);
 
     CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kReverseString};
     _collatorAccessor.reset(false,
@@ -2719,7 +2719,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAddToSetWithCollat
     auto exprs = stage_builder::buildCombinePartialAggregates(
         accStatement, {_inputSlotId}, {_collatorSlotId}, _state);
     ASSERT_EQ(exprs.size(), 1u);
-    auto expr = exprs[0].extractExpr(_state).expr;
+    auto expr = exprs[0].extractExpr(_state);
 
     CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kToLowerString};
     _collatorAccessor.reset(false,
@@ -2919,12 +2919,12 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAvg) {
                                       << BSON_ARRAY(1 << 2 << 3ll << 4ll << 5.5 << 6.6)
                                       << BSON_ARRAY(1 << 2 << 3ll << 4ll << 5.5 << 6.6
                                                       << Decimal128(7) << Decimal128(8))));
-    auto doubleDoubleSumExpr = compileAggExpression(*exprs[0].getExpr(_state).expr, &_aggAccessor);
+    auto doubleDoubleSumExpr = compileAggExpression(*exprs[0].getExpr(_state), &_aggAccessor);
     aggregateAndAssertResults(
         inputTag, inputVal, expectedTag, expectedVal, doubleDoubleSumExpr.get());
 
     // Now compile the second expression and make sure it computes a simple sum.
-    auto simpleSumExpr = compileAggExpression(*exprs[1].getExpr(_state).expr, &_aggAccessor);
+    auto simpleSumExpr = compileAggExpression(*exprs[1].getExpr(_state), &_aggAccessor);
 
     auto inputValues = BSON_ARRAY(5 << 8 << 0 << 4);
     auto expectedAggStates = BSON_ARRAY(5 << 13 << 13 << 17);

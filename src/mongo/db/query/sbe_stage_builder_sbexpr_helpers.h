@@ -34,6 +34,69 @@
 #include "mongo/db/query/sbe_stage_builder_sbexpr.h"
 
 namespace mongo::stage_builder {
+using SbExprOptSbSlotPair = std::pair<SbExpr, boost::optional<sbe::value::SlotId>>;
+
+using SbExprOptSbSlotVector = std::vector<SbExprOptSbSlotPair>;
+
+namespace {
+template <typename SbExprOptSbSlotVector>
+inline void makeSbExprOptSbSlotVecHelper(SbExprOptSbSlotVector& result) {}
+
+template <typename... Ts>
+inline void makeSbExprOptSbSlotVecHelper(SbExprOptSbSlotVector& result, SbExpr expr, Ts&&... rest) {
+    result.emplace_back(std::move(expr), boost::none);
+    makeSbExprOptSbSlotVecHelper(result, std::forward<Ts>(rest)...);
+}
+
+template <typename... Ts>
+inline void makeSbExprOptSbSlotVecHelper(SbExprOptSbSlotVector& result,
+                                         std::pair<SbExpr, sbe::value::SlotId> p,
+                                         Ts&&... rest) {
+    result.emplace_back(std::move(p.first), boost::make_optional(p.second));
+    makeSbExprOptSbSlotVecHelper(result, std::forward<Ts>(rest)...);
+}
+
+template <typename... Ts>
+inline void makeSbExprOptSbSlotVecHelper(SbExprOptSbSlotVector& result,
+                                         std::pair<SbExpr, SbSlot> p,
+                                         Ts&&... rest) {
+    result.emplace_back(std::move(p.first), boost::make_optional(p.second.getId()));
+    makeSbExprOptSbSlotVecHelper(result, std::forward<Ts>(rest)...);
+}
+
+template <typename... Ts>
+inline void makeSbExprOptSbSlotVecHelper(SbExprOptSbSlotVector& result,
+                                         std::pair<SbExpr, boost::optional<sbe::value::SlotId>> p,
+                                         Ts&&... rest) {
+    result.emplace_back(std::move(p.first), p.second);
+    makeSbExprOptSbSlotVecHelper(result, std::forward<Ts>(rest)...);
+}
+
+template <typename... Ts>
+inline void makeSbExprOptSbSlotVecHelper(SbExprOptSbSlotVector& result,
+                                         std::pair<SbExpr, boost::optional<SbSlot>> p,
+                                         Ts&&... rest) {
+    result.emplace_back(std::move(p.first),
+                        p.second ? boost::make_optional(p.second->getId()) : boost::none);
+    makeSbExprOptSbSlotVecHelper(result, std::forward<Ts>(rest)...);
+}
+}  // namespace
+
+template <typename... Ts>
+auto makeSbExprOptSbSlotVec(Ts&&... pack) {
+    SbExprOptSbSlotVector v;
+    if constexpr (sizeof...(pack) > 0) {
+        v.reserve(sizeof...(Ts));
+        makeSbExprOptSbSlotVecHelper(v, std::forward<Ts>(pack)...);
+    }
+    return v;
+}
+
+/**
+ * SbExprBuilder is a helper class that offers numerous methods for building expressions. These
+ * methods take all take their input expressions in the form of SbExprs and return their result
+ * in the form of an SbExpr.
+ */
 class SbExprBuilder {
 public:
     using CaseValuePair = SbExpr::CaseValuePair;
@@ -147,11 +210,80 @@ public:
             getEPrimBinaryOp(logicOp), std::move(leaves), _state);
     }
 
-private:
+protected:
     std::unique_ptr<sbe::EExpression> extractExpr(SbExpr& e);
 
     sbe::EExpression::Vector extractExpr(SbExpr::Vector& sbExprs);
 
     StageBuilderState& _state;
+};
+
+/**
+ * The SbBuilder class extends SbExprBuilder with additional methods for creating SbStages.
+ */
+class SbBuilder : public SbExprBuilder {
+public:
+    SbBuilder(StageBuilderState& state, PlanNodeId nodeId)
+        : SbExprBuilder(state), _nodeId(nodeId) {}
+
+    inline PlanNodeId getNodeId() const {
+        return _nodeId;
+    }
+    inline void setNodeId(PlanNodeId nodeId) {
+        _nodeId = nodeId;
+    }
+
+    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
+                                                               SbExprOptSbSlotVector projects) {
+        return makeProjectImpl(std::move(stage), std::move(projects));
+    }
+
+    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
+                                                               const PlanStageSlots& outputs,
+                                                               SbExprOptSbSlotVector projects) {
+        return makeProjectImpl(std::move(stage), std::move(projects), &outputs);
+    }
+
+    template <typename... Args>
+    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
+                                                               SbExpr arg,
+                                                               Args&&... args) {
+        return makeProjectImpl(std::move(stage),
+                               makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...));
+    }
+
+    template <typename T, typename... Args>
+    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
+                                                               std::pair<SbExpr, T> arg,
+                                                               Args&&... args) {
+        return makeProjectImpl(std::move(stage),
+                               makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...));
+    }
+
+    template <typename... Args>
+    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
+                                                               const PlanStageSlots& outputs,
+                                                               SbExpr arg,
+                                                               Args&&... args) {
+        return makeProjectImpl(std::move(stage),
+                               makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...),
+                               &outputs);
+    }
+
+    template <typename T, typename... Args>
+    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
+                                                               const PlanStageSlots& outputs,
+                                                               std::pair<SbExpr, T> arg,
+                                                               Args&&... args) {
+        return makeProjectImpl(std::move(stage),
+                               makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...),
+                               &outputs);
+    }
+
+protected:
+    std::pair<SbStage, std::vector<SbSlot>> makeProjectImpl(
+        SbStage stage, SbExprOptSbSlotVector projects, const PlanStageSlots* outputs = nullptr);
+
+    PlanNodeId _nodeId;
 };
 }  // namespace mongo::stage_builder

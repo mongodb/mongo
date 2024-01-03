@@ -126,15 +126,6 @@ buildSearchMetadataExecutorSBE(OperationContext* opCtx,
                                PlanYieldPolicySBE* yieldPolicy);
 
 /**
- * Associate a slot with a signature representing all the possible types that the value stored at
- * runtime in the slot can assume.
- */
-struct TypedSlot {
-    sbe::value::SlotId slotId;
-    TypeSignature typeSignature;
-};
-
-/**
  * The PlanStageSlots class is used by SlotBasedStageBuilder to return the output slots produced
  * after building a stage.
  */
@@ -300,12 +291,6 @@ public:
     }
 
     // Maps 'name' to 'slot' and clears any prior mapping the 'name' may have had.
-    void set(const UnownedSlotName& name, sbe::value::SlotId slot) {
-        set(name, TypedSlot{slot, TypeSignature::kAnyScalarType});
-    }
-    void set(OwnedSlotName name, sbe::value::SlotId slot) {
-        set(std::move(name), TypedSlot{slot, TypeSignature::kAnyScalarType});
-    }
     void set(const UnownedSlotName& name, TypedSlot slot) {
         _data->slotNameToIdMap.insert_or_assign(name, slot);
     }
@@ -449,9 +434,6 @@ public:
         set(kResult, slot);
         _data->resultInfoChanges.reset();
     }
-    void setResultObj(sbe::value::SlotId slot) {
-        setResultObj(TypedSlot{slot, TypeSignature::kAnyScalarType});
-    }
 
     // Returns true if this PlanStageSlots has "ResultInfo" (kResult mapped to a base object, a list
     // of changed fields in 'resultInfoChanges', and changed field slots), otherwise returns false.
@@ -486,9 +468,6 @@ public:
         set(kResult, slot);
         _data->resultInfoChanges.emplace();
     }
-    void setResultInfoBaseObj(sbe::value::SlotId slot) {
-        setResultInfoBaseObj(TypedSlot{slot, TypeSignature::kAnyScalarType});
-    }
 
     void setBlockSlot(OwnedSlotName name, TypedSlot slot) {
         tassert(8542200, "Cannot override an initialized blockSlot", !_data->blockSlot);
@@ -522,9 +501,6 @@ public:
         auto& changes = *_data->resultInfoChanges;
         changes = ProjectionEffects(FieldSet::makeOpenSet(drops), modifys, {}).compose(changes);
     }
-
-    // Return the type information associated with the requested slot.
-    TypeSignature getSignatureForSlot(sbe::value::SlotId slotId);
 
     // Returns a sorted list of all the names in this PlanStageSlots has that are required by
     // 'reqs', plus any additional names needed by 'reqs' that this PlanStageSlots does not satisfy.
@@ -1118,13 +1094,10 @@ private:
     std::unique_ptr<sbe::PlanStage> buildBlockToRow(std::unique_ptr<sbe::PlanStage> stage,
                                                     PlanStageSlots& outputs);
 
-    // Given an expression built on top of scalar processing, along with the definition of the
-    // visible slots (some of which could be marked as holding block of values), produce an
-    // expression tree that can be executed directly on top of them. Returns an empty result if the
-    // expression isn't vectorizable.
-    boost::optional<TypedExpression> buildVectorizedExpr(SbExpr scalarExpression,
-                                                         PlanStageSlots& outputs,
-                                                         bool forFilterStage);
+    std::pair<std::unique_ptr<sbe::PlanStage>, std::vector<TypedSlot>> buildBlockToRow(
+        std::unique_ptr<sbe::PlanStage> stage,
+        PlanStageSlots& outputs,
+        std::vector<TypedSlot> individualSlots);
 
     /**
      * Given a scalar filter Expression it tries to produced the vectorised stage. If this is

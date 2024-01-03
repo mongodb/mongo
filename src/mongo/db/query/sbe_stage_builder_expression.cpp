@@ -125,11 +125,8 @@ struct ExpressionVisitorContext {
         invariant(exprStack.size() >= arity);
     }
 
-    void pushExpr(abt::HolderPtr expr) {
+    void pushExpr(SbExpr expr) {
         exprStack.emplace_back(std::move(expr));
-    }
-    void pushExpr(sbe::value::SlotId slotId) {
-        exprStack.emplace_back(slotId);
     }
 
     optimizer::ABT popABTExpr() {
@@ -189,7 +186,7 @@ optimizer::ABT generateTraverseHelper(ExpressionVisitorContext* context,
     // Generate an expression to read a sub-field at the current nested level.
     auto fieldName = makeABTConstant(fp.getFieldName(level));
     auto fieldExpr = topLevelFieldSlot
-        ? makeABTVariable(topLevelFieldSlot->slotId)
+        ? makeABTVariable(*topLevelFieldSlot)
         : makeABTFunction("getField"_sd, std::move(*inputExpr), std::move(fieldName));
 
     if (level == fp.getPathLength() - 1) {
@@ -2244,7 +2241,7 @@ public:
             const auto* slots = _context->slots;
             if (expr->getVariableId() == Variables::kRootId) {
                 // Set inputExpr to refer to the root document.
-                inputExpr = _context->rootSlot ? SbExpr{_context->rootSlot->slotId} : SbExpr{};
+                inputExpr = SbExpr{_context->rootSlot};
                 expectsDocumentInputOnly = true;
 
                 if (slots && fp) {
@@ -2252,7 +2249,7 @@ public:
                     // to 'expr'.
                     auto fpe = std::make_pair(PlanStageSlots::kPathExpr, fp->fullPath());
                     if (slots->has(fpe)) {
-                        _context->pushExpr(slots->get(fpe).slotId);
+                        _context->pushExpr(slots->get(fpe));
                         return;
                     }
 

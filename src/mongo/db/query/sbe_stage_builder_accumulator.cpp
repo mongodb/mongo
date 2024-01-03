@@ -609,10 +609,7 @@ SbExpr::Vector buildInitializeAccumulatorMulti(StringDataMap<SbExpr> argExprs,
     // isGroupAccum].
     auto maxAccumulatorBytes = internalQueryTopNAccumulatorBytes.load();
     if (maxSizeExpr.isConstantExpr()) {
-        auto maxSizeEExpr = maxSizeExpr.getExpr(state).expr;
-        auto* maxSizeConstant = maxSizeEExpr->as<sbe::EConstant>();
-
-        auto [tag, val] = maxSizeConstant->getConstant();
+        auto [tag, val] = maxSizeExpr.getConstantValue();
         auto [convertOwn, convertTag, convertVal] =
             genericNumConvert(tag, val, sbe::value::TypeTags::NumberInt64);
         uassert(7548606,
@@ -1296,7 +1293,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     // Convert 'sbExprs' to a vector of sbe::EExpressions and return it.
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
     for (auto&& e : sbExprs) {
-        exprs.emplace_back(e.extractExpr(state).expr);
+        exprs.emplace_back(e.extractExpr(state));
     }
     return exprs;
 }
@@ -1351,7 +1348,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     // Convert 'sbExprs' to a vector of sbe::EExpressions and return it.
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
     for (auto&& e : sbExprs) {
-        exprs.emplace_back(e.extractExpr(state).expr);
+        exprs.emplace_back(e.extractExpr(state));
     }
     return exprs;
 }
@@ -1520,7 +1517,7 @@ std::unique_ptr<sbe::EExpression> buildFinalize(
         argSbExprs.emplace(k, SbExpr{v->clone()});
     }
     auto expr = buildFinalize(state, acc, aggSlots, std::move(argSbExprs), collatorSlot);
-    return expr.extractExpr(state).expr;
+    return expr.extractExpr(state);
 }
 
 SbExpr::Vector buildInitialize(const AccumulationStatement& acc,
@@ -1570,7 +1567,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
     // Convert 'sbExprs' to a vector of sbe::EExpressions and return it.
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
     for (auto&& e : sbExprs) {
-        exprs.emplace_back(e.extractExpr(state).expr);
+        exprs.emplace_back(e.extractExpr(state));
     }
     return exprs;
 }
@@ -1620,7 +1617,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
     // Convert 'sbExprs' to a vector of sbe::EExpressions and return it.
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
     for (auto&& e : sbExprs) {
-        exprs.emplace_back(e.extractExpr(state).expr);
+        exprs.emplace_back(e.extractExpr(state));
     }
     return exprs;
 }

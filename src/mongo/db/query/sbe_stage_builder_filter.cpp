@@ -160,7 +160,7 @@ struct MatchExpressionVisitorContext {
             7097201, "Expected 'rootSlot' or 'slots' to be defined", rootSlot || slots != nullptr);
 
         // Set up the top-level MatchFrame.
-        emplaceFrame(state, rootSlot ? rootSlot->slotId : boost::optional<sbe::value::SlotId>());
+        emplaceFrame(state, SbExpr{rootSlot});
     }
 
     SbExpr done() {
@@ -254,7 +254,7 @@ SbExpr generateTraverseF(SbExpr inputExpr,
     auto lambdaParam = SbExpr{SbVar{lambdaFrameId, 0}};
     auto getFieldName = isNumericField ? "getFieldOrElement"_sd : "getField"_sd;
     SbExpr fieldExpr = topLevelFieldSlot
-        ? b.makeVariable(topLevelFieldSlot->slotId)
+        ? SbExpr{*topLevelFieldSlot}
         : b.makeFunction(getFieldName, inputExpr.clone(), b.makeStrConstant(fp.getPart(level)));
 
     if (childIsLeafWithEmptyName) {
@@ -387,10 +387,10 @@ void generatePredicate(MatchExpressionVisitorContext* context,
         // corresponds to the full path 'path'.
         if (context->isFilterOverIxscan && !path.empty()) {
             auto name = std::make_pair(PlanStageSlots::kField, path.dottedField());
-            if (auto slot = slots->getIfExists(name); slot) {
+            if (auto slot = slots->getIfExists(name)) {
                 // We found a kField slot that matches. We don't need to perform any traversal;
                 // we can just evaluate the predicate on the slot directly and return.
-                frame.pushExpr(makePredicate(slot->slotId));
+                frame.pushExpr(makePredicate(*slot));
                 return;
             }
         }
@@ -406,7 +406,7 @@ void generatePredicate(MatchExpressionVisitorContext* context,
             auto lambdaFrameId = context->state.frameIdGenerator->generate();
             auto traverseFExpr = b.makeFunction(
                 "blockTraverseFPlaceholder"_sd,
-                b.makeVariable(slot->slotId),
+                SbExpr{*slot},
                 b.makeLocalLambda(lambdaFrameId, makePredicate(SbExpr{SbVar{lambdaFrameId, 0}})));
             frame.pushExpr(std::move(traverseFExpr));
             return;

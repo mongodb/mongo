@@ -375,7 +375,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
         state, csn->filter.get(), TypedSlot{resultSlot, TypeSignature::kAnyScalarType}, nullptr);
     if (!filterExpr.isNull()) {
         stage = sbe::makeS<sbe::FilterStage<false>>(
-            std::move(stage), filterExpr.extractExpr(state).expr, csn->nodeId());
+            std::move(stage), filterExpr.extractExpr(state), csn->nodeId());
     }
 
     PlanStageSlots outputs;
@@ -492,7 +492,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                          &outputs);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
-                std::move(stage), filterExpr.extractExpr(state).expr, csn->nodeId());
+                std::move(stage), filterExpr.extractExpr(state), csn->nodeId());
         }
     }
 

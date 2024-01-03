@@ -151,7 +151,7 @@ public:
                     "sbe expression benchmark PlanStage",
                     "stage"_attr = debugPrint(stage.get()));
 
-        auto expr = evalExpr.extractExpr(state).expr;
+        auto expr = evalExpr.extractExpr(state);
         LOGV2_DEBUG(6979802,
                     1,
                     "sbe expression benchmark EExpression",

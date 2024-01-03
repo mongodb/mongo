@@ -37,9 +37,24 @@ namespace mongo::stage_builder {
 // The signature of an expression is the set of all the types that the Value produced at runtime can
 // assume (including TypeTags::Nothing).
 struct TypeSignature {
+    using MaskType = uint64_t;
+    struct AllTypesTag {};
+
+    // For all valid TypeSignatures, the highest bit of the mask will always be 0.
+    static constexpr unsigned int highBitIdx = 8 * sizeof(MaskType) - 1;
+
+    static_assert(8 * sizeof(MaskType) > static_cast<size_t>(sbe::value::TypeTags::TypeTagsMax));
+
     // Predefined constants for common types.
-    static TypeSignature kAnyBSONType, kAnyScalarType, kArrayType, kBlockType, kBooleanType,
-        kCellType, kDateTimeType, kNothingType, kNumericType, kObjectType, kStringType;
+    static TypeSignature kAnyType, kBlockType, kCellType, kAnyScalarType, kAnyBSONType, kArrayType,
+        kBooleanType, kDateTimeType, kNothingType, kNumericType, kObjectType, kStringType;
+
+    TypeSignature() noexcept = default;
+
+    TypeSignature(MaskType mask) noexcept : typesMask(mask) {}
+
+    TypeSignature(AllTypesTag) noexcept
+        : typesMask((1ull << static_cast<size_t>(sbe::value::TypeTags::TypeTagsMax)) - 1u) {}
 
     // Return whether this signature is a strict subset of the other signature.
     bool isSubset(TypeSignature other) const {
@@ -73,11 +88,49 @@ struct TypeSignature {
     bool canCompareWith(TypeSignature other) const;
 
     // Simple bitmask using one bit for each enum in the TypeTags definition.
-    int64_t typesMask = 0;
+    MaskType typesMask = 0;
 };
 
-MONGO_STATIC_ASSERT((8 * sizeof(TypeSignature::typesMask)) >
-                    (size_t)sbe::value::TypeTags::TypeTagsMax);
+// An alternative to 'boost::optional<TypeSignature>' that is more compact.
+class OptTypeSignature {
+public:
+    using MaskType = TypeSignature::MaskType;
+
+    // For all valid TypeSignatures, the highest bit of the mask will always be 0. For the
+    // special "sentinel" value ('sentinelMaskVal'), the highest bit of the mask is set to 1.
+    static constexpr MaskType sentinelMaskVal = 1ull << TypeSignature::highBitIdx;
+
+    OptTypeSignature() noexcept = default;
+
+    OptTypeSignature(TypeSignature ts) noexcept : _ts(ts) {}
+
+    OptTypeSignature(boost::optional<TypeSignature> ts) noexcept
+        : _ts(ts ? *ts : TypeSignature{sentinelMaskVal}) {}
+
+    operator bool() const noexcept {
+        return has_value();
+    }
+    TypeSignature operator*() const {
+        tassert(8455818, "Expected OptTypeSignature to have value", has_value());
+        return _ts;
+    }
+
+    bool has_value() const {
+        return _ts.typesMask != sentinelMaskVal;
+    }
+    void reset() {
+        _ts = TypeSignature{sentinelMaskVal};
+    }
+    boost::optional<TypeSignature> get() const noexcept {
+        return has_value() ? boost::make_optional(_ts) : boost::none;
+    }
+    void set(const OptTypeSignature& ots) noexcept {
+        *this = ots;
+    }
+
+private:
+    TypeSignature _ts{sentinelMaskVal};
+};
 
 // Return the signature corresponding to the given SBE type.
 TypeSignature getTypeSignature(sbe::value::TypeTags type);

@@ -34,7 +34,7 @@
 namespace mongo::stage_builder {
 namespace {
 inline bool hasABT(const SbExpr& e) {
-    return e.hasABT();
+    return !e.isEExpr() && e.canExtractABT();
 }
 
 inline bool hasABT(const SbExpr::Vector& exprs) {
@@ -113,7 +113,7 @@ inline optimizer::Operations getOptimizerOp(sbe::EPrimBinary::Op op) {
 }  // namespace
 
 std::unique_ptr<sbe::EExpression> SbExprBuilder::extractExpr(SbExpr& e) {
-    return e.extractExpr(_state).expr;
+    return e.extractExpr(_state);
 }
 
 sbe::EExpression::Vector SbExprBuilder::extractExpr(SbExpr::Vector& sbExprs) {
@@ -380,5 +380,44 @@ SbExpr SbExprBuilder::generateInfinityCheck(SbVar var) {
 
 SbExpr SbExprBuilder::generateInvalidRoundPlaceArgCheck(SbVar var) {
     return abt::wrap(stage_builder::generateInvalidRoundPlaceArgCheck(var.getABTName()));
+}
+
+std::pair<SbStage, std::vector<SbSlot>> SbBuilder::makeProjectImpl(SbStage stage,
+                                                                   SbExprOptSbSlotVector projects,
+                                                                   const PlanStageSlots* outputs) {
+    boost::optional<VariableTypes> variableTypes;
+    if (outputs) {
+        variableTypes.emplace(buildVariableTypes(*outputs));
+    }
+
+    VariableTypes* varTypes = variableTypes ? &*variableTypes : nullptr;
+
+    sbe::SlotExprPairVector slotExprPairs;
+    std::vector<SbSlot> outSlots;
+
+    for (auto& [expr, optSlot] : projects) {
+        expr.optimize(_state, varTypes);
+
+        if (!optSlot && expr.isSlotExpr()) {
+            // If 'optSlot' is not set and 'expr' is an SbSlot, then we don't need to
+            // project anything and instead we can just store 'expr.toSlot()' directly
+            // into 'outSlots'.
+            outSlots.emplace_back(expr.toSlot());
+        } else {
+            // Otherwise, allocate a slot if needed, add a project to 'slotExprPairs' for this
+            // update, and then store the SbSlot (annotated with the type signature from 'expr')
+            // into 'outSlots'.
+            sbe::value::SlotId slot = optSlot ? *optSlot : _state.slotId();
+            outSlots.emplace_back(slot, expr.getTypeSignature());
+            slotExprPairs.emplace_back(slot, expr.extractExpr(_state));
+        }
+    }
+
+    if (!slotExprPairs.empty()) {
+        return {sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(slotExprPairs), _nodeId),
+                std::move(outSlots)};
+    }
+
+    return {std::move(stage), std::move(outSlots)};
 }
 }  // namespace mongo::stage_builder

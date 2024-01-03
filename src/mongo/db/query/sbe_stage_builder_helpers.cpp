@@ -238,8 +238,8 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyTrue(std::unique_ptr<sbe::EExpres
     return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(true));
 }
 
-std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId) {
-    return sbe::makeE<sbe::EVariable>(slotId);
+std::unique_ptr<sbe::EExpression> makeVariable(TypedSlot ts) {
+    return sbe::makeE<sbe::EVariable>(ts.slotId);
 }
 
 std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId, sbe::value::SlotId slotId) {
@@ -657,15 +657,15 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
 }
 
 std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
-                                                     sbe::value::SlotId resultSlot,
-                                                     sbe::value::SlotId recordIdSlot,
+                                                     TypedSlot resultSlot,
+                                                     TypedSlot recordIdSlot,
                                                      std::vector<std::string> fields,
                                                      sbe::value::SlotVector fieldSlots,
-                                                     sbe::value::SlotId seekRecordIdSlot,
-                                                     sbe::value::SlotId snapshotIdSlot,
-                                                     sbe::value::SlotId indexIdentSlot,
-                                                     sbe::value::SlotId indexKeySlot,
-                                                     sbe::value::SlotId indexKeyPatternSlot,
+                                                     TypedSlot seekRecordIdSlot,
+                                                     TypedSlot snapshotIdSlot,
+                                                     TypedSlot indexIdentSlot,
+                                                     TypedSlot indexKeySlot,
+                                                     TypedSlot indexKeyPatternSlot,
                                                      const CollectionPtr& collToFetch,
                                                      PlanNodeId planNodeId,
                                                      sbe::value::SlotVector slotsToForward) {
@@ -678,16 +678,16 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
 
     // Scan the collection in the range [seekRecordIdSlot, Inf).
     auto scanStage = sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
-                                                resultSlot,
-                                                recordIdSlot,
-                                                snapshotIdSlot,
-                                                indexIdentSlot,
-                                                indexKeySlot,
-                                                indexKeyPatternSlot,
+                                                resultSlot.slotId,
+                                                recordIdSlot.slotId,
+                                                snapshotIdSlot.slotId,
+                                                indexIdentSlot.slotId,
+                                                indexKeySlot.slotId,
+                                                indexKeyPatternSlot.slotId,
                                                 boost::none /* oplogTsSlot */,
                                                 std::move(fields),
                                                 std::move(fieldSlots),
-                                                seekRecordIdSlot,
+                                                seekRecordIdSlot.slotId,
                                                 boost::none /* minRecordIdSlot */,
                                                 boost::none /* maxRecordIdSlot */,
                                                 true /* forward */,
@@ -702,8 +702,11 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
         sbe::makeS<sbe::LimitSkipStage>(
             std::move(scanStage), makeInt64Constant(1), nullptr, planNodeId),
         std::move(slotsToForward),
-        sbe::makeSV(
-            seekRecordIdSlot, snapshotIdSlot, indexIdentSlot, indexKeySlot, indexKeyPatternSlot),
+        sbe::makeSV(seekRecordIdSlot.slotId,
+                    snapshotIdSlot.slotId,
+                    indexIdentSlot.slotId,
+                    indexKeySlot.slotId,
+                    indexKeyPatternSlot.slotId),
         nullptr /* predicate */,
         planNodeId);
 }
@@ -836,16 +839,22 @@ std::pair<std::vector<std::string>, std::vector<ProjectNode>> getProjectNodes(
     return {std::move(ctx.data().paths), std::move(ctx.data().nodes)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFieldsToSlots(
+struct ProjectFieldsNodeValue {
+    SbExpr expr;
+    bool visited{false};
+    bool incrementedDepth{false};
+};
+
+std::pair<std::unique_ptr<sbe::PlanStage>, std::vector<TypedSlot>> projectFieldsToSlots(
     std::unique_ptr<sbe::PlanStage> stage,
     const std::vector<std::string>& fields,
-    sbe::value::SlotId resultSlot,
+    TypedSlot resultSlot,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     StageBuilderState& state,
     const PlanStageSlots* slots) {
     // 'outputSlots' will match the order of 'fields'. Bail out early if 'fields' is empty.
-    auto outputSlots = sbe::makeSV();
+    std::vector<TypedSlot> outputSlots;
     if (fields.empty()) {
         return {std::move(stage), std::move(outputSlots)};
     }
@@ -857,7 +866,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
         sbe::SlotExprPairVector projects;
         for (size_t i = 0; i < fields.size(); ++i) {
             auto name = std::make_pair(PlanStageSlots::kField, StringData(fields[i]));
-            auto fieldSlot = slots->getSlotIfExists(name);
+            auto fieldSlot = slots->getIfExists(name);
             if (fieldSlot) {
                 outputSlots.emplace_back(*fieldSlot);
             } else {
@@ -877,8 +886,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
 
     // Handle the case where 'fields' contains at least one dotted path. We begin by creating a
     // path tree from 'fields'.
-    using Node = PathTreeNode<SbExpr>;
-    auto treeRoot = buildPathTree<SbExpr>(fields, BuildPathTreeMode::AllowConflictingPaths);
+    using NodeValue = ProjectFieldsNodeValue;
+    using Node = PathTreeNode<NodeValue>;
+
+    auto treeRoot = buildPathTree<NodeValue>(fields, BuildPathTreeMode::AllowConflictingPaths);
 
     std::vector<Node*> fieldNodes;
     for (const auto& field : fields) {
@@ -889,30 +900,32 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
     auto fieldNodesSet = absl::flat_hash_set<Node*>{fieldNodes.begin(), fieldNodes.end()};
 
     std::vector<Node*> roots;
-    treeRoot->value = resultSlot;
+    treeRoot->value.expr = resultSlot;
+    treeRoot->value.visited = true;
     roots.emplace_back(treeRoot.get());
 
     // If 'slots' is not null, then we perform a DFS traversal over the path tree to get it set up.
     if (slots != nullptr) {
         auto hasNodesToVisit = [&](const Node::ChildrenVector& v) {
-            return std::any_of(v.begin(), v.end(), [](auto&& c) { return !c->value; });
+            return std::any_of(v.begin(), v.end(), [](auto&& c) { return !c->value.visited; });
         };
         auto preVisit = [&](Node* node, const std::string& path) {
             auto name = std::make_pair(PlanStageSlots::kField, StringData(path));
             // Look for a kField slot that corresponds to node's path.
             if (auto slot = slots->getIfExists(name); slot) {
-                // We found a kField slot. Assign it to 'node->value' and mark 'node' as "visited",
-                // and add 'node' to 'roots'.
-                node->value = slot->slotId;
+                // We found a kField slot. Assign it to 'node->value.expr' and mark 'node'
+                // as "visited", and add 'node' to 'roots'.
+                node->value.expr = *slot;
+                node->value.visited = true;
                 roots.emplace_back(node);
             }
         };
         auto postVisit = [&](Node* node) {
             // When 'node' hasn't been visited and it's not in 'fieldNodesSet' and when all of
             // node's children have already been visited, mark 'node' as having been "visited".
-            // (The specific value we assign to 'node->value' doesn't actually matter.)
-            if (!node->value && !fieldNodesSet.count(node) && !hasNodesToVisit(node->children)) {
-                node->value = sbe::value::SlotId{-1};
+            if (!node->value.visited && !fieldNodesSet.count(node) &&
+                !hasNodesToVisit(node->children)) {
+                node->value.visited = true;
             }
         };
         visitPathTreeNodes(treeRoot.get(), preVisit, postVisit);
@@ -924,13 +937,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
 
     for (auto&& root : roots) {
         // For each node in 'roots' we perform a DFS traversal, taking care to avoid visiting nodes
-        // that are marked as having been "visited" already during the previous phase.
+        // that were marked as "visited" during the previous phase.
         visitPathTreeNodes(
             root,
             [&](Node* node, const DfsState& dfs) {
-                // If node->value is initialized, that means that 'node' and its descendants
-                // have already been visited.
-                if (node->value) {
+                // Skip this node if 'visited' is true.
+                if (node->value.visited) {
                     return false;
                 }
                 // visitRootNode is false, so we should be guaranteed that that there are at least
@@ -938,17 +950,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
                 tassert(7182002, "Expected DfsState to have at least 2 entries", dfs.size() >= 2);
 
                 auto parent = dfs[dfs.size() - 2].first;
-                auto getFieldExpr =
-                    makeFunction("getField"_sd,
-                                 parent->value.hasSlot() ? makeVariable(*parent->value.getSlot())
-                                                         : parent->value.extractExpr(state).expr,
-                                 makeStrConstant(node->name));
+                auto getFieldExpr = makeFunction(
+                    "getField"_sd, parent->value.expr.getExpr(state), makeStrConstant(node->name));
 
                 auto hasOneChildToVisit = [&] {
                     size_t count = 0;
                     auto it = node->children.begin();
                     for (; it != node->children.end() && count <= 1; ++it) {
-                        count += !(*it)->value;
+                        count += !(*it)->value.visited;
                     }
                     return count == 1;
                 };
@@ -956,14 +965,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
                 if (!fieldNodesSet.count(node) && hasOneChildToVisit()) {
                     // If 'fieldNodesSet.count(node)' is false and 'node' doesn't have multiple
                     // children that need to be visited, then we don't need to project value to
-                    // a slot. Store 'getExprvalue' into 'node->value' and return.
-                    node->value = std::move(getFieldExpr);
+                    // a slot. Store 'getFieldExpr' into 'node->value' and return.
+                    node->value.expr = std::move(getFieldExpr);
+                    node->value.visited = true;
                     return true;
                 }
 
                 // We need to project 'getFieldExpr' to a slot.
                 auto slot = slotIdGenerator->generate();
-                node->value = slot;
+                node->value.expr = slot;
+                node->value.visited = true;
                 // Grow 'stackOfProjects' if needed so that 'stackOfProjects[depth]' is valid.
                 if (depth >= stackOfProjects.size()) {
                     stackOfProjects.resize(depth + 1);
@@ -973,14 +984,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
                 projects.emplace_back(slot, std::move(getFieldExpr));
                 // Increment the depth while we visit node's descendents.
                 ++depth;
+                node->value.incrementedDepth = true;
 
                 return true;
             },
             [&](Node* node) {
-                // If 'node->value' holds a slot, that means the previsit phase incremented 'depth'.
-                // Now that we are done visiting node's descendents, we decrement 'depth'.
-                if (node->value.hasSlot()) {
+                // Now that we are done visiting node's descendents, we decrement 'depth'
+                // if 'node->value.incrementedDepth' is true.
+                if (node->value.incrementedDepth) {
                     --depth;
+                    node->value.incrementedDepth = false;
                 }
             });
     }
@@ -993,7 +1006,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
     }
 
     for (auto* node : fieldNodes) {
-        outputSlots.emplace_back(*node->value.getSlot());
+        outputSlots.emplace_back(node->value.expr.toSlot());
     }
 
     return {std::move(stage), std::move(outputSlots)};

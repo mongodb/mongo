@@ -175,46 +175,39 @@ StringMap<const ExpressionFieldPath*> collectFieldPaths(const GroupNode* groupNo
 }
 
 // Given a list of field path expressions used in the group-by ('_id') and accumulator expressions
-// of a $group, populate a slot in 'childOutputs' for each path found. Each slot is bound via a
-// ProjectStage to an EExpression that evaluates the path traversal.
+// of a $group, populate a slot in 'outputs' for each path found. Each slot is bound to an SBE
+// EExpression (via a ProjectStage) that evaluates the path traversal.
 MONGO_COMPILER_NOINLINE
 SbStage projectPathTraversalsForGroupBy(
     StageBuilderState& state,
     const GroupNode& groupNode,
-    SbStage childStage,
-    PlanStageSlots& childOutputs,
+    SbStage stage,
+    PlanStageSlots& outputs,
     const StringMap<const ExpressionFieldPath*>& groupFieldMap) {
-    // Slot to EExpression map that tracks path traversal expressions. Note that this only contains
-    // expressions corresponding to paths which require traversals (that is, if there exists a
-    // top level field slot corresponding to a field, we take care not to add it to 'projects' to
-    // avoid rebinding a slot).
-    sbe::SlotExprPairVector projects;
+    SbBuilder b(state, groupNode.nodeId());
 
-    // Populates 'projects' and 'childOutputs' with an expression and/or a slot, respectively,
-    // corresponding to the value of 'fieldExpr'.
+    SbExprOptSbSlotVector projects;
     for (auto& fp : groupFieldMap) {
         // Either find a slot corresponding to it or generate an expression for it and bind it to a
         // slot.
-        TypedSlot slot;
-        auto result = stage_builder::generateExpression(
-            state, fp.second, childOutputs.getResultObjIfExists(), &childOutputs);
-
-        if (result.hasSlot()) {
-            slot = TypedSlot{*result.getSlot(), TypeSignature::kAnyScalarType};
-        } else {
-            auto newSlot = state.slotId();
-            auto expr = result.extractExpr(state);
-            projects.emplace_back(newSlot, std::move(expr.expr));
-            slot = TypedSlot{newSlot, expr.typeSignature};
-        }
-        childOutputs.set(std::make_pair(PlanStageSlots::kPathExpr, fp.first), slot);
+        projects.emplace_back(stage_builder::generateExpression(
+                                  state, fp.second, outputs.getResultObjIfExists(), &outputs),
+                              boost::none);
     }
 
     if (!projects.empty()) {
-        childStage = makeProject(std::move(childStage), std::move(projects), groupNode.nodeId());
+        auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(projects));
+        stage = std::move(outStage);
+
+        size_t i = 0;
+        for (auto& fp : groupFieldMap) {
+            auto name = PlanStageSlots::OwnedSlotName(PlanStageSlots::kPathExpr, fp.first);
+            outputs.set(std::move(name), outSlots[i]);
+            ++i;
+        }
     }
 
-    return childStage;
+    return stage;
 }
 
 MONGO_COMPILER_NOINLINE
@@ -234,11 +227,10 @@ std::tuple<sbe::value::SlotVector, SbStage, SbExpr> generateGroupByObjKey(
     sbe::SlotExprPairVector projects;
 
     for (auto&& [fieldName, fieldExpr] : idExprObj->getChildExpressions()) {
-        auto abt = abt::unwrap(
-            generateExpression(state, fieldExpr.get(), rootSlot, &outputs).extractABT());
+        auto e = generateExpression(state, fieldExpr.get(), rootSlot, &outputs);
 
         auto slot = state.slotId();
-        projects.emplace_back(slot, abtToExpr(abt, state, &varTypes).expr);
+        projects.emplace_back(slot, e.extractExpr(state, &varTypes));
 
         slots.push_back(slot);
         exprs.emplace_back(b.makeStrConstant(fieldName));
@@ -259,7 +251,7 @@ std::tuple<sbe::value::SlotVector, SbStage, SbExpr> generateGroupByObjKey(
         auto slot = state.slotId();
 
         auto e = b.makeFillEmptyNull(std::move(exprs[1]));
-        stage = makeProject(std::move(stage), nodeId, slot, e.extractExpr(state).expr);
+        stage = makeProject(std::move(stage), nodeId, slot, e.extractExpr(state));
 
         slots[0] = slot;
         exprs[1] = SbVar{slots[0]};
@@ -282,16 +274,17 @@ std::tuple<sbe::value::SlotVector, SbStage, SbExpr> generateGroupBySingleKey(
     // The group-by field may end up being 'Nothing' and in that case _id: null will be
     // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
     SbExprBuilder b(state);
-    auto groupBySbExpr =
+    auto groupByExpr =
         b.makeFillEmptyNull(generateExpression(state, idExpr.get(), rootSlot, &outputs));
     VariableTypes varTypes = buildVariableTypes(outputs);
-    auto groupByExpr = groupBySbExpr.extractExpr(state, &varTypes);
 
-    if (auto groupByExprConstant = groupByExpr.expr->as<sbe::EConstant>(); groupByExprConstant) {
-        return {sbe::value::SlotVector{}, std::move(stage), std::move(groupByExpr.expr)};
+    if (groupByExpr.isConstantExpr()) {
+        return {
+            sbe::value::SlotVector{}, std::move(stage), groupByExpr.extractExpr(state, &varTypes)};
     } else {
         auto slot = state.slotId();
-        stage = makeProject(std::move(stage), nodeId, slot, std::move(groupByExpr.expr));
+        stage =
+            makeProject(std::move(stage), nodeId, slot, groupByExpr.extractExpr(state, &varTypes));
         return {sbe::value::SlotVector{slot}, std::move(stage), SbExpr{}};
     }
 }
@@ -356,13 +349,12 @@ sbe::value::SlotVector generateAccumulator(StageBuilderState& state,
                     str::stream() << accStmt.expr.name
                                   << " accumulator must have the root slot set",
                     rootSlot);
-            auto key = collatorSlot ? b.makeFunction("generateCheapSortKey",
-                                                     std::move(sortSpecExpr),
-                                                     SbVar{rootSlot->slotId},
-                                                     SbVar{*collatorSlot})
-                                    : b.makeFunction("generateCheapSortKey",
-                                                     std::move(sortSpecExpr),
-                                                     SbVar{rootSlot->slotId});
+            auto key = collatorSlot
+                ? b.makeFunction("generateCheapSortKey",
+                                 std::move(sortSpecExpr),
+                                 SbVar{*rootSlot},
+                                 SbVar{*collatorSlot})
+                : b.makeFunction("generateCheapSortKey", std::move(sortSpecExpr), SbVar{*rootSlot});
             accArgs.emplace(AccArgs::kTopBottomNKey,
                             b.makeFunction("sortKeyComponentVectorToArray", std::move(key)));
 
@@ -452,10 +444,9 @@ sbe::value::SlotVector generateAccumulator(StageBuilderState& state,
     for (size_t i = 0; i < accExprs.size(); i++) {
         auto slot = slotIdGenerator->generate();
         aggSlots.push_back(slot);
-        aggSlotExprs.push_back(
-            std::make_pair(slot,
-                           sbe::AggExprPair{std::move(accInitExprs[i].extractExpr(state).expr),
-                                            std::move(accExprs[i].extractExpr(state).expr)}));
+        aggSlotExprs.push_back(std::make_pair(
+            slot,
+            sbe::AggExprPair{accInitExprs[i].extractExpr(state), accExprs[i].extractExpr(state)}));
     }
 
     return aggSlots;
@@ -502,7 +493,7 @@ sbe::SlotExprPairVector generateMergingExpressions(StageBuilderState& state,
     sbe::SlotExprPairVector result;
     result.reserve(spillSlots.size());
     for (size_t i = 0; i < spillSlots.size(); ++i) {
-        result.push_back({spillSlots[i], mergingExprs[i].extractExpr(state).expr});
+        result.push_back({spillSlots[i], mergingExprs[i].extractExpr(state)});
     }
     return result;
 }
@@ -549,7 +540,7 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, SbStage> generateGr
             return dedupedGroupBySlots[0];
         } else {
             auto slot = state.slotId();
-            projects.emplace_back(slot, idFinalExpr.extractExpr(state).expr);
+            projects.emplace_back(slot, idFinalExpr.extractExpr(state));
             return slot;
         }
     }();
@@ -583,7 +574,7 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, SbStage> generateGr
         if (finalExpr) {
             auto outSlot = state.slotId();
             finalSlots.push_back(outSlot);
-            projects.emplace_back(outSlot, finalExpr.extractExpr(state).expr);
+            projects.emplace_back(outSlot, finalExpr.extractExpr(state));
         } else {
             finalSlots.push_back(groupOutSlots[idxAccFirstSlot]);
         }
@@ -632,8 +623,8 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, SbStage> buildGroup
         // initializer expression
         if (idFinalExpr) {
             auto slot = state.slotId();
-            groupByStage = makeProject(
-                std::move(groupByStage), nodeId, slot, idFinalExpr.extractExpr(state).expr);
+            groupByStage =
+                makeProject(std::move(groupByStage), nodeId, slot, idFinalExpr.extractExpr(state));
 
             groupBySlots.clear();
             groupBySlots.push_back(slot);
@@ -652,7 +643,7 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, SbStage> buildGroup
 
         auto isObjSlot = state.slotId();
         groupByStage = makeProject(
-            std::move(groupByStage), nodeId, isObjSlot, isObjectExpr.extractExpr(state).expr);
+            std::move(groupByStage), nodeId, isObjSlot, isObjectExpr.extractExpr(state));
 
         return boost::optional<TypedSlot>(TypedSlot{isObjSlot, TypeSignature::kObjectType});
     }();
@@ -822,14 +813,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         if (childOutputs.hasBlockOutput()) {
             // The group-by field may end up being 'Nothing' and in that case _id: null will be
             // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
-            auto groupByBlockExpr = buildVectorizedExpr(
+            SbExpr groupByBlockExpr = buildVectorizedExpr(
+                _state,
                 b.makeFillEmptyNull(generateExpression(
                     _state, idExpr.get(), childOutputs.getResultObjIfExists(), &childOutputs)),
                 childOutputs,
                 false);
-            if (groupByBlockExpr.has_value() &&
-                TypeSignature::kBlockType.isSubset(groupByBlockExpr->typeSignature)) {
 
+            auto typeSig = groupByBlockExpr.getTypeSignature();
+
+            if (groupByBlockExpr && typeSig && TypeSignature::kBlockType.isSubset(*typeSig)) {
                 // Make up a temporary field name so that we can register the slot in the
                 // childOutputs, as buildBlockToRow below reads from it to get the slots to convert
                 // to scalar. Use a Base64-encoded UUID to minimize the chance of colliding with
@@ -840,10 +833,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
                 auto slot = _state.slotId();
                 groupByStage = makeProject(
-                    std::move(childStage), nodeId, slot, std::move(groupByBlockExpr->expr));
+                    std::move(childStage), nodeId, slot, groupByBlockExpr.extractExpr(_state));
                 groupBySlots = sbe::value::SlotVector{slot};
-                childOutputs.set(groupIdFieldName,
-                                 TypedSlot{slot, groupByBlockExpr->typeSignature});
+                childOutputs.set(groupIdFieldName, TypedSlot{slot, *typeSig});
 
                 // TODO: remove this section when $group is able to digest block values.
                 // For now, we have to close the block processing pipeline here, remove the
@@ -910,7 +902,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto outputExpr = b.makeFunction(newObjFn, std::move(funcArgs));
 
         auto slot = _slotIdGenerator.generate();
-        stage = makeProject(std::move(stage), nodeId, slot, outputExpr.extractExpr(_state).expr);
+        stage = makeProject(std::move(stage), nodeId, slot, outputExpr.extractExpr(_state));
 
         outputs.setResultObj(TypedSlot{slot, TypeSignature::kObjectType});
     }
