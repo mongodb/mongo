@@ -6,6 +6,9 @@ This runs in the background as other tests are ongoing.
 
 from buildscripts.resmokelib.testing.hooks.interface import Hook
 from bson import binary
+import pymongo.errors
+
+QUERY_FEATURE_NOT_ALLOWED_CODE = 224
 
 
 class RunQueryStats(Hook):
@@ -13,19 +16,35 @@ class RunQueryStats(Hook):
 
     IS_BACKGROUND = False
 
-    def __init__(self, hook_logger, fixture):
+    def __init__(self, hook_logger, fixture, allow_feature_not_supported=False):
+        """Initialize the RunQueryStats hook.
+
+        Args:
+            hook_logger: the logger instance for this hook.
+            fixture: the target fixture (replica sets or a sharded cluster).
+            allow_feature_not_supported: absorb 'QueryFeatureNotAllowed' errors when calling 
+                $queryStats. This is to support fuzzer suites that may manipulate the FCV.
+        """
         description = "Read query stats data after each test."
         super().__init__(hook_logger, fixture, description)
         self.client = self.fixture.mongo_client()
         self.hmac_key = binary.Binary(("0" * 32).encode('utf-8'), 8)
+        self.allow_feature_not_supported = allow_feature_not_supported
 
     def verify_query_stats(self, querystats_spec):
         """Verify a $queryStats call has all the right properties."""
-        with self.client.admin.aggregate([{"$queryStats": querystats_spec}]) as cursor:
-            for operation in cursor:
-                assert "key" in operation
-                assert "metrics" in operation
-                assert "asOf" in operation
+        try:
+            with self.client.admin.aggregate([{"$queryStats": querystats_spec}]) as cursor:
+                for operation in cursor:
+                    assert "key" in operation
+                    assert "metrics" in operation
+                    assert "asOf" in operation
+        except pymongo.errors.OperationFailure as err:
+            if not self.allow_feature_not_supported or err.code != QUERY_FEATURE_NOT_ALLOWED_CODE:
+                raise err
+            else:
+                self.logger.info("Encountered a 'QueryFeatureNotAllowed' error. "
+                                 "$queryStats will not be run for this test.")
 
     def after_test(self, test, test_report):
         self.verify_query_stats({})
