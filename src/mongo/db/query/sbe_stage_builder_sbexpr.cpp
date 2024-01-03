@@ -270,6 +270,16 @@ TypedExpression SbExpr::extractExpr(StageBuilderState& state) {
     return {std::move(get<EExpr>(_storage)), TypeSignature::kAnyScalarType};
 }
 
+bool SbExpr::isConstantExpr() const {
+    if (holds_alternative<abt::HolderPtr>(_storage)) {
+        return get<abt::HolderPtr>(_storage)->_value.is<optimizer::Constant>();
+    }
+    if (holds_alternative<std::unique_ptr<sbe::EExpression>>(_storage)) {
+        return get<std::unique_ptr<sbe::EExpression>>(_storage)->as<sbe::EConstant>() != nullptr;
+    }
+    return false;
+}
+
 TypedExpression SbExpr::getExpr(StageBuilderState& state) const {
     return clone().extractExpr(state);
 }

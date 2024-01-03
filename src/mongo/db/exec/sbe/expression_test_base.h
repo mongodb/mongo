@@ -40,6 +40,8 @@
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
+#include "mongo/db/query/sbe_stage_builder_plan_data.h"
+#include "mongo/db/query/sbe_stage_builder_state.h"
 #include "mongo/unittest/golden_test.h"
 
 namespace mongo::sbe {
@@ -61,13 +63,12 @@ namespace mongo::sbe {
  */
 class EExpressionTestFixture : public virtual SBETestFixture {
 protected:
-    EExpressionTestFixture(std::unique_ptr<sbe::RuntimeEnvironment> runtimeEnv)
-        : _runtimeEnv(runtimeEnv.get()), _ctx(std::move(runtimeEnv)) {
+    EExpressionTestFixture()
+        : _env{std::make_unique<sbe::RuntimeEnvironment>()},
+          _runtimeEnv{_env.runtimeEnv},
+          _ctx{_env.ctx} {
         _ctx.root = &_emptyStage;
     }
-
-    EExpressionTestFixture()
-        : EExpressionTestFixture(std::make_unique<sbe::RuntimeEnvironment>()) {}
 
     value::SlotId bindAccessor(value::SlotAccessor* accessor) {
         auto slot = _slotIdGenerator.generate();
@@ -326,8 +327,9 @@ protected:
 protected:
     value::SlotIdGenerator _slotIdGenerator;
     CoScanStage _emptyStage{kEmptyPlanNodeId};
+    stage_builder::Environment _env;
     RuntimeEnvironment* _runtimeEnv;
-    CompileCtx _ctx;
+    CompileCtx& _ctx;
     vm::ByteCode _vm;
     std::vector<std::pair<value::SlotId, value::SlotAccessor*>> boundAccessors;
 };

@@ -270,6 +270,18 @@ public:
             holds_alternative<abt::HolderPtr>(_storage);
     }
 
+    bool isNull() const noexcept {
+        return holds_alternative<bool>(_storage);
+    }
+
+    explicit operator bool() const noexcept {
+        return !isNull();
+    }
+
+    void reset() noexcept {
+        _storage = false;
+    }
+
     SbExpr clone() const {
         if (hasSlot()) {
             return get<sbe::value::SlotId>(_storage);
@@ -291,24 +303,13 @@ public:
         return {};
     }
 
-    bool isNull() const noexcept {
-        return holds_alternative<bool>(_storage);
-    }
-
-    explicit operator bool() const noexcept {
-        return !isNull();
-    }
-
-    void reset() noexcept {
-        _storage = false;
-    }
+    bool isConstantExpr() const;
 
     TypedExpression getExpr(StageBuilderState& state) const;
 
     /**
      * Extract the expression on top of the stack as an SBE EExpression node. If the expression is
-     * stored as an ABT node, it is lowered into an SBE expression, using the provided map to
-     * convert variable names into slot ids.
+     * stored as an ABT node, it is lowered into an SBE expression.
      */
     TypedExpression extractExpr(StageBuilderState& state);
 

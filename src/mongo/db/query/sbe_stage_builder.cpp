@@ -4954,18 +4954,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             }
         } else {
             if (initExprArgs.size() == 1) {
-                window.initExprs = buildInitialize(
-                    accStmt, std::move(initExprArgs.begin()->second), _frameIdGenerator);
-            } else {
                 window.initExprs =
-                    buildInitialize(accStmt, std::move(initExprArgs), _frameIdGenerator);
+                    buildInitialize(accStmt, std::move(initExprArgs.begin()->second), _state);
+            } else {
+                window.initExprs = buildInitialize(accStmt, std::move(initExprArgs), _state);
             }
             if (argExprs.size() == 1) {
                 window.addExprs = buildAccumulator(
-                    accStmt, argExprs.begin()->second->clone(), collatorSlot, _frameIdGenerator);
+                    accStmt, argExprs.begin()->second->clone(), collatorSlot, _state);
             } else {
-                window.addExprs = buildAccumulator(
-                    accStmt, cloneExprMap(argExprs), collatorSlot, _frameIdGenerator);
+                window.addExprs =
+                    buildAccumulator(accStmt, cloneExprMap(argExprs), collatorSlot, _state);
             }
             window.removeExprs =
                 std::vector<std::unique_ptr<sbe::EExpression>>{window.addExprs.size()};
@@ -5204,10 +5203,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                 accStmt,
                                 window.windowExprSlots,
                                 std::move(finalArgExprs),
-                                collatorSlot,
-                                _frameIdGenerator)
-                : buildFinalize(
-                      _state, accStmt, window.windowExprSlots, collatorSlot, _frameIdGenerator);
+                                collatorSlot)
+                : buildFinalize(_state, accStmt, window.windowExprSlots, collatorSlot)
+                      .extractExpr(_state)
+                      .expr;
         }
 
         // Deal with empty window for finalize expressions.
