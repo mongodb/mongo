@@ -841,6 +841,7 @@ TEST_F(NodeSBE, SamplingTest) {
 
     const ProjectionName scanProjName = prefixId.getNextId("scan");
     QueryParameterMap qp;
+    OptimizerCounterInfo optCounterInfo;
     ABT tree = translatePipelineToABT(metadata,
                                       *pipeline.get(),
                                       scanProjName,
@@ -864,7 +865,8 @@ TEST_F(NodeSBE, SamplingTest) {
                                             defaultConvertPathToInterval,
                                             DebugInfo::kDefaultForProd,
                                             {._sqrtSampleSizeEnabled = false},
-                                            qp};
+                                            qp,
+                                            optCounterInfo};
 
     // Used to record the sampling plans.
     ABTVector nodes;
@@ -889,7 +891,8 @@ TEST_F(NodeSBE, SamplingTest) {
         ConstEval::constFold,
         DebugInfo::kDefaultForTests,
         {} /*queryHints*/,
-        qp};
+        qp,
+        optCounterInfo};
 
     PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(tree));
 

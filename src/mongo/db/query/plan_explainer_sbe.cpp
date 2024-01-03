@@ -511,8 +511,12 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
 }  // namespace
 
 const PlanExplainer::ExplainVersion& PlanExplainerSBE::getVersion() const {
-    static const ExplainVersion kExplainVersion = "2";
-    return kExplainVersion;
+    if (_optimizerData) {
+        static const ExplainVersion kExplainVersionForCQF = "3";
+        return kExplainVersionForCQF;
+    }
+    static const ExplainVersion kExplainVersionForStageBuilders = "2";
+    return kExplainVersionForStageBuilders;
 }
 
 std::string PlanExplainerSBE::getPlanSummary() const {

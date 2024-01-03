@@ -95,6 +95,7 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
     }
 
     QueryParameterMap qp;  // Intentionally unused
+    OptimizerCounterInfo optCounterInfo;
     OptPhaseManager phaseManager{{_optPhases, kDefaultExplorationSet, kDefaultSubstitutionSet},
                                  _prefixId,
                                  false /*requireRID*/,
@@ -106,7 +107,8 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
                                  ConstEval::constFold,
                                  DebugInfo::kDefaultForTests,
                                  _hints,
-                                 qp};
+                                 qp,
+                                 optCounterInfo};
     optimize(phaseManager, abt);
 
     const auto& memo = phaseManager.getMemo();

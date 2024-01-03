@@ -95,7 +95,8 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhasesAndRewrites phasesAndRew
                                  ConstFoldFn constFold,
                                  DebugInfo debugInfo,
                                  QueryHints queryHints,
-                                 QueryParameterMap queryParameters)
+                                 QueryParameterMap queryParameters,
+                                 OptimizerCounterInfo& optCounterInfo)
     : _phasesAndRewrites(std::move(phasesAndRewrites)),
       _debugInfo(std::move(debugInfo)),
       _hints(std::move(queryHints)),
@@ -112,7 +113,8 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhasesAndRewrites phasesAndRew
       _requireRID(requireRID),
       _ridProjections(),
       _prefixId(prefixId),
-      _queryParameters(std::move(queryParameters)) {
+      _queryParameters(std::move(queryParameters)),
+      _optCounterInfo(optCounterInfo) {
     uassert(6624093, "Cost derivation is null", _costEstimator);
     uassert(7088900, "Exploration CE is null", _explorationCE);
     uassert(7088901, "Substitution CE is null", _substitutionCE);
@@ -217,7 +219,8 @@ void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
                                           _constFold,
                                           *_logicalPropsDerivation,
                                           useSubstitutionCE ? *_substitutionCE : *_explorationCE,
-                                          _queryParameters);
+                                          _queryParameters,
+                                          _optCounterInfo);
     rootGroupId = logicalRewriter->addRootNode(input);
 
     if (runStandalone) {

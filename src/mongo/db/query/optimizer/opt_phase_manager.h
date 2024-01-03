@@ -37,6 +37,7 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/db/query/opt_counter_info.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/cascades/logical_rewriter.h"
@@ -131,7 +132,8 @@ public:
                     ConstFoldFn constFold,
                     DebugInfo debugInfo,
                     QueryHints queryHints,
-                    QueryParameterMap queryParameters);
+                    QueryParameterMap queryParameters,
+                    OptimizerCounterInfo& optCounterInfo);
 
     // We only allow moving.
     OptPhaseManager(const OptPhaseManager& /*other*/) = delete;
@@ -288,6 +290,10 @@ private:
     // Map from parameter ID to constant for the query we are optimizing. This is used by the CE
     // module to estimate selectivities of query parameters.
     QueryParameterMap _queryParameters;
+
+    // This tracks notable events during optimization. It is used for explain purposes. We don't own
+    // this.
+    OptimizerCounterInfo& _optCounterInfo;
 };
 
 }  // namespace mongo::optimizer

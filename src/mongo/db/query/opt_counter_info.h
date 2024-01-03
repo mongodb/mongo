@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -31,16 +31,15 @@
 
 namespace mongo {
 
-// The information in this struct is used for classic-engine explains.
-struct PlanEnumeratorExplainInfo {
-    bool hitIndexedOrLimit = false;
-    bool hitIndexedAndLimit = false;
-    bool hitScanLimit = false;
+// The information in this struct is used for CQF explains, i.e. it is the CQF version of
+// PlanEnumeratorExplainInfo.
+struct OptimizerCounterInfo {
+    OptimizerCounterInfo(bool maxPSRCountReached = false)
+        : maxPartialSchemaReqCountReached(maxPSRCountReached) {}
 
-    void merge(PlanEnumeratorExplainInfo other) {
-        hitIndexedOrLimit = hitIndexedOrLimit || other.hitIndexedOrLimit;
-        hitIndexedAndLimit = hitIndexedAndLimit || other.hitIndexedAndLimit;
-        hitScanLimit = hitScanLimit || other.hitScanLimit;
-    }
+    // This is set to true during optimization if we fail to convert a FilterNode to a SargableNode
+    // because we have exceeded the predicate limit for a SargableNode.
+    bool maxPartialSchemaReqCountReached;
 };
+
 }  // namespace mongo

@@ -92,6 +92,7 @@ public:
                     bool isOpen,
                     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
                     bool generatedByBonsai,
+                    OptimizerCounterInfo optCounterInfo = {},
                     std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr,
                     std::unique_ptr<RemoteExplainVector> remoteExplains = nullptr);
 

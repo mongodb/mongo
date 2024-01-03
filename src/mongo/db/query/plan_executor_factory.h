@@ -138,6 +138,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     bool isFromPlanCache,
     bool matchesCachedPlan,
     bool generatedByBonsai,
+    OptimizerCounterInfo optCounterInfo = {},
     std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr,
     std::unique_ptr<RemoteExplainVector> remoteExplains = nullptr);
 

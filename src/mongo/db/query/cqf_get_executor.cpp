@@ -412,6 +412,7 @@ static ExecParams createExecutor(
     const boost::optional<MatchExpression*> pipelineMatchExpr,
     const QueryType& query,
     const boost::optional<sbe::PlanCacheKey>& planCacheKey,
+    OptimizerCounterInfo optCounterInfo,
     PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
     auto env = VariableEnvironment::build(planAndProps._node);
     SlotVarMap slotMap;
@@ -527,7 +528,8 @@ static ExecParams createExecutor(
             std::move(sbeYieldPolicy),
             false /*isFromPlanCache*/,
             true /* generatedByBonsai */,
-            pipelineMatchExpr};
+            pipelineMatchExpr,
+            std::move(optCounterInfo)};
 }
 
 bool isIndexDefinitionId(const IndexDefinition& idx) {
@@ -597,6 +599,7 @@ OptPhaseManager createSamplingPhaseManager(const cost_model::CostModelCoefficien
         entry.second.shardingMetadata().setMayContainOrphans(false);
     }
 
+    OptimizerCounterInfo optCounterInfo;
     return {OptPhaseManager::PhasesAndRewrites::getDefaultForSampling(),
             prefixId,
             false /*requireRID*/,
@@ -611,7 +614,8 @@ OptPhaseManager createSamplingPhaseManager(const cost_model::CostModelCoefficien
              ._samplingCollectionSizeMin = hints._samplingCollectionSizeMin,
              ._samplingCollectionSizeMax = hints._samplingCollectionSizeMax,
              ._sqrtSampleSizeEnabled = hints._sqrtSampleSizeEnabled} /*hints*/,
-            queryParameters};
+            queryParameters,
+            optCounterInfo};
 }
 
 // Helper to construct an appropriate 'CardinalityEstimator'.
@@ -1048,6 +1052,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                                            queryHints,
                                                            collectionExists,
                                                            queryParameters);
+    OptimizerCounterInfo optCounterInfo;
     OptPhaseManager phaseManager{std::move(phasesAndRewrites),
                                  prefixId,
                                  requireRID,
@@ -1059,7 +1064,8 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                  constFold,
                                  DebugInfo::kDefaultForProd,
                                  std::move(queryHints),
-                                 std::move(queryParameters)};
+                                 std::move(queryParameters),
+                                 optCounterInfo};
 
     auto resultPlans = phaseManager.optimizeNoAssert(std::move(abt), false /*includeRejected*/);
     if (resultPlans.empty()) {
@@ -1117,7 +1123,8 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                               requireRID,
                               pipelineMatchExpr,
                               *pipeline,
-                              planCacheKey);
+                              planCacheKey,
+                              std::move(optCounterInfo));
     } else if (canonicalQuery) {
         return createExecutor(std::move(phaseManager),
                               std::move(planAndProps),
@@ -1128,7 +1135,8 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                               requireRID,
                               pipelineMatchExpr,
                               *canonicalQuery,
-                              planCacheKey);
+                              planCacheKey,
+                              std::move(optCounterInfo));
     } else {
         MONGO_UNREACHABLE;
     }
@@ -1179,6 +1187,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> makeExecFromPar
                                        std::move(execArgs.yieldPolicy),
                                        execArgs.planIsFromCache,
                                        false, /* matchesCachedPlan */
-                                       execArgs.generatedByBonsai);
+                                       execArgs.generatedByBonsai,
+                                       std::move(execArgs.optCounterInfo));
 }
 }  // namespace mongo

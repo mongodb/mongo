@@ -89,6 +89,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  bool isOpen,
                                  std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
                                  bool generatedByBonsai,
+                                 OptimizerCounterInfo optCounterInfo,
                                  std::unique_ptr<RemoteCursorMap> remoteCursors,
                                  std::unique_ptr<RemoteExplainVector> remoteExplains)
     : _state{isOpen ? State::kOpened : State::kClosed},
@@ -169,6 +170,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   isCachedCandidate,
                                                   matchesCachedPlan,
                                                   _rootData.debugInfo,
+                                                  std::move(optCounterInfo),
                                                   _remoteExplains.get());
     _cursorType = _rootData.staticData->cursorType;
 

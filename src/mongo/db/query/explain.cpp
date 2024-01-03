@@ -175,13 +175,20 @@ void generatePlannerInfo(PlanExecutor* exec,
     }
 
     auto&& explainer = exec->getPlanExplainer();
-    auto&& enumeratorInfo = explainer.getEnumeratorInfo();
-    plannerBob.append("maxIndexedOrSolutionsReached", enumeratorInfo.hitIndexedOrLimit);
-    plannerBob.append("maxIndexedAndSolutionsReached", enumeratorInfo.hitIndexedAndLimit);
-    plannerBob.append("maxScansToExplodeReached", enumeratorInfo.hitScanLimit);
-
     if (framework == PlanExecutor::QueryFramework::kCQF) {
+        // CQF-only fields.
+        BSONObjBuilder optimizerCountersBob(plannerBob.subobjStart("optimizerCounters"));
+        optimizerCountersBob.append("maxPartialSchemaReqCountReached",
+                                    explainer.getOptExplainInfo().maxPartialSchemaReqCountReached);
+        optimizerCountersBob.doneFast();
+
         plannerBob.append("queryFramework", "cqf");
+    } else {
+        // Classic-only fields.
+        auto&& enumeratorInfo = explainer.getEnumeratorInfo();
+        plannerBob.append("maxIndexedOrSolutionsReached", enumeratorInfo.hitIndexedOrLimit);
+        plannerBob.append("maxIndexedAndSolutionsReached", enumeratorInfo.hitIndexedAndLimit);
+        plannerBob.append("maxScansToExplodeReached", enumeratorInfo.hitScanLimit);
     }
 
     auto&& [winningStats, _] =

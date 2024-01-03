@@ -1651,6 +1651,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        planningResult->isRecoveredFromPlanCache(),
                                        matchesCachedPlan,
                                        false /* generatedByBonsai */,
+                                       {} /* optCounterInfo */,
                                        std::move(remoteCursors),
                                        std::move(remoteExplains));
 }  // getSlotBasedExecutor
@@ -1950,6 +1951,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
                                        false /* planIsFromCache */,
                                        false /* matchesCachedPlan */,
                                        false /* generatedByBonsai */,
+                                       {} /* optCounterInfo */,
                                        std::move(remoteCursors));
 }
 

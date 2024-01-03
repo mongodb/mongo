@@ -134,12 +134,41 @@ function analyzeExplainHelper(explainPathList, expectedStages, expectedDir) {
 }
 
 // Asserts on some of the top-level fields in the find explain.
-function analyzeTopLevelExplain(explain, expectedParsedQuery) {
+function analyzeTopLevelExplain(
+    explain, isSharded, expectedMaxPSRCountReached, expectedParsedQuery) {
     function nodeAssertions(nodeExplain) {
+        // Assert that the explain version is 3.
+        // TODO SERVER-56621: Remove if statement and isSharded arg from analyzeTopLevelExplain.
+        if (!isSharded) {
+            assert(nodeExplain.explainVersion === "3",
+                   `Expected the explainVersion field to have value 3 but instead it has value ${
+                       nodeExplain.explainVersion}. The whole top-level explain is ${
+                       tojson(nodeExplain)}`);
+        }
+
         let path = nodeExplain;
         if (nodeExplain.hasOwnProperty("queryPlanner")) {
             path = nodeExplain.queryPlanner;
         }
+        // Assert that CQF is the queryFramework.
+        assert(path.queryFramework === "cqf",
+               `Expected the queryFramework field to have value "cqf" but instead it has value ${
+                   path.queryFramework}. The whole top-level explain is ${tojson(nodeExplain)}`);
+
+        // Assert that the optimizerCounters sub-object is as expected.
+        assert(
+            path.hasOwnProperty("optimizerCounters"),
+            `Explain does not have the "optimizerCounters" field. The whole top-level explain is ${
+                tojson(nodeExplain)}`);
+        assert(
+            path.optimizerCounters.hasOwnProperty("maxPartialSchemaReqCountReached") &&
+                path.optimizerCounters.maxPartialSchemaReqCountReached ===
+                    expectedMaxPSRCountReached,
+            `Expected the optimizerCounters.maxPartialSchemaReqCountReached field to have value ${
+                expectedMaxPSRCountReached} but instead it has value ${
+                path.optimizerCounters
+                    .maxPartialSchemaReqCountReached}. The whole top-level explain is ${
+                tojson(nodeExplain)}`);
 
         // Assert that the parsedQuery sub-object is as expected.
         assert.eq(
@@ -311,34 +340,91 @@ function runTest(db, coll, isSharded) {
         [{$match: {a: {$lt: 5}}}, {$project: {'a': 1}}] /* pipeline */,
         {} /* hint */);
 
+    // Test that the maxPSRCountReached field is populated as expected: false for the first query
+    // where there is only one predicate and true for the second where there are 11 (the current
+    // limit is 10).
+    let explain = coll.find({$or: [{a: {$lt: 100}}]}).explain();
+    analyzeTopLevelExplain(explain, isSharded, false /* expectedMaxPSRCountReached */, {
+        "filter": {"a": {"$lt": 100}}
+    } /* expectedParsedQuery */);
+
+    // We create an index and use a $natural hint to ensure that the rewrite during which this case
+    // could be reached happens.
+    assert.commandWorked(coll.createIndex({a: 1}));
+    explain = coll.find({
+                      $or: [
+                          {a: {$lt: 100}},
+                          {b: {$gt: 0}},
+                          {c: {$lt: 99}},
+                          {d: {$gt: 1}},
+                          {e: {$lt: 98}},
+                          {f: {$gt: 2}},
+                          {g: {$lt: 97}},
+                          {h: {$gt: 3}},
+                          {i: {$lt: 96}},
+                          {j: {$gt: 4}},
+                          {k: {$lt: 95}}
+                      ]
+                  })
+                  .hint({$natural: 1})
+                  .explain();
+    analyzeTopLevelExplain(explain, isSharded, true /* expectedMaxPSRCountReached */, {
+        "filter": {
+            "$or": [
+                {"a": {"$lt": 100}},
+                {"c": {"$lt": 99}},
+                {"e": {"$lt": 98}},
+                {"g": {"$lt": 97}},
+                {"i": {"$lt": 96}},
+                {"k": {"$lt": 95}},
+                {"b": {"$gt": 0}},
+                {"d": {"$gt": 1}},
+                {"f": {"$gt": 2}},
+                {"h": {"$gt": 3}},
+                {"j": {"$gt": 4}}
+            ]
+        }
+    } /* expectedParsedQuery */);
+    assert.commandWorked(coll.dropIndex({a: 1}));
+
     // Test that the parsedQuery field is empty when the query is empty.
-    let explain = coll.find().explain();
-    analyzeTopLevelExplain(explain, {"filter": {}} /* expectedParsedQuery */)
+    explain = coll.find().explain();
+    analyzeTopLevelExplain(explain, isSharded, false /* expectedMaxPSRCountReached */, {
+        "filter": {}
+    } /* expectedParsedQuery */)
 
     explain = coll.explain().aggregate();
-    analyzeTopLevelExplain(explain, {"pipeline": []} /* expectedParsedQuery */)
+    analyzeTopLevelExplain(explain, isSharded, false /* expectedMaxPSRCountReached */, {
+        "pipeline": []
+    } /* expectedParsedQuery */)
 
     // Test that the parsedQuery field is correct for a more complex query.
     explain = coll.find({$or: [{a: 1}, {a: {$lt: 1}}]}, {a: 1}).explain();
-    analyzeTopLevelExplain(explain, {
+    analyzeTopLevelExplain(explain, isSharded, false /* expectedMaxPSRCountReached */, {
         "filter": {"$or": [{"a": {"$eq": 1}}, {"a": {"$lt": 1}}]},
         "projection": {"a": true, "_id": true}
     })
 
     explain = coll.explain().aggregate([{$match: {$and: [{a: {$lt: 5}}, {a: 5}]}}]);
-    analyzeTopLevelExplain(explain, {"pipeline": [{$match: {$and: [{a: {$lt: 5}}, {a: 5}]}}]});
+    analyzeTopLevelExplain(explain, isSharded, false /* expectedMaxPSRCountReached */, {
+        "pipeline": [{$match: {$and: [{a: {$lt: 5}}, {a: 5}]}}]
+    });
 
     // Test that the parsedQuery field reveals optimizations done before the query gets translated
     // to ABT.
 
     // Combine $or of equality predicates into $in.
     explain = coll.find({$or: [{a: 1}, {a: 2}]}).explain();
-    analyzeTopLevelExplain(explain, {"filter": {"a": {"$in": [1, 2]}}});
+    analyzeTopLevelExplain(explain, isSharded, false /* expectedMaxPSRCountReached */, {
+        "filter": {"a": {"$in": [1, 2]}}
+    });
 
     // Reorder stages such that filter comes first.
     explain = coll.explain().aggregate([{$project: {a: 1}}, {$match: {a: 5}}]);
     analyzeTopLevelExplain(
         explain,
+        isSharded,
+        false /* expectedMaxPSRCountReached */,
         {"pipeline": [{$match: {a: 5}}, {$project: {_id: true, a: true}}]},
     );
 }

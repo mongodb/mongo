@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/opt_counter_info.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
@@ -68,6 +69,7 @@ struct ExecParams {
     bool planIsFromCache;
     bool generatedByBonsai;
     const boost::optional<MatchExpression*> pipelineMatchExpr;
+    OptimizerCounterInfo optCounterInfo;
 };
 
 /**

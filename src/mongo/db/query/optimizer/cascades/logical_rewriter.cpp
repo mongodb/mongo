@@ -74,7 +74,8 @@ LogicalRewriter::LogicalRewriter(const Metadata& metadata,
                                  const ConstFoldFn& constFold,
                                  const LogicalPropsInterface& logicalPropsDerivation,
                                  const CardinalityEstimator& cardinalityEstimator,
-                                 const QueryParameterMap& queryParameters)
+                                 const QueryParameterMap& queryParameters,
+                                 OptimizerCounterInfo& optCounterInfo)
     : _activeRewriteSet(std::move(rewriteSet)),
       _groupsPending(),
       _metadata(metadata),
@@ -86,7 +87,8 @@ LogicalRewriter::LogicalRewriter(const Metadata& metadata,
       _constFold(constFold),
       _logicalPropsDerivation(logicalPropsDerivation),
       _cardinalityEstimator(cardinalityEstimator),
-      _queryParameters(queryParameters) {
+      _queryParameters(queryParameters),
+      _optCounterInfo(optCounterInfo) {
     initializeRewrites();
 
     if (_activeRewriteSet.count(LogicalRewriteType::SargableSplit) > 0) {
@@ -226,6 +228,10 @@ public:
 
     const auto& getConstFold() const {
         return _rewriter._constFold;
+    }
+
+    void setMaxPSRCountReached() {
+        _rewriter._optCounterInfo.maxPartialSchemaReqCountReached = true;
     }
 
 private:
@@ -697,7 +703,8 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return;
     }
     if (PSRExpr::numLeaves(conversion->_reqMap) > SargableNode::kMaxPartialSchemaReqs) {
-        // Too many requirements.
+        // Too many requirements. Record that we reached this state.
+        ctx.setMaxPSRCountReached();
         return;
     }
     if (psr::isNoop(conversion->_reqMap)) {

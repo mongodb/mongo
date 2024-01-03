@@ -165,6 +165,7 @@ OptPhaseManager makePhaseManager(
     const boost::optional<cost_model::CostModelCoefficients>& costModel,
     DebugInfo debugInfo,
     QueryHints queryHints) {
+    OptimizerCounterInfo optCounterInfo;
     return OptPhaseManager{std::move(phasesAndRewrites),
                            prefixId,
                            false /*requireRID*/,
@@ -176,7 +177,8 @@ OptPhaseManager makePhaseManager(
                            ConstEval::constFold,
                            std::move(debugInfo),
                            std::move(queryHints),
-                           {} /*queryParameters*/};
+                           {} /*queryParameters*/,
+                           optCounterInfo};
 }
 
 OptPhaseManager makePhaseManager(
@@ -204,6 +206,7 @@ OptPhaseManager makePhaseManager(
     const boost::optional<cost_model::CostModelCoefficients>& costModel,
     DebugInfo debugInfo,
     QueryHints queryHints) {
+    OptimizerCounterInfo optCounterInfo;
     return OptPhaseManager{std::move(phasesAndRewrites),
                            prefixId,
                            false /*requireRID*/,
@@ -215,7 +218,8 @@ OptPhaseManager makePhaseManager(
                            ConstEval::constFold,
                            std::move(debugInfo),
                            std::move(queryHints),
-                           {} /*queryParameters*/};
+                           {} /*queryParameters*/,
+                           optCounterInfo};
 }
 
 
@@ -224,6 +228,7 @@ OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
                                            Metadata metadata,
                                            DebugInfo debugInfo,
                                            QueryHints queryHints) {
+    OptimizerCounterInfo optCounterInfo;
     return OptPhaseManager{{std::move(phaseSet), kDefaultExplorationSet, kDefaultSubstitutionSet},
                            prefixId,
                            true /*requireRID*/,
@@ -235,7 +240,8 @@ OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
                            ConstEval::constFold,
                            std::move(debugInfo),
                            std::move(queryHints),
-                           {} /*queryParameters*/};
+                           {} /*queryParameters*/,
+                           optCounterInfo};
 }
 
 bool planComparator(const PlanAndProps& e1, const PlanAndProps& e2) {

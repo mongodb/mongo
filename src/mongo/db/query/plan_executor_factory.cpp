@@ -152,6 +152,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     bool planIsFromCache,
     bool matchesCachedPlan,
     bool generatedByBonsai,
+    OptimizerCounterInfo optCounterInfo,
     std::unique_ptr<RemoteCursorMap> remoteCursors,
     std::unique_ptr<RemoteExplainVector> remoteExplains) {
     auto&& [rootStage, data] = root;
@@ -180,6 +181,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                  false /*isOpen*/,
                  std::move(yieldPolicy),
                  generatedByBonsai,
+                 std::move(optCounterInfo),
                  std::move(remoteCursors),
                  std::move(remoteExplains)),
              PlanExecutor::Deleter{opCtx}}};
@@ -208,7 +210,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                  std::move(nss),
                                  true, /*isOpen*/
                                  std::move(yieldPolicy),
-                                 false /*generatedByBonsai*/),
+                                 false /*generatedByBonsai*/,
+                                 {} /* optCounterInfo */),
              PlanExecutor::Deleter{opCtx}}};
 }
 

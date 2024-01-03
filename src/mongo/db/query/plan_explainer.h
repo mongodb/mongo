@@ -33,6 +33,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/opt_counter_info.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_solution.h"
@@ -46,7 +47,10 @@ namespace mongo {
 class PlanExplainer {
 public:
     /**
-     * A version of the explain format. "1" is used for the classic engine and "2" for SBE.
+     * A version of the explain format:
+     * - "1" is used for the classic engine
+     * - "2" for SBE stagebuilders
+     * - "3" for CQF
      */
     using ExplainVersion = std::string;
 
@@ -59,10 +63,12 @@ public:
     using PlanStatsDetails = std::pair<BSONObj, boost::optional<PlanSummaryStats>>;
 
     PlanExplainer() {}
-    PlanExplainer(const QuerySolution* solution)
+    PlanExplainer(const QuerySolution* solution,
+                  boost::optional<OptimizerCounterInfo> optCounterInfo = boost::none)
         : _solution(solution),
           _enumeratorExplainInfo{_solution ? _solution->_enumeratorExplainInfo
-                                           : PlanEnumeratorExplainInfo{}} {}
+                                           : PlanEnumeratorExplainInfo{}},
+          _optCounterInfo(std::move(optCounterInfo)) {}
     PlanExplainer(const PlanEnumeratorExplainInfo& info) : _enumeratorExplainInfo{info} {}
 
     virtual ~PlanExplainer() = default;
@@ -125,13 +131,21 @@ public:
         ExplainOptions::Verbosity verbosity) const = 0;
 
     /**
-     * Returns an object containing what query knobs the planner hit during plan enumeration.
+     * Returns an object containing what query knobs the planner hit during plan enumeration. This
+     * is specific to classic.
      */
     PlanEnumeratorExplainInfo getEnumeratorInfo() const {
         return _enumeratorExplainInfo;
     }
     void updateEnumeratorExplainInfo(const PlanEnumeratorExplainInfo& other) {
         _enumeratorExplainInfo.merge(other);
+    }
+
+    /**
+     * Returns an object containing what query limits the optimizer hit. This is specific to CQF.
+     */
+    OptimizerCounterInfo getOptExplainInfo() const {
+        return _optCounterInfo.get();
     }
 
     void setQuerySolution(const QuerySolution* qs) {
@@ -141,5 +155,6 @@ public:
 protected:
     const QuerySolution* _solution{nullptr};
     PlanEnumeratorExplainInfo _enumeratorExplainInfo;
+    boost::optional<OptimizerCounterInfo> _optCounterInfo;
 };
 }  // namespace mongo

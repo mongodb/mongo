@@ -70,8 +70,9 @@ public:
                      bool isCachedPlan,
                      bool matchesCachedPlan,
                      std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+                     OptimizerCounterInfo optCounterInfo = {},
                      RemoteExplainVector* remoteExplains = nullptr)
-        : PlanExplainer{solution},
+        : PlanExplainer{solution, boost::optional<OptimizerCounterInfo>(std::move(optCounterInfo))},
           _root{root},
           _rootData{data},
           _optimizerData(std::move(optimizerData)),

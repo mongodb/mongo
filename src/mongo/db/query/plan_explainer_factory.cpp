@@ -82,6 +82,7 @@ std::unique_ptr<PlanExplainer> make(
     bool isFromPlanCache,
     bool matchesCachedPlan,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfoSBE,
+    OptimizerCounterInfo optCounterInfo,
     RemoteExplainVector* remoteExplains) {
     if (!debugInfoSBE) {
         debugInfoSBE = std::make_shared<const plan_cache_debug_info::DebugInfoSBE>(
@@ -97,6 +98,7 @@ std::unique_ptr<PlanExplainer> make(
                                               isFromPlanCache,
                                               matchesCachedPlan,
                                               debugInfoSBE,
+                                              std::move(optCounterInfo),
                                               remoteExplains);
 }
 }  // namespace mongo::plan_explainer_factory

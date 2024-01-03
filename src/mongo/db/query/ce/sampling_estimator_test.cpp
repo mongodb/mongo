@@ -78,6 +78,7 @@ TEST(SamplingEstimatorTest, SampleIndexedFields) {
                                 true /*isMultiKey*/}}})}}};
 
     QueryParameterMap qp;
+    OptimizerCounterInfo optCounterInfo;
     // We are not lowering the paths.
     OptPhaseManager phaseManagerForSampling{{{OptPhase::MemoSubstitutionPhase,
                                               OptPhase::MemoExplorationPhase,
@@ -94,7 +95,8 @@ TEST(SamplingEstimatorTest, SampleIndexedFields) {
                                             defaultConvertPathToInterval,
                                             DebugInfo::kDefaultForProd,
                                             {._sqrtSampleSizeEnabled = false},
-                                            qp};
+                                            qp,
+                                            optCounterInfo};
 
     // Used to record the sampling plans.
     ABTVector nodes;
@@ -119,7 +121,8 @@ TEST(SamplingEstimatorTest, SampleIndexedFields) {
         ConstEval::constFold,
         DebugInfo::kDefaultForTests,
         {} /*queryHints*/,
-        qp};
+        qp,
+        optCounterInfo};
 
     PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(rootNode));
 
@@ -171,6 +174,7 @@ TEST(SamplingEstimatorTest, DoNotSampleUnindexedFields) {
                                             "c", CollationOp::Ascending, true /*isMultiKey*/)}})}}};
 
     QueryParameterMap qp;
+    OptimizerCounterInfo optCounterInfo;
     // We are not lowering the paths.
     OptPhaseManager phaseManagerForSampling{{{OptPhase::MemoSubstitutionPhase,
                                               OptPhase::MemoExplorationPhase,
@@ -187,7 +191,8 @@ TEST(SamplingEstimatorTest, DoNotSampleUnindexedFields) {
                                             defaultConvertPathToInterval,
                                             DebugInfo::kDefaultForProd,
                                             {._sqrtSampleSizeEnabled = false},
-                                            qp};
+                                            qp,
+                                            optCounterInfo};
 
     // Used to record the sampling plans.
     ABTVector nodes;
@@ -212,7 +217,8 @@ TEST(SamplingEstimatorTest, DoNotSampleUnindexedFields) {
         ConstEval::constFold,
         DebugInfo::kDefaultForTests,
         {} /*queryHints*/,
-        qp};
+        qp,
+        optCounterInfo};
 
     PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(rootNode));
 
@@ -236,6 +242,7 @@ TEST_F(NodeSBE, SampleTwoPredicatesAtOnceTest) {
     const ProjectionName scanProjName = prefixId.getNextId("scan");
 
     QueryParameterMap qp;
+    OptimizerCounterInfo optCounterInfo;
     ABT tree = translatePipelineToABT(metadata,
                                       *pipeline.get(),
                                       scanProjName,
@@ -259,7 +266,8 @@ TEST_F(NodeSBE, SampleTwoPredicatesAtOnceTest) {
                                             defaultConvertPathToInterval,
                                             DebugInfo::kDefaultForProd,
                                             {._sqrtSampleSizeEnabled = false},
-                                            qp};
+                                            qp,
+                                            optCounterInfo};
 
     // Used to record the sampling plans.
     ABTVector nodes;
@@ -284,7 +292,8 @@ TEST_F(NodeSBE, SampleTwoPredicatesAtOnceTest) {
         ConstEval::constFold,
         DebugInfo::kDefaultForTests,
         {} /*queryHints*/,
-        qp};
+        qp,
+        optCounterInfo};
 
     PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(tree));
 

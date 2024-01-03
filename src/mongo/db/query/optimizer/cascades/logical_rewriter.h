@@ -36,6 +36,7 @@
 #include <string>
 #include <utility>
 
+#include "mongo/db/query/opt_counter_info.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/cascades/logical_rewrites.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
@@ -69,7 +70,8 @@ public:
                     const ConstFoldFn& constFold,
                     const LogicalPropsInterface& logicalPropsDerivation,
                     const CardinalityEstimator& cardinalityEstimator,
-                    const QueryParameterMap& queryParameters);
+                    const QueryParameterMap& queryParameters,
+                    OptimizerCounterInfo& optCounterInfo);
 
     // This is a transient structure. We do not allow copying or moving.
     LogicalRewriter() = delete;
@@ -134,6 +136,8 @@ private:
     const LogicalPropsInterface& _logicalPropsDerivation;
     const CardinalityEstimator& _cardinalityEstimator;
     const QueryParameterMap& _queryParameters;
+    // This tracks notable events during optimization. It is used for explain purposes.
+    OptimizerCounterInfo& _optCounterInfo;
 
     RewriteFnMap _rewriteMap;
 

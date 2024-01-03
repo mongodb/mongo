@@ -793,6 +793,9 @@ boost::optional<ExecParams> tryGetSBEExecutorViaFastPath(
     sbePlan->prepare(data.env.ctx);
     CurOp::get(opCtx)->stopQueryPlanningTimer();
 
+    // Note that since we are not doing any optimization in the fast path (and thus will have
+    // nothing to record for explain purposes), we create an empty OptimizerCounterInfo object
+    // below.
     return {{opCtx,
              nullptr /*solution*/,
              {std::move(sbePlan), std::move(data)},
@@ -802,7 +805,8 @@ boost::optional<ExecParams> tryGetSBEExecutorViaFastPath(
              std::move(sbeYieldPolicy),
              false /*isFromPlanCache*/,
              true /* generatedByBonsai */,
-             nullptr /*pipelineMatchExpr*/}};
+             nullptr /*pipelineMatchExpr*/,
+             {} /* optCounterInfo */}};
 }
 
 boost::optional<ExecParams> tryGetSBEExecutorViaFastPath(
