@@ -49,18 +49,20 @@ namespace mongo::sbe {
  * both. If both a skip of 's' and a limit of 'l' are provided, first skips 's' results and then
  * limits the remaining results to at most 'l'.
  *
+ * Skip and limit values are provided via expressions that are evaluated when the plan is opened.
+ *
  * Debug string formats:
  *
- *  limit limitAmount
- *  limitskip limitAmount skipAmount
+ *  limit limitExpression
+ *  limitskip limitExpression skipExpression
  *
- * If there is just a skip but no limit, the format is "limitskip none skipAmount".
+ * If there is just a skip but no limit, the format is "limitskip none skipExpression".
  */
 class LimitSkipStage final : public PlanStage {
 public:
     LimitSkipStage(std::unique_ptr<PlanStage> input,
-                   boost::optional<long long> limit,
-                   boost::optional<long long> skip,
+                   std::unique_ptr<EExpression> limit,
+                   std::unique_ptr<EExpression> skip,
                    PlanNodeId planNodeId,
                    bool participateInTrialRunTracking = true);
 
@@ -83,9 +85,18 @@ protected:
     }
 
 private:
-    const boost::optional<long long> _limit;
-    const boost::optional<long long> _skip;
-    long long _current;
+    boost::optional<int64_t> _runLimitOrSkipCode(const vm::CodeFragment* code,
+                                                 vm::ByteCode& bytecode);
+
+    std::unique_ptr<EExpression> _limitExpr;
+    std::unique_ptr<EExpression> _skipExpr;
+
+    std::unique_ptr<vm::CodeFragment> _limitCode;
+    std::unique_ptr<vm::CodeFragment> _skipCode;
+
+    boost::optional<int64_t> _limit;
+    boost::optional<int64_t> _skip;
+    int64_t _current;
     bool _isEOF;
     LimitSkipStats _specificStats;
 };

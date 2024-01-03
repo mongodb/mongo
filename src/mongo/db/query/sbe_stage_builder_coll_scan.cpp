@@ -159,8 +159,10 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     // Project out the RecordId we want to resume from as 'seekSlot'.
     auto seekSlot = state.slotId();
     auto projStage = sbe::makeProjectStage(
-        sbe::makeS<sbe::LimitSkipStage>(
-            sbe::makeS<sbe::CoScanStage>(csn->nodeId()), 1, boost::none, csn->nodeId()),
+        sbe::makeS<sbe::LimitSkipStage>(sbe::makeS<sbe::CoScanStage>(csn->nodeId()),
+                                        makeInt64Constant(1),
+                                        nullptr,
+                                        csn->nodeId()),
         csn->nodeId(),
         seekSlot,
         std::move(seekRecordIdExpression));
@@ -228,9 +230,11 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     // 'limit 1' stage on top of the outer branch, as it should produce just a single seek recordId.
     auto innerStage = isResumingTailableScan || !resumeAfterRecordId
         ? std::move(inputStage)
-        : sbe::makeS<sbe::LimitSkipStage>(std::move(inputStage), boost::none, 1, csn->nodeId());
+        : sbe::makeS<sbe::LimitSkipStage>(
+              std::move(inputStage), nullptr, makeInt64Constant(1), csn->nodeId());
     return sbe::makeS<sbe::LoopJoinStage>(
-        sbe::makeS<sbe::LimitSkipStage>(std::move(unionStage), 1, boost::none, csn->nodeId()),
+        sbe::makeS<sbe::LimitSkipStage>(
+            std::move(unionStage), makeInt64Constant(1), nullptr, csn->nodeId()),
         std::move(innerStage),
         sbe::makeSV(),
         sbe::makeSV(seekRecordIdSlot),

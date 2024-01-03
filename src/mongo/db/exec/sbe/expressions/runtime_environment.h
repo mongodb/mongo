@@ -191,6 +191,7 @@ public:
      * Dumps all the slots currently defined in this environment into the given string builder.
      */
     void debugString(StringBuilder* builder) const;
+    std::string toDebugString() const;
 
 private:
     RuntimeEnvironment(const RuntimeEnvironment&);

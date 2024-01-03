@@ -39,6 +39,7 @@
 #include <boost/none.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
@@ -51,14 +52,51 @@
 
 namespace mongo::sbe {
 
-using LimitSkipStageTest = PlanStageTestFixture;
+class LimitSkipStageTest : public PlanStageTestFixture {
+protected:
+    void runLimit200Skip300Test(std::unique_ptr<RuntimeEnvironment> env,
+                                std::unique_ptr<EExpression> limitExpr,
+                                std::unique_ptr<EExpression> skipExpr) {
+        // Make an input array containing 64-integers 0 thru 999, inclusive.
+        auto [inputTag, inputVal] = value::makeNewArray();
+        value::ValueGuard inputGuard{inputTag, inputVal};
+        auto inputView = value::getArrayView(inputVal);
+        int i;
+        for (i = 0; i < 1000; ++i) {
+            inputView->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(i));
+        }
+
+        // Make a "limit 200 skip 300" stage.
+        inputGuard.reset();
+        auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+        auto limit = makeS<LimitSkipStage>(
+            std::move(scanStage), std::move(limitExpr), std::move(skipExpr), kEmptyPlanNodeId);
+
+        auto ctx = makeCompileCtx(std::move(env));
+        auto resultAccessor = prepareTree(ctx.get(), limit.get(), scanSlot);
+
+        // Verify that `limit` produces exactly 300 thru 499, inclusive.
+        for (i = 0; i < 200; ++i) {
+            ASSERT_TRUE(limit->getNext() == PlanState::ADVANCED);
+
+            auto [tag, val] = resultAccessor->getViewOfValue();
+            ASSERT_TRUE(tag == value::TypeTags::NumberInt64);
+            ASSERT_TRUE(value::bitcastTo<int64_t>(val) == i + 300);
+        }
+
+        ASSERT_TRUE(limit->getNext() == PlanState::IS_EOF);
+    }
+};
 
 TEST_F(LimitSkipStageTest, LimitSimpleTest) {
     auto ctx = makeCompileCtx();
 
     // Make a "limit 1000" stage.
     auto limit = makeS<LimitSkipStage>(
-        makeS<CoScanStage>(kEmptyPlanNodeId), 1000, boost::none, kEmptyPlanNodeId);
+        makeS<CoScanStage>(kEmptyPlanNodeId),
+        makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1000)),
+        nullptr,
+        kEmptyPlanNodeId);
 
     prepareTree(ctx.get(), limit.get());
 
@@ -72,34 +110,23 @@ TEST_F(LimitSkipStageTest, LimitSimpleTest) {
 }
 
 TEST_F(LimitSkipStageTest, LimitSkipSimpleTest) {
-    auto ctx = makeCompileCtx();
+    runLimit200Skip300Test(
+        std::make_unique<RuntimeEnvironment>(),
+        makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<long long>(200LL)),
+        makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<long long>(300LL)));
+}
 
-    // Make an input array containing 64-integers 0 thru 999, inclusive.
-    auto [inputTag, inputVal] = value::makeNewArray();
-    value::ValueGuard inputGuard{inputTag, inputVal};
-    auto inputView = value::getArrayView(inputVal);
-    int i;
-    for (i = 0; i < 1000; ++i) {
-        inputView->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(i));
-    }
-
-    // Make a "limit 200 skip 300" stage.
-    inputGuard.reset();
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
-    auto limit = makeS<LimitSkipStage>(std::move(scanStage), 200, 300, kEmptyPlanNodeId);
-
-    auto resultAccessor = prepareTree(ctx.get(), limit.get(), scanSlot);
-
-    // Verify that `limit` produces exactly 300 thru 499, inclusive.
-    for (i = 0; i < 200; ++i) {
-        ASSERT_TRUE(limit->getNext() == PlanState::ADVANCED);
-
-        auto [tag, val] = resultAccessor->getViewOfValue();
-        ASSERT_TRUE(tag == value::TypeTags::NumberInt64);
-        ASSERT_TRUE(value::bitcastTo<int64_t>(val) == i + 300);
-    }
-
-    ASSERT_TRUE(limit->getNext() == PlanState::IS_EOF);
+TEST_F(LimitSkipStageTest, LimitSkipSlotTest) {
+    std::unique_ptr<RuntimeEnvironment> env = std::make_unique<RuntimeEnvironment>();
+    auto limitExpr = makeE<EVariable>(env->registerSlot(value::TypeTags::NumberInt64,
+                                                        value::bitcastFrom<long long>(200LL),
+                                                        false,
+                                                        getSlotIdGenerator()));
+    auto skipExpr = makeE<EVariable>(env->registerSlot(value::TypeTags::NumberInt64,
+                                                       value::bitcastFrom<long long>(300LL),
+                                                       false,
+                                                       getSlotIdGenerator()));
+    runLimit200Skip300Test(std::move(env), std::move(limitExpr), std::move(skipExpr));
 }
 
 }  // namespace mongo::sbe

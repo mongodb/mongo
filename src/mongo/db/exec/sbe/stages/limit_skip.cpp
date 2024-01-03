@@ -42,28 +42,35 @@
 
 namespace mongo::sbe {
 LimitSkipStage::LimitSkipStage(std::unique_ptr<PlanStage> input,
-                               boost::optional<long long> limit,
-                               boost::optional<long long> skip,
+                               std::unique_ptr<EExpression> limit,
+                               std::unique_ptr<EExpression> skip,
                                PlanNodeId planNodeId,
                                bool participateInTrialRunTracking)
     : PlanStage(!skip ? "limit"_sd : "limitskip"_sd, planNodeId, participateInTrialRunTracking),
-      _limit(limit),
-      _skip(skip),
+      _limitExpr(std::move(limit)),
+      _skipExpr(std::move(skip)),
       _current(0),
       _isEOF(false) {
-    invariant(_limit || _skip);
+    invariant(_limitExpr || _skipExpr);
     _children.emplace_back(std::move(input));
-    _specificStats.limit = limit;
-    _specificStats.skip = skip;
 }
 
 std::unique_ptr<PlanStage> LimitSkipStage::clone() const {
-    return std::make_unique<LimitSkipStage>(
-        _children[0]->clone(), _limit, _skip, _commonStats.nodeId, _participateInTrialRunTracking);
+    return std::make_unique<LimitSkipStage>(_children[0]->clone(),
+                                            _limitExpr ? _limitExpr->clone() : nullptr,
+                                            _skipExpr ? _skipExpr->clone() : nullptr,
+                                            _commonStats.nodeId,
+                                            _participateInTrialRunTracking);
 }
 
 void LimitSkipStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
+    if (_limitExpr) {
+        _limitCode = _limitExpr->compile(ctx);
+    }
+    if (_skipExpr) {
+        _skipCode = _skipExpr->compile(ctx);
+    }
 }
 
 value::SlotAccessor* LimitSkipStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -76,6 +83,12 @@ void LimitSkipStage::open(bool reOpen) {
     _commonStats.opens++;
     _isEOF = false;
     _children[0]->open(reOpen);
+
+    vm::ByteCode bytecode;
+    _limit = _runLimitOrSkipCode(_limitCode.get(), bytecode);
+    _skip = _runLimitOrSkipCode(_skipCode.get(), bytecode);
+    _specificStats.limit = _limit;
+    _specificStats.skip = _skip;
 
     if (_skip) {
         for (_current = 0; _current < *_skip && !_isEOF; _current++) {
@@ -107,10 +120,10 @@ std::unique_ptr<PlanStageStats> LimitSkipStage::getStats(bool includeDebugInfo) 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
         if (_limit) {
-            bob.appendNumber("limit", *_limit);
+            bob.appendNumber("limit", static_cast<long long>(*_limit));
         }
         if (_skip) {
-            bob.appendNumber("skip", *_skip);
+            bob.appendNumber("skip", static_cast<long long>(*_skip));
         }
         ret->debugInfo = bob.obj();
     }
@@ -125,11 +138,15 @@ const SpecificStats* LimitSkipStage::getSpecificStats() const {
 
 std::vector<DebugPrinter::Block> LimitSkipStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
-    if (!_skip) {
-        ret.emplace_back(std::to_string(*_limit));
+    if (!_skipExpr) {
+        DebugPrinter::addBlocks(ret, _limitExpr->debugPrint());
     } else {
-        ret.emplace_back(_limit ? std::to_string(*_limit) : "none");
-        ret.emplace_back(std::to_string(*_skip));
+        if (_limitExpr) {
+            DebugPrinter::addBlocks(ret, _limitExpr->debugPrint());
+        } else {
+            ret.emplace_back("none");
+        }
+        DebugPrinter::addBlocks(ret, _skipExpr->debugPrint());
     }
     DebugPrinter::addNewLine(ret);
 
@@ -142,6 +159,23 @@ size_t LimitSkipStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
     size += size_estimator::estimate(_children);
     size += size_estimator::estimate(_specificStats);
+    size += _limitExpr ? _limitExpr->estimateSize() : 0;
+    size += _skipExpr ? _skipExpr->estimateSize() : 0;
     return size;
 }
+
+boost::optional<int64_t> LimitSkipStage::_runLimitOrSkipCode(const vm::CodeFragment* code,
+                                                             vm::ByteCode& bytecode) {
+    if (code == nullptr) {
+        return boost::none;
+    }
+
+    auto [owned, tag, val] = bytecode.run(code);
+    value::ValueGuard guard{owned, tag, val};
+    tassert(8349200,
+            "Expect limit or skip code to return an int64",
+            tag == value::TypeTags::NumberInt64);
+    return value::bitcastTo<int64_t>(val);
+}
+
 }  // namespace mongo::sbe
