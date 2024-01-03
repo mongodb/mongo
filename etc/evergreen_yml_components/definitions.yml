@@ -198,7 +198,6 @@ variables:
   teardown_task:
   - func: "f_expansions_write"
   - func: "attach scons logs"
-  - func: "send scons cedar report"
   - func: "attach report"
   - func: "attach artifacts"
   - func: "attach local resmoke invocation"
@@ -269,7 +268,6 @@ variables:
   - func: "f_expansions_write"
   teardown_task:
   - func: "attach scons logs"
-  - func: "send scons cedar report"
   setup_group_can_fail_task: true
   setup_group:
   - command: manifest.load
@@ -2451,21 +2449,6 @@ functions:
       permissions: public-read
       display_name: SCons stdout log
 
-  "send scons cedar report":
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/scons_metrics_report.sh"
-
-    - command: perf.send
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        bucket: mciuploads
-        prefix: ${task_id}_${execution}
-        file: src/scons_cedar_report.json
-
   "attach report":
     command: attach.results
     params:
@@ -2562,14 +2545,6 @@ functions:
         permissions: public-read
         content_type: application/gzip
         display_name: Cedar Report JSON
-
-    - command: perf.send
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        bucket: mciuploads
-        prefix: ${task_id}_${execution}
-        file: src/build_metrics_cedar_report.json
 
   "attach artifacts":
     command: attach.artifacts
@@ -9355,7 +9330,6 @@ task_groups:
   - func: "f_expansions_write"
   teardown_task:
   - func: "attach scons logs"
-  - func: "send scons cedar report"
   tasks:
   - compile_visibility_test
 
@@ -9381,7 +9355,6 @@ task_groups:
   - func: "f_expansions_write"
   teardown_task:
   - func: "attach scons logs"
-  - func: "send scons cedar report"
   setup_group_can_fail_task: true
   setup_group:
   - command: manifest.load
@@ -9411,7 +9384,6 @@ task_groups:
   - func: "f_expansions_write"
   teardown_task:
   - func: "attach scons logs"
-  - func: "send scons cedar report"
   setup_group_can_fail_task: true
   setup_group:
   - command: manifest.load
