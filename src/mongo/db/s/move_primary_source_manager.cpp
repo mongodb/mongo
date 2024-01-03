@@ -34,6 +34,7 @@
 #include "mongo/db/s/move_primary_source_manager.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
@@ -416,17 +417,20 @@ Status MovePrimarySourceManager::cleanStaleData(OperationContext* opCtx) {
     }
 
     // Only drop the cloned (unsharded) collections.
-    DBDirectClient client(opCtx);
     for (auto& coll : _clonedColls) {
-        BSONObj dropCollResult;
-        client.runCommand(_dbname.toString(), BSON("drop" << coll.coll()), dropCollResult);
-        Status dropStatus = getStatusFromCommandResult(dropCollResult);
-        if (!dropStatus.isOK()) {
+        DropReply unusedDropReply;
+        try {
+            uassertStatusOK(
+                dropCollection(opCtx,
+                               coll,
+                               &unusedDropReply,
+                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops));
+        } catch (const DBException& e) {
             LOGV2(22045,
                   "Failed to drop cloned collection {namespace} in movePrimary: {error}",
                   "Failed to drop cloned collection in movePrimary",
                   "namespace"_attr = coll,
-                  "error"_attr = redact(dropStatus));
+                  "error"_attr = redact(e));
         }
     }
 
