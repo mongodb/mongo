@@ -1080,7 +1080,7 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
     invariant(c);
     ON_BLOCK_EXIT([&] { c->close(c); });
 
-    std::map<string, BSONObjBuilder*> subs;
+    StringMap<BSONObjBuilder*> subs;
     const char* desc;
     uint64_t value;
     while (c->next(c) == 0 && c->get_value(c, &desc, nullptr, &value) == 0) {
@@ -1115,18 +1115,17 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                 continue;
             }
 
-            BSONObjBuilder*& sub = subs[prefix.toString()];
+            BSONObjBuilder*& sub = subs[prefix];
             if (!sub)
                 sub = new BSONObjBuilder();
-            sub->appendNumber(str::ltrim(suffix.toString()), v);
+            sub->appendNumber(str::ltrim(suffix), v);
         }
     }
 
-    for (std::map<string, BSONObjBuilder*>::const_iterator it = subs.begin(); it != subs.end();
-         ++it) {
-        const std::string& s = it->first;
-        bob->append(s, it->second->obj());
-        delete it->second;
+    for (const auto& kvp : subs) {
+        const std::string& s = kvp.first;
+        bob->append(s, kvp.second->obj());
+        delete kvp.second;
     }
     return Status::OK();
 }
