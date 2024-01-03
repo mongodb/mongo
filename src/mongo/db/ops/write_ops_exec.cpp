@@ -179,46 +179,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 namespace mongo::write_ops_exec {
-class Atomic64Metric;
-}  // namespace mongo::write_ops_exec
-
-namespace mongo {
-template <>
-struct BSONObjAppendFormat<write_ops_exec::Atomic64Metric> : FormatKind<NumberLong> {};
-}  // namespace mongo
-
-namespace mongo::write_ops_exec {
-
-/**
- * Atomic wrapper for long long type for Metrics.
- */
-class Atomic64Metric {
-public:
-    /** Set _value to the max of the current or newMax. */
-    void setIfMax(long long newMax) {
-        /*  Note: compareAndSwap will load into val most recent value. */
-        for (long long val = _value.load(); val < newMax && !_value.compareAndSwap(&val, newMax);) {
-        }
-    }
-
-    /** store val into value. */
-    void set(long long val) {
-        _value.store(val);
-    }
-
-    /** Return the current value. */
-    long long get() const {
-        return _value.load();
-    }
-
-    /** TODO: SERVER-73806 Avoid implicit conversion to long long */
-    operator long long() const {
-        return get();
-    }
-
-private:
-    mongo::AtomicWord<long long> _value;
-};
 
 // Convention in this file: generic helpers go in the anonymous namespace. Helpers that are for a
 // single type of operation are static functions defined above their caller.
