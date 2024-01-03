@@ -21,7 +21,6 @@ const denylistedTests = [
     "removeShardFromZone",
     "oidcListKeys",
     "oidcRefreshKeys",
-    "aggregate_$search"  // TODO SERVER-82767 enable this test.
 ];
 
 function runTests(tests, conn, impls, options) {
@@ -37,9 +36,15 @@ const impls = {
         // Some tests requires mongot, however, setting this failpoint will make search queries to
         // return EOF, that way all the hassle of setting it up can be avoided.
         let disableSearchFailpoint;
+        let mongosDisableSearchFailpoint;
         if (testObj.disableSearch) {
             disableSearchFailpoint = configureFailPoint(conn.rs0 ? conn.rs0.getPrimary() : conn,
                                                         'searchReturnEofImmediately');
+            // In a sharded environment, the failpoint must be set on mongos and mongod.
+            if (conn.s0) {
+                mongosDisableSearchFailpoint =
+                    configureFailPoint(conn.s0, 'searchReturnEofImmediately');
+            }
         }
         const testCase = testObj.testcases[0];
 
@@ -61,10 +66,18 @@ const impls = {
         if (disableSearchFailpoint) {
             disableSearchFailpoint.off();
         }
+        if (mongosDisableSearchFailpoint) {
+            mongosDisableSearchFailpoint.off();
+        }
     }
 };
 
-let conn = MongoRunner.runMongod();
+// We have to set the mongotHost parameter for the $search-relatead tests to pass configuration
+// checks.
+const opts = {
+    setParameter: {mongotHost: "localhost:27017"}
+};
+let conn = MongoRunner.runMongod(opts);
 
 // Test with standalone mongod.
 runTests(tests, conn, impls);
@@ -73,7 +86,7 @@ MongoRunner.stopMongod(conn);
 
 // Test with a sharded cluster. Some tests require the first shard's name acquired from the
 // auth commands library to be up-to-date in order to set up correctly.
-conn = new ShardingTest({shards: 1, mongos: 2});
+conn = new ShardingTest({shards: 1, mongos: 2, other: {shardOptions: opts, mongosOptions: opts}});
 runTests(tests, conn, impls, {shard0name: conn.shard0.shardName});
 
 conn.stop();
