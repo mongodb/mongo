@@ -85,6 +85,7 @@ public:
     static constexpr StringData k2dsphereFinestIndexedLevel = "finestIndexedLevel"_sd;
     static constexpr StringData k2dsphereVersionFieldName = "2dsphereIndexVersion"_sd;
     static constexpr StringData kBackgroundFieldName = "background"_sd;
+    static constexpr StringData kBucketSizeFieldName = "bucketSize"_sd;
     static constexpr StringData kCollationFieldName = "collation"_sd;
     static constexpr StringData kDefaultLanguageFieldName = "default_language"_sd;
     static constexpr StringData kDropDuplicatesFieldName = "dropDups"_sd;
