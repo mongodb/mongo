@@ -612,7 +612,7 @@ void collectQueryStatsMongos(OperationContext* opCtx, std::unique_ptr<query_stat
 
     auto snapshot = query_stats::captureMetrics(
         opCtx,
-        opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),
+        query_stats::microsecondsToUint64(opDebug.additiveMetrics.executionTime),
         opDebug.additiveMetrics);
 
     query_stats::writeQueryStats(opCtx, opDebug.queryStatsInfo.keyHash, std::move(key), snapshot);

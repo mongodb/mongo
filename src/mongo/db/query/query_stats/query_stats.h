@@ -206,6 +206,13 @@ struct QueryStatsSnapshot {
     uint64_t queryExecMicros;
     uint64_t firstResponseExecMicros;
     uint64_t docsReturned;
+
+    uint64_t keysExamined;
+    uint64_t docsExamined;
+    bool hasSortStage;
+    bool usedDisk;
+    bool fromMultiPlanner;
+    bool fromPlanCache;
 };
 
 /**

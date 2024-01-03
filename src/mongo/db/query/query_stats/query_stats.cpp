@@ -217,6 +217,14 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
     toUpdate.totalExecMicros.aggregate(snapshot.queryExecMicros);
     toUpdate.firstResponseExecMicros.aggregate(snapshot.firstResponseExecMicros);
     toUpdate.docsReturned.aggregate(snapshot.docsReturned);
+
+    toUpdate.keysExamined.aggregate(snapshot.keysExamined);
+    toUpdate.docsExamined.aggregate(snapshot.docsExamined);
+    toUpdate.hasSortStage.aggregate(snapshot.hasSortStage);
+    toUpdate.usedDisk.aggregate(snapshot.usedDisk);
+    toUpdate.fromMultiPlanner.aggregate(snapshot.fromMultiPlanner);
+    toUpdate.fromPlanCache.aggregate(snapshot.fromPlanCache);
+
     toUpdate.addSupplementalStats(std::move(supplementalStatsEntry));
 }
 
@@ -291,10 +299,18 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
 QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
                                   int64_t firstResponseExecutionTime,
                                   const OpDebug::AdditiveMetrics& metrics) {
+    auto& opDebug = CurOp::get(opCtx)->debug();
+
     QueryStatsSnapshot snapshot{
-        static_cast<uint64_t>(metrics.executionTime.value_or(Microseconds{0}).count()),
+        microsecondsToUint64(metrics.executionTime),
         static_cast<uint64_t>(firstResponseExecutionTime),
         static_cast<uint64_t>(metrics.nreturned.value_or(0)),
+        static_cast<uint64_t>(metrics.keysExamined.value_or(0)),
+        static_cast<uint64_t>(metrics.docsExamined.value_or(0)),
+        opDebug.hasSortStage,
+        opDebug.usedDisk,
+        opDebug.fromMultiPlanner,
+        opDebug.fromPlanCache,
     };
 
     return snapshot;

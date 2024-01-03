@@ -200,8 +200,11 @@ export function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
         assert(expectedKey.hasOwnProperty(field), field);
         assert.eq(expectedKey[field], resultingKey[field]);
     }
+
     // Make sure the resulting key isn't missing any fields.
-    assert.eq(fieldsCounter, Object.keys(expectedKey).length, resultingKey);
+    assert.eq(fieldsCounter,
+              Object.keys(expectedKey).length,
+              "Query Shape Key is missing or has extra fields: " + tojson(resultingKey));
 }
 
 export function assertExpectedResults(results,
@@ -258,6 +261,30 @@ export function assertExpectedResults(results,
             assert.eq(totalExecMicros[field], firstResponseExecMicros[field]);
         }
     }
+}
+
+export function assertAggregatedMetric(results, metricName, {sum, min, max, sumOfSq}) {
+    const {key, metrics, asOf} = results;
+
+    assert.docEq({
+        sum: NumberLong(sum),
+        max: NumberLong(max),
+        min: NumberLong(min),
+        sumOfSquares: NumberLong(sumOfSq)
+    },
+                 metrics[metricName],
+                 `Metric: ${metricName}`);
+}
+
+export function assertAggregatedBoolean(results, metricName, {trueCount, falseCount}) {
+    const {key, metrics, asOf} = results;
+
+    assert.docEq({
+        "true": NumberLong(trueCount),
+        "false": NumberLong(falseCount),
+    },
+                 metrics[metricName],
+                 `Metric: ${metricName}`);
 }
 
 export function asFieldPath(str) {
