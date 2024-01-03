@@ -155,12 +155,8 @@ TEST_F(AggCmdShapeTest, IncludesLet) {
                 "coll": "testColl"
             },
             "let": {
-                "x": {
-                    "$const": 1
-                },
-                "y": {
-                    "$const": "?"
-                }
+                "x":  1,
+                "y": "?"
             },
             "command": "aggregate",
             "pipeline": [

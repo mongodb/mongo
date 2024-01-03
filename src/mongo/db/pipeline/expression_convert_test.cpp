@@ -169,6 +169,32 @@ TEST_F(ExpressionConvertTest, ConvertWithoutToFailsToParse) {
         });
 }
 
+TEST_F(ExpressionConvertTest, RoundTripSerialization) {
+    auto expCtx = getExpCtx();
+
+    // Round-trip serialization of an argument that *looks* like an expression.
+    auto spec = BSON("$convert" << BSON("input" << BSON("$literal" << BSON("$toString"
+                                                                           << "this is a string"))
+                                                << "to"
+                                                << "string"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto serialized = convertExp->serialize(opts);
+    ASSERT_VALUE_EQ(Value(BSON("$convert" << BSON("input" << BSON("?"
+                                                                  << "?")
+                                                          << "to"
+                                                          << BSON("$const"
+                                                                  << "string")))),
+                    serialized);
+
+    auto roundTrip = Expression::parseExpression(expCtx.get(),
+                                                 serialized.getDocument().toBson(),
+                                                 expCtx->variablesParseState)
+                         ->serialize(opts);
+    ASSERT_VALUE_EQ(roundTrip, serialized);
+}
+
 TEST_F(ExpressionConvertTest, InvalidTypeNameFails) {
     auto expCtx = getExpCtx();
 

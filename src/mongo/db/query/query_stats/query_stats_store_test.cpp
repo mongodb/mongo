@@ -222,7 +222,7 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
         fcr->setMaxTimeMS(1000);
         fcr->setNoCursorTimeout(false);
         opCtx->setComment(BSON("comment"
-                               << " foo"));
+                               << " foo bar baz"));
         fcr->setSingleBatch(false);
         fcr->setAllowDiskUse(false);
         fcr->setAllowPartialResults(true);
@@ -1205,12 +1205,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                     "locale": "simple"
                 },
                 "let": {
-                    "HASH<var1>": {
-                        "$const": "?"
-                    },
-                    "HASH<var2>": {
-                        "$const": "?"
-                    }
+                    "HASH<var1>": "?",
+                    "HASH<var2>": "?"
                 },
                 "command": "aggregate",
                 "pipeline": [
@@ -1244,9 +1240,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                                 "$first": "$HASH<d>.HASH<e>"
                             },
                             "HASH<f>": {
-                                "$sum": {
-                                    "$const": 1
-                                }
+                                "$sum": 1
                             }
                         }
                     },

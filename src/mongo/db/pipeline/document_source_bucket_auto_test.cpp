@@ -948,9 +948,7 @@ TEST_F(BucketAutoTests, QueryShapeReParseSerializedStage) {
                 "granularity": "R5",
                 "output": {
                     "count": {
-                        "$sum": {
-                            "$const":1
-                        }
+                        "$sum": 1
                     },
                     "years": {
                         "$push": "$year"

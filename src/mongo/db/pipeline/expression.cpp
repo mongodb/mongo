@@ -115,13 +115,14 @@ Value ExpressionConstant::serializeConstant(const SerializationOptions& opts, Va
     if (val.missing()) {
         return Value("$$REMOVE"_sd);
     }
-    if (opts.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString) {
+    // Debug and representative serialization policies do not wrap constants with $const in order to
+    // reduce verbosity/size of the resulting query shape. The $const is not needed to disambiguate
+    // in these cases, since we never choose a value which could be mis-construed as an expression,
+    // such as a string starting with a '$' or an object with a $-prefixed field name.
+    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
         return opts.serializeLiteral(val);
     }
 
-    // Other serialization policies need to include this $const in order to be unambiguous for
-    // re-parsing this output later. If for example the constant was '$cashMoney' - we don't want to
-    // misinterpret it as a field path when parsing.
     return Value(DOC("$const" << opts.serializeLiteral(val)));
 }
 
