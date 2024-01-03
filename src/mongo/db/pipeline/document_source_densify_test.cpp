@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/util/assert_util.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -65,6 +65,50 @@ Date_t makeDate(std::string dateStr) {
     return statusDate.getValue();
 }
 
+// Helper to verify that generated values relate correctly to the step.
+bool isOnStepRelativeTo(DensifyValue testVal, DensifyValue base, RangeStatement range) {
+    if (testVal.isDate()) {
+
+        auto date = testVal.getDate();
+        auto unit = range.getUnit().value();
+        long long step = range.getStep().coerceToLong();
+        auto baseDate = base.getDate();
+
+        // Months, quarters and years have variable lengths depending on leap days
+        // and days-in-a-month, so a step is not a constant number of milliseconds
+        // across all dates. For these units, we need to iterate through rather
+        // than performing a calculation with modulo. As long as `baseDate` is not
+        // a large number of steps away from the value we're testing (as is true in
+        // our usage with _current as the base), this should not be a performance
+        // issue.
+        if (unit == TimeUnit::month || unit == TimeUnit::quarter || unit == TimeUnit::year) {
+
+            Date_t steppedDate = baseDate;
+            while (steppedDate < date) {
+                steppedDate = dateAdd(steppedDate, unit, step, TimeZoneDatabase::utcZone());
+            }
+            return steppedDate == date;
+        } else {
+            // Steps with units smaller than one month are always constant sized
+            // (because unix time does not have leap seconds), so we can perform
+            // modulo arithmetic.
+            auto testMillis = date.toMillisSinceEpoch();
+            auto baseMillis = baseDate.toMillisSinceEpoch();
+            auto stepDurationInMillis =
+                dateAdd(Date_t::fromMillisSinceEpoch(0), unit, step, TimeZoneDatabase::utcZone())
+                    .toMillisSinceEpoch();
+            auto diff = testMillis - baseMillis;
+            return diff % stepDurationInMillis == 0;
+        }
+    } else if (testVal.isNumber()) {
+        Value diff =
+            uassertStatusOK(ExpressionSubtract::apply(testVal.getNumber(), base.getNumber()));
+        Value remainder = uassertStatusOK(ExpressionMod::apply(diff, range.getStep()));
+        return remainder.getDouble() == 0.0;
+    }
+    return false;
+}
+
 DEATH_TEST(DensifyGeneratorTest, ErrorsIfMinOverMax, "lower or equal to max") {
     Document doc{{"a", 1}};
     size_t counter = 0;
@@ -75,7 +119,8 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfMinOverMax, "lower or equal to max") {
                  doc,
                  doc,
                  ValueComparator(),
-                 &counter),
+                 &counter,
+                 false),
         AssertionException,
         5733303);
 }
@@ -90,7 +135,8 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfStepIsZero, "be positive") {
                  doc,
                  doc,
                  ValueComparator(),
-                 &counter),
+                 &counter,
+                 false),
         AssertionException,
         5733305);
 }
@@ -105,7 +151,8 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsOnMixedValues, "same type") {
                  doc,
                  doc,
                  ValueComparator(),
-                 &counter),
+                 &counter,
+                 false),
         AssertionException,
         5733300);
 }
@@ -120,7 +167,8 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsInDocument, "cannot include 
                  doc,
                  doc,
                  ValueComparator(),
-                 &counter),
+                 &counter,
+                 false),
         AssertionException,
         5733306);
 }
@@ -139,7 +187,8 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsButIsArray, "cannot include 
                  preservedFields,
                  doc,
                  ValueComparator(),
-                 &counter),
+                 &counter,
+                 false),
         AssertionException,
         5733306);
 }
@@ -158,7 +207,8 @@ TEST(DensifyGeneratorTest, ErrorsIfFieldIsInArray) {
                  preservedFields,
                  doc,
                  ValueComparator(),
-                 &counter),
+                 &counter,
+                 false),
         AssertionException,
         5733307);
 }
@@ -173,7 +223,8 @@ TEST(DensifyGeneratorTest, ErrorsIfPrefixOfFieldExists) {
                  doc,
                  doc,
                  ValueComparator(),
-                 &counter),
+                 &counter,
+                 false),
         AssertionException,
         5733308);
 }
@@ -188,7 +239,8 @@ TEST(DensifyGeneratorTest, GeneratesNumericDocumentCorrectly) {
                  Document(),
                  doc,
                  ValueComparator(),
-                 &counter);
+                 &counter,
+                 false);
     ASSERT_FALSE(generator.done());
     Document docOne{{"a", 1}};
     ASSERT_DOCUMENT_EQ(docOne, generator.getNextDocument());
@@ -206,7 +258,8 @@ TEST(DensifyGeneratorTest, GeneratesNumericDocumentCorrectlyWithoutFinalDoc) {
                  Document(),
                  boost::none,
                  ValueComparator(),
-                 &counter);
+                 &counter,
+                 false);
     ASSERT_FALSE(generator.done());
     Document docOne{{"a", 1}};
     ASSERT_DOCUMENT_EQ(docOne, generator.getNextDocument());
@@ -224,7 +277,8 @@ TEST(DensifyGeneratorTest, PreservesIncludeFields) {
                  preserveFields,
                  doc,
                  ValueComparator(),
-                 &counter);
+                 &counter,
+                 false);
     ASSERT_FALSE(generator.done());
     Document docOne{{"b", 1}, {"c", 1}, {"a", 1}};
     ASSERT_DOCUMENT_EQ(docOne, generator.getNextDocument());
@@ -243,7 +297,8 @@ TEST(DensifyGeneratorTest, GeneratesNumberOfNumericDocumentsCorrectly) {
                  Document(),
                  doc,
                  ValueComparator(),
-                 &counter);
+                 &counter,
+                 false);
     for (int curVal = 0; curVal < 10; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", curVal}};
@@ -265,7 +320,8 @@ TEST(DensifyGeneratorTest, WorksWithNonIntegerStepAndPreserveFields) {
                  preserveFields,
                  doc,
                  ValueComparator(),
-                 &counter);
+                 &counter,
+                 false);
     for (double curVal = 0; curVal < 10; curVal += 1.3) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"b", 1}, {"c", 1}, {"a", curVal}};
@@ -286,7 +342,8 @@ TEST(DensifyGeneratorTest, GeneratesOffsetFromMaxDocsCorrectly) {
                  Document(),
                  doc,
                  ValueComparator(),
-                 &counter);
+                 &counter,
+                 false);
     for (int curVal = 1; curVal < 11; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", curVal}};
@@ -308,7 +365,8 @@ TEST(DensifyGeneratorTest, GeneratesAtDottedPathCorrectly) {
                  preservedFields,
                  doc,
                  ValueComparator(),
-                 &counter);
+                 &counter,
+                 false);
     for (int curVal = 1; curVal < 11; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", Document{{"b", 1}, {"c", curVal}}}};
@@ -326,7 +384,8 @@ TEST(DensifyGeneratorTest, GeneratesAtDottedPathCorrectly) {
                          secondPreservedFields,
                          doc,
                          ValueComparator(),
-                         &counter);
+                         &counter,
+                         false);
     for (int curVal = 1; curVal < 11; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", Document{{"b", 1}, {"c", Document{{"d", curVal}}}}}};
@@ -348,7 +407,8 @@ DEATH_TEST(DensifyGeneratorTest, FailsIfDatesAndUnitNotProvided, "date step") {
                                 Document(),
                                 Document(),
                                 ValueComparator(),
-                                &counter),
+                                &counter,
+                                false),
                        AssertionException,
                        5733501);
 }
@@ -362,7 +422,8 @@ DEATH_TEST(DensifyGeneratorTest, FailsIfNumberAndUnitProvided, "non-date") {
                  Document(),
                  Document(),
                  ValueComparator(),
-                 &counter),
+                 &counter,
+                 false),
         AssertionException,
         5733506);
 }
@@ -378,7 +439,8 @@ DEATH_TEST(DensifyGeneratorTest, DateMinMustBeLessThanMax, "lower or equal to") 
                                 Document(),
                                 Document(),
                                 ValueComparator(),
-                                &counter),
+                                &counter,
+                                false),
                        AssertionException,
                        5733502);
 }
@@ -394,7 +456,8 @@ DEATH_TEST(DensifyGeneratorTest, DateStepMustBeInt, "whole number") {
                                 Document(),
                                 Document(),
                                 ValueComparator(),
-                                &counter),
+                                &counter,
+                                false),
                        AssertionException,
                        5733505);
 }
@@ -412,7 +475,8 @@ TEST(DensifyGeneratorTest, GeneratesDatesBySecondCorrectly) {
                               Document(),
                               doc,
                               ValueComparator(),
-                              &counter);
+                              &counter,
+                              false);
     for (int curVal = 1; curVal < 11; curVal += 2) {
         auto appendStr = std::to_string(curVal);
         appendStr.insert(appendStr.begin(), 2 - appendStr.length(), '0');
@@ -438,7 +502,8 @@ TEST(DensifyGeneratorTest, GeneratesDatesByHourCorrectly) {
                               Document(),
                               doc,
                               ValueComparator(),
-                              &counter);
+                              &counter,
+                              false);
     for (int curVal = 1; curVal < 15; curVal += 2) {
         auto appendStr = std::to_string(curVal);
         appendStr.insert(appendStr.begin(), 2 - appendStr.length(), '0');
@@ -464,7 +529,8 @@ TEST(DensifyGeneratorTest, GeneratesDatesByMonthCorrectly) {
                               Document(),
                               doc,
                               ValueComparator(),
-                              &counter);
+                              &counter,
+                              false);
     for (int curVal = 1; curVal < 10; curVal += 2) {
         auto appendStr = std::to_string(curVal);
         appendStr.insert(appendStr.begin(), 2 - appendStr.length(), '0');
@@ -1400,12 +1466,12 @@ TEST_F(DensifyCloneTest, InternalDensifyCanBeCloned) {
 
 TEST(DensifyStepTest, InternalDensifyIsOnStepWithNumbers) {
     auto range = RangeStatement(Value(2), Full(), boost::none);
-    ASSERT_TRUE(DensifyValue(Value(5)).isOnStepRelativeTo(Value(1), range));
+    ASSERT_TRUE(isOnStepRelativeTo(DensifyValue(Value(5)), Value(1), range));
 }
 
 TEST(DensifyStepTest, InternalDensifyIsOffStepWithNumbers) {
     auto range = RangeStatement(Value(2), Full(), boost::none);
-    ASSERT_FALSE(DensifyValue(Value(5)).isOnStepRelativeTo(Value(2), range));
+    ASSERT_FALSE(isOnStepRelativeTo(DensifyValue(Value(5)), Value(2), range));
 }
 
 TEST(DensifyStepTest, InternalDensifyIsOnStepWithSmallDateStep) {
@@ -1413,7 +1479,7 @@ TEST(DensifyStepTest, InternalDensifyIsOnStepWithSmallDateStep) {
     auto val = DensifyValue(makeDate("2021-01-01T00:00:05.000Z"));
     auto base = DensifyValue(makeDate("2021-01-01T00:00:01.000Z"));
 
-    ASSERT_TRUE(val.isOnStepRelativeTo(base, range));
+    ASSERT_TRUE(isOnStepRelativeTo(val, base, range));
 }
 
 TEST(DensifyStepTest, InternalDensifyIsOffStepWithSmallDateStep) {
@@ -1421,7 +1487,7 @@ TEST(DensifyStepTest, InternalDensifyIsOffStepWithSmallDateStep) {
     auto val = DensifyValue(makeDate("2021-01-01T00:00:05.000Z"));
     auto base = DensifyValue(makeDate("2021-01-01T00:00:02.000Z"));
 
-    ASSERT_FALSE(val.isOnStepRelativeTo(base, range));
+    ASSERT_FALSE(isOnStepRelativeTo(val, base, range));
 }
 
 TEST(DensifyStepTest, InternalDensifyIsOnStepWithLargeDateStep) {
@@ -1429,7 +1495,7 @@ TEST(DensifyStepTest, InternalDensifyIsOnStepWithLargeDateStep) {
     auto val = DensifyValue(makeDate("2021-05-01T00:00:00.000Z"));
     auto base = DensifyValue(makeDate("2021-01-01T00:00:00.000Z"));
 
-    ASSERT_TRUE(val.isOnStepRelativeTo(base, range));
+    ASSERT_TRUE(isOnStepRelativeTo(val, base, range));
 }
 
 TEST(DensifyStepTest, InternalDensifyIsOffStepWithLargeDateStep) {
@@ -1437,7 +1503,7 @@ TEST(DensifyStepTest, InternalDensifyIsOffStepWithLargeDateStep) {
     auto val = DensifyValue(makeDate("2021-05-01T00:00:00.000Z"));
     auto base = DensifyValue(makeDate("2021-01-01T00:00:00.000Z"));
 
-    ASSERT_FALSE(val.isOnStepRelativeTo(base, range));
+    ASSERT_FALSE(isOnStepRelativeTo(val, base, range));
 }
 
 TEST(DensifyStepTest, InternalDensifyIsOffStepForDaysWithLargeDateStep) {
@@ -1445,7 +1511,7 @@ TEST(DensifyStepTest, InternalDensifyIsOffStepForDaysWithLargeDateStep) {
     auto val = DensifyValue(makeDate("2021-05-03T00:00:00.000Z"));
     auto base = DensifyValue(makeDate("2021-01-01T00:00:00.000Z"));
 
-    ASSERT_FALSE(val.isOnStepRelativeTo(base, range));
+    ASSERT_FALSE(isOnStepRelativeTo(val, base, range));
 }
 
 TEST_F(DensifyRedactionTest, RedactionDateBounds) {

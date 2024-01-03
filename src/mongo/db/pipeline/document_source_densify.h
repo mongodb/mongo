@@ -30,8 +30,6 @@
 #pragma once
 
 #include <boost/smart_ptr.hpp>
-#include <cstddef>
-#include <iosfwd>
 #include <list>
 #include <set>
 #include <string>
@@ -202,12 +200,6 @@ public:
     }
 
     /**
-     * Checks if the value is exactly on the step defined in the given RangeStatement
-     * relative to the provided base value.
-     */
-    bool isOnStepRelativeTo(DensifyValue base, RangeStatement range) const;
-
-    /**
      * Comparison operator overloads.
      */
     bool operator==(const DensifyValue& rhs) const {
@@ -355,7 +347,8 @@ public:
                      boost::optional<Document> includeFields,
                      boost::optional<Document> finalDoc,
                      ValueComparator comp,
-                     size_t* counter);
+                     size_t* counter,
+                     bool maxInclusive);
         Document getNextDocument();
         bool done() const;
 
@@ -373,6 +366,7 @@ public:
         // The minimum value that this generator will create, therefore the next generated
         // document will have this value.
         DensifyValue _min;
+        bool _maxInclusive = false;
 
         enum class GeneratorState {
             // Generating documents between '_min' and the upper bound.
@@ -451,6 +445,13 @@ private:
         kAbove,
     };
 
+    /**
+     * Helper to pull a document from the previous stage and verify that it is eligible for
+     * densification. Returns a pair where the boolean is true if this doc should be passed through
+     * and false if it can be densified. The second result is the document from the previous stage.
+     */
+    std::pair<bool, DocumentSource::GetNextResult> getAndCheckInvalidDoc();
+
     DensifyValue getDensifyValue(const Document& doc) {
         auto val = DensifyValue::getFromDocument(doc, _field);
         uassert(6053600,
@@ -469,11 +470,15 @@ private:
 
     /**
      * Decides whether or not to build a DocGen and return the first document generated or return
-     * the current doc if the rangeMin + step is greater than rangeMax. Used for both 'full' and
-     * 'partition' bounds.
+     * the current doc if the rangeMin + step is greater than rangeMax.
      */
-    DocumentSource::GetNextResult handleNeedGen(Document currentDoc);
+    DocumentSource::GetNextResult handleNeedGen(Document currentDoc, DensifyValue lastSeen);
 
+    /**
+     * Check whether or not the first document in the partition needs to be densified. Returns the
+     * document this iteration should return.
+     */
+    DocumentSource::GetNextResult checkFirstDocAgainstRangeStart(Document doc);
     /**
      * Checks where the current doc's value lies compared to the range and creates the correct
      * DocGen if needed and returns the next doc.
@@ -481,39 +486,18 @@ private:
     DocumentSource::GetNextResult handleNeedGenExplicit(Document currentDoc);
 
     /**
-     * Takes care of when an EOF has been hit for the explicit case. It checks if we have finished
-     * densifying over the range, and if so changes the state to be kDensify done. Otherwise it
-     * builds a new generator that will finish densifying over the range and changes the state to
-     * kHaveGen. Only used if the input is not partitioned.
-     */
-    DocumentSource::GetNextResult densifyExplicitRangeAfterEOF();
-
-    /**
-     * Decide what to do for the first document in a given partition for explicit range. Either
-     * generate documents between the minimum and the value, or just return it.
-     */
-    DocumentSource::GetNextResult processFirstDocForExplicitRange(Document doc);
-
-    /**
-     * Creates a document generator based on the value passed in, the current _current, and the
-     * ExplicitBounds on the stage. Once created, the state changes to kHaveGenerator and the first
-     * document from the generator is returned.
-     */
-    DocumentSource::GetNextResult processDocAboveExplicitMinBound(Document doc);
-
-    /**
-     * Takes in a value and checks if the value is below, on the bottom, inside, or above the
-     * range, and returns the equivelant state from ValComparedToRange.
-     */
-    ValComparedToRange getPositionRelativeToRange(DensifyValue val);
-
-    /**
-     * Handles when the pSource has been exhausted. In the full case we are done with the
-     * densification process and the state becomes kDensifyDone, however in the explicit case we
-     * may still need to densify over the remainder of the range, so the
-     * densifyExplicitRangeAfterEOF() function is called.
+     * Handles when the pSource has been exhausted. Has different behavior depending on the densify
+     * mode, but generally speaking sets the min/max for what still needs to be done, and then
+     * delegates to helpers to finish densifying each partition individually. In the non-partitioned
+     * case, this is the "trivial" partition of the whole collection.
      */
     DocumentSource::GetNextResult handleSourceExhausted();
+
+    /**
+     * Set up necessary tracking variables based on the densify mode. Only called once at the
+     * beginning of execution.
+     */
+    void initializeState();
 
     /**
      * Handles building a document generator once we've seen an EOF for partitioned input. Min will
@@ -522,52 +506,52 @@ private:
      */
     DocumentSource::GetNextResult finishDensifyingPartitionedInput();
     DocumentSource::GetNextResult finishDensifyingPartitionedInputHelper(
-        DensifyValue max, boost::optional<DensifyValue> minOverride = boost::none);
-
-    /**
-     * Checks if the current document generator is done. If it is and we have finished densifying,
-     * it changes the state to be kDensifyDone. If there is more to densify, the state becomes
-     * kNeedGen. The generator is also deleted.
-     */
-    void resetDocGen(RangeStatement::ExplicitBounds bounds);
-
-    /**
-     * Set up the state for densifying over partitions.
-     */
-    void initializePartitionState(Document initialDoc);
+        DensifyValue max,
+        boost::optional<DensifyValue> minOverride = boost::none,
+        bool maxInclusive = false);
 
     /**
      * Helper to set the value in the partition table.
      */
-    void setPartitionValue(Document doc) {
-        if (_partitionExpr) {
-            auto partitionKey = getDensifyPartition(doc);
-            auto partitionVal = getDensifyValue(doc);
-            SimpleMemoryUsageToken memoryToken{partitionKey.getApproximateSize() +
-                                                   partitionVal.getApproximateSize(),
-                                               &_memTracker};
-            _partitionTable[partitionKey] = {std::move(memoryToken), std::move(partitionVal)};
-            uassert(6007200,
-                    str::stream() << "$densify exceeded memory limit of "
-                                  << _memTracker.maxAllowedMemoryUsageBytes(),
-                    _memTracker.withinMemoryLimit());
-        }
+    void setPartitionValue(Document doc,
+                           boost::optional<DensifyValue> valueOverride = boost::none) {
+        tassert(8246103, "partitionExpr", _partitionExpr);
+        auto partitionKey = getDensifyPartition(doc);
+        auto partitionVal = valueOverride ? *valueOverride : getDensifyValue(doc);
+        SimpleMemoryUsageToken memoryToken{
+            partitionKey.getApproximateSize() + partitionVal.getApproximateSize(), &_memTracker};
+        _partitionTable[partitionKey] = {std::move(memoryToken), std::move(partitionVal)};
+        uassert(6007200,
+                str::stream() << "$densify exceeded memory limit of "
+                              << _memTracker.maxAllowedMemoryUsageBytes(),
+                _memTracker.withinMemoryLimit());
     }
 
     /**
      * Helpers to create doc generators. Sets _docGenerator to the created generator.
      */
+    boost::optional<Document> createIncludeFieldsObj(Document doc);
+    boost::optional<Document> createIncludeFieldsObj(Value val);
+    /**
+     * Create a document generator for the given range statement. The generation will start at 'min'
+     * (inclusive) and will go to the end of the given 'range'. Whether or not a document at the
+     * range maximum depends on 'maxInclusive' -- if true, the range will be inclusive on both ends.
+     * Will output documents that include any given 'includeFields' (with their values) and, if
+     * given, will output 'finalDoc' unchanged at the end of the generated documents.
+     */
     void createDocGenerator(DensifyValue min,
                             RangeStatement range,
                             boost::optional<Document> includeFields,
-                            boost::optional<Document> finalDoc) {
+                            boost::optional<Document> finalDoc,
+                            bool maxInclusive = false) {
         _docGenerator = DocGenerator(min,
                                      range,
                                      _field,
                                      includeFields,
                                      finalDoc,
                                      pExpCtx->getValueComparator(),
-                                     &_docsGenerated);
+                                     &_docsGenerated,
+                                     maxInclusive);
     }
     void createDocGenerator(DensifyValue min, RangeStatement range) {
         createDocGenerator(min, range, boost::none, boost::none);
@@ -579,29 +563,32 @@ private:
 
     boost::optional<DocGenerator> _docGenerator = boost::none;
 
-    /**
-     * The last value seen or generated by the stage that is also in line with the step.
-     */
-    boost::optional<DensifyValue> _current = boost::none;
-
-    // Used to keep track of the bounds for densification in the full case.
-    boost::optional<DensifyValue> _globalMin = boost::none;
-    boost::optional<DensifyValue> _globalMax = boost::none;
+    // Used to keep track of the bounds for densification.
+    // Track the minimum seen across the input set. Should be the first document seen.
+    boost::optional<DensifyValue> _fullDensifyGlobalMin = boost::none;
+    // Track the maximum seen across the input set. Should be the last document seen.
+    boost::optional<DensifyValue> _fullDensifyGlobalMax = boost::none;
+    bool _isFullDensify = false;
+    // Value to store the beginning/end of the densification range. Note that these may also be
+    // stored in the range object we had parsed initially, but we store them here again for easier
+    // access and to avoid using parsing objects during execution.
+    boost::optional<DensifyValue> _rangeDensifyStart = boost::none;
+    boost::optional<DensifyValue> _rangeDensifyEnd = boost::none;
 
     // _partitionExpr has two purposes:
     // 1. to determine which partition a document belongs in.
     // 2. to initialize new documents with the right partition key.
     // For example, if the stage had 'partitionByFields: ["a", "x.y"]' then this expression
     // would be {a: "$a", {x: {y: "$x.y"}}}.
-    boost::intrusive_ptr<ExpressionObject> _partitionExpr;
-
-    bool _eof = false;
+    // In the non-partitioned case, this is set to be a constant expression "true".
+    boost::intrusive_ptr<Expression> _partitionExpr;
 
     enum class DensifyState {
-        kUninitializedOrBelowRange,
+        kUninitialized,
         kNeedGen,
         kHaveGenerator,
-        kFinishingDensify,
+        kFinishingDensifyNoGenerator,
+        kFinishingDensifyWithGenerator,
         kDensifyDone
     };
 
@@ -610,11 +597,16 @@ private:
     size_t _maxDocs = 0;
     SimpleMemoryUsageTracker _memTracker;
 
-    DensifyState _densifyState = DensifyState::kUninitializedOrBelowRange;
+    DensifyState _densifyState = DensifyState::kUninitialized;
+    // The field on which we are densifying.
     FieldPath _field;
+    // The list of partitions we are using to densify taken from the original stage object.
     std::list<FieldPath> _partitions;
+    // Range statement taken from the original stage object.
     RangeStatement _range;
-    // Store of the value we've seen for each partition.
+    // Store of the value we've seen for each partition. In the non-partitioned case should only
+    // have one key -- "true". This allows us to pretend that all input is partitioned and use the
+    // same codepath.
     ValueUnorderedMap<SimpleMemoryUsageTokenWith<DensifyValue>> _partitionTable;
 };
 }  // namespace mongo
