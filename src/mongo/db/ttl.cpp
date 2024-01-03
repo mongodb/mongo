@@ -616,11 +616,6 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
             return false;
 
         const auto& collectionPtr = coll.getCollectionPtr();
-        if (!feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-            collectionPtr->isCapped() && !collectionPtr->isClustered()) {
-            return false;
-        }
 
         if (MONGO_unlikely(hangTTLMonitorWithLock.shouldFail())) {
             LOGV2(22534,

@@ -274,26 +274,21 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
             }
             // Note that TTL deletion is supported on capped clustered collections via bounded
             // collection scan, which does not use an index.
-            if (feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-                !collection->isCapped()) {
-                if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
-                    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                        [svcCtx = opCtx->getServiceContext(),
-                         uuid = collection->uuid(),
-                         indexName,
-                         hasInvalidExpireAfterSeconds](OperationContext*,
-                                                       boost::optional<Timestamp>) {
-                            TTLCollectionCache::get(svcCtx).registerTTLInfo(
-                                uuid,
-                                TTLCollectionCache::Info{indexName, hasInvalidExpireAfterSeconds});
-                        });
-                } else {
-                    TTLCollectionCache::get(opCtx->getServiceContext())
-                        .registerTTLInfo(
-                            collection->uuid(),
+            if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
+                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                    [svcCtx = opCtx->getServiceContext(),
+                     uuid = collection->uuid(),
+                     indexName,
+                     hasInvalidExpireAfterSeconds](OperationContext*, boost::optional<Timestamp>) {
+                        TTLCollectionCache::get(svcCtx).registerTTLInfo(
+                            uuid,
                             TTLCollectionCache::Info{indexName, hasInvalidExpireAfterSeconds});
-                }
+                    });
+            } else {
+                TTLCollectionCache::get(opCtx->getServiceContext())
+                    .registerTTLInfo(
+                        collection->uuid(),
+                        TTLCollectionCache::Info{indexName, hasInvalidExpireAfterSeconds});
             }
         }
 
@@ -515,15 +510,6 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
 
     // Normalise the spec
     const auto normalSpec = IndexCatalog::normalizeIndexSpecs(opCtx, collection, validatedSpec);
-
-    // Check whether this is a TTL index being created on a capped collection.
-    if (collection && collection->isCapped() &&
-        validatedSpec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) &&
-        !feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        MONGO_likely(!ignoreTTLIndexCappedCollectionCheck.shouldFail())) {
-        return {ErrorCodes::CannotCreateIndex, "Cannot create TTL index on a capped collection"};
-    }
 
     // Check whether this is a non-_id index and there are any settings disallowing this server
     // from building non-_id indexes.
