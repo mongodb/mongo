@@ -19,7 +19,8 @@
  *   # convertToCapped requires a global lock and any background operations on the database causes
  *   # it to fail due to not finishing quickly enough.
  *   incompatible_with_concurrency_simultaneous,
- *   requires_collstats, requires_capped
+ *   requires_collstats,
+ *   requires_capped
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
