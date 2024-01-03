@@ -32,7 +32,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - windows-vsCurrent-large
+    - windows-vsCurrent-xlarge
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
@@ -86,7 +86,7 @@ buildvariants:
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
       --win-version-min=win10
       --use-diagnostic-latches=off
-    num_scons_link_jobs_available: 0.25
+    num_scons_link_jobs_available: 0.2
     python: '/cygdrive/c/python/python39/python.exe'
     ext: zip
     scons_cache_scope: shared
@@ -106,7 +106,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-vsCurrent-large
+    - windows-vsCurrent-xxlarge
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen

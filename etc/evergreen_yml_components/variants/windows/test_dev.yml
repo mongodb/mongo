@@ -176,7 +176,7 @@ buildvariants:
   tasks:
   - name: compile_upload_benchmarks_TG
     distros:
-    - windows-vsCurrent-large
+    - windows-vsCurrent-xlarge
   - name: .benchmarks !benchmarks_orphaned_first_half !benchmarks_orphaned_second_half
 
 ### Security Patch-Specific Build Variants ###

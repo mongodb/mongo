@@ -19,7 +19,8 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=windows
       CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+      LIBPATH="c:/sasl/lib"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
       --win-version-min=win10
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python39/python.exe'
@@ -35,7 +36,7 @@ buildvariants:
   tasks:
   - name: compile_test_serial_no_unittests_TG
     distros:
-    - windows-vsCurrent-large
+    - windows-vsCurrent-xlarge
   - name: .aggfuzzer .common !.feature_flag_guarded
   - name: audit
   - name: auth_audit_gen

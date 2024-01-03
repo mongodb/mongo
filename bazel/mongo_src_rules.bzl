@@ -12,18 +12,30 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 # /Oy-               disable frame pointer optimization (overrides /O2, only affects 32-bit)
 # /INCREMENTAL: NO - disable incremental link - avoid the level of indirection for function calls
 
+# /pdbpagesize:16384
+#     windows non optimized builds will cause the PDB to blow up in size, 
+#     this allows a larger PDB. The flag is undocumented at the time of writing
+#     but the microsoft thread which brought about its creation can be found here: 
+#     https://developercommunity.visualstudio.com/t/pdb-limit-of-4-gib-is-likely-to-be-a-problem-in-a/904784
+#
+#     Without this flag MSVC will report a red herring error message, about disk space or invalid path.
+
 WINDOWS_DBG_COPTS = [
     "/MDd",
     "/RTC1",
     "/Od",
+    "/pdbpagesize:16384"
 ]
+
 WINDOWS_OPT_ON_COPTS = [
     "/MD",
     "/O2",
     "/Oy-",
 ]
+
 WINDOWS_OPT_OFF_COPTS = [
-    "-O0",
+    "/Od",
+    "/pdbpagesize:16384"
 ]
 
 WINDOWS_OPT_DBG_COPTS = [
@@ -33,11 +45,13 @@ WINDOWS_OPT_DBG_COPTS = [
     "/Zo",
     "/Oy-",
 ]
+
 WINDOWS_OPT_SIZE_COPTS = [
     "/MD",
     "/Os",
     "/Oy-",
 ]
+
 WINDOWS_RELEASE_COPTS = [
     "/MD",
     "/Od",

@@ -6,7 +6,13 @@ buildvariants:
   modules:
   - enterprise
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include c:/snmp/include"
+      LIBPATH="c:/sasl/lib c:/snmp/lib"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+      --win-version-min=win10
     compile_variant: enterprise-windows-ninja
   tasks:
   - name: compile_ninja_next_TG
@@ -69,7 +75,13 @@ buildvariants:
   modules:
   - enterprise
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include c:/snmp/include"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+      LIBPATH="c:/sasl/lib c:/snmp/lib"
+      --win-version-min=win10
   tasks:
   - name: compile_ninja_default_profile_TG
     distros:
@@ -79,10 +91,10 @@ buildvariants:
     - windows-vsCurrent-xlarge
   - name: compile_ninja_fast_profile_TG
     distros:
-    - windows-vsCurrent-xlarge
+    - windows-vsCurrent-xxlarge
   - name: compile_ninja_compiledb_profile_TG
     distros:
-    - windows-vsCurrent-xlarge
+    - windows-vsCurrent-xxlarge
 
 - name: ubuntu1804-ninja-build-profiles
   display_name: "Ninja Build Profiles: Ubuntu 18.04"
@@ -122,7 +134,12 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --link-model=dynamic
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --link-model=dynamic
     has_packages: false
   tasks:
   - name: compile_ninja_next_TG

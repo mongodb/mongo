@@ -2904,7 +2904,16 @@ elif env.TargetOSIs('windows'):
     env.Append(CCFLAGS=["/MDd" if debugBuild else "/MD"])
 
     if optBuild == "off":
-        env.Append(CCFLAGS=["/Od"])
+        env.Append(
+            CCFLAGS=["/Od"],
+            # windows non optimized builds will cause the PDB to blow up in size,
+            # this allows a larger PDB. The flag is undocumented at the time of writing
+            # but the microsoft thread which brought about its creation can be found here:
+            # https://developercommunity.visualstudio.com/t/pdb-limit-of-4-gib-is-likely-to-be-a-problem-in-a/904784
+            #
+            # Without this flag MSVC will report a red herring error message, about disk space or invalid path.
+            LINKFLAGS=["/pdbpagesize:16384"])
+
         if debugBuild:
             # /RTC1: - Enable Stack Frame Run-Time Error Checking; Reports when a variable is used
             # without having been initialized (implies /Od: no optimizations)

@@ -86,7 +86,7 @@ buildvariants:
       LIBPATH="c:/sasl/lib"
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
-    num_scons_link_jobs_available: 0.5
+    num_scons_link_jobs_available: 0.2
     python: '/cygdrive/c/python/python39/python.exe'
     ext: zip
     scons_cache_scope: shared
@@ -101,7 +101,7 @@ buildvariants:
   tasks:
   - name: compile_test_serial_TG
     distros:
-    - windows-vsCurrent-large
+    - windows-vsCurrent-xlarge
   - name: burn_in_tests_gen
     depends_on:
     - name: version_burn_in_gen
