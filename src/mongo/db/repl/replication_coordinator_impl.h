@@ -840,6 +840,9 @@ private:
 
     class WaiterList {
     public:
+        WaiterList() = delete;
+        WaiterList(Atomic64Metric& waiterCountMetric);
+
         // Adds waiter into the list.
         void add_inlock(const OpTime& opTime, SharedWaiterHandle waiter);
         // Adds a waiter into the list and returns the future of the waiter's promise.
@@ -857,8 +860,13 @@ private:
         void setErrorAll_inlock(Status status);
 
     private:
+        void _updateMetric_inlock();
+
         // Waiters sorted by OpTime.
         std::multimap<OpTime, SharedWaiterHandle> _waiters;
+        // We keep a separate count outside _waiters.size() in order to avoid having to
+        // take a lock to read the metric.
+        Atomic64Metric& _waiterCountMetric;
     };
 
     enum class HeartbeatState { kScheduled = 0, kSent = 1 };

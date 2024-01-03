@@ -105,6 +105,9 @@
 
 namespace mongo {
 namespace repl {
+extern Atomic64Metric& replicationWaiterListMetric;
+extern Atomic64Metric& opTimeWaiterListMetric;
+
 namespace {
 
 using executor::NetworkInterfaceMock;
@@ -5850,6 +5853,138 @@ TEST_F(ReplCoordTest,
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
     ASSERT_OK(statusAndDur.status);
     awaiter.reset();
+}
+
+
+// We need to wait for replication to start waiting before the waiter metric increases.  We
+// return the metric value from the function for the convenience of the assert macro below,
+// which allows us to get a nice assert message without repeating the value.
+template <typename T, typename U>
+U expectMetricIncreaseTo(T& metric, U value) {
+    // If this doesn't go in 10 seconds, something's seriously wrong; even if just a slow machine,
+    // the test will likely fail anyway.
+    constexpr auto timeout = Seconds(10);
+    const auto deadline = Date_t::now() + timeout;
+    U lastValue = metric.get();
+    U curValue = metric.get();
+    while (curValue < value && Date_t::now() <= deadline) {
+        sleepFor(Milliseconds{10});
+        curValue = metric.get();
+        lastValue = curValue;
+    }
+    return curValue;
+}
+
+#define ASSERT_METRIC_INCREASE_TO(metric, value) \
+    ASSERT_EQ(expectMetricIncreaseTo(metric, value), value)
+
+TEST_F(ReplCoordTest, ReplicationWaiterMetrics) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1)
+                                          << BSON("host"
+                                                  << "node3:12345"
+                                                  << "_id" << 2))),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTimeWithTermOne(100, 1),
+                                                        Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+
+    ReplicationAwaiter awaiter1(getReplCoord(), getServiceContext());
+    ReplicationAwaiter awaiter2(getReplCoord(), getServiceContext());
+
+    OpTimeWithTermOne time1(100, 1);
+    OpTimeWithTermOne time2(100, 2);
+    OpTimeWithTermOne time3(100, 3);
+
+    WriteConcernOptions writeConcern;
+    writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
+    writeConcern.w = 2;
+
+    WriteConcernOptions writeConcernLocal;
+    writeConcernLocal.wTimeout = WriteConcernOptions::kNoTimeout;
+    writeConcernLocal.w = 1;
+    writeConcernLocal.syncMode = WriteConcernOptions::SyncMode::UNSET;
+
+    // 2 waiters waiting for 2 nodes to reach time1.
+    awaiter1.setOpTime(time1);
+    awaiter1.setWriteConcern(writeConcern);
+    awaiter1.start();
+    ASSERT_METRIC_INCREASE_TO(replicationWaiterListMetric, 1);
+    ASSERT_EQ(opTimeWaiterListMetric.get(), 0);
+
+    awaiter2.setOpTime(time1);
+    awaiter2.setWriteConcern(writeConcern);
+    awaiter2.start();
+    ASSERT_METRIC_INCREASE_TO(replicationWaiterListMetric, 2);
+    ASSERT_EQ(opTimeWaiterListMetric.get(), 0);
+
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time1, Date_t() + Seconds(100));
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time1));
+    ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter1.getResult();
+    ASSERT_OK(statusAndDur.status);
+    statusAndDur = awaiter2.getResult();
+    ASSERT_OK(statusAndDur.status);
+    ASSERT_EQ(replicationWaiterListMetric.get(), 0);
+    ASSERT_EQ(opTimeWaiterListMetric.get(), 0);
+    awaiter1.reset();
+    awaiter2.reset();
+
+    // 2 nodes waiting for time2, but only locally.
+    awaiter1.setOpTime(time2);
+    awaiter1.setWriteConcern(writeConcernLocal);
+    awaiter1.start();
+    ASSERT_METRIC_INCREASE_TO(opTimeWaiterListMetric, 1);
+    ASSERT_EQ(replicationWaiterListMetric.get(), 0);
+
+    awaiter2.setOpTime(time2);
+    awaiter2.setWriteConcern(writeConcernLocal);
+    awaiter2.start();
+    ASSERT_METRIC_INCREASE_TO(opTimeWaiterListMetric, 2);
+    ASSERT_EQ(replicationWaiterListMetric.get(), 0);
+
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time2, Date_t() + Seconds(100));
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time2));
+    statusAndDur = awaiter1.getResult();
+    ASSERT_OK(statusAndDur.status);
+    statusAndDur = awaiter2.getResult();
+    ASSERT_OK(statusAndDur.status);
+    awaiter1.reset();
+    awaiter2.reset();
+    ASSERT_EQ(replicationWaiterListMetric.get(), 0);
+    ASSERT_EQ(opTimeWaiterListMetric.get(), 0);
+
+    // 2 nodes waiting for time3, one local one not, but we're going to step down first.
+    awaiter1.setOpTime(time3);
+    awaiter1.setWriteConcern(writeConcernLocal);
+    awaiter1.start();
+    ASSERT_METRIC_INCREASE_TO(opTimeWaiterListMetric, 1);
+    ASSERT_EQ(replicationWaiterListMetric.get(), 0);
+
+    awaiter2.setOpTime(time3);
+    awaiter2.setWriteConcern(writeConcern);
+    awaiter2.start();
+    ASSERT_METRIC_INCREASE_TO(replicationWaiterListMetric, 1);
+    ASSERT_EQ(opTimeWaiterListMetric.get(), 1);
+
+    const auto opCtx = makeOperationContext();
+    getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
+
+    statusAndDur = awaiter1.getResult();
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, statusAndDur.status);
+    statusAndDur = awaiter2.getResult();
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, statusAndDur.status);
+    awaiter1.reset();
+    awaiter2.reset();
+    ASSERT_EQ(replicationWaiterListMetric.get(), 0);
+    ASSERT_EQ(opTimeWaiterListMetric.get(), 0);
 }
 
 TEST_F(ReplCoordTest,
