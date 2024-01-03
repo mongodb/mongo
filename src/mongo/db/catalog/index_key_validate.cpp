@@ -617,7 +617,8 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
                     IndexDescriptor::k2dIndexMinFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::k2dIndexMaxFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::k2dsphereCoarsestIndexedLevel == indexSpecElemFieldName ||
-                    IndexDescriptor::k2dsphereFinestIndexedLevel == indexSpecElemFieldName) &&
+                    IndexDescriptor::k2dsphereFinestIndexedLevel == indexSpecElemFieldName ||
+                    IndexDescriptor::kBucketSizeFieldName == indexSpecElemFieldName) &&
                    !indexSpecElem.isNumber()) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "The field '" << indexSpecElemFieldName
