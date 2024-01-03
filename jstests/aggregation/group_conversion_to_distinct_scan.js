@@ -592,8 +592,16 @@ assertPipelineResultsAndExplain({
 // accumulator that includes an expression.
 //
 assertPipelineResultsAndExplain({
-    pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$last: {$add: ["$b", "$c"]}}}}],
-    expectedOutput: [{_id: null, accum: 2.5}, {_id: 1, accum: 5}, {_id: 2, accum: 4}],
+    pipeline: [
+        {$sort: {a: 1, b: 1}},
+        {$group: {_id: "$a", accum: {$last: {$add: ["$b", "$c"]}}}},
+        /* There are 2 documents with {a: null}, one of which is missing that key entirely.
+         * Because those compare equal, we don't know whether the $last one will be the one
+         * matching {c: 1} or {c: 1.5}. To make the test deterministic, we add 0.6 to
+         * whatever result we get and round it to the nearest integer. */
+        {$project: {_id: "$_id", accum: {$round: [{$add: ["$accum", 0.6]}, 0]}}}
+    ],
+    expectedOutput: [{_id: null, accum: 3.0}, {_id: 1, accum: 6}, {_id: 2, accum: 5}],
     validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {a: 1, b: 1, c: 1}),
 });
 

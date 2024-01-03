@@ -58,7 +58,7 @@ assert.commandWorked(coll.insert(documents));
 pipeline = [
     {$project: {_id: 0}},
     {$densify: {field: "val", range: {step: 1, bounds: "partition"}, partitionByFields: ["part"]}},
-    {$fill: {output: {toFill: {method: "locf"}}, partitionByFields: ["part"]}}
+    {$fill: {sortBy: {val: 1}, output: {toFill: {method: "locf"}}, partitionByFields: ["part"]}},
 ];
 result = coll.aggregate(pipeline).toArray();
 
@@ -87,7 +87,7 @@ assertArrayEq({actual: result, expected: expected});
 pipeline = [
     {$project: {_id: 0}},
     {$densify: {field: "val", range: {step: 1, bounds: "full"}, partitionByFields: ["part"]}},
-    {$fill: {output: {toFill: {method: "locf"}}, partitionByFields: ["part"]}}
+    {$fill: {sortBy: {val: 1}, output: {toFill: {method: "locf"}}, partitionByFields: ["part"]}}
 ];
 result = coll.aggregate(pipeline).toArray();
 

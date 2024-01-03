@@ -915,7 +915,7 @@ private:
 
     void sort() {
         STLComparator less(this->_comp);
-        std::stable_sort(_data.begin(), _data.end(), less);
+        std::sort(_data.begin(), _data.end(), less);
         this->_stats.incrementNumSorted(_data.size());
         auto& memPool = this->_memPool;
         if (memPool) {
@@ -1194,7 +1194,7 @@ private:
         if (_data.size() == this->_opts.limit) {
             std::sort_heap(_data.begin(), _data.end(), less);
         } else {
-            std::stable_sort(_data.begin(), _data.end(), less);
+            std::sort(_data.begin(), _data.end(), less);
         }
 
         this->_stats.incrementBytesSorted(this->_stats.memUsage());

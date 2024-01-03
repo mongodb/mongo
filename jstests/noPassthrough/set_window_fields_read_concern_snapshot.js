@@ -53,11 +53,11 @@ let pipeline = [
     {
         $setWindowFields: {
             partitionBy: "$partition",
-            sortBy: {partition: 1},
+            sortBy: {partition: 1, val: 1},
             output: {sum: {$sum: "$val", window: {documents: [lowerBound, upperBound]}}}
         }
     },
-    {$sort: {val: 1}},
+    {$sort: {val: 1, partition: 1}},
 ];
 let aggregationCommand = {
     aggregate: coll.getName(),
