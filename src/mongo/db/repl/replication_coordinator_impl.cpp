@@ -177,6 +177,11 @@ CounterMetric userOpsRunning("repl.stateTransition.userOperationsRunning");
 CounterMetric numAutoReconfigsForRemovalOfNewlyAddedFields(
     "repl.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields");
 
+Atomic64Metric& replicationWaiterListMetric =
+    makeServerStatusMetric<Atomic64Metric>("repl.waiters.replication");
+Atomic64Metric& opTimeWaiterListMetric =
+    makeServerStatusMetric<Atomic64Metric>("repl.waiters.opTime");
+
 using namespace fmt::literals;
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -214,15 +219,24 @@ constexpr StringData kQuiesceModeShutdownMessage =
 
 }  // namespace
 
+ReplicationCoordinatorImpl::WaiterList::WaiterList(Atomic64Metric& waiterCountMetric)
+    : _waiterCountMetric(waiterCountMetric) {}
+
+void ReplicationCoordinatorImpl::WaiterList::_updateMetric_inlock() {
+    _waiterCountMetric.set(_waiters.size());
+}
+
 void ReplicationCoordinatorImpl::WaiterList::add_inlock(const OpTime& opTime,
                                                         SharedWaiterHandle waiter) {
     _waiters.emplace(opTime, std::move(waiter));
+    _updateMetric_inlock();
 }
 
 SharedSemiFuture<void> ReplicationCoordinatorImpl::WaiterList::add_inlock(
     const OpTime& opTime, boost::optional<WriteConcernOptions> wc) {
     auto pf = makePromiseFuture<void>();
     _waiters.emplace(opTime, std::make_shared<Waiter>(std::move(pf.promise), std::move(wc)));
+    _updateMetric_inlock();
     return std::move(pf.future);
 }
 
@@ -230,6 +244,7 @@ bool ReplicationCoordinatorImpl::WaiterList::remove_inlock(SharedWaiterHandle wa
     for (auto iter = _waiters.begin(); iter != _waiters.end(); iter++) {
         if (iter->second == waiter) {
             _waiters.erase(iter);
+            _updateMetric_inlock();
             return true;
         }
     }
@@ -253,6 +268,7 @@ void ReplicationCoordinatorImpl::WaiterList::setValueIf_inlock(Func&& func,
             it = _waiters.erase(it);
         }
     }
+    _updateMetric_inlock();
 }
 
 void ReplicationCoordinatorImpl::WaiterList::setValueAll_inlock() {
@@ -260,6 +276,7 @@ void ReplicationCoordinatorImpl::WaiterList::setValueAll_inlock() {
         waiter->promise.emplaceValue();
     }
     _waiters.clear();
+    _updateMetric_inlock();
 }
 
 void ReplicationCoordinatorImpl::WaiterList::setErrorAll_inlock(Status status) {
@@ -268,6 +285,7 @@ void ReplicationCoordinatorImpl::WaiterList::setErrorAll_inlock(Status status) {
         waiter->promise.setError(status);
     }
     _waiters.clear();
+    _updateMetric_inlock();
 }
 
 namespace {
@@ -327,6 +345,8 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _topCoord(std::move(topCoord)),
       _replExecutor(std::move(executor)),
       _externalState(std::move(externalState)),
+      _replicationWaiterList(replicationWaiterListMetric),
+      _opTimeWaiterList(opTimeWaiterListMetric),
       _inShutdown(false),
       _memberState(MemberState::RS_STARTUP),
       _rsConfigState(kConfigPreStart),
