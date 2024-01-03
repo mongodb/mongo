@@ -1758,12 +1758,22 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForReadUntil(OperationContext*
 Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
                                                     OpTime targetOpTime,
                                                     boost::optional<Date_t> deadline) {
-    if (!_externalState->oplogExists(opCtx)) {
-        return {ErrorCodes::NotYetInitialized, "The oplog does not exist."};
-    }
-
     {
         stdx::unique_lock lock(_mutex);
+
+        // During rollback the oplog collection gets reset, this non-lock protected access of the
+        // oplog collection is racey with it being set. We do not want to acquire a lock here since
+        // this is a blocking call, so we opt to fail the wait if we are in rollback since we cannot
+        // guarantee the oplog contents.
+        if (_memberState.rollback()) {
+            return {ErrorCodes::InterruptedDueToReplStateChange,
+                    "Unable to wait for wait for op time while node is in rollback."};
+        }
+
+        if (!_externalState->oplogExists(opCtx)) {
+            return {ErrorCodes::NotYetInitialized, "The oplog does not exist."};
+        }
+
         if (targetOpTime > _getMyLastAppliedOpTime_inlock()) {
             if (_inShutdown) {
                 return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
