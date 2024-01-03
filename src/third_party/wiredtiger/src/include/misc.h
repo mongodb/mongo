@@ -44,7 +44,7 @@
 
 #define WT_MINUTE (60)
 
-#define WT_PROGRESS_MSG_PERIOD (20)
+#define WT_PROGRESS_MSG_PERIOD (20) /* Seconds. */
 
 #define WT_KILOBYTE (1024)
 #define WT_MEGABYTE (1048576)
