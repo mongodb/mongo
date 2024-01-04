@@ -139,6 +139,13 @@ void appendSingleStatusToWriteErrors(const Status& status,
     replyBase->setWriteErrors(errors);
 }
 
+void appendPossibleWriteConcernErrorToReply(const WriteConcernErrorDetail& wce,
+                                            write_ops::WriteCommandReplyBase* replyBase) {
+    if (wce.isValid(nullptr)) {
+        replyBase->setWriteConcernError(wce.toBSON());
+    }
+}
+
 void replyToResponse(OperationContext* opCtx,
                      write_ops::WriteCommandReplyBase* replyBase,
                      BatchedCommandResponse* response) {
@@ -149,6 +156,13 @@ void replyToResponse(OperationContext* opCtx,
             response->addToErrDetails(error);
         }
     }
+
+    if (auto& wcErrorObj = replyBase->getWriteConcernError()) {
+        auto wcError = std::make_unique<WriteConcernErrorDetail>();
+        wcError->parseBSON(wcErrorObj.value(), nullptr);
+        response->setWriteConcernError(wcError.release());
+    }
+
     if (auto& retriedStmtIds = replyBase->getRetriedStmtIds()) {
         response->setRetriedStmtIds(*retriedStmtIds);
     }
@@ -448,6 +462,7 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     auto documents = insertRequest.getDocuments();
 
     std::vector<write_ops::WriteError> writeErrors;
+    WriteConcernErrorDetail wcError;
     int32_t stmtId = getStmtIdForWriteAt(insertRequest, 0);
     uint32_t iter = 0;
     uint32_t numDocs = 0;
@@ -484,12 +499,24 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
                 break;
             }
         } else if (!swResult.getValue().getEffectiveStatus().isOK()) {
-            writeErrors.push_back(
-                write_ops::WriteError(iter, swResult.getValue().getEffectiveStatus()));
-            // If the request is ordered (inserts are ordered by default) we will return
-            // early.
-            if (insertRequest.getOrdered()) {
-                break;
+            auto& commitResult = swResult.getValue();
+
+            if (commitResult.wcError.isValid(nullptr)) {
+                commitResult.wcError.cloneTo(&wcError);
+            }
+
+            if (!commitResult.cmdStatus.isOK()) {
+                writeErrors.push_back(
+                    write_ops::WriteError(iter, swResult.getValue().getEffectiveStatus()));
+                // If the request is ordered (inserts are ordered by default) we will return
+                // early.
+                if (insertRequest.getOrdered()) {
+                    break;
+                }
+            } else {
+                // If it gets here, then we merely have a write concern error.
+                // The commit succeeded, only that the WC failed to be satisfied.
+                numDocs++;
             }
         } else {
             if (auto& stmtIds = reply->getRetriedStmtIds()) {
@@ -509,6 +536,7 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     if (!retriedStmtIds.empty()) {
         writeBase.setRetriedStmtIds(std::move(retriedStmtIds));
     }
+    appendPossibleWriteConcernErrorToReply(wcError, &writeBase);
     returnReply.setWriteCommandReplyBase(writeBase);
 
     return {FLEBatchResult::kProcessed, returnReply};
@@ -590,8 +618,13 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
 
         appendSingleStatusToWriteErrors(swResult.getStatus(), &reply->getWriteCommandReplyBase());
     } else if (!swResult.getValue().getEffectiveStatus().isOK()) {
-        appendSingleStatusToWriteErrors(swResult.getValue().getEffectiveStatus(),
-                                        &reply->getWriteCommandReplyBase());
+        auto& commitResult = swResult.getValue();
+        appendPossibleWriteConcernErrorToReply(commitResult.wcError,
+                                               &reply->getWriteCommandReplyBase());
+        if (!commitResult.cmdStatus.isOK()) {
+            appendSingleStatusToWriteErrors(commitResult.cmdStatus,
+                                            &reply->getWriteCommandReplyBase());
+        }
     }
 
     return *reply;
@@ -683,8 +716,13 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
 
         appendSingleStatusToWriteErrors(swResult.getStatus(), &reply->getWriteCommandReplyBase());
     } else if (!swResult.getValue().getEffectiveStatus().isOK()) {
-        appendSingleStatusToWriteErrors(swResult.getValue().getEffectiveStatus(),
-                                        &reply->getWriteCommandReplyBase());
+        auto& commitResult = swResult.getValue();
+        appendPossibleWriteConcernErrorToReply(commitResult.wcError,
+                                               &reply->getWriteCommandReplyBase());
+        if (!commitResult.cmdStatus.isOK()) {
+            appendSingleStatusToWriteErrors(commitResult.cmdStatus,
+                                            &reply->getWriteCommandReplyBase());
+        }
     }
 
     return *reply;
@@ -810,6 +848,18 @@ std::shared_ptr<write_ops::FindAndModifyCommandRequest> constructDefaultReply() 
     return std::make_shared<write_ops::FindAndModifyCommandRequest>(NamespaceString::kEmpty);
 }
 
+template <typename ReplyType>
+void addWriteConcernErrorInfoToReply(const WriteConcernErrorDetail& wce, ReplyType* reply) {
+    return;
+}
+template <>
+void addWriteConcernErrorInfoToReply(const WriteConcernErrorDetail& wce,
+                                     write_ops::FindAndModifyCommandReply* reply) {
+    if (wce.isValid(nullptr)) {
+        reply->setWriteConcernError(wce.toBSON());
+    }
+}
+
 /**
  * Extracts update payloads from a {findAndModify: nss, ...} request,
  * and proxies to `validateInsertUpdatePayload()`.
@@ -920,7 +970,11 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     if (!swResult.isOK()) {
         return swResult.getStatus();
     } else if (!swResult.getValue().getEffectiveStatus().isOK()) {
-        return swResult.getValue().getEffectiveStatus();
+        auto& commitResult = swResult.getValue();
+        addWriteConcernErrorInfoToReply(commitResult.wcError, reply.get());
+        if (!commitResult.cmdStatus.isOK()) {
+            return commitResult.cmdStatus;
+        }
     }
 
     return std::pair<ReplyType, OpMsgRequest>{*reply, ownedRequest};
