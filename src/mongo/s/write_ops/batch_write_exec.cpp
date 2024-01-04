@@ -661,11 +661,11 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
 
         BatchedCommandResponse batchedCommandResponse;
         Status responseStatus = response.swResponse.getStatus();
+        std::string errMsg;
+        if (!batchedCommandResponse.parseBSON(response.swResponse.getValue().data, &errMsg)) {
+            responseStatus = {ErrorCodes::FailedToParse, errMsg};
+        }
         if (responseStatus.isOK()) {
-            std::string errMsg;
-            if (!batchedCommandResponse.parseBSON(response.swResponse.getValue().data, &errMsg)) {
-                responseStatus = {ErrorCodes::FailedToParse, errMsg};
-            }
             bool abortBatch = processResponseFromRemote(
                 opCtx, targeter, shardInfo, batchedCommandResponse, batchOp, batch, stats);
             // Since we are not in a transaction we can not abort on Write Errors and the following
