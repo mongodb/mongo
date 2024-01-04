@@ -104,6 +104,7 @@ format_binary="./t"
 home="."
 live_record_binary=""
 minutes=0
+out_of_space_detected=0
 parallel_jobs=8
 quit=0
 skip_errors=0
@@ -383,6 +384,24 @@ report_failure()
 	echo "$name: failure status reported" > $dir/$status
 }
 
+# Report all running CONFIGs
+report_running_configs()
+{
+	echo "############################################"
+	echo "Out of disk space detected, outputting non-failed CONFIGs"
+	echo "############################################"
+	list=$(ls $home | grep '^RUNDIR.[0-9]*.log')
+	for i in $list; do
+		dir="$home/${i%.*}"
+
+		# Note the directory may not yet exist, only the log file
+		[[ -d "$dir" ]] || continue
+
+		echo "$dir/CONFIG:"
+		sed 's/^/    /' < $dir/CONFIG
+	done
+}
+
 # Wait for a process to die. Handle both child and non-child processes.
 # $1 pid
 # Return <exit code> of process if child or 127 if non-child
@@ -484,8 +503,10 @@ resolve()
 			continue
 		}
 
-		# Check for Evergreen running out of disk space, and forcibly quit.
+		# Check for running out of disk space and forcibly quit.
 		grep -E -i 'no space left on device' $log > /dev/null && {
+			out_of_space_detected=1
+			report_failure $dir
 			rm -rf $dir $log $rec_dir
 			force_quit_reason "job in $dir ran out of disk space"
 			continue
@@ -690,6 +711,8 @@ while :; do
 	[[ $force_quit -eq 0 ]] && [[ $running -ge $parallel_jobs ]] && sleep 8
 	sleep 2
 done
+
+[[ $out_of_space_detected -eq 1 ]] && report_running_configs
 
 msg "$success successful jobs, $failure failed jobs"
 
