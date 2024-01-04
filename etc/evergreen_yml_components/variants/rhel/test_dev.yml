@@ -277,7 +277,6 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: streams
-  - name: streams_auth
   - name: streams_kafka
   - name: vector_search
   - name: vector_search_auth
@@ -1012,7 +1011,6 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: streams
-  - name: streams_auth
   - name: query_stats_aggregation_passthrough
   - name: query_stats_mongos_aggregation_passthrough
   - name: query_stats_mongos_passthrough
@@ -1264,7 +1262,6 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: streams
-  - name: streams_auth
   - name: streams_kafka
   - name: vector_search
   - name: vector_search_auth

@@ -1206,5 +1206,4 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
   - name: streams
-  - name: streams_auth
   - name: streams_kafka

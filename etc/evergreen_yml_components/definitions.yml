@@ -8565,13 +8565,6 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
-  name: streams_auth
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
   name: streams_kafka
   tags: []
   commands:

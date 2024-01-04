@@ -304,7 +304,6 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: streams
-  - name: streams_auth
   - name: streams_kafka
   - name: vector_search
   - name: vector_search_auth
@@ -649,7 +648,6 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
   - name: streams
-  - name: streams_auth
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
   - name: .serverless
@@ -816,7 +814,6 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: streams
-  - name: streams_auth
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
