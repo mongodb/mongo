@@ -5351,7 +5351,7 @@ buildvariants:
     # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
     # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
     additional_env_vars: |
       export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     # We don't run C++ memory sanitized testing as it creates false positives. MSAN also causes

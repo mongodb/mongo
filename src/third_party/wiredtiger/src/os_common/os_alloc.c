@@ -214,6 +214,7 @@ __wt_realloc_aligned(
          * Sometimes we're allocating memory and we don't care about the final length --
          * bytes_allocated_ret may be NULL.
          */
+        newp = NULL;
         p = *(void **)retp;
         bytes_allocated = (bytes_allocated_ret == NULL) ? 0 : *bytes_allocated_ret;
         WT_ASSERT(session,
