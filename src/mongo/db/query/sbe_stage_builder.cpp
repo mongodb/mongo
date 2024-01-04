@@ -178,11 +178,10 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
     if (cq.cqPipeline().empty() || !cq.isSearchQuery() || !cq.getExpCtxRaw()->uuid) {
         return;
     }
-    auto& searchHelper = getSearchHelpers(cq.getOpCtx()->getServiceContext());
-    auto stage = cq.cqPipeline().front().get();
 
     // Build a SearchNode in order to retrieve the search info.
-    auto sn = searchHelper->getSearchNode(stage);
+    auto sn = SearchNode::getSearchNode(cq.cqPipeline().front().get());
+
     auto& env = data->env;
 
     // Set values for QSN slots.

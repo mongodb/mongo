@@ -68,7 +68,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_skip.h"
-#include "mongo/db/pipeline/search_helper.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collation_spec.h"
@@ -746,13 +746,13 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
     auto svcCtx = opCtx->getServiceContext();
     if (svcCtx) {
         if (shardDispatchResults.pipelineForSingleShard) {
-            getSearchHelpers(svcCtx)->assertSearchMetaAccessValid(
+            search_helpers::assertSearchMetaAccessValid(
                 shardDispatchResults.pipelineForSingleShard->getSources(), expCtx.get());
         } else {
             tassert(7972499,
                     "Must have split pipeline if 'pipelineForSingleShard' not present",
                     shardDispatchResults.splitPipeline);
-            getSearchHelpers(svcCtx)->assertSearchMetaAccessValid(
+            search_helpers::assertSearchMetaAccessValid(
                 shardDispatchResults.splitPipeline->shardsPipeline->getSources(),
                 shardDispatchResults.splitPipeline->mergePipeline->getSources(),
                 expCtx.get());

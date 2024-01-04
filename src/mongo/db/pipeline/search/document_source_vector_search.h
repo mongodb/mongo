@@ -31,7 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/query/vector_search/document_source_vector_search_gen.h"
+#include "mongo/db/pipeline/search/document_source_vector_search_gen.h"
 #include "mongo/executor/task_executor_cursor.h"
 
 namespace mongo {

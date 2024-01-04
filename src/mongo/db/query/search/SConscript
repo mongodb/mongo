@@ -7,42 +7,16 @@ env = env.Clone()
 env.SConscript(dirs=['mongotmock'], exports=['env'])
 
 env.Library(
-    target='document_source_search',
+    target='mongot_cursor',
     source=[
-        'document_source_search.cpp',
-        'document_source_search_meta.cpp',
-        'document_source_internal_search_id_lookup.cpp',
-        'document_source_internal_search_mongot_remote.cpp',
-        'document_source_internal_search_mongot_remote.idl',
         'mongot_cursor.cpp',
-        'plan_sharded_search.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
-        '$BUILD_DIR/mongo/db/query/plan_executor',
-        '$BUILD_DIR/mongo/db/shard_filterer',
-        '$BUILD_DIR/mongo/db/shard_role_api',
+        '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
+        '$BUILD_DIR/mongo/db/query/plan_yield_policy',
         '$BUILD_DIR/mongo/executor/task_executor_cursor',
         'mongot_options',
         'search_task_executors',
-    ],
-)
-
-env.Library(
-    target='document_source_list_search_indexes',
-    source=[
-        'document_source_list_search_indexes.cpp',
-        'document_source_list_search_indexes.idl',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/search_index_commands',
-        'search_index_helpers_interface',
     ],
 )
 
@@ -100,28 +74,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/auth_checks',
         '$BUILD_DIR/mongo/db/auth/authorization_session_test_fixture',
-        'document_source_list_search_indexes',
-    ],
-)
-
-env.CppUnitTest(
-    target='db_query_search_test',
-    source=[
-        'document_source_search_test.cpp',
-        'document_source_search_meta_test.cpp',
-        'document_source_internal_search_id_lookup_test.cpp',
-        'document_source_internal_search_mongot_remote_test.cpp',
-        'document_source_list_search_indexes_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util',
-        '$BUILD_DIR/mongo/db/pipeline/document_source_mock',
-        '$BUILD_DIR/mongo/db/service_context_non_d',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'document_source_list_search_indexes',
-        'document_source_search',
-        'mongot_options',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
     ],
 )
 

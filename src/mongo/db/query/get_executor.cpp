@@ -105,7 +105,7 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/search_helper.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -1620,11 +1620,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
         plan_cache_util::updatePlanCache(opCtx, collections, *cq, *solutions[0], *root, data);
     }
 
-    auto& searchHelper = getSearchHelpers(cq->getOpCtx()->getServiceContext());
-    auto remoteCursors =
-        cq->getExpCtx()->explain ? nullptr : searchHelper->getSearchRemoteCursors(cq->cqPipeline());
+    auto remoteCursors = cq->getExpCtx()->explain
+        ? nullptr
+        : search_helpers::getSearchRemoteCursors(cq->cqPipeline());
     auto remoteExplains = cq->getExpCtx()->explain
-        ? searchHelper->getSearchRemoteExplains(cq->getExpCtxRaw(), cq->cqPipeline())
+        ? search_helpers::getSearchRemoteExplains(cq->getExpCtxRaw(), cq->cqPipeline())
         : nullptr;
 
     // Prepare the SBE tree for execution.

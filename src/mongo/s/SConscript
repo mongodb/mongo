@@ -453,11 +453,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory',
         '$BUILD_DIR/mongo/db/process_health/fault_manager',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
-        # TODO SERVER-83717 Remove these dependencies on search-related document sources once
-        # they're moved into libpipeline.
-        '$BUILD_DIR/mongo/db/query/search/document_source_list_search_indexes',
-        '$BUILD_DIR/mongo/db/query/search/document_source_search',
-        '$BUILD_DIR/mongo/db/query/vector_search/document_source_vector_search',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/server_options_base',

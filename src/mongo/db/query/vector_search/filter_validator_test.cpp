@@ -27,13 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/vector_search/document_source_vector_search.h"
 #include "mongo/db/query/vector_search/filter_validator.h"
 
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {

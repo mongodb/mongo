@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/query/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 
 namespace mongo {
 

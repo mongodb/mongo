@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "document_source_list_search_indexes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/authorization_checks.h"
@@ -35,6 +34,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util.h"
 

@@ -93,7 +93,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-#include "mongo/db/pipeline/search_helper.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -721,15 +721,14 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createAdditionalPipeline
     auto expCtx = pipeline->getContext();
 
     // Exchange is not allowed to be specified if there is a $search stage.
-    if (auto& searchHelpers = getSearchHelpers(expCtx->opCtx->getServiceContext());
-        searchHelpers && searchHelpers->isSearchPipeline(pipeline.get())) {
+    if (search_helpers::isSearchPipeline(pipeline.get())) {
         // Release locks early, before we generate the search pipeline, so that we don't hold them
         // during network calls to mongot. This is fine for search pipelines since they are not
         // reading any local (lock-protected) data in the main pipeline.
         resetContextFn();
         pipelines.push_back(std::move(pipeline));
 
-        if (auto metadataPipe = searchHelpers->generateMetadataPipelineForSearch(
+        if (auto metadataPipe = search_helpers::generateMetadataPipelineForSearch(
                 expCtx->opCtx, expCtx, request, pipelines.back().get(), expCtx->uuid)) {
             pipelines.push_back(std::move(metadataPipe));
         }
@@ -792,8 +791,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
         // have gotten from find command.
         execs.emplace_back(std::move(executor));
     } else {
-        getSearchHelpers(expCtx->opCtx->getServiceContext())
-            ->prepareSearchForTopLevelPipeline(pipeline.get());
+        search_helpers::prepareSearchForTopLevelPipeline(pipeline.get());
         // Complete creation of the initial $cursor stage, if needed.
         PipelineD::attachInnerQueryExecutorToPipeline(
             collections, attachCallback, std::move(executor), pipeline.get());

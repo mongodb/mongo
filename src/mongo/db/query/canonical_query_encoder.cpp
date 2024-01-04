@@ -78,7 +78,7 @@
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/search_helper.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/analyze_regex.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_command.h"
@@ -1145,9 +1145,7 @@ void encodePipeline(const ExpressionContext* expCtx,
             // Match expressions are parameterized so need to be encoded differently.
             encodeKeyForAutoParameterizedMatchSBE(
                 expCtx->opCtx, matchStage->getMatchExpression(), bufBuilder);
-        } else if (getSearchHelpers(expCtx->opCtx->getServiceContext())
-                       ->encodeSearchForSbeCache(expCtx, documentSource, bufBuilder)) {
-        } else {
+        } else if (!search_helpers::encodeSearchForSbeCache(expCtx, documentSource, bufBuilder)) {
             serializedArray.clear();
             documentSource->serializeToArray(serializedArray);
 

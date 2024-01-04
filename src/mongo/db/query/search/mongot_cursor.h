@@ -26,20 +26,21 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
 
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
-#include "mongo/db/pipeline/search_helper.h"
-#include "mongo/db/query/search/document_source_internal_search_mongot_remote.h"
-#include "mongo/db/query/search/document_source_search.h"
-#include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/executor/task_executor_cursor.h"
 
 namespace mongo::mongot_cursor {
+namespace {
+auto makeRetryOnNetworkErrorPolicy() {
+    return [retried = false](const Status& st) mutable {
+        return std::exchange(retried, true) ? false : ErrorCodes::isNetworkError(st);
+    };
+}
+}  // namespace
 
 static constexpr StringData kSearchField = "search"_sd;
+static constexpr StringData kVectorSearchCmd = "vectorSearch"_sd;
 static constexpr StringData kCollectionUuidField = "collectionUUID"_sd;
 static constexpr StringData kQueryField = "query"_sd;
 static constexpr StringData kExplainField = "explain"_sd;
@@ -48,6 +49,10 @@ static constexpr StringData kIntermediateField = "intermediate"_sd;
 static constexpr StringData kCursorOptionsField = "cursorOptions"_sd;
 static constexpr StringData kDocsRequestedField = "docsRequested"_sd;
 static constexpr StringData kRequiresSearchSequenceToken = "requiresSearchSequenceToken"_sd;
+
+// Default sort spec is to sort decreasing by search score.
+static const BSONObj kSortSpec = BSON("$searchScore" << -1);
+static constexpr StringData kSearchSortValuesFieldPrefix = "$searchSortValues."_sd;
 
 /**
  * Create the RemoteCommandRequest for the provided command.
@@ -67,10 +72,6 @@ std::vector<executor::TaskExecutorCursor> establishCursors(
     bool preFetchNextBatch,
     std::function<void(BSONObjBuilder& bob)> augmentGetMore = nullptr,
     std::unique_ptr<PlanYieldPolicyRemoteCursor> yieldPolicy = nullptr);
-
-// Default sort spec is to sort decreasing by search score.
-static const BSONObj kSortSpec = BSON("$searchScore" << -1);
-static constexpr StringData kSearchSortValuesFieldPrefix = "$searchSortValues."_sd;
 
 /**
  * Run the given search query against mongot and build one cursor object for each
@@ -103,44 +104,19 @@ BSONObj getSearchExplainResponse(const ExpressionContext* expCtx,
                                  executor::TaskExecutor* taskExecutor);
 
 /**
- * Consult mongot to get planning information for sharded search queries.
+ * Send the search command `cmdObj` to the remote search server this process is connected to.
+ * Retry the command on failure whenever the retryPolicy argument indicates we should; the policy
+ * accepts a Status encoding the error the command failed with (local or remote) and returns a
+ * bool that is `true` when we should retry. The default is to retry once on network errors.
+ *
+ * Returns the RemoteCommandResponse we received from the remote. If we fail to get an OK
+ * response from the remote after all retry attempts conclude, we throw the error the most
+ * recent attempt failed with.
  */
-InternalSearchMongotRemoteSpec planShardedSearch(
-    const boost::intrusive_ptr<ExpressionContext>& pExpCtx, const BSONObj& searchRequest);
-
-/**
- * Create the initial search pipeline which can be used for both $search and $searchMeta. The
- * returned list is unique and mutable.
- */
-template <typename TargetSearchDocumentSource>
-std::list<boost::intrusive_ptr<DocumentSource>> createInitialSearchPipeline(
-    BSONObj specObj, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-
-    uassert(6600901,
-            "Running search command in non-allowed context (update pipeline)",
-            !expCtx->isParsingPipelineUpdate);
-
-    // This is only called from user pipelines during desugaring of $search/$searchMeta, so the
-    // `specObj` should be the search query itself.
-    auto executor = executor::getMongotTaskExecutor(expCtx->opCtx->getServiceContext());
-    if ((!expCtx->mongoProcessInterface->isExpectedToExecuteQueries() ||
-         !expCtx->mongoProcessInterface->inShardedEnvironment(expCtx->opCtx)) ||
-        MONGO_unlikely(DocumentSourceSearch::skipSearchStageRemoteSetup())) {
-        return {make_intrusive<TargetSearchDocumentSource>(std::move(specObj), expCtx, executor)};
-    }
-
-    // Send a planShardedSearch command to mongot to get the relevant planning information,
-    // including the metadata merging pipeline and the optional merge sort spec.
-    auto params = planShardedSearch(expCtx, specObj);
-
-    return {make_intrusive<TargetSearchDocumentSource>(std::move(params), expCtx, executor)};
-}
-
-/**
- * Helper function that determines whether the document source references the $$SEARCH_META
- * variable.
- */
-bool hasReferenceToSearchMeta(const DocumentSource& ds);
+executor::RemoteCommandResponse runSearchCommandWithRetries(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const BSONObj& cmdObj,
+    std::function<bool(Status)> retryPolicy = makeRetryOnNetworkErrorPolicy());
 
 /**
  * Helper function to throw if mongot host is not properly configured, only if the command
@@ -148,58 +124,4 @@ bool hasReferenceToSearchMeta(const DocumentSource& ds);
  */
 void throwIfNotRunningWithMongotHostConfigured(
     const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-/**
- * A class that contains methods that are implemented as stubs in community that need to be
- * overridden.
- * TODO SERVER-83293 Clean up this class alongside SearchHelpers
- */
-class SearchImplementedHelperFunctions : public SearchDefaultHelperFunctions {
-public:
-    void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline,
-                                     ExpressionContext* expCtx) override final;
-    void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline,
-                                     const Pipeline::SourceContainer& mergePipeline,
-                                     ExpressionContext* expCtx) override final;
-    void prepareSearchForTopLevelPipeline(Pipeline* pipeline) override final;
-    void prepareSearchForNestedPipeline(Pipeline* pipeline) override final;
-    std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineForSearch(
-        OperationContext* opCtx,
-        boost::intrusive_ptr<ExpressionContext> expCtx,
-        const AggregateCommandRequest& request,
-        Pipeline* origPipeline,
-        boost::optional<UUID> uuid) override final;
-    bool isSearchPipeline(const Pipeline* pipeline) override final;
-    bool isSearchMetaPipeline(const Pipeline* pipeline) override final;
-
-    bool isSearchStage(DocumentSource* stage) override final;
-    bool isSearchMetaStage(DocumentSource* stage) override final;
-
-    std::unique_ptr<SearchNode> getSearchNode(DocumentSource* stage) override final;
-    void establishSearchQueryCursors(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                     DocumentSource* stage,
-                                     std::unique_ptr<PlanYieldPolicyRemoteCursor>) override final;
-
-    bool encodeSearchForSbeCache(const ExpressionContext* expCtx,
-                                 DocumentSource* ds,
-                                 BufBuilder* bufBuilder) override final;
-
-    void establishSearchMetaCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                   DocumentSource* stage,
-                                   std::unique_ptr<PlanYieldPolicyRemoteCursor>) override final;
-
-    boost::optional<executor::TaskExecutorCursor> getSearchMetadataCursor(
-        DocumentSource* ds) override final;
-
-    std::function<void(BSONObjBuilder& bob)> buildSearchGetMoreFunc(
-        std::function<boost::optional<long long>()> calcDocsNeeded) override final;
-
-    std::unique_ptr<RemoteCursorMap> getSearchRemoteCursors(
-        const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline) override final;
-
-    std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
-        const ExpressionContext* expCtx,
-        const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline) override final;
-};
-
-}  // namespace mongo::mongot_cursor
+};  // namespace mongo::mongot_cursor

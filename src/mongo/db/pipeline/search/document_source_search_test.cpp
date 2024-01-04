@@ -26,19 +26,15 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include <boost/intrusive_ptr.hpp>
-#include <vector>
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_replace_root.h"
-#include "mongo/db/pipeline/document_source_single_document_transformation.h"
-#include "mongo/db/pipeline/document_source_union_with.h"
-#include "mongo/db/query/search/document_source_internal_search_mongot_remote.h"
-#include "mongo/db/query/search/document_source_search_meta.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -51,7 +47,7 @@ using boost::intrusive_ptr;
 using std::list;
 using std::vector;
 
-using SearchMetaTest = AggregationContextFixture;
+using SearchTest = AggregationContextFixture;
 
 struct MockMongoInterface final : public StubMongoProcessInterface {
     bool inShardedEnvironment(OperationContext* opCtx) const override {
@@ -59,27 +55,47 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
     }
 };
 
-TEST_F(SearchMetaTest, TestParsingOfSearchMeta) {
-    const auto mongotQuery = fromjson("{query: 'cakes', path: 'title'}");
-    auto specObj = BSON("$searchMeta" << mongotQuery);
+TEST_F(SearchTest, ShouldSerializeAndExplainAtUnspecifiedVerbosity) {
+    const auto mongotQuery = fromjson("{term: 'asdf'}");
+    const auto stageObj = BSON("$search" << mongotQuery);
 
     auto expCtx = getExpCtx();
     expCtx->mongoProcessInterface = std::make_unique<MockMongoInterface>();
-    auto fromNs = NamespaceString::createNamespaceString_forTest("unittests.$cmd.aggregate");
-    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
-        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+    expCtx->uuid = UUID::gen();
+
+    intrusive_ptr<DocumentSource> searchDS =
+        DocumentSourceSearch::createFromBson(stageObj.firstElement(), expCtx);
     list<intrusive_ptr<DocumentSource>> results =
-        DocumentSourceSearchMeta::createFromBson(specObj.firstElement(), expCtx);
+        dynamic_cast<DocumentSourceSearch*>(searchDS.get())->desugar();
+    ASSERT_EQUALS(results.size(), 2UL);
 
-    ASSERT_EQUALS(results.size(), 1UL);
-    ASSERT(dynamic_cast<DocumentSourceSearchMeta*>(results.begin()->get()));
+    const auto* mongotRemoteStage =
+        dynamic_cast<DocumentSourceInternalSearchMongotRemote*>(results.front().get());
+    ASSERT(mongotRemoteStage);
 
-    // $searchMeta argument must be an object.
-    specObj = BSON("$searchMeta" << 1000);
-    ASSERT_THROWS_CODE(
-        DocumentSourceSearchMeta::createFromBson(specObj.firstElement(), getExpCtx()),
-        AssertionException,
-        ErrorCodes::FailedToParse);
+    const auto* idLookupStage =
+        dynamic_cast<DocumentSourceInternalSearchIdLookUp*>(results.back().get());
+    ASSERT(idLookupStage);
+
+    vector<Value> explainedStages;
+    mongotRemoteStage->serializeToArray(explainedStages);
+    idLookupStage->serializeToArray(explainedStages);
+    ASSERT_EQUALS(explainedStages.size(), 2UL);
+
+    auto mongotRemoteExplain = explainedStages[0];
+    ASSERT_DOCUMENT_EQ(mongotRemoteExplain.getDocument(),
+                       Document({{"$_internalSearchMongotRemote", Document(mongotQuery)}}));
+
+    auto idLookupExplain = explainedStages[1];
+    ASSERT_DOCUMENT_EQ(idLookupExplain.getDocument(),
+                       Document({{"$_internalSearchIdLookup", Document()}}));
+}
+
+TEST_F(SearchTest, ShouldFailToParseIfSpecIsNotObject) {
+    const auto specObj = fromjson("{$search: 1}");
+    ASSERT_THROWS_CODE(DocumentSourceSearch::createFromBson(specObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
 }
 
 }  // namespace

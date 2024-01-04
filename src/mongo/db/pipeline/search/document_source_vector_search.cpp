@@ -29,15 +29,16 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/db/query/vector_search/document_source_vector_search.h"
+#include "mongo/db/pipeline/search/document_source_vector_search.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/search/lite_parsed_search.h"
+#include "mongo/db/pipeline/search/vector_search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
-#include "mongo/db/query/search/document_source_internal_search_id_lookup.h"
-#include "mongo/db/query/search/lite_parsed_search.h"
+#include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/query/vector_search/filter_validator.h"
-#include "mongo/db/query/vector_search/mongot_cursor.h"
 #include "mongo/db/s/operation_sharding_state.h"
 
 namespace mongo {
@@ -107,7 +108,7 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
     }
 
     BSONObj explainInfo = _explainResponse.isEmpty()
-        ? mongot_cursor::getVectorSearchExplainResponse(pExpCtx, _request, _taskExecutor.get())
+        ? search_helpers::getVectorSearchExplainResponse(pExpCtx, _request, _taskExecutor.get())
         : _explainResponse;
 
     baseObj = baseObj.addFields(BSON("explain" << opts.serializeLiteral(explainInfo)));
@@ -170,14 +171,14 @@ DocumentSource::GetNextResult DocumentSourceVectorSearch::doGetNext() {
 
     if (pExpCtx->explain) {
         _explainResponse =
-            mongot_cursor::getVectorSearchExplainResponse(pExpCtx, _request, _taskExecutor.get());
+            search_helpers::getVectorSearchExplainResponse(pExpCtx, _request, _taskExecutor.get());
         return DocumentSource::GetNextResult::makeEOF();
     }
 
     // If this is the first call, establish the cursor.
     if (!_cursor) {
         _cursor.emplace(
-            mongot_cursor::establishVectorSearchCursor(pExpCtx, _request, _taskExecutor));
+            search_helpers::establishVectorSearchCursor(pExpCtx, _request, _taskExecutor));
     }
 
     return getNextAfterSetup();

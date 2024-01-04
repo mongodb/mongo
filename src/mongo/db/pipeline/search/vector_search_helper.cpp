@@ -26,23 +26,22 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/db/pipeline/search/vector_search_helper.h"
 
-#include "mongo/db/query/vector_search/mongot_cursor.h"
+#include "mongo/db/query/search/mongot_cursor.h"
 
-namespace mongo::mongot_cursor {
-
+namespace mongo {
 namespace {
-
 executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const VectorSearchSpec& request) {
     BSONObjBuilder cmdBob;
-    cmdBob.append(kVectorSearchCmd, expCtx->ns.coll());
+    cmdBob.append(mongot_cursor::kVectorSearchCmd, expCtx->ns.coll());
     uassert(7828001,
             str::stream()
                 << "A uuid is required for a vector search query, but was missing. Got namespace "
                 << expCtx->ns.toStringForErrorMsg(),
             expCtx->uuid);
-    expCtx->uuid.value().appendToBuilder(&cmdBob, kCollectionUuidField);
+    expCtx->uuid.value().appendToBuilder(&cmdBob, mongot_cursor::kCollectionUuidField);
 
     cmdBob.append(VectorSearchSpec::kQueryVectorFieldName, request.getQueryVector());
     cmdBob.append(VectorSearchSpec::kPathFieldName, request.getPath());
@@ -65,11 +64,11 @@ executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
                       BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->explain)));
     }
 
-    return getRemoteCommandRequest(expCtx->opCtx, expCtx->ns, cmdBob.obj());
+    return mongot_cursor::getRemoteCommandRequest(expCtx->opCtx, expCtx->ns, cmdBob.obj());
 }
-
 }  // namespace
 
+namespace search_helpers {
 executor::TaskExecutorCursor establishVectorSearchCursor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const VectorSearchSpec& request,
@@ -78,10 +77,11 @@ executor::TaskExecutorCursor establishVectorSearchCursor(
     // everything to fit into one batch, since we give mongot the exact upper bound initially - we
     // will only see multiple batches if this upper bound doesn't fit in 16MB. This should be a rare
     // enough case that it shouldn't overwhelm mongot to pre-fetch.
-    auto cursors = establishCursors(expCtx,
-                                    getRemoteCommandRequestForVectorSearchQuery(expCtx, request),
-                                    taskExecutor,
-                                    true /* preFetchNextBatch */);
+    auto cursors = mongot_cursor::establishCursors(
+        expCtx,
+        getRemoteCommandRequestForVectorSearchQuery(expCtx, request),
+        taskExecutor,
+        true /* preFetchNextBatch */);
     // Should always have one results cursor.
     tassert(7828000, "Expected exactly one cursor from mongot", cursors.size() == 1);
     return std::move(cursors.front());
@@ -93,5 +93,5 @@ BSONObj getVectorSearchExplainResponse(const boost::intrusive_ptr<ExpressionCont
     auto request = getRemoteCommandRequestForVectorSearchQuery(expCtx, spec);
     return mongot_cursor::getExplainResponse(expCtx.get(), request, taskExecutor);
 }
-
-}  // namespace mongo::mongot_cursor
+}  // namespace search_helpers
+}  // namespace mongo

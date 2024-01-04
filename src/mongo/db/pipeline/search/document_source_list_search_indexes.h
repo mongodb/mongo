@@ -32,7 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/query/search/document_source_list_search_indexes_gen.h"
+#include "mongo/db/pipeline/search/document_source_list_search_indexes_gen.h"
 
 namespace mongo {
 class DocumentSourceListSearchIndexesSpec;

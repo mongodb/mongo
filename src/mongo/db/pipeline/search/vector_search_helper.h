@@ -27,16 +27,12 @@
  *    it in the license file.
  */
 
-
 #pragma once
 
-#include "mongo/db/query/search/mongot_cursor.h"
-#include "mongo/db/query/vector_search/document_source_vector_search_gen.h"
+#include "mongo/db/pipeline/search/document_source_vector_search_gen.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 
-namespace mongo::mongot_cursor {
-
-static constexpr StringData kVectorSearchCmd = "vectorSearch"_sd;
-
+namespace mongo::search_helpers {
 /**
  * Run the given vector search request against mongot and build a cursor object for the cursor
  * returned from mongot.
@@ -52,5 +48,4 @@ executor::TaskExecutorCursor establishVectorSearchCursor(
 BSONObj getVectorSearchExplainResponse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        const VectorSearchSpec& request,
                                        executor::TaskExecutor* taskExecutor);
-
-}  // namespace mongo::mongot_cursor
+}  // namespace mongo::search_helpers

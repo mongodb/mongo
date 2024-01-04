@@ -31,9 +31,10 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
-#include "mongo/db/pipeline/search_helper.h"
-#include "mongo/db/query/search/document_source_internal_search_mongot_remote.h"
-#include "mongo/db/query/search/document_source_internal_search_mongot_remote_gen.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
+#include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/executor/task_executor_cursor.h"
 
 namespace mongo {
 
@@ -65,12 +66,6 @@ public:
      * past shards only stages.
      */
     static bool canMovePastDuringSplit(const DocumentSource& ds);
-
-    /**
-     * Method to expose the status of the 'searchReturnsEoFImmediately' failpoint to the code
-     * that sets up this document source.
-     */
-    static bool skipSearchStageRemoteSetup();
 
     DocumentSourceSearch() = default;
     DocumentSourceSearch(BSONObj query,

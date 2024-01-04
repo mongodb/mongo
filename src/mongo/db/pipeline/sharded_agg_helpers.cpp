@@ -82,7 +82,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-#include "mongo/db/pipeline/search_helper.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
@@ -1326,8 +1326,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
         // TODO SERVER-65349 Investigate relaxing this restriction.
         if (!splitPipelines || !splitPipelines->shardsPipeline ||
             !splitPipelines->shardsPipeline->peekFront() ||
-            !getSearchHelpers(expCtx->opCtx->getServiceContext())
-                 ->isSearchPipeline(splitPipelines->shardsPipeline.get())) {
+            !search_helpers::isSearchPipeline(splitPipelines->shardsPipeline.get())) {
             exchangeSpec = checkIfEligibleForExchange(opCtx, splitPipelines->mergePipeline.get());
         }
     }

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/sbe/stages/search_cursor.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -285,9 +286,7 @@ void SearchCursorStage::open(bool reOpen) {
 
     if (_cursor && _limit != 0) {
         _cursor->updateGetMoreFunc(
-            getSearchHelpers(_opCtx->getServiceContext())->buildSearchGetMoreFunc([this] {
-                return calcDocsNeeded();
-            }));
+            search_helpers::buildSearchGetMoreFunc([this] { return calcDocsNeeded(); }));
     }
 
     if (_sortSpecAccessor) {

@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/db/pipeline/document_source.h"
 
 namespace mongo {

@@ -76,7 +76,7 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/search_helper.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -556,8 +556,8 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
                 feature_flags::gFeatureFlagSearchInSbe.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
-        auto searchNode = getSearchHelpers(query.getOpCtx()->getServiceContext())
-                              ->getSearchNode(query.cqPipeline().front().get());
+        // Build a SearchNode in order to retrieve the search info.
+        auto searchNode = SearchNode::getSearchNode(query.cqPipeline().front().get());
 
         if (searchNode->searchQuery.getBoolField(kReturnStoredSourceArg) ||
             searchNode->isSearchMeta) {
@@ -1874,10 +1874,8 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             continue;
         }
 
-        auto isSearch =
-            getSearchHelpers(query.getOpCtx()->getServiceContext())->isSearchStage(innerStage);
-        auto isSearchMeta =
-            getSearchHelpers(query.getOpCtx()->getServiceContext())->isSearchMetaStage(innerStage);
+        auto isSearch = search_helpers::isSearchStage(innerStage);
+        auto isSearchMeta = search_helpers::isSearchMetaStage(innerStage);
         if (isSearch || isSearchMeta) {
             // In the $search case, we create the $search query solution node in QueryPlanner::Plan
             // instead of here. The empty branch here assures that we don't hit the tassert below

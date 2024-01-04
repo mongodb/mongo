@@ -1937,6 +1937,8 @@ struct SearchNode : public QuerySolutionNode {
           remoteCursorId(remoteCursorId),
           remoteCursorVars(remoteCursorVars) {}
 
+    static std::unique_ptr<SearchNode> getSearchNode(DocumentSource* stage);
+
     StageType getType() const override {
         return STAGE_SEARCH;
     }

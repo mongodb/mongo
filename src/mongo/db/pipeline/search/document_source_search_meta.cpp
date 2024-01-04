@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/search/document_source_search_meta.h"
+#include "mongo/db/pipeline/search/document_source_search_meta.h"
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/lite_parsed_search.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/cursor_response_gen.h"
-#include "mongo/db/query/search/document_source_internal_search_mongot_remote.h"
-#include "mongo/db/query/search/lite_parsed_search.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_task_executors.h"
 
@@ -136,7 +137,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBso
 
     // Otherwise, we need to call this helper to determine if this is a sharded environment. If so,
     // we need to consult a mongot to construct such a merging pipeline for us to use later.
-    return mongot_cursor::createInitialSearchPipeline<DocumentSourceSearchMeta>(specObj, expCtx);
+    return search_helpers::createInitialSearchPipeline<DocumentSourceSearchMeta>(specObj, expCtx);
 }
 
 }  // namespace mongo

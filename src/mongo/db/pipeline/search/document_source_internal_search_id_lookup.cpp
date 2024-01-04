@@ -26,15 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include "mongo/platform/basic.h"
-
-#include "document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/query/search/document_source_internal_search_mongot_remote_gen.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
 
 namespace mongo {
 

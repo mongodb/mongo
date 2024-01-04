@@ -29,9 +29,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -39,9 +37,10 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/search/lite_parsed_search.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
-#include "mongo/db/query/search/document_source_internal_search_id_lookup.h"
-#include "mongo/db/query/search/lite_parsed_search.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"

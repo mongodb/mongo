@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/search/document_source_list_search_indexes.h"
+#include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 
 #include "mongo/db/commands/search_index_commands.h"
 #include "mongo/db/query/search/search_index_helpers.h"

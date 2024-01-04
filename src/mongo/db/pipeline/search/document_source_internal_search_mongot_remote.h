@@ -34,8 +34,9 @@
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_constraints.h"
-#include "mongo/db/query/search/document_source_internal_search_mongot_remote_gen.h"
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/stacktrace.h"
@@ -47,8 +48,6 @@ namespace mongo {
  */
 class DocumentSourceInternalSearchMongotRemote : public DocumentSource {
 public:
-    static constexpr auto kReturnStoredSourceArg = "returnStoredSource"_sd;
-
     static constexpr StringData kStageName = "$_internalSearchMongotRemote"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

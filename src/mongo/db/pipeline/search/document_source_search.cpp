@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/search/document_source_search.h"
+#include "mongo/db/pipeline/search/document_source_search.h"
 
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -37,10 +35,10 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
-#include "mongo/db/query/search/document_source_internal_search_id_lookup.h"
-#include "mongo/db/query/search/document_source_internal_search_mongot_remote.h"
-#include "mongo/db/query/search/lite_parsed_search.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 
 namespace mongo {
@@ -208,7 +206,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSearch::doOptimizeAt(
     // $setVariableFromSubPipeline stage until we split the pipeline (see distributedPlanLogic()),
     // but at that point we don't have access to the full pipeline to know whether we need it.
     _pipelineNeedsSearchMeta = std::any_of(std::next(itr), container->end(), [](const auto& itr) {
-        return mongot_cursor::hasReferenceToSearchMeta(*itr);
+        return search_helpers::hasReferenceToSearchMeta(*itr);
     });
 
     return std::next(itr);
@@ -243,7 +241,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSearch::dist
         // sortSpec in response. Note that this is done for unsharded collections as well as sharded
         // ones because the two collection types are treated the same in the context of shard
         // targeting.
-        _spec = mongot_cursor::planShardedSearch(pExpCtx, _searchQuery);
+        _spec = search_helpers::planShardedSearch(pExpCtx, _searchQuery);
         validateSortSpec(_spec->getSortSpec());
     }
 
@@ -267,13 +265,9 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSearch::dist
     return logic;
 }
 
-bool DocumentSourceSearch::skipSearchStageRemoteSetup() {
-    return MONGO_unlikely(searchReturnEofImmediately.shouldFail());
-}
-
 bool DocumentSourceSearch::canMovePastDuringSplit(const DocumentSource& ds) {
     // Check if next stage uses the variable.
-    return !mongot_cursor::hasReferenceToSearchMeta(ds) &&
+    return !search_helpers::hasReferenceToSearchMeta(ds) &&
         ds.constraints().preservesOrderAndMetadata;
 }
 
