@@ -370,8 +370,6 @@ QueryHints getHintsFromQueryKnobs() {
         internalCascadesOptimizerSamplingCEFallBackForFilterNode.load();
     hints._samplingCollectionSizeMin = internalCascadesOptimizerSampleSizeMin.load();
     hints._samplingCollectionSizeMax = internalCascadesOptimizerSampleSizeMax.load();
-    hints._sampleIndexedFields = internalCascadesOptimizerSampleIndexedFields.load();
-    hints._sampleTwoFields = internalCascadesOptimizerSampleTwoFields.load();
     hints._sqrtSampleSizeEnabled = internalCascadesOptimizerEnableSqrtSampleSize.load();
 
     return hints;
@@ -626,14 +624,6 @@ OptPhaseManager createSamplingPhaseManager(const cost_model::CostModelCoefficien
         entry.second.shardingMetadata().setMayContainOrphans(false);
     }
 
-    const QueryHints& samplingHints = {
-        ._numSamplingChunks = hints._numSamplingChunks,
-        ._samplingCollectionSizeMin = hints._samplingCollectionSizeMin,
-        ._samplingCollectionSizeMax = hints._samplingCollectionSizeMax,
-        ._sampleIndexedFields = hints._sampleIndexedFields,
-        ._sampleTwoFields = hints._sampleTwoFields,
-        ._sqrtSampleSizeEnabled = hints._sqrtSampleSizeEnabled};
-
     OptimizerCounterInfo optCounterInfo;
     return {OptPhaseManager::PhasesAndRewrites::getDefaultForSampling(),
             prefixId,
@@ -645,7 +635,10 @@ OptPhaseManager createSamplingPhaseManager(const cost_model::CostModelCoefficien
             defaultConvertPathToInterval,
             constFold,
             DebugInfo::kDefaultForProd,
-            samplingHints,
+            {._numSamplingChunks = hints._numSamplingChunks,
+             ._samplingCollectionSizeMin = hints._samplingCollectionSizeMin,
+             ._samplingCollectionSizeMax = hints._samplingCollectionSizeMax,
+             ._sqrtSampleSizeEnabled = hints._sqrtSampleSizeEnabled} /*hints*/,
             queryParameters,
             optCounterInfo};
 }

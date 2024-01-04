@@ -890,22 +890,8 @@ server_parameters:
     validator:
       gte: 1
 
-  internalCascadesOptimizerSampleIndexedFields:
-    description: "Controls whether to only sample indexed fields for CE."
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalCascadesOptimizerSampleIndexedFields"
-    cpp_vartype: AtomicWord<bool>
-    default: true
-
-  internalCascadesOptimizerSampleTwoFields:
-    description: "Controls whether to sample the two most frequent fields together."
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalCascadesOptimizerSampleTwoFields"
-    cpp_vartype: AtomicWord<bool>
-    default: true
-
   internalCascadesOptimizerEnableSqrtSampleSize:
-    description: "Use sqrt(numDocs) for sample size when enabled, otherwise numDocs."
+    description: "Use sqrt(numDocs) for sample size when enabled, otherwise numDocs"
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerEnableSqrtSampleSize"
     cpp_vartype: AtomicWord<bool>
