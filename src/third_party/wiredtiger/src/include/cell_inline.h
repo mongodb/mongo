@@ -1325,6 +1325,7 @@ static inline int
 __wt_dsk_cell_data_ref_kv(
   WT_SESSION_IMPL *session, int page_type, WT_CELL_UNPACK_KV *unpack, WT_ITEM *store)
 {
+    WT_ASSERT(session, unpack != NULL);
     WT_ASSERT(session, __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
     return (__cell_data_ref(session, NULL, page_type, (WT_CELL_UNPACK_COMMON *)unpack, store));
 }
