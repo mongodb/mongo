@@ -544,6 +544,19 @@ functions:
         fi
         exit 0
 
+  # The following cppsuite tasks define a greater overall task.
+  "cppsuite test run all": &cppsuite_test_run_all
+    command: shell.exec
+    params:
+      # The tests need to be executed in the cppsuite directory as some required libraries have
+      # their paths defined relative to this directory.
+      working_dir: "wiredtiger/cmake_build/test/cppsuite"
+      shell: bash
+      script: |
+        set -o verbose
+        ${PREPARE_TEST_ENV}
+        ./run -C '${test_config}' -l 2
+
   # Delete unnecessary data from the upload.
   "cppsuite test remove files": &cppsuite_remove_files
     command: shell.exec
@@ -598,7 +611,7 @@ functions:
         rm -rf wiredtiger
         exit "$exit_code"
 
-  # The typical cppsuite test function. Doesn't upload perf statistics to evergreen.
+  # The cppsuite test per task function. Doesn't upload perf statistics to evergreen.
   "cppsuite test":
     - *cppsuite_test_run
     # Since we later remove the WiredTiger folder, we need to check for core dumps now.
@@ -1733,135 +1746,15 @@ tasks:
           test_config_filename: configs/background_compact_default.txt
           test_name: background_compact
 
-  - name: cppsuite-cache-resize-test-default
+  - name: cppsuite-default-all
     tags: ["pull_request"]
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/cache_resize_default.txt
-          test_name: cache_resize
-
-  - name: cppsuite-operations-test-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
+      - func: "cppsuite test run all"
         vars:
           test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/operations_test_default.txt
-          test_name: operations_test
-
-  - name: cppsuite-hs-cleanup-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/hs_cleanup_default.txt
-          test_name: hs_cleanup
-
-  - name: cppsuite-burst-inserts-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/burst_inserts_default.txt
-          test_name: burst_inserts
-
-  - name: cppsuite-bounded-cursor-perf-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/bounded_cursor_perf_default.txt
-          test_name: bounded_cursor_perf
-
-  - name: cppsuite-bounded-cursor-stress-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/bounded_cursor_stress_default.txt
-          test_name: bounded_cursor_stress
-
-  - name: cppsuite-bounded-cursor-stress-reverse-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/bounded_cursor_stress_reverse_default.txt
-          test_name: bounded_cursor_stress
-
-  - name: cppsuite-bounded-cursor-prefix-stat-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/bounded_cursor_prefix_stat_default.txt
-          test_name: bounded_cursor_prefix_stat
-
-  - name: cppsuite-bounded-cursor-prefix-search-near-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/bounded_cursor_prefix_search_near_default.txt
-          test_name: bounded_cursor_prefix_search_near
-
-  - name: cppsuite-bounded-cursor-prefix-indices-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/bounded_cursor_prefix_indices_default.txt
-          test_name: bounded_cursor_prefix_indices
-
-  - name: cppsuite-reverse-split-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/reverse_split_default.txt
-          test_name: reverse_split
 
   - name: cppsuite-background-long
     tags: ["cppsuite-stress-test"]
@@ -5504,9 +5397,7 @@ buildvariants:
     - name: format-stress-pull-request-test
     - name: make-check-test
       distros: ubuntu2004-large
-    - name: cppsuite-operations-test-default
-    - name: cppsuite-hs-cleanup-default
-    - name: cppsuite-burst-inserts-default
+    - name: cppsuite-default-all
 
 - name: ubuntu2004-compilers
   display_name: "! Ubuntu 20.04 Compilers"
