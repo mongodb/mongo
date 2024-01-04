@@ -278,9 +278,7 @@ buildvariants:
 - <<: *al2023_arm64_compile_variant_dependency
   name: atlas-like-replica.2023-09
   display_name: PERF M60-like-replica.2023-09 3-Node ReplSet
-  # TODO SERVER-74399 Reduce frequency back to baseline.
-  # cron: &atlas-like-repl-cron "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
-  cron: &atlas-like-repl-cron "0 0 * * *" # Every day at 00:00
+  cron: &atlas-like-repl-cron "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup: atlas-like-replica.2023-09
