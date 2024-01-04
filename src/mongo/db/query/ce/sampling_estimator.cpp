@@ -283,7 +283,8 @@ public:
         // canCombine will be set to true.
         boost::optional<std::pair<ABT, ABT>> paths;
         bool canCombine = false;
-        if (PSRExpr::isSingletonDisjunction(node.getReqMap())) {
+        if (_phaseManager.getHints()._sampleTwoFields &&
+            PSRExpr::isSingletonDisjunction(node.getReqMap())) {
             const IndexPathOccurrences& indexMap = scanDef.getIndexPathOccurrences();
             std::vector<std::pair<int, ABT>> indexedFields;
             PSRExpr::visitSingletonDNF(
@@ -346,7 +347,9 @@ public:
                 }
                 // Continue the sampling estimation only if the field from the partial schema is
                 // indexed.
-                const CERecord& filterCE = isFieldPathIndexed(key, scanDef)
+                const bool shouldSample = isFieldPathIndexed(key, scanDef) ||
+                    !_phaseManager.getHints()._sampleIndexedFields;
+                const CERecord& filterCE = shouldSample
                     ? estimateFilterCE(metadata,
                                        memo,
                                        logicalProps,

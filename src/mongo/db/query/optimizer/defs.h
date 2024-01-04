@@ -376,6 +376,12 @@ struct QueryHints {
     size_t _samplingCollectionSizeMin = 100;
     size_t _samplingCollectionSizeMax = 10000;
 
+    // Controls if we exclusively sample indexed fields.
+    bool _sampleIndexedFields = true;
+
+    // Controls if we sample the two most common indexed fields together.
+    bool _sampleTwoFields = true;
+
     // If enabled, take the square root of numDocs for sample size.
     bool _sqrtSampleSizeEnabled = true;
 };
