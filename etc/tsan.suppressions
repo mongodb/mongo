@@ -29,3 +29,8 @@ race:src/third_party/wiredtiger/*
 signal:abruptQuitAction
 signal:abruptQuitWithAddrSignal
 signal:StackTraceSigAltStackTest::tryHandler
+
+# https://github.com/mongodb/mongo-c-driver/blob/3f2c35d97e7f12de5da4f049dce4c3f8494aba67/.tsan-suppressions#L2C1-L2C30
+# This warning in the mongo-c-driver is expected to be harmless and is suppressed in the
+# mongo-c-driver repo itself.
+race:_mongoc_handshake_freeze
