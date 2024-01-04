@@ -118,7 +118,13 @@ class StringDataPrinter(object):
 
     def to_string(self):
         """Return data for printing."""
-        size = self.val["_size"]
+        # As of SERVER-82604, StringData is based on std::string_view, so try with that first
+        sv = self.val['_sv']
+        if sv is not None:
+            return sv
+
+        # ... back-off to the legacy format otherwise
+        size = self.val['_size']
         if size == -1:
             return self.val['_data'].lazy_string()
         return self.val['_data'].lazy_string(length=size)
