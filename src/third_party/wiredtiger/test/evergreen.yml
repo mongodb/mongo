@@ -189,6 +189,7 @@ functions:
           ${IMPORT_GCP_SDK|} \
           ${IMPORT_S3_SDK|} \
           ${SPINLOCK_TYPE|} \
+          ${ENABLE_COLORIZE_OUTPUT|-DENABLE_COLORIZE_OUTPUT=0} \
           ${CC_OPTIMIZE_LEVEL|}"
 
         # The RHEL PPC platform does not have ZSTD. Strip it out.

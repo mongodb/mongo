@@ -171,6 +171,12 @@ config_bool(
 )
 
 config_bool(
+    ENABLE_COLORIZE_OUTPUT
+    "Compile with build error colors enabled"
+    DEFAULT ON
+)
+
+config_bool(
     ENABLE_PYTHON
     "Configure the python API"
     DEFAULT ${default_enable_python}
