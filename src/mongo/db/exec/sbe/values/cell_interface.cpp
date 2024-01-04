@@ -69,6 +69,7 @@ std::string pathToString(const CellBlock::Path& p) {
 }  // namespace
 
 std::string CellBlock::PathRequest::toString() const {
-    return pathToString(path);
+    return str::stream() << (type == kFilter ? "FilterPath" : "ProjectPath") << "("
+                         << pathToString(path) << ")";
 }
 }  // namespace mongo::sbe::value
