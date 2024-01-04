@@ -40,9 +40,6 @@
 
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
-(function() {
-"use strict";
-
 const kNumDocs = 1000;
 const kNumReadTickets = 5;
 const replTest = new ReplSetTest({
@@ -236,4 +233,3 @@ for (let i = 0; i < queuedReaders.length; i++) {
 stepDownShell();
 
 replTest.stopSet();
-})();
