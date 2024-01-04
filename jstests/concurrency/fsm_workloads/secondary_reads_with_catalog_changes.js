@@ -22,7 +22,6 @@
  *   uses_write_concern,
  * ]
  */
-import "jstests/libs/sbe_assert_error_override.js";
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/secondary_reads.js";
