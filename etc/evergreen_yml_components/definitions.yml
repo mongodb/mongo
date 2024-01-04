@@ -2917,6 +2917,8 @@ tasks:
       - "./build/**_bm.gcno"
       - "./build/**_bm.exe"
       - "./build/**_bm.pdb"
+      - "./build/**.so"
+      - "./build/**.debug"
   - command: s3.put
     params:
       aws_key: ${aws_key}

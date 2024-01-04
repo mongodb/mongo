@@ -42,6 +42,7 @@ buildvariants:
       --ssl
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
@@ -79,6 +80,7 @@ buildvariants:
       --ssl
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -162,6 +164,7 @@ buildvariants:
       --ssl
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
     multiversion_platform: rhel80
     multiversion_edition: enterprise
