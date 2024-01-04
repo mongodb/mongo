@@ -55,10 +55,8 @@ env.Library(
     source=[
         'recovery_unit.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/fail_point',
         'storage_options',
     ],
@@ -74,11 +72,9 @@ env.Library(
         'named_pipe_windows.cpp' if env.TargetOSIs('windows') else [],
         'record_store.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/query/query_knobs' if not env.TargetOSIs('windows') else [],
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/fail_point',
         'storage_options',
@@ -117,9 +113,9 @@ env.Library(
     source=[
         'execution_context.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
         'key_string',
-        'storage_options',
     ],
 )
 
@@ -426,7 +422,6 @@ env.Library(
         'storage_engine_init.cpp',
         'storage_engine_change_context.cpp',
     ],
-    LIBDEPS=[],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/exec/scoped_timer',
         '$BUILD_DIR/mongo/db/service_context',
@@ -455,13 +450,13 @@ env.Library(
 )
 
 env.Library(
-    target="write_unit_of_work",
+    target='write_unit_of_work',
     source=[
-        "write_unit_of_work.cpp",
+        'write_unit_of_work.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/fail_point',
         'recovery_unit_base',
     ],
@@ -626,6 +621,7 @@ env.CppUnitTest(
         'storage_engine_common',
         'storage_engine_lock_file',
         'storage_engine_metadata',
+        'storage_options',
     ],
 )
 

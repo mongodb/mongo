@@ -371,7 +371,6 @@ env.Library(
         'virtual_collection_impl.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/collection_index_usage_tracker',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
@@ -397,6 +396,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/storage/storage_util',
         '$BUILD_DIR/mongo/db/system_index',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
@@ -459,6 +459,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/execution_context',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/storage/record_store_base',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/util/progress_meter',
@@ -592,6 +593,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         #TODO SERVER-77571 this should only depend on the shard_role_api library.
         '$BUILD_DIR/mongo/db/shard_role',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         'index_catalog',
     ],
 )

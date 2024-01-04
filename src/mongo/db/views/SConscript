@@ -28,6 +28,9 @@ env.Library(
         'resolved_view',
         'views',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+    ],
 )
 
 env.Library(

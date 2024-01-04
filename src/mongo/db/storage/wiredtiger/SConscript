@@ -66,7 +66,6 @@ wtEnv.Library(
         '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/mongo/db/storage/recovery_unit_base',
         '$BUILD_DIR/mongo/db/storage/storage_file_util',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         '$BUILD_DIR/mongo/util/elapsed_tracker',
         '$BUILD_DIR/mongo/util/processinfo',
@@ -88,6 +87,7 @@ wtEnv.Library(
         '$BUILD_DIR/mongo/db/storage/backup_block',
         '$BUILD_DIR/mongo/db/storage/capped_snapshots',
         '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/log_and_backoff',
@@ -116,6 +116,7 @@ wtEnv.Library(
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
     LIBDEPS_DEPENDENTS=[

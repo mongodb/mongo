@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/unittest/temp_dir.h"
 
 #include <exception>
 
@@ -34,12 +35,9 @@
 #include <boost/filesystem/path.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/value.h"
 #include "mongo/util/str.h"
@@ -49,9 +47,13 @@
 namespace mongo {
 namespace unittest {
 namespace {
+
+Mutex tempPathRootMutex = MONGO_MAKE_LATCH("tempPathRootMutex");
 boost::filesystem::path tempPathRoot;
 
 void setTempPathRoot(boost::filesystem::path root) {
+    std::lock_guard lg(tempPathRootMutex);
+
     if (!boost::filesystem::exists(root)) {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "Attempted to use a tempPath (" << root.string()
@@ -66,12 +68,17 @@ void setTempPathRoot(boost::filesystem::path root) {
     tempPathRoot = std::move(root);
 }
 
+const boost::filesystem::path& getTempPathRoot() {
+    std::lock_guard lg(tempPathRootMutex);
 
-MONGO_INITIALIZER(SetTempDirDefaultRoot)(InitializerContext*) {
     if (tempPathRoot.empty()) {
-        setTempPathRoot(boost::filesystem::temp_directory_path());
+        tempPathRoot = boost::filesystem::temp_directory_path();
     }
+
+    uassert(8448300, "Unable to set temp directory", !tempPathRoot.empty());
+    return tempPathRoot;
 }
+
 }  // namespace
 
 TempDir::TempDir(const std::string& namePrefix) {
@@ -81,7 +88,7 @@ TempDir::TempDir(const std::string& namePrefix) {
     const boost::filesystem::path dirName =
         boost::filesystem::unique_path(namePrefix + "-%%%%-%%%%-%%%%-%%%%");
 
-    _path = (tempPathRoot / dirName).string();
+    _path = (getTempPathRoot() / dirName).string();
 
     bool createdNewDirectory = boost::filesystem::create_directory(_path);
     if (!createdNewDirectory) {

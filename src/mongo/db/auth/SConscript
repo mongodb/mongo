@@ -85,9 +85,6 @@ env.Library(
     source=[
         'user.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         '$BUILD_DIR/mongo/db/server_base',
@@ -107,6 +104,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/shard_role',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
     ],
 )
 

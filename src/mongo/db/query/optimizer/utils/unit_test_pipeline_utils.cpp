@@ -40,8 +40,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -64,17 +62,11 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/intrusive_counter.h"
 
-
 namespace mongo::optimizer {
 namespace {
-std::unique_ptr<unittest::TempDir> tempDir;
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(ABTPipelineTestInitTempDir, ("SetTempDirDefaultRoot"))
-(InitializerContext*) {
-    if (!tempDir) {
-        tempDir = std::make_unique<unittest::TempDir>("ABTPipelineTest");
-    }
-}
+unittest::TempDir tempDir("ABTPipelineTest");
+
 }  // namespace
 
 std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
@@ -99,7 +91,7 @@ std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
         ctx->setResolvedNamespace(resolvedNss.ns, resolvedNss);
     }
 
-    ctx->tempDir = tempDir->path();
+    ctx->tempDir = tempDir.path();
 
     return Pipeline::parse(request.getPipeline(), ctx);
 }

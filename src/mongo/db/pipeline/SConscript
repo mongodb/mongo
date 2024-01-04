@@ -77,12 +77,12 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/query/query_settings/query_settings',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/write_concern_options',
         'document_sources_idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
     ],
 )
 
@@ -410,7 +410,6 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/stats/resource_consumption_metrics',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/timeseries/catalog_helper',
         '$BUILD_DIR/mongo/db/update/update_document_diff',
         '$BUILD_DIR/mongo/db/views/resolved_view',
@@ -439,6 +438,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/sorter/sorter_base',
         '$BUILD_DIR/mongo/db/sorter/sorter_stats',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/executor/task_executor_cursor',

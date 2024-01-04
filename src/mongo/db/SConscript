@@ -608,6 +608,7 @@ env.Library(
         'record_id_helpers',
         'repl/storage_interface',
         'server_base',
+        'storage/storage_options',
     ],
 )
 
@@ -1004,6 +1005,7 @@ env.Library(
         'stats/top',
         'storage/capped_snapshots',
         'storage/snapshot_helper',
+        'storage/storage_options',
     ],
 )
 
@@ -1165,9 +1167,9 @@ env.Library(
         'system_index.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/exec/scoped_timer',
         'catalog/index_key_validate',
         'catalog/multi_index_block',
+        'exec/scoped_timer',
         'index_builds_coordinator_interface',
         'shard_role',
     ],
@@ -1325,6 +1327,7 @@ env.Library(
         'shard_role',
         'storage/disk_space_util',
         'storage/encryption_hooks',
+        'storage/storage_options',
         'storage/storage_util',
         'storage/two_phase_index_build_knobs_idl',
     ],
@@ -1507,11 +1510,12 @@ env.Library(
         'exec/working_set_common.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/health_log_interface',
-        '$BUILD_DIR/mongo/db/exec/working_set',
-        '$BUILD_DIR/mongo/db/index/index_access_method',
-        '$BUILD_DIR/mongo/db/storage/execution_context',
+        'catalog/health_log_interface',
+        'exec/working_set',
+        'index/index_access_method',
         'server_base',
+        'storage/execution_context',
+        'storage/key_string',
     ],
 )
 
@@ -1521,8 +1525,8 @@ env.Library(
         'exec/write_stage_common.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-        '$BUILD_DIR/mongo/db/exec/working_set',
+        'exec/document_value/document_value',
+        'exec/working_set',
         'server_base',
         'shard_filterer',
         'shard_role_api',
@@ -1904,6 +1908,7 @@ env.Library(
         'repl/repl_settings',
         'rw_concern_d',
         'server_feature_flags',
+        'storage/storage_options',
         'storage/storage_repair_observer',
         'storage/storage_util',
         'timeseries/timeseries_extended_range',
@@ -2736,18 +2741,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='commands_test_example',
-    source=[
-        'commands_test_example.idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
-        'commands',
-        'server_base',
-    ],
-)
-
 # TODO(SERVER-45266) This could be part of db_unittest_test but it needs to mutate
 # storageGlobalParams.
 env.CppUnitTest(
@@ -2758,6 +2751,18 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/rpc/rpc',
         'op_msg_fuzzer_fixture',
+        'server_base',
+    ],
+)
+
+env.Library(
+    target='commands_test_example',
+    source=[
+        'commands_test_example.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'commands',
         'server_base',
     ],
 )
@@ -2959,8 +2964,8 @@ env.CppLibfuzzerTest(
         'op_msg_fuzzer.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         'op_msg_fuzzer_fixture',
+        'server_base',
     ],
 )
 
@@ -2970,7 +2975,7 @@ env.Benchmark(
         'commands_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        'server_base',
     ],
 )
 
@@ -2991,7 +2996,7 @@ env.Benchmark(
         'd_concurrency_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_non_d',
+        'service_context_non_d',
         'shard_role_api',
     ],
 )
@@ -3002,24 +3007,23 @@ env.Benchmark(
         'service_entry_point_common_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmongod',
-        '$BUILD_DIR/mongo/db/catalog/catalog_impl',
-        '$BUILD_DIR/mongo/db/commands/standalone',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
-        '$BUILD_DIR/mongo/db/op_observer/op_observer',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
-        '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
-        '$BUILD_DIR/mongo/db/storage/storage_control',
-        '$BUILD_DIR/mongo/db/vector_clock_mongod',
-        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
+        'auth/authmongod',
+        'catalog/catalog_impl',
+        'commands/standalone',
+        'dbdirectclient',
+        'index_builds_coordinator_mongod',
         'mongod_options_init',
+        'op_observer/op_observer',
         'read_write_concern_defaults_mock',
-        'service_context',
+        'repl/replmocks',
+        'repl/storage_interface_impl',
+        's/sharding_runtime_d',
+        'server_base',
         'service_context_d',
+        'storage/storage_control',
         'storage/wiredtiger/storage_wiredtiger',
+        'vector_clock_mongod',
     ],
 )
 
@@ -3029,7 +3033,6 @@ env.Benchmark(
         'namespace_string_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/optime',
         'server_base',
     ],
 )

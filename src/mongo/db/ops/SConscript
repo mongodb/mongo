@@ -69,6 +69,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',
         '$BUILD_DIR/mongo/db/stats/top',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog',
         '$BUILD_DIR/mongo/db/timeseries/bucket_compression',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
@@ -119,23 +120,21 @@ env.Library(
 )
 
 env.Library(
-    target='parsed_update_array_filters',
-    source='parsed_update_array_filters.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/query_expressions',
-    ],
-)
-
-env.Library(
     target='parsed_update',
-    source='parsed_update_base.cpp',
+    source=[
+        'parsed_update_array_filters.cpp',
+        'parsed_update_base.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/disk_use_options_idl',
+        '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/update/update_driver',
-        'parsed_update_array_filters',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
     ],
 )
 
