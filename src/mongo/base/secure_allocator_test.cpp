@@ -33,6 +33,7 @@
 #include "mongo/base/secure_allocator.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/processinfo.h"
 
 namespace mongo {
 
@@ -133,6 +134,62 @@ TEST(SecureAllocator, allocatorCanBeDisabled) {
     }
 
     ASSERT_GT(pegInvokationCount, pegInvokationCountLast);
+}
+
+/**
+ * This class tests the secure allocation by the following steps:
+ * Allocating first half a page and checking the correctness of the paged byte accocation count and
+ * byte allocation count. Allocating another half a page and checking the correctness of allocation
+ * byte counts. Deallocating all allocations and checking the correcness of allocation byte counts.
+ */
+TEST(SecureAllocator, secureAllocBytesCount) {
+    ProcessInfo p;
+    auto pageSize = p.getPageSize();
+    using namespace mongo::secure_allocator_details;
+    uint32_t initAllocCnt = gSecureAllocCountInfo().getSecureAllocByteCount();
+    uint32_t allocCnt = initAllocCnt;
+    uint32_t expectedPageBytesCnt, pageBytesCnt;
+    uint32_t initPageBytesCnt = gSecureAllocCountInfo().getSecureAllocBytesInPages();
+    pageBytesCnt = initPageBytesCnt;
+
+    // The first allocation: allocating half a page.
+    auto halfPageSize = pageSize / 2;
+    void* ptr1 = allocate(halfPageSize, alignof(uint32_t));
+
+
+    // pageBytesCnt is the current count in paged byte allocation.
+    // If we have sufficient bytes for the current allocation, we do not need to allocate more
+    // pages. If we do not have enough bytes, we should allocate a new page.
+    if (pageBytesCnt - initAllocCnt >= halfPageSize) {
+        expectedPageBytesCnt = pageBytesCnt;
+    } else {
+        expectedPageBytesCnt = pageBytesCnt + pageSize;
+    }
+
+    // Checking the correctness of the paged byte accocation count and byte allocation count.
+    pageBytesCnt = gSecureAllocCountInfo().getSecureAllocBytesInPages();
+    allocCnt = gSecureAllocCountInfo().getSecureAllocByteCount();
+    ASSERT_EQUALS(halfPageSize + initAllocCnt, allocCnt);
+    ASSERT_EQUALS(expectedPageBytesCnt, gSecureAllocCountInfo().getSecureAllocBytesInPages());
+
+    // The second allocation: allocating half a page.
+    void* ptr2 = allocate(halfPageSize, alignof(uint32_t));
+
+    // Checking the correctness of the byte counts after the second allocation.
+    if (pageBytesCnt - allocCnt >= halfPageSize) {
+        expectedPageBytesCnt = pageBytesCnt;
+    } else {
+        expectedPageBytesCnt = pageBytesCnt + pageSize;
+    }
+    ASSERT_EQUALS(pageSize + initAllocCnt, gSecureAllocCountInfo().getSecureAllocByteCount());
+    ASSERT_EQUALS(expectedPageBytesCnt, gSecureAllocCountInfo().getSecureAllocBytesInPages());
+
+    deallocate(ptr1, halfPageSize);
+    deallocate(ptr2, halfPageSize);
+
+    // Checking the correctness of byte counts after the deallocations.
+    ASSERT_EQUALS(initAllocCnt, gSecureAllocCountInfo().getSecureAllocByteCount());
+    ASSERT_EQUALS(initPageBytesCnt, gSecureAllocCountInfo().getSecureAllocBytesInPages());
 }
 
 }  // namespace mongo

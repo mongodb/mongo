@@ -44,6 +44,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
@@ -54,6 +55,33 @@ namespace secure_allocator_details {
 
 void* allocate(std::size_t bytes, std::size_t alignOf);
 void deallocate(void* ptr, std::size_t bytes);
+
+/**
+ * This class keeps track of secure allocation byte count and secure allocation bytes that are
+ * allocated in paged allocations.
+ */
+
+class SecureAllocCountInfo {
+public:
+    uint32_t getSecureAllocByteCount() {
+        return secureAllocByteCount.load();
+    }
+    uint32_t getSecureAllocBytesInPages() {
+        return secureAllocBytesInPages.load();
+    }
+    void updateSecureAllocByteCount(int32_t cnt) {
+        secureAllocByteCount.fetchAndAdd(cnt);
+    }
+    void updateSecureAllocBytesInPages(int32_t cnt) {
+        secureAllocBytesInPages.fetchAndAdd(cnt);
+    }
+
+private:
+    AtomicWord<uint32_t> secureAllocByteCount{0};
+    AtomicWord<uint32_t> secureAllocBytesInPages{0};
+};
+
+SecureAllocCountInfo& gSecureAllocCountInfo();
 
 inline void* allocateWrapper(std::size_t bytes, std::size_t alignOf, bool secure) {
     if (secure) {
