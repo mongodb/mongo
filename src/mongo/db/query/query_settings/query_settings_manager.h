@@ -131,10 +131,35 @@ public:
      * Performs the QuerySettings lookup by computing QueryShapeHash only in cases when at least one
      * QueryShapeConfiguration is set for the given namespace.
      */
+    template <typename Fn>
     boost::optional<std::pair<QuerySettings, QueryInstance>> getQuerySettingsForQueryShapeHash(
-        OperationContext* opCtx,
-        std::function<query_shape::QueryShapeHash(void)> queryShapeHashFn,
-        const NamespaceString& nss) const;
+        OperationContext* opCtx, const Fn& queryShapeHashFn, const NamespaceString& nss) const {
+        Lock::SharedLock readLock(opCtx, _mutex);
+        // Perform the lookup for namespace string to query settings map maintained for the given
+        // tenant.
+        auto queryShapeConfigurationsIt =
+            _tenantIdToVersionedQueryShapeConfigurationsMap.find(nss.dbName().tenantId());
+        if (queryShapeConfigurationsIt == _tenantIdToVersionedQueryShapeConfigurationsMap.end()) {
+            return boost::none;
+        }
+
+        // Perform the lookup for query settings map maintained for the given namespace.
+        const auto& nssToQueryShapeConfigurationsMap =
+            queryShapeConfigurationsIt->second.nssToQueryShapeConfigurationsMap;
+        auto nssToQueryShapeConfigurationsMapIt = nssToQueryShapeConfigurationsMap.find(nss);
+        if (nssToQueryShapeConfigurationsMapIt == nssToQueryShapeConfigurationsMap.end()) {
+            return boost::none;
+        }
+
+        // Lookup query settings for the QueryShapeHash.
+        const auto& queryShapeConfigurationsMap = nssToQueryShapeConfigurationsMapIt->second;
+        auto queryShapeConfigurationIt = queryShapeConfigurationsMap.find(queryShapeHashFn());
+        if (queryShapeConfigurationIt == queryShapeConfigurationsMap.end()) {
+            return boost::none;
+        }
+
+        return queryShapeConfigurationIt->second;
+    }
 
     /**
      * Returns (QuerySettings, QueryInstance) pair associated with the QueryShapeHash for the given

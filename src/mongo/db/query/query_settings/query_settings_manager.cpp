@@ -31,9 +31,7 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
-#include <map>
 
-#include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
@@ -130,38 +128,6 @@ QuerySettingsManager& QuerySettingsManager::get(OperationContext* opCtx) {
 void QuerySettingsManager::create(
     ServiceContext* service, std::function<void(OperationContext*)> clusterParameterRefreshFn) {
     getQuerySettingsManager(service).emplace(service, clusterParameterRefreshFn);
-}
-
-boost::optional<std::pair<QuerySettings, QueryInstance>>
-QuerySettingsManager::getQuerySettingsForQueryShapeHash(
-    OperationContext* opCtx,
-    std::function<query_shape::QueryShapeHash(void)> queryShapeHashFn,
-    const NamespaceString& nss) const {
-    Lock::SharedLock readLock(opCtx, _mutex);
-    // Perform the lookup for namespace string to query settings map maintained for the given
-    // tenant.
-    auto queryShapeConfigurationsIt =
-        _tenantIdToVersionedQueryShapeConfigurationsMap.find(nss.dbName().tenantId());
-    if (queryShapeConfigurationsIt == _tenantIdToVersionedQueryShapeConfigurationsMap.end()) {
-        return boost::none;
-    }
-
-    // Perform the lookup for query settings map maintained for the given namespace.
-    const auto& nssToQueryShapeConfigurationsMap =
-        queryShapeConfigurationsIt->second.nssToQueryShapeConfigurationsMap;
-    auto nssToQueryShapeConfigurationsMapIt = nssToQueryShapeConfigurationsMap.find(nss);
-    if (nssToQueryShapeConfigurationsMapIt == nssToQueryShapeConfigurationsMap.end()) {
-        return boost::none;
-    }
-
-    // Lookup query settings for the QueryShapeHash.
-    const auto& queryShapeConfigurationsMap = nssToQueryShapeConfigurationsMapIt->second;
-    auto queryShapeConfigurationIt = queryShapeConfigurationsMap.find(queryShapeHashFn());
-    if (queryShapeConfigurationIt == queryShapeConfigurationsMap.end()) {
-        return boost::none;
-    }
-
-    return queryShapeConfigurationIt->second;
 }
 
 boost::optional<std::pair<QuerySettings, QueryInstance>>

@@ -217,31 +217,6 @@ RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
 }
 
-QuerySettings lookupQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                  const NamespaceString& nss,
-                                  const mongo::SerializationContext& serializationContext,
-                                  std::function<query_shape::QueryShapeHash()> queryShapeHashFn) {
-    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
-    // this could run during startup while the FCV is still uninitialized.
-    if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return query_settings::QuerySettings();
-    }
-
-    auto* opCtx = expCtx->opCtx;
-    auto& manager = QuerySettingsManager::get(opCtx);
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    auto hashFn = [&]() {
-        if (opDebug.queryStatsInfo.key) {
-            return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
-        }
-        return queryShapeHashFn();
-    };
-
-    // Return the found query settings or an empty one.
-    return manager.getQuerySettingsForQueryShapeHash(opCtx, hashFn, nss).get_value_or({}).first;
-}
-
 namespace utils {
 
 /**
