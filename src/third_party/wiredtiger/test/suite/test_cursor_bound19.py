@@ -139,6 +139,3 @@ class test_cursor_bound19(bound_base):
 
         index_cursor.set_key(self.gen_key(30))
         self.assertEqual(index_cursor.search(), wiredtiger.WT_NOTFOUND)
-
-if __name__ == '__main__':
-    wttest.run()

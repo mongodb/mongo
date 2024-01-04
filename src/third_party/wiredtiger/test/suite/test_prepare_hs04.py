@@ -248,6 +248,3 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         # We put prepared updates in multiple sessions so that we do not hang
         # because of cache being full with uncommitted updates.
         self.prepare_updates(ds)
-
-if __name__ == '__main__':
-    wttest.run()

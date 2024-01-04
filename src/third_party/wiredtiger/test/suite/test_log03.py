@@ -96,6 +96,3 @@ class test_log03(wttest.WiredTigerTestCase):
             result = self.with_log_sync(12, dirty_pct)
             #self.tty('tried: ' + str(dirty_pct) + ', got: ' + str(result) + ', expected: ' + str(baseline + increase))
             self.assertGreater(result, baseline + increase)
-
-if __name__ == '__main__':
-    wttest.run()

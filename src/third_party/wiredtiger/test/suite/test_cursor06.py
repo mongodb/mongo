@@ -106,6 +106,3 @@ class test_cursor06(wttest.WiredTigerTestCase):
         msg = '/Invalid argument/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: c.reconfigure("xxx=true"), msg)
-
-if __name__ == '__main__':
-    wttest.run()

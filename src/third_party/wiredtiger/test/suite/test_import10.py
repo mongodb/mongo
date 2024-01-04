@@ -90,6 +90,3 @@ class test_import10(backup_base):
         all_files = self.take_full_backup(self.dir, bkup_c)
         self.assertTrue(self.uri + ".wt" not in all_files)
         bkup_c.close()
-
-if __name__ == '__main__':
-    wttest.run()

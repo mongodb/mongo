@@ -91,6 +91,3 @@ class test_truncate08(wttest.WiredTigerTestCase):
         while cursor.next() == 0:
             continue
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

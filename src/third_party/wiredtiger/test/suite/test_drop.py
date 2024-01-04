@@ -106,6 +106,3 @@ class test_drop(wttest.WiredTigerTestCase):
         self.session.drop(lsmuri, 'force')
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.drop(lsmuri, None))
-
-if __name__ == '__main__':
-    wttest.run()

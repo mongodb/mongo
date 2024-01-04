@@ -144,6 +144,3 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
                                 ',oldest_timestamp=' + self.timestamp_str(250))
         for key, value in cursor:
             self.assertEqual(value, valueC)
-
-if __name__ == '__main__':
-    wttest.run()

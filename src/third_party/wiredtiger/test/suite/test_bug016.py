@@ -103,6 +103,3 @@ class test_bug016(wttest.WiredTigerTestCase):
         cursor.insert()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: cursor.get_key(), "/requires key be set/")
-
-if __name__ == '__main__':
-    wttest.run()

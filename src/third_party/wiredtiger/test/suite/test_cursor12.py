@@ -436,6 +436,3 @@ class test_cursor12(wttest.WiredTigerTestCase):
         c.set_key(ds.key(30))
         self.assertEqual(c.modify(mods), wiredtiger.WT_NOTFOUND)
         self.session.rollback_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

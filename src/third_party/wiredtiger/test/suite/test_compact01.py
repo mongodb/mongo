@@ -126,6 +126,3 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor = self.session.open_cursor('statistics:' + uri, None, None)
         self.assertLess(stat_cursor[stat.dsrc.btree_row_leaf][2], self.maxpages)
         stat_cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

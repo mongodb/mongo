@@ -95,6 +95,3 @@ class test_compress02(wttest.WiredTigerTestCase):
 
         # Check the table contains the last checkpointed value.
         self.check(valuea, self.uri, self.nrows)
-
-if __name__ == '__main__':
-    wttest.run()

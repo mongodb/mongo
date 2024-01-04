@@ -98,8 +98,3 @@ class test_salvage02(wttest.WiredTigerTestCase):
         self.open_conn(config='salvage=true')
         results = list(self.session.open_cursor(self.uri))
         assert(len(results) == nrows)
-
-if __name__ == '__main__':
-    wttest.run()
-
-

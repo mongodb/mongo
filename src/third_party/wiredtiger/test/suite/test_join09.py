@@ -109,6 +109,3 @@ class test_join09(wttest.WiredTigerTestCase):
         c1.close()
         c0.close()
         self.dropUntilSuccess(self.session, 'table:join09')
-
-if __name__ == '__main__':
-    wttest.run()

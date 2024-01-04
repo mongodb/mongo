@@ -89,6 +89,3 @@ class test_bug010(wttest.WiredTigerTestCase):
                     msg='Mismatch on iteration ' + str(its) +\
                                         ' for table ' + str(i))
                 c.close()
-
-if __name__ == '__main__':
-    wttest.run()

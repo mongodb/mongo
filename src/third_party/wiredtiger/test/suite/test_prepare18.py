@@ -47,6 +47,3 @@ class test_prepare18(wttest.WiredTigerTestCase):
         msg='/a prepared transaction cannot include a logged table/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.session.prepare_transaction('prepare_timestamp=1'), msg)
-
-if __name__ == '__main__':
-    wttest.run()

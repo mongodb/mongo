@@ -100,6 +100,3 @@ class test_base02(wttest.WiredTigerTestCase):
                     })]
         for confstr in conf_jsonstr:
             self.create_and_drop(confstr)
-
-if __name__ == '__main__':
-    wttest.run()

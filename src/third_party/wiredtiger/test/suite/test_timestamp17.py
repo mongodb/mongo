@@ -183,6 +183,3 @@ class test_timestamp17(wttest.WiredTigerTestCase, suite_subprocess):
         else:
             self.assertEqual(search_success, wiredtiger.WT_NOTFOUND)
         self.session.commit_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -587,6 +587,3 @@ class test_hs06(wttest.WiredTigerTestCase):
         for i in range(1, 11):
             self.assertEqual(cursor[self.create_key(i)], expected)
         self.session.rollback_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

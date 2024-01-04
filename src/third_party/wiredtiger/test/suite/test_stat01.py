@@ -158,6 +158,3 @@ class test_stat01(wttest.WiredTigerTestCase):
     def test_missing_file_stats(self):
         self.assertRaises(wiredtiger.WiredTigerError, lambda:
             self.session.open_cursor('statistics:file:DoesNotExist'))
-
-if __name__ == '__main__':
-    wttest.run()

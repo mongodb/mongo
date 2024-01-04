@@ -86,6 +86,3 @@ class test_metadata_cursor02(wttest.WiredTigerTestCase):
 
             # Should include the metadata and the two valid tables
             self.assertEqual(count, self.metauri.endswith('create') and 2 or 3)
-
-if __name__ == '__main__':
-    wttest.run()

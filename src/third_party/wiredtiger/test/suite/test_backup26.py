@@ -106,6 +106,3 @@ class test_backup26(backup_base):
             ds.check_cursor(c)
             c.close()
         backup_conn.close()
-
-if __name__ == '__main__':
-    wttest.run()

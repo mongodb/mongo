@@ -198,6 +198,3 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         else:
             self.assertGreaterEqual(upd_aborted + hs_removed + hs_sweep, nrows * 11)
             self.assertEqual(upd_aborted_dryrun + hs_removed_dryrun + hs_sweep_dryrun, 0)
-
-if __name__ == '__main__':
-    wttest.run()

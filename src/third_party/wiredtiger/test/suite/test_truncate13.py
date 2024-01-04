@@ -268,6 +268,3 @@ class test_truncate13(wttest.WiredTigerTestCase):
         # If we wrote more data, read it back.
         if self.add_data:
             self.check(uri, 1, 0, nrows, 50, valuec)
-
-if __name__ == '__main__':
-    wttest.run()

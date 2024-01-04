@@ -140,6 +140,3 @@ class test_debug_mode03(wttest.WiredTigerTestCase):
         self.assertGreater(self.find_ts_log_rec(base_ts + 0x201), 0)
         self.assertGreater(self.find_ts_log_rec(base_ts + 0x202), 0)
         self.assertGreater(self.find_ts_log_rec(base_ts + 0x203), 0)
-
-if __name__ == '__main__':
-    wttest.run()

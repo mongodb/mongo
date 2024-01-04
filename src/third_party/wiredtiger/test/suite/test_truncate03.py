@@ -163,6 +163,3 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.search(), 0)
             self.assertEqual(cursor.get_value(), v)
         self.assertEqual(cursor.close(), 0)
-
-if __name__ == '__main__':
-    wttest.run()

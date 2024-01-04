@@ -60,6 +60,3 @@ class test_join05(wttest.WiredTigerTestCase):
         self.assertEquals(nr_found, 2)
         jcursor.close()
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

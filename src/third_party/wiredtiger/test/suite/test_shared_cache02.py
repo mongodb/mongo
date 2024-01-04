@@ -190,6 +190,3 @@ class test_shared_cache02(wttest.WiredTigerTestCase):
             "eviction_target=50")
 
         self.closeConnections()
-
-if __name__ == '__main__':
-    wttest.run()

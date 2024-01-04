@@ -149,6 +149,3 @@ class test_schema05(TieredConfigMixin, wttest.WiredTigerTestCase):
         self.drop_indices()
         self.create_indices()
         self.check_entries()
-
-if __name__ == '__main__':
-    wttest.run()

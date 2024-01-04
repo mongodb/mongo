@@ -201,6 +201,3 @@ class test_backup29(backup_base):
         self.pr("Sweep done")
 
         self.incr_backup_and_validate()
-
-if __name__ == '__main__':
-    wttest.run()

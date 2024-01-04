@@ -218,6 +218,3 @@ class test_load_commandline(wttest.WiredTigerTestCase, suite_subprocess):
         self.load_commandline(["table", "filename=bar"], False)
         self.load_commandline(["table", "source=bar"], False)
         self.load_commandline(["table", "version=(100,200)"], False)
-
-if __name__ == '__main__':
-    wttest.run()

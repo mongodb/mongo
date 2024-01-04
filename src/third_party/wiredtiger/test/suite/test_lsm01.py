@@ -82,6 +82,3 @@ class test_lsm01(wttest.WiredTigerTestCase):
         # TODO: Adding an explicit drop here can cause deadlocks, if a merge
         # is still happening. See issue #349.
         # self.session.drop(self.uri)
-
-if __name__ == '__main__':
-    wttest.run()

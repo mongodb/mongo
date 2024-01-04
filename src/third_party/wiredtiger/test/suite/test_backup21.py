@@ -84,6 +84,3 @@ class test_backup21(backup_base):
             work_queue.join()
             done.set()
             t.join()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -190,6 +190,3 @@ class test_rollback_to_stable36(wttest.WiredTigerTestCase):
         # Validate the data; we should see all of it, since the truncations weren't stable.
         self.check(ds, value_a, nrows, 15)
         self.check(ds, value_a, nrows, 25)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -95,6 +95,3 @@ class test_txn03(wttest.WiredTigerTestCase):
         t1c.close()
         t2c.close()
         self.session2.rollback_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

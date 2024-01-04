@@ -36,6 +36,3 @@ class test_lsm_key_format(wttest.WiredTigerTestCase):
             lambda: self.session.create(
             "table:A", "key_format=r,value_format=S,type=lsm"),
             '/key_format/')
-
-if __name__ == '__main__':
-    wttest.run()

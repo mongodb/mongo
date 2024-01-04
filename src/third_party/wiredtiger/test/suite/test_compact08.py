@@ -65,6 +65,3 @@ class test_compact08(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.background_compaction(),
             '/Operation not supported/')
-
-if __name__ == '__main__':
-    wttest.run()

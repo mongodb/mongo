@@ -140,6 +140,3 @@ class test_checkpoint09(wttest.WiredTigerTestCase):
         self.assertEqual(val, nrows + nrows/10 + nrows/100)
 
         self.session.close()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -297,6 +297,3 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         cursor = s.open_cursor(uri, None, self.config)
         self.assertEquals(cursor.next(), 0)
         self.assertEqual(cursor.get_key(), simple_key(cursor, 99))
-
-if __name__ == '__main__':
-    wttest.run()

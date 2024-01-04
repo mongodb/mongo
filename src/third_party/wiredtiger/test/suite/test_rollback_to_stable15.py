@@ -146,6 +146,3 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
         self.assertEqual(calls, 2)
 
         self.session.close()
-
-if __name__ == '__main__':
-    wttest.run()

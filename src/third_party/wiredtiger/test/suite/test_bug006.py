@@ -75,6 +75,3 @@ class test_bug006(wttest.WiredTigerTestCase):
         self.verifyUntilSuccess(self.session, uri)
 
         self.dropUntilSuccess(self.session, uri)
-
-if __name__ == '__main__':
-    wttest.run()

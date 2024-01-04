@@ -144,6 +144,3 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 
         # Reader transaction cannot see the remove on key-1 after the checkpoint.
         self.check(session3, ds, 1, value_a, 25)
-
-if __name__ == '__main__':
-    wttest.run()

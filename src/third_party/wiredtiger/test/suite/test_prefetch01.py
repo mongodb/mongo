@@ -80,6 +80,3 @@ class test_prefetch01(wttest.WiredTigerTestCase):
             new_conn = self.wiredtiger_open(self.new_dir, conn_cfg)
             new_session = new_conn.open_session(session_cfg)
             self.assertEqual(new_session.close(), 0)
-
-if __name__ == '__main__':
-    wttest.run()

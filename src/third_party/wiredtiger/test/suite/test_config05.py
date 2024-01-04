@@ -106,6 +106,3 @@ class test_config05(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.wiredtiger_open('.', 'create'),
             '/WiredTiger database is already being managed/')
-
-if __name__ == '__main__':
-    wttest.run()

@@ -149,6 +149,3 @@ class test_overwrite(wttest.WiredTigerTestCase):
         cursor.set_key(ds.key(201))
         cursor.set_value(ds.value(1008))
         self.assertEquals(cursor.update(), 0)
-
-if __name__ == '__main__':
-    wttest.run()

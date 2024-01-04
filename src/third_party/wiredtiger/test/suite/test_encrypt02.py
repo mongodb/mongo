@@ -117,6 +117,3 @@ class test_encrypt02(wttest.WiredTigerTestCase, suite_subprocess):
         wtargs += ['dump', self.uri]
         self.runWt(wtargs, outfilename='dump.out')
         self.check_non_empty_file('dump.out')
-
-if __name__ == '__main__':
-    wttest.run()

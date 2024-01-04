@@ -120,9 +120,3 @@ class test_compat04(wttest.WiredTigerTestCase, suite_subprocess):
         config_str = 'compatibility=(release=%s,require_max=%s)' % (self.rel, self.rel)
         conn = self.wiredtiger_open('.', config_str)
         conn.close()
-
-if __name__ == '__main__':
-    wttest.run()
-
-if __name__ == '__main__':
-    wttest.run()

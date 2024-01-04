@@ -115,6 +115,3 @@ class test_truncate09(wttest.WiredTigerTestCase):
         # Search for a removed key which is not stabilised, hence should find it.
         cursor.set_key(simple_key(cursor, 75000))
         self.assertEqual(cursor.search(), 0)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -134,6 +134,3 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         self.assertGreaterEqual(hs_removed, 0)
         self.assertEqual(hs_sweep, 0)
         self.assertGreaterEqual(pages_walk_skipped, 0)
-
-if __name__ == '__main__':
-    wttest.run()

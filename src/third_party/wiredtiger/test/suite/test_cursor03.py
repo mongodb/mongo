@@ -114,6 +114,3 @@ class test_cursor03(TestCursorTracker):
         self.cur_last(cursor)
         self.cur_check_backward(cursor, -1)
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

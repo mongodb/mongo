@@ -77,6 +77,3 @@ class test_bug013(wttest.WiredTigerTestCase):
 
         # Verify that the data is as we expect
         self.check_entries([[2, 6, 1]])
-
-if __name__ == '__main__':
-    wttest.run()

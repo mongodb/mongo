@@ -198,6 +198,3 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertTimestampsEqual(
             self.conn.query_timestamp('get=oldest_reader'), self.timestamp_str(6))
         self.session.commit_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

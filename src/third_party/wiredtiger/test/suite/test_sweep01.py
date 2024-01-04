@@ -206,6 +206,3 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print("ref1: " + str(ref1) + " ref2: " + str(ref2))
             print("XX2: nfile1: " + str(nfile1) + " nfile2: " + str(nfile2))
         self.assertEqual(nfile2 == final_nfile, True)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -113,6 +113,3 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
             lambda: session.commit_transaction('commit_timestamp=' +\
             self.timestamp_str(200) + ',durable_timestamp=' + self.timestamp_str(240)), msg)
         '''
-
-if __name__ == '__main__':
-    wttest.run()

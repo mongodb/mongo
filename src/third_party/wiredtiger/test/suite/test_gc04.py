@@ -96,6 +96,3 @@ class test_gc04(test_gc_base):
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_evict), 0)
         self.assertEqual(self.get_stat(stat.conn.checkpoint_cleanup_pages_removed), 0)
         self.assertGreater(self.get_stat(stat.conn.checkpoint_cleanup_pages_visited), 0)
-
-if __name__ == '__main__':
-    wttest.run()

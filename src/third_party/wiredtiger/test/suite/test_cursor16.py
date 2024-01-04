@@ -108,6 +108,3 @@ class test_cursor16(wttest.WiredTigerTestCase):
 
         #self.tty('end cursors cached=' + str(self.cached_stats()))
         self.assertEqual(0, self.cached_stats())
-
-if __name__ == '__main__':
-    wttest.run()

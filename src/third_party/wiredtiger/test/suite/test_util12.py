@@ -119,6 +119,3 @@ class test_util12(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['write', 'table:' + self.tablename,
                     'def', '456', 'abc'], errfilename=self.errfile, failure=True)
         self.check_file_contains(self.errfile, 'usage:')
-
-if __name__ == '__main__':
-    wttest.run()

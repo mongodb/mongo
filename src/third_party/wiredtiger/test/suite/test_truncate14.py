@@ -248,6 +248,3 @@ class test_truncate14(wttest.WiredTigerTestCase):
 
         # Read back the data again.
         self.check(uri, blob_rows + blob_rows - 1, 35, value_a)
-
-if __name__ == '__main__':
-    wttest.run()

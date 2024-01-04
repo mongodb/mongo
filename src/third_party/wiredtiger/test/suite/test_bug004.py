@@ -108,6 +108,3 @@ class test_bug004(wttest.WiredTigerTestCase):
                 c1.get_key(), self.make_key(c1, i))
             self.assertEqual(
                 c1.get_value(), simple_value(c1, i) + 'abcdef' * 100)
-
-if __name__ == '__main__':
-    wttest.run()

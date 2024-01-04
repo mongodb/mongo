@@ -212,6 +212,3 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
                 self.check_records(cursor, r, self.nrecords, self.nrecords * 2)
             cursor.close()
         self.assertEqual(self.expect_forceerror, self.got_forceerror)
-
-if __name__ == '__main__':
-    wttest.run()

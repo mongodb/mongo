@@ -99,6 +99,3 @@ class test_schema01(TieredConfigMixin, wttest.WiredTigerTestCase):
                 expectpos += 1
             c.close()
             self.drop_table()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -90,6 +90,3 @@ class test_rollback_to_stable30(wttest.WiredTigerTestCase):
 
     def test_rts_prepare_rollback(self):
         self.prepare_resolve(self.session.rollback_transaction)
-
-if __name__ == '__main__':
-    wttest.run()

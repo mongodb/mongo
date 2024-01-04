@@ -213,6 +213,3 @@ class test_dump_projection(wttest.WiredTigerTestCase, suite_subprocess):
         self.reopen_conn(self.dir)
         pop_reload = ProjectionDataSet(self, uri, self.nentries, key_format='S')
         pop_reload.check()
-
-if __name__ == '__main__':
-    wttest.run()

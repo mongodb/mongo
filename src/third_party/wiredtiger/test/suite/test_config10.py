@@ -66,6 +66,3 @@ class test_config10(wttest.WiredTigerTestCase):
         self.conn = self.wiredtiger_open('.', salvage_config)
         # Check salvage populates file.
         self.assertNotEqual(os.stat('WiredTiger').st_size, 0)
-
-if __name__ == '__main__':
-    wttest.run()

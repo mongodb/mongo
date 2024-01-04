@@ -83,6 +83,3 @@ class test_encrypt07(test_salvage01.test_salvage01):
     @wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
     def test_salvage_process_damaged(self):
         return super(test_encrypt07, self).test_salvage_process_damaged()
-
-if __name__ == '__main__':
-    wttest.run()

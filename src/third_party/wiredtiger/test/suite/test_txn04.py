@@ -193,6 +193,3 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         self.session2 = self.conn.open_session()
         with self.expectedStdoutPattern('recreating metadata'):
             self.ops()
-
-if __name__ == '__main__':
-    wttest.run()

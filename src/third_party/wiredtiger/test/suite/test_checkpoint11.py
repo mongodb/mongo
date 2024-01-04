@@ -255,6 +255,3 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         #    inconsistent_ckpt = stat_cursor[stat.conn.txn_rts_inconsistent_ckpt][2]
         #    stat_cursor.close()
         #    self.assertGreater(inconsistent_ckpt, 0)
-
-if __name__ == '__main__':
-    wttest.run()

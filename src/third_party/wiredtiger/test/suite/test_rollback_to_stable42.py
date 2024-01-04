@@ -117,6 +117,3 @@ class test_rollback_to_stable42(test_rollback_to_stable_base):
         # of these birds with one stone.
         with self.customStdoutPattern(custom_validator):
             simulate_crash_restart(self, ".", "RESTART")
-
-if __name__ == '__main__':
-    wttest.run()

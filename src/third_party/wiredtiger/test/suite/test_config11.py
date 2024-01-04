@@ -104,6 +104,3 @@ class test_config11(wttest.WiredTigerTestCase):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         self.assertGreater(current_cache_usage, stat_cursor[stat.conn.cache_bytes_inuse][2] * 2)
         stat_cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

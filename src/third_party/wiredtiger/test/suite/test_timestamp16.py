@@ -59,6 +59,3 @@ class test_timestamp16(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
         self.session.checkpoint('use_timestamp=true')
         self.assertTimestampsEqual('2', self.conn.query_timestamp('get=last_checkpoint'))
-
-if __name__ == '__main__':
-    wttest.run()

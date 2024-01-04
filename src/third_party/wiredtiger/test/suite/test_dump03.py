@@ -83,7 +83,3 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['dump', '-k', self.key, '-w', str(self.winsize), self.uri], outfilename=self.output)
         num_lines = self.get_num_data_lines_from_dump(self.output)
         assert num_lines == self.expected_num_lines, num_lines
-
-
-if __name__ == '__main__':
-    wttest.run()

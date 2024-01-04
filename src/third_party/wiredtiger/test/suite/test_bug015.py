@@ -42,6 +42,3 @@ class test_bug015(wttest.WiredTigerTestCase):
         self.session.create(idx1, "columns=(v)")
         self.session.drop(idx2, "force=true")
         self.session.create(idx2, "columns=(v)")
-
-if __name__ == '__main__':
-    wttest.run()

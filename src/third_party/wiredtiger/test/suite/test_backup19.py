@@ -106,5 +106,3 @@ class test_backup19(backup_base):
         self.take_full_backup(self.home_full)
         self.take_incr_backup(self.home_incr)
         self.compare_backups(self.uri, self.home_full, self.home_incr, str(self.bkup_id))
-if __name__ == '__main__':
-    wttest.run()

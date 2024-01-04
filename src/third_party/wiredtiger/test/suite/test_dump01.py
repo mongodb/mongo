@@ -125,6 +125,3 @@ class test_pretty_hex_dump(wttest.WiredTigerTestCase, suite_subprocess):
                 self.assertEqual(True, h == px,
                     'Data section starts at different lines.\n' + 'Hex: ' + h + 'Pretty_hex: ' + px)
                 data_started = True
-
-if __name__ == '__main__':
-    wttest.run()

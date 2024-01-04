@@ -216,6 +216,3 @@ class test_hs21(wttest.WiredTigerTestCase):
             # closed.
             base_write_gen = self.parse_run_write_gen(file_uri)
             self.assertEqual(initial_base_write_gen, base_write_gen)
-
-if __name__ == '__main__':
-    wttest.run()

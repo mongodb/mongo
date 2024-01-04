@@ -135,6 +135,3 @@ class test_hs02(wttest.WiredTigerTestCase):
         # Repeat earlier checks
         self.check(uri, expect_1, 1)
         self.check(uri, [(bigvalue2, nrows)], 100)
-
-if __name__ == '__main__':
-    wttest.run()

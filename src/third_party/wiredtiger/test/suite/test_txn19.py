@@ -552,6 +552,3 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.reopen_conn(salvagedir, salvage_config),
                     '/.*/')
-
-if __name__ == '__main__':
-    wttest.run()

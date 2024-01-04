@@ -131,6 +131,3 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
         # Ensure the metadata for the table we created is found
         value = cursor['table:' + self.table_name1]
         self.assertTrue(value.find('key_format') != -1)
-
-if __name__ == '__main__':
-    wttest.run()

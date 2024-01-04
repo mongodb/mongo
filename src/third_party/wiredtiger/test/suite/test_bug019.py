@@ -139,6 +139,3 @@ class test_bug019(wttest.WiredTigerTestCase):
             self.pr("FAILURE: sleepcount " + str(sleepcount))
             self.pr("FAILURE: max_wait_time " + str(max_wait_time))
         self.assertTrue(sleepcount < max_wait_time)
-
-if __name__ == '__main__':
-    wttest.run()

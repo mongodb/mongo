@@ -242,6 +242,3 @@ class test_import11(test_import_base):
 
         # Perform a checkpoint.
         self.checkpoint_and_flush_tier()
-
-if __name__ == '__main__':
-    wttest.run()

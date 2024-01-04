@@ -116,6 +116,3 @@ class test_rollback_to_stable38(wttest.WiredTigerTestCase):
         self.assertGreater(hs_btree_truncate, 0)
         self.assertGreater(fastdelete_pages, 0)
         stat_cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

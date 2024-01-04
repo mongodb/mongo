@@ -54,6 +54,3 @@ class test_row_store_empty_values(wttest.WiredTigerTestCase):
         # Confirm the values weren't stored.
         cursor = self.session.open_cursor('statistics:' + uri, None, 'statistics=(tree_walk)')
         self.assertEqual(cursor[stat.dsrc.btree_row_empty_values][2], nentries)
-
-if __name__ == '__main__':
-    wttest.run()

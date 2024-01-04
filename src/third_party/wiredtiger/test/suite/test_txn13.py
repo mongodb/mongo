@@ -92,6 +92,3 @@ class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.ignoreStdoutPatternIfExists('Eviction took more than 1 minute')
         self.assertTrue(gotException == self.expect_err)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -225,6 +225,3 @@ class test_verbose01(test_verbose_base):
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
                 lambda:self.wiredtiger_open(self.home, 'verbose=[test_verbose_invalid]'),
                 '/\'test_verbose_invalid\' not a permitted choice for key \'verbose\'/')
-
-if __name__ == '__main__':
-    wttest.run()

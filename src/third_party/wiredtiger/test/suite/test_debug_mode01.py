@@ -88,6 +88,3 @@ class test_debug_mode01(wttest.WiredTigerTestCase):
         rollback = self.rollback_error(1)
         rollback += self.rollback_error(2)
         self.assertTrue(rollback == 0)
-
-if __name__ == '__main__':
-    wttest.run()

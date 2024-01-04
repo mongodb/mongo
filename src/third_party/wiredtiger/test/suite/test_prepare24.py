@@ -121,6 +121,3 @@ class test_prepare24(wttest.WiredTigerTestCase):
             self.session.rollback_transaction()
 
             ts += 40
-
-if __name__ == '__main__':
-    wttest.run()

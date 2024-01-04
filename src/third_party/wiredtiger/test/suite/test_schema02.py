@@ -294,6 +294,3 @@ class test_schema02(TieredConfigMixin, wttest.WiredTigerTestCase):
         self.session.create("colgroup:main:c2", "columns=(S3,i4)")
         self.populate()
         self.check_entries()
-
-if __name__ == '__main__':
-    wttest.run()

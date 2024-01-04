@@ -181,6 +181,3 @@ class test_cursor_bound20(bound_base):
 
         index_cursor.set_key(MAX_BYTE_ARRAY)
         self.assertEqual(index_cursor.search(), wiredtiger.WT_NOTFOUND)
-
-if __name__ == '__main__':
-    wttest.run()

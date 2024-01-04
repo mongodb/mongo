@@ -49,7 +49,3 @@ class test_stat11(wttest.WiredTigerTestCase):
             # Use the value just in case; we would have already failed if it did not exist.
             self.assertNotEqual(v, None)
         stat_cursor.close()
-
-
-if __name__ == '__main__':
-    wttest.run()

@@ -165,6 +165,3 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
 
             # Check the state after each commit/rollback.
             self.check_all(current, committed)
-
-if __name__ == '__main__':
-    wttest.run()

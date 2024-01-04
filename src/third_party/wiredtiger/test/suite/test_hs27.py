@@ -316,6 +316,3 @@ class test_hs27(wttest.WiredTigerTestCase):
 
         # Check that our main session can still read the latest data.
         self.check(self.session, ds.uri, ds, 100)
-
-if __name__ == '__main__':
-    wttest.run()

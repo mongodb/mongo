@@ -147,6 +147,3 @@ class test_bug001(wttest.WiredTigerTestCase):
 
         self.assertEqual(cursor.close(), 0)
         self.dropUntilSuccess(self.session, uri)
-
-if __name__ == '__main__':
-    wttest.run()

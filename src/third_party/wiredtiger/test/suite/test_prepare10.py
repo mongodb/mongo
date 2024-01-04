@@ -198,6 +198,3 @@ class test_prepare10(wttest.WiredTigerTestCase):
         cursor3.close()
         session3.close()
         self.session.close()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -146,6 +146,3 @@ class test_verbose03(test_verbose_base):
                 pass
             c.close()
             session.close()
-
-if __name__ == '__main__':
-    wttest.run()

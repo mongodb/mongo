@@ -62,6 +62,3 @@ class test_bug005(wttest.WiredTigerTestCase):
 
         # Verify the object again.
         self.verifyUntilSuccess(self.session, self.uri)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -107,6 +107,3 @@ class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(5))
         self.session.timestamp_transaction('durable_timestamp=' + self.timestamp_str(5))
         self.session.commit_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

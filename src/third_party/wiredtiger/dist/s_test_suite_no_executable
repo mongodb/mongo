@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+cd ../test/suite
+if [[ $(find . -executable -type f | grep -v -w "./run.py") ]]; then
+    echo "The following files should not be executable: " &&
+    find . -executable -type f | grep -v -w "./run.py"
+fi
+
+exit 0

@@ -168,6 +168,3 @@ class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
         # The test may output the following error message while opening a file that
         # does not exist. Ignore that.
         self.ignoreStderrPatternIfExists('No such file or directory')
-
-if __name__ == '__main__':
-    wttest.run()

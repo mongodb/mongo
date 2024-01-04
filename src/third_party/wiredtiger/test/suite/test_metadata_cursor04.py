@@ -71,6 +71,3 @@ class test_metadata04(wttest.WiredTigerTestCase):
     def test_metadata04_table(self):
         self.session.create(self.uri, 'log=(enabled=false),key_format=S,value_format=S,')
         self.check_meta(self.uri, True)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -90,6 +90,3 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
             ds.populate()
             self.iterate(uri, ds)
             self.dropUntilSuccess(self.session, uri)
-
-if __name__ == '__main__':
-    wttest.run()

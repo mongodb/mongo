@@ -84,6 +84,3 @@ class test_rollback_to_stable20(test_rollback_to_stable_base):
         stat_cursor.close()
 
         self.assertLess(open_dhandle_count, 5)
-
-if __name__ == '__main__':
-    wttest.run()

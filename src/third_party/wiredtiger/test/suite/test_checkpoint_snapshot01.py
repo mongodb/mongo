@@ -93,6 +93,3 @@ class test_checkpoint_snapshot01(wttest.WiredTigerTestCase):
         # Open the new directory.
         self.conn = self.setUpConnectionOpen("RESTART")
         self.session = self.setUpSessionOpen(self.conn)
-
-if __name__ == '__main__':
-    wttest.run()

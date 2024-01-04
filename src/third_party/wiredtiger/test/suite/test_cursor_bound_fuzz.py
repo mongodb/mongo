@@ -579,6 +579,3 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
             if (i % 10 == 0):
                 # Technically this is a write but easier to do it with this session.
                 self.session.checkpoint()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -100,6 +100,3 @@ class test_config07(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         self.checkLogFileSize(self.expected_log_size)
-
-if __name__ == '__main__':
-    wttest.run()

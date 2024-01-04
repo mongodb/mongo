@@ -79,6 +79,3 @@ class test_checkpoint05(wttest.WiredTigerTestCase):
         self.assertTrue (final_count < initial_count * 3)
 
         self.session.close()
-
-if __name__ == '__main__':
-    wttest.run()

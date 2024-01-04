@@ -56,6 +56,3 @@ class test_debug_mode08(test_base03.test_base03):
         cursor = self.session.open_cursor(self.uri, None)
         cursor['key'] = 'value'
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

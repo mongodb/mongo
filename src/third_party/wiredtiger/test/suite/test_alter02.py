@@ -243,6 +243,3 @@ class test_alter02(TieredConfigMixin, wttest.WiredTigerTestCase):
         if self.conncreate or (self.connreopen and self.reopen):
             self.pr("EXPECTED KEYS 2: " + str(expected_keys))
             self.verify_logrecs(expected_keys)
-
-if __name__ == '__main__':
-    wttest.run()

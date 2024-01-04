@@ -86,6 +86,3 @@ class test_stat_log01_readonly(wttest.WiredTigerTestCase):
         self.close_conn()
         conn = self.wiredtiger_open(self.home, "readonly")
         conn.close()
-
-if __name__ == '__main__':
-    wttest.run()

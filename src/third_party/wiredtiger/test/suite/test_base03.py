@@ -147,6 +147,3 @@ class test_base03(wttest.WiredTigerTestCase):
 
         self.assertEqual(i, self.nentries)
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

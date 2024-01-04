@@ -94,6 +94,3 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Checkpoint at 50
         s.checkpoint('use_timestamp=true')
-
-if __name__ == '__main__':
-    wttest.run()

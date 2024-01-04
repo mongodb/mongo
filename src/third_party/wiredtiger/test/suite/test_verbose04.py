@@ -168,6 +168,3 @@ class test_verbose04(test_verbose_base):
                 c = session.open_cursor(uri)
                 c['multiple'] = 'multiple'
                 c.close()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -170,6 +170,3 @@ class test_checkpoint07(wttest.WiredTigerTestCase):
         self.assertEqual(val3, oldval3)
 
         self.session.close()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -123,6 +123,3 @@ class test_verbose02(test_verbose_base):
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
                 lambda:self.wiredtiger_open(self.home, 'verbose=[api:6]'),
                 '/Failed to parse verbose option \'api\'/')
-
-if __name__ == '__main__':
-    wttest.run()

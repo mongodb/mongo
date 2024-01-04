@@ -88,6 +88,3 @@ class test_search_near02(wttest.WiredTigerTestCase):
 
         self.assertEqual(cursor.get_key(), 1000)
         self.assertEqual(cursor.get_value(), value1)
-
-if __name__ == '__main__':
-    wttest.run()

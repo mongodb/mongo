@@ -118,6 +118,3 @@ class test_gc02(test_gc_base):
 
         # Check that the new updates are only seen after the update timestamp.
         self.check(bigvalue, uri, nrows, 200)
-
-if __name__ == '__main__':
-    wttest.run()

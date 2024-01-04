@@ -153,6 +153,3 @@ class test_alter03(TieredConfigMixin, wttest.WiredTigerTestCase):
         # Alter app metadata and verify
         self.session.alter(uri, 'app_metadata="meta_data_3",')
         self.verify_metadata('', 'app_metadata="meta_data_3",', '')
-
-if __name__ == '__main__':
-    wttest.run()

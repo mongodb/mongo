@@ -281,6 +281,3 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         # logged should not see any of it.
         # print "check_stable 3"
         self.check_stable(self.value3, 0, self.nkeys, self.nkeys)
-
-if __name__ == '__main__':
-    wttest.run()

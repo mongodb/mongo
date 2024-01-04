@@ -211,6 +211,3 @@ class test_cursor_bound09(bound_base):
             else:
                 raise e
         session2.rollback_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

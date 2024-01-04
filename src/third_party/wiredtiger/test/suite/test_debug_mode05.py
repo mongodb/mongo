@@ -88,6 +88,3 @@ class test_debug_mode05(wttest.WiredTigerTestCase):
         cursor.close()
 
         self.conn.rollback_to_stable()
-
-if __name__ == '__main__':
-    wttest.run()

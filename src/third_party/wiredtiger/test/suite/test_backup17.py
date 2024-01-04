@@ -106,6 +106,3 @@ class test_backup17(backup_base):
         self.assertLess(len(uri2_lens), len(uri1_lens))
         # Assert that we recorded the same total data length for both.
         self.assertEqual(sum(uri2_lens), sum(uri1_lens))
-
-if __name__ == '__main__':
-    wttest.run()

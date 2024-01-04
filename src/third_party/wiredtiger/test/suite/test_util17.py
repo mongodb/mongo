@@ -52,6 +52,3 @@ class test_util17(wttest.WiredTigerTestCase, suite_subprocess):
         expected_string = "cache_walk: Entries in the root page=1"
         self.runWt(["stat", "table:" + self.tablename ], outfilename=outfile)
         self.check_file_contains(outfile, expected_string)
-
-if __name__ == '__main__':
-    wttest.run()

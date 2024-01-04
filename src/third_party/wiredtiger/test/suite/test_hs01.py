@@ -192,6 +192,3 @@ class test_hs01(wttest.WiredTigerTestCase):
         self.session.checkpoint()
         # Check that the latest data can be seen.
         self.durable_check(bigvalue4, uri, ds)
-
-if __name__ == '__main__':
-    wttest.run()

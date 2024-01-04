@@ -90,6 +90,3 @@ class test_stat_log02(wttest.WiredTigerTestCase):
 
         self.check_stats_file(".")
         self.check_file_contains_tables(".")
-
-if __name__ == '__main__':
-    wttest.run()

@@ -584,6 +584,3 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         session.commit_transaction()
 
         # End of Scenario-4.
-
-if __name__ == '__main__':
-    wttest.run()

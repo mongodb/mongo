@@ -132,7 +132,3 @@ class test_gc05(test_gc_base):
                 ckpt_cursor.set_key(i)
                 self.assertEqual(ckpt_cursor.search(), 0)
                 self.assertEqual(ckpt_cursor.get_value(), value_w)
-
-
-if __name__ == '__main__':
-    wttest.run()

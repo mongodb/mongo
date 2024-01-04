@@ -166,6 +166,3 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
                     self.assertEqual(curs.get_value(), 0)
                 else:
                     self.assertEqual(curs.search(), wiredtiger.WT_NOTFOUND)
-
-if __name__ == '__main__':
-    wttest.run()

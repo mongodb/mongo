@@ -110,6 +110,3 @@ class test_rollback_to_stable29(test_rollback_to_stable_base):
         stat_cursor.close()
 
         self.assertGreaterEqual(hs_removed, 0)
-
-if __name__ == '__main__':
-    wttest.run()

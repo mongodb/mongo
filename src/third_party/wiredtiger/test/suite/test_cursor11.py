@@ -150,6 +150,3 @@ class test_cursor11(wttest.WiredTigerTestCase):
             wiredtiger.WiredTigerError, c.get_value, msg)
         self.assertEquals(c.next(), 0)
         self.assertEquals(c.get_key(), ds.key(1))
-
-if __name__ == '__main__':
-    wttest.run()

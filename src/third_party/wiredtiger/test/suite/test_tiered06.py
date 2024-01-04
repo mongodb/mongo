@@ -398,6 +398,3 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
         # all the file systems we created.
         fs1.terminate(session)
         ss.terminate(session)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -186,6 +186,3 @@ class test_bulk_checkpoint_in_txn(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                                      lambda: self.session.open_cursor(test_uri, None, 'bulk'),
                                      "/Bulk cursors can't be opened inside a transaction/")
-
-if __name__ == '__main__':
-    wttest.run()

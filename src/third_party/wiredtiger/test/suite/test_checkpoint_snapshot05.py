@@ -184,6 +184,3 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
         with open_cursor(self.session, 'statistics:') as stat_cursor:
             self.assertGreater(stat_cursor[stat.conn.txn_rts_inconsistent_ckpt][2], 0)
             self.assertEqual(stat_cursor[stat.conn.txn_rts_keys_removed][2], 0)
-
-if __name__ == '__main__':
-    wttest.run()

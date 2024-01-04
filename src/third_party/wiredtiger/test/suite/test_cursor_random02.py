@@ -95,6 +95,3 @@ class test_cursor_random02(wttest.WiredTigerTestCase):
                 'cursor is returning sequential data')
         self.assertGreater(differentKeys, num_entries // 4,
             'next_random random distribution not adequate')
-
-if __name__ == '__main__':
-    wttest.run()

@@ -37,6 +37,3 @@ class test_unicode01(wttest.WiredTigerTestCase):
         # the Unicode standard.
         metadata_string = u'app_metadata={"name" : "Employ\u222b\u67d2\ud4db"}'
         self.session.create('table:t', metadata_string)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -184,6 +184,3 @@ class test_compact02(wttest.WiredTigerTestCase):
             self.assertGreater(statDict["pages_rewritten"],0)
             self.assertEqual(statDict["pages_rewritten"] + statDict["pages_skipped"],
                             statDict["pages_reviewed"])
-
-if __name__ == '__main__':
-    wttest.run()

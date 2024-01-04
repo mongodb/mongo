@@ -165,6 +165,3 @@ class test_backup16(backup_base):
         # see one file, the file that does not have any checkpoint information.
         files_to_backup = [self.file4]
         self.verify_incr_backup(files_to_backup)
-
-if __name__ == '__main__':
-    wttest.run()

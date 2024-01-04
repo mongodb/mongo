@@ -87,6 +87,3 @@ class test_encrypt08(wttest.WiredTigerTestCase):
                 lambda:
                    self.reopen_conn(config = sysconfig),
              self.msg)
-
-if __name__ == '__main__':
-    wttest.run()

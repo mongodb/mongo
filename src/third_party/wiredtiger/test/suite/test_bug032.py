@@ -127,6 +127,3 @@ class test_bug032(wttest.WiredTigerTestCase):
         validate_cursor = self.session.open_cursor(ds.uri)
         validate_cursor.set_key(ds.key(txn1_key_num))
         self.assertEqual(validate_cursor.search(), 0)
-
-if __name__ == '__main__':
-    wttest.run()

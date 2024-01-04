@@ -78,6 +78,3 @@ class test_lsm02(wttest.WiredTigerTestCase):
 
         self.verify_key_exists(self.uri + 'renamed', 'a', 'a')
         self.verify_key_exists(self.uri, 'b', 'b')
-
-if __name__ == '__main__':
-    wttest.run()

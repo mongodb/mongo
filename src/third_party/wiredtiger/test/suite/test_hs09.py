@@ -224,6 +224,3 @@ class test_hs09(wttest.WiredTigerTestCase):
         # records should be seen so none should be compared to 0, and if any are the
         # resulting Python type error means something's wrong.
         self.check_ckpt_hs(0, value1, 2, 3)
-
-if __name__ == '__main__':
-    wttest.run()

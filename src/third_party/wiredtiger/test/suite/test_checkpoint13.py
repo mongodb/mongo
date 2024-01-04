@@ -153,7 +153,3 @@ class test_checkpoint(wttest.WiredTigerTestCase):
                 lambda: trydrop(), '/cannot be dropped/')
 
             ckpt_cursor.close()
-
-
-if __name__ == '__main__':
-    wttest.run()

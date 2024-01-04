@@ -110,6 +110,3 @@ class test_rollback_to_stable27(test_rollback_to_stable_base):
                 self.assertEqual(v, value_b)
             self.session.rollback_transaction()
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -105,6 +105,3 @@ class test_compact05(wttest.WiredTigerTestCase):
         else:
             self.assertEqual(pages_rewritten, 0)
             self.assertEqual(pages_rewritten_expected, 0)
-
-if __name__ == '__main__':
-    wttest.run()

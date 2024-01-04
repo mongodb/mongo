@@ -156,6 +156,3 @@ class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
         self.assertGreaterEqual(keys_removed, 0)
         self.assertEqual(keys_restored, 0)
         self.assertGreater(pages_skipped, 0)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -189,6 +189,3 @@ class test_util18(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(wt_args_beginning, outfilename='printlog-lsn-offset-beginning.out')
         self.runWt(wt_args_first, outfilename='printlog-lsn-offset-first.out')
         self.assertTrue(filecmp.cmp('printlog-lsn-offset-beginning.out', 'printlog-lsn-offset-first.out'))
-
-if __name__ == '__main__':
-    wttest.run()

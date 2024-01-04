@@ -97,6 +97,3 @@ class test_rename(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.rename(uri1, uri2, None),
             '/type must match URI/')
-
-if __name__ == '__main__':
-    wttest.run()

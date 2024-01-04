@@ -329,6 +329,3 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
 
         self.assertGreaterEqual(inconsistent_ckpt, 0)
         self.assertEqual(keys_removed, 0)
-
-if __name__ == '__main__':
-    wttest.run()

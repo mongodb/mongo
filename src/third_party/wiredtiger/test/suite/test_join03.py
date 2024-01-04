@@ -127,6 +127,3 @@ class test_join03(wttest.WiredTigerTestCase):
         for extraargs in [ '', ',strategy=bloom,count=1000' ]:
             for csvformat in [ 'SS', 'ii', 'Si', 'iS' ]:
                 self.join(csvformat, '', extraargs)
-
-if __name__ == '__main__':
-    wttest.run()

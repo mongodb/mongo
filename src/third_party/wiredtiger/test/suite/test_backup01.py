@@ -184,6 +184,3 @@ class test_backup(backup_base):
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(
             self.objs[0][0], None, "checkpoint=two"))
-
-if __name__ == '__main__':
-    wttest.run()

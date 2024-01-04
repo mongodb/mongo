@@ -60,6 +60,3 @@ class test_create_excl(TieredConfigMixin, wttest.WiredTigerTestCase):
 
         # Non-exclusive create is allowed.
         self.session.create(uri + "_non_existent1", "exclusive=false")
-
-if __name__ == '__main__':
-    wttest.run()

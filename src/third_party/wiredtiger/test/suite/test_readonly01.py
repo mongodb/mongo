@@ -139,6 +139,3 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
                 self.readonly()
         else:
             self.readonly()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -155,6 +155,3 @@ class test_log04(wttest.WiredTigerTestCase):
         self.check(c_log, 30, key, value60)
         self.check(c_ts, 30, key, value55)
         self.check(c_nots, 30, key, value60)
-
-if __name__ == '__main__':
-    wttest.run()

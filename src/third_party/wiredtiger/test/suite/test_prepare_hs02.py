@@ -173,6 +173,3 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
 
         cur.close()
         self.session.close()
-
-if __name__ == '__main__':
-    wttest.run()

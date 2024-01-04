@@ -170,6 +170,3 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
         self.assertGreaterEqual(upd_aborted + keys_removed, (nrows*2) - 2)
 
         self.session.close()
-
-if __name__ == '__main__':
-    wttest.run()

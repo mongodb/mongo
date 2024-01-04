@@ -69,6 +69,3 @@ class test_upgrade(wttest.WiredTigerTestCase):
         if self.uri == "table:":
             self.upgrade(ComplexDataSet, False)
             self.upgrade(ComplexDataSet, True)
-
-if __name__ == '__main__':
-    wttest.run()

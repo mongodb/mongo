@@ -46,6 +46,3 @@ class test_txn21(wttest.WiredTigerTestCase):
         # Test during commit.
         self.session.begin_transaction()
         self.session.commit_transaction('operation_timeout_ms=2000')
-
-if __name__ == '__main__':
-    wttest.run()

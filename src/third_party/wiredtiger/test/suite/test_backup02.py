@@ -90,6 +90,3 @@ class test_backup02(wttest.WiredTigerTestCase):
             for t in opthreads:
                 t.join()
             bkp.join()
-
-if __name__ == '__main__':
-    wttest.run()

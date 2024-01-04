@@ -568,5 +568,3 @@ class test_schema03(TieredConfigMixin, wttest.WiredTigerTestCase):
                 self.check_one(full_idxname, cursor, key, val)
             cursor.close()
             self.show_python("cursor.close()")
-if __name__ == '__main__':
-    wttest.run()

@@ -84,6 +84,3 @@ class test_split(wttest.WiredTigerTestCase):
         stat_cursor = self.session.open_cursor('statistics:' + self.uri, None)
         self.assertEqual(2, stat_cursor[stat.dsrc.btree_row_leaf][2])
         stat_cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

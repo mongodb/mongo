@@ -173,6 +173,3 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         self.check(ds, self.first_checkpoint, nonzeros, zeros, value_a, 25)
         self.check(ds, self.first_checkpoint, nonzeros, zeros, value_a, None) # default read ts
         self.check(ds, self.first_checkpoint, nonzeros, zeros, value_a, 0) # no read ts
-
-if __name__ == '__main__':
-    wttest.run()

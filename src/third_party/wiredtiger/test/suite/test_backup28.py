@@ -90,7 +90,3 @@ class test_backup28(backup_base):
             self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
                 lambda: self.wiredtiger_open(self.dir, "backup_restore_target={0}".format(target_uri_list_format)),
                 '/partial backup restore only supports objects of type .* formats in the target uri list/')
-
-
-if __name__ == '__main__':
-    wttest.run()

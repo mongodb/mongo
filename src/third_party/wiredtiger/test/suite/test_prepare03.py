@@ -196,6 +196,3 @@ class test_prepare03(wttest.WiredTigerTestCase):
             cursor.set_key(self.genkey(self.nentries))
         cursor.search_near()
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

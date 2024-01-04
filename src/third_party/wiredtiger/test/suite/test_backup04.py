@@ -121,6 +121,3 @@ class test_backup_target(backup_base):
         self.take_full_backup(full_dir)
         self.compare_backups(self.uri, self.dir, full_dir)
         self.compare_backups(self.uri, self.dir, './')
-
-if __name__ == '__main__':
-    wttest.run()

@@ -159,6 +159,3 @@ class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.session.create(self.uri4, 'key_format=S,value_format=S')
         self.session.drop(self.uri4, 'remove_files=false')
         self.assertTrue(os.path.isfile("abcde-0000000001.wtobj"))
-
-if __name__ == '__main__':
-    wttest.run()

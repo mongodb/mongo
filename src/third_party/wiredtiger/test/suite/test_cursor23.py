@@ -98,7 +98,3 @@ class test_cursor23(wttest.WiredTigerTestCase):
 
         cursor.close()
         self.session.close()
-
-
-if __name__ == '__main__':
-    wttest.run()

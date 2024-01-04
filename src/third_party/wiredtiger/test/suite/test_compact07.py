@@ -212,6 +212,3 @@ class test_compact07(wttest.WiredTigerTestCase):
         # Background compaction may have been inspecting a table when disabled, which is considered
         # as an interruption, ignore that message.
         self.ignoreStdoutPatternIfExists('background compact interrupted by application')
-
-if __name__ == '__main__':
-    wttest.run()

@@ -520,6 +520,3 @@ class test_join07(wttest.WiredTigerTestCase):
         clause1 = "(7 < A <= 500 && B[bloom=300] < 150)"
         clause2 = "(F[bloom=500] > '234' || G[bloom=20] < '100')"
         self.interpret("[N=1000][key=S]" + clause1 + "&&" + clause2)
-
-if __name__ == '__main__':
-    wttest.run()

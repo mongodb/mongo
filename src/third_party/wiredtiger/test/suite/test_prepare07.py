@@ -171,6 +171,3 @@ class test_prepare07(wttest.WiredTigerTestCase):
         # transaction is a prepared transaction and the oldest timestamp
         # advances beyond the prepared timestamp.
         self.older_prepare_updates(uri, ds, nrows, value_a, value_b)
-
-if __name__ == '__main__':
-    wttest.run()

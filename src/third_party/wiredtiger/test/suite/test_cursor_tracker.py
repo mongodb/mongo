@@ -487,6 +487,3 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             else:
                 kind = 'value'
             self.fail('mismatched ' + kind + ', want: ' + wantstr + ', got: ' + gotstr)
-
-if __name__ == '__main__':
-    wttest.run()

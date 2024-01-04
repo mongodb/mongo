@@ -144,6 +144,3 @@ class test_alter04(TieredConfigMixin, wttest.WiredTigerTestCase):
             else:
                 self.session.alter(suburi, alter_param)
                 self.verify_metadata(alter_param)
-
-if __name__ == '__main__':
-    wttest.run()

@@ -53,6 +53,3 @@ class test_debug_mode04(wttest.WiredTigerTestCase):
         self.conn.reconfigure("debug_mode=(eviction=false)")
         self.session.create(self.uri, 'key_format=i,value_format=u')
         self.add_data()
-
-if __name__ == '__main__':
-    wttest.run()

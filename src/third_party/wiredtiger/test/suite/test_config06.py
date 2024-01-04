@@ -87,6 +87,3 @@ class test_config06(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None)
         cursor[k] = v
         self.assertEquals(cursor[k[:1]], v[:1])
-
-if __name__ == '__main__':
-    wttest.run()

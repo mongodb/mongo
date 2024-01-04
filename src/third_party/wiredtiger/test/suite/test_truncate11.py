@@ -113,6 +113,3 @@ class test_truncate11(wttest.WiredTigerTestCase):
         read_deleted = stat_cursor[stat.conn.cache_read_deleted][2]
         self.assertLess(read_deleted, 10)
         stat_cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -224,6 +224,3 @@ class test_cursor_bound02(bound_base):
         # Test bound API: Test that clear works after a clear.
         self.assertEqual(cursor.bound("action=clear"), 0)
         self.assertEqual(cursor.bound("action=clear"), 0)
-
-if __name__ == '__main__':
-    wttest.run()

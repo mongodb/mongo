@@ -346,6 +346,3 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
         self.check_empty_file(errfile)  # expect no output
         self.check_no_error_in_file(errfile)
         self.check_damaged(self.tablename)
-
-if __name__ == '__main__':
-    wttest.run()

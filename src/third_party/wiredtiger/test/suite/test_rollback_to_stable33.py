@@ -86,6 +86,3 @@ class test_rollback_to_stable33(wttest.WiredTigerTestCase):
             self.assertEquals(c[ds.key(10)], ds.value(10))
             self.assertEquals(c[ds.key(11)], ds.value(11))
             self.assertEquals(c[ds.key(12)], ds.value(12))
-
-if __name__ == '__main__':
-    wttest.run()

@@ -74,6 +74,3 @@ class test_rollback_to_stable41(test_rollback_to_stable_base):
         # Real RTS, newer data should vanish.
         self.conn.rollback_to_stable()
         self.check(value_a, uri, nrows, None, 30)
-
-if __name__ == '__main__':
-    wttest.run()

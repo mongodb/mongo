@@ -240,6 +240,3 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_dump_process_timestamp_new(self):
         self.dump(False, False, 5, 7)
-
-if __name__ == '__main__':
-    wttest.run()

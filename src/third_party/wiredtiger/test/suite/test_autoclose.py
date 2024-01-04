@@ -156,6 +156,3 @@ class test_autoclose(wttest.WiredTigerTestCase):
         self.assertRaisesHavingMessage(RuntimeError,
                                        lambda: conn.open_session(None),
                                        '/wt_connection.* is None/')
-
-if __name__ == '__main__':
-    wttest.run()

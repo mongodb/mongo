@@ -127,6 +127,3 @@ class test_cursor_bound16(bound_base):
         self.cursor_traversal_bound(dumpcurs, self.start_key, self.end_key, False, 60)
 
         dumpcurs.close()
-
-if __name__ == '__main__':
-    wttest.run()

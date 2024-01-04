@@ -135,6 +135,3 @@ class test_tiered18(wttest.WiredTigerTestCase, TieredConfigMixin):
         conf = ',tiered_storage=(shared=true)'
         err_msg = "/Invalid argument/"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: self.session.create(self.uri_fail, "base_create + conf"), err_msg)
-
-if __name__ == '__main__':
-    wttest.run()

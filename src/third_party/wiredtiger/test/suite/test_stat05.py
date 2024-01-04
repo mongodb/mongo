@@ -99,6 +99,3 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
             cursor[ds.key(i)] = ds.value(i)
         cursor.close()
         self.openAndWalkStatCursor()
-
-if __name__ == '__main__':
-    wttest.run()

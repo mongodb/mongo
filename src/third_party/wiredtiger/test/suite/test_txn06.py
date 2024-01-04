@@ -66,6 +66,3 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
 
         # We were trying to generate a message matching this pattern.
         self.captureout.checkAdditionalPattern(self, "old snapshot")
-
-if __name__ == '__main__':
-    wttest.run()

@@ -63,6 +63,3 @@ class test_txn12(wttest.WiredTigerTestCase, suite_subprocess):
         # This commit should succeed as open cursor should not set transaction
         # error.
         session.commit_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

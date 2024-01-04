@@ -132,6 +132,3 @@ class test_prepare22(wttest.WiredTigerTestCase):
                 cursor.set_key(1)
                 self.assertEquals(cursor.search(), wiredtiger.WT_NOTFOUND)
             self.session.rollback_transaction()
-
-if __name__ == '__main__':
-    wttest.run()

@@ -198,6 +198,3 @@ class test_truncate16(wttest.WiredTigerTestCase):
         read_deleted_still = stat_cursor[stat.conn.cache_read_deleted][2]
         self.assertEqual(read_deleted_still, read_deleted)
         stat_cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

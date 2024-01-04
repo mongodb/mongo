@@ -119,6 +119,3 @@ class test_util03_import(wttest.WiredTigerTestCase, suite_subprocess):
         for i in range(1, 1000):
             self.assertEqual(cursor[i], i)
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

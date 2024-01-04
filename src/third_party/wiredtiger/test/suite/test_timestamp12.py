@@ -115,6 +115,3 @@ class test_timestamp12(wttest.WiredTigerTestCase):
             ckpt_exp = dict((k, 1) for k in first_range)
 
         self.verify_expected(logged_exp, ckpt_exp)
-
-if __name__ == '__main__':
-    wttest.run()

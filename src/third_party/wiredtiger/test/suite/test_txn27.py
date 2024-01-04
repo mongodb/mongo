@@ -82,6 +82,3 @@ class test_txn27(wttest.WiredTigerTestCase):
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor1.update(), msg1)
         # Expect the rollback reason to give us the true reason for the rollback.
         self.assertEquals(session1.get_rollback_reason(), msg2)
-
-if __name__ == '__main__':
-    wttest.run()

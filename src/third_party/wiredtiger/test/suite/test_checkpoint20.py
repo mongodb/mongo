@@ -171,6 +171,3 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         #self.checkfail(ds, self.first_checkpoint, nrows // 2 + 1, 20)
         #if self.stable_ts >= 20:
         #    self.checkfail(ds, self.first_checkpoint, nrows // 2 + 1, None)
-
-if __name__ == '__main__':
-    wttest.run()

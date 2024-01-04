@@ -301,6 +301,3 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
                 for k in keys[:(key_range // 2)]))
             self.check(self.session, 'read_timestamp=' + latest_ts,
                 self.table_ts_log, dict((k, 1) for k in keys[(1 + key_range // 2):]), missing=True)
-
-if __name__ == '__main__':
-    wttest.run()

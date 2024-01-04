@@ -110,6 +110,3 @@ class test_timestamp19(wttest.WiredTigerTestCase):
             self.conn.query_timestamp('get=oldest_timestamp'), self.timestamp_str(70))
         self.assertTimestampsEqual(\
             self.conn.query_timestamp('get=stable_timestamp'), self.timestamp_str(70))
-
-if __name__ == '__main__':
-    wttest.run()

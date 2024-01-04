@@ -92,6 +92,3 @@ class test_util19(wttest.WiredTigerTestCase, suite_subprocess):
             self.check_file_contains('downgrade.out', compat_str)
         else:
             self.check_file_not_contains('downgrade.out', compat_str)
-
-if __name__ == '__main__':
-    wttest.run()

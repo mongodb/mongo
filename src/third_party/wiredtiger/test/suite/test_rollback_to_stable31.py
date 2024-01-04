@@ -113,6 +113,3 @@ class test_rollback_to_stable31(test_rollback_to_stable_base):
             self.check(value_a, uri, 0, nrows, 15)
             self.check(value_b, uri, 0, nrows, 25)
             self.check(value_c, uri, 0, nrows, 35)
-
-if __name__ == '__main__':
-    wttest.run()

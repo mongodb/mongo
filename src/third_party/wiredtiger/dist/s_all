@@ -116,6 +116,7 @@ run "s_define" &
 run "s_docs" &
 run "s_evergreen" &
 run "s_evergreen_validate $fast" &
+run "s_test_suite_no_executable" &
 run "s_export" &
 run "s_free" &
 run "s_funcs" &

@@ -197,6 +197,3 @@ class test_hs08(wttest.WiredTigerTestCase):
         squashed_write = self.get_stat(stat.conn.cache_hs_write_squash)
         self.assertGreaterEqual(hs_writes, 5)
         self.assertEqual(squashed_write, 5)
-
-if __name__ == '__main__':
-    wttest.run()

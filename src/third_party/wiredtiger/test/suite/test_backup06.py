@@ -160,6 +160,3 @@ class test_backup06(backup_base):
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, total)
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

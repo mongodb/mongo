@@ -106,6 +106,3 @@ class test_pack(wttest.WiredTigerTestCase):
         self.check('s', "4")
         self.check("1s", "4")
         self.check("2s", "42")
-
-if __name__ == '__main__':
-    wttest.run()

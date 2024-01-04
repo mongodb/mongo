@@ -154,6 +154,3 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
             self.session.open_cursor(self.uri, None, None))
         self.assertRaises(wiredtiger.WiredTigerError, lambda:
             self.session.open_cursor(self.index_uri, None, None))
-
-if __name__ == '__main__':
-    wttest.run()

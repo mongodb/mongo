@@ -450,6 +450,3 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(
             self.uri, None, "checkpoint=WiredTigerCheckpoint")
         self.assertEqual(cursor.next(), 0)
-
-if __name__ == '__main__':
-    wttest.run()

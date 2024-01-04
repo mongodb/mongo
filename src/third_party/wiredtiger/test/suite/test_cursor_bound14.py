@@ -192,6 +192,3 @@ class test_cursor_bound14(bound_base):
         else:
             self.assertEqual(cursor.update(), 0)
         cursor.close()
-
-if __name__ == '__main__':
-    wttest.run()

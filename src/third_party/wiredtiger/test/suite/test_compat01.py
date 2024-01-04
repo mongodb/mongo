@@ -221,6 +221,3 @@ class test_reconfig_fail(wttest.WiredTigerTestCase):
         msg = '/system must be quiescent/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.conn.reconfigure(compat_str), msg)
-
-if __name__ == '__main__':
-    wttest.run()

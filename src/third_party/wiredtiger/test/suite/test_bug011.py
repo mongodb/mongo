@@ -71,6 +71,3 @@ class test_bug011(wttest.WiredTigerTestCase):
                 cursors[i].set_key(ds.key(random.randint(0, self.nrows - 1)))
                 cursors[i].search()
                 cursors[i].reset()
-
-if __name__ == '__main__':
-    wttest.run()

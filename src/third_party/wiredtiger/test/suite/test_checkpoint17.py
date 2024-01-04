@@ -136,6 +136,3 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         self.check(ds, self.second_checkpoint, nrows, value_a, nrows, 10)
         self.check(ds, self.second_checkpoint, nrows, value_b, nrows, 20)
         self.check(ds, self.second_checkpoint, nrows, value_c, nrows, 30)
-
-if __name__ == '__main__':
-    wttest.run()

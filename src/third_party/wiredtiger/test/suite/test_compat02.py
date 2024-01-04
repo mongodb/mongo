@@ -190,6 +190,3 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
             self.pr("EXPECT SUCCESS")
             conn = self.wiredtiger_open('.', restart_config)
             conn.close()
-
-if __name__ == '__main__':
-    wttest.run()
