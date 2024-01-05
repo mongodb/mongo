@@ -10,7 +10,7 @@ function getConn(connStr) {
         return new Mongo(connStr);
     } catch (exp) {
         jsTest.log('Unable to connect to ' + connStr + ": " + tojson(exp));
-        throw exp;
+        return null;
     }
 }
 
@@ -34,7 +34,7 @@ function sendCommandToInitialSyncNodeInReplSet(
                 } finally {
                     initialSyncConn.close();
                 }
-            }
+            }  // Move on if we can't get a connection to the node.
         }
     }
 }
@@ -61,7 +61,13 @@ function maybeSendCommandToInitialSyncNodes(
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
-    const topology = DiscoverTopology.findConnectedNodes(conn);
+    let topology;
+    try {
+        topology = DiscoverTopology.findConnectedNodes(conn);
+    } catch (exp) {
+        jsTestLog("Unable to run findConnectedNodes: " + tojson(exp))
+        return func.apply(conn, makeFuncArgs(commandObj));
+    }
 
     // Find initial sync nodes to send command to.
     if (topology.type == Topology.kReplicaSet) {
@@ -86,7 +92,7 @@ function maybeSendCommandToInitialSyncNodes(
                     } finally {
                         shardPrimaryConn.close();
                     }
-                }
+                }  // Move on if we can't get a connection to the node.
             }
         }
         if (topology.configsvr.type == Topology.kReplicaSet) {
@@ -102,7 +108,7 @@ function maybeSendCommandToInitialSyncNodes(
                 } finally {
                     configConn.close();
                 }
-            }
+            }  // Move on if we can't get a connection to the node.
         }
     }
 
