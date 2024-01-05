@@ -49,6 +49,7 @@
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
+#include "mongo/db/exec/sbe/values/generic_compare.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
@@ -1002,6 +1003,58 @@ bool operator==(const MultiMap& lhs, const MultiMap& rhs) {
 
 bool operator!=(const MultiMap& lhs, const MultiMap& rhs) {
     return !(lhs == rhs);
+}
+
+std::pair<TypeTags, Value> genericEq(TypeTags lhsTag,
+                                     Value lhsVal,
+                                     TypeTags rhsTag,
+                                     Value rhsVal,
+                                     const StringDataComparator* comparator) {
+    return genericCompare<std::equal_to<>>(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
+}
+
+std::pair<TypeTags, Value> genericNeq(TypeTags lhsTag,
+                                      Value lhsVal,
+                                      TypeTags rhsTag,
+                                      Value rhsVal,
+                                      const StringDataComparator* comparator) {
+    auto [tag, val] = genericEq(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
+    // genericEq() will return either Boolean or Nothing. If it returns Boolean, negate
+    // 'val' before returning it.
+    val = tag == TypeTags::Boolean ? bitcastFrom<bool>(!bitcastTo<bool>(val)) : val;
+    return {tag, val};
+}
+
+std::pair<TypeTags, Value> genericLt(TypeTags lhsTag,
+                                     Value lhsVal,
+                                     TypeTags rhsTag,
+                                     Value rhsVal,
+                                     const StringDataComparator* comparator) {
+    return genericCompare<std::less<>>(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
+}
+
+std::pair<TypeTags, Value> genericLte(TypeTags lhsTag,
+                                      Value lhsVal,
+                                      TypeTags rhsTag,
+                                      Value rhsVal,
+                                      const StringDataComparator* comparator) {
+    return genericCompare<std::less_equal<>>(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
+}
+
+std::pair<TypeTags, Value> genericGt(TypeTags lhsTag,
+                                     Value lhsVal,
+                                     TypeTags rhsTag,
+                                     Value rhsVal,
+                                     const StringDataComparator* comparator) {
+    return genericCompare<std::greater<>>(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
+}
+
+std::pair<TypeTags, Value> genericGte(TypeTags lhsTag,
+                                      Value lhsVal,
+                                      TypeTags rhsTag,
+                                      Value rhsVal,
+                                      const StringDataComparator* comparator) {
+    return genericCompare<std::greater_equal<>>(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
 }
 }  // namespace value
 }  // namespace sbe

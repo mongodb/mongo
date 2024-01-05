@@ -389,6 +389,17 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                                         Value rhsValue,
                                         const StringDataComparator* comparator = nullptr);
 
+inline std::pair<TypeTags, Value> compare3way(TypeTags lhsTag,
+                                              Value lhsValue,
+                                              TypeTags rhsTag,
+                                              Value rhsValue,
+                                              const StringDataComparator* comparator = nullptr) {
+    if (lhsTag == TypeTags::Nothing || rhsTag == TypeTags::Nothing) {
+        return {TypeTags::Nothing, 0};
+    }
+    return compareValue(lhsTag, lhsValue, rhsTag, rhsValue, comparator);
+}
+
 bool isNaN(TypeTags tag, Value val) noexcept;
 
 bool isInfinity(TypeTags tag, Value val) noexcept;
@@ -2193,6 +2204,42 @@ private:
 std::pair<TypeTags, Value> arrayToSet(TypeTags tag,
                                       Value val,
                                       CollatorInterface* collator = nullptr);
+
+std::pair<TypeTags, Value> genericEq(TypeTags lhsTag,
+                                     Value lhsValue,
+                                     TypeTags rhsTag,
+                                     Value rhsValue,
+                                     const StringDataComparator* comparator = nullptr);
+
+std::pair<TypeTags, Value> genericNeq(TypeTags lhsTag,
+                                      Value lhsValue,
+                                      TypeTags rhsTag,
+                                      Value rhsValue,
+                                      const StringDataComparator* comparator = nullptr);
+
+std::pair<TypeTags, Value> genericLt(TypeTags lhsTag,
+                                     Value lhsValue,
+                                     TypeTags rhsTag,
+                                     Value rhsValue,
+                                     const StringDataComparator* comparator = nullptr);
+
+std::pair<TypeTags, Value> genericLte(TypeTags lhsTag,
+                                      Value lhsValue,
+                                      TypeTags rhsTag,
+                                      Value rhsValue,
+                                      const StringDataComparator* comparator = nullptr);
+
+std::pair<TypeTags, Value> genericGt(TypeTags lhsTag,
+                                     Value lhsValue,
+                                     TypeTags rhsTag,
+                                     Value rhsValue,
+                                     const StringDataComparator* comparator = nullptr);
+
+std::pair<TypeTags, Value> genericGte(TypeTags lhsTag,
+                                      Value lhsValue,
+                                      TypeTags rhsTag,
+                                      Value rhsValue,
+                                      const StringDataComparator* comparator = nullptr);
 }  // namespace value
 }  // namespace sbe
 }  // namespace mongo

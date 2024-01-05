@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
+#include "mongo/db/exec/sbe/values/generic_compare.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/logv2/log.h"
@@ -302,7 +303,7 @@ FastTuple<bool, value::TypeTags, value::Value> blockCompareGeneric(value::ValueB
                      ColumnOpType::ReturnNothingOnMissing{}};
 
     const auto cmpOp = value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
-        return genericCompare<Cmp>(tag, val, rhsTag, rhsVal);
+        return value::genericCompare<Cmp>(tag, val, rhsTag, rhsVal);
     });
 
     auto res = blockView->map(cmpOp);
@@ -392,7 +393,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmp3wS
                                                    ColumnOpType::ReturnNothingOnMissing{}};
 
     const auto cmpOp = value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
-        return compare3way(tag, val, value.b, value.c);
+        return value::compare3way(tag, val, value.b, value.c);
     });
 
     auto res = blockView->map(cmpOp);

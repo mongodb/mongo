@@ -1960,7 +1960,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggMin(value::TypeTags 
         return {true, tag, val};
     }
 
-    auto [tag, val] = compare3way(accTag, accValue, fieldTag, fieldValue, collator);
+    auto [tag, val] = value::compare3way(accTag, accValue, fieldTag, fieldValue, collator);
 
     if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int>(val) < 0) {
         auto [tag, val] = value::copyValue(accTag, accValue);
@@ -1970,7 +1970,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggMin(value::TypeTags 
         return {true, tag, val};
     }
 }
-
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggMax(value::TypeTags accTag,
                                                                 value::Value accValue,
@@ -1989,7 +1988,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggMax(value::TypeTags 
         return {true, tag, val};
     }
 
-    auto [tag, val] = compare3way(accTag, accValue, fieldTag, fieldValue, collator);
+    auto [tag, val] = value::compare3way(accTag, accValue, fieldTag, fieldValue, collator);
 
     if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int>(val) > 0) {
         auto [tag, val] = value::copyValue(accTag, accValue);
@@ -5858,7 +5857,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMinMaxFromArray(
     int sign_adjust = f == Builtin::internalLeast ? -1 : +1;
     while (!arrayEnum.atEnd()) {
         auto [itemTag, itemVal] = arrayEnum.getViewOfValue();
-        auto [tag, val] = compare3way(itemTag, itemVal, accTag, accVal, collator);
+        auto [tag, val] = value::compare3way(itemTag, itemVal, accTag, accVal, collator);
         if (tag == value::TypeTags::Nothing) {
             // The comparison returns Nothing if one of the arguments is Nothing or if a sort order
             // cannot be determined: bail out immediately and return Nothing.
@@ -10295,7 +10294,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
                 value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
-                auto [tag, val] = genericCompare<std::less<>>(lhsTag, lhsVal, rhsTag, rhsVal);
+                auto [tag, val] = value::genericLt(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
                 break;
@@ -10312,10 +10311,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
                 value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
-                auto [tag, val] =
-                    genericCompare<std::less<>>(lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
-
-                pushStack(false, tag, val);
+                if (collTag == value::TypeTags::collator) {
+                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+                    auto [tag, val] = value::genericLt(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+                    pushStack(false, tag, val);
+                } else {
+                    pushStack(false, value::TypeTags::Nothing, 0);
+                }
                 break;
             }
             case Instruction::lessEq: {
@@ -10327,7 +10329,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
                 value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
-                auto [tag, val] = genericCompare<std::less_equal<>>(lhsTag, lhsVal, rhsTag, rhsVal);
+                auto [tag, val] = value::genericLte(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
                 break;
@@ -10344,10 +10346,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
                 value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
-                auto [tag, val] = genericCompare<std::less_equal<>>(
-                    lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
-
-                pushStack(false, tag, val);
+                if (collTag == value::TypeTags::collator) {
+                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+                    auto [tag, val] = value::genericLte(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+                    pushStack(false, tag, val);
+                } else {
+                    pushStack(false, value::TypeTags::Nothing, 0);
+                }
                 break;
             }
             case Instruction::greater: {
@@ -10359,7 +10364,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
                 value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
-                auto [tag, val] = genericCompare<std::greater<>>(lhsTag, lhsVal, rhsTag, rhsVal);
+                auto [tag, val] = value::genericGt(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
 
@@ -10377,10 +10382,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
                 value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
-                auto [tag, val] = genericCompare<std::greater<>>(
-                    lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
-
-                pushStack(false, tag, val);
+                if (collTag == value::TypeTags::collator) {
+                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+                    auto [tag, val] = value::genericGt(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+                    pushStack(false, tag, val);
+                } else {
+                    pushStack(false, value::TypeTags::Nothing, 0);
+                }
                 break;
             }
             case Instruction::greaterEq: {
@@ -10392,8 +10400,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
                 value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
-                auto [tag, val] =
-                    genericCompare<std::greater_equal<>>(lhsTag, lhsVal, rhsTag, rhsVal);
+                auto [tag, val] = value::genericGte(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
                 break;
@@ -10410,10 +10417,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
                 value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
-                auto [tag, val] = genericCompare<std::greater_equal<>>(
-                    lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
-
-                pushStack(false, tag, val);
+                if (collTag == value::TypeTags::collator) {
+                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+                    auto [tag, val] = value::genericGte(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+                    pushStack(false, tag, val);
+                } else {
+                    pushStack(false, value::TypeTags::Nothing, 0);
+                }
                 break;
             }
             case Instruction::eq: {
@@ -10425,7 +10435,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
                 value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
-                auto [tag, val] = genericCompare<std::equal_to<>>(lhsTag, lhsVal, rhsTag, rhsVal);
+                auto [tag, val] = value::genericEq(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
                 break;
@@ -10442,10 +10452,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
                 value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
-                auto [tag, val] = genericCompare<std::equal_to<>>(
-                    lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
-
-                pushStack(false, tag, val);
+                if (collTag == value::TypeTags::collator) {
+                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+                    auto [tag, val] = value::genericEq(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+                    pushStack(false, tag, val);
+                } else {
+                    pushStack(false, value::TypeTags::Nothing, 0);
+                }
                 break;
             }
             case Instruction::neq: {
@@ -10457,8 +10470,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
                 value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
-                auto [tag, val] = genericCompare<std::equal_to<>>(lhsTag, lhsVal, rhsTag, rhsVal);
-                std::tie(tag, val) = genericNot(tag, val);
+                auto [tag, val] = value::genericNeq(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
                 break;
@@ -10475,11 +10487,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
                 value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
-                auto [tag, val] = genericCompare<std::equal_to<>>(
-                    lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
-                std::tie(tag, val) = genericNot(tag, val);
-
-                pushStack(false, tag, val);
+                if (collTag == value::TypeTags::collator) {
+                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+                    auto [tag, val] = value::genericNeq(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+                    pushStack(false, tag, val);
+                } else {
+                    pushStack(false, value::TypeTags::Nothing, 0);
+                }
                 break;
             }
             case Instruction::cmp3w: {
@@ -10491,7 +10505,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
                 value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
-                auto [tag, val] = compare3way(lhsTag, lhsVal, rhsTag, rhsVal);
+                auto [tag, val] = value::compare3way(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
 
@@ -10509,9 +10523,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
                 value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
-                auto [tag, val] = compare3way(lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
-
-                pushStack(false, tag, val);
+                if (collTag == value::TypeTags::collator) {
+                    auto comp = static_cast<StringDataComparator*>(value::getCollatorView(collVal));
+                    auto [tag, val] = value::compare3way(lhsTag, lhsVal, rhsTag, rhsVal, comp);
+                    pushStack(false, tag, val);
+                } else {
+                    pushStack(false, value::TypeTags::Nothing, 0);
+                }
                 break;
             }
             case Instruction::fillEmpty: {

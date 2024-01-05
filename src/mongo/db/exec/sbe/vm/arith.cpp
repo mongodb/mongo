@@ -1220,34 +1220,6 @@ std::pair<value::TypeTags, value::Value> ByteCode::genericNot(value::TypeTags ta
     }
 }
 
-std::pair<value::TypeTags, value::Value> ByteCode::compare3way(
-    value::TypeTags lhsTag,
-    value::Value lhsValue,
-    value::TypeTags rhsTag,
-    value::Value rhsValue,
-    const StringDataComparator* comparator) {
-    if (lhsTag == value::TypeTags::Nothing || rhsTag == value::TypeTags::Nothing) {
-        return {value::TypeTags::Nothing, 0};
-    }
-
-    return value::compareValue(lhsTag, lhsValue, rhsTag, rhsValue, comparator);
-}
-
-std::pair<value::TypeTags, value::Value> ByteCode::compare3way(value::TypeTags lhsTag,
-                                                               value::Value lhsValue,
-                                                               value::TypeTags rhsTag,
-                                                               value::Value rhsValue,
-                                                               value::TypeTags collTag,
-                                                               value::Value collValue) {
-    if (collTag != value::TypeTags::collator) {
-        return {value::TypeTags::Nothing, 0};
-    }
-
-    auto comparator = static_cast<StringDataComparator*>(getCollatorView(collValue));
-
-    return value::compareValue(lhsTag, lhsValue, rhsTag, rhsValue, comparator);
-}
-
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericAcos(value::TypeTags argTag,
                                                                      value::Value argValue) {
     return genericTrigonometricFun<Acos>(argTag, argValue);

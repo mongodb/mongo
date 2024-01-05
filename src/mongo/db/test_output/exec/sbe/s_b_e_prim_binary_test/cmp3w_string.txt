@@ -16,11 +16,11 @@ RESULT: Nothing
 
 -- EXECUTE VARIATION:
 SLOTS: [1: Nothing, 2: Nothing, 3: Collator({"locale" : "mock_always_equal", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
-RESULT: 0
+RESULT: Nothing
 
 -- EXECUTE VARIATION:
 SLOTS: [1: Nothing, 2: Nothing, 3: Collator({"locale" : "mock_to_lower_string", "caseLevel" : false, "caseFirst" : "off", "strength" : 3, "numericOrdering" : false, "alternate" : "non-ignorable", "maxVariable" : "punct", "normalization" : false, "backwards" : false, "version" : "mock_version"})]
-RESULT: 0
+RESULT: Nothing
 
 -- EXECUTE VARIATION:
 SLOTS: [1: Nothing, 2: "abc", 3: Nothing]
