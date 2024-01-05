@@ -1881,6 +1881,7 @@ functions:
       - "src/evergreen/run_python_script.sh"
       - "buildscripts/package_test.py"
       - "release"
+      - "--evg-project=${project}"
 
   "set up EC2 instance": &set_up_ec2_instance
 
