@@ -118,6 +118,22 @@ public:
     }
 };
 
+void registerCollectionStatsCollector(FTDCController* controller,
+                                      StringData statsName,
+                                      StringData collName,
+                                      const DatabaseName& db) {
+    controller->addPeriodicCollector(
+        std::make_unique<FTDCSimpleInternalCommandCollector>(
+            "aggregate",
+            statsName,
+            db,
+            BSON("aggregate" << collName << "cursor" << BSONObj{} << "pipeline"
+                             << BSON_ARRAY(BSON("$collStats"
+                                                << BSON("storageStats" << BSON(
+                                                            "waitForLock" << false << "numericOnly"
+                                                                          << true)))))),
+        ClusterRole::ShardServer);
+}
 
 void registerShardCollectors(FTDCController* controller) {
     registerServerCollectorsForRole(controller, ClusterRole::ShardServer);
@@ -139,19 +155,14 @@ void registerShardCollectors(FTDCController* controller) {
 
         // CollectionStats
         if (!isArbiter) {
-            controller->addPeriodicCollector(
-                std::make_unique<FTDCSimpleInternalCommandCollector>(
-                    "aggregate",
-                    "local.oplog.rs.stats",
-                    DatabaseName::kLocal,
-                    BSON("aggregate"
-                         << "oplog.rs"
-                         << "cursor" << BSONObj{} << "pipeline"
-                         << BSON_ARRAY(BSON("$collStats"
-                                            << BSON("storageStats"
-                                                    << BSON("waitForLock" << false << "numericOnly"
-                                                                          << true)))))),
-                ClusterRole::ShardServer);
+            registerCollectionStatsCollector(
+                controller, "local.oplog.rs.stats", "oplog.rs", DatabaseName::kLocal);
+            registerCollectionStatsCollector(
+                controller, "config.transactions.stats", "transactions", DatabaseName::kConfig);
+            registerCollectionStatsCollector(controller,
+                                             "config.image_collection.stats",
+                                             "image_collection",
+                                             DatabaseName::kConfig);
         }
     }
     controller->addPeriodicMetadataCollector(
