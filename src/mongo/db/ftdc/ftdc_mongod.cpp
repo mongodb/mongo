@@ -118,6 +118,20 @@ public:
     }
 };
 
+void registerCollectionStatsCollector(FTDCController* controller,
+                                      StringData statsName,
+                                      StringData collName,
+                                      const DatabaseName& db) {
+    controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
+        "aggregate",
+        statsName,
+        db,
+        BSON("aggregate" << collName << "cursor" << BSONObj{} << "pipeline"
+                         << BSON_ARRAY(BSON("$collStats"
+                                            << BSON("storageStats"
+                                                    << BSON("waitForLock" << false << "numericOnly"
+                                                                          << true)))))));
+}
 
 void registerMongoDCollectors(FTDCController* controller) {
     // These metrics are only collected if replication is enabled
@@ -130,16 +144,13 @@ void registerMongoDCollectors(FTDCController* controller) {
             BSON("replSetGetStatus" << 1 << "initialSync" << 0)));
 
         // CollectionStats
-        controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-            "aggregate",
-            "local.oplog.rs.stats",
-            DatabaseName::kLocal,
-            BSON("aggregate"
-                 << "oplog.rs"
-                 << "cursor" << BSONObj{} << "pipeline"
-                 << BSON_ARRAY(BSON("$collStats" << BSON(
-                                        "storageStats" << BSON(
-                                            "waitForLock" << false << "numericOnly" << true)))))));
+        registerCollectionStatsCollector(
+            controller, "local.oplog.rs.stats", "oplog.rs", DatabaseName::kLocal);
+        registerCollectionStatsCollector(
+            controller, "config.transactions.stats", "transactions", DatabaseName::kConfig);
+        registerCollectionStatsCollector(
+            controller, "config.image_collection.stats", "image_collection", DatabaseName::kConfig);
+
         if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
             // GetDefaultRWConcern
             controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
