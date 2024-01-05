@@ -352,7 +352,9 @@ void WriteOp::noteWriteWithoutShardKeyWithIdResponse(
     int n,
     boost::optional<const BulkWriteReplyItem&> bulkWriteReplyItem) {
     dassert(n == 0 || n == 1);
-    invariant(!bulkWriteReplyItem || bulkWriteReplyItem->getN() == n);
+    tassert(8346300,
+            "BulkWriteReplyItem 'n' value does not match supplied 'n' value",
+            !bulkWriteReplyItem || bulkWriteReplyItem->getN() == n);
     const WriteOpRef& ref = targetedWrite.writeOpRef;
     auto& currentChildOp = _childOps[ref.second];
     if (n == 0) {

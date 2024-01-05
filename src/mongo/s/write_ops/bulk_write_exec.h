@@ -231,13 +231,20 @@ public:
     void noteErrorForRemainingWrites(const Status& status);
 
     /**
+     * Notes the response for a single write op.
+     */
+    void noteWriteOpResponse(const std::unique_ptr<TargetedWrite>& targetedWrite,
+                             WriteOp& op,
+                             const BulkWriteCommandReply& commandReply,
+                             boost::optional<const BulkWriteReplyItem&> replyItem);
+
+    /**
      * Processes the response to a TargetedWriteBatch. Sharding related errors are then grouped
      * by namespace and captured in the map passed in.
      */
     void noteChildBatchResponse(
         const TargetedWriteBatch& targetedBatch,
-        const std::vector<BulkWriteReplyItem>& replyItems,
-        const boost::optional<std::vector<StmtId>>& retriedStmtIds,
+        const BulkWriteCommandReply& commandReply,
         boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace);
 
 

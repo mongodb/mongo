@@ -991,20 +991,9 @@ void BulkWriteOp::processChildBatchResponseFromRemote(
                 response.shardId, bwReply.getWriteConcernError().value(), writeBatch);
         }
 
-        // TODO (SERVER-76958): Iterate through the cursor rather than looking only at the first
-        // batch.
-        const auto& replyItems = bwReply.getCursor().getFirstBatch();
-
-        _nInserted += bwReply.getNInserted();
-        _nDeleted += bwReply.getNDeleted();
-        _nMatched += bwReply.getNMatched();
-        _nUpserted += bwReply.getNUpserted();
-        _nModified += bwReply.getNModified();
-
         // Capture the errors if any exist and mark the writes in the TargetedWriteBatch so that
         // they may be re-targeted if needed.
-        noteChildBatchResponse(
-            writeBatch, replyItems, bwReply.getRetriedStmtIds(), errorsPerNamespace);
+        noteChildBatchResponse(writeBatch, bwReply, errorsPerNamespace);
     } else {
         noteChildBatchError(writeBatch, childBatchStatus);
 
@@ -1036,11 +1025,45 @@ void BulkWriteOp::processChildBatchResponseFromRemote(
     }
 }
 
+void BulkWriteOp::noteWriteOpResponse(const std::unique_ptr<TargetedWrite>& targetedWrite,
+                                      WriteOp& op,
+                                      const BulkWriteCommandReply& commandReply,
+                                      const boost::optional<const BulkWriteReplyItem&> replyItem) {
+    if (op.getWriteType() == WriteType::WithoutShardKeyWithId) {
+        // Since WithoutShardKeyWithId is always sent in its own batch, the top-level summary fields
+        // give us information for that specific write.
+        // Here, we have to extract the fields that are equivalent to 'n' in 'update' and 'delete'
+        // command replies:
+        // - For an update, this is 'nMatched' (rather than 'nUpdated', as it is possible the update
+        // matches a document but the update modification is a no-op, e.g. it sets a field to its
+        // current value, and in that case we should consider the write as done).
+        // - For a delete, we can just consult 'nDeleted'.
+        // Since the write is either an update or a delete, summing these two values gives us the
+        // correct value of 'n'.
+        auto n = commandReply.getNMatched() + commandReply.getNDeleted();
+        op.noteWriteWithoutShardKeyWithIdResponse(*targetedWrite, n, replyItem);
+        if (op.getWriteState() == WriteOpState_Completed) {
+            _shouldStopCurrentRound = true;
+        }
+    } else {
+        op.noteWriteComplete(*targetedWrite, replyItem);
+    }
+}
+
 void BulkWriteOp::noteChildBatchResponse(
     const TargetedWriteBatch& targetedBatch,
-    const std::vector<BulkWriteReplyItem>& replyItems,
-    const boost::optional<std::vector<StmtId>>& retriedStmtIds,
+    const BulkWriteCommandReply& commandReply,
     boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace) {
+
+    // TODO (SERVER-76958): Iterate through the cursor rather than looking only at the first
+    // batch.
+    const auto& replyItems = commandReply.getCursor().getFirstBatch();
+
+    _nInserted += commandReply.getNInserted();
+    _nDeleted += commandReply.getNDeleted();
+    _nMatched += commandReply.getNMatched();
+    _nUpserted += commandReply.getNUpserted();
+    _nModified += commandReply.getNModified();
 
     // To support errorsOnly:true we need to keep separate track of the index in the replyItems
     // array and the index of the write ops we need to mark. This is because with errorsOnly we do
@@ -1065,7 +1088,7 @@ void BulkWriteOp::noteChildBatchResponse(
             tassert(8266001,
                     "bulkWrite should always get replies when not in errorsOnly",
                     _clientRequest.getErrorsOnly());
-            writeOp.noteWriteComplete(*write);
+            noteWriteOpResponse(write, writeOp, commandReply, boost::none);
             continue;
         }
 
@@ -1122,24 +1145,15 @@ void BulkWriteOp::noteChildBatchResponse(
             tassert(8266003,
                     "bulkWrite should get a reply for every write op when not in errorsOnly mode",
                     _clientRequest.getErrorsOnly());
-            writeOp.noteWriteComplete(*write);
+
+            noteWriteOpResponse(write, writeOp, commandReply, boost::none);
             // We need to keep the replyIndex where it is until we see the op matching its index.
             replyIndex--;
             continue;
         }
 
         if (reply.getStatus().isOK()) {
-            if (writeOp.getWriteType() == WriteType::WithoutShardKeyWithId) {
-                tassert(8346300,
-                        "bulkWrite success reply item unexpectedly missing N value",
-                        reply.getN() != boost::none);
-                writeOp.noteWriteWithoutShardKeyWithIdResponse(*write, reply.getN().value(), reply);
-                if (writeOp.getWriteState() == WriteOpState_Completed) {
-                    _shouldStopCurrentRound = true;
-                }
-            } else {
-                writeOp.noteWriteComplete(*write, reply);
-            }
+            noteWriteOpResponse(write, writeOp, commandReply, reply);
         } else {
             lastError.emplace(write->writeOpRef.first, reply.getStatus());
             writeOp.noteWriteError(*write, *lastError);
@@ -1172,7 +1186,8 @@ void BulkWriteOp::noteChildBatchResponse(
         }
     }
 
-    if (retriedStmtIds && !retriedStmtIds->empty()) {
+    if (auto retriedStmtIds = commandReply.getRetriedStmtIds();
+        retriedStmtIds && !retriedStmtIds->empty()) {
         if (_retriedStmtIds) {
             _retriedStmtIds->insert(
                 _retriedStmtIds->end(), retriedStmtIds->begin(), retriedStmtIds->end());
@@ -1273,10 +1288,19 @@ void BulkWriteOp::noteChildBatchError(const TargetedWriteBatch& targetedBatch,
         emulatedReplies.emplace_back(i, status);
     }
 
+    auto emulatedReply = BulkWriteCommandReply();
+    emulatedReply.setCursor(BulkWriteCommandResponseCursor(
+        0, emulatedReplies, NamespaceString::makeBulkWriteNSS(_clientRequest.getDollarTenant())));
+    emulatedReply.setNErrors(numErrors);
+    emulatedReply.setNDeleted(0);
+    emulatedReply.setNModified(0);
+    emulatedReply.setNInserted(0);
+    emulatedReply.setNUpserted(0);
+    emulatedReply.setNMatched(0);
+
     // This error isn't actually specific to any namespaces and so we do not want to track it.
     noteChildBatchResponse(targetedBatch,
-                           emulatedReplies,
-                           /* retriedStmtIds */ boost::none,
+                           emulatedReply,
                            /* errorsPerNamespace*/ boost::none);
 }
 
