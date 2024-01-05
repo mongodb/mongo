@@ -32,6 +32,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/components/field_level_encryption/resmoke_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &task_template
   name: template
@@ -7140,50 +7141,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: fle
-  tags: ["encrypt", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: fle2_query_analysis
-  tags: ["encrypt", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: fle2
-  tags: ["encrypt", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: fle2_sharding
-  tags: ["encrypt", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: fle2_high_cardinality
-  tags: ["encrypt"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: fle2_sharding_high_cardinality
-  tags: ["encrypt"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
 
 - <<: *task_template
   name: ocsp
