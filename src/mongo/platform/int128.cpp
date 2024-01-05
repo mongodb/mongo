@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,41 +27,22 @@
  *    it in the license file.
  */
 
-#pragma once
+#include <absl/strings/str_cat.h>
 
-#include <absl/numeric/int128.h>
-#include <string>
-
-using uint128_t = absl::uint128;
-using int128_t = absl::int128;
+#include "mongo/platform/int128.h"
 
 namespace absl {
 
-std::string toString(const uint128& v);
-std::string toString(const int128& v);
+std::string toString(const uint128& v) {
+    std::string s;
+    StrAppend(&s, v);
+    return s;
+}
+
+std::string toString(const int128& v) {
+    std::string s;
+    StrAppend(&s, v);
+    return s;
+}
 
 }  // namespace absl
-
-namespace mongo {
-template <typename T>
-struct make_unsigned : public std::make_unsigned<T> {};
-
-template <>
-struct make_unsigned<int128_t> {
-    using type = uint128_t;
-};
-
-template <typename T>
-struct make_signed : public std::make_signed<T> {};
-
-template <>
-struct make_signed<uint128_t> {
-    using type = int128_t;
-};
-
-template <typename T>
-using make_unsigned_t = typename make_unsigned<T>::type;
-
-template <typename T>
-using make_signed_t = typename make_signed<T>::type;
-}  // namespace mongo

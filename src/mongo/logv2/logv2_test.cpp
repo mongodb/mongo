@@ -124,6 +124,7 @@
 #include "mongo/logv2/uassert_sink.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/platform/int128.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/assert.h"
@@ -643,6 +644,37 @@ TEST_F(LogV2TypesTest, Numeric) {
     testFloatingPoint(0.0f);
     testFloatingPoint(0.0);
     // long double is prohibited, we don't use this type and favors Decimal128 instead.
+}
+
+// int128 is not a numeric type for the purposes of BSON.
+TEST_F(LogV2TypesTest, Int128) {
+    auto test = [&](auto value) {
+        text.clear();
+        LOGV2(7497400, "uint128/int128 {name}", "name"_attr = value);
+        ASSERT_EQUALS(text.back(), "uint128/int128 " + toString(value));
+    };
+
+    test(uint128_t(0));
+    test(std::numeric_limits<uint128_t>::min());
+    test(std::numeric_limits<uint128_t>::max());
+    test(uint128_t(-10));
+    test(uint128_t(-2));
+    test(uint128_t(-1));
+    test(uint128_t(0));
+    test(uint128_t(1));
+    test(uint128_t(2));
+    test(uint128_t(10));
+
+    test(int128_t(0));
+    test(std::numeric_limits<int128_t>::min());
+    test(std::numeric_limits<int128_t>::max());
+    test(int128_t(-10));
+    test(int128_t(-2));
+    test(int128_t(-1));
+    test(int128_t(0));
+    test(int128_t(1));
+    test(int128_t(2));
+    test(int128_t(10));
 }
 
 TEST_F(LogV2TypesTest, Enums) {
