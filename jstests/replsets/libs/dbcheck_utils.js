@@ -160,6 +160,8 @@ function getIndexNames(db, collName, allowedErrorCodes) {
     return [];
 }
 
+// List of collection names that are ignored from dbcheck.
+const collNamesIgnoredFromDBCheck = ["operationalLatencyHistogramTest_coll_temp"];
 // Run dbCheck for all collections in the database with given parameters and potentially wait for
 // completion.
 export const runDbCheckForDatabase =
@@ -183,6 +185,12 @@ export const runDbCheckForDatabase =
         ];
 
         listCollectionsWithoutViews(db).map(c => c.name).forEach(collName => {
+            if (collNamesIgnoredFromDBCheck.includes(collName)) {
+                jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is skipped on ns: " +
+                          db.getName() + "." + collName + " for RS: " + replSet.getURL());
+                return;
+            }
+
             jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is starting on ns: " +
                       db.getName() + "." + collName + " for RS: " + replSet.getURL());
             runDbCheck(replSet,
