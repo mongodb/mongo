@@ -75,7 +75,6 @@ struct CellBlock {
 
     using Component = std::variant<Get, Traverse, Id>;
     using Path = std::vector<Component>;
-    enum PathRequestType { kFilter, kProject };
 
     struct PathRequest {
         // The path requested (ie which fields).
@@ -83,8 +82,6 @@ struct CellBlock {
 
         // TODO: May want some other information here, like if we know we can omit certain values
         // etc etc or if we want to specify which type of position info will be needed.
-
-        PathRequestType type;
 
         std::string toString() const;
     };
