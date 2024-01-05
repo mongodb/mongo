@@ -188,20 +188,52 @@ class ProcessTestCase(TestCase, UndoDBUtilsMixin):
 
 
 class TestCaseFactory:
-    def __init__(self, factory_class):
+    def __init__(self, factory_class, shell_options):
         if not issubclass(factory_class, TestCase):
             raise TypeError("factory_class should be a subclass of Interface.TestCase",
                             factory_class)
         self._factory_class = factory_class
+        self.shell_options = shell_options
 
-    def create_test_case(self, *args, **kwargs) -> TestCase:
-        return self._factory_class(*args, **kwargs)
-
-    def create_test_case_for_thread(self, logger, num_clients=1, thread_id=0) -> TestCase:
-        """Create a test case to be run in a separate thread."""
+    def create_test_case(self, logger, shell_options) -> TestCase:
         raise NotImplementedError(
-            "create_test_case_for_thread must be implemented by TestCaseFactory subclasses")
+            "create_test_case must be implemented by TestCaseFactory subclasses")
+
+    def create_test_case_for_thread(self, logger, num_clients=1, thread_id=0,
+                                    tenant_id=None) -> TestCase:
+        """Create and configure a TestCase to be run in a separate thread."""
+
+        shell_options = self._get_shell_options_for_thread(num_clients, thread_id, tenant_id)
+        test_case = self.create_test_case(logger, shell_options)
+        return test_case
 
     def configure(self, fixture, *args, **kwargs):
         """Configure the test case factory."""
         raise NotImplementedError("configure must be implemented by TestCaseFactory subclasses")
+
+    def make_process(self):
+        """Make a process for a TestCase."""
+        raise NotImplementedError("make_process must be implemented by TestCaseFactory subclasses")
+
+    def _get_shell_options_for_thread(self, num_clients, thread_id, tenant_id):
+        """Get shell_options with an initialized TestData object for given thread."""
+
+        # We give each thread its own copy of the shell_options.
+        shell_options = self.shell_options.copy()
+        global_vars = shell_options["global_vars"].copy()
+        test_data = global_vars["TestData"].copy()
+        if tenant_id:
+            test_data["tenantId"] = tenant_id
+
+        # We set a property on TestData to mark the main test when multiple clients are going to run
+        # concurrently in case there is logic within the test that must execute only once. We also
+        # set a property on TestData to indicate how many clients are going to run the test so they
+        # can avoid executing certain logic when there may be other operations running concurrently.
+        is_main_test = thread_id == 0
+        test_data["isMainTest"] = is_main_test
+        test_data["numTestClients"] = num_clients
+
+        global_vars["TestData"] = test_data
+        shell_options["global_vars"] = global_vars
+
+        return shell_options

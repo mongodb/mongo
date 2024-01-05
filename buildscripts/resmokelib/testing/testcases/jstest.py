@@ -123,49 +123,22 @@ class JSTestCaseBuilder(interface.TestCaseFactory):
         """Initialize the JSTestCase with the JS file to run."""
         self.test_case_template = _SingleJSTestCase(logger, js_filename, test_id, shell_executable,
                                                     shell_options)
-        interface.TestCaseFactory.__init__(self, _SingleJSTestCase)
+        interface.TestCaseFactory.__init__(self, _SingleJSTestCase, shell_options)
 
     def configure(self, fixture, *args, **kwargs):
         """Configure the jstest."""
         self.test_case_template.configure(fixture, *args, **kwargs)
         self.test_case_template.configure_shell()
+        self.shell_options = self.test_case_template.shell_options
 
-    def _make_process(self):
-        # This function should only be called by interface.py's as_command().
+    def make_process(self):
+        # This function should only be called by MultiClientsTestCase's _make_process().
         return self.test_case_template._make_process()  # pylint: disable=protected-access
 
-    def _get_shell_options_for_thread(self, num_clients, thread_id, tenant_id=None):
-        """Get shell_options with an initialized TestData object for given thread."""
-
-        # We give each _SingleJSTestCase its own copy of the shell_options.
-        shell_options = self.test_case_template.shell_options.copy()
-        global_vars = shell_options["global_vars"].copy()
-        test_data = global_vars["TestData"].copy()
-        if tenant_id:
-            test_data["tenantId"] = tenant_id
-
-        # We set a property on TestData to mark the main test when multiple clients are going to run
-        # concurrently in case there is logic within the test that must execute only once. We also
-        # set a property on TestData to indicate how many clients are going to run the test so they
-        # can avoid executing certain logic when there may be other operations running concurrently.
-        is_main_test = thread_id == 0
-        test_data["isMainTest"] = is_main_test
-        test_data["numTestClients"] = num_clients
-
-        global_vars["TestData"] = test_data
-        shell_options["global_vars"] = global_vars
-
-        return shell_options
-
-    def create_test_case_for_thread(self, logger, num_clients=1, thread_id=0,
-                                    tenant_id=None) -> _SingleJSTestCase:
-        """Create and configure a _SingleJSTestCase to be run in a separate thread."""
-
-        shell_options = self._get_shell_options_for_thread(num_clients, thread_id, tenant_id)
-        test_case = self.create_test_case(logger, self.test_case_template.js_filename,
-                                          self.test_case_template._id,
-                                          self.test_case_template.shell_executable, shell_options)
-
+    def create_test_case(self, logger, shell_options):
+        test_case = _SingleJSTestCase(logger, self.test_case_template.js_filename,
+                                      self.test_case_template._id,
+                                      self.test_case_template.shell_executable, shell_options)
         test_case.configure(self.test_case_template.fixture)
         return test_case
 
@@ -210,7 +183,7 @@ class MultiClientsTestCase(interface.TestCase, interface.UndoDBUtilsMixin):
 
     def _make_process(self):
         # This function should only be called by interface.py's as_command().
-        return self._factory._make_process()  # pylint: disable=protected-access
+        return self._factory.make_process()  # pylint: disable=protected-access
 
     def _run_single_copy(self):
         tenant_id = str(ObjectId()) if self.use_tenant_client else None

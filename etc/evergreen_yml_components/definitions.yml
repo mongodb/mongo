@@ -6356,6 +6356,8 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
+      resmoke_jobs_max: 1
+      resmoke_args: --numClientsPerFixture=2 --useTenantClient
 
 - <<: *gen_task_template
   name: multitenancy_shard_merge_jscore_passthrough_gen
