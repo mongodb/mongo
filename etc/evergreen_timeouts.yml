@@ -19,6 +19,7 @@ overrides:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
+  # TODO: Delete me once all tests have been migrated over from complete-tsan
   enterprise-rhel80-debug-complete-tsan:
   - task: shard_merge_jscore_passthrough
     exec_timeout: 240  # 4 hours
@@ -46,6 +47,20 @@ overrides:
     exec_timeout: 600  # 10 hours
   - task: change_stream_optimization_fuzzer
     exec_timeout: 600  # 10 hours
+  - task: shard_merge_jscore_passthrough
+    exec_timeout: 240  # 4 hours
+  - task: shard_merge_causally_consistent_jscore_passthrough
+    exec_timeout: 240  # 4 hours
+  - task: shard_merge_multi_stmt_txn_jscore_passthrough
+    exec_timeout: 240  # 4 hours
+  - task: multitenancy_shard_merge_jscore_passthrough
+    exec_timeout: 240  # 4 hours
+  - task: multitenancy_shard_merge_multi_stmt_txn_jscore_passthrough
+    exec_timeout: 240  # 4 hours
+  - task: read_concern_linearizable_passthrough
+    exec_timeout: 270 # 4.5 hours
+  - task: sharding
+    exec_timeout: 180  # 3 hours
 
   macos:
   - task: replica_sets_jscore_passthrough
