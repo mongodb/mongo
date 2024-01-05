@@ -2836,7 +2836,7 @@ tasks:
     vars:
       targets: >-
         build/fast/mongo/platform/visibility_test1
-      separate_debug: off
+      separate_debug: on
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1

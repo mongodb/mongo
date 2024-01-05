@@ -4,6 +4,9 @@ load("@poetry//:dependencies.bzl", "dependency")
 # config selection
 load("@bazel_skylib//lib:selects.bzl", "selects")
 
+load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+
+load("//bazel:separate_debug.bzl", "extract_debuginfo" , "WITH_DEBUG_SUFFIX")
 # === Windows-specific compilation settings ===
 
 # /RTC1              Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized (implies /Od: no optimizations)
@@ -110,6 +113,17 @@ ADDRESS_SANITIZER_DEFINES = select({
     ("//bazel/config:sanitize_disabled"): [],
 }, no_match_error = ADDRESS_SANITIZER_ERROR_MESSAGE)
 
+SEPARATE_DEBUG_ENABLED = select({
+    "//bazel/config:separate_debug_enabled": True,
+    "//conditions:default": False,
+})
+
+TCMALLOC_DEPS = select({
+    "//bazel/config:tcmalloc_allocator": ["//src/third_party/gperftools:tcmalloc_minimal"],
+    "//bazel/config:auto_allocator_windows": ["//src/third_party/gperftools:tcmalloc_minimal"],
+    "//bazel/config:auto_allocator_linux": ["//src/third_party/gperftools:tcmalloc_minimal"],
+    "//conditions:default": [],
+})
 
 def force_includes_copt(package_name, name):
 
@@ -208,18 +222,22 @@ def mongo_cc_library(
     """
 
     # Avoid injecting into unwind/libunwind_asm to avoid a circular dependency.
-    if name not in ["unwind", "libunwind_asm"]:
+    if name not in ["unwind", "tcmalloc_minimal"]:
         deps += LIBUNWIND_DEPS
         local_defines += LIBUNWIND_DEFINES
 
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
 
+    all_deps = deps
+    if name != "tcmalloc_minimal":
+        all_deps += TCMALLOC_DEPS
+
     native.cc_library(
-        name = name,
+        name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs,
         hdrs = hdrs + fincludes_hdr,
-        deps = deps,
+        deps = all_deps,
         visibility = visibility,
         testonly = testonly,
         copts = MONGO_GLOBAL_COPTS + ADDRESS_SANITIZER_COPTS + copts + fincludes_copt,
@@ -232,6 +250,14 @@ def mongo_cc_library(
         local_defines = MONGO_GLOBAL_DEFINES + ADDRESS_SANITIZER_DEFINES + local_defines,
         includes = [],
     )
+
+    extract_debuginfo(
+        name=name,
+        binary_with_debug=":" + name + WITH_DEBUG_SUFFIX,
+        type="library",
+        enabled = SEPARATE_DEBUG_ENABLED,
+        deps = all_deps)
+
 
 def mongo_cc_binary(
         name,
@@ -265,10 +291,12 @@ def mongo_cc_binary(
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
 
+    all_deps = deps + LIBUNWIND_DEPS + TCMALLOC_DEPS
+
     native.cc_binary(
-        name = name,
+        name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs + fincludes_hdr,
-        deps = deps + LIBUNWIND_DEPS,
+        deps = all_deps,
         visibility = visibility,
         testonly = testonly,
         copts = MONGO_GLOBAL_COPTS + ADDRESS_SANITIZER_COPTS + copts + fincludes_copt,
@@ -279,14 +307,16 @@ def mongo_cc_binary(
             "//conditions:default": linkstatic,
         }),
         local_defines = MONGO_GLOBAL_DEFINES + ADDRESS_SANITIZER_DEFINES + LIBUNWIND_DEFINES + local_defines,
-        malloc = select({
-          "//bazel/config:tcmalloc_allocator": "//src/third_party/gperftools:tcmalloc_minimal",
-          "//bazel/config:auto_allocator_windows": "//src/third_party/gperftools:tcmalloc_minimal",
-          "//bazel/config:auto_allocator_linux": "//src/third_party/gperftools:tcmalloc_minimal",
-          "//conditions:default": "@bazel_tools//tools/cpp:malloc",
-        }),
         includes = [],
     )
+
+    extract_debuginfo(
+        name=name,
+        binary_with_debug=":" + name + WITH_DEBUG_SUFFIX,
+        type="program",
+        enabled = SEPARATE_DEBUG_ENABLED,
+        deps = all_deps)
+
 
 IdlInfo = provider(
     fields = {

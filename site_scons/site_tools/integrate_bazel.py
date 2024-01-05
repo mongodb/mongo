@@ -410,6 +410,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         bazel_internal_flags = [
             f'--//bazel/config:compiler_type={env.ToolchainName()}',
             f'--//bazel/config:build_mode={build_mode}',
+            f'--//bazel/config:separate_debug={True if env.GetOption("separate-debug") == "on" else False}',
             f'--//bazel/config:use_libunwind={env["USE_VENDORED_LIBUNWIND"]}',
             f'--//bazel/config:use_gdbserver={False if env.GetOption("gdbserver") is None else True}',
             f'--//bazel/config:spider_monkey_dbg={True if env.GetOption("spider-monkey-dbg") == "on" else False}',

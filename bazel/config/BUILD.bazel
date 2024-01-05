@@ -13,6 +13,7 @@ load(
     "sanitize",
     "use_wiredtiger",
     "build_grpc",
+    "separate_debug",
 )
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
@@ -304,7 +305,7 @@ config_setting(
 
 allocator(
     name = "allocator",
-    build_setting_default = "system",
+    build_setting_default = "auto",
 )
 
 config_setting(
@@ -505,6 +506,7 @@ config_setting(
         "//bazel/config:sanitize": "disabled",
     },
 )
+
 # --------------------------------------------
 # ----------- computed sanitizer flags -------
 
@@ -516,4 +518,20 @@ selects.config_setting_group(
 selects.config_setting_group(
     name = "sanitize_address_required_settings",
     match_all = [":sanitize_address", ":system_allocator", ":sanitize_address_build_mode", ":compiler_type_clang"],
+)
+
+# --------------------------------------
+# separate_debug options
+# --------------------------------------
+
+separate_debug(
+    name = "separate_debug",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "separate_debug_enabled",
+    flag_values = {
+        "//bazel/config:separate_debug": "True",
+    },
 )

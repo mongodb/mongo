@@ -210,3 +210,17 @@ sanitize = rule(
     implementation = sanitizer_impl,
     build_setting = config.string_list(flag = True, repeatable = True)
 )
+
+# =========
+# separate_debug
+# =========
+
+separate_debug_provider = provider(
+    doc = "Enable splitting deubg info into a separate file (e.g. '.debug')",
+    fields = ["enabled"],
+)
+
+separate_debug = rule(
+    implementation = lambda ctx: separate_debug_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
