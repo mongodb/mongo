@@ -47,7 +47,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/transport/session.h"
-#include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -125,9 +124,6 @@ protected:
 private:
     // Keeps the lifetime of the operation context
     ServiceContext::UniqueOperationContext _opCtxHolder;
-
-    // The temporary dbpath for the tests in this fixture.
-    unittest::TempDir _tempDir;
 };
 
 }  // namespace mongo

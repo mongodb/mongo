@@ -137,7 +137,7 @@ std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
     boost::intrusive_ptr<ExpressionContextForTest> ctx(
         new ExpressionContextForTest(opCtx, request));
 
-    unittest::TempDir tempDir("ABTPipelineTest");
+    static unittest::TempDir tempDir("ABTPipelineTest");
     ctx->tempDir = tempDir.path();
 
     return Pipeline::parse(request.getPipeline(), ctx);
@@ -329,6 +329,5 @@ std::vector<BSONObj> runPipeline(OperationContext* opCtx,
 
     return results;
 }
-
 
 }  // namespace mongo::optimizer

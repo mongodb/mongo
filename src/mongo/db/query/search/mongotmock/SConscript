@@ -29,14 +29,15 @@ env.Library(
 )
 
 mongotmock = env.Program(
-    target="mongotmock",
+    target='mongotmock',
     source=[
-        "mongotmock_main_shim.cpp",
+        'mongotmock_main_shim.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/plan_executor',
         '$BUILD_DIR/mongo/util/cryptd/mongocryptd_core',
         'mongotmock_core',
     ],
-    AIB_COMPONENT="mongotmock",
-    AIB_COMPONENTS_EXTRA=["dist-test"],
+    AIB_COMPONENT='mongotmock',
+    AIB_COMPONENTS_EXTRA=['dist-test'],
 )

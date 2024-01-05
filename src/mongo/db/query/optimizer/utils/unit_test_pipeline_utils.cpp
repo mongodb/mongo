@@ -63,11 +63,6 @@
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo::optimizer {
-namespace {
-
-unittest::TempDir tempDir("ABTPipelineTest");
-
-}  // namespace
 
 std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
     const NamespaceString& nss,
@@ -91,6 +86,7 @@ std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
         ctx->setResolvedNamespace(resolvedNss.ns, resolvedNss);
     }
 
+    static unittest::TempDir tempDir("ABTPipelineTest");
     ctx->tempDir = tempDir.path();
 
     return Pipeline::parse(request.getPipeline(), ctx);
@@ -411,4 +407,5 @@ std::string ABTGoldenTestFixture::testParameterizedABTTranslation(StringData var
     formatGoldenTestQueryParameters(qp, stream);
     return formatGoldenTestExplain(translated, stream);
 }
+
 }  // namespace mongo::optimizer

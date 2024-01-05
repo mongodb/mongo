@@ -51,7 +51,7 @@
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/testing_proctor.h"
 
-using mongo::Status;
+using ::mongo::Status;
 
 namespace moe = ::mongo::optionenvironment;
 
@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
     Status ret = parser.run(options, argVec, &environment);
     if (!ret.isOK()) {
         std::cerr << options.helpString();
-        return static_cast<int>(mongo::ExitCode::fail);
+        return static_cast<int>(::mongo::ExitCode::fail);
     }
 
     bool list = false;

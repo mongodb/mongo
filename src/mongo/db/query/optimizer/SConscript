@@ -132,38 +132,38 @@ env.Library(
 
 # Heavyweight test utils (depend on pipeline).
 env.Library(
-    target="unit_test_pipeline_utils",
+    target='unit_test_pipeline_utils',
     source=[
-        "utils/unit_test_pipeline_utils.cpp",
+        'utils/unit_test_pipeline_utils.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/pipeline/abt_translation",
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        '$BUILD_DIR/mongo/db/pipeline/abt_translation',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/query/canonical_query',
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        "unit_test_utils",
+        'unit_test_utils',
     ],
 )
 
 env.CppUnitTest(
     target='optimizer_test',
     source=[
-        "bool_expression_test.cpp",
-        "index_union_optimizer_test.cpp",
-        "logical_rewriter_optimizer_test.cpp",
-        "optimizer_test.cpp",
-        "physical_rewriter_optimizer_test.cpp",
-        "physical_rewriter_parallelism_test.cpp",
-        "reference_tracker_test.cpp",
-        "remove_orphans_requirement_test.cpp",
-        "rewrites/const_eval_test.cpp",
-        "rewrites/path_optimizer_test.cpp",
-        "unit_test_infra_test.cpp",
+        'bool_expression_test.cpp',
+        'index_union_optimizer_test.cpp',
+        'logical_rewriter_optimizer_test.cpp',
+        'optimizer_test.cpp',
+        'physical_rewriter_optimizer_test.cpp',
+        'physical_rewriter_parallelism_test.cpp',
+        'reference_tracker_test.cpp',
+        'remove_orphans_requirement_test.cpp',
+        'rewrites/const_eval_test.cpp',
+        'rewrites/path_optimizer_test.cpp',
+        'unit_test_infra_test.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",  # needed to register extended type destruction for MakeObjSpec :(
-        "unit_test_utils",
+        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe',  # needed to register extended type destruction for MakeObjSpec :(
+        'unit_test_utils',
     ],
 )
 
@@ -204,4 +204,4 @@ env.Benchmark(
     ],
 )
 
-env.PrettyPrinterTest(target="optimizer_gdb_test.py")
+env.PrettyPrinterTest(target='optimizer_gdb_test.py')

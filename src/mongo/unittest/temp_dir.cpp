@@ -39,6 +39,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/options_parser/value.h"
 #include "mongo/util/str.h"
 
@@ -48,7 +49,7 @@ namespace mongo {
 namespace unittest {
 namespace {
 
-Mutex tempPathRootMutex = MONGO_MAKE_LATCH("tempPathRootMutex");
+SimpleMutex tempPathRootMutex;
 boost::filesystem::path tempPathRoot;
 
 void setTempPathRoot(boost::filesystem::path root) {

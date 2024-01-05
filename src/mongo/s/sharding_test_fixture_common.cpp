@@ -60,9 +60,7 @@ namespace mongo {
 using executor::NetworkTestEnv;
 using unittest::assertGet;
 
-ShardingTestFixtureCommon::ShardingTestFixtureCommon() : _tempDir("sharding_test_fixture_common") {
-    storageGlobalParams.dbpath = _tempDir.path();
-}
+ShardingTestFixtureCommon::ShardingTestFixtureCommon() = default;
 
 ShardingTestFixtureCommon::~ShardingTestFixtureCommon() {
     invariant(!_opCtxHolder,
