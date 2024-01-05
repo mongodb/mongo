@@ -90,6 +90,29 @@ env.Library(
     ],
 )
 
+# This target holds the shared logic for dispatching search index requests to a mongot,
+# whereas the search_index_helper targets below hold the logic for fetching collection
+# metadata, either as a mongos router or mongod shard.
+env.Library(
+    target='search_index_common',
+    source=[
+        'manage_search_index_request.idl',
+        'search_index_common.cpp',
+    ],
+    LIBDEPS=[
+        'search_index_helpers_interface',
+        'search_index_options',
+        'search_task_executors',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
 env.Library(
     target='search_index_helpers_interface',
     source=[
@@ -122,15 +145,5 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'search_index_helpers_interface',
-    ],
-)
-
-env.Library(
-    target='manage_search_index_request',
-    source=[
-        'manage_search_index_request.idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
     ],
 )

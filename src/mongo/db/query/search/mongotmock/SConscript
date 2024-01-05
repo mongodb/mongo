@@ -21,7 +21,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
         '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/query/search/manage_search_index_request',
+        '$BUILD_DIR/mongo/db/query/search/search_index_common',
         '$BUILD_DIR/mongo/db/server_options_servers',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/util/version_impl',

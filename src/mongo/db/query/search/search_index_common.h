@@ -27,9 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/search_index_commands_gen.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
+/**
+ * Runs a ManageSearchIndex command request against the remote search index management endpoint.
+ * Passes the remote command response data back to the caller if the status is OK, otherwise throws
+ * if the command failed.
+ */
+BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const UUID& uuid,
+                                      const BSONObj& userCmd);
 
 /**
  * Runs the given command against the remote search index management server, if the remote host

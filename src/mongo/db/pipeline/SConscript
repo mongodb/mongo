@@ -433,7 +433,6 @@ pipelineEnv.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/commands/fsync_locked',
-        '$BUILD_DIR/mongo/db/commands/search_index_commands',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/fts/base_fts',
@@ -443,6 +442,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/query/query_settings/manager',
         '$BUILD_DIR/mongo/db/query/search/mongot_cursor',
         '$BUILD_DIR/mongo/db/query/search/mongot_options',
+        '$BUILD_DIR/mongo/db/query/search/search_index_common',
         '$BUILD_DIR/mongo/db/query/search/search_index_helpers_interface',
         '$BUILD_DIR/mongo/db/query/vector_search/vector_search',
         '$BUILD_DIR/mongo/db/repl/image_collection_entry',
