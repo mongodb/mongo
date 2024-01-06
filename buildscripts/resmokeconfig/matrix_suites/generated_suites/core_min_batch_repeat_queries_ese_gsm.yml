@@ -43,6 +43,7 @@ selector:
   exclude_files:
   - jstests/core/txns/**/*.js
   - jstests/core/queryable_encryption/**/*.js
+  - jstests/core/query/query_settings/**/*.js
   - jstests/core/**/profile1.js
   - jstests/core/**/profile2.js
   - jstests/core/**/find9.js

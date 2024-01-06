@@ -191,6 +191,13 @@ export var FixtureHelpers = (function() {
         return primaryInfo.hasOwnProperty('setName');
     }
 
+    /**
+     * Returns true if we have a standalone mongod.
+     */
+    function isStandalone(db) {
+        return !isMongos(db) && !isReplSet(db);
+    }
+
     return {
         isMongos: isMongos,
         isSharded: isSharded,
@@ -206,5 +213,6 @@ export var FixtureHelpers = (function() {
         getSecondaries: getSecondaries,
         getPrimaryForNodeHostingDatabase: getPrimaryForNodeHostingDatabase,
         isReplSet: isReplSet,
+        isStandalone: isStandalone,
     };
 })();

@@ -149,9 +149,7 @@ testColl.getIndexes();
 lastHistogram = assertHistogramDiffEq(testDB, testColl, lastHistogram, 0, 0, 1);
 
 // Reindex (Only standalone mode supports the reIndex command.)
-const hello = db.runCommand({hello: 1});
-const isStandalone = !FixtureHelpers.isMongos(db) && !hello.hasOwnProperty('setName');
-if (isStandalone) {
+if (FixtureHelpers.isStandalone(db)) {
     assert.commandWorked(testColl.reIndex());
     lastHistogram = assertHistogramDiffEq(testDB, testColl, lastHistogram, 0, 0, 1);
 }

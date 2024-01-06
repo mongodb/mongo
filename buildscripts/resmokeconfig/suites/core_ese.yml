@@ -10,8 +10,10 @@ selector:
   exclude_files:
   # Transactions are not supported on MongoDB standalone nodes.
   - jstests/core/txns/**/*.js
-  # Queryable encryption is not supported on standalone
+  # Queryable encryption is not supported on standalone.
   - jstests/core/queryable_encryption/**/*.js
+  # Query settings are not supported on standalone.
+  - jstests/core/query/query_settings/**/*.js
 
   exclude_with_any_tags:
   - does_not_support_encrypted_storage_engine

@@ -155,6 +155,15 @@ std::vector<QueryShapeConfiguration>::iterator findByHash(
     return matchingQueryShapeConfigurationIt;
 }
 
+void assertNoStandalone(OperationContext* opCtx, const std::string& cmdName) {
+    auto* repl = repl::ReplicationCoordinator::get(opCtx);
+    bool isStandalone = repl && !repl->getSettings().isReplSet() &&
+        serverGlobalParams.clusterRole.has(ClusterRole::None);
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << cmdName << " can only run on replica sets or sharded clusters",
+            !isStandalone);
+}
+
 class SetQuerySettingsCommand final : public TypedCommand<SetQuerySettingsCommand> {
 public:
     using Request = SetQuerySettingsCommandRequest;
@@ -275,6 +284,7 @@ public:
                     "setQuerySettings command is unknown",
                     feature_flags::gFeatureFlagQuerySettings.isEnabled(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            assertNoStandalone(opCtx, definition()->getName());
             auto response =
                 visit(OverloadedVisitor{
                           [&](const query_shape::QueryShapeHash& queryShapeHash) {
@@ -338,6 +348,7 @@ public:
                     "removeQuerySettings command is unknown",
                     feature_flags::gFeatureFlagQuerySettings.isEnabled(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            assertNoStandalone(opCtx, definition()->getName());
             auto tenantId = request().getDbName().tenantId();
             auto queryShapeHash =
                 visit(OverloadedVisitor{

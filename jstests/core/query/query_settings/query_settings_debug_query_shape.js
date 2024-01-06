@@ -2,7 +2,7 @@
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
 //   featureFlagQuerySettings,
-//   simulate_atlas_proxy_incompatible
+//   simulate_atlas_proxy_incompatible,
 // ]
 //
 

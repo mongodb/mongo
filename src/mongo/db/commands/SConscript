@@ -142,6 +142,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_settings/manager',
         '$BUILD_DIR/mongo/db/query/query_settings/utils',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
+        '$BUILD_DIR/mongo/db/repl/repl_settings',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'cluster_server_parameter_cmds_idl',
         'set_cluster_parameter_impl',

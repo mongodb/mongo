@@ -370,9 +370,7 @@ clearQueryCaches(coll, cachedQueries);
 //     Run reIndex on the collection.
 //     Confirm that cache is empty.
 // (Only standalone mode supports the reIndex command.)
-const isStandalone =
-    !FixtureHelpers.isMongos(db) && !db.runCommand({hello: 1}).hasOwnProperty('setName');
-if (isStandalone) {
+if (FixtureHelpers.isStandalone(db)) {
     addToQueryCache({
         queryArg: {a: 1, b: 1},
         collArg: coll,

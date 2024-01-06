@@ -34,6 +34,7 @@ selector:
   exclude_files:
   - jstests/core/txns/**/*.js
   - jstests/core/queryable_encryption/**/*.js
+  - jstests/core/query/query_settings/**/*.js
   exclude_with_any_tags:
   - does_not_support_repeated_reads
   - requires_profiling

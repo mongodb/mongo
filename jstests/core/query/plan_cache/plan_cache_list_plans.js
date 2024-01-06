@@ -39,6 +39,7 @@ import {
     getPlanStage
 } from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
@@ -217,7 +218,7 @@ if (!isSbeEnabled) {
 
 // Ensure query setting entry is present in $planCacheStats output.
 // TODO: SERVER-71537 Remove Feature Flag for PM-412.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings")) {
+if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings") && !FixtureHelpers.isStandalone(db)) {
     // Set query settings for a query to use 'settings.indexHints.allowedIndexes' indexes.
     const qsutils = new QuerySettingsUtils(db, coll.getName());
 
