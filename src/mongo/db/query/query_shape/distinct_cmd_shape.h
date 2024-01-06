@@ -57,7 +57,7 @@ struct DistinctCmdShapeComponents : public CmdSpecificShapeComponents {
     BSONObj representativeQuery;
 };
 
-class DistinctCmdShape : public Shape {
+class DistinctCmdShape final : public Shape {
 public:
     DistinctCmdShape(const ParsedDistinctCommand& distinct,
                      const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -68,6 +68,9 @@ public:
     void appendCmdSpecificShapeComponents(BSONObjBuilder&,
                                           OperationContext*,
                                           const SerializationOptions& opts) const final;
+
+    QueryShapeHash sha256Hash(OperationContext*,
+                              const SerializationContext& serializationContext) const override;
 
     DistinctCmdShapeComponents components;
 };

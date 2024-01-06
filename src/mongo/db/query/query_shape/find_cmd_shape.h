@@ -93,9 +93,15 @@ struct FindCmdShapeComponents : public CmdSpecificShapeComponents {
     SerializationOptions serializationOpts;
 
     void HashValue(absl::HashState state) const final;
+
+    /**
+     * Encodes all optional bools (as well as limit and skip) into a single uint32_t. Every flag
+     * takes two bits. 0b00 stands for none, 0b10 for false and 0b11 for true.
+     */
+    uint32_t optionalArgumentsEncoding() const;
 };
 
-class FindCmdShape : public CmdWithLetShape {
+class FindCmdShape final : public CmdWithLetShape {
 public:
     FindCmdShape(const ParsedFindCommand& findRequest,
                  const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -107,6 +113,9 @@ public:
     std::unique_ptr<FindCommandRequest> toFindCommandRequest() const;
 
     FindCmdShapeComponents components;
+
+    QueryShapeHash sha256Hash(OperationContext*,
+                              const SerializationContext& serializationContext) const override;
 
 protected:
     void appendLetCmdSpecificShapeComponents(BSONObjBuilder& bob,

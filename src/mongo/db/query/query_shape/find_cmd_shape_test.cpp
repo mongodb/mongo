@@ -129,6 +129,50 @@ TEST_F(FindCmdShapeTest, RespectsRedactionPolicy) {
     // interesting to ensure the $-prefix of $natural doesn't confuse us.
     ASSERT(!maybeRedactedSortShape(R"({$natural: 1})"));
 }
+
+TEST_F(FindCmdShapeTest, NoOptionalArguments) {
+    auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    auto&& parsedRequest =
+        uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+    auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
+    ASSERT_EQUALS(0, cmdShape->components.optionalArgumentsEncoding());
+}
+
+TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToTrue) {
+    auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    // Tailable can not be set together with 'singleBatch' option.
+    fcr->setSingleBatch(false);
+    fcr->setAllowDiskUse(true);
+    fcr->setReturnKey(true);
+    fcr->setShowRecordId(true);
+    fcr->setTailable(true);
+    fcr->setAwaitData(true);
+    fcr->setMirrored(true);
+    fcr->setOplogReplay(true);
+    fcr->setLimit(1);
+    fcr->setSkip(1);
+    auto&& parsedRequest =
+        uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+    auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
+    ASSERT_EQUALS(0x2FFFF, cmdShape->components.optionalArgumentsEncoding());
+}
+
+TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToFalse) {
+    auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    fcr->setSingleBatch(false);
+    fcr->setAllowDiskUse(false);
+    fcr->setReturnKey(false);
+    fcr->setShowRecordId(false);
+    fcr->setTailable(false);
+    fcr->setAwaitData(false);
+    fcr->setMirrored(false);
+    fcr->setOplogReplay(false);
+    auto&& parsedRequest =
+        uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+    auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
+    ASSERT_EQUALS(0x2AAA8, cmdShape->components.optionalArgumentsEncoding());
+}
+
 }  // namespace
 
 }  // namespace mongo::query_shape

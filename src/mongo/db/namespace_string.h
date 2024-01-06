@@ -396,6 +396,11 @@ public:
         return StringData{_data.data() + offset, _data.size() - offset};
     }
 
+    ConstDataRange asDataRange() const {
+        auto nss = ns();
+        return ConstDataRange(nss.data(), nss.size());
+    }
+
     StringData ns_forTest() const {
         return ns();
     }
@@ -1042,6 +1047,14 @@ public:
         } else {
             return H::combine(std::move(h), nssOrUUID.uuid());
         }
+    }
+
+    ConstDataRange asDataRange() const {
+        if (isNamespaceString()) {
+            return nss().asDataRange();
+        }
+        auto nss = uuid().toString();
+        return ConstDataRange(nss.data(), nss.size());
     }
 
 private:

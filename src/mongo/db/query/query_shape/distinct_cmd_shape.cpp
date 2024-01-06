@@ -85,4 +85,15 @@ void DistinctCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
     }
 }
 
+QueryShapeHash DistinctCmdShape::sha256Hash(OperationContext*, const SerializationContext&) const {
+    return SHA256Block::computeHash({
+        ConstDataRange(DistinctCommandRequest::kCommandName.data(),
+                       DistinctCommandRequest::kCommandName.size()),
+        nssOrUUID.asDataRange(),
+        components.representativeQuery.asDataRange(),
+        ConstDataRange(components.key.data(), components.key.size()),
+        collation.asDataRange(),
+    });
+}
+
 }  // namespace mongo::query_shape

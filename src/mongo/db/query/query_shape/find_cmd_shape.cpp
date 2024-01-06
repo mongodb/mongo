@@ -151,6 +151,28 @@ void FindCmdShapeComponents::HashValue(absl::HashState state) const {
                              hasField);
 }
 
+uint32_t FindCmdShapeComponents::optionalArgumentsEncoding() const {
+    uint32_t res{0};
+    for (const auto& arg : {singleBatch,
+                            allowDiskUse,
+                            returnKey,
+                            showRecordId,
+                            tailable,
+                            awaitData,
+                            mirrored,
+                            oplogReplay}) {
+        if (arg.has_value()) {
+            res |= arg ? 0b11 : 0b10;
+        }
+        res <<= 2;
+    }
+
+    res |= static_cast<uint32_t>(hasField.skip);
+    res |= static_cast<uint32_t>(hasField.limit) << 1;
+
+    return res;
+}
+
 std::unique_ptr<FindCommandRequest> FindCmdShape::toFindCommandRequest() const {
     auto fcr = std::make_unique<FindCommandRequest>(nssOrUUID);
 
@@ -225,6 +247,23 @@ void FindCmdShape::appendLetCmdSpecificShapeComponents(
         // This constructor will shapify according to the options.
         FindCmdShapeComponents{*request, expCtx, opts}.appendTo(bob);
     }
+}
+
+QueryShapeHash FindCmdShape::sha256Hash(OperationContext*, const SerializationContext&) const {
+    auto optionalArgsEncoding = components.optionalArgumentsEncoding();
+    return SHA256Block::computeHash({
+        ConstDataRange(FindCommandRequest::kCommandName.data(),
+                       FindCommandRequest::kCommandName.size()),
+        nssOrUUID.asDataRange(),
+        components.filter.asDataRange(),
+        components.projection.asDataRange(),
+        components.sort.asDataRange(),
+        components.min.asDataRange(),
+        components.max.asDataRange(),
+        ConstDataRange(reinterpret_cast<char*>(&optionalArgsEncoding), sizeof(uint32_t)),
+        _let.shapifiedLet.asDataRange(),
+        collation.asDataRange(),
+    });
 }
 
 }  // namespace mongo::query_shape

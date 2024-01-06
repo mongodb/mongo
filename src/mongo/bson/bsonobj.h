@@ -720,6 +720,10 @@ public:
         return sizeof(BSONObj) + objsize();
     }
 
+    ConstDataRange asDataRange() const {
+        return ConstDataRange(objdata(), objsize());
+    }
+
 private:
     static constexpr char kEmptyObjectPrototype[] = {/*size*/ kMinBSONLength, 0, 0, 0, /*eoo*/ 0};
 
