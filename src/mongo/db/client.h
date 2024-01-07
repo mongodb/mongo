@@ -134,6 +134,8 @@ public:
 
     static Client* getCurrent();
 
+    ~Client() override;
+
     bool getIsLocalHostConnection() {
         if (!hasRemote()) {
             return false;
@@ -194,6 +196,7 @@ public:
     }
 
     std::string clientAddress(bool includePort = false) const;
+
     const std::string& desc() const {
         return _desc;
     }
@@ -390,6 +393,7 @@ public:
 private:
     friend class ServiceContext;
     friend class ThreadClient;
+
     Client(std::string desc, Service* service, std::shared_ptr<transport::Session> session);
 
     /**
@@ -398,6 +402,7 @@ private:
     void _setOperationContext(OperationContext* opCtx);
 
     Service* _service;
+
     const std::shared_ptr<transport::Session> _session;
 
     // Description for the client (e.g. conn8)

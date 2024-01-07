@@ -36,7 +36,9 @@ env.CppUnitTest(
         'mutable_bson_algo_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
         'mutable_bson',
         'mutable_bson_test_utils',
     ],

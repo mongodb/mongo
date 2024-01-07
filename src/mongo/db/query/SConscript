@@ -431,7 +431,6 @@ env.Library(
         'yield_policy_callbacks_impl.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/collection_query_info',
         '$BUILD_DIR/mongo/db/shard_filterer',
         '$BUILD_DIR/mongo/db/shard_role',
@@ -441,6 +440,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/executor/task_executor_cursor',
     ],
 )
@@ -454,6 +454,7 @@ env.CppUnitTest(
         'canonical_query_test_util.cpp',
         'ce_mode_parameter_test.cpp',
         'classic_stage_builder_test.cpp',
+        'collection_query_info_test.cpp',
         'count_command_test.cpp',
         'cqf_fast_paths_test.cpp',
         'cqf_fast_paths_utils_test.cpp',
@@ -533,6 +534,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
+        '$BUILD_DIR/mongo/db/catalog/collection_query_info',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util',
         '$BUILD_DIR/mongo/db/exec/sbe/sbe_plan_stage_test',
         '$BUILD_DIR/mongo/db/multitenancy',
@@ -543,6 +545,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/idl/idl_parser',

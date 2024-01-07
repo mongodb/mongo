@@ -286,6 +286,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/executor/egress_connection_closer_manager',
         '$BUILD_DIR/mongo/transport/message_compressor',
+        '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
 
@@ -384,6 +385,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/executor/task_executor_test_fixture',
             '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
             '$BUILD_DIR/mongo/rpc/command_status',
+            '$BUILD_DIR/mongo/transport/transport_layer_common',
             '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
             '$BUILD_DIR/mongo/unittest/task_executor_proxy',
             '$BUILD_DIR/mongo/util/md5',

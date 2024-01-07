@@ -60,6 +60,17 @@ void invariantNoCurrentClient() {
                             << '"' << Client::getCurrent()->desc() << '"');
 }
 
+int64_t generateSeed(const std::string& desc) {
+    size_t seed = 0;
+    boost::hash_combine(seed, Date_t::now().asInt64());
+    boost::hash_combine(seed, desc);
+    return seed;
+}
+
+bool checkIfRouterClient(const std::shared_ptr<transport::Session>& session) {
+    return session && session->isFromRouterPort();
+}
+
 }  // namespace
 
 void Client::initThread(StringData desc,
@@ -81,18 +92,28 @@ void Client::initThread(StringData desc,
     setLogService(toLogService(service));
 }
 
-namespace {
-int64_t generateSeed(const std::string& desc) {
-    size_t seed = 0;
-    boost::hash_combine(seed, Date_t::now().asInt64());
-    boost::hash_combine(seed, desc);
-    return seed;
+void Client::setCurrent(ServiceContext::UniqueClient client) {
+    invariantNoCurrentClient();
+    setLogService(toLogService(client.get()->getService()));
+    currentClient = std::move(client);
+    if (auto opCtx = currentClient->_opCtx)
+        if (auto timers = OperationCPUTimers::get(opCtx))
+            timers->onThreadAttach();
 }
 
-bool checkIfRouterClient(const std::shared_ptr<transport::Session>& session) {
-    return session && session->isFromRouterPort();
+ServiceContext::UniqueClient Client::releaseCurrent() {
+    invariant(haveClient(), "No client to release");
+    if (auto opCtx = currentClient->_opCtx)
+        if (auto timers = OperationCPUTimers::get(opCtx))
+            timers->onThreadDetach();
+    setLogService(logv2::LogService::unknown);
+    return std::move(currentClient);
 }
-}  // namespace
+
+
+Client* Client::getCurrent() {
+    return currentClient.get();
+}
 
 Client::Client(std::string desc, Service* service, std::shared_ptr<transport::Session> session)
     : _service(service),
@@ -103,6 +124,8 @@ Client::Client(std::string desc, Service* service, std::shared_ptr<transport::Se
       _isRouterClient(checkIfRouterClient(_session)),
       _uuid(UUID::gen()),
       _tags(kPending) {}
+
+Client::~Client() = default;
 
 void Client::reportState(BSONObjBuilder& builder) {
     builder.append("desc", desc());
@@ -130,10 +153,6 @@ std::string Client::clientAddress(bool includePort) const {
     return getRemote().host();
 }
 
-Client* Client::getCurrent() {
-    return currentClient.get();
-}
-
 Client& cc() {
     invariant(haveClient());
     return *Client::getCurrent();
@@ -141,24 +160,6 @@ Client& cc() {
 
 bool haveClient() {
     return static_cast<bool>(currentClient);
-}
-
-ServiceContext::UniqueClient Client::releaseCurrent() {
-    invariant(haveClient(), "No client to release");
-    if (auto opCtx = currentClient->_opCtx)
-        if (auto timers = OperationCPUTimers::get(opCtx))
-            timers->onThreadDetach();
-    setLogService(logv2::LogService::unknown);
-    return std::move(currentClient);
-}
-
-void Client::setCurrent(ServiceContext::UniqueClient client) {
-    invariantNoCurrentClient();
-    setLogService(toLogService(client.get()->getService()));
-    currentClient = std::move(client);
-    if (auto opCtx = currentClient->_opCtx)
-        if (auto timers = OperationCPUTimers::get(opCtx))
-            timers->onThreadAttach();
 }
 
 /**

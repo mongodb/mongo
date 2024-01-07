@@ -20,12 +20,12 @@ env.Library(
         's2_common.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/geo/geometry',
         '$BUILD_DIR/mongo/db/geo/geoparser',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/third_party/s2/s2',
     ],

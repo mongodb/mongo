@@ -798,6 +798,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
         'client_out_of_line_executor',
     ],
 )
@@ -882,6 +883,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/diagnostic_info'
         if get_option('use-diagnostic-latches') == 'on' else [],
+        '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         '$BUILD_DIR/mongo/util/progress_meter',
         'audit',
@@ -1998,6 +2000,9 @@ env.Library(
         'commands',
         'pipeline/lite_parsed_document_source',
         'session/logical_session_id',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
 

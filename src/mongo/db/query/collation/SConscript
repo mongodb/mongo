@@ -6,23 +6,27 @@ Import("use_system_version_of_library")
 env = env.Clone()
 
 env.Library(
-    target="collator_interface",
+    target='collator_interface',
     source=[
-        "collation_index_key.cpp",
-        "collator_interface.cpp",
+        'collation_index_key.cpp',
+        'collator_interface.cpp',
     ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 
 env.Library(
-    target="collator_interface_mock",
+    target='collator_interface_mock',
     source=[
-        "collator_interface_mock.cpp",
+        'collator_interface_mock.cpp',
     ],
     LIBDEPS=[
-        "collator_interface",
+        'collator_interface',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 

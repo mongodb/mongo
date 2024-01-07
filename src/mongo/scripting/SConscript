@@ -32,6 +32,7 @@ scripting_common_env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
 

@@ -610,7 +610,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         'optime',
-        'optime_base',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/multitenancy',
@@ -632,17 +631,6 @@ env.Benchmark(
 )
 
 env.Library(
-    target='optime_base',
-    source=[
-        'optime_base.idl',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
-
-env.Library(
     target='oplog_application_interface',
     source=[
         'oplog_applier.cpp',
@@ -658,6 +646,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+        '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/processinfo',
         'repl_coordinator_interface',
         'repl_server_parameters',
@@ -921,10 +910,12 @@ env.Library(
         'read_concern_args.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/read_write_concern_provenance',
-        '$BUILD_DIR/mongo/db/server_base',
         'optime',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -971,6 +962,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
+        '$BUILD_DIR/mongo/util/fail_point',
         'repl_server_parameters',
         'split_horizon',
     ],
@@ -1189,23 +1181,11 @@ env.Library(
     source=[
         'bson_extract_optime.cpp',
         'optime.cpp',
+        'optime_base.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
-        'optime_base',
-    ],
-)
-
-env.Library(
-    target='multiapplier',
-    source=[
-        'multiapplier.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
-        'oplog_entry',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -1306,6 +1286,7 @@ env.Library(
         'initial_syncer.cpp',
         'initial_syncer_common_stats.cpp',
         'initial_syncer_factory.cpp',
+        'multiapplier.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
@@ -1313,7 +1294,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/transaction/transaction',
         'initial_sync_cloners',
-        'multiapplier',
         'oplog',
         'oplog_application_interface',
         'oplog_buffer_blocking_queue',
@@ -1331,6 +1311,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/serverless/serverless_lock',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/executor/scoped_task_executor',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
         'repl_server_parameters',
     ],
 )
@@ -1901,7 +1882,6 @@ if wiredtiger:
             'image_collection_entry',
             'initial_syncer',
             'isself',
-            'multiapplier',
             'oplog',
             'oplog_application_interface',
             'oplog_applier_impl_test_fixture',
@@ -2084,11 +2064,14 @@ env.Library(
         'topology_version_observer.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         'repl_coordinator_interface',
         'replica_set_messages',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+        '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
 

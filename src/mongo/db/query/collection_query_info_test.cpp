@@ -62,6 +62,7 @@
 
 namespace mongo {
 namespace {
+
 class IndexCatalogEntryMock : public IndexCatalogEntry {
 public:
     explicit IndexCatalogEntryMock(IndexDescriptor* descriptor) : _descriptor(descriptor) {}
@@ -188,7 +189,6 @@ std::unique_ptr<IndexDescriptor> makeIndexDescriptor(StringData indexName,
     const auto& accessMethodName = IndexNames::findPluginName(keyPattern);
     return std::make_unique<IndexDescriptor>(accessMethodName, std::move(indexSpec));
 }
-}  // namespace
 
 TEST(CollectionQueryInfoTest, computeUpdateIndexDataForCompoundWildcardIndex) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"_sd);
@@ -245,4 +245,6 @@ TEST(CollectionQueryInfoTest, computeUpdateIndexDataForCompoundWildcardIndex_Exc
     ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"d"_sd}));
     ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"_id"_sd}));
 }
+
+}  // namespace
 }  // namespace mongo
