@@ -535,7 +535,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 }));
             },
             planSummary: "COLLSCAN",
-            queryFramework: "classic",
+            queryFramework: sbeEnabled ? "sbe" : "classic",
             currentOpFilter: currentOpFilter
         });
 
@@ -552,7 +552,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                     db.runCommand({find: "currentop_query", filter: TestData.queryFilter}));
             },
             planSummary: "COLLSCAN",
-            queryFramework: "classic",
+            queryFramework: sbeEnabled ? "sbe" : "classic",
             currentOpFilter: currentOpFilter
         });
 
@@ -580,7 +580,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 assert.eq(cursor.itcount(), 0);
             },
             planSummary: "COLLSCAN",
-            queryFramework: "classic",
+            queryFramework: sbeEnabled ? "sbe" : "classic",
             currentOpFilter: currentOpFilter,
         });
 
@@ -607,7 +607,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 }));
             },
             planSummary: "COLLSCAN",
-            queryFramework: "classic",
+            queryFramework: sbeEnabled ? "sbe" : "classic",
             currentOpFilter: currentOpFilter,
         });
 

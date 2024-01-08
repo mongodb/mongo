@@ -165,6 +165,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,   // traversePImm
     -2,  // traverseF
     0,   // traverseFImm
+    -4,  // magicTraverseF
     0,   // traverseCsiCellValues
     0,   // traverseCsiCellTypes
     -2,  // setField
@@ -914,6 +915,9 @@ void CodeFragment::appendTraverseP(int codePosition, Instruction::Constants k) {
     adjustStackSimple(i);
 }
 
+void CodeFragment::appendMagicTraverseF() {
+    appendSimpleInstruction(Instruction::magicTraverseF);
+}
 void CodeFragment::appendTraverseF() {
     appendSimpleInstruction(Instruction::traverseF);
 }
@@ -1328,6 +1332,90 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
     });
     guard.reset();
     pushStack(true, tagArrOutput, valArrOutput);
+}
+
+void ByteCode::magicTraverseF(const CodeFragment* code) {
+    // A combined filter traversal (i.e. non-recursive visit of both array elements and the array
+    // itself) with getField/getElement to simulate numeric paths.
+    // The semantics are controlled by 2 runtime conditions:
+    // 1. is a value to be examined coming from an object (i.e. getField) or from an array (i.e.
+    // getElement)? Values originating from objects are further traversed whereas array values are
+    // not.
+    // 2. is this traversal at the leaf position of the path? If so then the further object
+    // traversals are followed. Otherwise there is no further traversals.
+    auto [ownFlag, tagFlag, valFlag] = getFromStack(0, true);
+    value::ValueGuard firstGuard{ownFlag, tagFlag, valFlag};
+    auto [lamOwn, lamTag, lamVal] = getFromStack(0, true);
+    value::ValueGuard lamGuard{lamOwn, lamTag, lamVal};
+    auto arrayIndex = getFromStack(0, true);
+    value::ValueGuard indexGuard{arrayIndex};
+    auto fieldName = getFromStack(0, true);
+    value::ValueGuard fieldGuard{fieldName};
+    auto [ownInput, tagInput, valInput] = getFromStack(0, true);
+    value::ValueGuard inputGuard{ownInput, tagInput, valInput};
+
+    const bool preTraverse = value::bitcastTo<int32_t>(valFlag) & MagicTraverse::kPreTraverse;
+    const bool postTraverse = value::bitcastTo<int32_t>(valFlag) & MagicTraverse::kPostTraverse;
+
+    auto lambdaPtr = value::bitcastTo<int64_t>(lamVal);
+
+    enum class Traverse { document, array };
+    auto innerTraverse = [&](value::TypeTags tagElem,
+                             value::Value valElem,
+                             Traverse type,
+                             bool nested) {
+        auto [ownArrayIndex, tagArrayIndex, valArrayIndex] = arrayIndex;
+        auto [ownFieldName, tagFieldName, valFieldName] = fieldName;
+
+        auto [ownInner, tagInner, valInner] = type == Traverse::document
+            ? getField(tagElem, valElem, tagFieldName, valFieldName)
+            : getElement(tagElem, valElem, tagArrayIndex, valArrayIndex);
+
+        // Follow on with a traversal only if the flag is set.
+        if (value::isArray(tagInner) && nested) {
+            const bool passed = value::arrayAny(
+                tagInner, valInner, [&](value::TypeTags tagElem, value::Value valElem) {
+                    pushStack(false, tagElem, valElem);
+                    if (runLambdaPredicate(code, lambdaPtr)) {
+                        pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+                        return true;
+                    }
+                    return false;
+                });
+            if (passed) {
+                return passed;
+            }
+        }
+        pushStack(ownInner, tagInner, valInner);
+        if (runLambdaPredicate(code, lambdaPtr)) {
+            pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+            return true;
+        }
+        return false;
+    };
+
+    if (value::isArray(tagInput)) {
+        const bool passed =
+            value::arrayAny(tagInput, valInput, [&](value::TypeTags tagElem, value::Value valElem) {
+                return innerTraverse(tagElem, valElem, Traverse::document, preTraverse);
+            });
+
+        if (passed) {
+            return;
+        }
+
+        // For values originating from arrays we do not run the inner traversal unless the flag is
+        // set.
+        if (!innerTraverse(tagInput, valInput, Traverse::array, postTraverse)) {
+            pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
+        }
+        return;
+    } else {
+        if (!innerTraverse(tagInput, valInput, Traverse::document, preTraverse)) {
+            pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
+        }
+        return;
+    }
 }
 
 void ByteCode::traverseF(const CodeFragment* code) {
@@ -10632,6 +10720,10 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
                 traverseF(code, codePosition, k == Instruction::True ? true : false);
 
+                break;
+            }
+            case Instruction::magicTraverseF: {
+                magicTraverseF(code);
                 break;
             }
             case Instruction::traverseCsiCellValues: {

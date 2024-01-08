@@ -414,6 +414,9 @@ public:
     MONGO_COMPILER_ALWAYS_INLINE ValueGuard(TypeTags tag, Value val) : _tag(tag), _value(val) {}
     MONGO_COMPILER_ALWAYS_INLINE ValueGuard(bool owned, TypeTags tag, Value val)
         : ValueGuard(owned ? tag : TypeTags::Nothing, owned ? val : 0) {}
+    MONGO_COMPILER_ALWAYS_INLINE ValueGuard(
+        const FastTuple<bool, value::TypeTags, value::Value>& tuple)
+        : ValueGuard(tuple.a, tuple.b, tuple.c) {}
     ValueGuard() = delete;
     ValueGuard(const ValueGuard&) = delete;
     ValueGuard(ValueGuard&& other) = delete;

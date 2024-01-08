@@ -143,7 +143,6 @@ void disableSBEForUnsupportedExpressions(const boost::intrusive_ptr<ExpressionCo
 void addExpressionToRoot(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          AndMatchExpression* root,
                          std::unique_ptr<MatchExpression> newNode) {
-    disableSBEForUnsupportedExpressions(expCtx, newNode.get());
     root->add(std::move(newNode));
 }
 }  // namespace
@@ -1430,6 +1429,8 @@ StatusWithMatchExpression parseElemMatch(boost::optional<StringData> name,
     }
 
     doc_validation_error::annotateTreeToIgnoreForErrorDetails(expCtx, sub.get());
+
+    disableSBEForUnsupportedExpressions(expCtx, sub.get());
 
     return {std::make_unique<ElemMatchObjectMatchExpression>(
         name, std::move(sub), createAnnotation(expCtx, e.fieldNameStringData(), name, e))};

@@ -341,6 +341,7 @@ struct Instruction {
         traversePImm,
         traverseF,  // traverse filter paths
         traverseFImm,
+        magicTraverseF,
         // Iterates over values in column index cells. Skips values from nested arrays.
         traverseCsiCellValues,
         // Iterates the column index cell and returns values representing the types of cell's
@@ -948,6 +949,15 @@ enum class AggMultiElems {
 };
 
 /**
+ * Flags controlling runtime behavior of a magical traverse intrinsic used for evaluating numerical
+ * paths.
+ * If kPreTraverse is specified then we run the traverse before calling getField/getElement.
+ * If kPostTraverse is specified then we run the traverse after calling getField/getElement.
+ * Note that we can freely combine pre and post flags; i.e. they are not mutually exclusive.
+ */
+enum MagicTraverse : int32_t { kPreTraverse = 1, kPostTraverse = 2 };
+
+/**
  * Less than comparison based on a sort pattern.
  */
 struct SortPatternLess {
@@ -1245,6 +1255,7 @@ public:
     void appendTraverseP(int codePosition, Instruction::Constants k);
     void appendTraverseF();
     void appendTraverseF(int codePosition, Instruction::Constants k);
+    void appendMagicTraverseF();
     void appendTraverseCellValues();
     void appendTraverseCellValues(int codePosition);
     void appendTraverseCellTypes();
@@ -1531,6 +1542,7 @@ private:
     void traverseF(const CodeFragment* code);
     void traverseF(const CodeFragment* code, int64_t position, bool compareArray);
     void traverseFInArray(const CodeFragment* code, int64_t position, bool compareArray);
+    void magicTraverseF(const CodeFragment* code);
 
     bool runLambdaPredicate(const CodeFragment* code, int64_t position);
     void traverseCsiCellValues(const CodeFragment* code, int64_t position);

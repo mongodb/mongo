@@ -240,17 +240,22 @@ SbExpr generateTraverseF(SbExpr inputExpr,
     // will be false.
     const bool childIsLeafWithEmptyName =
         (level == fp.numParts() - 2u) && fp.isPathComponentEmpty(level + 1);
-
+    const bool isNumericField =
+        (level < fp.FieldRef::numParts()) && fp.isNumericPathComponentStrict(level);
+    const bool isNumericFieldNext =
+        (level + 1 < fp.FieldRef::numParts()) && fp.isNumericPathComponentStrict(level + 1);
     const bool isLeafField = (level == fp.numParts() - 1u) || childIsLeafWithEmptyName;
-    const bool needsArrayCheck = isLeafField && mode == LeafTraversalMode::kArrayAndItsElements;
+    const bool needsArrayCheck = (isLeafField && mode == LeafTraversalMode::kArrayAndItsElements);
     const bool needsNothingCheck = !isLeafField && matchesNothing;
+    const bool isLeafNumeric =
+        (isNumericField && (!isNumericFieldNext || mode == LeafTraversalMode::kDoNotTraverseLeaf));
 
     auto lambdaFrameId = frameIdGenerator->generate();
     auto lambdaParam = SbExpr{SbVar{lambdaFrameId, 0}};
-
+    auto getFieldName = isNumericField ? "getFieldOrElement"_sd : "getField"_sd;
     SbExpr fieldExpr = topLevelFieldSlot
         ? b.makeVariable(topLevelFieldSlot->slotId)
-        : b.makeFunction("getField", inputExpr.clone(), b.makeStrConstant(fp.getPart(level)));
+        : b.makeFunction(getFieldName, inputExpr.clone(), b.makeStrConstant(fp.getPart(level)));
 
     if (childIsLeafWithEmptyName) {
         auto frameId = frameIdGenerator->generate();
@@ -274,7 +279,8 @@ SbExpr generateTraverseF(SbExpr inputExpr,
                                                       matchesNothing,
                                                       mode);
 
-    if (isLeafField && mode == LeafTraversalMode::kDoNotTraverseLeaf) {
+    if ((isLeafField && mode == LeafTraversalMode::kDoNotTraverseLeaf) ||
+        (!isNumericField && isNumericFieldNext)) {
         return b.makeLet(
             lambdaFrameId, SbExpr::makeSeq(std::move(fieldExpr)), std::move(resultExpr));
     }
@@ -301,10 +307,27 @@ SbExpr generateTraverseF(SbExpr inputExpr,
         fieldExpr = SbVar(*frameId, 0);
     }
 
+    int arrayIndex = 0;
+    if (isNumericField) {
+        auto status = NumberParser{}(fp.getPart(level), &arrayIndex);
+        tassert(7097203, "Cannot parse array index", status.isOK());
+    }
     // traverseF() can return Nothing only when the lambda returns Nothing. All expressions that we
     // generate return Boolean, so there is no need for explicit fillEmpty here.
-    auto traverseFExpr = b.makeFunction(
-        "traverseF", fieldExpr.clone(), std::move(lambdaExpr), b.makeBoolConstant(needsArrayCheck));
+    auto traverseFExpr = isNumericField
+        ? b.makeFunction(
+              "magicTraverseF",
+              inputExpr.clone(),
+              b.makeStrConstant(fp.getPart(level)),
+              b.makeInt32Constant(arrayIndex),
+              std::move(lambdaExpr),
+              b.makeInt32Constant(
+                  (isLeafNumeric ? sbe::vm::MagicTraverse::kPreTraverse : 0) +
+                  (isNumericFieldNext || isLeafField ? 0 : sbe::vm::MagicTraverse::kPostTraverse)))
+        : b.makeFunction("traverseF",
+                         fieldExpr.clone(),
+                         std::move(lambdaExpr),
+                         b.makeBoolConstant(needsArrayCheck));
 
     // When the predicate can match Nothing, we need to do some extra work for non-leaf fields.
     if (needsNothingCheck) {

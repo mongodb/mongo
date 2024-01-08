@@ -24,27 +24,6 @@ function testFieldTraversal(pipeline, localDoc, shouldMatchDoc, prefix) {
     } else {
         assert.eq(results.length, 0);
     }
-
-    // Look for the transformBy.
-    const explain = db.local.explain().aggregate(pipeline);
-    const projStages = [
-        ...getAggPlanStages(explain, "PROJECTION_SIMPLE"),
-        ...getAggPlanStages(explain, "PROJECTION_DEFAULT")
-    ];
-    assert.gt(projStages.length, 0, explain);
-
-    for (const projStage of projStages) {
-        // We have the stage, now make sure we have the correct projection.
-        let transform = projStage.transformBy;
-        if (transform.hasOwnProperty(prefix.join("."))) {
-            transform = transform[prefix.join(".")];
-        } else {
-            for (const field of prefix) {
-                transform = transform[field];
-            }
-        }
-        assert.eq(transform, true, explain);
-    }
 }
 
 function testLookupLocalField(localField, localDoc, shouldMatchDoc, prefix) {

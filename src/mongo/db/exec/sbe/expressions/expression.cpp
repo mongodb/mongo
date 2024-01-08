@@ -1181,6 +1181,7 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
      InstrFn{2, generator<2, &vm::CodeFragment::appendGetFieldOrElement>, false}},
     {"traverseP", InstrFn{3, generateTraverseP, false}},
     {"traverseF", InstrFn{3, generateTraverseF, false}},
+    {"magicTraverseF", InstrFn{5, generatorLegacy<&vm::CodeFragment::appendMagicTraverseF>, false}},
     {"traverseCsiCellValues", InstrFn{2, generateTraverseCellValues, false}},
     {"traverseCsiCellTypes", InstrFn{2, generateTraverseCellTypes, false}},
     {"setField", InstrFn{3, generatorLegacy<&vm::CodeFragment::appendSetField>, false}},
