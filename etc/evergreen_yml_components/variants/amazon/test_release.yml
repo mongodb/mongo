@@ -155,7 +155,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: amazon2-openssl111-large
-    compile_variant: amazon2
+    compile_variant: amazon2-openssl111
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -222,7 +222,7 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
-    compile_variant: enterprise-amazon2
+    compile_variant: enterprise-amazon2-openssl111
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -455,7 +455,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: amazon2-arm64-openssl111-large
-    compile_variant: amazon2-arm64
+    compile_variant: amazon2-arm64-openssl111
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
@@ -520,7 +520,7 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
-    compile_variant: enterprise-amazon2-arm64
+    compile_variant: enterprise-amazon2-arm64-openssl111
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
