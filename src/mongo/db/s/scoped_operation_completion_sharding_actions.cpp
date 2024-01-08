@@ -52,6 +52,8 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util_core.h"
@@ -131,8 +133,18 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
             _opCtx, staleInfo->getDb(), staleInfo->getVersionReceived());
         if (!handleMismatchStatus.isOK())
             LOGV2(22054,
-                  "Failed to database version exception as part of the current operation",
+                  "Failed to handle database version exception as part of the current operation",
                   "error"_attr = redact(handleMismatchStatus));
+    } else if (auto failedRefreshInfo = status->extraInfo<ShardCannotRefreshDueToLocksHeldInfo>()) {
+        // It is OK to synchronously refresh the catalog cache here.
+        const auto swCri = Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(
+            _opCtx, failedRefreshInfo->getNss());
+        if (!swCri.getStatus().isOK()) {
+            LOGV2(8150800,
+                  "Failed to handle ShardCannotRefreshDueToLocksHeld as part of the current "
+                  "operation",
+                  "error"_attr = redact(swCri.getStatus()));
+        }
     }
 }
 
