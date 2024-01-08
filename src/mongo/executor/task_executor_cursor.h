@@ -48,7 +48,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/plan_yield_policy_remote_cursor.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/remote_command_request.h"
@@ -97,8 +97,9 @@ public:
 
         // Optional yield policy allows us to yield(release storage resources) during remote call.
         // Using shared_ptr to allow tries on network failure, don't share the pointer on other
-        // purpose.
-        std::shared_ptr<PlanYieldPolicyRemoteCursor> yieldPolicy{nullptr};
+        // purpose. In practice, this will always be of type PlanYieldPolicyRemoteCursor, but
+        // for dependency reasons, we must use the generic PlanYieldPolicy here.
+        std::shared_ptr<PlanYieldPolicy> yieldPolicy{nullptr};
 
         Options() {}
     };
@@ -201,7 +202,7 @@ public:
         _options.getMoreAugmentationWriter = func;
     }
 
-    void updateYieldPolicy(std::unique_ptr<PlanYieldPolicyRemoteCursor> yieldPolicy) {
+    void updateYieldPolicy(std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
         _options.yieldPolicy = std::move(yieldPolicy);
     }
 
@@ -211,7 +212,7 @@ public:
         }
     }
 
-    PlanYieldPolicyRemoteCursor* getYieldPolicy() {
+    PlanYieldPolicy* getYieldPolicy() {
         return _options.yieldPolicy.get();
     }
 

@@ -423,7 +423,7 @@ void prepareSearchForNestedPipeline(Pipeline* pipeline) {
 
 void establishSearchQueryCursors(boost::intrusive_ptr<ExpressionContext> expCtx,
                                  DocumentSource* stage,
-                                 std::unique_ptr<PlanYieldPolicyRemoteCursor> yieldPolicy) {
+                                 std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
     if (!expCtx->uuid || !isSearchStage(stage) ||
         MONGO_unlikely(searchReturnEofImmediately.shouldFail())) {
         return;
@@ -459,7 +459,7 @@ void establishSearchQueryCursors(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 void establishSearchMetaCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                DocumentSource* stage,
-                               std::unique_ptr<PlanYieldPolicyRemoteCursor> yieldPolicy) {
+                               std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
     if (!expCtx->uuid || !isSearchMetaStage(stage) ||
         MONGO_unlikely(searchReturnEofImmediately.shouldFail())) {
         return;

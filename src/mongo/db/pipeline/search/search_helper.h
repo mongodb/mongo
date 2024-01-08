@@ -40,7 +40,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote_gen.h"
-#include "mongo/db/query/plan_yield_policy_remote_cursor.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor_cursor.h"
@@ -144,7 +144,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineForSearch(
  */
 void establishSearchQueryCursors(boost::intrusive_ptr<ExpressionContext> expCtx,
                                  DocumentSource* stage,
-                                 std::unique_ptr<PlanYieldPolicyRemoteCursor>);
+                                 std::unique_ptr<PlanYieldPolicy>);
 
 /**
  * Encode $search/$searchMeta to SBE plan cache.
@@ -158,7 +158,7 @@ bool encodeSearchForSbeCache(const ExpressionContext* expCtx,
  */
 void establishSearchMetaCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                DocumentSource* stage,
-                               std::unique_ptr<PlanYieldPolicyRemoteCursor>);
+                               std::unique_ptr<PlanYieldPolicy>);
 
 boost::optional<executor::TaskExecutorCursor> getSearchMetadataCursor(DocumentSource* ds);
 

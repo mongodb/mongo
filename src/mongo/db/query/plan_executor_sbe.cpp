@@ -53,6 +53,7 @@
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/plan_yield_policy_remote_cursor.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -176,7 +177,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
 
     if (_remoteCursors) {
         for (auto& it : *_remoteCursors) {
-            if (auto yieldPolicy = it.second->getYieldPolicy()) {
+            if (auto yieldPolicy =
+                    dynamic_cast<PlanYieldPolicyRemoteCursor*>(it.second->getYieldPolicy())) {
                 yieldPolicy->registerPlanExecutor(this);
             }
         }

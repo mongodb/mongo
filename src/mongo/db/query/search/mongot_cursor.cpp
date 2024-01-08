@@ -41,7 +41,7 @@ namespace {
 executor::TaskExecutorCursor::Options getSearchCursorOptions(
     bool preFetchNextBatch,
     std::function<void(BSONObjBuilder& bob)> augmentGetMore,
-    std::unique_ptr<PlanYieldPolicyRemoteCursor> yieldPolicy) {
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
     executor::TaskExecutorCursor::Options opts;
     opts.yieldPolicy = std::move(yieldPolicy);
     // If we are pushing down a limit to mongot, then we should avoid prefetching the next
@@ -134,7 +134,7 @@ std::vector<executor::TaskExecutorCursor> establishCursors(
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     bool preFetchNextBatch,
     std::function<void(BSONObjBuilder& bob)> augmentGetMore,
-    std::unique_ptr<PlanYieldPolicyRemoteCursor> yieldPolicy) {
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
     std::vector<executor::TaskExecutorCursor> cursors;
     auto initialCursor = makeTaskExecutorCursor(
         expCtx->opCtx,
@@ -161,7 +161,7 @@ std::vector<executor::TaskExecutorCursor> establishSearchCursors(
     std::function<void(BSONObjBuilder& bob)> augmentGetMore,
     const boost::optional<int>& protocolVersion,
     bool requiresSearchSequenceToken,
-    std::unique_ptr<PlanYieldPolicyRemoteCursor> yieldPolicy) {
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
     // UUID is required for mongot queries. If not present, no results for the query as the
     // collection has not been created yet.
     if (!expCtx->uuid) {

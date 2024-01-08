@@ -71,7 +71,7 @@ std::vector<executor::TaskExecutorCursor> establishCursors(
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     bool preFetchNextBatch,
     std::function<void(BSONObjBuilder& bob)> augmentGetMore = nullptr,
-    std::unique_ptr<PlanYieldPolicyRemoteCursor> yieldPolicy = nullptr);
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr);
 
 /**
  * Run the given search query against mongot and build one cursor object for each
@@ -85,7 +85,7 @@ std::vector<executor::TaskExecutorCursor> establishSearchCursors(
     std::function<void(BSONObjBuilder& bob)> augmentGetMore = nullptr,
     const boost::optional<int>& protocolVersion = boost::none,
     bool requiresSearchSequenceToken = false,
-    std::unique_ptr<PlanYieldPolicyRemoteCursor> yieldPolicy = nullptr);
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr);
 
 /**
  * Gets the explain information by issuing an explain command to mongot and blocking
