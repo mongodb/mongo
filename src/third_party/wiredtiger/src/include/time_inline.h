@@ -219,14 +219,14 @@ __wt_timer_start(WT_SESSION_IMPL *session, WT_TIMER *start_time)
 }
 
 /*
- * __wt_timer_evaluate --
+ * __wt_timer_evaluate_ms --
  *     Evaluate the difference between the current time and start time and output the difference in
  *     milliseconds.
  */
 static inline void
-__wt_timer_evaluate(WT_SESSION_IMPL *session, WT_TIMER *start_time, uint64_t *time_diff)
+__wt_timer_evaluate_ms(WT_SESSION_IMPL *session, WT_TIMER *start_time, uint64_t *time_diff_ms)
 {
     struct timespec cur_time;
     __wt_epoch(session, &cur_time);
-    *time_diff = WT_TIMEDIFF_MS(cur_time, *start_time);
+    *time_diff_ms = WT_TIMEDIFF_MS(cur_time, *start_time);
 }
