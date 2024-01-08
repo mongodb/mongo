@@ -37,6 +37,8 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/stale_exception.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -117,8 +119,18 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
             LOGV2(22054,
                   "Failed to handle database version exception as part of the current operation: "
                   "{error}",
-                  "Failed to database version exception as part of the current operation",
+                  "Failed to handle database version exception as part of the current operation",
                   "error"_attr = redact(handleMismatchStatus));
+    } else if (auto failedRefreshInfo = status->extraInfo<ShardCannotRefreshDueToLocksHeldInfo>()) {
+        // It is OK to synchronously refresh the catalog cache here.
+        const auto swCri = Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(
+            _opCtx, failedRefreshInfo->getNss());
+        if (!swCri.getStatus().isOK()) {
+            LOGV2(8150800,
+                  "Failed to handle ShardCannotRefreshDueToLocksHeld as part of the current "
+                  "operation",
+                  "error"_attr = redact(swCri.getStatus()));
+        }
     }
 }
 

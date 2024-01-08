@@ -171,6 +171,7 @@ void populateReply(OperationContext* opCtx,
         const auto& lastResult = result.results.back();
 
         if (lastResult == ErrorCodes::StaleDbVersion ||
+            lastResult == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
             ErrorCodes::isStaleShardVersionError(lastResult.getStatus()) ||
             ErrorCodes::isTenantMigrationError(lastResult.getStatus())) {
             // For ordered:false commands we need to duplicate these error results for all ops
