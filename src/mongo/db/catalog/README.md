@@ -1885,7 +1885,7 @@ Additionally, users can specify that they'd like to perform a `full` validation.
     + [ValidateAdaptor](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.h)
       used to traverse the record store and indexes. Validates that the records seen are valid
       `BSON` conformant to most [BSON specifications](https://bsonspec.org/spec.html). In `full`
-      and `checkBSONConformant` validation modes, all `BSON` checks, including the time-consuming
+      and `checkBSONConformance` validation modes, all `BSON` checks, including the time-consuming
       ones, will be enabled.
 * If a `full` validation was requested, we run the storage engines validation hooks at this point to
   allow a more thorough check to be performed.
