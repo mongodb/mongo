@@ -99,6 +99,7 @@ env.CppLibfuzzerTest(
         'protocol_fuzzer.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/transport/message_compressor',
         'message',

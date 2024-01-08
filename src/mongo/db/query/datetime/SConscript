@@ -47,6 +47,8 @@ timeZoneEnv.CppLibfuzzerTest(
         'date_time_support_fuzzer.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
         'date_time_support',
     ],
 )
