@@ -379,9 +379,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
     const BatonHandle& baton,
     boost::optional<std::shared_ptr<Timer>> fromConnAcquiredTimer) {
     auto startTimer = Timer();
-    auto opMsgRequest =
-        OpMsgRequest::fromDBAndBody(request.dbname, std::move(request.cmdObj), request.metadata);
-    opMsgRequest.validatedTenancyScope = request.validatedTenancyScope;
+    auto opMsgRequest = static_cast<OpMsgRequest>(request);
     return runCommand(
                std::move(opMsgRequest), baton, request.options.fireAndForget, fromConnAcquiredTimer)
         .then([this, startTimer = std::move(startTimer)](rpc::UniqueReply response) {
@@ -419,9 +417,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runExhaustCommand(OpMsgRe
 
 Future<executor::RemoteCommandResponse> AsyncDBClient::beginExhaustCommandRequest(
     executor::RemoteCommandRequest request, const BatonHandle& baton) {
-    auto opMsgRequest =
-        OpMsgRequest::fromDBAndBody(request.dbname, std::move(request.cmdObj), request.metadata);
-    opMsgRequest.validatedTenancyScope = request.validatedTenancyScope;
+    auto opMsgRequest = static_cast<OpMsgRequest>(request);
 
     return runExhaustCommand(std::move(opMsgRequest), baton);
 }

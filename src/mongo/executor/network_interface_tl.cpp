@@ -104,11 +104,6 @@ Status appendMetadata(RemoteCommandRequestOnAny* request,
         request->metadata = bob.obj();
     }
 
-    if (!request->opCtx)
-        return Status::OK();
-
-    request->validatedTenancyScope = auth::ValidatedTenancyScope::get(request->opCtx);
-
     return Status::OK();
 }
 

@@ -78,7 +78,9 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
       opCtx(opCtx),
       options(options),
       operationKey(opKey),
-      timeout(timeoutMillis) {
+      timeout(timeoutMillis),
+      _validatedTenancyScope(opCtx ? auth::ValidatedTenancyScope::get(opCtx) : boost::none) {
+
     // If there is a comment associated with the current operation, append it to the command that we
     // are about to dispatch to the shards.
     cmdObj = opCtx && opCtx->getComment() && !theCmdObj["comment"]
@@ -112,6 +114,15 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
 
 RemoteCommandRequestBase::RemoteCommandRequestBase()
     : id(requestIdCounter.addAndFetch(1)), operationKey(UUID::gen()) {}
+
+RemoteCommandRequestBase::operator OpMsgRequest() const {
+    OpMsgRequest opMsgRequest =
+        OpMsgRequest::fromDBAndBody(this->dbname, std::move(this->cmdObj), this->metadata);
+    if (this->validatedTenancyScope()) {
+        opMsgRequest.validatedTenancyScope = this->validatedTenancyScope();
+    }
+    return opMsgRequest;
+}
 
 void RemoteCommandRequestBase::_updateTimeoutFromOpCtxDeadline(const OperationContext* opCtx) {
     if (!opCtx || !opCtx->hasDeadline()) {

@@ -89,7 +89,14 @@ struct RemoteCommandRequestBase {
     DatabaseName dbname;
     BSONObj metadata{rpc::makeEmptyMetadata()};
     BSONObj cmdObj;
-    boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope;
+    const boost::optional<auth::ValidatedTenancyScope>& validatedTenancyScope() const {
+        return _validatedTenancyScope;
+    }
+
+    /**
+     * Conversion function that performs the RemoteCommandRequest conversion into OpMsgRequest
+     */
+    explicit operator OpMsgRequest() const;
 
     // OperationContext is added to each request to allow OP_Command metadata attachment access to
     // the Client object. The OperationContext is only accessed on the thread that calls
@@ -128,6 +135,8 @@ private:
      * than NetworkInterfaceExceededTimeLimit.
      */
     void _updateTimeoutFromOpCtxDeadline(const OperationContext* opCtx);
+
+    boost::optional<auth::ValidatedTenancyScope> _validatedTenancyScope;
 };
 
 /**
