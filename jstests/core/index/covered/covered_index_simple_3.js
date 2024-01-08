@@ -48,12 +48,17 @@ assert.eq(0,
           "simple.3.3 - docs examined should be 0 for covered query");
 
 // Test no query
-var plan = coll.find({}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-       "simple.3.4 - indexOnly should be true on covered query");
-assert.eq(0,
-          plan.executionStats.totalDocsExamined,
-          "simple.3.4 - docs examined should be 0 for covered query");
+if (!TestData.isCursorHintsToQuerySettings) {
+    // This guard excludes this test case from being run on the cursor_hints_to_query_settings
+    // suite. The suite replaces cursor hints with query settings. Query settings do not force
+    // indexes, and therefore empty filter will result in collection scans.
+    var plan = coll.find({}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
+    assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
+           "simple.3.4 - indexOnly should be true on covered query");
+    assert.eq(0,
+              plan.executionStats.totalDocsExamined,
+              "simple.3.4 - docs examined should be 0 for covered query");
+}
 
 // Test range query
 var plan =

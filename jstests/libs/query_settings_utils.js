@@ -30,8 +30,12 @@ export class QuerySettingsUtils {
     /**
      * Makes an query instance of the aggregate command with an optional pipeline clause.
      */
-    makeAggregateQueryInstance(pipeline = [], collName = this.collName) {
-        return {aggregate: collName, $db: this.db.getName(), pipeline};
+    makeAggregateQueryInstance(aggregateObj, collectionless = false) {
+        return {
+            aggregate: collectionless ? 1 : this.collName,
+            $db: this.db.getName(),
+            ...aggregateObj
+        };
     }
 
     /**
@@ -89,8 +93,8 @@ export class QuerySettingsUtils {
 
     /**
      * Helper function to assert equality of QueryShapeConfigurations. In order to ease the
-     * assertion logic, 'queryShapeHash' field is removed from the QueryShapeConfiguration prior to
-     * assertion.
+     * assertion logic, 'queryShapeHash' field is removed from the QueryShapeConfiguration prior
+     * to assertion.
      *
      * Since in sharded clusters the query settings may arrive with a delay to the mongos, the
      * assertion is done via 'assert.soon'.

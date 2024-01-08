@@ -6007,6 +6007,13 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
+  name: cursor_hints_to_query_settings
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
   name: query_stats_passthrough
   tags: []
   commands:

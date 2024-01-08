@@ -1,0 +1,86 @@
+# This test suite emulates cursor hints with query settings commands. This aims to test the
+# correctness of query settings application.
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+  exclude_files:
+    # TODO SERVER-81601 Re-enable once query settings support views.
+    - jstests/core/query/agg_hint.js
+    - jstests/core/views/views_find.js
+
+    # Query settings do not force indexes, and therefore empty filter will result in collection scans.
+    - jstests/core/index/geo/geo6.js
+    - jstests/core/index/index_check6.js
+    - jstests/core/index/index_diag.js
+    - jstests/core/index/index_multikey.js
+    - jstests/core/query/covered_multikey.js
+    - jstests/core/query/explain/explain_shell_helpers.js
+    - jstests/core/return_key.js
+
+    # This suite emits additional explains alongside the tested command. This interferes with the number of
+    # expected plan cache entries.
+    - jstests/core/query/plan_cache/plan_cache_sbe_hinted.js
+    # This suite intercepts exceptions in order to override only commands which worked originally. This interferes
+    # with the expected exit code of the test and/or 'assert.throws()'.
+    - jstests/core/query/count/count_plan_summary.js
+    - jstests/core/query/cursor/getmore_invalidated_cursors.js
+
+    # Query settings have a higher precedence over index filters.
+    - jstests/core/index/index_filter_catalog_independent.js
+    - jstests/core/index/index_filter_collation.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/index/index_filter_on_hidden_index.js
+    - jstests/core/index/wildcard/compound_wildcard_index_filter.js
+    - jstests/core/index/wildcard/wildcard_index_filter.js
+
+    # Tests partial/sparse indexes. These cannot be forced using query settings if they
+    # lead to an incomplete result set.
+    - jstests/core/index/index_multiple_compatibility.js
+    - jstests/core/index/indext.js
+    - jstests/core/index/sparse_index_internal_expr.js
+    - jstests/core/query/exists/existsa.js
+    # Similar to the above, column store indexes cannot be forced using query settings.
+    - jstests/core/columnstore/columnstore_index_correctness.js
+
+    - jstests/core/query/query_settings/**/*.js
+    - jstests/core/timeseries/**/*.js
+
+    # Tests which are not supported on standalone.
+    - jstests/core/queryable_encryption/**/*.js
+    - jstests/core/txns/**/*.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - requires_profiling
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+      eval: >-
+        globalThis.testingReplication = true;
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        await import("jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
+      global_vars:
+        TestData:
+          isCursorHintsToQuerySettings: true
+  hooks:
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnNamespaceNotFound: false
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        # TODO SERVER-52304 Remove this once the query settings feature flag is enabled.
+        featureFlagQuerySettings: true
+    num_nodes: 2

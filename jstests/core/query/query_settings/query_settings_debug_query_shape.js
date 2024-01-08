@@ -61,27 +61,29 @@ runTest({
 
 // Test the aggregate command case.
 runTest({
-  queryInstance: qsutils.makeAggregateQueryInstance([
-    {
-      $lookup: {
-        from: "inventory",
-        localField: "item",
-        foreignField: "sku",
-        as: "inventory_docs",
-      },
-    },
-    {
-      $match: {
-        qty: { $lt: 5 },
-        manufacturer: {
-          $in: ["Acme Corporation", "Umbrella Corporation"],
-        },
-      },
-    },
-    {
-      $count: "itemsLowOnStock",
-    },
-  ]),
+  queryInstance: qsutils.makeAggregateQueryInstance({
+      pipeline: [
+          {
+            $lookup: {
+              from: "inventory",
+              localField: "item",
+              foreignField: "sku",
+              as: "inventory_docs",
+            },
+          },
+          {
+            $match: {
+              qty: { $lt: 5 },
+              manufacturer: {
+                $in: ["Acme Corporation", "Umbrella Corporation"],
+              },
+            },
+          },
+          {
+            $count: "itemsLowOnStock",
+          },
+      ],
+  }),
   expectedDebugQueryShape: {
     cmdNs: {db: db.getName(), coll: collName},
     command: "aggregate",
@@ -130,8 +132,10 @@ runTest({
 
 // Test the inception case: setting query settings on '$querySettings'.
 runTest({
-    queryInstance: qsutils.makeAggregateQueryInstance(
-        /* pipeline */[{$querySettings: {showDebugQueryShape: true}}], /* collName */ 1),
+    queryInstance: qsutils.makeAggregateQueryInstance({
+        pipeline: [{$querySettings: {showDebugQueryShape: true}}],
+    },
+                                                      /* collectionless */ true),
     expectedDebugQueryShape: {
         cmdNs: {db: db.getName(), coll: "$cmd.aggregate"},
         command: "aggregate",

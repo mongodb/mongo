@@ -18,15 +18,17 @@ let test =
         const coll = assertDropAndRecreateCollection(db, jsTestName());
         const qsutils = new QuerySettingsUtils(db, coll.getName());
 
-        let query = qsutils.makeAggregateQueryInstance([
-            {$match: {matchKey: 15}},
-            {
-                $group: {
-                    _id: "groupID",
-                    values: {$addToSet: "$value"},
+        let query = qsutils.makeAggregateQueryInstance({
+            pipeline: [
+                {$match: {matchKey: 15}},
+                {
+                    $group: {
+                        _id: "groupID",
+                        values: {$addToSet: "$value"},
+                    },
                 },
-            },
-        ]);
+            ]
+        });
         let querySetting = {indexHints: {allowedIndexes: ["groupID_1", {$natural: 1}]}};
 
         // Ensure that query settings cluster parameter is empty.

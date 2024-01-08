@@ -56,12 +56,18 @@ assert.eq(0,
           "compound.1.3 - nscannedObjects should be 0 for covered query");
 
 // Test no query
-var plan = coll.find({}, {b: 1, c: 1, _id: 0}).hint({a: 1, b: -1, c: 1}).explain("executionStats");
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-       "compound.1.4 - indexOnly should be true on covered query");
-assert.eq(0,
-          plan.executionStats.totalDocsExamined,
-          "compound.1.4 - nscannedObjects should be 0 for covered query");
+if (!TestData.isCursorHintsToQuerySettings) {
+    // This guard excludes this test case from being run on the cursor_hints_to_query_settings
+    // suite. The suite replaces cursor hints with query settings. Query settings do not force
+    // indexes, and therefore empty filter will result in collection scans.
+    var plan =
+        coll.find({}, {b: 1, c: 1, _id: 0}).hint({a: 1, b: -1, c: 1}).explain("executionStats");
+    assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
+           "compound.1.4 - indexOnly should be true on covered query");
+    assert.eq(0,
+              plan.executionStats.totalDocsExamined,
+              "compound.1.4 - nscannedObjects should be 0 for covered query");
+}
 
 // Test range query
 var plan = coll.find({a: {$gt: 25, $lt: 43}}, {b: 1, c: 1, _id: 0})

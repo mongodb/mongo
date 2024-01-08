@@ -134,10 +134,16 @@ let buildPipelineShape = matchValue => {
 
 // Same for aggregate query settings.
 testQuerySettingsUsing({
-    queryA: qsutils.makeAggregateQueryInstance(buildPipeline(15)),
+    queryA: qsutils.makeAggregateQueryInstance({
+        pipeline: buildPipeline(15),
+    }),
     queryShapeA: buildPipelineShape({$eq: "?number"}),
-    queryB: qsutils.makeAggregateQueryInstance(buildPipeline("string")),
-    queryBPrime: qsutils.makeAggregateQueryInstance(buildPipeline("another string")),
+    queryB: qsutils.makeAggregateQueryInstance({
+        pipeline: buildPipeline("string"),
+    }),
+    queryBPrime: qsutils.makeAggregateQueryInstance({
+        pipeline: buildPipeline("another string"),
+    }),
     querySettingsA: {indexHints: {allowedIndexes: ["groupID_1", {$natural: 1}]}},
     querySettingsB: {indexHints: {allowedIndexes: ["matchKey_1"]}},
 });

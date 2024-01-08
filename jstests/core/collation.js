@@ -269,15 +269,20 @@ assertIndexHasCollation({e: 1}, {locale: "simple"});
 
 // Test that an index with a non-simple collation contains collator-generated comparison keys
 // rather than the verbatim indexed strings.
-coll = testDb.collation_index2;
-coll.drop();
-assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr_CA"}}));
-assert.commandWorked(coll.createIndex({b: 1}));
-assert.commandWorked(coll.insert({a: "foo", b: "foo"}));
-assert.eq(1, coll.find().collation({locale: "fr_CA"}).hint({a: 1}).returnKey().itcount());
-assert.neq("foo", coll.find().collation({locale: "fr_CA"}).hint({a: 1}).returnKey().next().a);
-assert.eq(1, coll.find().collation({locale: "fr_CA"}).hint({b: 1}).returnKey().itcount());
-assert.eq("foo", coll.find().collation({locale: "fr_CA"}).hint({b: 1}).returnKey().next().b);
+if (!TestData.isCursorHintsToQuerySettings) {
+    // This guard excludes this test case from being run on the cursor_hints_to_query_settings
+    // suite. The suite replaces cursor hints with query settings. Query settings do not force
+    // indexes, and therefore empty filter will result in collection scans.
+    coll = testDb.collation_index2;
+    coll.drop();
+    assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr_CA"}}));
+    assert.commandWorked(coll.createIndex({b: 1}));
+    assert.commandWorked(coll.insert({a: "foo", b: "foo"}));
+    assert.eq(1, coll.find().collation({locale: "fr_CA"}).hint({a: 1}).returnKey().itcount());
+    assert.neq("foo", coll.find().collation({locale: "fr_CA"}).hint({a: 1}).returnKey().next().a);
+    assert.eq(1, coll.find().collation({locale: "fr_CA"}).hint({b: 1}).returnKey().itcount());
+    assert.eq("foo", coll.find().collation({locale: "fr_CA"}).hint({b: 1}).returnKey().next().b);
+}
 
 // Test that a query with a string comparison can use an index with a non-simple collation if it
 // has a matching collation.
@@ -670,16 +675,25 @@ assert.commandWorked(coll.dropIndexes());
 
 // Find should return correct results when collation specified and compatible partial index
 // exists.
-assert.commandWorked(coll.createIndex(
-    {str: 1},
-    {partialFilterExpression: {str: {$lte: "FOO"}}, collation: {locale: "en_US", strength: 2}}));
-assert.eq(
-    1, coll.find({str: "foo"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount());
-assert.commandWorked(coll.insert({_id: 3, str: "goo"}));
-assert.eq(
-    0, coll.find({str: "goo"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount());
-assert.commandWorked(coll.remove({_id: 3}));
-assert.commandWorked(coll.dropIndexes());
+if (!TestData.isCursorHintsToQuerySettings) {
+    // This guard excludes this test case from being run on cursor_hints_to_query_settings suite.
+    // The suite replaces cursor hints with query settings. Query settings do not force
+    // partial/sparse indexes with incomplete result sets as described in SERVER-26413, and as such
+    // will yield different results.
+    assert.commandWorked(coll.createIndex({str: 1}, {
+        partialFilterExpression: {str: {$lte: "FOO"}},
+        collation: {locale: "en_US", strength: 2}
+    }));
+    assert.eq(
+        1,
+        coll.find({str: "foo"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount());
+    assert.commandWorked(coll.insert({_id: 3, str: "goo"}));
+    assert.eq(
+        0,
+        coll.find({str: "goo"}).collation({locale: "en_US", strength: 2}).hint({str: 1}).itcount());
+    assert.commandWorked(coll.remove({_id: 3}));
+    assert.commandWorked(coll.dropIndexes());
+}
 
 // Queries that use a index with a non-matching collation should add a sort
 // stage if needed.

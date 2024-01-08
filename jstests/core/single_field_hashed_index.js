@@ -91,16 +91,18 @@ explain = t.find({b: {$exists: false}}).explain();
 assert(!isIxscan(db, getWinningPlan(explain.queryPlanner)), explain);
 
 // Test sparse index has smaller total items on after inserts.
-for (let i = 0; i < 10; i++) {
-    assert.commandWorked(t.insert({b: i}));
-}
-const totalb = t.find().hint(sparseIndex).toArray().length;
-assert.eq(totalb, 10, "sparse index has wrong total");
+if (!TestData.isCursorHintsToQuerySettings) {
+    for (let i = 0; i < 10; i++) {
+        assert.commandWorked(t.insert({b: i}));
+    }
+    const totalb = t.find().hint(sparseIndex).toArray().length;
+    assert.eq(totalb, 10, "sparse index has wrong total");
 
-const total = t.find().hint({"_id": 1}).toArray().length;
-const totala = t.find().hint(indexSpec).toArray().length;
-assert.eq(total, totala, "non-sparse index has wrong total");
-assert.lt(totalb, totala, "sparse index should have smaller total");
+    const total = t.find().hint({"_id": 1}).toArray().length;
+    const totala = t.find().hint(indexSpec).toArray().length;
+    assert.eq(total, totala, "non-sparse index has wrong total");
+    assert.lt(totalb, totala, "sparse index should have smaller total");
+}
 
 // Test that having arrays along the path of the index is not allowed.
 assert.commandWorked(t.createIndex({"field1.field2.0.field4": "hashed"}));

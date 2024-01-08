@@ -155,6 +155,7 @@ buildvariants:
   - name: query_stats_mongos_aggregation_passthrough
   - name: query_stats_mongos_passthrough
   - name: query_stats_passthrough
+  - name: cursor_hints_to_query_settings
 
 - &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
   <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template

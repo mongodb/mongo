@@ -142,4 +142,5 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
 OverrideHelpers.overrideRunCommand(runCommandOverride);
 
 // Always apply the override if a test spawns a parallel shell.
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/rerun_queries.js");
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/make_index_filters_into_query_settings.js");

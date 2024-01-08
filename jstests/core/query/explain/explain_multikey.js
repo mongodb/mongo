@@ -65,10 +65,15 @@ function verifyMultikeyInfoInExplainOutput(testOptions) {
     assert.eq({a: [], "b.c": [], "b.d": []}, stage.multiKeyPaths, tojson(stage));
 }
 
-verifyMultikeyInfoInExplainOutput({
-    commandObj: {find: coll.getName(), hint: keyPattern},
-    stage: "IXSCAN",
-});
+if (!TestData.isCursorHintsToQuerySettings) {
+    // This guard excludes this test case from being run on the cursor_hints_to_query_settings
+    // suite. The suite replaces cursor hints with query settings. Query settings do not force
+    // indexes, and therefore empty filter will result in collection scans.
+    verifyMultikeyInfoInExplainOutput({
+        commandObj: {find: coll.getName(), hint: keyPattern},
+        stage: "IXSCAN",
+    });
+}
 
 verifyMultikeyInfoInExplainOutput({
     commandObj: {count: coll.getName(), hint: keyPattern},

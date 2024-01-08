@@ -190,17 +190,22 @@ assertExpectedResult(findCmd, expected, kIsCovered, kNonBlockingSort);
 assert.commandWorked(coll.dropIndex({a: 1, b: 1}));
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
-findCmd = {
-    find: collName,
-    filter: {},
-    projection: {a: 1, b: 1, _id: 0},
-    collation: {locale: "en_US", strength: 3},
-    sort: {a: 1, b: 1},
-    hint: {a: 1, b: 1}
-};
+if (!TestData.isCursorHintsToQuerySettings) {
+    // This guard excludes this test case from being run on the cursor_hints_to_query_settings
+    // suite. The suite replaces cursor hints with query settings. Query settings do not force
+    // indexes, and therefore empty filter will result in collection scans.
+    findCmd = {
+        find: collName,
+        filter: {},
+        projection: {a: 1, b: 1, _id: 0},
+        collation: {locale: "en_US", strength: 3},
+        sort: {a: 1, b: 1},
+        hint: {a: 1, b: 1}
+    };
 
-expected = [{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "a"}, {a: 1, b: "A"}, {a: 2, b: 2}];
-assertExpectedResult(findCmd, expected, kIsCovered, kBlockingSort);
+    expected = [{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "a"}, {a: 1, b: "A"}, {a: 2, b: 2}];
+    assertExpectedResult(findCmd, expected, kIsCovered, kBlockingSort);
+}
 
 // Test covered sort plan possible with non-multikey dotted field in sort key.
 assert(coll.drop());
