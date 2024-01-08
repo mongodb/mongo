@@ -50,6 +50,7 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
@@ -63,6 +64,7 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -1177,6 +1179,29 @@ TEST(BSONValidateColumn, BSONColumnBadExtendedSelector) {
         + ((block >> 8) << 8); /* original blocks */
     memcpy((char*)columnData.data + 31, &block, sizeof(block));
     ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+}
+
+TEST(BSONValidateColumn, BSONColumnInterestingFuzzerInputs) {
+    std::vector<std::string> base64s = {
+        "EI8AAAAADAA=",                  // fieldname not empty
+        "CgCwCrCwsLCwsLCwsAEAAAAAAAAA",  // non-zero delta off a jstNULL
+
+        // non-zero delta off of strlength > 16
+        "BQAjAAAAIwAAAAAAAABASHM/oaGhoaGhAAH1Tq9n//8AAAAAAABASHM/oaGhoaGhAAH1Tq9n//8AAAEA"};
+
+    for (auto& base64 : base64s) {
+        std::string data = base64::decode(base64.c_str());
+
+        // Fuzzer checks that validateBSONColumn keeps us from
+        // decoding strings with structural problems (incorrect strings
+        // that handle gracefully are not currently guaranteed
+        // to fail validation)
+        try {
+            if (validateBSONColumn(data.data(), data.size()).isOK())
+                BSONColumn(data.data(), data.size()).size();
+        } catch (...) {
+        }
+    }
 }
 
 }  // namespace

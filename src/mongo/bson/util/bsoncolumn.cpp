@@ -687,10 +687,8 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder64::materialize(
         case Object:
         case Array:
         case EOO:  // EOO indicates the end of an interleaved object.
+        default:   // Unsupported type for deltas should throw an assertion
             uasserted(6785500, "Invalid delta in BSON Column encoding");
-        default:
-            // No other types use int64 and need to allocate value storage
-            MONGO_UNREACHABLE;
     }
 
     return elem.element();
@@ -720,6 +718,9 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder128::materialize(
                 auto elem = allocator.allocate(type, fieldName, last.valuesize());
                 // The first 5 bytes in binData is a count and subType, copy them from previous
                 memcpy(elem.value(), last.value(), 5);
+                uassert(8412601,
+                        "BinData length should not exceed 16 in a delta encoding",
+                        last.valuestrsize() <= 16);
                 Simple8bTypeUtil::decodeBinary(
                     lastEncodedValue, elem.value() + 5, last.valuestrsize());
                 return elem;
@@ -735,7 +736,8 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder128::materialize(
             }
             default:
                 // No other types should use int128
-                MONGO_UNREACHABLE;
+                // Unsupported type for deltas should throw an assertion
+                uasserted(8412600, "Invalid delta in BSON Column encoding");
         }
     }()
                         .element();
