@@ -40,8 +40,9 @@ executor:
     - class: CleanEveryN
       n: 20
   fixture:
-    class: MongoDFixture
+    class: ReplicaSetFixture
     mongod_options:
       set_parameters:
         enableTestCommands: 1
         featureFlagQuerySettings: true
+    num_nodes: 2
