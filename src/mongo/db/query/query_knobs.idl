@@ -47,6 +47,11 @@ enums:
         values:
             # Force the classic query engine for all queries.
             kForceClassicEngine: "forceClassicEngine"
+            # Only allow pushdown of certain agg stages to SBE including $group, $lookup,
+            # $_internalUnpackBucket, and search. If none of these stages are present and can be
+            # pushed down, fall back to the classic engine. 'featureFlagSbeFull' can override this,
+            # and allow for all supported stages to be pushed down.
+            kTrySbeRestricted: "trySbeRestricted"
             # Attempt to use SBE for eligible queries, otherwise fallback to the classic engine.
             kTrySbeEngine: "trySbeEngine"
             # Attempt to use the Bonsai optimizer and lower to SBE for eligible queries, otherwise
@@ -838,7 +843,7 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
-  
+
   internalCascadesOptimizerSampleChunks:
     description: "Controls the number of chunks to sample for CE."
     set_at: [ startup, runtime ]
@@ -904,7 +909,7 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
     test_only: true
-  
+
   internalCascadesOptimizerEnableNotPushdown:
     description: "Enables the NotPushdown optimization which attempts to remove Not nodes by pushing them down towards the leaves."
     set_at: [ startup, runtime ]
@@ -1246,7 +1251,7 @@ server_parameters:
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryEnableBooleanExpressionsSimplifier:
-    description: "Boolean expression simplifier converts filter expression into Disjunctive Normal 
+    description: "Boolean expression simplifier converts filter expression into Disjunctive Normal
      Form and applies some simplifications."
     set_at: [ startup, runtime ]
     cpp_varname: internalQueryEnableBooleanExpressionsSimplifier
@@ -1269,7 +1274,7 @@ server_parameters:
     default: 1000
 
   internalQueryMaxSizeFactorToSimplify:
-    description: "If the simplified expression is larger than the original expression's size times 
+    description: "If the simplified expression is larger than the original expression's size times
       `internalQueryMaxSizeFactorToSimplify`, the simplified one will be rejected."
     set_at: [ startup, runtime ]
     cpp_varname: internalQueryMaxSizeFactorToSimplify
@@ -1351,7 +1356,7 @@ server_parameters:
     default: 1024
     validator:
         gt: 0
-  
+
   internalQuerySlotBasedExecutionDisableTimeSeriesPushdown:
     description: "If true, the system will not push down time-series queries to the SBE execution engine."
     set_at: [ startup, runtime ]

@@ -69,6 +69,7 @@ Status QueryFrameworkControl::setFromString(StringData value, const boost::optio
     switch (newVal) {
         case QueryFrameworkControlEnum::kForceClassicEngine:
         case QueryFrameworkControlEnum::kTrySbeEngine:
+        case QueryFrameworkControlEnum::kTrySbeRestricted:
             break;
         case QueryFrameworkControlEnum::kTryBonsai:
             if (feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(

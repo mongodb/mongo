@@ -1584,7 +1584,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
  * Function which returns true if 'cq' uses features that are currently supported in SBE without
  * 'featureFlagSbeFull' being set; false otherwise.
  */
-bool shouldUseRegularSbe(const CanonicalQuery& cq) {
+bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq) {
     auto sbeCompatLevel = cq.getExpCtx()->sbeCompatibility;
     // We shouldn't get here if there are expressions in the query which are completely unsupported
     // by SBE.
@@ -1597,6 +1597,15 @@ bool shouldUseRegularSbe(const CanonicalQuery& cq) {
     if (cq.getExpCtx()->sbeCompatibility != SbeCompatibility::fullyCompatible) {
         return false;
     }
+
+    // If we can't push down any agg stages when internalQueryFrameworkControl is set to
+    // "trySbeRestricted", we return false.
+    if (QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp() ==
+            QueryFrameworkControlEnum::kTrySbeRestricted &&
+        cq.cqPipeline().empty()) {
+        return false;
+    }
+
     for (const auto& stage : cq.cqPipeline()) {
         if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage->documentSource())) {
             // Group stage wouldn't be pushed down if it's not supported in SBE.
@@ -1649,7 +1658,7 @@ attemptToGetSlotBasedExecutor(
     // (Ignore FCV check): This is intentional because we always want to use this feature once the
     // feature flag is enabled.
     const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
-    const bool canUseRegularSbe = shouldUseRegularSbe(*canonicalQuery);
+    const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery);
 
     // If 'canUseRegularSbe' is true, then only the subset of SBE which is currently on by default
     // is used by the query. If 'sbeFull' is true, then the server is configured to run any
