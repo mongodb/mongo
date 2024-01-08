@@ -526,6 +526,10 @@ they've been released.
     definition.
     * ***We do not support disabling feature flags once they have been enabled via IDL in a release
     build***.
+    * ***Feature flags must not be enabled after a branch cut if the FCV has not yet been upgraded***.
+    This is because before FCVs are upgraded on master, we will temporarily have two builds that
+    have the same version (the newly cut branch and master). If the two builds differ on which
+    feature flags are enabled, this will lead to test failures in certain multiversion suites.
     * Project team should run a full patch build against all the ! builders to minimize the impact
     on the Build Baron process.
     * If there are downstream teams that will break when this flag is enabled then enabling the
@@ -764,5 +768,7 @@ IX or X lock first, and then check the feature flag/FCV value after that point.
 * Any projects/tickets that use and enable a feature flag ***must*** leave that feature flag in the 
 codebase at least until the next major release. 
 * We do not support disabling feature flags once they have been enabled via IDL in a release build.
+* Feature flags should never be enabled in the period of time after branch cut but before FCV
+constants have been upgraded to the next version.
 * In general, tag tests that depend on a feature flag with `featureFlagXX` and `requires_fcv_yy`
 tags, where `yy` is the FCV that the feature flag is/will be enabled by default on.
