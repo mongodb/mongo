@@ -9,6 +9,7 @@ from bson import binary
 import pymongo.errors
 
 QUERY_FEATURE_NOT_ALLOWED_CODE = 224
+QUERY_STATS_NOT_ENABLED_CODE = 7373500
 
 
 class RunQueryStats(Hook):
@@ -52,5 +53,13 @@ class RunQueryStats(Hook):
             {"transformIdentifiers": {"algorithm": "hmac-sha-256", "hmacKey": self.hmac_key}})
 
     def before_test(self, test, test_report):
-        self.client.admin.command("setParameter", 1, internalQueryStatsCacheSize="0%")
-        self.client.admin.command("setParameter", 1, internalQueryStatsCacheSize="1%")
+        try:
+            # Clear out all existing entries, then reset the size cap.
+            self.client.admin.command("setParameter", 1, internalQueryStatsCacheSize="0%")
+            self.client.admin.command("setParameter", 1, internalQueryStatsCacheSize="1%")
+        except pymongo.errors.OperationFailure as err:
+            if not self.allow_feature_not_supported or err.code != QUERY_STATS_NOT_ENABLED_CODE:
+                raise err
+            else:
+                self.logger.info("Encountered an error while configuring the query stats store. "
+                                 "Query stats will not be collected for this test.")
