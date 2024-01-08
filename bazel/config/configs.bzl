@@ -185,30 +185,35 @@ build_grpc = rule(
 
 sanitize_provider = provider(
     doc = "enable selected sanitizers",
-    fields = ["type"],
+    fields = ["enabled"],
 )
 
-valid_sanitizer_values = [
-    "address",
-    "fuzzer",
-    "leak",
-    "thread",
-    "undefined",
-    "memory",
-    "disabled",
-]
+asan = rule(
+    implementation = lambda ctx: sanitize_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
 
-def sanitizer_impl(ctx):
-    sanitizer_values = ctx.build_setting_value
-    for sv in sanitizer_values:
-        if sv not in valid_sanitizer_values:
-            fail(str(ctx.label) + " sanitizer allowed to take values {" + ", ".join(valid_sanitizer_values) + "} but was set to unallowed value " + sv)
-    return sanitize_provider(type = sanitizer_values)
+fsan = rule(
+    implementation = lambda ctx: sanitize_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+lsan = rule(
+    implementation = lambda ctx: sanitize_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+msan = rule(
+    implementation = lambda ctx: sanitize_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
 
+tsan = rule(
+    implementation = lambda ctx: sanitize_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
 
-sanitize = rule(
-    implementation = sanitizer_impl,
-    build_setting = config.string_list(flag = True, repeatable = True)
+ubsan = rule(
+    implementation = lambda ctx: sanitize_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
 )
 
 # =========

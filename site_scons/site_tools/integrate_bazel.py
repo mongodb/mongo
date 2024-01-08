@@ -27,6 +27,15 @@ _SUPPORTED_PLATFORM_MATRIX = [
     "macos:arm64:clang",
 ]
 
+_SANITIZER_MAP = {
+    "address": "asan",
+    "fuzzer": "fsan",
+    "memory": "msan",
+    "leak": "lsan",
+    "thread": "tsan",
+    "undefined": "ubsan",
+}
+
 
 class Globals:
 
@@ -431,7 +440,7 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         if sanitizer_option is not None:
             options = sanitizer_option.split(",")
-            formatted_options = [f'--//bazel/config:sanitize={opt}' for opt in options]
+            formatted_options = [f'--//bazel/config:{_SANITIZER_MAP[opt]}=True' for opt in options]
             bazel_internal_flags.extend(formatted_options)
 
         if normalized_os != "linux" or normalized_arch not in ["arm64", 'amd64']:

@@ -10,7 +10,12 @@ load(
     "use_wait_for_debugger",
     "use_disable_ref_track",
     "use_ocsp_stapling",
-    "sanitize",
+    "asan",
+    "fsan",
+    "lsan",
+    "msan",
+    "tsan",
+    "ubsan",
     "use_wiredtiger",
     "build_grpc",
     "separate_debug",
@@ -453,57 +458,129 @@ config_setting(
 # sanitizer options
 # --------------------------------------
 
-sanitize(
-    name = "sanitize",
-    build_setting_default = ["disabled"],
+# ------ address sanitizer --------
+
+asan(
+    name = "asan",
+    build_setting_default = False,
 )
 
 config_setting(
-    name = "sanitize_address",
+    name = "asan_enabled",
     flag_values = {
-        "//bazel/config:sanitize": "address",
+        "//bazel/config:asan": "True",
     },
 )
 
 config_setting(
-    name = "sanitize_fuzzer",
+    name = "asan_disabled",
     flag_values = {
-        "//bazel/config:sanitize": "fuzzer",
+        "//bazel/config:asan": "False",
+    },
+)
+
+# ------ fuzzer sanitizer --------
+
+fsan(
+    name = "fsan",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "fsan_enabled",
+    flag_values = {
+        "//bazel/config:fsan": "True",
     },
 )
 
 config_setting(
-    name = "sanitize_leak",
+    name = "fsan_disabled",
     flag_values = {
-        "//bazel/config:sanitize": "leak",
+        "//bazel/config:fsan": "False",
+    },
+)
+
+# ------ leak sanitizer --------
+
+lsan(
+    name = "lsan",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "lsan_enabled",
+    flag_values = {
+        "//bazel/config:lsan": "True",
     },
 )
 
 config_setting(
-    name = "sanitize_memory",
+    name = "lsan_disabled",
     flag_values = {
-        "//bazel/config:sanitize": "memory",
+        "//bazel/config:lsan": "False",
+    },
+)
+
+# ------ memory sanitizer --------
+
+msan(
+    name = "msan",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "msan_enabled",
+    flag_values = {
+        "//bazel/config:msan": "True",
     },
 )
 
 config_setting(
-    name = "sanitize_thread",
+    name = "msan_disabled",
     flag_values = {
-        "//bazel/config:sanitize": "thread",
+        "//bazel/config:msan": "False",
+    },
+)
+
+# ------ thread sanitizer --------
+
+tsan(
+    name = "tsan",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "tsan_enabled",
+    flag_values = {
+        "//bazel/config:tsan": "True",
     },
 )
 
 config_setting(
-    name = "sanitize_undefined",
+    name = "tsan_disabled",
     flag_values = {
-        "//bazel/config:sanitize": "undefined",
+        "//bazel/config:tsan": "False",
+    },
+)
+
+# ------ undefined sanitizer --------
+
+ubsan(
+    name = "ubsan",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "ubsan_enabled",
+    flag_values = {
+        "//bazel/config:ubsan": "True",
     },
 )
 
 config_setting(
-     name = "sanitize_disabled",
+    name = "ubsan_disabled",
     flag_values = {
-        "//bazel/config:sanitize": "disabled",
+        "//bazel/config:ubsan": "False",
     },
 )
 
@@ -511,13 +588,38 @@ config_setting(
 # ----------- computed sanitizer flags -------
 
 selects.config_setting_group(
-    name = "sanitize_address_build_mode",
+    name = "sanitize_build_mode",
     match_any = [":opt_on", ":opt_debug"],
 )
 
 selects.config_setting_group(
+    name = "all_sanitizer_required_settings",
+    match_all = [":sanitize_build_mode", ":compiler_type_clang"]
+)
+
+selects.config_setting_group(
+    name = "any_enabled_sanitizer",
+    match_any = [":asan_enabled", ":fsan_enabled", ":msan_enabled", ":lsan_enabled", ":tsan_enabled", ":ubsan_enabled"],
+)
+
+selects.config_setting_group(
+    name = "no_enabled_sanitizer",
+    match_all = [":asan_disabled", ":fsan_disabled", ":msan_disabled", ":lsan_disabled", ":tsan_disabled", ":ubsan_disabled"],
+)
+
+selects.config_setting_group(
+    name = "any_sanitizer_required_setting",
+    match_all = [":any_enabled_sanitizer", ":all_sanitizer_required_settings"],
+)
+
+selects.config_setting_group(
     name = "sanitize_address_required_settings",
-    match_all = [":sanitize_address", ":system_allocator", ":sanitize_address_build_mode", ":compiler_type_clang"],
+    match_all = [":asan_enabled", ":system_allocator"],
+)
+
+selects.config_setting_group(
+    name = "sanitize_memory_required_settings",
+    match_all = [":msan_enabled", ":system_allocator"],
 )
 
 # --------------------------------------

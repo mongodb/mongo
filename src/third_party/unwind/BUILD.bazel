@@ -56,7 +56,7 @@ mongo_cc_library(
         "dist/src/mi/Lset_reg.c",
         "dist/src/mi/mempool.c",
         "dist/src/mi/strerror.c",
-    ] + 
+    ] +
     select({
         "@platforms//os:linux": ["dist/src/os-linux.c"]
     }) +
@@ -190,5 +190,5 @@ mongo_cc_library(
         "HAVE_CONFIG_H",
         # Grant access to nonstandard gnu c functions, which the dist autoconf build script is also setting.
         "_GNU_SOURCE",
-    ]
+    ],
 )

@@ -16,9 +16,9 @@ load("//bazel:separate_debug.bzl", "extract_debuginfo" , "WITH_DEBUG_SUFFIX")
 # /INCREMENTAL: NO - disable incremental link - avoid the level of indirection for function calls
 
 # /pdbpagesize:16384
-#     windows non optimized builds will cause the PDB to blow up in size, 
+#     windows non optimized builds will cause the PDB to blow up in size,
 #     this allows a larger PDB. The flag is undocumented at the time of writing
-#     but the microsoft thread which brought about its creation can be found here: 
+#     but the microsoft thread which brought about its creation can be found here:
 #     https://developercommunity.visualstudio.com/t/pdb-limit-of-4-gib-is-likely-to-be-a-problem-in-a/904784
 #
 #     Without this flag MSVC will report a red herring error message, about disk space or invalid path.
@@ -85,23 +85,38 @@ LIBUNWIND_DEFINES = select({
     "//conditions:default": [],
 })
 
-ADDRESS_SANITIZER_ERROR_MESSAGE = (
+REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE = (
     "\nError:\n" +
-    "    address sanitizer requires these configurations:\n"+
+    "    any sanitizer requires these configurations:\n"+
     "    --//bazel/config:compiler_type=clang\n" +
-    "    --//bazel/config:allocator=system\n" +
     "    --//bazel/config:build_mode=opt_on [OR] --//bazel/config:build_mode=opt_debug"
 )
 
+# -fno-omit-frame-pointer should be added if any sanitizer flag is used by user
+ANY_SANITIZER_AVAILABLE_COPTS = select({
+    "//bazel/config:no_enabled_sanitizer": [],
+    "//bazel/config:any_sanitizer_required_setting": ["-fno-omit-frame-pointer"],
+},
+no_match_error = REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE)
+
+
+ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE = (
+    "\nError:\n" +
+    "    address and memory sanitizers require these configurations:\n"+
+    "    --//bazel/config:allocator=system\n"
+)
+
 ADDRESS_SANITIZER_COPTS = select({
-    ("//bazel/config:sanitize_address_required_settings"): ["-fsanitize=address", "-fno-omit-frame-pointer"],
-    ("//bazel/config:sanitize_disabled"): [],
-}, no_match_error = ADDRESS_SANITIZER_ERROR_MESSAGE)
+    ("//bazel/config:sanitize_address_required_settings"): ["-fsanitize=address"],
+    "//bazel/config:asan_disabled": [],
+}
+, no_match_error = ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE)
 
 ADDRESS_SANITIZER_LINKFLAGS = select({
     ("//bazel/config:sanitize_address_required_settings"): ["-fsanitize=address"],
-    ("//bazel/config:sanitize_disabled"): [],
-}, no_match_error = ADDRESS_SANITIZER_ERROR_MESSAGE)
+    "//bazel/config:asan_disabled": [],
+}
+, no_match_error = ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE)
 
 # Unfortunately, abseil requires that we make these macros
 # (this, and THREAD_ and UNDEFINED_BEHAVIOR_ below) set,
@@ -110,8 +125,24 @@ ADDRESS_SANITIZER_LINKFLAGS = select({
 # basically pervasive via the 'base' library.
 ADDRESS_SANITIZER_DEFINES = select({
     ("//bazel/config:sanitize_address_required_settings"): ["ADDRESS_SANITIZER"],
-    ("//bazel/config:sanitize_disabled"): [],
-}, no_match_error = ADDRESS_SANITIZER_ERROR_MESSAGE)
+    "//bazel/config:asan_disabled": [],
+}
+, no_match_error = ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE)
+
+# Makes it easier to debug memory failures at the cost of some perf: -fsanitize-memory-track-origins
+MEMORY_SANITIZER_COPTS = select({
+    ("//bazel/config:sanitize_memory_required_settings"): ["-fsanitize=memory", "-fsanitize-memory-track-origins"],
+    ("//bazel/config:msan_disabled"): [],
+}
+, no_match_error = ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE)
+
+# Makes it easier to debug memory failures at the cost of some perf: -fsanitize-memory-track-origins
+MEMORY_SANITIZER_LINKFLAGS = select({
+    ("//bazel/config:sanitize_memory_required_settings"): ["-fsanitize=memory"],
+    ("//bazel/config:msan_disabled"): [],
+}
+, no_match_error = ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE)
+
 
 SEPARATE_DEBUG_ENABLED = select({
     "//bazel/config:separate_debug_enabled": True,
@@ -240,9 +271,10 @@ def mongo_cc_library(
         deps = all_deps,
         visibility = visibility,
         testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + ADDRESS_SANITIZER_COPTS + copts + fincludes_copt,
+        copts = MONGO_GLOBAL_COPTS + ANY_SANITIZER_AVAILABLE_COPTS + ADDRESS_SANITIZER_COPTS + MEMORY_SANITIZER_COPTS + copts + fincludes_copt,
         data = data,
         tags = tags,
+        linkopts = ADDRESS_SANITIZER_LINKFLAGS + MEMORY_SANITIZER_LINKFLAGS + linkopts,
         linkstatic = select({
             "@platforms//os:windows": True,
             "//conditions:default": linkstatic,
@@ -299,9 +331,10 @@ def mongo_cc_binary(
         deps = all_deps,
         visibility = visibility,
         testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + ADDRESS_SANITIZER_COPTS + copts + fincludes_copt,
+        copts = MONGO_GLOBAL_COPTS + ANY_SANITIZER_AVAILABLE_COPTS + ADDRESS_SANITIZER_COPTS + MEMORY_SANITIZER_COPTS + copts + fincludes_copt,
         data = data,
         tags = tags,
+        linkopts = ADDRESS_SANITIZER_LINKFLAGS + MEMORY_SANITIZER_LINKFLAGS + linkopts,
         linkstatic = select({
             "@platforms//os:windows": True,
             "//conditions:default": linkstatic,
