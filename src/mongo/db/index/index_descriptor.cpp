@@ -171,12 +171,10 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     const IndexCatalogEntry* existingIndex) const {
     auto existingIndexDesc = existingIndex->descriptor();
 
-    //btree index check, avoid create duplicate btree indexes, Avoid affecting performance by the deplicate index.
+    //btree index check, avoid creating duplicate btree indexes.
     //for example:
-    // add two index: db.collection.createIndex({a:1}) and db.collection.createIndex({a:11})
-    // the tow index are actually the same, One of them is a useless index, but it can affect the insert performance.
-    //
-    // In addition, They also affecting query performance because both are candidate indexes.
+    // Add two indexes: db.collection.createIndex({a:1}) and db.collection.createIndex({a:11})
+    // The two indexes are actually the same, One of them is a useless index
     auto dealBtreeKeyPattern = [&](const BSONObj& indexKeyPattern) {
         if (getIndexType() != INDEX_BTREE) {
              return indexKeyPattern;
@@ -205,7 +203,7 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     BSONObj newKeyPattern = dealBtreeKeyPattern(keyPattern());
 
     // We first check whether the key pattern is identical for both indexes.
-    if (SimpleBSONObjComparator::kInstance.evaluate(newKeyPattern =
+    if (SimpleBSONObjComparator::kInstance.evaluate(newKeyPattern ==
                                                     existingIndexDesc->keyPattern())) {
         return Comparison::kDifferent;
     }
