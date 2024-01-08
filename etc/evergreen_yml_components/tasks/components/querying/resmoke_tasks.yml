@@ -9,6 +9,7 @@ variables:
 # - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/field_level_encryption/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/querying/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/components/replication/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/security/resmoke_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &task_template

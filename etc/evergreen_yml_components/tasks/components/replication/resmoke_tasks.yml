@@ -2,6 +2,27 @@
 #             Variable                #
 #######################################
 variables:
+# Used when the tests it runs depend only on mongod, mongos, the jstestshell and the tools.
+# THIS HAS COPIES IN
+# - etc/evergreen_yml_components/definitions.yml
+# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/components/field_level_encryption/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/components/querying/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/components/replication/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/components/security/resmoke_tasks.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &task_template
+  name: template
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --help
+      resmoke_jobs_max: 0  # No cap on number of jobs.
+
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
@@ -132,3 +153,177 @@ tasks:
       vars:
         use_large_distro: "true"
         resmoke_jobs_max: 1
+
+- <<: *gen_task_template
+  name: replica_sets_jscore_multiversion_gen
+  tags: ["assigned_to_component_replication", "multiversion", "multiversion_passthrough"]
+  commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      replica_sets_jscore_passthrough_last_continuous_new_new_old: last_continuous
+      replica_sets_jscore_passthrough_last_continuous_new_old_new: last_continuous
+      replica_sets_jscore_passthrough_last_continuous_old_new_new: last_continuous
+      replica_sets_jscore_passthrough_last_lts_new_new_old: last_lts
+      replica_sets_jscore_passthrough_last_lts_new_old_new: last_lts
+      replica_sets_jscore_passthrough_last_lts_old_new_new: last_lts
+  - func: "generate resmoke tasks"
+    vars:
+      suite: replica_sets_jscore_passthrough
+      run_no_feature_flag_tests: "true"
+
+- <<: *gen_task_template
+  name: replica_sets_reconfig_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+  tags: ["assigned_to_component_replication"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: replica_sets_api_version_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      fallback_num_sub_suites: 5
+
+- <<: *gen_task_template
+  name: replica_sets_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "replica_sets", "common", "san", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *task_template
+  name: replica_sets_large_txns_format_jscore_passthrough
+  tags: ["assigned_to_component_replication", "replica_sets", "multi_oplog", "large", "non_maj_read", "san"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
+  name: replica_sets_multi_stmt_txn_jscore_passthrough
+  tags: ["assigned_to_component_replication", "replica_sets", "large"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *gen_task_template
+  name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "replica_sets", "non_maj_read"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "replica_sets", "non_maj_read", "non_live_record"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *task_template
+  name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
+  tags: ["assigned_to_component_replication", "replica_sets", "non_maj_read"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *gen_task_template
+  name: replica_sets_initsync_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "replica_sets", "san", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: replica_sets_uninitialized_fcv_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "replica_sets", "san", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: replica_sets_fcbis_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "replica_sets", "fcbis", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_args: --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: replica_sets_initsync_static_jscore_passthrough
+  tags: ["assigned_to_component_replication", "replica_sets", "san", "large"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *gen_task_template
+  name: replica_sets_kill_primary_jscore_passthrough_gen
+  tags: ["assigned_to_component_replication", "replica_sets", "large", "non_maj_read", "non_live_record"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *task_template
+  name: replica_sets_terminate_primary_jscore_passthrough
+  tags: ["assigned_to_component_replication", "replica_sets", "large", "non_maj_read"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
+  name: replica_sets_kill_secondaries_jscore_passthrough
+  tags: ["assigned_to_component_replication", "replica_sets", "san", "large", "non_live_record", "ignore_on_code_coverage"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *gen_task_template
+  name: replica_sets_jscore_passthrough_with_auto_bootstrap_and_replica_set_endpoint_gen
+  tags: ["assigned_to_component_replication"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: replica_sets_gen
+  tags: ["assigned_to_component_replication", "replica_sets", "san", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: replica_sets_max_mirroring_large_txns_format_gen
+  tags: ["assigned_to_component_replication"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: replica_sets_auth_gen
+  tags: ["assigned_to_component_replication", "replica_sets", "common", "san", "auth", "no_debug_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: replica_sets_multiversion_gen
+  tags: ["assigned_to_component_replication", "random_multiversion_ds", "multiversion"]
+  commands:
+  - func: "initialize multiversion tasks"
+    vars:
+      replica_sets_last_lts: last_lts
+      replica_sets_last_continuous: last_continuous
+  - func: "generate resmoke tasks"
+    vars:
+      suite: replica_sets
+      run_no_feature_flag_tests: "true"
