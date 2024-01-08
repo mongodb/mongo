@@ -28,7 +28,6 @@ export var disconnectSecondaries;
 export var reconnectSecondaries;
 export var createRstArgs;
 export var createRst;
-export var waitUntilAllNodesHavePrimaryConfig;
 
 var count = 0;
 var w = 0;
@@ -894,25 +893,4 @@ createRst = function(rstArgs, retryOnRetryableErrors) {
             throw e;
         }
     }
-};
-
-/**
- * Wait until all the nodes in a replica set have the same config as the primary.  This means
- * term and version must match as well as content.
- */
-waitUntilAllNodesHavePrimaryConfig = function(replSet) {
-    let primaryConfig = replSet.getReplSetConfigFromNode();
-    replSet.nodes.forEach(function(node) {
-        assert.soon(function() {
-            try {
-                const nodeConfig = replSet.getReplSetConfigFromNode(node.nodeId);
-                return tojson(nodeConfig) == tojson(primaryConfig);
-            } catch (e) {
-                if (e.toString().includes("network error while attempting to run command")) {
-                    return false;
-                }
-                throw e;
-            }
-        });
-    });
 };
