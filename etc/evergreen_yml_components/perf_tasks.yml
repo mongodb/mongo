@@ -105,6 +105,10 @@ functions:
 tasks:
   ###
   # Same in every DSI project
+  - name: generate_all_variant_auto_tasks
+    priority: 5
+    commands:
+      - func: f_generate_all_variant_auto_tasks
   - name: schedule_global_auto_tasks
     priority: 5
     commands:

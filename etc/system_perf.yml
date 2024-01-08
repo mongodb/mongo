@@ -22,49 +22,33 @@ variables:
   _real_compile_amazon2: &_compile_amazon2
     - name: compile
       variant: compile-amazon2
-    - name: schedule_global_auto_tasks
-      variant: task_generation
   _real_compile_rhel70: &_compile_rhel70
     - name: compile
       variant: compile-rhel70
-    - name: schedule_global_auto_tasks
-      variant: task_generation
   _real_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
     - name: compile
       variant: compile-amazon-linux2-arm64
-    - name: schedule_global_auto_tasks
-      variant: task_generation
   _real_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
     - name: compile
       variant: compile-amazon-linux2-arm64
     - name: compile_mongocrypt_shlib
       variant: compile-amazon-linux2-arm64-mongocrypt-shlib
-    - name: schedule_global_auto_tasks
-      variant: task_generation
   _real_compile_amazon2_streams: &_compile_amazon2_streams
     - name: compile
       variant: compile-amazon2-streams
-    - name: schedule_global_auto_tasks
-      variant: task_generation
   _real_compile_al2023_arm64: &_compile_al2023_arm64
     - name: compile
       variant: compile-al2023-arm64
-    - name: schedule_global_auto_tasks
-      variant: task_generation
   _real_compile_al2023_arm64_with_mongocrypt_shlib: &_compile_al2023_arm64_with_mongocrypt_shlib
     - name: compile
       variant: compile-al2023-arm64
     - name: compile_mongocrypt_shlib
       variant: compile-al2023-arm64-mongocrypt-shlib
-    - name: schedule_global_auto_tasks
-      variant: task_generation
   _real_compile_mixed_amazon_linux2_al2023_arm64: &_compile_mixed_amazon_linux2_al2023_arm64
     - name: compile
       variant: compile-amazon-linux2-arm64
     - name: compile
       variant: compile-al2023-arm64
-    - name: schedule_global_auto_tasks
-      variant: task_generation
 
   _real_expansions: &_expansion_updates []
   ###
@@ -72,23 +56,17 @@ variables:
   ###
   # **Or**: Leave this section uncommented to bypass/skip compile.
   #  _skip_compile_amazon2: &_compile_amazon2
-  #      - name: schedule_global_auto_tasks
-  #        variant: task_generation
+  #      []
   #  _skip_compile_rhel70: &_compile_rhel70
-  #      - name: schedule_global_auto_tasks
-  #        variant: task_generation
+  #      []
   #  _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
-  #     - name: schedule_global_auto_tasks
-  #       variant: task_generation
+  #     []
   #  _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
-  #     - name: schedule_global_auto_tasks
-  #       variant: task_generation
+  #     []
   #  _skip_compile_amazon2_streams: &_compile_amazon2_streams
-  #     - name: schedule_global_auto_tasks
-  #       variant: task_generation
+  #     []
   #  _skip_compile_al2023_arm64: &_compile_al2023_arm64
-  #     - name: schedule_global_auto_tasks
-  #       variant: task_generation
+  #     []
   #  _skip_expansions: &_expansion_updates
   #      # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9
   #      - key: mdb_binary_for_client
@@ -113,6 +91,13 @@ variables:
     - py-tpcc
     - PrivateWorkloads
     - flamegraph
+
+  _schedule_variant_auto_tasks_task: &schedule_variant_auto_tasks_task
+    name: schedule_variant_auto_tasks
+    activate: false
+    depends_on:
+      - name: schedule_global_auto_tasks
+        variant: task_generation
 
 modules:
   ###
@@ -312,6 +297,40 @@ functions:
     # Can't be empty so just `echo`.
     - command: shell.exec
       params: {script: "echo"}
+
+  f_generate_all_variant_auto_tasks:
+    - command: git.get_project
+      params:
+        directory: *src_dir
+        revisions:
+          dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          linkbench: ${linkbench_rev}
+          linkbench2: ${linkbench2_rev}
+          tsbs: ${tsbs_rev}
+          workloads: ${workloads_rev}
+          mongo-perf: ${mongo-perf_rev}
+          YCSB: ${YCSB_rev}
+          py-tpcc: ${py-tpcc_rev}
+          PrivateWorkloads: ${PrivateWorkloads_rev}
+    - command: expansions.write
+      params:
+        file: ./expansions.yml
+    - command: shell.exec
+      params:
+        # The script below makes sure that if we generate all tasks in a patch, we will only generate
+        # them and not run all of them, since activating all tasks is the default behavior for task
+        # generation in a patch.
+        script: |
+          if [ "${is_patch|false}" = "true" ]; then
+            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf.yml --no-activate
+          else
+            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf.yml
+          fi
+    - command: generate.tasks
+      params:
+        files:
+          - build/TaskJSON/Tasks.json
 
   ###
   # Prepares the environment before compiling the binaries
@@ -962,6 +981,8 @@ buildvariants:
     run_on:
       - amazon2-build
     tasks:
+      - name: generate_all_variant_auto_tasks
+        activate: true
       - name: schedule_global_auto_tasks
 
   ###
@@ -1276,7 +1297,7 @@ buildvariants:
     depends_on: *_compile_amazon2
     tasks: &classic_engine_tasks
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: ycsb_60GB.long
@@ -1334,7 +1355,7 @@ buildvariants:
     depends_on: *_compile_amazon2
     tasks: &classic_engine_1nodereplset_tasks
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: linkbench
       - name: linkbench2
       - name: snapshot_reads
@@ -1379,7 +1400,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: bestbuy_4_analytics
       - name: bestbuy_4_analytics_columnstore
       - name: bestbuy_4_inserts
@@ -1429,7 +1450,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: tpcc
@@ -1459,7 +1480,7 @@ buildvariants:
     depends_on: *_compile_al2023_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: ycsb_60GB
       # TODO: Turn on with Python3 py-tpcc support (PERF-4758)
@@ -1489,15 +1510,11 @@ buildvariants:
     depends_on:
       - name: compile
         variant: compile-amazon2
-      - name: schedule_global_auto_tasks
-        variant: task_generation
       - name: compile
         variant: compile-amazon-linux2-arm64
-      - name: schedule_global_auto_tasks
-        variant: task_generation
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: tpcc
       - name: linkbench2
@@ -1523,15 +1540,11 @@ buildvariants:
     depends_on:
       - name: compile
         variant: compile-amazon2
-      - name: schedule_global_auto_tasks
-        variant: task_generation
       - name: compile
         variant: compile-amazon-linux2-arm64
-      - name: schedule_global_auto_tasks
-        variant: task_generation
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
         cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
       - name: ycsb_60GB
@@ -1559,12 +1572,8 @@ buildvariants:
     run_on:
       - "rhel70-perf-atlas-large"
     depends_on:
-      - name: schedule_global_auto_tasks
-        variant: task_generation
       - name: compile
         variant: compile-amazon-linux2-arm64
-      - name: schedule_global_auto_tasks
-        variant: task_generation
     tasks:
       - name: locust_bulk_insert
 
@@ -1589,15 +1598,11 @@ buildvariants:
     depends_on:
       - name: compile
         variant: compile-amazon2
-      - name: schedule_global_auto_tasks
-        variant: task_generation
       - name: compile
         variant: compile-rhel70
-      - name: schedule_global_auto_tasks
-        variant: task_generation
     tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: tpcc
@@ -1634,7 +1639,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks: &standalonetasks
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: dsi_integ_test_run_command_simple
       - name: smoke_test
       - name: canaries_only
@@ -1684,7 +1689,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: ycsb_60GB.long
@@ -1731,7 +1736,7 @@ buildvariants:
     depends_on: *_compile_amazon2_streams
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: stream_workloads
 
   - name: linux-standalone-classic-query-engine.2022-11
@@ -1794,7 +1799,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks: &bonsai_standalone_tasks
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
 
   - name: linux-intel-standalone-sampling-bonsai
     display_name: Linux Intel Standalone (Bonsai with Sampling CE)
@@ -1873,7 +1878,7 @@ buildvariants:
     depends_on: *_compile_amazon2
     tasks: &bonsai_1nodereplset_tasks
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: linkbench2
       - name: snapshot_reads
 
@@ -1996,7 +2001,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: linkbench
       - name: linkbench2
 
@@ -2020,7 +2025,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks: &1nodetasks
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: ycsb_60GB.long
@@ -2124,7 +2129,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks: &audit-tasks
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: crud_workloads_majority
       - name: smoke_test
@@ -2190,7 +2195,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64_with_mongocrypt_shlib
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: medical_workload_diagnosis_50_50_high_value
         cron: *high-value-workload-cron
       - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
@@ -2238,7 +2243,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64_with_mongocrypt_shlib
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: linkbench
 
@@ -2262,7 +2267,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: smoke_test
       - name: ycsb_60GB
@@ -2288,7 +2293,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: smoke_test
       - name: ycsb_60GB
@@ -2314,7 +2319,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: smoke_test
       - name: ycsb_60GB
@@ -2340,7 +2345,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: crud_workloads_majority
       - name: crud_workloads_w1
       - name: smoke_test
@@ -2368,7 +2373,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks: &linux_3_shard_tasks
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: industry_benchmarks_w1
       - name: crud_workloads_majority
@@ -2412,7 +2417,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: industry_benchmarks_w1
 
@@ -2456,9 +2461,9 @@ buildvariants:
     run_on:
       - "rhel70-perf-shard-lite"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks: &shardlitetasks
+    tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: bestbuy_agg
       - name: bestbuy_agg_merge_different_db
       - name: bestbuy_agg_merge_same_db
@@ -2499,9 +2504,9 @@ buildvariants:
     run_on:
       - "rhel70-perf-shard-lite"
     depends_on: *_compile_amazon2
-    tasks: &shardlitetasks
+    tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: mongos_workloads
       - name: move_chunk_workloads
@@ -2528,7 +2533,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: linkbench
 
@@ -2552,7 +2557,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: change_streams_preimage_throughput
       - name: change_streams_preimage_latency
       - name: tsbs_query_sharded
@@ -2580,7 +2585,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
 
   - name: linux-3-node-replSet.2022-11
     display_name: Linux 3-Node ReplSet 2022-11
@@ -2602,7 +2607,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
         cron: *high-value-workload-cron
       - name: industry_benchmarks_w1
@@ -2693,7 +2698,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: industry_benchmarks_w1
       - name: ycsb_60GB
@@ -2763,7 +2768,7 @@ buildvariants:
     depends_on: *_compile_amazon2
     tasks: &3node-intel-tasks
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
         cron: *high-value-workload-cron
       - name: ycsb_60GB
@@ -2824,7 +2829,7 @@ buildvariants:
     depends_on: *_compile_amazon2
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: ycsb_60GB.long
       - name: linkbench2
@@ -2878,7 +2883,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: ycsb_60GB.long
@@ -2938,7 +2943,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: ycsb_60GB.long
@@ -2998,7 +3003,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: ycsb_60GB.long
@@ -3062,7 +3067,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: crud_workloads_majority
       - name: industry_benchmarks
 
@@ -3086,7 +3091,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks_stepdowns
       - name: industry_benchmarks_rolling_restarts
       - name: industry_benchmarks_non_retryable_writes_stepdowns
@@ -3120,7 +3125,7 @@ buildvariants:
       - "rhel70-perf-replset"
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: initialsync-large
       - name: initialsync-large-fcbis
 
@@ -3144,7 +3149,7 @@ buildvariants:
       - "rhel70-perf-replset"
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
 
   - name: linux-replSet-initialsync-logkeeper.2022-11
     display_name: Linux ReplSet Initial Sync LogKeeper 2022-11
@@ -3168,7 +3173,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: initialsync-logkeeper
       - name: initialsync-logkeeper-fcbis
 
@@ -3195,7 +3200,7 @@ buildvariants:
   #   depends_on: *_compile_amazon_linux2_arm64
   #   tasks:
   #     - name: schedule_patch_auto_tasks
-  #     - name: schedule_variant_auto_tasks
+  #     - *schedule_variant_auto_tasks_task
   #     - name: initialsync-logkeeper-snapshot-update
 
   - name: linux-replSet-audit.2022-11
@@ -3218,7 +3223,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: industry_benchmarks
 
   - name: linux-replSet-auth-delay.2022-11
@@ -3241,7 +3246,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
 
   - name: linux-3-node-replSet-250mbwtcache.2023-05
     display_name: Linux 3-Node ReplSet 250 MB WiredTiger Cache 2023-05
@@ -3263,7 +3268,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
 
   - &linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-arm.2023-01
@@ -3391,7 +3396,7 @@ buildvariants:
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
-    tasks: &mirobenchmarks-all-feature-flags-tasks
+    tasks:
       - name: big_collection
       - name: genny_scale_InsertRemove
       - name: genny_execution_UserAcquisition
@@ -3432,7 +3437,7 @@ buildvariants:
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-sbe.2023-02
-    tasks: &mirobenchmarks-all-feature-flags-tasks
+    tasks:
       - name: big_collection
       - name: genny_scale_InsertRemove
       - name: genny_execution_UserAcquisition
@@ -3733,7 +3738,7 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
+      - *schedule_variant_auto_tasks_task
       - name: genny_resharding_withIndexes
 
   # Uncomment this to run resharding snapshot FCV updates automatically.
@@ -3759,5 +3764,5 @@ buildvariants:
   #   depends_on: *_compile_amazon_linux2_arm64
   #   tasks:
   #     - name: schedule_patch_auto_tasks
-  #     - name: schedule_variant_auto_tasks
+  #     - *schedule_variant_auto_tasks_task
   #     - name: resharding-3shard-snapshot-update
