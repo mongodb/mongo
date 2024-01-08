@@ -316,7 +316,7 @@ class ConstantPrinter(object):
 
     @staticmethod
     def print_sbe_value(tag, value):
-        value_print_fn = "sbe::value::print"
+        value_print_fn = "mongo::sbe::value::print"
         (print_fn_symbol, _) = gdb.lookup_symbol(value_print_fn)
         if print_fn_symbol is None:
             raise gdb.GdbError("Could not find pretty print function: " + value_print_fn)
@@ -606,10 +606,10 @@ class FieldProjectionMapPrinter(object):
             res += "<rid>: " + str(rid_proj) + ", "
         if get_boost_optional(root_proj) is not None:
             res += "<root>: " + str(root_proj) + ", "
-        # Rely on default printer for std::set, but remove the extra metadata at the start.
-        field_projections = self.val["_fieldProjections"]
-        res += "<empty>" if field_projections["size_"] == 0 else str(field_projections).split(
-            "elems  =")[-1]
+
+        # Python reformats the string with embedded "=" characters, avoid that by replacing here.
+        res += str(self.val["_fieldProjections"]).replace("=", ":").replace("{", "(").replace(
+            "}", ")")
         res += "}"
         return res
 
@@ -718,6 +718,27 @@ class ResidualRequirementPrinter(object):
         return res
 
 
+class ScanParamsPrinter(object):
+    """Pretty-printer for ScanParams."""
+
+    def __init__(self, val):
+        """Initialize ScanParamsPrinter."""
+        self.val = val
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return None
+
+    def to_string(self):
+        res = "scan_params: (fields: " + str(self.val["_fieldProjectionMap"]) + ", "
+        residual_reqs = get_boost_optional(self.val["_residualRequirements"])
+        if residual_reqs is not None:
+            res += "residual: " + str(residual_reqs)
+        res += ")"
+        return res
+
+
 class SargableNodePrinter(FixedArityNodePrinter):
     """Pretty-printer for SargableNode."""
 
@@ -730,17 +751,9 @@ class SargableNodePrinter(FixedArityNodePrinter):
         self.add_child(str(self.val["_reqMap"]).replace("\n", ""))
         self.add_child(self.print_candidate_indexes())
 
-        self.scan_params = get_boost_optional(self.val["_scanParams"])
-        if self.scan_params is not None:
-            self.add_child(self.print_scan_params())
-
-    def print_scan_params(self):
-        res = "scan_params: (proj: " + str(self.scan_params["_fieldProjectionMap"]) + ", "
-        residual_reqs = get_boost_optional(self.scan_params["_residualRequirements"])
-        if residual_reqs is not None:
-            res += "residual: " + str(residual_reqs)
-        res += ")"
-        return res
+        scan_params = get_boost_optional(self.val["_scanParams"])
+        if scan_params is not None:
+            self.add_child(scan_params)
 
     def print_candidate_indexes(self):
         res = "candidateIndexes: ["
@@ -752,13 +765,8 @@ class SargableNodePrinter(FixedArityNodePrinter):
         res += "]"
         return res
 
-    @staticmethod
-    def index_req_to_string(index_req):
-        req_map = ["Index", "Seek", "Complete"]
-        return req_map[index_req]
-
     def to_string(self):
-        return "Sargable [" + self.index_req_to_string(self.val["_target"]) + "]"
+        return "Sargable [" + strip_namespace(str(self.val["_target"])) + "]"
 
 
 class RIDIntersectNodePrinter(FixedArityNodePrinter):
@@ -1123,6 +1131,8 @@ def register_optimizer_printers(pp):
            StrongStringAliasPrinter)
     pp.add("FieldProjectionMap", f"{OPTIMIZER_NS}::FieldProjectionMap", False,
            FieldProjectionMapPrinter)
+
+    pp.add("ScanParams", f"{OPTIMIZER_NS}::ScanParams", False, ScanParamsPrinter)
 
     # Add the sub-printers for each of the possible ABT types.
     # This is the set of known ABT variants that GDB is aware of. When adding to this list, ensure

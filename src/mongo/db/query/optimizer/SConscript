@@ -204,4 +204,15 @@ env.Benchmark(
     ],
 )
 
-env.PrettyPrinterTest(target='optimizer_gdb_test.py')
+optimizer_gdb_test_program = env.Program(
+    target='optimizer_gdb_test_program',
+    source=[
+        'optimizer_gdb_test_program.cpp',
+    ],
+    LIBDEPS=['$BUILD_DIR/mongo/base', 'optimizer', 'unit_test_utils'],
+    AIB_COMPONENT='pretty-printer-tests',
+    AIB_COMPONENTS_EXTRA=['dist-test'],
+)
+optimizer_gdb_test_program_installed = env.GetAutoInstalledFiles(optimizer_gdb_test_program[0])
+
+env.PrettyPrinterTest('optimizer_gdb_test.py', TEST_PROGRAM=optimizer_gdb_test_program_installed)

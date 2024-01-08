@@ -42,7 +42,6 @@ utEnv.Library(
         '$BUILD_DIR/mongo/util/pcre_wrapper',
         '$BUILD_DIR/third_party/shim_yaml',
     ],
-    AIB_COMPONENT='unittests',
 )
 
 env.Library(
