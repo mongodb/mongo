@@ -2417,10 +2417,7 @@ tasks:
               ${python_binary|python3} ../test/suite/run.py -v 4 test_prepare_hs03.py --hook timestamp
             done
 
-  # csuite-long-running-bucket1 and csuite-long-running-bucket2 test tasks each run half of the long-running tests
-  # so that each test task completes within the 5-hour time limit
-
-  - name: csuite-long-running-bucket1
+  - name: csuite-long-running
     # Set 5 hours timeout (60 * 60 * 5)
     exec_timeout_secs: 18000
     commands:
@@ -2428,19 +2425,7 @@ tasks:
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
-          # Run the first test, and then every second test
-          extra_args: -L long_running -I 1,,2
-
-  - name: csuite-long-running-bucket2
-    # Set 5 hours timeout (60 * 60 * 5)
-    exec_timeout_secs: 18000
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "make check directory"
-        vars:
-          # Run the second test, and then every second test
-          extra_args: -L long_running -I 2,,2
+          extra_args: -L long_running -j ${num_jobs}
 
   # Break out Python unit tests into multiple buckets/tasks.  We have a fixed number of buckets,
   # and we use the -b option of the test/suite/run.py script to split up the tests.
@@ -5966,11 +5951,7 @@ buildvariants:
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-test
-    - name: csuite-long-running-bucket1
-      # Some of the long-running tests require a large instance to run successfully.
-      distros: ubuntu2004-large
-      batchtime: 1440 # once a day
-    - name: csuite-long-running-bucket2
+    - name: csuite-long-running
       # Some of the long-running tests require a large instance to run successfully.
       distros: ubuntu2004-large
       batchtime: 1440 # once a day
@@ -6025,7 +6006,7 @@ buildvariants:
       export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     # We don't run C++ memory sanitized testing as it creates false positives. MSAN also causes
     # some csuite tests to take an extended amount of time. These are excluded from the
-    # make-check-test task and are covered by the csuite-long-running-bucket1 & 2 tasks.
+    # make-check-test task and are covered by the csuite-long-running task.
     extra_args: -LE "cppsuite|long_running"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
@@ -6038,16 +6019,10 @@ buildvariants:
     - name: format-stress-pull-request-test
     - name: make-check-test
       distros: ubuntu2004-large
-      # FIXME-WT-11989 Long running test may timeout with sanitizers.
-    # - name: csuite-long-running-bucket1
-    #   # Some of the long-running tests require a large instance to run successfully.
-    #   distros: ubuntu2004-large
-    #   batchtime: 1440 # once a day
-      # FIXME-WT-11989 Long running test may timeout with sanitizers.
-    # - name: csuite-long-running-bucket2
-    #   # Some of the long-running tests require a large instance to run successfully.
-    #   distros: ubuntu2004-large
-    #   batchtime: 1440 # once a day
+    - name: csuite-long-running
+      # Some of the long-running tests require a large instance to run successfully.
+      distros: ubuntu2004-large
+      batchtime: 1440 # once a day
 
 - name: ubuntu2004-ubsan
   display_name: "! Ubuntu 20.04 UBSAN"
