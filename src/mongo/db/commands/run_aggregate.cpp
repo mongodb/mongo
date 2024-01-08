@@ -180,6 +180,7 @@ CounterMetric allowDiskUseFalseCounter("query.allowDiskUseFalse");
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterCreatingAggregationPlan);
+MONGO_FAIL_POINT_DEFINE(hangAfterAcquiringCollectionCatalog);
 
 /**
  * If a pipeline is empty (assuming that a $cursor stage hasn't been created yet), it could mean
@@ -1246,7 +1247,13 @@ Status _runAggregate(OperationContext* opCtx,
     // must never hold open storage cursors while ignoring interrupt.
     InterruptibleLockGuard interruptibleLockAcquisition(shard_role_details::getLocker(opCtx));
 
-    auto initContext = [&](auto_get_collection::ViewMode m) -> void {
+    auto catalog = CollectionCatalog::latest(opCtx);
+
+    hangAfterAcquiringCollectionCatalog.executeIf(
+        [&](const auto&) { hangAfterAcquiringCollectionCatalog.pauseWhileSet(); },
+        [&](const BSONObj& data) { return nss.coll() == data["collection"].valueStringData(); });
+
+    auto initContext = [&](auto_get_collection::ViewMode m) {
         ctx.emplace(opCtx,
                     nss,
                     AutoGetCollection::Options{}.viewMode(m).secondaryNssOrUUIDs(
@@ -1257,6 +1264,10 @@ Status _runAggregate(OperationContext* opCtx,
                                                  ctx->getNss(),
                                                  ctx->isAnySecondaryNamespaceAViewOrSharded(),
                                                  secondaryExecNssList);
+        // Return the catalog that gets implicitly stashed during the collection acquisition above,
+        // which also implicitly opened a storage snapshot. This catalog object can be potentially
+        // different than the one obtained before and will be in sync with the opened snapshot.
+        return CollectionCatalog::get(opCtx);
     };
 
     auto resetContext = [&]() -> void {
@@ -1267,7 +1278,6 @@ Status _runAggregate(OperationContext* opCtx,
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
-    auto catalog = CollectionCatalog::get(opCtx);
 
     {
         // If we are in a transaction, check whether the parsed pipeline supports being in
@@ -1315,6 +1325,9 @@ Status _runAggregate(OperationContext* opCtx,
             // Upgrade and wait for read concern if necessary.
             _adjustChangeStreamReadConcern(opCtx);
 
+            // Obtain collection locks on the execution namespace; that is, the oplog.
+            catalog = initContext(auto_get_collection::ViewMode::kViewsForbidden);
+
             // Raise an error if 'origNss' is a view. We do not need to check this if we are opening
             // a stream on an entire db or across the cluster.
             if (!origNss.isCollectionlessAggregateNS()) {
@@ -1337,8 +1350,6 @@ Status _runAggregate(OperationContext* opCtx,
             collatorToUse.emplace(std::move(collator));
             collatorToUseMatchesDefault = match;
 
-            // Obtain collection locks on the execution namespace; that is, the oplog.
-            initContext(auto_get_collection::ViewMode::kViewsForbidden);
             uassert(ErrorCodes::ChangeStreamNotEnabled,
                     "Change streams must be enabled before being used",
                     !isServerless ||
@@ -1365,7 +1376,7 @@ Status _runAggregate(OperationContext* opCtx,
                     ctx == boost::none);
         } else {
             // This is a regular aggregation. Lock the collection or view.
-            initContext(auto_get_collection::ViewMode::kViewsPermitted);
+            catalog = initContext(auto_get_collection::ViewMode::kViewsPermitted);
             auto [collator, match] = resolveCollator(opCtx,
                                                      request.getCollation().get_value_or(BSONObj()),
                                                      collections.getMainCollection());
