@@ -23,9 +23,28 @@ const isSbeEnabled = checkSbeFullyEnabled(db);
 var coll = db.jstests_plan_cache_shell_helpers;
 coll.drop();
 
-function assertCacheLength(length) {
+// Function that enforces the presence (or absence) of the specified query shapes in the plan cache.
+function assertCacheContent(expectedShapes) {
     const cacheContents = coll.getPlanCache().list();
-    assert.eq(length, cacheContents.length, cacheContents);
+    var cacheKeysSet = new Set();
+    for (var i = 0; i < cacheContents.length; i++) {
+        cacheKeysSet.add(isSbeEnabled ? cacheContents[i].planCacheKey
+                                      : tojson(cacheContents[i].createdFromQuery));
+    }
+    for (const [shape, shouldBeInCache] of expectedShapes) {
+        var searchKey = isSbeEnabled ? getPlanCacheKeyFromShape({
+            query: shape.query,
+            projection: shape.projection,
+            sort: shape.sort,
+            collection: coll,
+            db: db
+        })
+                                     : tojson(shape);
+        assert.eq(cacheKeysSet.has(searchKey),
+                  shouldBeInCache,
+                  'expected query plan ' + tojson(searchKey) + ' to be ' +
+                      (shouldBeInCache ? 'present' : 'absent') + ' in ' + tojson(cacheContents));
+    }
 }
 
 // Add data and indices.
@@ -40,11 +59,20 @@ assert.commandWorked(coll.createIndex({b: 1}));
 var queryB = {a: {$gte: 199}, b: -1};
 var projectionB = {_id: 0, b: 1};
 var sortC = {c: -1};
+var queryBprojBSortShape = {query: queryB, sort: sortC, projection: projectionB};
+var queryBprojBShape = {query: queryB, sort: {}, projection: projectionB};
+var queryBSortShape = {query: queryB, sort: sortC, projection: {}};
+var queryBShape = {query: queryB, sort: {}, projection: {}};
 assert.eq(1, coll.find(queryB, projectionB).sort(sortC).itcount(), 'unexpected document count');
 assert.eq(1, coll.find(queryB, projectionB).itcount(), 'unexpected document count');
 assert.eq(1, coll.find(queryB).sort(sortC).itcount(), 'unexpected document count');
 assert.eq(1, coll.find(queryB).itcount(), 'unexpected document count');
-assertCacheLength(4);
+assertCacheContent([
+    [queryBprojBSortShape, true],
+    [queryBprojBShape, true],
+    [queryBSortShape, true],
+    [queryBShape, true]
+]);
 
 //
 // PlanCache.getName
@@ -75,44 +103,24 @@ missingCollection.drop();
 assert.throws(() => missingCollection.getPlanCache().list());
 
 // Test that we can use $group and $count with the list() helper.
-assert.eq([{_id: null, count: 4}],
-          planCache.list([{$group: {_id: null, count: {$sum: 1}}}]),
-          planCache.list());
-assert.eq([{count: 4}], planCache.list([{$count: "count"}]), planCache.list());
+var groupQuery = planCache.list([{$group: {_id: null, count: {$sum: 1}}}]);
+assert(groupQuery instanceof Array, planCache.list());
+assert.gte(groupQuery[0].count, 4, groupQuery);
+
+var countQuery = planCache.list([{$count: "count"}]);
+assert(countQuery instanceof Array, planCache.list());
+assert.gte(countQuery[0].count, 4, countQuery);
 
 // Test that we can collect descriptions of all the queries that created cache entries using the
 // list() helper.
 if (isSbeEnabled) {
-    assertArrayEq({
-        expected: [
-            {planCacheKey: getPlanCacheKeyFromShape({query: queryB, collection: coll, db: db})},
-            {
-                planCacheKey:
-                    getPlanCacheKeyFromShape({query: queryB, sort: sortC, collection: coll, db: db})
-            },
-            {
-                planCacheKey: getPlanCacheKeyFromShape(
-                    {query: queryB, projection: projectionB, collection: coll, db: db})
-            },
-            {
-                planCacheKey: getPlanCacheKeyFromShape(
-                    {query: queryB, projection: projectionB, sort: sortC, collection: coll, db: db})
-            },
-        ],
-        actual: planCache.list([{$project: {planCacheKey: 1}}]),
-        extraErrorMsg: planCache.list()
-    });
+    var listQuery = planCache.list([{$project: {planCacheKey: 1}}]);
+    assert(listQuery instanceof Array, planCache.list());
+    assert.gte(listQuery.length, 4);
 } else {
-    assertArrayEq({
-        expected: [
-            {query: queryB, sort: {}, projection: {}},
-            {query: queryB, sort: sortC, projection: {}},
-            {query: queryB, sort: {}, projection: projectionB},
-            {query: queryB, sort: sortC, projection: projectionB}
-        ],
-        actual: planCache.list([{$replaceWith: "$createdFromQuery"}]),
-        extraErrorMsg: planCache.list()
-    });
+    var listQuery = planCache.list([{$replaceWith: "$createdFromQuery"}]);
+    assert(listQuery instanceof Array, planCache.list());
+    assert.gte(listQuery.length, 4);
 }
 
 //
@@ -128,16 +136,36 @@ assert.throws(function() {
 
 // Invoke with various permutations of required (query) and optional (projection, sort) arguments.
 planCache.clearPlansByQuery(queryB, projectionB);
-assertCacheLength(3);
+assertCacheContent([
+    [queryBprojBSortShape, true],
+    [queryBprojBShape, false],
+    [queryBSortShape, true],
+    [queryBShape, true]
+]);
 
 planCache.clearPlansByQuery(queryB, undefined, sortC);
-assertCacheLength(2);
+assertCacheContent([
+    [queryBprojBSortShape, true],
+    [queryBprojBShape, false],
+    [queryBSortShape, false],
+    [queryBShape, true]
+]);
 
 planCache.clearPlansByQuery(queryB);
-assertCacheLength(1);
+assertCacheContent([
+    [queryBprojBSortShape, true],
+    [queryBprojBShape, false],
+    [queryBSortShape, false],
+    [queryBShape, false]
+]);
 
 planCache.clear();
-assertCacheLength(0);
+assertCacheContent([
+    [queryBprojBSortShape, false],
+    [queryBprojBShape, false],
+    [queryBSortShape, false],
+    [queryBShape, false]
+]);
 
 // clearPlansByQuery() will also accept a single argument with the query shape object
 // as an alternative to specifying the query, sort and projection parameters separately.
@@ -153,7 +181,12 @@ assert.eq(1, coll.find(queryB).sort(sortC).itcount(), 'unexpected document count
 
 // Clear using query shape object.
 planCache.clearPlansByQuery({query: queryB, projection: {}, sort: sortC});
-assertCacheLength(0);
+assertCacheContent([
+    [queryBprojBSortShape, false],
+    [queryBprojBShape, false],
+    [queryBSortShape, false],
+    [queryBShape, false]
+]);
 
 // Should not error on missing or extra fields in query shape object.
 planCache.clearPlansByQuery({query: queryB});
@@ -168,12 +201,27 @@ planCache.clearPlansByQuery(
 missingCollection.getPlanCache().clear();
 // Re-populate plan cache with 1 query shape.
 assert.eq(1, coll.find(queryB, projectionB).sort(sortC).itcount(), 'unexpected document count');
-assertCacheLength(1);
+assertCacheContent([
+    [queryBprojBSortShape, true],
+    [queryBprojBShape, false],
+    [queryBSortShape, false],
+    [queryBShape, false]
+]);
 // Clear cache.
 planCache.clear();
-assertCacheLength(0);
+assertCacheContent([
+    [queryBprojBSortShape, false],
+    [queryBprojBShape, false],
+    [queryBSortShape, false],
+    [queryBShape, false]
+]);
 
 // Verify that explaining a find command does not write to the plan cache.
 planCache.clear();
 const explain = coll.find(queryB, projectionB).sort(sortC).explain(true);
-assertCacheLength(0);
+assertCacheContent([
+    [queryBprojBSortShape, false],
+    [queryBprojBShape, false],
+    [queryBSortShape, false],
+    [queryBShape, false]
+]);

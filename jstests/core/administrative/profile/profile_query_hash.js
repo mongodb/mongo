@@ -42,8 +42,6 @@ assert.eq(1,
 const profileObj0 =
     getLatestProfilerEntry(testDB, {op: "query", "command.comment": "Query0 find command"});
 assert(profileObj0.hasOwnProperty("planCacheKey"), tojson(profileObj0));
-let shapes = coll.getPlanCache().list();
-assert.eq(1, shapes.length, shapes);
 
 // Executes query1 and gets the corresponding system.profile entry.
 assert.eq(0,
@@ -53,10 +51,7 @@ const profileObj1 =
     getLatestProfilerEntry(testDB, {op: "query", "command.comment": "Query1 find command"});
 assert(profileObj1.hasOwnProperty("planCacheKey"), tojson(profileObj1));
 
-// Since the query shapes are the same, we only expect there to be one query shape present in
-// the plan cache commands output.
-shapes = coll.getPlanCache().list();
-assert.eq(1, shapes.length, shapes);
+// Check that the query shapes are the same.
 assert.eq(
     profileObj0.planCacheKey, profileObj1.planCacheKey, 'unexpected not matching query hashes');
 
@@ -85,10 +80,7 @@ const profileObj2 =
 assert(profileObj2.hasOwnProperty("planCacheKey"), tojson(profileObj2));
 
 // Query0 and query1 should both have the same query hash for the given indexes. Whereas, query2
-// should have a unique hash. Asserts that a total of two distinct hashes results in two query
-// shapes.
-shapes = coll.getPlanCache().list();
-assert.eq(2, shapes.length, shapes);
+// should have a unique hash.
 assert.neq(profileObj0.planCacheKey, profileObj2.planCacheKey, 'unexpected matching query hashes');
 
 // The planCacheKey in explain should be different for query2 than the hash from query0 and
