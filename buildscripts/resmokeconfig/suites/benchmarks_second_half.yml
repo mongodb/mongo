@@ -54,6 +54,7 @@ selector:
   - build/install/bin/window_function_percentile_bm*
   - build/install/bin/rate_limiting_bm*
   - build/install/bin/profile_filter_bm*
+  - build/install/bin/plan_cache_key_encoding_bm*
   # These benchmarks are being run as part of the benchmarks_expression*.yml
   - build/install/bin/expression_bm*
   - build/install/bin/sbe_expression_bm*

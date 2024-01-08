@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,38 +29,42 @@
 
 #include <benchmark/benchmark.h>
 #include <memory>
-#include <utility>
-#include <vector>
 
-#include <absl/container/node_hash_map.h>
-
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/bonsai_query_bm_fixture.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/abt/canonical_query_translation.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/metadata.h"
-#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/query_test_service_context.h"
 
 namespace mongo::optimizer {
 namespace {
 /**
- * Benchmarks translation from CanonicalQuery to ABT.
+ * Benchmarks parsing of BSON to CQ and encoding of CanonicalQuery to SBE PlanCacheKey.
  */
-class CanonicalQueryABTTranslate : public BonsaiQueryBenchmarkFixture {
+class CanonicalQueryParseAndEncodeSBE : public BonsaiQueryBenchmarkFixture {
 public:
-    CanonicalQueryABTTranslate() {}
+    CanonicalQueryParseAndEncodeSBE() {}
+
+    static CanonicalQuery::QueryShapeString parseAndEncode(OperationContext* opCtx,
+                                                           NamespaceString nss,
+                                                           BSONObj matchSpec,
+                                                           BSONObj projectSpec) {
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
+        findCommand->setFilter(matchSpec);
+        findCommand->setProjection(projectSpec);
+        auto cq = std::make_unique<CanonicalQuery>(
+            CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx, *findCommand),
+                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        cq->setSbeCompatible(true);
+
+        return canonical_query_encoder::encodeSBE(*cq);
+    }
 
     void benchmarkPipeline(benchmark::State& state,
                            const std::vector<BSONObj>& pipeline) override final {
-        state.SkipWithError("Find translation fixture cannot translate a pipeline");
+        state.SkipWithError("CanonicalQuery encoding fixture cannot encode a pipeline.");
         return;
     }
 
@@ -71,37 +75,14 @@ public:
         auto opCtx = testServiceContext.makeOperationContext();
         auto nss = NamespaceString::createNamespaceString_forTest("test.bm");
 
-        Metadata metadata{{}};
-        auto prefixId = PrefixId::createForTests();
-        ProjectionName scanProjName{prefixId.getNextId("scan")};
-
-        auto findCommand = std::make_unique<FindCommandRequest>(nss);
-        findCommand->setFilter(matchSpec);
-        findCommand->setProjection(projectSpec);
-        auto cq = std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-        QueryParameterMap qp;
-
-        if (!isEligibleForBonsai_forTesting(*cq).isFullyEligible()) {
-            state.SkipWithError("CanonicalQuery is not supported by CQF");
-            return;
-        }
-
         // This is where recording starts.
         for (auto keepRunning : state) {
-            benchmark::DoNotOptimize(
-                translateCanonicalQueryToABT(metadata,
-                                             *cq,
-                                             scanProjName,
-                                             make<ScanNode>(scanProjName, "collection"),
-                                             prefixId,
-                                             qp));
+            benchmark::DoNotOptimize(parseAndEncode(opCtx.get(), nss, matchSpec, projectSpec));
             benchmark::ClobberMemory();
         }
     }
 };
 
-BENCHMARK_MQL_TRANSLATION(CanonicalQueryABTTranslate)
+BENCHMARK_QUERY_ENCODING(CanonicalQueryParseAndEncodeSBE);
 }  // namespace
 }  // namespace mongo::optimizer

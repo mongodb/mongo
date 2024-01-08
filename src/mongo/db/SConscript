@@ -3043,3 +3043,16 @@ env.Benchmark(
         'server_base',
     ],
 )
+
+bmEnv = env.Clone()
+bmEnv.InjectThirdParty(libraries=["benchmark"])
+bmEnv.Library(
+    target='bonsai_query_bm_fixture',
+    source=[
+        'bonsai_query_bm_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/shim_benchmark',
+    ],
+)

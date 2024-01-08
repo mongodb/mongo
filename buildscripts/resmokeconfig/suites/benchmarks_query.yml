@@ -11,6 +11,7 @@ selector:
   - build/install/bin/shapifying_bm*
   - build/install/bin/profile_filter_bm*
   - build/install/bin/query_settings_lookup_bm*
+  - build/install/bin/plan_cache_key_encoding_bm*
 
 executor:
   config: {}

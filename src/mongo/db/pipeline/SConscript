@@ -631,12 +631,12 @@ env.Benchmark(
     source=[
         'abt/abt_fallback_mechanism_cq_bm.cpp',
         'abt/abt_fallback_mechanism_pipeline_bm.cpp',
-        'abt/abt_translate_bm_fixture.cpp',
         'abt/abt_translate_cq_bm.cpp',
         'abt/abt_translate_pipeline_bm.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/bonsai_query_bm_fixture',
         '$BUILD_DIR/mongo/db/pipeline/abt_translation',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/query/canonical_query',

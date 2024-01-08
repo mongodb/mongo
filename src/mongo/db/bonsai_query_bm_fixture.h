@@ -37,13 +37,13 @@
 
 namespace mongo {
 
-class ABTTranslateBenchmarkFixture : public benchmark::Fixture {
+class BonsaiQueryBenchmarkFixture : public benchmark::Fixture {
 public:
-    virtual void benchmarkABTTranslate(benchmark::State& state,
-                                       BSONObj matchSpec,
-                                       BSONObj projectSpec) = 0;
-    virtual void benchmarkABTTranslate(benchmark::State& state,
-                                       const std::vector<BSONObj>& pipeline) = 0;
+    virtual void benchmarkQueryMatchProject(benchmark::State& state,
+                                            BSONObj matchSpec,
+                                            BSONObj projectSpec) = 0;
+    virtual void benchmarkPipeline(benchmark::State& state,
+                                   const std::vector<BSONObj>& pipeline) = 0;
 
     void benchmarkMatch(benchmark::State& state);
     void benchmarkMatchTwoFields(benchmark::State& state);
@@ -55,6 +55,7 @@ public:
     void benchmarkMatchGtLt(benchmark::State& state);
     void benchmarkMatchIn(benchmark::State& state);
     void benchmarkMatchInLarge(benchmark::State& state);
+    void benchmarkMatchSize(benchmark::State& state);
     void benchmarkMatchElemMatch(benchmark::State& state);
     void benchmarkMatchComplex(benchmark::State& state);
 
@@ -66,6 +67,15 @@ public:
     void benchmarkProjectIncludeDepthTwo(benchmark::State& state);
     void benchmarkProjectIncludeDepthTwenty(benchmark::State& state);
 
+    void benchmarkMatchProjectExclude(benchmark::State& state);
+    void benchmarkMatchProjectInclude(benchmark::State& state);
+    void benchmarkMatchProjectIncludeTwoFields(benchmark::State& state);
+    void benchmarkMatchProjectIncludeTwentyFields(benchmark::State& state);
+
+    void benchmarkMatchProjectIncludeDepthTwo(benchmark::State& state);
+    void benchmarkMatchProjectIncludeDepthTwenty(benchmark::State& state);
+
+    void benchmarkOneStage(benchmark::State& state);
     void benchmarkTwoStages(benchmark::State& state);
     void benchmarkTwentyStages(benchmark::State& state);
 
@@ -107,6 +117,9 @@ public:
     BENCHMARK_F(Fixture, MatchInLarge)(benchmark::State & state) {                        \
         benchmarkMatchInLarge(state);                                                     \
     }                                                                                     \
+    BENCHMARK_F(Fixture, MatchSize)(benchmark::State & state) {                           \
+        benchmarkMatchSize(state);                                                        \
+    }                                                                                     \
     BENCHMARK_F(Fixture, MatchElemMatch)(benchmark::State & state) {                      \
         benchmarkMatchElemMatch(state);                                                   \
     }                                                                                     \
@@ -131,6 +144,24 @@ public:
     BENCHMARK_F(Fixture, ProjectIncludeDepthTwenty)(benchmark::State & state) {           \
         benchmarkProjectIncludeDepthTwenty(state);                                        \
     }                                                                                     \
+    BENCHMARK_F(Fixture, MatchProjectExclude)(benchmark::State & state) {                 \
+        benchmarkMatchProjectExclude(state);                                              \
+    }                                                                                     \
+    BENCHMARK_F(Fixture, MatchProjectInclude)(benchmark::State & state) {                 \
+        benchmarkMatchProjectInclude(state);                                              \
+    }                                                                                     \
+    BENCHMARK_F(Fixture, MatchProjectIncludeTwoFields)(benchmark::State & state) {        \
+        benchmarkMatchProjectIncludeTwoFields(state);                                     \
+    }                                                                                     \
+    BENCHMARK_F(Fixture, MatchProjectIncludeTwentyFields)(benchmark::State & state) {     \
+        benchmarkMatchProjectIncludeTwentyFields(state);                                  \
+    }                                                                                     \
+    BENCHMARK_F(Fixture, MatchProjectIncludeDepthTwo)(benchmark::State & state) {         \
+        benchmarkMatchProjectIncludeDepthTwo(state);                                      \
+    }                                                                                     \
+    BENCHMARK_F(Fixture, MatchProjectIncludeDepthTwenty)(benchmark::State & state) {      \
+        benchmarkMatchProjectIncludeDepthTwenty(state);                                   \
+    }                                                                                     \
     BENCHMARK_F(Fixture, MatchBitsAllClear)(benchmark::State & state) {                   \
         benchmarkMatchBitsAllClear(state);                                                \
     }                                                                                     \
@@ -148,6 +179,9 @@ public:
 // find translation.
 #define BENCHMARK_MQL_PIPELINE_TRANSLATION(Fixture)                        \
                                                                            \
+    BENCHMARK_F(Fixture, OneStage)(benchmark::State & state) {             \
+        benchmarkOneStage(state);                                          \
+    }                                                                      \
     BENCHMARK_F(Fixture, TwoStages)(benchmark::State & state) {            \
         benchmarkTwoStages(state);                                         \
     }                                                                      \
@@ -162,5 +196,67 @@ public:
     }                                                                      \
     BENCHMARK_F(Fixture, SampleThenManyStages)(benchmark::State & state) { \
         benchmarkSampleThenManyStages(state);                              \
+    }
+
+// These benchmarks cover some simple queries which are eligible for the Bonsai plan cache.
+#define BENCHMARK_QUERY_ENCODING(Fixture)                                             \
+                                                                                      \
+    BENCHMARK_F(Fixture, Match)(benchmark::State & state) {                           \
+        benchmarkMatch(state);                                                        \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchTwoFields)(benchmark::State & state) {                  \
+        benchmarkMatchTwoFields(state);                                               \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchTwentyFields)(benchmark::State & state) {               \
+        benchmarkMatchTwentyFields(state);                                            \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchDepthTwo)(benchmark::State & state) {                   \
+        benchmarkMatchDepthTwo(state);                                                \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchDepthTwenty)(benchmark::State & state) {                \
+        benchmarkMatchDepthTwenty(state);                                             \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchGtLt)(benchmark::State & state) {                       \
+        benchmarkMatchGtLt(state);                                                    \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchIn)(benchmark::State & state) {                         \
+        benchmarkMatchIn(state);                                                      \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchInLarge)(benchmark::State & state) {                    \
+        benchmarkMatchInLarge(state);                                                 \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchSize)(benchmark::State & state) {                       \
+        benchmarkMatchSize(state);                                                    \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchComplex)(benchmark::State & state) {                    \
+        benchmarkMatchComplex(state);                                                 \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectExclude)(benchmark::State & state) {             \
+        benchmarkMatchProjectExclude(state);                                          \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectInclude)(benchmark::State & state) {             \
+        benchmarkMatchProjectInclude(state);                                          \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectIncludeTwoFields)(benchmark::State & state) {    \
+        benchmarkMatchProjectIncludeTwoFields(state);                                 \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectIncludeTwentyFields)(benchmark::State & state) { \
+        benchmarkMatchProjectIncludeTwentyFields(state);                              \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectIncludeDepthTwo)(benchmark::State & state) {     \
+        benchmarkMatchProjectIncludeDepthTwo(state);                                  \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectIncludeDepthTwenty)(benchmark::State & state) {  \
+        benchmarkMatchProjectIncludeDepthTwenty(state);                               \
+    }
+
+// These benchmarks cover some simple pipelines which are eligible for the Bonsai plan cache.
+#define BENCHMARK_PIPELINE_QUERY_ENCODING(Fixture)              \
+                                                                \
+    BENCHMARK_F(Fixture, OneStage)(benchmark::State & state) {  \
+        benchmarkOneStage(state);                               \
+    }                                                           \
+    BENCHMARK_F(Fixture, TwoStages)(benchmark::State & state) { \
+        benchmarkTwoStages(state);                              \
     }
 }  // namespace mongo

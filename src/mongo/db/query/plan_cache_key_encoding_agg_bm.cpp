@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,79 +29,67 @@
 
 #include <benchmark/benchmark.h>
 #include <memory>
-#include <utility>
-#include <vector>
 
-#include <absl/container/node_hash_map.h>
-
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/bonsai_query_bm_fixture.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/abt/canonical_query_translation.h"
-#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/cqf_command_utils.h"
-#include "mongo/db/query/find_command.h"
-#include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/metadata.h"
-#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo::optimizer {
 namespace {
 /**
- * Benchmarks translation from CanonicalQuery to ABT.
+ * Benchmarks encoding of CanonicalQuery to SBE PlanCacheKey.
  */
-class CanonicalQueryABTTranslate : public BonsaiQueryBenchmarkFixture {
+class PipelineEncodeSBE : public BonsaiQueryBenchmarkFixture {
 public:
-    CanonicalQueryABTTranslate() {}
-
-    void benchmarkPipeline(benchmark::State& state,
-                           const std::vector<BSONObj>& pipeline) override final {
-        state.SkipWithError("Find translation fixture cannot translate a pipeline");
-        return;
-    }
+    PipelineEncodeSBE() {}
 
     void benchmarkQueryMatchProject(benchmark::State& state,
                                     BSONObj matchSpec,
                                     BSONObj projectSpec) override final {
+        std::vector<BSONObj> pipeline;
+        if (!matchSpec.isEmpty()) {
+            pipeline.push_back(BSON("$match" << matchSpec));
+        }
+        if (!projectSpec.isEmpty()) {
+            pipeline.push_back(BSON("$project" << projectSpec));
+        }
+        benchmarkPipeline(state, pipeline);
+    }
+
+    void benchmarkPipeline(benchmark::State& state,
+                           const std::vector<BSONObj>& pipeline) override final {
         QueryTestServiceContext testServiceContext;
         auto opCtx = testServiceContext.makeOperationContext();
-        auto nss = NamespaceString::createNamespaceString_forTest("test.bm");
+        auto expCtx = make_intrusive<ExpressionContextForTest>(
+            opCtx.get(), NamespaceString::createNamespaceString_forTest("test.bm"));
 
-        Metadata metadata{{}};
-        auto prefixId = PrefixId::createForTests();
-        ProjectionName scanProjName{prefixId.getNextId("scan")};
+        std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =
+            Pipeline::parse(pipeline, expCtx);
+        parsedPipeline->optimizePipeline();
+        parsedPipeline->parameterize();
 
-        auto findCommand = std::make_unique<FindCommandRequest>(nss);
-        findCommand->setFilter(matchSpec);
-        findCommand->setProjection(projectSpec);
-        auto cq = std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-        QueryParameterMap qp;
-
-        if (!isEligibleForBonsai_forTesting(*cq).isFullyEligible()) {
-            state.SkipWithError("CanonicalQuery is not supported by CQF");
-            return;
+        std::vector<boost::intrusive_ptr<DocumentSource>> pipelineStages;
+        for (auto&& source : parsedPipeline->getSources()) {
+            pipelineStages.emplace_back(source);
         }
 
         // This is where recording starts.
         for (auto keepRunning : state) {
             benchmark::DoNotOptimize(
-                translateCanonicalQueryToABT(metadata,
-                                             *cq,
-                                             scanProjName,
-                                             make<ScanNode>(scanProjName, "collection"),
-                                             prefixId,
-                                             qp));
+                canonical_query_encoder::encodePipeline(expCtx.get(), pipelineStages));
             benchmark::ClobberMemory();
         }
     }
 };
 
-BENCHMARK_MQL_TRANSLATION(CanonicalQueryABTTranslate)
+BENCHMARK_QUERY_ENCODING(PipelineEncodeSBE);
+BENCHMARK_PIPELINE_QUERY_ENCODING(PipelineEncodeSBE);
 }  // namespace
 }  // namespace mongo::optimizer

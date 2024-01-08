@@ -35,8 +35,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/bonsai_query_bm_fixture.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/abt/abt_translate_bm_fixture.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -49,12 +49,12 @@ namespace {
 /**
  * Benchmarks the fallback mechanism for Pipelines.
  */
-class FallBackMechanismPipelineBenchmark : public ABTTranslateBenchmarkFixture {
+class FallBackMechanismPipelineBenchmark : public BonsaiQueryBenchmarkFixture {
 public:
     FallBackMechanismPipelineBenchmark() {}
 
-    void benchmarkABTTranslate(benchmark::State& state,
-                               const std::vector<BSONObj>& pipeline) override final {
+    void benchmarkPipeline(benchmark::State& state,
+                           const std::vector<BSONObj>& pipeline) override final {
         QueryTestServiceContext testServiceContext;
         auto opCtx = testServiceContext.makeOperationContext();
 
@@ -73,9 +73,9 @@ public:
         }
     }
 
-    void benchmarkABTTranslate(benchmark::State& state,
-                               BSONObj matchSpec,
-                               BSONObj projectSpec) override final {
+    void benchmarkQueryMatchProject(benchmark::State& state,
+                                    BSONObj matchSpec,
+                                    BSONObj projectSpec) override final {
         std::vector<BSONObj> pipeline;
         if (!matchSpec.isEmpty()) {
             pipeline.push_back(BSON("$match" << matchSpec));
@@ -83,7 +83,7 @@ public:
         if (!projectSpec.isEmpty()) {
             pipeline.push_back(BSON("$project" << projectSpec));
         }
-        benchmarkABTTranslate(state, pipeline);
+        benchmarkPipeline(state, pipeline);
     }
 };
 
