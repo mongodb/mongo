@@ -90,6 +90,6 @@ config.members = [m0, m1, m2, m3, m4, m5, m6, m7];
 reconfig(replTest, config);
 // There is a chance that some nodes haven't finished reconfig, if we directly call stopSet, those
 // nodes may fail to answer certain commands and fail the test.
-waitAllNodesHaveConfig(replTest, config);
+replTest.waitForAllNewlyAddedRemovals();
 replTest.stopSet();
 })();
