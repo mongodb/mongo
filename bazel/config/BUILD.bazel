@@ -17,6 +17,7 @@ load(
     "tsan",
     "ubsan",
     "use_wiredtiger",
+    "use_libcxx",
     "build_grpc",
     "separate_debug",
 )
@@ -433,6 +434,36 @@ config_setting(
     flag_values = {
         "//bazel/config:use_wiredtiger": "True",
     },
+)
+
+# --------------------------------------
+# libc++ options
+# --------------------------------------
+
+use_libcxx(
+    name = "use_libcxx",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_libcxx_enabled",
+    flag_values = {
+        "//bazel/config:use_libcxx": "True",
+    },
+)
+
+config_setting(
+    name = "use_libcxx_disabled",
+    flag_values = {
+        "//bazel/config:use_libcxx": "False",
+    },
+)
+
+# --------------------------------------------
+# ----------- computed libc++ flags ----------
+selects.config_setting_group(
+    name = "use_libcxx_required_settings",
+    match_all = [":use_libcxx_enabled", ":compiler_type_clang"],
 )
 
 # --------------------------------------

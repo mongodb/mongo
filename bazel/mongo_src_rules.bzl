@@ -60,7 +60,26 @@ WINDOWS_RELEASE_COPTS = [
     "/Od",
 ]
 
-MONGO_GLOBAL_COPTS = ["-Isrc"] + select({
+LIBCXX_ERROR_MESSAGE = (
+    "\nError:\n" +
+    "    libc++ requires these configuration:\n"+
+    "    --//bazel/config:compiler_type=clang\n"
+)
+
+LIBCXX_COPTS = select({
+    ("//bazel/config:use_libcxx_required_settings"): ["-stdlib=libc++"],
+    ("//bazel/config:use_libcxx_disabled"): [],
+}, no_match_error = LIBCXX_ERROR_MESSAGE)
+
+LIBCXX_LINKFLAGS = LIBCXX_COPTS
+
+# TODO SERVER-54659 - ASIO depends on std::result_of which was removed in C++ 20
+LIBCXX_DEFINES = select({
+    ("//bazel/config:use_libcxx_required_settings"): ["ASIO_HAS_STD_INVOKE_RESULT"],
+    ("//bazel/config:use_libcxx_disabled"): [],
+}, no_match_error = LIBCXX_ERROR_MESSAGE)
+
+WINDOWS_COPTS = select({
     "//bazel/config:windows_dbg": WINDOWS_DBG_COPTS,
     "//bazel/config:windows_opt_on": WINDOWS_OPT_ON_COPTS,
     "//bazel/config:windows_opt_off": WINDOWS_OPT_OFF_COPTS,
@@ -70,7 +89,7 @@ MONGO_GLOBAL_COPTS = ["-Isrc"] + select({
     "//conditions:default": [],
 })
 
-MONGO_GLOBAL_DEFINES = select({
+DEBUG_DEFINES = select({
     "//bazel/config:dbg": ["MONGO_CONFIG_DEBUG_BUILD"],
     "//conditions:default": ["NDEBUG"],
 })
@@ -155,6 +174,13 @@ TCMALLOC_DEPS = select({
     "//bazel/config:auto_allocator_linux": ["//src/third_party/gperftools:tcmalloc_minimal"],
     "//conditions:default": [],
 })
+
+MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES
+
+MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS \
+                    + MEMORY_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS
+
+MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + LIBCXX_LINKFLAGS
 
 def force_includes_copt(package_name, name):
 
@@ -271,15 +297,15 @@ def mongo_cc_library(
         deps = all_deps,
         visibility = visibility,
         testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + ANY_SANITIZER_AVAILABLE_COPTS + ADDRESS_SANITIZER_COPTS + MEMORY_SANITIZER_COPTS + copts + fincludes_copt,
+        copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
         data = data,
         tags = tags,
-        linkopts = ADDRESS_SANITIZER_LINKFLAGS + MEMORY_SANITIZER_LINKFLAGS + linkopts,
+        linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
         linkstatic = select({
             "@platforms//os:windows": True,
             "//conditions:default": linkstatic,
         }),
-        local_defines = MONGO_GLOBAL_DEFINES + ADDRESS_SANITIZER_DEFINES + local_defines,
+        local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         includes = [],
     )
 
@@ -331,15 +357,15 @@ def mongo_cc_binary(
         deps = all_deps,
         visibility = visibility,
         testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + ANY_SANITIZER_AVAILABLE_COPTS + ADDRESS_SANITIZER_COPTS + MEMORY_SANITIZER_COPTS + copts + fincludes_copt,
+        copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
         data = data,
         tags = tags,
-        linkopts = ADDRESS_SANITIZER_LINKFLAGS + MEMORY_SANITIZER_LINKFLAGS + linkopts,
+        linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
         linkstatic = select({
             "@platforms//os:windows": True,
             "//conditions:default": linkstatic,
         }),
-        local_defines = MONGO_GLOBAL_DEFINES + ADDRESS_SANITIZER_DEFINES + LIBUNWIND_DEFINES + local_defines,
+        local_defines = MONGO_GLOBAL_DEFINES + LIBUNWIND_DEFINES + local_defines,
         includes = [],
     )
 
