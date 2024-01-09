@@ -56,9 +56,14 @@ constexpr inline T kInitialMax = 0;
 template <>
 constexpr inline double kInitialMax<double> = 0;
 
+template <typename T>
+constexpr inline T kInitialSummation = static_cast<T>(0);
+
 /** Arithmetic wrapper around DoubleDoubleSummation */
 class DoubleSum {
 public:
+    DoubleSum() = default;
+    DoubleSum(double sum, double addend = 0.0) : _v(DoubleDoubleSummation::create(sum, addend)) {}
     operator double() const {
         return _v.getDouble();
     }
@@ -125,7 +130,7 @@ public:
     }
 
 private:
-    Summation<T> sum{};
+    Summation<T> sum{kInitialSummation<T>};
     T max{kInitialMax<T>};
     T min{kInitialMin<T>};
 
@@ -133,7 +138,7 @@ private:
      * The sum of squares along with (an externally stored) count will allow us to compute the
      * variance/stddev.
      */
-    Summation<T> sumOfSquares{};
+    Summation<T> sumOfSquares{kInitialSummation<T>};
 };
 
 extern template void AggregatedMetric<uint64_t>::appendTo(BSONObjBuilder& builder,
