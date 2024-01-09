@@ -850,7 +850,15 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               }
           }
 
-          Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
+          // If a change collection is to be created, that is, the change streams are being enabled
+          // for a tenant, acquire exclusive tenant lock.
+          Lock::DBLock dbLock(
+              opCtx,
+              nss.dbName(),
+              MODE_IX,
+              Date_t::max(),
+              boost::make_optional(nss.tenantId() && nss.isChangeCollection(), MODE_X));
+
           if (auto idIndexElem = cmd["idIndex"]) {
               // Remove "idIndex" field from command.
               auto cmdWithoutIdIndex = cmd.removeField("idIndex");
