@@ -114,6 +114,9 @@ var ShardingTest = function ShardingTest(params) {
     // concern (5 minutes)
     const kDefaultWTimeoutMs = 5 * 60 * 1000;
 
+    // Oplog collection name
+    const kOplogName = 'oplog.rs';
+
     // Ensure we don't mutate the passed-in parameters.
     params = Object.extend({}, params, true);
 
@@ -1140,6 +1143,17 @@ var ShardingTest = function ShardingTest(params) {
      */
     ShardingTest.prototype.awaitReplicationOnShards = function() {
         this._rs.forEach(replSet => replSet.test.awaitReplication());
+    };
+
+    /**
+     * Query the oplog from a given node.
+     */
+    ShardingTest.prototype.findOplog = function(conn, query, limit) {
+        return conn.getDB('local')
+            .getCollection(kOplogName)
+            .find(query)
+            .sort({$natural: -1})
+            .limit(limit);
     };
 
     /**
