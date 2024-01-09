@@ -120,6 +120,9 @@ var ShardingTest = function(params) {
     // concern (5 minutes)
     var kDefaultWTimeoutMs = 5 * 60 * 1000;
 
+    // Oplog collection name
+    const kOplogName = 'oplog.rs';
+
     // Publicly exposed variables
 
     /**
@@ -1171,6 +1174,17 @@ var ShardingTest = function(params) {
      */
     this.refreshCatalogCacheForNs = function(node, ns) {
         node.getCollection(ns).findOne();
+    };
+
+    /**
+     * Query the oplog from a given node.
+     */
+    ShardingTest.prototype.findOplog = function(conn, query, limit) {
+        return conn.getDB('local')
+            .getCollection(kOplogName)
+            .find(query)
+            .sort({$natural: -1})
+            .limit(limit);
     };
 
     /**
