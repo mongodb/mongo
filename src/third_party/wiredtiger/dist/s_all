@@ -22,8 +22,28 @@ while len(pids):
 ' $$
 }
 
+CLRL=$'\e[K'     # Clear to the end of line.
+CLRS=$'\e[0J'    # Clear to the bottom of screen.
+BOL=$'\r'        # Move cursor to the beginning of line.
+# stty unfortunately uses stdin (not stdout) to locate the tty so have to check both.
+[[ -t 1 && -t 0 ]] && { ISTTY=1; CLRIFTTY="$CLRS"; }
+
+status() {
+    [[ -n "$ISTTY" ]] || return
+    local text="$1"
+    [[ -z "$text" ]] && { echo -n $CLRS; return; }  # Short path to just clear the status
+    local ttycols=`stty size | sed -n 's/^[0-9]* //p'`
+    [[ -z "$ttycols" || "$ttycols" -lt 1 ]] && return
+    [[ -n "$text" && $(( ${#text} % $ttycols )) -eq 0 ]] && text="$text "
+    local nlines=$(( ${#text} / $ttycols ))
+    [[ $nlines -gt 0 ]] && local UP=$'\e['"${nlines}A"
+    echo -n "$CLRS$text$BOL$UP"
+}
+
 trap '
     exitcode=$?
+    # Clear status
+    status ""
     # Kill all child processes recursively.
     kill `allchildpids` 2>/dev/null
     # Cleanup in both current and parent dir.
@@ -45,56 +65,83 @@ force=
 errmode=0
 errfound=0
 
-while :
+help() {
+    cat << _END
+Run all presubmit tests.
+Usage: $0 [... options]
+  -E                 Return an error code on failure.
+  -f                 Force versions to be updated.
+  -F                 Run fast.
+  --no-interactive   Disable interactitve terminal status.
+  -h, --help         Display this help.
+_END
+    exit $1
+}
+
+while [[ "$#" -gt 0 ]]
     do case "$1" in
-    -E)    # Return an error code on failure
+    -E)                # Return an error code on failure
         errmode=1
         shift;;
-    -f)    # Force versions to be updated
+    -f)                # Force versions to be updated
         force="-f"
         shift;;
-    -F)    # Run fast.
+    -F)                # Run fast.
         echo "dist/s_all running in fast mode..."
         fast="-F"
         shift;;
+    -h | --help) help 0;;
+    --no-interactive)   # Force disable terminal status report
+        ISTTY="" CLRIFTTY=""
+        shift;;
     *)
-        break;;
+        echo "Unknown option '$1'. Use '-h' for help."
+        exit 1;;
     esac
 done
 
-echo "Updating files that include the package version" &&
-    bash ./s_version $force
-
 errchk()
 {
-    if ! `test -s $2`; then
+    local name="$1" file="$2" flags="$3"
+
+    if [[ ! -s "$file" ]]; then
+        rm -f "$file"
         return
     fi
 
-    echo '#########' s_all run of: "$1" resulted in:$'\n'"$(cat $2)"$'\n''#########'
+    echo $CLRIFTTY'#########' s_all run of: "$name" resulted in:$'\n'"$(cat "$file")"$'\n''#########'
 
-    if grep -q "$1.*skipped" $2 || [[ "$3" = "--warning-only" ]]; then
+    if grep -q "$name.*skipped" "$file" || [[ "$flags" = "--warning-only" ]]; then
         : # If the test was skipped or marked warning only, ignore the failure.
     else
         errfound=1;
-        echo "$1" >> "${t_pfx}_errfound"
+        echo "$name" >> "${t_pfx}_errfound"
     fi
 
-    rm -f $2
+    rm -f "$file"
 }
 
 run()
 {
+    local bg=
+    [[ "$1" == "--bg" ]] && { bg=1; shift; }
     local cmd="$1" flags="$2"
     local name="${cmd%% *}"
     local t="${t_pfx}-${name}-$$"
     [[ "$name" =~ .*\.py$ ]] && cmd="python3 $cmd" || cmd="/bin/bash $cmd"
+    [[ -z "$bg" ]] && status "Running: $name"
     $cmd > $t 2>&1
+    [[ -z "$bg" ]] && status ""
     errchk "$name" "$t" "$flags"
 }
 
-# Non parallelizable scripts. The following scripts either modify files or
-# already parallelize internally.
+# The s_version script doesn't produce output to the temporary file,
+# exempt it from normal error processing.
+status "Running: s_version"
+/bin/bash ./s_version $force   # Update files that include the package version.
+
+# Non parallelizable scripts.
+# The following scripts either modify files or already parallelize internally.
 run "s_readme $force"
 run "s_install $force"
 run "api_config_gen.py"
@@ -111,32 +158,43 @@ run "s_typedef -b"
 run "test_tag.py"
 run "s_mentions" "--warning-only"
 
-# Run in parallel:
-run "s_define" &
-run "s_docs" &
-run "s_evergreen" &
-run "s_evergreen_validate $fast" &
-run "s_test_suite_no_executable" &
-run "s_export" &
-run "s_free" &
-run "s_funcs" &
-run "s_function $fast" &
-run "s_getopt" &
-run "s_lang" &
-run "s_longlines" &
-run "s_python" &
-run "s_stat" &
-run "s_string" &
-run "s_tags" &
-run "s_typedef -c" &
-run "s_visibility_checks" &
-run "s_void" &
-run "s_whitespace" &
-run "function.py" &
-run "style.py" &
-run "comment_style.py $fast" &
-run "type_to_str.py" &
-wait
+# Run in parallel.
+run --bg "s_define" &
+run --bg "s_docs" &
+run --bg "s_evergreen" &
+run --bg "s_evergreen_validate $fast" &
+run --bg "s_test_suite_no_executable" &
+run --bg "s_export" &
+run --bg "s_free" &
+run --bg "s_funcs" &
+run --bg "s_function $fast" &
+run --bg "s_getopt" &
+run --bg "s_lang" &
+run --bg "s_longlines" &
+run --bg "s_python" &
+run --bg "s_stat" &
+run --bg "s_string" &
+run --bg "s_tags" &
+run --bg "s_typedef -c" &
+run --bg "s_visibility_checks" &
+run --bg "s_void" &
+run --bg "s_whitespace" &
+run --bg "function.py" &
+run --bg "style.py" &
+run --bg "comment_style.py $fast" &
+run --bg "type_to_str.py" &
+
+# Wait for completion.
+if [[ -n "$ISTTY" ]]; then
+    while J="$(echo `jobs -rp` | tr ' ' '|')" && [[ -n "$J" ]]; do
+        status "$(echo -n $'Running:'`ps -o ppid=,command= | egrep "^($J) " | egrep -o " s_\w*| \w*\.py" | sort`)"
+        sleep 0.2
+    done
+fi
+status ""  # Clear any remaining status.
+wait       # Call "wait" in any case even if the jobs are done to clear their state.
+
+# Collect errors and compute the exit status.
 
 [[ -s "${t_pfx}_errfound" ]] && errfound=1
 
