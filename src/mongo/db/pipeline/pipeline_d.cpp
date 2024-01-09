@@ -1420,6 +1420,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
 
     if (cq.isOK()) {
         cq.getValue()->requestAdditionalMetadata(deps.metadataDeps());
+        cq.getValue()->setSearchMetadata(deps.searchMetadataDeps());
     }
     return cq;
 }
@@ -1532,17 +1533,20 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     // call this lambda in two phases: 1) determine compatible stages and attach them to the
     // canonical query, and 2) finalize the push down and trim the pushed-down stages from the
     // original pipeline.
-    auto extractAndAttachPipelineStages = [&collections, &pipeline, needsMerge{expCtx->needsMerge}](
-                                              auto* canonicalQuery, bool attachOnly) {
-        if (attachOnly) {
-            std::vector<boost::intrusive_ptr<DocumentSource>> stagesForPushdown;
-            bool allStagesPushedDown = findSbeCompatibleStagesForPushdown(
-                collections, canonicalQuery, needsMerge, pipeline, stagesForPushdown);
-            canonicalQuery->setCqPipeline(std::move(stagesForPushdown), allStagesPushedDown);
-        } else {
-            trimPipelineStages(pipeline, canonicalQuery->cqPipeline().size());
-        }
-    };
+    auto extractAndAttachPipelineStages =
+        [&collections, &pipeline, &unavailableMetadata, needsMerge{expCtx->needsMerge}](
+            auto* canonicalQuery, bool attachOnly) {
+            if (attachOnly) {
+                std::vector<boost::intrusive_ptr<DocumentSource>> stagesForPushdown;
+                bool allStagesPushedDown = findSbeCompatibleStagesForPushdown(
+                    collections, canonicalQuery, needsMerge, pipeline, stagesForPushdown);
+                canonicalQuery->setCqPipeline(std::move(stagesForPushdown), allStagesPushedDown);
+            } else {
+                trimPipelineStages(pipeline, canonicalQuery->cqPipeline().size());
+                canonicalQuery->setRemainingSearchMetadata(
+                    pipeline->getDependencies(unavailableMetadata).searchMetadataDeps());
+            }
+        };
 
     // For performance, we pass a null callback instead of 'extractAndAttachPipelineStages' when
     // 'pipeline' is empty. The 'extractAndAttachPipelineStages' is a no-op when there are no

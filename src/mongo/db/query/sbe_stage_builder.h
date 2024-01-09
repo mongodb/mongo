@@ -1114,6 +1114,8 @@ private:
      */
     const CollectionPtr& getCurrentCollection(const PlanStageReqs& reqs) const;
 
+    std::pair<std::vector<std::string>, sbe::value::SlotVector> buildSearchMetadataSlots();
+
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;

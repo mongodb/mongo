@@ -1255,6 +1255,9 @@ std::string encodeSBE(const CanonicalQuery& cq, const bool requiresSbeCompatibil
     encodeFindCommandRequest(cq, &bufBuilder);
 
     encodePipeline(cq.getExpCtxRaw(), cq.cqPipeline(), &bufBuilder);
+    if (const auto& bitset = cq.searchMetadata(); bitset.any()) {
+        bufBuilder.appendStr(bitset.to_string(), false /* includeEndingNull */);
+    }
 
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }

@@ -5343,6 +5343,47 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSearchMeta(
     return {std::move(stage), std::move(outputs)};
 }
 
+std::pair<std::vector<std::string>, sbe::value::SlotVector>
+SlotBasedStageBuilder::buildSearchMetadataSlots() {
+    std::vector<std::string> metadataNames;
+    sbe::value::SlotVector metadataSlots;
+
+    const QueryMetadataBitSet& metadataBit = _cq.searchMetadata();
+    if (metadataBit.test(DocumentMetadataFields::MetaType::kSearchScore) || _state.needsMerge) {
+        metadataNames.push_back(Document::metaFieldSearchScore.toString());
+        metadataSlots.push_back(_slotIdGenerator.generate());
+        _data->metadataSlots.searchScoreSlot = metadataSlots.back();
+    }
+
+    if (metadataBit.test(DocumentMetadataFields::MetaType::kSearchHighlights) ||
+        _state.needsMerge) {
+        metadataNames.push_back(Document::metaFieldSearchHighlights.toString());
+        metadataSlots.push_back(_slotIdGenerator.generate());
+        _data->metadataSlots.searchHighlightsSlot = metadataSlots.back();
+    }
+
+    if (metadataBit.test(DocumentMetadataFields::MetaType::kSearchScoreDetails) ||
+        _state.needsMerge) {
+        metadataNames.push_back(Document::metaFieldSearchScoreDetails.toString());
+        metadataSlots.push_back(_slotIdGenerator.generate());
+        _data->metadataSlots.searchDetailsSlot = metadataSlots.back();
+    }
+
+    if (metadataBit.test(DocumentMetadataFields::MetaType::kSearchSortValues) ||
+        _state.needsMerge) {
+        metadataNames.push_back(Document::metaFieldSearchSortValues.toString());
+        metadataSlots.push_back(_slotIdGenerator.generate());
+        _data->metadataSlots.searchSortValuesSlot = metadataSlots.back();
+    }
+
+    // searchSequenceToken is only available when user specify it in the query.
+    metadataNames.push_back(Document::metaFieldSearchSequenceToken.toString());
+    metadataSlots.push_back(_slotIdGenerator.generate());
+    _data->metadataSlots.searchSequenceToken = metadataSlots.back();
+
+    return {metadataNames, metadataSlots};
+}
+
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSearch(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto sn = static_cast<const SearchNode*>(root);
@@ -5382,20 +5423,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Register the $$SEARCH_META slot.
     _state.getBuiltinVarSlot(Variables::kSearchMetaId);
 
-    std::vector<std::string> metadataNames = {Document::metaFieldSearchScore.toString(),
-                                              Document::metaFieldSearchHighlights.toString(),
-                                              Document::metaFieldSearchScoreDetails.toString(),
-                                              Document::metaFieldSearchSortValues.toString(),
-                                              Document::metaFieldSearchSequenceToken.toString()};
-    auto metadataSlots = _slotIdGenerator.generateMultiple(metadataNames.size());
-    // We have to generate all search metadata slots until we have migrate everything to SBE, this
-    // is because the metadata usage may depends on post-SBE DocumentSources in the pipeline, the
-    // SBE plan cache won't work in this case.
-    _data->metadataSlots.searchScoreSlot = metadataSlots[0];
-    _data->metadataSlots.searchHighlightsSlot = metadataSlots[1];
-    _data->metadataSlots.searchDetailsSlot = metadataSlots[2];
-    _data->metadataSlots.searchSortValuesSlot = metadataSlots[3];
-    _data->metadataSlots.searchSequenceToken = metadataSlots[4];
+    auto [metadataNames, metadataSlots] = buildSearchMetadataSlots();
 
     _data->metadataSlots.sortKeySlot = _slotIdGenerator.generate();
 

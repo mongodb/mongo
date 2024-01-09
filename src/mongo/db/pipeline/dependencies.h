@@ -194,6 +194,16 @@ struct DepsTracker {
     }
 
     /**
+     * Return all of the search metadata dependencies.
+     */
+    QueryMetadataBitSet& searchMetadataDeps() {
+        return _searchMetadataDeps;
+    }
+    const QueryMetadataBitSet& searchMetadataDeps() const {
+        return _searchMetadataDeps;
+    }
+
+    /**
      * Request that all metadata in the given QueryMetadataBitSet be added as dependencies. Throws a
      * UserException if any of the requested metadata fields have been marked as unavailable.
      */
@@ -222,9 +232,12 @@ private:
     // Represents all metadata not available to the pipeline.
     QueryMetadataBitSet _unavailableMetadata;
 
-    // Represents which metadata is used by the pipeline. This is populated while performing
-    // dependency analysis.
+    // Represents which metadata stored in collection is used by the pipeline. This is populated
+    // while performing dependency analysis.
     QueryMetadataBitSet _metadataDeps;
+    // Represents which search metadata is used by the pipeline. This is populated while performing
+    // dependency analysis.
+    QueryMetadataBitSet _searchMetadataDeps;
 };
 
 }  // namespace mongo
