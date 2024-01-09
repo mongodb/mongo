@@ -126,24 +126,21 @@ namespace {
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCommand(
     OperationContext* opCtx,
     CanonicalDistinct canonicalDistinct,
-    VariantCollectionPtrOrAcquisition coll) {
-    const auto plannerOptions = QueryPlannerParams::DEFAULT;
+    const CollectionAcquisition& coll) {
     const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
     const auto& collectionPtr = coll.getCollectionPtr();
 
     // If the collection doesn't exist 'getExecutor()' should create an EOF plan for it no matter
     // the query.
     if (!collectionPtr) {
-        return uassertStatusOK(getExecutor(opCtx,
-                                           coll,
-                                           canonicalDistinct.releaseQuery(),
-                                           nullptr /* extractAndAttachPipelineStages */,
-                                           yieldPolicy,
-                                           plannerOptions));
+        return uassertStatusOK(getExecutorFind(opCtx,
+                                               MultipleCollectionAccessor{coll},
+                                               canonicalDistinct.releaseQuery(),
+                                               yieldPolicy));
     }
 
     // Try creating a plan that does DISTINCT_SCAN.
-    auto executor = tryGetExecutorDistinct(coll, plannerOptions, &canonicalDistinct);
+    auto executor = tryGetExecutorDistinct(coll, QueryPlannerParams::DEFAULT, &canonicalDistinct);
     if (executor.isOK()) {
         return std::move(executor.getValue());
     }
@@ -165,12 +162,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures},
         .explain = cq->getExplain()});
 
-    return uassertStatusOK(getExecutor(opCtx,
-                                       coll,
-                                       std::move(cqWithoutProjection),
-                                       nullptr /* extractAndAttachPipelineStages */,
-                                       yieldPolicy,
-                                       plannerOptions));
+    return uassertStatusOK(getExecutorFind(
+        opCtx, MultipleCollectionAccessor{coll}, std::move(cqWithoutProjection), yieldPolicy));
 }
 }  // namespace
 

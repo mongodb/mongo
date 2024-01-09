@@ -634,12 +634,10 @@ TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
     auto cq = std::make_unique<CanonicalQuery>(
         CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
                              .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-    auto exec = uassertStatusOK(getExecutor(opCtx(),
-                                            &coll,
-                                            std::move(cq),
-                                            nullptr /* extractAndAttachPipelineStages */,
-                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                            0));
+    auto exec = uassertStatusOK(getExecutorFind(opCtx(),
+                                                MultipleCollectionAccessor{coll},
+                                                std::move(cq),
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY));
 
     auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
     ASSERT(execImpl);

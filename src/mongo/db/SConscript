@@ -1598,6 +1598,7 @@ execEnv.Library(
         'pipeline/pipeline_d.cpp',
         'pipeline/plan_executor_pipeline.cpp',
         'pipeline/plan_explainer_pipeline.cpp',
+        'pipeline/sbe_pushdown.cpp',
         'query/all_indices_required_checker.cpp',
         'query/bind_input_params.cpp',
         'query/classic_stage_builder.cpp',

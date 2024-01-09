@@ -137,11 +137,10 @@ RecordId Helpers::findOne(OperationContext* opCtx,
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
     cq->setForceGenerateRecordId(true);
 
-    auto exec = uassertStatusOK(getExecutor(opCtx,
-                                            &collection,
-                                            std::move(cq),
-                                            nullptr /* extractAndAttachPipelineStages */,
-                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY));
+    auto exec = uassertStatusOK(getExecutorFind(opCtx,
+                                                MultipleCollectionAccessor{collection},
+                                                std::move(cq),
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY));
 
     PlanExecutor::ExecState state;
     BSONObj obj;

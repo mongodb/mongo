@@ -105,6 +105,7 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/sbe_pushdown.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
@@ -1676,87 +1677,33 @@ bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, cons
     return cq.getExpCtx()->sbeCompatibility >= minRequiredCompatibility;
 }
 
-/**
- * Attempts to create a slot-based executor for the query, if the query plan is eligible for SBE
- * execution. This function has three possible return values:
- *
- *  1. A plan executor. This is in the case where the query is SBE eligible and encounters no errors
- * in executor creation. This result is to be expected in the majority of cases.
- *  2. A non-OK status. This is when errors are encountered during executor creation.
- *  3. The canonical query. This is to return ownership of the 'canonicalQuery' argument in the case
- * where the query plan is not eligible for SBE execution but it is not an error case.
- */
-StatusWith<std::variant<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
-                        std::unique_ptr<CanonicalQuery>>>
-attemptToGetSlotBasedExecutor(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    const QueryPlannerParams& plannerParams) {
-    if (extractAndAttachPipelineStages) {
-        // Push down applicable pipeline stages and attach to the query, but don't remove from
-        // the high-level pipeline object until we know for sure we will execute with SBE.
-        extractAndAttachPipelineStages(canonicalQuery.get(), true /* attachOnly */);
+bool shouldAttemptSBE(const CanonicalQuery* canonicalQuery) {
+    if (!canonicalQuery->isSbeCompatible()) {
+        return false;
     }
 
-    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
-
-    if (canUseRegularSbe || sbeFull) {
-        auto sbeYieldPolicy =
-            PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, canonicalQuery->nss());
-        SlotBasedPrepareExecutionHelper helper{
-            opCtx,
-            collections,
-            canonicalQuery.get(),
-            sbeYieldPolicy.get(),
-            plannerParams.options,
-        };
-        auto planningResultWithStatus = helper.prepare();
-        if (!planningResultWithStatus.isOK()) {
-            return planningResultWithStatus.getStatus();
-        }
-
-        if (extractAndAttachPipelineStages) {
-            // Given that we are using SBE, we need to remove the pushed-down stages
-            // from the original pipeline object.
-            extractAndAttachPipelineStages(canonicalQuery.get(), false /* attachOnly */);
-        }
-        auto statusWithExecutor =
-            getSlotBasedExecutor(opCtx,
-                                 collections,
-                                 std::move(canonicalQuery),
-                                 std::move(sbeYieldPolicy),
-                                 plannerParams,
-                                 std::move(planningResultWithStatus.getValue()));
-        if (statusWithExecutor.isOK()) {
-            return std::move(statusWithExecutor.getValue());
-        } else {
-            return statusWithExecutor.getStatus();
-        }
+    // If query settings engine version is set, use it to determine which engine should be used.
+    if (auto queryFramework = canonicalQuery->getExpCtx()->getQuerySettings().getQueryFramework()) {
+        return *queryFramework == QueryFrameworkControlEnum::kTrySbeEngine;
     }
 
-    // Either we did not meet the criteria for attempting SBE, or we attempted query planning and
-    // determined that SBE should not be used. Reset any fields that may have been modified, and
-    // fall back to classic engine.
-    canonicalQuery->setCqPipeline({}, false);
-    canonicalQuery->setSbeCompatible(false);
-    return std::move(canonicalQuery);
+    return !canonicalQuery->getForceClassicEngine();
 }
-
 }  // namespace
 
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    const QueryPlannerParams& plannerParams) {
-    auto& querySettings = canonicalQuery->getExpCtx()->getQuerySettings();
+    QueryPlannerParams plannerParams,
+    Pipeline* pipeline,
+    bool needsMerge,
+    QueryMetadataBitSet unavailableMetadata) {
+    if (OperationShardingState::isComingFromRouter(opCtx)) {
+        plannerParams.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    }
+
     auto exec = [&]() {
         invariant(canonicalQuery);
         const auto& mainColl = collections.getMainCollection();
@@ -1795,47 +1742,46 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
             }
         }
 
-        const bool shouldAttemptSBE = [&]() {
-            // If the query is not SBE compatible, do not attempt to run it on SBE.
-            if (!canonicalQuery->isSbeCompatible()) {
-                return false;
-            }
+        if (shouldAttemptSBE(canonicalQuery.get())) {
+            // Add the stages that are candidates for SBE lowering from the 'pipeline' into the
+            // 'canonicalQuery'. This must be done _before_ checking shouldUseRegularSbe() or
+            // creating SlotBasedPrepareExecutionHelper because both inspect the pipline on the
+            // canonical query.
+            attachPipelineStages(collections, pipeline, needsMerge, canonicalQuery.get());
 
-            // If query settings engine version is set, use it to determine which engine should be
-            // used.
-            if (auto queryFramework = querySettings.getQueryFramework()) {
-                return *queryFramework == QueryFrameworkControlEnum::kTrySbeEngine;
-            }
+            const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+            const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
 
-            return !canonicalQuery->getForceClassicEngine();
-        }();
-        if (shouldAttemptSBE) {
-            auto statusWithExecutor =
-                attemptToGetSlotBasedExecutor(opCtx,
-                                              collections,
-                                              std::move(canonicalQuery),
-                                              std::move(extractAndAttachPipelineStages),
-                                              yieldPolicy,
-                                              plannerParams);
-            if (!statusWithExecutor.isOK()) {
-                return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
-                    statusWithExecutor.getStatus());
-            }
-            auto& maybeExecutor = statusWithExecutor.getValue();
-            if (holds_alternative<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
-                    maybeExecutor)) {
-                return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(std::move(
-                    get<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(maybeExecutor)));
-            } else {
-                // The query is not eligible for SBE execution - reclaim the canonical query and
-                // fall back to classic.
-                tassert(7087103,
-                        "return value must contain canonical query if not executor",
-                        holds_alternative<std::unique_ptr<CanonicalQuery>>(maybeExecutor));
-                canonicalQuery = std::move(get<std::unique_ptr<CanonicalQuery>>(maybeExecutor));
+            if (canUseRegularSbe || sbeFull) {
+                auto sbeYieldPolicy = PlanYieldPolicySBE::make(
+                    opCtx, yieldPolicy, collections, canonicalQuery->nss());
+                SlotBasedPrepareExecutionHelper helper{
+                    opCtx,
+                    collections,
+                    canonicalQuery.get(),
+                    sbeYieldPolicy.get(),
+                    plannerParams.options,
+                };
+                auto planningResultWithStatus = helper.prepare();
+                if (!planningResultWithStatus.isOK()) {
+                    return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>{
+                        planningResultWithStatus.getStatus()};
+                } else {
+                    // We are committing to running the query in SBE.
+                    finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
+
+                    return getSlotBasedExecutor(opCtx,
+                                                collections,
+                                                std::move(canonicalQuery),
+                                                std::move(sbeYieldPolicy),
+                                                plannerParams,
+                                                std::move(planningResultWithStatus.getValue()));
+                }
             }
         }
-        // Ensure that 'sbeCompatible' is set accordingly.
+
+        // If we are here, it means the query cannot run in SBE and we should fallback to classic.
         canonicalQuery->setSbeCompatible(false);
         if (collections.isAcquisition()) {
             return getClassicExecutor(opCtx,
@@ -1848,80 +1794,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
                 opCtx, &mainColl, std::move(canonicalQuery), yieldPolicy, plannerParams);
         }
     }();
+
     if (exec.isOK()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->debug().queryFramework = exec.getValue()->getQueryFramework();
     }
     return exec;
-}
-
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
-    OperationContext* opCtx,
-    VariantCollectionPtrOrAcquisition coll,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    size_t plannerOptions) {
-
-    return getExecutor(opCtx,
-                       holds_alternative<CollectionAcquisition>(coll.get())
-                           ? MultipleCollectionAccessor{get<CollectionAcquisition>(coll.get())}
-                           : MultipleCollectionAccessor{coll.getCollectionPtr()},
-                       std::move(canonicalQuery),
-                       std::move(extractAndAttachPipelineStages),
-                       yieldPolicy,
-                       QueryPlannerParams{plannerOptions});
-}
-
-//
-// Find
-//
-
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
-    bool permitYield,
-    QueryPlannerParams plannerParams) {
-
-    auto yieldPolicy = permitYield ? PlanYieldPolicy::YieldPolicy::YIELD_AUTO
-                                   : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY;
-
-    if (OperationShardingState::isComingFromRouter(opCtx)) {
-        plannerParams.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    }
-
-    return getExecutor(opCtx,
-                       collections,
-                       std::move(canonicalQuery),
-                       std::move(extractAndAttachPipelineStages),
-                       yieldPolicy,
-                       plannerParams);
-}
-
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
-    OperationContext* opCtx,
-    VariantCollectionPtrOrAcquisition coll,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
-    bool permitYield,
-    size_t plannerOptions) {
-
-    auto multi = visit(OverloadedVisitor{[](const CollectionPtr* collPtr) {
-                                             return MultipleCollectionAccessor{*collPtr};
-                                         },
-                                         [](const CollectionAcquisition& acq) {
-                                             return MultipleCollectionAccessor{acq};
-                                         }},
-                       coll.get());
-
-    return getExecutorFind(opCtx,
-                           multi,
-                           std::move(canonicalQuery),
-                           std::move(extractAndAttachPipelineStages),
-                           permitYield,
-                           QueryPlannerParams{plannerOptions});
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetadataExecutorSBE(
@@ -3110,7 +2988,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
     }
 
     OperationContext* opCtx = canonicalDistinct->getQuery()->getExpCtx()->opCtx;
-    const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
 
     uassert(ErrorCodes::InternalErrorNotSupported,
             "distinct command is not eligible for bonsai",
@@ -3141,7 +3018,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
                                             std::move(ws),
                                             std::move(root),
                                             coll,
-                                            yieldPolicy,
+                                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                             plannerOptions,
                                             NamespaceString::kEmpty,
                                             std::move(soln));

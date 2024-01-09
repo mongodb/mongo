@@ -140,12 +140,11 @@ protected:
             CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
                                  .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
-        auto exec = uassertStatusOK(getExecutor(opCtx(),
-                                                &_coll,
-                                                std::move(cq),
-                                                nullptr /* extractAndAttachPipelineStages */,
-                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                QueryPlannerParams::RETURN_OWNED_DATA));
+        auto exec = uassertStatusOK(getExecutorFind(opCtx(),
+                                                    MultipleCollectionAccessor{_coll},
+                                                    std::move(cq),
+                                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                    QueryPlannerParams::RETURN_OWNED_DATA));
 
         _source = DocumentSourceCursor::create(MultipleCollectionAccessor(_coll),
                                                std::move(exec),

@@ -91,10 +91,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss);
 
 /**
- * Filter indexes retrieved from index catalog by
- * allowed indices in query settings.
- * Used by getExecutor().
- * This function is public to facilitate testing.
+ * Filters indexes retrieved from index catalog by allowed indices in query settings.
  */
 void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
                                std::vector<IndexEntry>* indexEntries);
@@ -170,76 +167,23 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
                                   bool tailable);
 
 /**
- * Get a plan executor for a query.
+ * Gets a plan executor for a query. If the query is valid and an executor could be created, returns
+ * a StatusWith with the PlanExecutor. If the query cannot be executed, returns a Status indicating
+ * why.
  *
- * If the query is valid and an executor could be created, returns a StatusWith with the
- * PlanExecutor.
- *
- * If the query cannot be executed, returns a Status indicating why.
- *
- * If the caller provides a 'extractAndAttachPipelineStages' function and the query is eligible for
- * pushdown into the find layer this function will be invoked to extract pipeline stages and
- * attach them to the provided 'CanonicalQuery'. This function should capture the Pipeline that
- * stages should be extracted from. If the boolean 'attachOnly' argument is true, it will only find
- * and attach the applicable stages to the query. If it is false, it will remove the extracted
- * stages from the pipeline.
- *
- * Note that the first overload takes a 'MultipleCollectionAccessor' and can construct a
- * PlanExecutor over multiple collections, while the second overload takes a single 'CollectionPtr'
- * and can only construct a PlanExecutor over a single collection.
- */
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    const QueryPlannerParams& plannerOptions);
-
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
-    OperationContext* opCtx,
-    VariantCollectionPtrOrAcquisition coll,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    size_t plannerOptions = 0);
-
-/**
- * Get a plan executor for a .find() operation. The executor will have a 'YIELD_AUTO' yield policy
- * unless a false value for 'permitYield' or being part of a multi-document transaction forces it to
- * have a 'NO_INTERRUPT' yield policy.
- *
- * If the query is valid and an executor could be created, returns a StatusWith with the
- * PlanExecutor.
- *
- * If the query cannot be executed, returns a Status indicating why.
- *
- * If the caller provides a 'extractAndAttachPipelineStages' function and the query is eligible for
- * pushdown into the find layer this function will be invoked to extract pipeline stages and
- * attach them to the provided 'CanonicalQuery'. This function should capture the Pipeline that
- * stages should be extracted from. If the boolean 'attachOnly' argument is true, it will only find
- * and attach the applicable stages to the query. If it is false, it will remove the extracted
- * stages from the pipeline.
- *
- * Note that the first overload takes a 'MultipleCollectionAccessor' and can construct a
- * PlanExecutor over multiple collections, while the second overload takes a single
- * 'CollectionPtr' and can only construct a PlanExecutor over a single collection.
+ * If the caller provides a 'pipeline' pointer and the query is eligible for running in SBE, a
+ * prefix of the pipeline might be moved into the provided 'canonicalQuery' for pushing down into
+ * the find layer.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
-    bool permitYield = false,
-    QueryPlannerParams plannerOptions = QueryPlannerParams{});
-
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
-    OperationContext* opCtx,
-    VariantCollectionPtrOrAcquisition collection,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
-    bool permitYield = false,
-    size_t plannerOptions = QueryPlannerParams::DEFAULT);
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    QueryPlannerParams plannerOptions = QueryPlannerParams{},
+    Pipeline* pipeline = nullptr,
+    bool needsMerge = false,
+    QueryMetadataBitSet unavailableMetadata = QueryMetadataBitSet{});
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetadataExecutorSBE(
     OperationContext* opCtx,

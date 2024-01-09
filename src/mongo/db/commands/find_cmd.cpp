@@ -482,14 +482,10 @@ public:
 
             // Get the execution plan for the query.
             const auto& collection = collectionOrView->getCollection();
-            bool permitYield = true;
-            auto exec =
-                uassertStatusOK(getExecutorFind(opCtx,
-                                                collection,
-                                                std::move(cq),
-                                                nullptr /* extractAndAttachPipelineStages */,
-                                                permitYield,
-                                                QueryPlannerParams::DEFAULT));
+            auto exec = uassertStatusOK(getExecutorFind(opCtx,
+                                                        MultipleCollectionAccessor{collection},
+                                                        std::move(cq),
+                                                        PlanYieldPolicy::YieldPolicy::YIELD_AUTO));
 
             auto bodyBuilder = result->getBodyBuilder();
             // Got the execution tree. Explain it.
@@ -745,14 +741,10 @@ public:
             cq->setUseCqfIfEligible(true);
 
             // Get the execution plan for the query.
-            bool permitYield = true;
-            auto exec =
-                uassertStatusOK(getExecutorFind(opCtx,
-                                                collection,
-                                                std::move(cq),
-                                                nullptr /* extractAndAttachPipelineStages */,
-                                                permitYield,
-                                                QueryPlannerParams::DEFAULT));
+            auto exec = uassertStatusOK(getExecutorFind(opCtx,
+                                                        MultipleCollectionAccessor{collection},
+                                                        std::move(cq),
+                                                        PlanYieldPolicy::YieldPolicy::YIELD_AUTO));
 
             // If the executor supports it, find operations will maintain the storage engine state
             // across commands.

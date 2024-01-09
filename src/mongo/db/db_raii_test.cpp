@@ -117,12 +117,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                               .allowedFeatures =
                                                   MatchExpressionParser::kBanAllSpecialFeatures}});
-    bool permitYield = true;
     auto swExec = getExecutorFind(opCtx,
-                                  &collection,
+                                  MultipleCollectionAccessor{collection},
                                   std::move(cq),
-                                  nullptr /* extractAndAttachPipelineStages */,
-                                  permitYield);
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
     ASSERT_OK(swExec.getStatus());
     return std::move(swExec.getValue());
 }
