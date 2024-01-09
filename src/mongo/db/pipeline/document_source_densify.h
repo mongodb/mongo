@@ -290,7 +290,7 @@ public:
                               }},
             _bounds);
         if (_unit)
-            spec[kArgUnit] = opts.serializeLiteral(serializeTimeUnit(*_unit));
+            spec[kArgUnit] = Value(serializeTimeUnit(*_unit));
         return spec.freezeToValue();
     }
 
