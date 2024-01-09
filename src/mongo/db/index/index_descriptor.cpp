@@ -247,9 +247,41 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     const IndexCatalogEntry* existingIndex) const {
     auto existingIndexDesc = existingIndex->descriptor();
 
+    //Index check, avoid creating duplicate indexes.
+    //For example:
+    // Add two indexes: db.collection.createIndex({a:1}) and db.collection.createIndex({a:11})
+    // The two indexes are actually the same, One of them is a useless index
+    auto dealIndexKeyPattern = [&](const BSONObj& indexKeyPattern) {
+        if (getIndexType() != INDEX_BTREE) {
+             return indexKeyPattern;
+        }
+
+        //Hidden index is not restricted
+        if (hidden() == true) {
+            return indexKeyPattern;
+        }
+
+        BSONObjBuilder build;
+        BSONObjIterator kpIt(indexKeyPattern);
+        while (kpIt.more()) {
+            BSONElement elt = kpIt.next();
+
+            // The canonical check as to whether a key pattern element is "ascending" or "descending" is
+            // (elt.number() >= 0). This is defined by the Ordering class.  
+            invariant(elt.isNumber());
+            int sortOrder = (elt.number() >= 0) ? 1 : -1;
+            build.append(elt.fieldName(), sortOrder);
+        }
+
+        return build.obj();
+    };
+
+    BSONObj newIndexKeyPattern = dealIndexKeyPattern(keyPattern());
+    BSONObj existingIndexKeyPattern = dealIndexKeyPattern(existingIndexDesc->keyPattern());
+
     // We first check whether the key pattern is identical for both indexes.
-    if (SimpleBSONObjComparator::kInstance.evaluate(keyPattern() !=
-                                                    existingIndexDesc->keyPattern())) {
+    if (SimpleBSONObjComparator::kInstance.evaluate(newIndexKeyPattern !=
+                                                    existingIndexKeyPattern)) {
         return Comparison::kDifferent;
     }
 
