@@ -516,23 +516,22 @@ static ExecParams createExecutor(
         phaseManager.getMetadata(), std::move(toExplain), explainVersion);
 
     // (Possibly) cache the SBE plan.
-    if constexpr (std::is_same_v<QueryType, CanonicalQuery>) {
-        if (planCacheKey && shouldCachePlan(*sbePlan)) {
-            sbe::getPlanCache(opCtx).setPinned(
-                *planCacheKey,
-                canonical_query_encoder::computeHash(query.encodeKeyForPlanCacheCommand()),
-                std::make_unique<sbe::CachedSbePlan>(sbePlan->clone(),
-                                                     // Make a copy of the plan stage data,
-                                                     // since it needs to be owned by the
-                                                     // cached plan.
-                                                     stage_builder::PlanStageData(data),
-                                                     // No query solution, so no query solution
-                                                     // hash either.
-                                                     0),
-                opCtx->getServiceContext()->getPreciseClockSource()->now(),
-                plan_cache_debug_info::DebugInfoSBE(),
-                CurOp::get(opCtx)->getShouldOmitDiagnosticInformation());
-        }
+    if (planCacheKey && shouldCachePlan(*sbePlan)) {
+        sbe::getPlanCache(opCtx).setPinned(
+            *planCacheKey,
+            canonical_query_encoder::computeHash(
+                canonical_query_encoder::encodeForPlanCacheCommand(query)),
+            std::make_unique<sbe::CachedSbePlan>(sbePlan->clone(),
+                                                 // Make a copy of the plan stage data,
+                                                 // since it needs to be owned by the
+                                                 // cached plan.
+                                                 stage_builder::PlanStageData(data),
+                                                 // No query solution, so no query solution
+                                                 // hash either.
+                                                 0),
+            opCtx->getServiceContext()->getPreciseClockSource()->now(),
+            plan_cache_debug_info::DebugInfoSBE(),
+            CurOp::get(opCtx)->getShouldOmitDiagnosticInformation());
     }
 
     sbePlan->prepare(data.env.ctx);
@@ -681,17 +680,22 @@ std::unique_ptr<CardinalityEstimator> createCardinalityEstimator(
 }
 
 /**
- * Creates a plan cache key from the provided CanonicalQuery.
+ * Creates a plan cache key from the provided CanonicalQuery or Pipeline.
  */
+template <typename QueryType>
 boost::optional<sbe::PlanCacheKey> createPlanCacheKey(
-    const CanonicalQuery& query, const MultipleCollectionAccessor& collections) {
+    const QueryType& query, const MultipleCollectionAccessor& collections) {
     if (!feature_flags::gFeatureFlagOptimizerPlanCache.isEnabledUseLatestFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return boost::none;
     } else if (!static_cast<bool>(collections.getMainCollection())) {
         return boost::none;
-    } else {
+    }
+
+    if constexpr (std::is_same_v<QueryType, CanonicalQuery>) {
         return boost::make_optional(plan_cache_key_factory::make(query, collections, false));
+    } else {
+        return boost::make_optional(plan_cache_key_factory::make(query, collections));
     }
 }
 }  // namespace
@@ -953,8 +957,21 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
         involvedCollections = pipeline->getInvolvedCollections();
     }
 
-    const auto planCacheKey =
-        canonicalQuery ? createPlanCacheKey(*canonicalQuery, collections) : boost::none;
+    // TODO SERVER-82185: Update value of parameterizationOn based on M2-eligibility
+    // TODO SERVER-83414: Enable histogram CE with parameterization.
+    const auto parameterizationOn = (internalQueryCardinalityEstimatorMode != "histogram"_sd) &&
+        internalCascadesOptimizerEnableParameterization.load();
+
+    const auto planCacheKey = [&]() -> boost::optional<sbe::PlanCacheKey> {
+        if (canonicalQuery) {
+            return createPlanCacheKey(*canonicalQuery, collections);
+        } else if (pipeline->isParameterized()) {
+            // Create plan cache key for pipeline if was parameterized
+            return createPlanCacheKey(*pipeline, collections);
+        }
+
+        return boost::none;
+    }();
 
     const auto& collection = collections.getMainCollection();
 
@@ -1002,13 +1019,9 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 
     QueryParameterMap queryParameters;
 
-    // TODO SERVER-82185: Update value of _isCacheable based on M2-eligibility
-    // TODO SERVER-83414: Enable histogram CE with parameterization.
-    const auto _isCacheable = (internalQueryCardinalityEstimatorMode != "histogram"_sd) &&
-        internalCascadesOptimizerEnableParameterization.load();
     if (pipeline) {
         // Clear match expression auto-parameterization before pipeline to ABT translation
-        if (!_isCacheable && pipeline->isParameterized()) {
+        if (!parameterizationOn && pipeline->isParameterized()) {
             pipeline->unparameterize();
         }
 
@@ -1023,7 +1036,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     } else {
         // Clear match expression auto-parameterization by setting max param count to zero before
         // CQ to ABT translation
-        if (!_isCacheable) {
+        if (!parameterizationOn) {
             MatchExpression::unparameterize(canonicalQuery->getPrimaryMatchExpression());
         }
 
@@ -1038,7 +1051,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 
     // If pipeline exists, is cacheable, and is parameterized, save the MatchExpression in
     // ExecParams for binding.
-    const auto pipelineMatchExpr = pipeline && _isCacheable && pipeline->isParameterized()
+    const auto pipelineMatchExpr = pipeline && parameterizationOn && pipeline->isParameterized()
         ? boost::make_optional(
               dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())->getMatchExpression())
         : boost::none;

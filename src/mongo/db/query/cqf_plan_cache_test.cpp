@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/index_catalog_mock.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query_test_util.h"
 #include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
@@ -59,7 +60,9 @@ public:
           _uuid(UUID::gen()),
           _collectionPtr(),
           _queryHints(getHintsFromQueryKnobs()),
-          _featureFlagController("featureFlagOptimizerPlanCache", true) {}
+          _featureFlagController("featureFlagOptimizerPlanCache", true),
+          _cardinalityEstimatorController("internalQueryCardinalityEstimatorMode", "sampling"),
+          _parameterizationController("internalCascadesOptimizerEnableParameterization", true) {}
 
     /**
      * Optimize the CanonicalQuery and return the executor parameters.
@@ -67,6 +70,21 @@ public:
     boost::optional<ExecParams> optimize(const CanonicalQuery& query) {
         return getSBEExecutorViaCascadesOptimizer(MultipleCollectionAccessor{_collectionPtr},
                                                   _queryHints,
+                                                  BonsaiEligibility::FullyEligible,
+                                                  &query);
+    }
+
+    /**
+     * Optimize the Pipeline and return the executor parameters.
+     */
+    boost::optional<ExecParams> optimize(Pipeline& query,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return getSBEExecutorViaCascadesOptimizer(opCtx(),
+                                                  expCtx,
+                                                  nss,
+                                                  MultipleCollectionAccessor{_collectionPtr},
+                                                  _queryHints,
+                                                  boost::none,
                                                   BonsaiEligibility::FullyEligible,
                                                   &query);
     }
@@ -103,9 +121,16 @@ protected:
     /**
      * Build a plan cache key from a CanonicalQuery.
      */
-    sbe::PlanCacheKey makeSbeKey(const CanonicalQuery& query) {
+    sbe::PlanCacheKey makePlanCacheKey(const CanonicalQuery& query) {
         return plan_cache_key_factory::make(
             query, MultipleCollectionAccessor{_collectionPtr}, false);
+    }
+
+    /**
+     * Build a plan cache key from a Pipeline.
+     */
+    sbe::PlanCacheKey makePlanCacheKey(const Pipeline& query) {
+        return plan_cache_key_factory::make(query, MultipleCollectionAccessor{_collectionPtr});
     }
 
 private:
@@ -113,16 +138,33 @@ private:
     CollectionPtr _collectionPtr;
     QueryHints _queryHints;
     RAIIServerParameterControllerForTest _featureFlagController;
+    RAIIServerParameterControllerForTest _cardinalityEstimatorController;
+    RAIIServerParameterControllerForTest _parameterizationController;
 };
 
-TEST_F(CqfPlanCacheTest, CqfPlanCacheInsertTest) {
+TEST_F(CqfPlanCacheTest, CqfPlanCacheCanonicalQueryInsertTest) {
     auto query = canonicalize("{jenny: 8675309}", "{}", "{}", "{}");
-    const auto key = makeSbeKey(*query);
+    const auto key = makePlanCacheKey(*query);
 
     auto& planCache = sbe::getPlanCache(opCtx());
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     ASSERT_NE(optimize(*query), boost::none);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
+}
+
+TEST_F(CqfPlanCacheTest, CqfPlanCachePipelineInsertTest) {
+    const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {jenny: 8675309}}")};
+    const auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx(), nss);
+    auto query = Pipeline::parse(rawPipeline, expCtx);
+    query->parameterize();
+
+    const auto key = makePlanCacheKey(*query);
+
+    auto& planCache = sbe::getPlanCache(opCtx());
+
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_NE(optimize(*query, expCtx), boost::none);
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
 }
 
