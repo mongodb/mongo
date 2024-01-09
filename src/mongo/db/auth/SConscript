@@ -514,11 +514,27 @@ env.Library(
     source=[
         'ldap_operation_stats.cpp',
         'ldap_cumulative_operation_stats.cpp',
-        'user_cache_acquisition_stats.cpp'
+        'user_cache_acquisition_stats.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         'auth',
+    ],
+)
+
+env.Library(
+    target='authorization_session_test_fixture',
+    source=[
+        'authorization_session_for_test.cpp',
+        'authorization_session_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        'auth',
+        'auth_impl_internal',
+        'authentication_restriction',
+        'authmocks',
     ],
 )
 
@@ -531,7 +547,6 @@ env.CppUnitTest(
         'authorization_contract_test.cpp',
         'auth_op_observer_test.cpp',
         'authorization_manager_test.cpp',
-        'authorization_session_for_test.cpp',
         'authorization_session_test.cpp',
         'builtin_roles_test.cpp',
         'privilege_parser_test.cpp',
@@ -554,14 +569,12 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/net/network',
         'address_restriction',
-        'auth',
-        'auth_impl_internal',
         'auth_op_observer',
         'authentication_restriction',
         'authmocks',
+        'authorization_session_test_fixture',
         'saslauth',
         'security_file',
         'security_key',

@@ -33,115 +33,21 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_depth.h"
-#include "mongo/crypto/mechanism_scram.h"
-#include "mongo/crypto/sha1_block.h"
-#include "mongo/crypto/sha256_block.h"
-#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_checks.h"
-#include "mongo/db/auth/authorization_manager_impl.h"
-#include "mongo/db/auth/authorization_session_for_test.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/restriction_environment.h"
-#include "mongo/db/auth/sasl_options.h"
+#include "mongo/db/auth/authorization_session_test_fixture.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
 namespace {
-
-class FailureCapableAuthzManagerExternalStateMock : public AuthzManagerExternalStateMock {
-public:
-    FailureCapableAuthzManagerExternalStateMock() = default;
-    ~FailureCapableAuthzManagerExternalStateMock() = default;
-
-    void setFindsShouldFail(bool enable) {
-        _findsShouldFail = enable;
-    }
-
-    Status findOne(OperationContext* opCtx,
-                   const NamespaceString& collectionName,
-                   const BSONObj& query,
-                   BSONObj* result) override {
-        if (_findsShouldFail && collectionName == AuthorizationManager::usersCollectionNamespace) {
-            return Status(ErrorCodes::UnknownError,
-                          "findOne on admin.system.users set to fail in mock.");
-        }
-        return AuthzManagerExternalStateMock::findOne(opCtx, collectionName, query, result);
-    }
-
-private:
-    bool _findsShouldFail{false};
-};
-
-class AuthorizationSessionTest : public ScopedGlobalServiceContextForTest, public unittest::Test {
-public:
-    void setUp() {
-        _session = transportLayer.createSession();
-        _client = getServiceContext()->makeClient("testClient", _session);
-        RestrictionEnvironment::set(
-            _session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
-        _opCtx = _client->makeOperationContext();
-        auto localManagerState = std::make_unique<FailureCapableAuthzManagerExternalStateMock>();
-        managerState = localManagerState.get();
-        managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-        auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
-            getServiceContext(), std::move(localManagerState));
-        authzManager = uniqueAuthzManager.get();
-        AuthorizationManager::set(getServiceContext(), std::move(uniqueAuthzManager));
-        auto localSessionState = std::make_unique<AuthzSessionExternalStateMock>(authzManager);
-        sessionState = localSessionState.get();
-        authzSession = std::make_unique<AuthorizationSessionForTest>(
-            std::move(localSessionState),
-            AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});
-        authzManager->setAuthEnabled(true);
-
-        credentials =
-            BSON("SCRAM-SHA-1" << scram::Secrets<SHA1Block>::generateCredentials(
-                                      "a", saslGlobalParams.scramSHA1IterationCount.load())
-                               << "SCRAM-SHA-256"
-                               << scram::Secrets<SHA256Block>::generateCredentials(
-                                      "a", saslGlobalParams.scramSHA256IterationCount.load()));
-    }
-
-    void tearDown() override {
-        authzSession->logoutAllDatabases(_client.get(), "Ending AuthorizationSessionTest");
-    }
-
-    Status createUser(const UserName& username, const std::vector<RoleName>& roles) {
-        BSONObjBuilder userDoc;
-        userDoc.append("_id", username.getUnambiguousName());
-        username.appendToBSON(&userDoc);
-        userDoc.append("credentials", credentials);
-
-        BSONArrayBuilder rolesBSON(userDoc.subarrayStart("roles"));
-        for (const auto& role : roles) {
-            role.serializeToBSON(&rolesBSON);
-        }
-        rolesBSON.doneFast();
-
-        return managerState->insertPrivilegeDocument(_opCtx.get(), userDoc.obj(), {});
-    }
-
-protected:
-    FailureCapableAuthzManagerExternalStateMock* managerState;
-    transport::TransportLayerMock transportLayer;
-    transport::SessionHandle _session;
-    ServiceContext::UniqueClient _client;
-    ServiceContext::UniqueOperationContext _opCtx;
-    AuthzSessionExternalStateMock* sessionState;
-    AuthorizationManager* authzManager;
-    std::unique_ptr<AuthorizationSessionForTest> authzSession;
-    BSONObj credentials;
-};
+using AuthorizationSessionTest = AuthorizationSessionTestFixture;
 
 const NamespaceString testFooNss("test.foo");
 const NamespaceString testBarNss("test.bar");
