@@ -71,7 +71,7 @@ public:
     /**
      * Invoked when the node enters the primary state.
      */
-    void onStepUp(OperationContext* opCtx);
+    void onStepUp();
 
     void updateSleepSeconds(Seconds newSeconds);
 
