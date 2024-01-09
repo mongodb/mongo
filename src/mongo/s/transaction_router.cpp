@@ -1084,7 +1084,10 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
         }
         _continueTxn(opCtx, txnNumberAndRetryCounter, action);
     } else {
-        // This is a newer transaction.
+        // This is a newer transaction
+        uassert(ErrorCodes::InterruptedAtShutdown,
+                "New transaction cannot be started at shutdown.",
+                !SessionCatalog::get(opCtx)->getDisallowNewTransactions());
         _beginTxn(opCtx, txnNumberAndRetryCounter, action);
     }
 

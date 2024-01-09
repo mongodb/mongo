@@ -182,6 +182,7 @@ MONGO_FAIL_POINT_DEFINE(failReplicaSetChangeConfigServerUpdateHook);
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(pauseWhileKillingOperationsAtShutdown);
+MONGO_FAIL_POINT_DEFINE(pauseAfterImplicitlyAbortAllTransactions)
 
 #if defined(_WIN32)
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
@@ -299,6 +300,8 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
     };
 
     const auto catalog = SessionCatalog::get(opCtx);
+
+    catalog->setDisallowNewTransactions();
 
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
@@ -449,6 +452,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
                 "Abort all active transactions in the catalog that have not yet been committed",
                 &shutdownTimeElapsedBuilder);
             implicitlyAbortAllTransactions(opCtx);
+            pauseAfterImplicitlyAbortAllTransactions.pauseWhileSet();
         } catch (const DBException& excep) {
             LOGV2_WARNING(22854, "Error aborting all active transactions", "error"_attr = excep);
         }
