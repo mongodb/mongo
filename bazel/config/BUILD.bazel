@@ -653,6 +653,11 @@ selects.config_setting_group(
     match_all = [":msan_enabled", ":system_allocator"],
 )
 
+selects.config_setting_group(
+    name = "sanitize_fuzzer_required_settings",
+    match_all = [":fsan_enabled"],
+)
+
 # --------------------------------------
 # separate_debug options
 # --------------------------------------

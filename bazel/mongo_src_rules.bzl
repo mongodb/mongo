@@ -119,7 +119,7 @@ ANY_SANITIZER_AVAILABLE_COPTS = select({
 no_match_error = REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE)
 
 
-ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE = (
+SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE = (
     "\nError:\n" +
     "    address and memory sanitizers require these configurations:\n"+
     "    --//bazel/config:allocator=system\n"
@@ -129,13 +129,13 @@ ADDRESS_SANITIZER_COPTS = select({
     ("//bazel/config:sanitize_address_required_settings"): ["-fsanitize=address"],
     "//bazel/config:asan_disabled": [],
 }
-, no_match_error = ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE)
+, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
 
 ADDRESS_SANITIZER_LINKFLAGS = select({
     ("//bazel/config:sanitize_address_required_settings"): ["-fsanitize=address"],
     "//bazel/config:asan_disabled": [],
 }
-, no_match_error = ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE)
+, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
 
 # Unfortunately, abseil requires that we make these macros
 # (this, and THREAD_ and UNDEFINED_BEHAVIOR_ below) set,
@@ -146,21 +146,41 @@ ADDRESS_SANITIZER_DEFINES = select({
     ("//bazel/config:sanitize_address_required_settings"): ["ADDRESS_SANITIZER"],
     "//bazel/config:asan_disabled": [],
 }
-, no_match_error = ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE)
+, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
 
 # Makes it easier to debug memory failures at the cost of some perf: -fsanitize-memory-track-origins
 MEMORY_SANITIZER_COPTS = select({
     ("//bazel/config:sanitize_memory_required_settings"): ["-fsanitize=memory", "-fsanitize-memory-track-origins"],
     ("//bazel/config:msan_disabled"): [],
 }
-, no_match_error = ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE)
+, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
 
 # Makes it easier to debug memory failures at the cost of some perf: -fsanitize-memory-track-origins
 MEMORY_SANITIZER_LINKFLAGS = select({
     ("//bazel/config:sanitize_memory_required_settings"): ["-fsanitize=memory"],
     ("//bazel/config:msan_disabled"): [],
 }
-, no_match_error = ADDRESS_AND_MEMORY_SANITIZER_ERROR_MESSAGE)
+, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
+
+
+GENERIC_SANITIZER_ERROR_MESSAGE = (
+    "Failed to enable sanitizers with flag: "
+)
+# We can't include the fuzzer flag with the other sanitize flags
+# The libfuzzer library already has a main function, which will cause the dependencies check
+# to fail
+FUZZER_SANITIZER_COPTS = select({
+    ("//bazel/config:sanitize_fuzzer_required_settings"): ["-fsanitize=fuzzer-no-link", "-fprofile-instr-generate", "-fcoverage-mapping"],
+    ("//bazel/config:fsan_disabled"): [],
+}
+, no_match_error = GENERIC_SANITIZER_ERROR_MESSAGE + "fuzzer")
+
+# These flags are needed to generate a coverage report
+FUZZER_SANITIZER_LINKFLAGS = select({
+    ("//bazel/config:sanitize_fuzzer_required_settings"): ["-fsanitize=fuzzer-no-link", "-fprofile-instr-generate", "-fcoverage-mapping"],
+    ("//bazel/config:fsan_disabled"): [],
+}
+, no_match_error = GENERIC_SANITIZER_ERROR_MESSAGE + "fuzzer")
 
 
 SEPARATE_DEBUG_ENABLED = select({
@@ -178,9 +198,9 @@ TCMALLOC_DEPS = select({
 MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES
 
 MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS \
-                    + MEMORY_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS
+                    + MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS
 
-MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + LIBCXX_LINKFLAGS
+MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS + LIBCXX_LINKFLAGS
 
 def force_includes_copt(package_name, name):
 
