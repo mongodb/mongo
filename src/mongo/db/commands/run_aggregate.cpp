@@ -1552,8 +1552,8 @@ Status _runAggregate(OperationContext* opCtx,
                 // DocumentSourceMatch in the Pipeline), so we can avoid copying them into the SBE
                 // runtime environment. We must ensure that the MatchExpression lives at least as
                 // long as the executor.
-                execs.emplace_back(uassertStatusOK(
-                    makeExecFromParams(nullptr, std::move(pipeline), std::move(*maybeExec))));
+                execs.emplace_back(uassertStatusOK(makeExecFromParams(
+                    nullptr, std::move(pipeline), collections, std::move(*maybeExec))));
             } else {
                 // If we had an optimization failure, only error if we're not in tryBonsai.
                 bonsaiExecSuccess = false;

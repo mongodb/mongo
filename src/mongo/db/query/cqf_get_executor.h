@@ -118,6 +118,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> makeExecFromParams(
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    const MultipleCollectionAccessor& collections,
     ExecParams execArgs);
 
 }  // namespace mongo

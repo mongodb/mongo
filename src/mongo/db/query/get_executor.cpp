@@ -1778,8 +1778,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
                     collections, std::move(queryHints), canonicalQuery.get());
             }();
             if (maybeExec) {
-                auto exec = uassertStatusOK(makeExecFromParams(
-                    std::move(canonicalQuery), nullptr /*pipeline*/, std::move(*maybeExec)));
+                auto exec = uassertStatusOK(makeExecFromParams(std::move(canonicalQuery),
+                                                               nullptr /*pipeline*/,
+                                                               collections,
+                                                               std::move(*maybeExec)));
                 return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
                     std::move(exec));
             } else {

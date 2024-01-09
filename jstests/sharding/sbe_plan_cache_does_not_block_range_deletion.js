@@ -4,8 +4,6 @@
  * @tags: [
  *   # This test requires the fix from SERVER-73032.
  *   requires_fcv_63,
- *   # TODO SERVER-67607: Test plan cache with CQF enabled.
- *   cqf_incompatible,
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";

@@ -391,9 +391,8 @@ void setupShardFiltering(OperationContext* opCtx,
         : collections.getMainCollection().isSharded_DEPRECATED();
     if (isSharded) {
         // Allocate a global slot for shard filtering and register it in 'runtimeEnv'.
-        sbe::value::SlotId shardFiltererSlot = runtimeEnv.registerSlot(
+        runtimeEnv.registerSlot(
             kshardFiltererSlotName, sbe::value::TypeTags::Nothing, 0, false, &slotIdGenerator);
-        populateShardFiltererSlot(opCtx, runtimeEnv, shardFiltererSlot, collections);
     }
 }
 
@@ -1206,12 +1205,19 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> makeExecFromParams(
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    const MultipleCollectionAccessor& collections,
     ExecParams execArgs) {
     if (cq) {
         input_params::bind(cq->getPrimaryMatchExpression(), execArgs.root.second, false);
     } else if (execArgs.pipelineMatchExpr != boost::none) {
         // If pipeline contains a parameterized MatchExpression, bind constants.
         input_params::bind(execArgs.pipelineMatchExpr.get(), execArgs.root.second, false);
+    }
+
+    if (auto shardFiltererSlot =
+            execArgs.root.second.env->getSlotIfExists(kshardFiltererSlotName)) {
+        populateShardFiltererSlot(
+            execArgs.opCtx, *execArgs.root.second.env, *shardFiltererSlot, collections);
     }
 
     return plan_executor_factory::make(execArgs.opCtx,
