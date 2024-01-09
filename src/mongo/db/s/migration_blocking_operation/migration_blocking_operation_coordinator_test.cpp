@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-class MigrationBlockingOperationCoordinatorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
+class MigrationBlockingOperationCoordinatorTest : public repl::PrimaryOnlyServiceMongoDTest {
 protected:
     using Service = ShardingDDLCoordinatorService;
     using Instance = MigrationBlockingOperationCoordinator;
@@ -47,9 +47,15 @@ protected:
         NamespaceString::createNamespaceString_forTest("testDb", "coll");
     const DatabaseVersion kDbVersion{UUID::gen(), Timestamp(1, 0)};
 
+    MigrationBlockingOperationCoordinatorTest() {
+        _mockCommandResponse = std::make_unique<MockCommandResponse>();
+    }
+
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         return std::make_unique<Service>(
-            serviceContext, std::make_unique<ShardingDDLCoordinatorExternalStateFactoryForTest>());
+            serviceContext,
+            std::make_unique<ShardingDDLCoordinatorExternalStateFactoryForTest>(
+                _mockCommandResponse.get()));
     }
 
     ShardingDDLCoordinatorId getCoordinatorId() const {
@@ -135,9 +141,10 @@ protected:
     ServiceContext::UniqueOperationContext _opCtxHolder;
     OperationContext* _opCtx;
     std::vector<UUID> _operations;
+    std::unique_ptr<MockCommandResponse> _mockCommandResponse;
 };
 
-TEST_F(MigrationBlockingOperationCoordinatorServiceTest, CreateAndDeleteStateDocument) {
+TEST_F(MigrationBlockingOperationCoordinatorTest, CreateAndDeleteStateDocument) {
     ASSERT_FALSE(stateDocumentExistsOnDisk());
 
     _operations = {UUID::gen()};
@@ -149,27 +156,27 @@ TEST_F(MigrationBlockingOperationCoordinatorServiceTest, CreateAndDeleteStateDoc
     ASSERT_FALSE(stateDocumentExistsOnDisk());
 }
 
-TEST_F(MigrationBlockingOperationCoordinatorServiceTest, EndOperationDecrementsCount) {
+TEST_F(MigrationBlockingOperationCoordinatorTest, EndOperationDecrementsCount) {
     _operations = {UUID::gen(), UUID::gen()};
     beginOperations();
     _instance->endOperation(_opCtx, _operations[0]);
     assertOperationCountOnDisk(1);
 }
 
-TEST_F(MigrationBlockingOperationCoordinatorServiceTest, BeginMultipleOperations) {
+TEST_F(MigrationBlockingOperationCoordinatorTest, BeginMultipleOperations) {
     _operations = {UUID::gen(), UUID::gen()};
     beginOperations();
     assertOperationCountOnDisk(2);
 }
 
-TEST_F(MigrationBlockingOperationCoordinatorServiceTest, BeginSameOperationMultipleTimes) {
+TEST_F(MigrationBlockingOperationCoordinatorTest, BeginSameOperationMultipleTimes) {
     _operations = {UUID::gen()};
     beginOperations();
     beginOperations();
     assertOperationCountOnDisk(1);
 }
 
-TEST_F(MigrationBlockingOperationCoordinatorServiceTest, EndSameOperationMultipleTimes) {
+TEST_F(MigrationBlockingOperationCoordinatorTest, EndSameOperationMultipleTimes) {
     _operations = {UUID::gen(), UUID::gen()};
     beginOperations();
 
@@ -179,7 +186,7 @@ TEST_F(MigrationBlockingOperationCoordinatorServiceTest, EndSameOperationMultipl
     assertOperationCountOnDisk(1);
 }
 
-DEATH_TEST_F(MigrationBlockingOperationCoordinatorServiceTest,
+DEATH_TEST_F(MigrationBlockingOperationCoordinatorTest,
              InvalidInitialStateDocument,
              "Operations should not be ongoing while migrations are running") {
     auto stateDocument = createStateDocument();
@@ -194,7 +201,7 @@ DEATH_TEST_F(MigrationBlockingOperationCoordinatorServiceTest,
     Instance::getOrCreate(_opCtx, _service, stateDocument.toBSON());
 }
 
-DEATH_TEST_F(MigrationBlockingOperationCoordinatorServiceTest,
+DEATH_TEST_F(MigrationBlockingOperationCoordinatorTest,
              DuplicateOperationsOnDisk,
              "Duplicate operations found on disk with same UUID") {
     auto stateDocument = createStateDocument();
@@ -211,7 +218,7 @@ DEATH_TEST_F(MigrationBlockingOperationCoordinatorServiceTest,
     Instance::getOrCreate(_opCtx, _service, stateDocument.toBSON());
 }
 
-TEST_F(MigrationBlockingOperationCoordinatorServiceTest, FunctionCallWhileCoordinatorCleaningUp) {
+TEST_F(MigrationBlockingOperationCoordinatorTest, FunctionCallWhileCoordinatorCleaningUp) {
     auto fp = globalFailPointRegistry().find("hangBeforeRemovingCoordinatorDocument");
     invariant(fp);
     fp->setMode(FailPoint::alwaysOn);
@@ -233,6 +240,34 @@ TEST_F(MigrationBlockingOperationCoordinatorServiceTest, FunctionCallWhileCoordi
 
     ASSERT_OK(_instance->getCompletionFuture().getNoThrow());
     ASSERT_FALSE(stateDocumentExistsOnDisk());
+}
+
+TEST_F(MigrationBlockingOperationCoordinatorTest,
+       BeginOperationFailsBlockingMigrationsOnNetworkError) {
+    _mockCommandResponse->appendResponse(
+        Fault(Status(ErrorCodes::HostUnreachable, "simulated network error")));
+
+    _operations = {UUID::gen()};
+    ASSERT_THROWS_CODE(beginOperations(), DBException, ErrorCodes::HostUnreachable);
+
+    // Ensure that the doc state was deleted and instance was clean up.
+    ASSERT_OK(_instance->getCompletionFuture().getNoThrow());
+    ASSERT_FALSE(stateDocumentExistsOnDisk());
+}
+
+TEST_F(MigrationBlockingOperationCoordinatorTest, EnsureEndOperationFailsAllowingMigrations) {
+    _operations = {UUID::gen()};
+    beginOperations();
+
+    _mockCommandResponse->appendResponse(
+        Fault(Status(ErrorCodes::HostUnreachable, "simulated network error")));
+
+    ASSERT_THROWS_CODE(
+        _instance->endOperation(_opCtx, _operations[0]), DBException, ErrorCodes::HostUnreachable);
+
+    // Ensure that the doc state was untouched.
+    ASSERT_TRUE(stateDocumentExistsOnDisk());
+    assertOperationCountOnDisk(1);
 }
 
 }  // namespace mongo

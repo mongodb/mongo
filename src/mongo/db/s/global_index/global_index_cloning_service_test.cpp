@@ -65,6 +65,7 @@
 #include "mongo/db/s/global_index/global_index_cloning_service.h"
 #include "mongo/db/s/global_index/global_index_util.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
+#include "mongo/db/s/sharding_test_helpers.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
@@ -103,6 +104,7 @@ using OpObserverForTest =
                                                                          GlobalIndexClonerDoc>;
 using PauseDuringStateTransitions =
     resharding_service_test_helpers::PauseDuringStateTransitions<GlobalIndexClonerStateEnum>;
+using Fault = sharding_test_helpers::Fault;
 
 const ShardId kRecipientShardId{"myShardId"};
 const NamespaceString kSourceNss =
@@ -149,24 +151,6 @@ public:
 private:
     const UUID _sourceUUID{UUID::gen()};
     const ShardId _someDonorId{"otherShardId"};
-};
-
-class Fault {
-public:
-    Fault(Status error, int triggerCount = 1)
-        : _error(std::move(error)), _remainingTriggerCount(triggerCount) {}
-
-    void throwIfEnabled() {
-        if (_remainingTriggerCount == 0 || _remainingTriggerCount-- == 0) {
-            return;
-        }
-
-        uassertStatusOK(_error);
-    }
-
-private:
-    const Status _error;
-    int _remainingTriggerCount{0};
 };
 
 template <typename T>

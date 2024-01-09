@@ -30,11 +30,17 @@
 #pragma once
 
 #include "mongo/db/s/sharding_ddl_coordinator_external_state.h"
+#include "mongo/db/s/sharding_test_helpers.h"
 
 namespace mongo {
 
+using Fault = sharding_test_helpers::Fault;
+using MockCommandResponse = sharding_test_helpers::FaultGenerator;
+
 class ShardingDDLCoordinatorExternalStateForTest : public ShardingDDLCoordinatorExternalState {
 public:
+    ShardingDDLCoordinatorExternalStateForTest(MockCommandResponse* mockCommandResponse);
+
     virtual void checkShardedDDLAllowedToStart(OperationContext* opCtx,
                                                const NamespaceString& nss) const override;
     virtual void waitForVectorClockDurable(OperationContext* opCtx) const override;
@@ -42,12 +48,26 @@ public:
                                            const DatabaseName& dbName) const override;
     virtual bool isShardedTimeseries(OperationContext* opCtx,
                                      const NamespaceString& bucketNss) const override;
+    virtual void allowMigrations(OperationContext* opCtx,
+                                 NamespaceString nss,
+                                 bool allowMigrations) const override;
+
+private:
+    MockCommandResponse* _mockCommandResponse;
 };
 
 class ShardingDDLCoordinatorExternalStateFactoryForTest
     : public ShardingDDLCoordinatorExternalStateFactory {
 public:
+    ShardingDDLCoordinatorExternalStateFactoryForTest() {
+        _mockCommandResponse = std::make_unique<MockCommandResponse>().get();
+    }
+    ShardingDDLCoordinatorExternalStateFactoryForTest(MockCommandResponse* mockCommandResponse);
+
     virtual std::unique_ptr<ShardingDDLCoordinatorExternalState> create() const override;
+
+private:
+    MockCommandResponse* _mockCommandResponse;
 };
 
 }  // namespace mongo

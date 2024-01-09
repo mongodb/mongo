@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -95,16 +96,27 @@ void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opC
         return;
     }
     _operations.insert(operationUUID);
+    ScopeGuard removeOperationGuard([&] { _operations.erase(operationUUID); });
 
     auto newDoc = _getDoc();
+    auto isFirst = _isFirstOperation(lock);
 
-    if (_isFirstOperation(lock)) {
+    if (isFirst) {
         newDoc.setOperations(std::vector<UUID>{});
         newDoc.setPhase(Phase::kBlockingMigrations);
     }
     newDoc.getOperations()->push_back(operationUUID);
 
     _insertOrUpdateStateDocument(lock, opCtx, std::move(newDoc));
+
+    if (isFirst) {
+        ScopeGuard removeStateDocumentGuard([&] { _completionPromise.emplaceValue(); });
+
+        _getExternalState()->allowMigrations(opCtx, nss(), false);
+        removeStateDocumentGuard.dismiss();
+    }
+
+    removeOperationGuard.dismiss();
 }
 
 void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx,
@@ -117,6 +129,16 @@ void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx
     }
     _operations.erase(operationUUID);
 
+    if (_operations.empty()) {
+        ScopeGuard insertOperationGuard([&] { _operations.insert(operationUUID); });
+
+        _getExternalState()->allowMigrations(opCtx, nss(), true);
+        insertOperationGuard.dismiss();
+
+        _completionPromise.emplaceValue();
+        return;
+    }
+
     auto newDoc = _getDoc();
     std::erase(newDoc.getOperations().get(), operationUUID);
 
@@ -127,9 +149,7 @@ void MigrationBlockingOperationCoordinator::_insertOrUpdateStateDocument(
     WithLock lk,
     OperationContext* opCtx,
     MigrationBlockingOperationCoordinatorDocument newStateDocument) {
-    if (_operations.empty()) {
-        _completionPromise.emplaceValue();
-    } else if (_isFirstOperation(lk)) {
+    if (_isFirstOperation(lk)) {
         _insertStateDocument(opCtx, std::move(newStateDocument));
     } else {
         _updateStateDocument(opCtx, std::move(newStateDocument));

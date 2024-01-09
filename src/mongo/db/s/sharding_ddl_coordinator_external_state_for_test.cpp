@@ -31,6 +31,10 @@
 
 namespace mongo {
 
+ShardingDDLCoordinatorExternalStateForTest::ShardingDDLCoordinatorExternalStateForTest(
+    MockCommandResponse* mockCommandResponse)
+    : _mockCommandResponse{mockCommandResponse} {}
+
 void ShardingDDLCoordinatorExternalStateForTest::checkShardedDDLAllowedToStart(
     OperationContext* opCtx, const NamespaceString& nss) const {}
 
@@ -45,9 +49,19 @@ bool ShardingDDLCoordinatorExternalStateForTest::isShardedTimeseries(
     return false;
 }
 
+void ShardingDDLCoordinatorExternalStateForTest::allowMigrations(OperationContext* opCtx,
+                                                                 NamespaceString nss,
+                                                                 bool allowMigrations) const {
+    _mockCommandResponse->getNext();
+}
+
+ShardingDDLCoordinatorExternalStateFactoryForTest::
+    ShardingDDLCoordinatorExternalStateFactoryForTest(MockCommandResponse* mockCommandResponse)
+    : _mockCommandResponse{mockCommandResponse} {}
+
 std::unique_ptr<ShardingDDLCoordinatorExternalState>
 ShardingDDLCoordinatorExternalStateFactoryForTest::create() const {
-    return std::make_unique<ShardingDDLCoordinatorExternalStateForTest>();
+    return std::make_unique<ShardingDDLCoordinatorExternalStateForTest>(_mockCommandResponse);
 }
 
 }  // namespace mongo

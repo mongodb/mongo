@@ -43,7 +43,9 @@ public:
                                            const DatabaseName& dbName) const = 0;
     virtual bool isShardedTimeseries(OperationContext* opCtx,
                                      const NamespaceString& bucketNss) const = 0;
-
+    virtual void allowMigrations(OperationContext* opCtx,
+                                 NamespaceString nss,
+                                 bool allowMigrations) const = 0;
 
 private:
 };
@@ -57,6 +59,9 @@ public:
                                            const DatabaseName& dbName) const override;
     virtual bool isShardedTimeseries(OperationContext* opCtx,
                                      const NamespaceString& bucketNss) const override;
+    virtual void allowMigrations(OperationContext* opCtx,
+                                 NamespaceString nss,
+                                 bool allowMigrations) const override;
 };
 
 class ShardingDDLCoordinatorExternalStateFactory {

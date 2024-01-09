@@ -30,6 +30,7 @@
 #include "mongo/db/s/sharding_ddl_coordinator_external_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/global_user_write_block_state.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/grid.h"
 
@@ -63,6 +64,16 @@ bool ShardingDDLCoordinatorExternalStateImpl::isShardedTimeseries(
         // if we don't find the bucket nss it means the collection is not
         // sharded.
         return false;
+    }
+}
+
+void ShardingDDLCoordinatorExternalStateImpl::allowMigrations(OperationContext* opCtx,
+                                                              NamespaceString nss,
+                                                              bool allowMigrations) const {
+    if (allowMigrations) {
+        sharding_ddl_util::resumeMigrations(opCtx, nss, boost::none);
+    } else {
+        sharding_ddl_util::stopMigrations(opCtx, nss, boost::none);
     }
 }
 
