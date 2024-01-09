@@ -72,7 +72,6 @@
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/ce/heuristic_estimator.h"
@@ -1003,40 +1002,14 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 
     QueryParameterMap queryParameters;
 
-    // Check if pipeline is eligible for plan caching.
     // TODO SERVER-82185: Update value of _isCacheable based on M2-eligibility
     // TODO SERVER-83414: Enable histogram CE with parameterization.
-    auto _isCacheable = (internalQueryCardinalityEstimatorMode != "histogram"_sd) &&
+    const auto _isCacheable = (internalQueryCardinalityEstimatorMode != "histogram"_sd) &&
         internalCascadesOptimizerEnableParameterization.load();
     if (pipeline) {
-        _isCacheable &= [&]() -> bool {
-            auto& sources = pipeline->getSources();
-
-            // Sources cannot be empty or contain more than two stages.
-            if (sources.empty() || sources.size() > 2) {
-                return false;
-            }
-
-            // First stage must be a DocumentSourceMatch.
-            const auto& firstStageItr = sources.begin();
-            auto firstStageName = firstStageItr->get()->getSourceName();
-            if (firstStageName != DocumentSourceMatch::kStageName) {
-                return false;
-            }
-
-            // If optional second stage exists, must be a projection stage.
-            auto secondStageItr = std::next(firstStageItr);
-            if (secondStageItr != sources.end()) {
-                return secondStageItr->get()->getSourceName() == DocumentSourceProject::kStageName;
-            }
-
-            return true;
-        }();
-
-        // TODO SERVER-84528: Perform parameterization before calling
-        // getSBEExecutorViaCascadesOptimizer
-        if (_isCacheable) {
-            pipeline->parameterize();
+        // Clear match expression auto-parameterization before pipeline to ABT translation
+        if (!_isCacheable && pipeline->isParameterized()) {
+            pipeline->unparameterize();
         }
 
         abt = translatePipelineToABT(metadata,
@@ -1063,8 +1036,9 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                            maxFilterDepth);
     }
 
-    // If pipeline exists and is cacheable, save the MatchExpression in ExecParams for binding.
-    const auto pipelineMatchExpr = pipeline && _isCacheable
+    // If pipeline exists, is cacheable, and is parameterized, save the MatchExpression in
+    // ExecParams for binding.
+    const auto pipelineMatchExpr = pipeline && _isCacheable && pipeline->isParameterized()
         ? boost::make_optional(
               dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())->getMatchExpression())
         : boost::none;

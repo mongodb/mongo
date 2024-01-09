@@ -58,7 +58,7 @@ ABT translatePipeline(const Metadata& metadata,
                       std::string scanDefName,
                       PrefixId& prefixId,
                       const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {},
-                      bool parameterized = false,
+                      bool shouldParameterize = false,
                       QueryParameterMap* = nullptr,
                       size_t maxDepth = kMaxPathConjunctionDecomposition);
 

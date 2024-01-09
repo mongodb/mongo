@@ -98,7 +98,7 @@ ABT translatePipeline(const Metadata& metadata,
                       std::string scanDefName,
                       PrefixId& prefixId,
                       const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss,
-                      bool parameterized,
+                      bool shouldParameterize,
                       QueryParameterMap* parameters,
                       size_t maxFilterDepth) {
     auto opCtx = cc().makeOperationContext();
@@ -108,7 +108,7 @@ ABT translatePipeline(const Metadata& metadata,
                       *opCtx,
                       involvedNss);
     pipeline->optimizePipeline();
-    if (parameterized) {
+    if (shouldParameterize) {
         pipeline->parameterize();
     }
     QueryParameterMap qp;

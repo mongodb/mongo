@@ -482,14 +482,31 @@ BSONObj Pipeline::getInitialQuery() const {
 }
 
 void Pipeline::parameterize() {
-    if (_sources.empty()) {
-        return;
+    if (!_sources.empty()) {
+        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(_sources.front().get())) {
+            MatchExpression::parameterize(matchStage->getMatchExpression());
+            _isParameterized = true;
+        }
     }
+}
 
-    auto firstStage = _sources.front().get();
-    if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(firstStage)) {
-        MatchExpression::parameterize(matchStage->getMatchExpression());
+void Pipeline::unparameterize() {
+    if (!_sources.empty()) {
+        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(_sources.front().get())) {
+            // Sets max param count in MatchExpression::parameterize() to 0, clearing
+            // MatchExpression auto-parameterization before pipeline to ABT translation.
+            MatchExpression::unparameterize(matchStage->getMatchExpression());
+            _isParameterized = false;
+        }
     }
+}
+
+bool Pipeline::canParameterize() {
+    if (!_sources.empty()) {
+        // First stage must be a DocumentSourceMatch.
+        return _sources.begin()->get()->getSourceName() == DocumentSourceMatch::kStageName;
+    }
+    return false;
 }
 
 bool Pipeline::needsPrimaryShardMerger() const {

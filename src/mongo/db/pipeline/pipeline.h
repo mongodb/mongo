@@ -303,6 +303,24 @@ public:
     void parameterize();
 
     /**
+     * Clear any parameterization in the pipeline.
+     */
+    void unparameterize();
+
+    /**
+     * Returns 'true' if a pipeline's structure is eligible for parameterization. It must have a
+     * $match first stage.
+     */
+    bool canParameterize();
+
+    /**
+     * Returns 'true' if a pipeline is parameterized.
+     */
+    bool isParameterized() {
+        return _isParameterized;
+    }
+
+    /**
      * Returns 'true' if the pipeline must merge on the primary shard.
      */
     bool needsPrimaryShardMerger() const;
@@ -538,6 +556,7 @@ private:
     SplitState _splitState = SplitState::kUnsplit;
     boost::intrusive_ptr<ExpressionContext> pCtx;
     bool _disposed = false;
+    bool _isParameterized = false;
 };
 
 /**

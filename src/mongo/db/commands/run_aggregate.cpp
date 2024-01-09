@@ -88,6 +88,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
@@ -1539,6 +1540,29 @@ Status _runAggregate(OperationContext* opCtx,
                         request.getHint(),
                         pipeline.get())) {
                     return fastPathExec;
+                }
+
+                // Checks that the pipeline is M2/M4-eligible in Bonsai. An eligible pipeline has
+                // (1) a $match first stage, and (2) an optional $project second stage. All other
+                // stages are unsupported.
+                auto fullyEligible = [](auto& sources) {
+                    // Sources cannot contain more than two stages.
+                    if (sources.size() > 2) {
+                        return false;
+                    }
+                    const auto& firstStageItr = sources.begin();
+                    // If optional second stage exists, must be a projection stage.
+                    if (auto secondStageItr = std::next(firstStageItr);
+                        secondStageItr != sources.end()) {
+                        return secondStageItr->get()->getSourceName() ==
+                            DocumentSourceProject::kStageName;
+                    }
+                    return true;
+                };
+
+                if (internalCascadesOptimizerEnableParameterization.load() &&
+                    pipeline->canParameterize() && fullyEligible(pipeline->getSources())) {
+                    pipeline->parameterize();
                 }
 
                 return getSBEExecutorViaCascadesOptimizer(opCtx,
