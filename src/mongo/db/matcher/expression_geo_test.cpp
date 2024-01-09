@@ -504,6 +504,79 @@ TEST(ExpressionGeoTest, RoundTripSerializeGeoExpressions) {
     assertRepresentativeGeoNearShapeIsStable(
         fromjson("{$geoNear: { $geometry: {coordinates: [0, 10]}}}"),
         fromjson("{$geoNear: { $geometry: {coordinates: [1, 1]}}}"));
+
+    assertRepresentativeGeoShapeIsStable(fromjson(R"({
+                "$geoIntersects": {
+                    "$geometry": {
+                        "type": "MultiLineString",
+                        "coordinates": [[
+                            [2, 0],
+                            [2, 2]
+                        ], [
+                            [0, 4],
+                            [1, 4]
+                        ]]
+                    }
+                }
+            })"),
+                                         fromjson(R"({
+                "$geoIntersects": {
+                    "$geometry": {
+                        "type": "MultiLineString",
+                        "coordinates": [[[0, 0], [1, 1]],[[0, 0], [1, 1]]]
+                    }
+                }
+            })"));
+
+    assertRepresentativeGeoShapeIsStable(fromjson(R"({
+                "$geoIntersects": {
+                    "$geometry": {
+                        "type": "LineString",
+                        "coordinates": [
+                            [2, 0],
+                            [2, 2]
+                        ]
+                    }
+                }
+            })"),
+                                         fromjson(R"({
+                "$geoIntersects": {
+                    "$geometry": {
+                        "type": "LineString",
+                        "coordinates": [[0, 0], [1, 1]]
+                    }
+                }
+            })"));
+
+    assertRepresentativeGeoShapeIsStable(fromjson(R"({
+                "$geoIntersects": {
+                    "$geometry": {
+                        "type": "GeometryCollection",
+                        "geometries": [{
+                            "type": "LineString",
+                            "coordinates": [
+                                [2, 0],
+                                [2, 2]
+                            ]
+                        }, {
+                            type: 'Point', coordinates: [2, 2]
+                        }]
+                    }
+                }
+            })"),
+                                         fromjson(R"({
+                "$geoIntersects": {
+                    "$geometry": {
+                        "type": "GeometryCollection",
+                        "geometries": [{
+                            "type": "LineString",
+                            "coordinates": [[0, 0], [1, 1]]
+                        }, {
+                            type: 'Point', coordinates: [1, 1]
+                        }]
+                    }
+                }
+            })"));
 }
 
 }  // namespace mongo

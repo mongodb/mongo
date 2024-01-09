@@ -101,7 +101,7 @@ void appendGeoJSONCoordinatesLiteral(BSONObjBuilder* bob,
                 fieldName,
                 BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(0 << 0) << BSON_ARRAY(0 << 1) << BSON_ARRAY(1 << 1)
                                                          << BSON_ARRAY(0 << 0))));
-            break;
+            return;
         }
         case GeoParser::GEOJSON_MULTI_POLYGON: {
             // MultiPolygon requires four pairs of coordinates in a closed loop wrapped in 2 arrays
@@ -110,30 +110,44 @@ void appendGeoJSONCoordinatesLiteral(BSONObjBuilder* bob,
                              BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(
                                  BSON_ARRAY(0 << 0) << BSON_ARRAY(0 << 1) << BSON_ARRAY(1 << 1)
                                                     << BSON_ARRAY(0 << 0)))));
-            break;
+            return;
         }
         case GeoParser::GEOJSON_POINT: {
             // Point requires a pair of coordinates to be re-parseable, so the representative
             // value is [1,1].
             bob->appendArray(fieldName, BSON_ARRAY(1 << 1));
-            break;
+            return;
         }
         case GeoParser::GEOJSON_MULTI_POINT: {
             // MultiPoint requires a pair of coordinates wrapped in an array to be re-parseable, so
             // the representative value is [[1,1]].
             bob->appendArray(fieldName, BSON_ARRAY(BSON_ARRAY(1 << 1)));
-            break;
+            return;
         }
         case GeoParser::GEOJSON_LINESTRING: {
             // LineString requires two pairs of coordinates to be re-parseable, so the
             // representative value is [[0,0],[1,1]].
             bob->appendArray(fieldName, BSON_ARRAY(BSON_ARRAY(0 << 0) << BSON_ARRAY(1 << 1)));
-            break;
+            return;
         }
-        default: {
+        case GeoParser::GEOJSON_MULTI_LINESTRING: {
+            // MultiLineString requires two LineStrings wrapped in an array to be re-parseable, so
+            // the representative value is [[[0,0],[1,1]],[[0,0],[1,1]]].
+            bob->appendArray(fieldName,
+                             BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(0 << 0) << BSON_ARRAY(1 << 1))
+                                        << BSON_ARRAY(BSON_ARRAY(0 << 0) << BSON_ARRAY(1 << 1))));
+            return;
+        }
+        case GeoParser::GEOJSON_GEOMETRY_COLLECTION:
             opts.appendLiteral(bob, coordinatesElem);
-        }
+            return;
+        case GeoParser::GEOJSON_UNKNOWN:
+            break;
     }
+
+    tasserted(8456600,
+              str::stream() << "unexpected geo type found in coordinates serialization: "
+                            << geoType);
 }
 
 void appendCRSObject(BSONObjBuilder* bob,
@@ -186,6 +200,16 @@ void appendGeometrySubObject(BSONObjBuilder* bob,
     }
     if (auto coordinatesElem = geometryObj[kGeometryCoordinatesField]) {
         appendGeoJSONCoordinatesLiteral(bob, coordinatesElem, typeElem, opts);
+    } else if (auto geometriesElem = geometryObj[GEOJSON_GEOMETRIES]) {
+        // We have a collection of geometries rather than a single one. Recursively serialize them
+        // and add to the output object.
+        BSONArrayBuilder geometriesArrBuilder;
+        for (const auto& geometry : geometriesElem.Array()) {
+            BSONObjBuilder geometryBuilder;
+            appendGeometrySubObject(&geometryBuilder, geometry.Obj(), opts);
+            geometriesArrBuilder.append(geometryBuilder.obj());
+        }
+        bob->append(GEOJSON_GEOMETRIES, geometriesArrBuilder.arr());
     }
 
     // 'crs' can be present if users want to use STRICT_SPHERE coordinate
