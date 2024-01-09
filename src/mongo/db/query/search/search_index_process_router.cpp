@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/search/search_index_helpers_router.h"
+#include "mongo/db/query/search/search_index_process_router.h"
 
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/service_context.h"
@@ -37,16 +37,16 @@
 
 namespace mongo {
 
-ServiceContext::ConstructorActionRegisterer searchIndexHelpersRouterImplementation{
-    "searchIndexHelpersRouter-registration", [](ServiceContext* serviceContext) {
+ServiceContext::ConstructorActionRegisterer SearchIndexProcessRouterImplementation{
+    "SearchIndexProcessRouter-registration", [](ServiceContext* serviceContext) {
         invariant(serviceContext);
         // Only register the router implementation if this server has a router service.
         if (auto service = serviceContext->getService(ClusterRole::RouterServer); service) {
-            SearchIndexHelpers::set(service, std::make_unique<SearchIndexHelpersRouter>());
+            SearchIndexProcessInterface::set(service, std::make_unique<SearchIndexProcessRouter>());
         }
     }};
 
-boost::optional<UUID> SearchIndexHelpersRouter::fetchCollectionUUID(OperationContext* opCtx,
+boost::optional<UUID> SearchIndexProcessRouter::fetchCollectionUUID(OperationContext* opCtx,
                                                                     const NamespaceString& nss) {
     // We perform a listCollection request to get the UUID from the actual primary shard for the
     // database. This will ensure it is correct for both SHARDED and UNSHARDED versions of the
@@ -84,7 +84,7 @@ boost::optional<UUID> SearchIndexHelpersRouter::fetchCollectionUUID(OperationCon
     return uuid;
 }
 
-UUID SearchIndexHelpersRouter::fetchCollectionUUIDOrThrow(OperationContext* opCtx,
+UUID SearchIndexProcessRouter::fetchCollectionUUIDOrThrow(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
     auto uuid = fetchCollectionUUID(opCtx, nss);
     if (!uuid) {

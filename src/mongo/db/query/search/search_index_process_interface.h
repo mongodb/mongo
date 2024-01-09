@@ -27,16 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/search/search_index_helpers.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
-class SearchIndexHelpersRouter : public SearchIndexHelpers {
+/**
+ * Interface to separate router role and shard role implementations.
+ */
+class SearchIndexProcessInterface {
 public:
-    boost::optional<UUID> fetchCollectionUUID(OperationContext* opCtx,
-                                              const NamespaceString& nss) override;
+    virtual ~SearchIndexProcessInterface() = default;
 
-    UUID fetchCollectionUUIDOrThrow(OperationContext* opCtx, const NamespaceString& nss) override;
+    static SearchIndexProcessInterface* get(Service* service);
+    static SearchIndexProcessInterface* get(OperationContext* opCtx);
+
+    static void set(Service* service, std::unique_ptr<SearchIndexProcessInterface> impl);
+
+    /**
+     * Returns the collection UUID or throws a NamespaceNotFound error.
+     */
+    virtual UUID fetchCollectionUUIDOrThrow(OperationContext* opCtx,
+                                            const NamespaceString& nss) = 0;
+
+    /**
+     * Returns the collection UUID or boost::none if no collection is found.
+     */
+    virtual boost::optional<UUID> fetchCollectionUUID(OperationContext* opCtx,
+                                                      const NamespaceString& nss) = 0;
 };
 
 }  // namespace mongo

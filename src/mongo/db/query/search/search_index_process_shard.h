@@ -27,27 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/search/search_index_helpers.h"
-
-#include "mongo/db/service_context.h"
+#include "mongo/db/query/search/search_index_process_interface.h"
 
 namespace mongo {
 
-Service::Decoration<std::unique_ptr<SearchIndexHelpers>> searchIndexHelpersDecoration =
-    Service::declareDecoration<std::unique_ptr<SearchIndexHelpers>>();
+class SearchIndexProcessShard : public SearchIndexProcessInterface {
+public:
+    boost::optional<UUID> fetchCollectionUUID(OperationContext* opCtx,
+                                              const NamespaceString& nss) override;
 
-SearchIndexHelpers* SearchIndexHelpers::get(Service* service) {
-    invariant(searchIndexHelpersDecoration(service).get());
-    return searchIndexHelpersDecoration(service).get();
-}
-
-SearchIndexHelpers* SearchIndexHelpers::get(OperationContext* ctx) {
-    return get(ctx->getService());
-}
-
-void SearchIndexHelpers::set(Service* service, std::unique_ptr<SearchIndexHelpers> impl) {
-    invariant(!searchIndexHelpersDecoration(service).get());
-    searchIndexHelpersDecoration(service) = std::move(impl);
-}
+    UUID fetchCollectionUUIDOrThrow(OperationContext* opCtx, const NamespaceString& nss) override;
+};
 
 }  // namespace mongo

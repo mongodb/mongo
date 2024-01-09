@@ -30,7 +30,7 @@
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 
 #include "mongo/db/query/search/search_index_common.h"
-#include "mongo/db/query/search/search_index_helpers.h"
+#include "mongo/db/query/search/search_index_process_interface.h"
 
 namespace mongo {
 
@@ -102,7 +102,7 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
     // the collectionUUID from either mongos or mongod depending on where the request was sent, so
     // we call those functions here.
     if (!_collectionUUID) {
-        _collectionUUID = SearchIndexHelpers::get(pExpCtx->opCtx)
+        _collectionUUID = SearchIndexProcessInterface::get(pExpCtx->opCtx)
                               ->fetchCollectionUUID(pExpCtx->opCtx, pExpCtx->ns);
     }
 

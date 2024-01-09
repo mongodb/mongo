@@ -40,9 +40,9 @@
 
 namespace mongo {
 
+namespace {
 using ListSearchIndexesAuthTest = AuthorizationSessionTestFixture;
 
-namespace {
 const TenantId kTenantId1(OID("12345678901234567890aaaa"));
 const NamespaceString nss =
     NamespaceString::createNamespaceString_forTest(kTenantId1, "test", "foo");

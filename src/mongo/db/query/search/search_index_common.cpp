@@ -30,9 +30,9 @@
 #include "mongo/db/query/search/search_index_common.h"
 
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
-#include "mongo/db/query/search/search_index_helpers.h"
 #include "mongo/db/query/search/search_index_options.h"
 #include "mongo/db/query/search/search_index_options_gen.h"
+#include "mongo/db/query/search/search_index_process_interface.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
@@ -129,7 +129,8 @@ BSONObj runSearchIndexCommand(OperationContext* opCtx,
                               const BSONObj& cmdObj) {
     throwIfNotRunningWithRemoteSearchIndexManagement();
 
-    auto collectionUUID = SearchIndexHelpers::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
+    auto collectionUUID =
+        SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
     BSONObj manageSearchIndexResponse =
         getSearchIndexManagerResponse(opCtx, nss, collectionUUID, cmdObj);
 

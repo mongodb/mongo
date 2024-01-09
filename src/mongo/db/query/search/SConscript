@@ -91,7 +91,7 @@ env.Library(
 )
 
 # This target holds the shared logic for dispatching search index requests to a mongot,
-# whereas the search_index_helper targets below hold the logic for fetching collection
+# whereas the search_index_process targets below hold the logic for fetching collection
 # metadata, either as a mongos router or mongod shard.
 env.Library(
     target='search_index_common',
@@ -100,8 +100,8 @@ env.Library(
         'search_index_common.cpp',
     ],
     LIBDEPS=[
-        'search_index_helpers_interface',
         'search_index_options',
+        'search_index_process_interface',
         'search_task_executors',
     ],
     LIBDEPS_PRIVATE=[
@@ -114,9 +114,9 @@ env.Library(
 )
 
 env.Library(
-    target='search_index_helpers_interface',
+    target='search_index_process_interface',
     source=[
-        'search_index_helpers.cpp',
+        'search_index_process_interface.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands',
@@ -126,24 +126,24 @@ env.Library(
 )
 
 env.Library(
-    target='search_index_helpers_shard',
+    target='search_index_process_shard',
     source=[
-        'search_index_helpers_shard.cpp',
+        'search_index_process_shard.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        'search_index_helpers_interface',
+        'search_index_process_interface',
     ],
 )
 
 env.Library(
-    target='search_index_command_router',
+    target='search_index_process_router',
     source=[
-        'search_index_helpers_router.cpp',
+        'search_index_process_router.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         '$BUILD_DIR/mongo/s/sharding_router_api',
-        'search_index_helpers_interface',
+        'search_index_process_interface',
     ],
 )

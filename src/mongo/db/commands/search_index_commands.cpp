@@ -32,7 +32,7 @@
 #include "mongo/db/commands/search_index_commands_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/search/search_index_common.h"
-#include "mongo/db/query/search/search_index_helpers.h"
+#include "mongo/db/query/search/search_index_process_interface.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 
@@ -94,7 +94,7 @@ public:
             const auto& nss = cmd.getNamespace();
 
             auto collectionUUID =
-                SearchIndexHelpers::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
+                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
 
             // Run the search index command against the remote search index management server.
             BSONObj manageSearchIndexResponse = getSearchIndexManagerResponse(
@@ -169,7 +169,7 @@ public:
             const auto& nss = cmd.getNamespace();
 
             auto collectionUUID =
-                SearchIndexHelpers::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
+                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
 
             BSONObj manageSearchIndexResponse = getSearchIndexManagerResponse(
                 opCtx, nss, collectionUUID, cmd.toBSON(BSONObj() /* commandPassthroughFields */));
@@ -251,7 +251,7 @@ public:
             const auto& nss = cmd.getNamespace();
 
             auto collectionUUID =
-                SearchIndexHelpers::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
+                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
 
             BSONObj manageSearchIndexResponse = getSearchIndexManagerResponse(
                 opCtx, nss, collectionUUID, cmd.toBSON(BSONObj() /* commandPassthroughFields */));
@@ -363,7 +363,7 @@ public:
             const auto& nss = cmd.getNamespace();
 
             auto collectionUUID =
-                SearchIndexHelpers::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
+                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
 
             BSONObj manageSearchIndexResponse = getSearchIndexManagerResponse(
                 opCtx, nss, collectionUUID, cmd.toBSON(BSONObj() /* commandPassthroughFields */));

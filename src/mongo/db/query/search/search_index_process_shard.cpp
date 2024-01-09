@@ -27,16 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/search/search_index_helpers.h"
+#include "mongo/db/query/search/search_index_process_shard.h"
+
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 
-class SearchIndexHelpersShard : public SearchIndexHelpers {
-public:
-    boost::optional<UUID> fetchCollectionUUID(OperationContext* opCtx,
-                                              const NamespaceString& nss) override;
+ServiceContext::ConstructorActionRegisterer SearchIndexProcessShardImplementation{
+    "SearchIndexProcessShard-registration", [](ServiceContext* serviceContext) {
+        invariant(serviceContext);
+        // Only register the router implementation if this server has a shard service.
+        if (auto service = serviceContext->getService(ClusterRole::ShardServer); service) {
+            SearchIndexProcessInterface::set(service, std::make_unique<SearchIndexProcessShard>());
+        }
+    }};
 
-    UUID fetchCollectionUUIDOrThrow(OperationContext* opCtx, const NamespaceString& nss) override;
-};
+boost::optional<UUID> SearchIndexProcessShard::fetchCollectionUUID(OperationContext* opCtx,
+                                                                   const NamespaceString& nss) {
+    return CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
+}
+
+UUID SearchIndexProcessShard::fetchCollectionUUIDOrThrow(OperationContext* opCtx,
+                                                         const NamespaceString& nss) {
+    auto optUuid = fetchCollectionUUID(opCtx, nss);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' does not exist.",
+            optUuid);
+    return optUuid.get();
+}
 
 }  // namespace mongo
