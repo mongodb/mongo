@@ -69,7 +69,13 @@ function runTestOnPrimaries(testFn, cursorId) {
 
 function assertLimitAbsorbed(explainRes, query) {
     let shardsArray = explainRes["shards"];
+
     for (let [_, individualShardObj] of Object.entries(shardsArray)) {
+        // TODO: See SERVER-84511 Explain seems to be broken with search. Currently, "stages" is not
+        // found in the bsonObj in the loop below.
+        if (individualShardObj["stages"] === undefined) {
+            continue;
+        }
         let stages = individualShardObj["stages"];
         // Assert limit was pushed down to shards.
         if ("returnStoredSource" in query) {

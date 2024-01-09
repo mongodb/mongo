@@ -110,6 +110,75 @@ var bsonWoCompareWrapper = function(obj1, obj2) {
     return bsonWoCompare(obj1, obj2) === 0;
 };
 
+// Test Object.entries() enumerates lazy property keys and values correctly.
+function runObjectEntriesTest() {
+    t.drop();
+    t.insertOne({_id: 1, a: "a", b: "b"});
+    let res = t.findOne();
+    assert.eq([["_id", 1], ["a", "a"], ["b", "b"]], Object.entries(res));
+    // Test that we don't re-define properties in Object.entries() after they've been already been
+    // defined. We can test this by updating the object here and ensuring the overwrite is reflected
+    // in Object.entries().
+    res.a = "b";
+    assert.eq([["_id", 1], ["a", "b"], ["b", "b"]], Object.entries(res));
+}
+
+function runObjectEntriesArrayTypesTest() {
+    t.drop();
+    // Test enumerating "dense" array.
+    t.insertOne({_id: 1, a: [1, 2, 3, 4, 5], b: "b"});
+    let res = t.findOne();
+    assert.eq([["_id", 1], ["a", [1, 2, 3, 4, 5]], ["b", "b"]], Object.entries(res));
+    assert.eq([["0", 1], ["1", 2], ["2", 3], ["3", 4], ["4", 5]], Object.entries(res.a));
+    jsTestLog("SR_DEBUG the type of the res = " + typeof res.a);
+    t.update({_id: 1}, {$set: {"a.9": 10}});
+    res = t.findOne();
+    // Test enumerating "sparse" array.
+    assert.eq([["_id", 1], ["a", [1, 2, 3, 4, 5, null, null, null, null, 10]], ["b", "b"]],
+              Object.entries(res));
+    assert.eq(
+        [
+            ["0", 1],
+            ["1", 2],
+            ["2", 3],
+            ["3", 4],
+            ["4", 5],
+            ["5", null],
+            ["6", null],
+            ["7", null],
+            ["8", null],
+            ["9", 10]
+        ],
+        Object.entries(res.a));
+
+    // Test overwriting the native object is not affected by the Object.entries() call.
+    res.a = [5, 6, 7, 8, 9];
+    assert.eq([["_id", 1], ["a", [5, 6, 7, 8, 9]], ["b", "b"]], Object.entries(res));
+    assert.eq([["0", 5], ["1", 6], ["2", 7], ["3", 8], ["4", 9]], Object.entries(res.a));
+
+    // Test enumerating nested array.
+    t.update({_id: 1}, {$set: {"a.10": [1, 2, 3, 4, 5]}});
+    res = t.findOne();
+    assert.eq(
+        [
+            ["_id", 1],
+            ["a", [1, 2, 3, 4, 5, null, null, null, null, 10, [1, 2, 3, 4, 5]]],
+            ["b", "b"]
+        ],
+        Object.entries(res));
+    assert.eq([["0", 1], ["1", 2], ["2", 3], ["3", 4], ["4", 5]], Object.entries(res.a[10]));
+    // Test overwriting the native object is not affected by the Object.entries() call.
+    res.a[10] = [5, 6, 7, 8, 9];
+    assert.eq(
+        [
+            ["_id", 1],
+            ["a", [1, 2, 3, 4, 5, null, null, null, null, 10, [5, 6, 7, 8, 9]]],
+            ["b", "b"]
+        ],
+        Object.entries(res));
+    assert.eq([["0", 5], ["1", 6], ["2", 7], ["3", 8], ["4", 9]], Object.entries(res.a[10]));
+}
+
 // Run the tests which work the same for both comparators.
 runTests(bsonWoCompareWrapper, "bsonWoCompare");
 runTests(bsonBinaryEqual, "bsonBinaryEqual");
@@ -127,3 +196,5 @@ testObjectsAreEqual(NumberInt("1"), NumberDecimal("1.0"), bsonWoCompareWrapper, 
 testObjectsAreNotEqual(NumberInt("1"), NumberDecimal("1.0"), bsonBinaryEqual, "bsonBinaryEqual");
 testObjectsAreEqual(NumberLong("1"), NumberDecimal("1.0"), bsonWoCompareWrapper, "bsonWoCompare");
 testObjectsAreNotEqual(NumberLong("1"), NumberDecimal("1.0"), bsonBinaryEqual, "bsonBinaryEqual");
+runObjectEntriesTest();
+runObjectEntriesArrayTypesTest();

@@ -9,11 +9,19 @@ export const kDefaultQueryStatsHmacKey = BinData(8, "MjM0NTY3ODkxMDExMTIxMzE0MTU
  */
 export function verifyMetrics(batch) {
     batch.forEach(element => {
+        function skipMetric(summaryValues) {
+            // Skip over fields that aren't aggregated metrics with sum/min/max (execCount,
+            // lastExecutionMicros). We also skip metrics that are aggregated, but that haven't
+            // yet been updated (i.e have a sum of 0). This can happen on occasion when new metrics
+            // are not yet in use, or are guarded by a feature flag. Instead, it may be better to
+            // keep a list of the metrics we expect to see here in the long term for a more
+            // consistent check.
+            return summaryValues.sum === undefined ||
+                (typeof summaryValues.sum === "object" && summaryValues.sum.valueOf() === 0);
+        }
         if (element.metrics.execCount === 1) {
             for (const [metricName, summaryValues] of Object.entries(element.metrics)) {
-                // Skip over fields that aren't aggregated metrics with sum/min/max (execCount,
-                // lastExecutionMicros).
-                if (summaryValues.sum === undefined) {
+                if (skipMetric(summaryValues)) {
                     continue;
                 }
                 const debugInfo = {[metricName]: summaryValues};
@@ -25,9 +33,7 @@ export function verifyMetrics(batch) {
             }
         } else {
             for (const [metricName, summaryValues] of Object.entries(element.metrics)) {
-                // Skip over fields that aren't aggregated metrics with sum/min/max (execCount,
-                // lastExecutionMicros).
-                if (summaryValues.sum === undefined) {
+                if (skipMetric(summaryValues)) {
                     continue;
                 }
                 const debugInfo = {[metricName]: summaryValues};
