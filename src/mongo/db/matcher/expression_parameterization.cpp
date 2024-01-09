@@ -121,22 +121,48 @@ void MatchExpressionParameterizationVisitor::visitComparisonMatchExpression(
         case BSONType::jstOID:
         case BSONType::Bool:
         case BSONType::RegEx:
-        case BSONType::Date:
         case BSONType::Code:
         case BSONType::Symbol:
         case BSONType::CodeWScope:
-        case BSONType::NumberInt:
-        case BSONType::bsonTimestamp:
-        case BSONType::NumberLong:
             expr->setInputParamId(_context->nextReusableInputParamId(expr));
             break;
-        case BSONType::NumberDouble:
-            if (!std::isnan(expr->getData().numberDouble())) {
+        case BSONType::bsonTimestamp:
+            if (expr->getData().timestamp() != Timestamp::max() &&
+                expr->getData().timestamp() != Timestamp::min()) {
                 expr->setInputParamId(_context->nextReusableInputParamId(expr));
             }
             break;
+        case BSONType::Date:
+            if (expr->getData().Date() != Date_t::max() &&
+                expr->getData().Date() != Date_t::min()) {
+                expr->setInputParamId(_context->nextReusableInputParamId(expr));
+            }
+            break;
+        case BSONType::NumberInt:
+            if (expr->getData().numberInt() != std::numeric_limits<int>::max() &&
+                expr->getData().numberInt() != std::numeric_limits<int>::min()) {
+                expr->setInputParamId(_context->nextReusableInputParamId(expr));
+            }
+            break;
+        case BSONType::NumberLong:
+            if (expr->getData().numberLong() != std::numeric_limits<long long>::max() &&
+                expr->getData().numberLong() != std::numeric_limits<long long>::min()) {
+                expr->setInputParamId(_context->nextReusableInputParamId(expr));
+            }
+            break;
+        case BSONType::NumberDouble: {
+            auto doubleVal = expr->getData().numberDouble();
+            if (!std::isnan(doubleVal) && doubleVal != std::numeric_limits<double>::max() &&
+                doubleVal != std::numeric_limits<double>::min() &&
+                doubleVal != std::numeric_limits<double>::infinity() &&
+                doubleVal != -std::numeric_limits<double>::infinity()) {
+                expr->setInputParamId(_context->nextReusableInputParamId(expr));
+            }
+            break;
+        }
         case BSONType::NumberDecimal:
-            if (!expr->getData().numberDecimal().isNaN()) {
+            if (!expr->getData().numberDecimal().isNaN() &&
+                !expr->getData().numberDecimal().isInfinite()) {
                 expr->setInputParamId(_context->nextReusableInputParamId(expr));
             }
             break;
@@ -146,6 +172,15 @@ void MatchExpressionParameterizationVisitor::visitComparisonMatchExpression(
 void MatchExpressionParameterizationVisitor::visit(InMatchExpression* expr) {
     // We don't set inputParamId if a InMatchExpression contains a regex.
     if (!expr->getRegexes().empty()) {
+        return;
+    }
+
+    // We don't set inputParamId if there's just one element because it could end up with a single
+    // interval index bound that may be eligible for fast COUNT_SCAN plan. However, a
+    // multiple-element $in query has more than one (point) intervals for the index bounds, which is
+    // ineligible for COUNT_SCAN. This is to make sure that $in queries with multiple elements will
+    // not share the same query shape with any other single-element $in query.
+    if (expr->getEqualities().size() == 1) {
         return;
     }
 

@@ -79,3 +79,38 @@ assert.eq(newCacheEntry.queryHash, queryHash, newCacheEntry);
 
 // The query should also return the same results as before.
 assert.eq(results, cacheResults);
+
+// Test that Infinity value in a filter should not be parameterized.
+// These two queries have the same query shape but should not have a same plan cache key because
+// the filter with a infinity value should not be eligible for auto-parameterization.
+const filterWithInf = {
+    "a": {$not: {$gt: NumberDecimal("Infinity")}}
+};
+const filterWithVeryLargeValue = {
+    "a": {$not: {$gt: NumberDecimal("9.999999999999999999999999999999999E+6144")}}
+};
+
+assert.neq(
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithInf}]), db),
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithVeryLargeValue}]), db));
+
+// Auto-parameterization should still apply if no infinity value is involved.
+assert.eq(
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: {"a": {$not: {$gt: 1}}}}]), db),
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithVeryLargeValue}]), db));
+
+const singleElemIn = {
+    "a": {$in: [1]}
+};
+const multipleElemsIn = {
+    "a": {$in: [1, 2]}
+};
+const multipleElemsIn2 = {
+    "a": {$in: [3, 4]}
+};
+assert.neq(getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: singleElemIn}]), db),
+           getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn}]), db));
+
+// Auto-parameterization should still apply if there's no single-element $in query.
+assert.eq(getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn}]), db),
+          getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn2}]), db));

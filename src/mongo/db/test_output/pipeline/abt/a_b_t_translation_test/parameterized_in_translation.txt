@@ -100,9 +100,7 @@ Filter []
 |   PathGet [a]
 |   PathTraverse [1]
 |   PathCompare [Eq]
-|   FunctionCall [getParam]
-|   |   Const [1]
-|   Const [0]
+|   Const [1]
 Scan [collection, {scan_0}]
 
 
