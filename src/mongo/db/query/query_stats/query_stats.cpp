@@ -228,6 +228,36 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
     toUpdate.addSupplementalStats(std::move(supplementalStatsEntry));
 }
 
+void insertQueryStatsEntry(QueryStatsStore::Partition& proofOfLock,
+                           QueryStatsStore& queryStatsStore,
+                           boost::optional<size_t> queryStatsKeyHash,
+                           std::unique_ptr<Key> key,
+                           const QueryStatsSnapshot& snapshot,
+                           std::unique_ptr<SupplementalStatsEntry> supplementalMetrics) {
+    tassert(7315200,
+            "key cannot be null when writing a new entry to the queryStats store",
+            key != nullptr);
+    size_t numEvicted =
+        queryStatsStore.put(*queryStatsKeyHash, QueryStatsEntry(std::move(key)), proofOfLock);
+    queryStatsEvictedMetric.increment(numEvicted);
+    auto newMetrics = proofOfLock->get(*queryStatsKeyHash);
+    if (!newMetrics.isOK()) {
+        // This can happen if the budget is immediately exceeded. Specifically
+        // if the there is not enough room for a single new entry if the number
+        // of partitions is too high relative to the size.
+        queryStatsStoreWriteErrorsMetric.increment();
+        LOGV2_DEBUG(7560900,
+                    0,
+                    "Failed to store queryStats entry.",
+                    "status"_attr = newMetrics.getStatus(),
+                    "queryStatsKeyHash"_attr = queryStatsKeyHash);
+        return;
+    }
+
+    return updateStatistics(
+        proofOfLock, newMetrics.getValue()->second, snapshot, std::move(supplementalMetrics));
+}
+
 }  // namespace
 
 void registerRequest(OperationContext* opCtx,
@@ -325,7 +355,21 @@ void writeQueryStats(OperationContext* opCtx,
     if (!queryStatsKeyHash) {
         return;
     }
-    auto&& queryStatsStore = getQueryStatsStore(opCtx);
+
+    // It's possible that query stats was enabled in registerRequest but has been disabled since
+    // (e.g., by FCV downgrade or setting the store size to 0). Rather than calling
+    // getQueryStatsStore (which would trigger a uassert if query stats is disabled), we return and
+    // log a message if query stats is disabled, and otherwise grab the query stats store directly.
+    if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
+        LOGV2_DEBUG(8456700,
+                    2,
+                    "Query stats was enabled when the command started but is now disabled. "
+                    "Metrics will not be collected.",
+                    "queryStatsKeyHash"_attr = queryStatsKeyHash);
+        return;
+    }
+    auto&& queryStatsStore =
+        queryStatsStoreDecoration(opCtx->getServiceContext())->getQueryStatsStore();
     auto&& [statusWithMetrics, partitionLock] =
         queryStatsStore.getWithPartitionLock(*queryStatsKeyHash);
     if (statusWithMetrics.isOK()) {
@@ -335,28 +379,12 @@ void writeQueryStats(OperationContext* opCtx,
     }
 
     // Otherwise we didn't find an existing entry. Try to create one.
-    tassert(7315200,
-            "key cannot be null when writing a new entry to the queryStats store",
-            key != nullptr);
-    size_t numEvicted =
-        queryStatsStore.put(*queryStatsKeyHash, QueryStatsEntry(std::move(key)), partitionLock);
-    queryStatsEvictedMetric.increment(numEvicted);
-    auto newMetrics = partitionLock->get(*queryStatsKeyHash);
-    if (!newMetrics.isOK()) {
-        // This can happen if the budget is immediately exceeded. Specifically
-        // if the there is not enough room for a single new entry if the number
-        // of partitions is too high relative to the size.
-        queryStatsStoreWriteErrorsMetric.increment();
-        LOGV2_DEBUG(7560900,
-                    0,
-                    "Failed to store queryStats entry.",
-                    "status"_attr = newMetrics.getStatus(),
-                    "queryStatsKeyHash"_attr = queryStatsKeyHash);
-        return;
-    }
-
-    return updateStatistics(
-        partitionLock, newMetrics.getValue()->second, snapshot, std::move(supplementalMetrics));
+    return insertQueryStatsEntry(partitionLock,
+                                 queryStatsStore,
+                                 queryStatsKeyHash,
+                                 std::move(key),
+                                 snapshot,
+                                 std::move(supplementalMetrics));
 }
 
 }  // namespace mongo::query_stats
