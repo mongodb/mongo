@@ -2797,7 +2797,7 @@ size_t sizeWithoutRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize) {
 size_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
     // See decodeRecordIdStrAtEnd for the size decoding algorithm
     invariant(bufSize > 0);
-    const uint8_t* buffer = static_cast<const uint8_t*>(bufferRaw);
+    const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
 
     // Decode RecordId binary string size
     size_t ridSize = 0;
@@ -2826,20 +2826,37 @@ size_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
 }
 
 RecordId decodeRecordIdLong(BufReader* reader) {
-    const uint8_t firstByte = readType<uint8_t>(reader, false);
-    const uint8_t numExtraBytes = firstByte >> 5;  // high 3 bits in firstByte
-    uint64_t repr = firstByte & 0x1f;              // low 5 bits in firstByte
-    for (int i = 0; i < numExtraBytes; i++) {
-        repr = (repr << 8) | readType<uint8_t>(reader, false);
+    const unsigned bufSize = reader->remaining();
+    keyStringAssert(843441,
+                    fmt::format("Input too short to decode RecordId. bufSize: {}", bufSize),
+                    bufSize >= 2);  // smallest possible encoding of a RecordId.
+
+    const unsigned char* firstBytePtr = static_cast<const unsigned char*>(reader->pos());
+    const unsigned char firstByte = *firstBytePtr;
+    const unsigned numExtraBytes = firstByte >> 5;  // high 3 bits in firstByte
+    uint64_t repr = firstByte & 0x1f;               // low 5 bits in firstByte
+
+    const unsigned ridSize = numExtraBytes + 2;
+    keyStringAssert(
+        8434401,
+        fmt::format("Encoded RecordId size is too big. bufSize: {}, ridSize: {}", bufSize, ridSize),
+        bufSize >= ridSize);
+    unsigned offset = 1;
+    for (; offset < numExtraBytes + 1; offset++) {
+        repr = (repr << 8) | firstBytePtr[offset];
     }
 
-    const uint8_t lastByte = readType<uint8_t>(reader, false);
+    const unsigned char lastByte = firstBytePtr[offset];
     keyStringAssert(8273000,
                     fmt::format("Number of extra bytes for RecordId is not encoded correctly. Low "
                                 "3 bits of lastByte: {}, high 3 bits of firstByte: {}",
                                 lastByte & 0x7,
                                 numExtraBytes),
                     (lastByte & 0x7) == numExtraBytes);
+
+    // Only advance the reader once we know we will return something.
+    reader->skip(ridSize);
+
     repr = (repr << 5) | (lastByte >> 3);  // fold in high 5 bits of last byte
     return RecordId(repr);
 }
@@ -2850,7 +2867,7 @@ RecordId decodeRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
     // without continuation bit.
 
     invariant(bufSize > 0);
-    const uint8_t* buffer = static_cast<const uint8_t*>(bufferRaw);
+    const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
 
     // Decode RecordId binary string size
     size_t ridSize = 0;
