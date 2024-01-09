@@ -7,10 +7,10 @@ setup_local_config_platform(name="local_config_platform")
 http_archive(
     name = "mongo_toolchain",
     build_file = "@//bazel/toolchains:mongo_toolchain.BUILD",
-    sha256 = "cea4ec44e3c62da3ad1952f1aa1bb489d0dfde18bfe0ff4af2317530be5af9a1",
+    sha256 = "269e54f97d9049d24d934f549a8963c15c954a5cb6fc0d75bbbcfb78df3c3647",
     urls = [
-        # v4 toolchain for ubuntu/arm64
-        "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2204-arm64/c8946f1ee23987ed32481a2f571d0ee38f86667b/bazel_v4_toolchain_builder_ubuntu2204_arm64_c8946f1ee23987ed32481a2f571d0ee38f86667b_23_10_25_04_25_33.tar.gz",
+        # v4 toolchain for amazon2/arm64
+        "https://mciuploads.s3.amazonaws.com/toolchain-builder/amazon2-arm64/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_amazon2_arm64_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
     ],
 )
 register_toolchains("@mongo_toolchain//:mongo_toolchain")

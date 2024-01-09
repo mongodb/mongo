@@ -23,9 +23,12 @@ COMMON_LINK_FLAGS = [
     "-nostdinc++",
     # Make sure that our toolchain libraries are used for linking
     "-Lexternal/mongo_toolchain/v4/lib",
+    "-Lexternal/mongo_toolchain/v4/lib64",
     "-Lexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0",
     "-Bexternal/mongo_toolchain/stow/gcc-v4/libexec/gcc/aarch64-mongodb-linux/11.3.0",
     "-Bexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0",
+    # Use the host system's glibc dynamic libraries
+    "-B/lib/aarch64-linux-gnu",
 ]
 
 COMMON_INCLUDE_DIRECTORIES = [
@@ -47,6 +50,8 @@ mongo_cc_toolchain_config(
         "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/aarch64-mongodb-linux",
         "external/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include",
         "external/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include-fixed",
+        # Use the host system's glibc headers
+        "/usr/include/aarch64-linux-gnu",
     ],
     bin_dirs = [
         # Make sure that the toolchain binaries are available
@@ -90,6 +95,8 @@ mongo_cc_toolchain_config(
         "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/aarch64-mongodb-linux",
         "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/backward",
         "external/mongo_toolchain/stow/llvm-v4/lib/clang/12.0.1/include",
+        # Use the host system's glibc headers
+        "/usr/include/aarch64-linux-gnu",
     ],
     bin_dirs = [
         # Make sure that the toolchain binaries are available
