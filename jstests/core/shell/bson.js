@@ -130,7 +130,6 @@ function runObjectEntriesArrayTypesTest() {
     let res = t.findOne();
     assert.eq([["_id", 1], ["a", [1, 2, 3, 4, 5]], ["b", "b"]], Object.entries(res));
     assert.eq([["0", 1], ["1", 2], ["2", 3], ["3", 4], ["4", 5]], Object.entries(res.a));
-    jsTestLog("SR_DEBUG the type of the res = " + typeof res.a);
     t.update({_id: 1}, {$set: {"a.9": 10}});
     res = t.findOne();
     // Test enumerating "sparse" array.
