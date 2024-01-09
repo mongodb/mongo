@@ -238,8 +238,19 @@ export class PreImageTruncateAfterShutdownTest {
     /** @private */
     _shutdownNode(conn, cleanShutdown) {
         jsTest.log(
-            "Force a checkpoint so the connection has data on startup recovery in the case of a crash");
-        assert.commandWorked(conn.adminCommand({fsync: 1}));
+            "Wait until the data is durable so the connection has data on startup recovery in the case of a crash");
+        const lastOplogTs = this._rst.findOplog(conn, {}, 1).toArray()[0].ts;
+        assert.soon(() => {
+            const result = conn.adminCommand({replSetGetStatus: 1});
+            assert.commandWorked(result);
+            if (timestampCmp(result.lastStableRecoveryTimestamp, lastOplogTs) >= 0) {
+                return true;
+            } else {
+                // The data isn't durable yet, force a checkpoint and try again.
+                assert.commandWorked(conn.adminCommand({fsync: 1}));
+                return false;
+            }
+        });
         if (cleanShutdown) {
             jsTest.log("Forcing a clean shutdown of the node");
             this._rst.stop(conn);
