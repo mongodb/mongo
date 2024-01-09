@@ -1772,14 +1772,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     RAIIServerParameterControllerForTest memoryController{
         "timeseriesIdleBucketExpiryMemoryUsageThreshold",
         250};  // An absurdly low limit that only allows us one open bucket at a time.
-    setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
-                       BSON("mode"
-                            << "alwaysOn"));
-    ScopeGuard guard{[] {
-        setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
-                           BSON("mode"
-                                << "off"));
-    }};
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
     // Try to insert with no open bucket. Should hint to re-open.
@@ -2191,14 +2184,7 @@ TEST_F(BucketCatalogTest, PreparingBatchConflictsWithQueryBasedReopening) {
 
 TEST_F(BucketCatalogTest, ArchiveBasedReopeningConflictsWithArchiveBasedReopeningOnSameBucket) {
     // Simplify test by restricting to a single stripe.
-    setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
-                       BSON("mode"
-                            << "alwaysOn"));
-    ScopeGuard guard{[] {
-        setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
-                           BSON("mode"
-                                << "off"));
-    }};
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
@@ -2244,14 +2230,7 @@ TEST_F(BucketCatalogTest, ArchiveBasedReopeningConflictsWithArchiveBasedReopenin
 TEST_F(BucketCatalogTest,
        ArchiveBasedReopeningDoesNotConflictWithArchiveBasedReopeningOnDifferentBucket) {
     // Simplify test by restricting to a single stripe.
-    setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
-                       BSON("mode"
-                            << "alwaysOn"));
-    ScopeGuard guard{[] {
-        setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
-                           BSON("mode"
-                                << "off"));
-    }};
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
