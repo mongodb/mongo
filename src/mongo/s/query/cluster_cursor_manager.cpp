@@ -44,7 +44,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/cursor_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/session/kill_sessions_common.h"
@@ -447,11 +446,10 @@ size_t ClusterCursorManager::cursorsTimedOut() const {
     return _cursorsTimedOut;
 }
 
-void ClusterCursorManager::stats() const {
+ClusterCursorManager::Stats ClusterCursorManager::stats() const {
     stdx::lock_guard<Latch> lk(_mutex);
 
-    auto& stats = CursorStats::getInstance();
-    stats.reset();
+    Stats stats;
 
     for (auto&& [cursorId, entry] : _cursorEntryMap) {
         if (entry.isKillPending()) {
@@ -461,23 +459,23 @@ void ClusterCursorManager::stats() const {
         }
 
         if (entry.getOperationUsingCursor()) {
-            stats.cursorStatsOpenPinned.increment();
+            ++stats.cursorsPinned;
         }
 
         switch (entry.getCursorType()) {
             case CursorType::SingleTarget:
-                stats.cursorStatsSingleTarget.increment();
-                stats.cursorStatsOpen.increment();
+                ++stats.cursorsSingleTarget;
                 break;
             case CursorType::MultiTarget:
-                stats.cursorStatsMultiTarget.increment();
-                stats.cursorStatsOpen.increment();
+                ++stats.cursorsMultiTarget;
                 break;
             case CursorType::QueuedData:
-                stats.cursorStatsQueuedData.increment();
+                ++stats.cursorsQueuedData;
                 break;
         }
     }
+
+    return stats;
 }
 
 void ClusterCursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {

@@ -29,11 +29,10 @@ env.Library(
 env.Library(
     target='auth',
     source=[
-        'auth_decorations.cpp',
         'auth_name.cpp',
         'authorization_manager.cpp',
-        'authorization_manager_factory.cpp',
         'authorization_session.cpp',
+        'auth_decorations.cpp',
         'role_name_or_string.cpp',
     ],
     LIBDEPS_PRIVATE=[
@@ -215,56 +214,11 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/api_parameters',
         '$BUILD_DIR/mongo/db/audit',  # audit:logLogout in AuthZSession.
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/util/caching',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         'auth_umc',
-    ],
-)
-
-env.Library(
-    target='auth_impl_internal_local',
-    source=[
-        'authz_manager_external_state_local.cpp',
-    ],
-    LIBDEPS=[
-        'auth_impl_internal',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/multitenancy',
-        '$BUILD_DIR/mongo/db/shard_role',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-    ],
-)
-
-env.Library(
-    target='authserver',
-    source=[
-        'authorization_manager_factory_impl.cpp',
-        'authz_manager_external_state_d.cpp',
-        'authz_manager_external_state_s.cpp',
-        'authz_session_external_state_server_common.cpp',
-        'authz_session_external_state_d.cpp',
-        'authz_session_external_state_s.cpp',
-        'enable_localhost_auth_bypass_parameter.idl',
-        'user_cache_invalidator_job.cpp',
-        'user_cache_invalidator_job_parameters.idl',
-    ],
-    LIBDEPS=[
-        'auth',
-        'authorization_manager_global',
-        'sasl_commands',
-        'saslauth',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/authentication_commands',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/s/grid',
-        'auth_impl_internal_local',
-        'sasl_options_init',
     ],
 )
 
@@ -390,6 +344,25 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='authservercommon',
+    source=[
+        'authz_session_external_state_server_common.cpp',
+        'enable_localhost_auth_bypass_parameter.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/authentication_commands',
+        'auth',
+        'auth_impl_internal',
+        'authorization_manager_global',
+        'sasl_commands',
+        'saslauth',
+    ],
+    LIBDEPS_PRIVATE=[
+        'sasl_options_init',
+    ],
+)
+
 yamlEnv = env.Clone()
 yamlEnv.InjectThirdParty(libraries=['yaml'])
 yamlEnv.Library(
@@ -459,9 +432,42 @@ env.Library(
 )
 
 env.Library(
+    target='authmongod',
+    source=[
+        'authz_manager_external_state_d.cpp',
+        'authz_session_external_state_d.cpp',
+    ],
+    LIBDEPS=[
+        'auth_impl_internal_local',
+        'authservercommon',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/shard_role',
+    ],
+)
+
+env.Library(
+    target='authmongos',
+    source=[
+        'authz_manager_external_state_s.cpp',
+        'authz_session_external_state_s.cpp',
+        'user_cache_invalidator_job.cpp',
+        'user_cache_invalidator_job_parameters.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/multitenancy',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/s/grid',
+        'authservercommon',
+    ],
+)
+
+env.Library(
     target='authmocks',
     source=[
-        'authorization_manager_factory_mock.cpp',
         'authz_manager_external_state_mock.cpp',
         'authz_session_external_state_mock.cpp',
     ],

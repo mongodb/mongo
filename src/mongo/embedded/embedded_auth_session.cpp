@@ -280,4 +280,16 @@ private:
 }  // namespace
 }  // namespace embedded
 
+namespace {
+
+std::unique_ptr<AuthorizationSession> authorizationSessionCreateImpl(
+    AuthorizationManager* authzManager) {
+    return std::make_unique<embedded::AuthorizationSession>(authzManager);
+}
+
+auto authorizationSessionCreateRegistration =
+    MONGO_WEAK_FUNCTION_REGISTRATION(AuthorizationSession::create, authorizationSessionCreateImpl);
+
+}  // namespace
+
 }  // namespace mongo

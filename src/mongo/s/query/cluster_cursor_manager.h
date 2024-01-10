@@ -127,6 +127,20 @@ public:
         Exhausted,
     };
 
+    struct Stats {
+        // Count of open cursors registered with CursorType::MultiTarget.
+        size_t cursorsMultiTarget = 0;
+
+        // Count of open cursors registered with CursorType::SingleTarget.
+        size_t cursorsSingleTarget = 0;
+
+        // Count of open cursors registered with CursorType::QueuedData.
+        size_t cursorsQueuedData = 0;
+
+        // Count of pinned cursors.
+        size_t cursorsPinned = 0;
+    };
+
     // Represents a function that may be passed into a ClusterCursorManager method which checks
     // whether the current client is authorized to perform the operation in question. The function
     // will be passed the list of users authorized to use the cursor.
@@ -508,7 +522,7 @@ public:
      *
      * Does not block.
      */
-    void stats() const;
+    Stats stats() const;
 
     /**
      * Appends sessions that have open cursors in this cursor manager to the given set of lsids.

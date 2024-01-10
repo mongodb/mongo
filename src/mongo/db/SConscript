@@ -2279,7 +2279,6 @@ env.Library(
         'service_context',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
@@ -2471,7 +2470,7 @@ env.Library(
         '$BUILD_DIR/mongo/watchdog/watchdog_mongod',
         '$BUILD_DIR/third_party/shim_snappy',
         'auth/auth_op_observer',
-        'auth/authserver',
+        'auth/authmongod',
         'bson/dotted_path_support',
         'catalog/catalog_impl',
         'catalog/collection_options',
@@ -3007,9 +3006,8 @@ env.Benchmark(
         'service_entry_point_common_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
-        'auth/authserver',
+        'auth/authmongod',
         'catalog/catalog_impl',
         'commands/standalone',
         'dbdirectclient',

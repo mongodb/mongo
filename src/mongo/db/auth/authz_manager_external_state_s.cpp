@@ -305,4 +305,15 @@ bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext*
     return foundRoles.size() > 0;
 }
 
+namespace {
+
+std::unique_ptr<AuthzManagerExternalState> authzManagerExternalStateCreateImpl() {
+    return std::make_unique<AuthzManagerExternalStateMongos>();
+}
+
+auto authzManagerExternalStateCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    AuthzManagerExternalState::create, authzManagerExternalStateCreateImpl);
+
+}  // namespace
+
 }  // namespace mongo

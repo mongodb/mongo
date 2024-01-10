@@ -47,4 +47,10 @@ void AuthorizationSession::ScopedImpersonate::swap() {
     swap(*std::get<1>(impersonations), _roles);
 }
 
+std::unique_ptr<AuthorizationSession> AuthorizationSession::create(
+    AuthorizationManager* authzManager) {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthorizationSession::create);
+    return w(authzManager);
+}
+
 }  // namespace mongo

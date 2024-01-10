@@ -48,7 +48,6 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_id.h"
-#include "mongo/db/cursor_stats.h"
 #include "mongo/db/generic_cursor_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -476,8 +475,6 @@ private:
     // 1) You have a lock on the appropriate partition in CursorManager.
     // 2) You know you have the cursor pinned.
     OperationContext* _operationUsingCursor;
-
-    CursorStats& cursorStats = CursorStats::getInstance();
 
     Date_t _lastUseDate;
     Date_t _createdDate;

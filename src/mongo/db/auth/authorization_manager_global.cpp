@@ -41,7 +41,6 @@
 #include "mongo/client/internal_auth.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_factory.h"
 #include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/security_key.h"
@@ -67,12 +66,7 @@ ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
         const auto authIsEnabled =
             serverGlobalParams.authState == ServerGlobalParams::AuthState::kEnabled;
 
-        std::unique_ptr<AuthorizationManager> authzManager;
-        if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
-            authzManager = globalAuthzManagerFactory->createRouter(service);
-        } else {
-            authzManager = globalAuthzManagerFactory->createShard(service);
-        }
+        auto authzManager = AuthorizationManager::create(service);
         authzManager->setAuthEnabled(authIsEnabled);
         authzManager->setShouldValidateAuthSchemaOnStartup(gStartupAuthSchemaValidation);
 

@@ -80,6 +80,9 @@ public:
         : _service(std::make_shared<MockServiceLiaisonImpl>()),
           _sessions(std::make_shared<MockSessionsCollectionImpl>()) {
 
+        AuthorizationManager::set(getServiceContext(),
+                                  AuthorizationManager::create(getServiceContext()));
+
         // Re-initialize the client after setting the AuthorizationManager to get an
         // AuthorizationSession.
         Client::releaseCurrent();

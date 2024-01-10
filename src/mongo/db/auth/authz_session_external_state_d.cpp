@@ -56,16 +56,9 @@ void AuthzSessionExternalStateMongod::startRequest(OperationContext* opCtx) {
 }
 
 bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
-    if (AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks()) {
-        return true;
-    }
-
-    if (!haveClient()) {
-        return false;
-    }
-
     // TODO(spencer): get "isInDirectClient" from OperationContext
-    return cc().isInDirectClient();
+    return cc().isInDirectClient() ||
+        AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
 }
 
 bool AuthzSessionExternalStateMongod::serverIsArbiter() const {
@@ -74,5 +67,18 @@ bool AuthzSessionExternalStateMongod::serverIsArbiter() const {
         repl::ReplicationCoordinator::get(getGlobalServiceContext())->getSettings().isReplSet() &&
         repl::ReplicationCoordinator::get(getGlobalServiceContext())->getMemberState().arbiter());
 }
+
+namespace {
+
+std::unique_ptr<AuthzSessionExternalState> authzSessionExternalStateImpl(
+    AuthorizationManager* authzManager) {
+    return std::make_unique<AuthzSessionExternalStateMongod>(authzManager);
+}
+
+auto authzSessionExternalStateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    AuthzSessionExternalState::create, authzSessionExternalStateImpl);
+
+}  // namespace
+
 
 }  // namespace mongo

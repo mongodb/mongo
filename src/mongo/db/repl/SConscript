@@ -2083,9 +2083,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authentication_session',
-        '$BUILD_DIR/mongo/db/auth/sasl_commands',
-        '$BUILD_DIR/mongo/db/auth/saslauth',
-        '$BUILD_DIR/mongo/db/commands/authentication_commands',
+        '$BUILD_DIR/mongo/db/auth/authservercommon',
         'hello_command',
     ],
 )
@@ -2246,7 +2244,7 @@ env.Benchmark(
         'replication_consistency_markers_impl_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authserver',
+        '$BUILD_DIR/mongo/db/auth/authmongod',
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_donor_service',

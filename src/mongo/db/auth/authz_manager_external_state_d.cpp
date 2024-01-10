@@ -96,4 +96,15 @@ bool AuthzManagerExternalStateMongod::hasOne(OperationContext* opCtx,
     return !Helpers::findOne(opCtx, ctx.getCollection(), query).isNull();
 }
 
+namespace {
+
+std::unique_ptr<AuthzManagerExternalState> authzManagerExternalStateCreateImpl() {
+    return std::make_unique<AuthzManagerExternalStateMongod>();
+}
+
+auto authzManagerExternalStateCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    AuthzManagerExternalState::create, authzManagerExternalStateCreateImpl);
+
+}  // namespace
+
 }  // namespace mongo

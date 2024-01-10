@@ -42,4 +42,10 @@ AuthorizationManager& AuthzSessionExternalState::getAuthorizationManager() {
     return *_authzManager;
 }
 
+std::unique_ptr<AuthzSessionExternalState> AuthzSessionExternalState::create(
+    AuthorizationManager* authzManager) {
+    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthzSessionExternalState::create);
+    return w(authzManager);
+}
+
 }  // namespace mongo

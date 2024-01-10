@@ -57,7 +57,6 @@ env.Library(
         'embedded.cpp',
         'embedded_auth_manager.cpp',
         'embedded_auth_session.cpp',
-        'embedded_authorization_manager_factory.cpp',
         'embedded_ismaster.cpp',
         'embedded_options.cpp',
         'embedded_options.idl',
