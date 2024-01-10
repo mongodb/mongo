@@ -26,7 +26,7 @@ else
 fi
 
 echo "Running 'dist/s_all' in the release tree"
-(cd "$DEST/dist" && env WT_RELEASE_BUILD=yes bash s_all -A > /dev/null)
+(cd "$DEST/dist" && env WT_RELEASE_BUILD=yes bash s_all > /dev/null)
 
 echo "Building documentation"
 (cd "$DEST/dist" && bash s_docs > /dev/null)
