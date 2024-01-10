@@ -40,12 +40,12 @@ function assertLogs(status, upgradeOrDowngrade, serverType, numShardServers) {
                'should not log but "FCV ' + upgradeOrDowngrade + ' success" log found');
     }
 
-    if (serverType === "replica set/standalone") {
+    if (serverType === "replica set/maintenance mode") {
         assert.soon(() => {
             let matchRes =
-                rawMongoProgramOutput().match(/\"serverType\":"replica set\/standalone"/g);
+                rawMongoProgramOutput().match(/\"serverType\":"replica set\/maintenance mode"/g);
             return matchRes != null && matchRes.length == status;
-        }, "should have " + status + " log(s) with serverType: replica set/standalone");
+        }, "should have " + status + " log(s) with serverType: replica set/maintenance mode");
     } else if (serverType === "shardedCluster") {
         assert.soon(() => {
             let matchRes = rawMongoProgramOutput().match(/\"serverType\":"config server"/g);
@@ -160,7 +160,7 @@ function runStandaloneTest() {
     checkFCV(adminDB, latestFCV);
 
     jsTest.log("Checking for correct FCV logging on a standalone.");
-    assertLogsWithFailpoints(conn, adminDB, "replica set/standalone", 0 /*numShardServers*/);
+    assertLogsWithFailpoints(conn, adminDB, "replica set/maintenance mode", 0 /*numShardServers*/);
 
     MongoRunner.stopMongod(conn);
 }
@@ -175,7 +175,7 @@ function runReplicaSetTest() {
 
     jsTest.log("Checking for correct FCV logging on a replica set.");
     assertLogsWithFailpoints(
-        primary, primaryAdminDB, "replica set/standalone", 0 /*numShardServers*/);
+        primary, primaryAdminDB, "replica set/maintenance mode", 0 /*numShardServers*/);
 
     rst.stopSet();
 }

@@ -436,23 +436,14 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         services.push_back(std::make_unique<ShardingDDLCoordinatorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
-        if (getGlobalReplSettings().isServerless()) {
-            services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
-            services.push_back(
-                std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
-            services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));
-        }
         services.push_back(std::make_unique<MultiUpdateCoordinatorService>(serviceContext));
     }
 
-    if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-        if (getGlobalReplSettings().isServerless()) {
-            services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
-            services.push_back(
-                std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
-            services.push_back(std::make_unique<ShardSplitDonorService>(serviceContext));
-            services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));
-        }
+    if (getGlobalReplSettings().isServerless()) {
+        services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
+        services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
+        services.push_back(std::make_unique<ShardSplitDonorService>(serviceContext));
+        services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));
     }
 
     if (change_stream_serverless_helpers::canInitializeServices()) {
