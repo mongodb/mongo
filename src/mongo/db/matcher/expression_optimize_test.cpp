@@ -496,6 +496,16 @@ TEST(ExpressionOptimizeTest, OrRewrittenToIn) {
     ASSERT_BSONOBJ_EQ(optimizeExpr(queries[10].first), fromjson(queries[10].second));
 }
 
+TEST(ExpressionOptimizeTest, OrRewrittenToInWithParameters) {
+    BSONObj obj = fromjson("{$or: [{f1: {$eq: 3}}, {f1: {$eq: 4}}]}");
+    std::unique_ptr<MatchExpression> matchExpr(parseMatchExpression(obj));
+    bool parameterized;
+    MatchExpression::parameterize(
+        matchExpr.get(), boost::none /*maxParamCount=*/, 0 /*startingParamId=*/, &parameterized);
+    ASSERT_TRUE(parameterized);
+    ASSERT_BSONOBJ_EQ(matchExpr->serialize(), obj);
+}
+
 TEST(ExpressionOptimizeTest, NorRemovesAlwaysFalseChildren) {
     BSONObj obj = fromjson("{$nor: [{a: 1}, {$alwaysFalse: 1}]}");
     std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
