@@ -218,7 +218,7 @@ structs:
                 optional: true
             type:
                 description: "An optional field containing disambiguation information if a reply contains multiple cursors."
-                type: string
+                type: CursorType
                 cpp_name: cursorType
                 optional: true
                 stability: unstable

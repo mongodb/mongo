@@ -194,21 +194,19 @@ parseMongotResponseCursors(std::vector<executor::TaskExecutorCursor> cursors) {
         result;
 
     for (auto it = cursors.begin(); it != cursors.end(); it++) {
-        auto cursorLabel = it->getType();
+        auto maybeCursorLabel = it->getType();
         // If a cursor is unlabeled mongot does not support metadata cursors. $$SEARCH_META
         // should not be supported in this query.
-        tassert(7856001, "Expected cursors to be labeled if there are more than one", cursorLabel);
+        tassert(
+            7856001, "Expected cursors to be labeled if there are more than one", maybeCursorLabel);
 
-        switch (CursorType_parse(IDLParserContext("ShardedAggHelperCursorType"), *cursorLabel)) {
+        switch (*maybeCursorLabel) {
             case CursorTypeEnum::DocumentResult:
                 result.first.emplace(std::move(*it));
                 break;
             case CursorTypeEnum::SearchMetaResult:
                 result.second.emplace(std::move(*it));
                 break;
-            default:
-                tasserted(7856003,
-                          str::stream() << "Unexpected cursor type '" << *cursorLabel << "'");
         }
     }
     return result;
@@ -277,8 +275,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineForSearch(
 
     std::unique_ptr<Pipeline, PipelineDeleter> newPipeline = nullptr;
     for (auto it = cursors.begin(); it != cursors.end(); it++) {
-        auto cursorLabel = it->getType();
-        if (!cursorLabel) {
+        auto maybeCursorLabel = it->getType();
+        if (!maybeCursorLabel) {
             // If a cursor is unlabeled mongot does not support metadata cursors. $$SEARCH_META
             // should not be supported in this query.
             tassert(6253301,
@@ -287,33 +285,33 @@ std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineForSearch(
             origSearchStage->setCursor(std::move(cursors.front()));
             return nullptr;
         }
-        auto cursorType =
-            CursorType_parse(IDLParserContext("ShardedAggHelperCursorType"), cursorLabel.value());
-        if (cursorType == CursorTypeEnum::DocumentResult) {
-            origSearchStage->setCursor(std::move(*it));
-            origPipeline->pipelineType = CursorTypeEnum::DocumentResult;
-        } else if (cursorType == CursorTypeEnum::SearchMetaResult) {
-            // If we don't think we're in a sharded environment, mongot should not have sent
-            // metadata.
-            tassert(
-                6253303, "Didn't expect metadata cursor from mongot", shouldBuildMetadataPipeline);
-            tassert(
-                6253726, "Expected to not already have created a metadata pipeline", !newPipeline);
+        switch (*maybeCursorLabel) {
+            case CursorTypeEnum::DocumentResult:
+                origSearchStage->setCursor(std::move(*it));
+                origPipeline->pipelineType = CursorTypeEnum::DocumentResult;
+                break;
+            case CursorTypeEnum::SearchMetaResult:
+                // If we don't think we're in a sharded environment, mongot should not have sent
+                // metadata.
+                tassert(6253303,
+                        "Didn't expect metadata cursor from mongot",
+                        shouldBuildMetadataPipeline);
+                tassert(6253726,
+                        "Expected to not already have created a metadata pipeline",
+                        !newPipeline);
 
-            // Construct a duplicate ExpressionContext for our cloned pipeline. This is necessary
-            // so that the duplicated pipeline and the cloned pipeline do not accidentally
-            // share an OperationContext.
-            auto newExpCtx = expCtx->copyWith(expCtx->ns, expCtx->uuid);
+                // Construct a duplicate ExpressionContext for our cloned pipeline. This is
+                // necessary so that the duplicated pipeline and the cloned pipeline do not
+                // accidentally share an OperationContext.
+                auto newExpCtx = expCtx->copyWith(expCtx->ns, expCtx->uuid);
 
-            // Clone the MongotRemote stage and set the metadata cursor.
-            auto newStage = origSearchStage->copyForAlternateSource(std::move(*it), newExpCtx);
+                // Clone the MongotRemote stage and set the metadata cursor.
+                auto newStage = origSearchStage->copyForAlternateSource(std::move(*it), newExpCtx);
 
-            // Build a new pipeline with the metadata source as the only stage.
-            newPipeline = Pipeline::create({newStage}, newExpCtx);
-            newPipeline->pipelineType = CursorTypeEnum::SearchMetaResult;
-        } else {
-            tasserted(6253302,
-                      str::stream() << "Unexpected cursor type '" << cursorLabel.value() << "'");
+                // Build a new pipeline with the metadata source as the only stage.
+                newPipeline = Pipeline::create({newStage}, newExpCtx);
+                newPipeline->pipelineType = *maybeCursorLabel;
+                break;
         }
     }
 

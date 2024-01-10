@@ -157,7 +157,7 @@ CursorResponse::CursorResponse(NamespaceString nss,
                                boost::optional<BSONObj> postBatchResumeToken,
                                boost::optional<BSONObj> writeConcernError,
                                boost::optional<BSONObj> varsField,
-                               boost::optional<std::string> cursorType,
+                               boost::optional<CursorTypeEnum> cursorType,
                                boost::optional<CursorMetrics> metrics,
                                bool partialResultsReturned,
                                bool invalidated,
@@ -225,13 +225,6 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(
 
     const auto& cursor = response.getCursor();
 
-    // TODO SERVER-84012: make this CursorType instead of string in the IDL.
-    // Callers use IDL to parse it from string to CursorTypeEnum, which can be avoided.
-    const boost::optional<StringData>& typeData = cursor.getCursorType();
-    boost::optional<std::string> type;
-    if (typeData)
-        type = boost::make_optional<std::string>(std::string{*typeData});
-
     auto maybeBatch = cursor.getFirstBatch();
     if (!maybeBatch)
         maybeBatch = cursor.getNextBatch();
@@ -266,7 +259,7 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(
              getOwnedBSONObj(cursor.getPostBatchResumeToken()),
              getOwnedBSONObj(response.getWriteConcernError()),
              getOwnedBSONObj(response.getVars()),
-             std::move(type),
+             cursor.getCursorType(),
              std::move(metrics),
              cursor.getPartialResultsReturned(),
              cursor.getInvalidated(),

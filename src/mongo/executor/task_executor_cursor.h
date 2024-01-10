@@ -178,7 +178,7 @@ public:
         return _cursorVars;
     }
 
-    boost::optional<std::string> getType() const {
+    boost::optional<CursorTypeEnum> getType() const {
         return _cursorType;
     }
 
@@ -281,7 +281,7 @@ private:
     boost::optional<BSONObj> _cursorVars = boost::none;
 
     // For commands that return multiple cursors, the type of the cursor.
-    boost::optional<std::string> _cursorType;
+    boost::optional<CursorTypeEnum> _cursorType;
 
     // This is a sum of the time spent waiting on remote calls.
     Milliseconds _millisecondsWaiting = Milliseconds(0);

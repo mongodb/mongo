@@ -75,11 +75,11 @@ executor::TaskExecutorCursor DocumentSourceSearchMeta::establishCursor() {
         return std::move(*cursors.begin());
     }
     for (auto&& cursor : cursors) {
-        tassert(6448008, "Expected every mongot cursor to come back with a type", cursor.getType());
-        auto cursorType = CursorType_parse(IDLParserContext("ShardedAggHelperCursorType"),
-                                           cursor.getType().value());
-        if (cursorType == CursorTypeEnum::SearchMetaResult) {
-            // Note this may leak the other cursor(s). Should look into whether we can killCursors.
+        auto maybeCursorType = cursor.getType();
+        tassert(6448008, "Expected every mongot cursor to come back with a type", maybeCursorType);
+        if (*maybeCursorType == CursorTypeEnum::SearchMetaResult) {
+            // Note this may leak the other cursor(s). Should look into whether we can
+            // killCursors.
             return std::move(cursor);
         }
     }

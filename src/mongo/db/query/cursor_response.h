@@ -242,7 +242,7 @@ public:
                    boost::optional<BSONObj> postBatchResumeToken = boost::none,
                    boost::optional<BSONObj> writeConcernError = boost::none,
                    boost::optional<BSONObj> varsField = boost::none,
-                   boost::optional<std::string> cursorType = boost::none,
+                   boost::optional<CursorTypeEnum> cursorType = boost::none,
                    boost::optional<CursorMetrics> metrics = boost::none,
                    bool partialResultsReturned = false,
                    bool invalidated = false,
@@ -328,7 +328,7 @@ private:
     boost::optional<BSONObj> _postBatchResumeToken;
     boost::optional<BSONObj> _writeConcernError;
     boost::optional<BSONObj> _varsField;
-    boost::optional<std::string> _cursorType;
+    boost::optional<CursorTypeEnum> _cursorType;
     boost::optional<CursorMetrics> _metrics;
     bool _partialResultsReturned = false;
     bool _invalidated = false;

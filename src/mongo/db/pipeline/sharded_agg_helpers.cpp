@@ -1522,14 +1522,13 @@ partitionCursors(std::vector<OwnedRemoteCursor> ownedCursors) {
         if (!maybeCursorType) {
             untypedCursors.push_back(std::move(ownedCursor));
         } else {
-            auto cursorType = CursorType_parse(IDLParserContext("ShardedAggHelperCursorType"),
-                                               maybeCursorType.value());
-            if (cursorType == CursorTypeEnum::DocumentResult) {
-                resultsCursors.push_back(std::move(ownedCursor));
-            } else if (cursorType == CursorTypeEnum::SearchMetaResult) {
-                metaCursors.push_back(std::move(ownedCursor));
-            } else {
-                tasserted(625304, "Received unknown cursor type from mongot.");
+            switch (*maybeCursorType) {
+                case CursorTypeEnum::DocumentResult:
+                    resultsCursors.push_back(std::move(ownedCursor));
+                    break;
+                case CursorTypeEnum::SearchMetaResult:
+                    metaCursors.push_back(std::move(ownedCursor));
+                    break;
             }
         }
     }
