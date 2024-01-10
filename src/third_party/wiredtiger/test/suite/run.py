@@ -429,7 +429,7 @@ if __name__ == '__main__':
                 if verbose < 0:
                         verbose = 0
                 continue
-            if option == '--ignore-stdout' or option == 'i':
+            if option == '-ignore-stdout' or option == 'i':
                 ignoreStdout = True
                 continue
             if option == '-config' or option == 'c':
