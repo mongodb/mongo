@@ -60,7 +60,6 @@ selector:
   - jstests/core/**/compact_keeps_indexes.js
   - jstests/core/**/currentop.js
   - jstests/core/**/dbhash.js
-  - jstests/core/**/dbhash2.js
   - jstests/core/**/fsync.js
   - jstests/core/**/geo_update_btree2.js
   - jstests/core/**/index9.js

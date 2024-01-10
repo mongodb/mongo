@@ -57,7 +57,6 @@ selector:
   # The following tests fail because a certain command or functionality is not supported on
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/**/dbhash.js  # dbhash.
-  - jstests/core/**/dbhash2.js  # dbhash.
 
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.

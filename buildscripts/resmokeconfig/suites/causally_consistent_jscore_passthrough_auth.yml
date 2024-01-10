@@ -28,7 +28,6 @@ selector:
   - jstests/core/**/compact_keeps_indexes.js  # compact.
   - jstests/core/**/currentop.js  # uses fsync.
   - jstests/core/**/dbhash.js  # dbhash.
-  - jstests/core/**/dbhash2.js  # dbhash.
   - jstests/core/**/fsync.js  # uses fsync.
   - jstests/core/**/geo_update_btree2.js  # notablescan.
   - jstests/core/**/index9.js  # "local" database.

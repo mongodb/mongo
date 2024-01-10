@@ -61,3 +61,6 @@ assert.neq(dbh(dba), dbh(dbb), "C2");
 dbb.foo.insert({_id: 5});
 assert.eq(gh(dba.foo, dba), gh(dbb.foo, dbb), "B3");
 assert.eq(dbh(dba), dbh(dbb), "C3");
+
+// Validate dbHash with an empty database does not trigger an fassert/invariant.
+assert.commandFailed(db.runCommand({"dbhash": ""}));
