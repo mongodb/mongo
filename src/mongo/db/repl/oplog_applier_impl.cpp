@@ -430,6 +430,7 @@ public:
 
 protected:
     void _recordApplied(const OpTimeAndWallTime& newOpTimeAndWallTime) {
+        _replCoord->setMyLastWrittenOpTimeAndWallTimeForward(newOpTimeAndWallTime);
         // We have to use setMyLastAppliedOpTimeAndWallTimeForward since this thread races with
         // ReplicationExternalStateImpl::onTransitionToPrimary.
         _replCoord->setMyLastAppliedOpTimeAndWallTimeForward(newOpTimeAndWallTime);

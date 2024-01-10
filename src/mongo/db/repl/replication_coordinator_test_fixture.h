@@ -181,8 +181,9 @@ protected:
         getReplCoord()->setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward({opTime, wallTime});
     }
 
-    void replCoordSetMyLastAppliedAndDurableOpTime(const OpTime& opTime,
-                                                   Date_t wallTime = Date_t()) {
+    void replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(const OpTime& opTime,
+                                                             Date_t wallTime = Date_t()) {
+        replCoordSetMyLastWrittenOpTime(opTime, wallTime);
         replCoordSetMyLastAppliedOpTime(opTime, wallTime);
         replCoordSetMyLastDurableOpTime(opTime, wallTime);
     }

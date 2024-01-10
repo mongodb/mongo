@@ -1366,7 +1366,7 @@ TEST_F(ReplCoordHBV1Test, RejectHeartbeatReconfigDuringElection) {
     assertStartSuccess(configObj, {"h1", 1});
 
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedAndDurableOpTime(time1, getNet()->now());
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time1, getNet()->now());
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -1429,8 +1429,8 @@ TEST_F(ReplCoordHBV1Test, AwaitHelloReturnsResponseOnReconfigViaHeartbeat) {
 
     // Become primary.
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
+                                                        Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
     ASSERT(getReplCoord()->getMemberState().primary());
 
@@ -1761,6 +1761,7 @@ TEST_F(ReplCoordHBV1Test,
     auto opTime1 = OpTime({10, 1}, 1);
     auto opTime2 = OpTime({11, 1}, 2);  // In higher term.
     auto commitPoint = OpTime({15, 1}, 2);
+    replCoordSetMyLastWrittenOpTime(opTime1, Date_t() + Seconds(100));
     replCoordSetMyLastAppliedOpTime(opTime1, Date_t() + Seconds(100));
 
     // Node 1 is the current primary. The commit point has a higher term than lastApplied.
@@ -1800,7 +1801,8 @@ TEST_F(ReplCoordHBV1Test,
         ASSERT_EQUALS(2, getReplCoord()->getTerm());
     }
 
-    // Update lastApplied, so commit point can be advanced.
+    // Update lastWritten and lastApplied, so commit point can be advanced.
+    replCoordSetMyLastWrittenOpTime(opTime2, Date_t() + Seconds(100));
     replCoordSetMyLastAppliedOpTime(opTime2, Date_t() + Seconds(100));
     {
         net->enterNetwork();
@@ -1837,6 +1839,7 @@ TEST_F(ReplCoordHBV1Test, LastCommittedOpTimeOnlyUpdatesFromHeartbeatIfNotInStar
 
     auto lastAppliedOpTime = OpTime({11, 1}, 2);
     auto commitPoint = OpTime({15, 1}, 2);
+    replCoordSetMyLastWrittenOpTime(lastAppliedOpTime, Date_t() + Seconds(100));
     replCoordSetMyLastAppliedOpTime(lastAppliedOpTime, Date_t() + Seconds(100));
 
     // Node 1 is the current primary.
@@ -1913,6 +1916,7 @@ TEST_F(ReplCoordHBV1Test, DoNotAttemptToUpdateLastCommittedOpTimeFromHeartbeatIf
 
     auto lastAppliedOpTime = OpTime({11, 1}, 2);
     auto commitPoint = OpTime({15, 1}, 2);
+    replCoordSetMyLastWrittenOpTime(lastAppliedOpTime, Date_t() + Seconds(100));
     replCoordSetMyLastAppliedOpTime(lastAppliedOpTime, Date_t() + Seconds(100));
 
     // Node 1 is the current primary.
@@ -1998,7 +2002,7 @@ TEST_F(ReplCoordHBV1Test, handleHeartbeatResponseForTestEnqueuesValidHandle) {
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     // Become primary.
-    replCoordSetMyLastAppliedAndDurableOpTime(opTime1, wallTime1);
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(opTime1, wallTime1);
     simulateSuccessfulV1Election();
     ASSERT(getReplCoord()->getMemberState().primary());
 
@@ -2254,8 +2258,7 @@ void HBStepdownAndReconfigTest::setUp() {
 
     auto replCoord = getReplCoord();
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(_commitPoint, _wallTime);
-    replCoordSetMyLastDurableOpTime(_commitPoint, _wallTime);
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(_commitPoint, _wallTime);
     simulateSuccessfulV1Election();
 
     // New term.

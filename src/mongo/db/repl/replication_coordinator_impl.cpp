@@ -325,6 +325,7 @@ InitialSyncerInterface::Options createInitialSyncerOptions(
     options.setMyLastOptime = [replCoord,
                                externalState](const OpTimeAndWallTime& opTimeAndWallTime) {
         // Note that setting the last applied opTime forward also advances the global timestamp.
+        replCoord->setMyLastWrittenOpTimeAndWallTimeForward(opTimeAndWallTime);
         replCoord->setMyLastAppliedOpTimeAndWallTimeForward(opTimeAndWallTime);
         signalOplogWaiters();
         // The oplog application phase of initial sync starts timestamping writes, causing
@@ -835,6 +836,7 @@ void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
 
 
         const auto lastApplied = opTimeStatus.getValue();
+        _setMyLastWrittenOpTimeAndWallTime(lock, lastApplied, false);
         _setMyLastAppliedOpTimeAndWallTime(lock, lastApplied, false);
         signalOplogWaiters();
 
@@ -1452,8 +1454,7 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeAndWallTimeForward(
                                        opTimeAndWallTime.opTime.getTimestamp());
     stdx::unique_lock<Latch> lock(_mutex);
 
-    // TODO(SERVER-83573): Enable this invariant.
-    // invariant(opTimeAndWallTime.opTime <= _getMyLastWrittenOpTime_inlock());
+    invariant(opTimeAndWallTime.opTime <= _getMyLastWrittenOpTime_inlock());
     if (_setMyLastAppliedOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
         _reportUpstream_inlock(std::move(lock));
     }
@@ -1463,8 +1464,7 @@ void ReplicationCoordinatorImpl::setMyLastDurableOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime) {
     stdx::unique_lock<Latch> lock(_mutex);
 
-    // TODO(SERVER-83573): Enable this invariant.
-    // invariant(opTimeAndWallTime.opTime <= _getMyLastWrittenOpTime_inlock());
+    invariant(opTimeAndWallTime.opTime <= _getMyLastWrittenOpTime_inlock());
     if (_setMyLastDurableOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
         _reportUpstream_inlock(std::move(lock));
     }
@@ -1515,6 +1515,7 @@ void ReplicationCoordinatorImpl::_resetMyLastOpTimes(WithLock lk) {
     LOGV2_DEBUG(21332, 1, "Resetting durable/applied optimes");
     // Reset to uninitialized OpTime
     bool isRollbackAllowed = true;
+    _setMyLastWrittenOpTimeAndWallTime(lk, OpTimeAndWallTime(), isRollbackAllowed);
     _setMyLastAppliedOpTimeAndWallTime(lk, OpTimeAndWallTime(), isRollbackAllowed);
     _setMyLastDurableOpTimeAndWallTime(lk, OpTimeAndWallTime(), isRollbackAllowed);
 }
@@ -5436,6 +5437,7 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opC
 
     stdx::unique_lock<Latch> lock(_mutex);
     bool isRollbackAllowed = true;
+    _setMyLastWrittenOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
     _setMyLastAppliedOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
     _setMyLastDurableOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
     _reportUpstream_inlock(std::move(lock));
@@ -5695,6 +5697,7 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint(
         if (_getMemberState_inlock().arbiter()) {
             // Arbiters do not store replicated data, so we consider their data trivially
             // consistent.
+            _setMyLastWrittenOpTimeAndWallTime(lk, committedOpTimeAndWallTime, false);
             _setMyLastAppliedOpTimeAndWallTime(lk, committedOpTimeAndWallTime, false);
         }
 

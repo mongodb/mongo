@@ -93,8 +93,8 @@ public:
         replCoord = getReplCoord();
 
         ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
-        replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 1), Date_t() + Seconds(100));
-        replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 1), Date_t() + Seconds(100));
+        replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 1),
+                                                            Date_t() + Seconds(100));
         simulateSuccessfulV1Election();
         ASSERT(replCoord->getMemberState().primary());
 
