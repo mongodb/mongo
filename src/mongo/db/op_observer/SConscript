@@ -37,6 +37,7 @@ env.Benchmark(
         'fcv_op_observer',
         'find_and_modify_images_op_observer',
         'op_observer',
+        'op_observer_impl',
         'operation_logger_impl',
         'operation_logger_transaction_proxy',
         'user_write_block_mode_op_observer',
@@ -84,9 +85,6 @@ env.Library(
     source=[
         'op_observer_impl.cpp',
     ],
-    LIBDEPS=[
-        'op_observer',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
@@ -108,6 +106,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/transaction/transaction',
         '$BUILD_DIR/mongo/db/transaction/transaction_operations',
         '$BUILD_DIR/mongo/s/grid',
+        'op_observer',
         'op_observer_util',
     ],
 )
@@ -210,6 +209,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/write_block_bypass',
         'change_stream_pre_images_op_observer',
         'find_and_modify_images_op_observer',
+        'op_observer',
         'op_observer_impl',
         'op_observer_util',
         'operation_logger_impl',

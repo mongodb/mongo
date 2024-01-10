@@ -51,15 +51,9 @@
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo {
+namespace {
 
-class LockManagerTest : public ServiceContextTest {};
-
-class ResourceIdTest : public unittest::Test {
-protected:
-    constexpr int getResourceTypeBits() {
-        return ResourceId::resourceTypeBits;
-    }
-};
+namespace resource_id_test {
 
 TEST(ResourceIdTest, Semantics) {
     ResourceId resIdDb(RESOURCE_DATABASE, 324334234);
@@ -84,9 +78,9 @@ TEST(ResourceIdTest, Semantics) {
     ASSERT_EQUALS(resId, resIdColl);
 }
 
-TEST_F(ResourceIdTest, Masking) {
+TEST(ResourceIdTest, Masking) {
     const uint64_t maxHash =
-        (1ULL << (64 - getResourceTypeBits())) - 1;  //  Only 60 bits usable for hash
+        (1ULL << (64 - ResourceId::resourceTypeBits)) - 1;  //  Only 60 bits usable for hash
     ResourceType resources[3] = {RESOURCE_GLOBAL, RESOURCE_COLLECTION, RESOURCE_METADATA};
     uint64_t hashes[3] = {maxHash, maxHash / 3, maxHash / 3 * 2};
 
@@ -100,21 +94,23 @@ TEST_F(ResourceIdTest, Masking) {
     }
 }
 
-DEATH_TEST_F(ResourceIdTest, StringConstructorMustNotBeCollection, "invariant") {
+DEATH_TEST(ResourceIdTest, StringConstructorMustNotBeCollection, "invariant") {
     ResourceId(RESOURCE_COLLECTION, "TestDB.collection");
 }
 
-DEATH_TEST_F(ResourceIdTest, StringConstructorMustNotBeDatabase, "invariant") {
+DEATH_TEST(ResourceIdTest, StringConstructorMustNotBeDatabase, "invariant") {
     ResourceId(RESOURCE_DATABASE, "TestDB");
 }
 
-DEATH_TEST_F(ResourceIdTest, CantCreateResourceMutexDirectly, "invariant") {
+DEATH_TEST(ResourceIdTest, CantCreateResourceMutexDirectly, "invariant") {
     ResourceId(RESOURCE_MUTEX, "TestDB");
 }
 
-//
-// LockManager
-//
+}  // namespace resource_id_test
+
+namespace lock_manager_test {
+
+class LockManagerTest : public ServiceContextTest {};
 
 TEST_F(LockManagerTest, IsModeCovered) {
     ASSERT(isModeCovered(MODE_IS, MODE_IX));
@@ -790,4 +786,7 @@ TEST_F(LockManagerTest, HasConflictingRequests) {
     ASSERT(lockMgr.unlock(&requestX));
 }
 
+}  // namespace lock_manager_test
+
+}  // namespace
 }  // namespace mongo

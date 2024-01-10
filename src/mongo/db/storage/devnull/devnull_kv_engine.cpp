@@ -48,6 +48,8 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/uuid.h"
@@ -313,6 +315,12 @@ DevNullKVEngine::DevNullKVEngine() {
                                             /*uuid=*/boost::none,
                                             "filename.wt",
                                             /*checkpointTimestamp=*/boost::none));
+}
+
+DevNullKVEngine::~DevNullKVEngine() = default;
+
+RecoveryUnit* DevNullKVEngine::newRecoveryUnit() {
+    return new RecoveryUnitNoop();
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* opCtx,

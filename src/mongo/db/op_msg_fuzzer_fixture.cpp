@@ -56,6 +56,7 @@
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
@@ -112,7 +113,6 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
 
     _clientStrand = ClientStrand::make(_serviceContext->getService()->makeClient("test", _session));
     auto clientGuard = _clientStrand->bind();
-    auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
 
     storageGlobalParams.dbpath = _dir.path();
     storageGlobalParams.engine = "wiredTiger";
@@ -122,10 +122,18 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     // (Generic FCV reference): Initialize FCV.
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
-    initializeStorageEngine(opCtx.get(),
-                            StorageEngineInitFlags::kAllowNoLockFile |
-                                StorageEngineInitFlags::kSkipMetadataFile);
-    StorageControl::startStorageControls(_serviceContext, true /*forTestOnly*/);
+    {
+        auto initializeStorageEngineOpCtx =
+            _serviceContext->makeOperationContext(clientGuard.get());
+        shard_role_details::setRecoveryUnit(initializeStorageEngineOpCtx.get(),
+                                            std::make_unique<RecoveryUnitNoop>(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+
+        initializeStorageEngine(initializeStorageEngineOpCtx.get(),
+                                StorageEngineInitFlags::kAllowNoLockFile |
+                                    StorageEngineInitFlags::kSkipMetadataFile);
+        StorageControl::startStorageControls(_serviceContext, true /*forTestOnly*/);
+    }
 
     ShardingState::create(_serviceContext);
     CollectionShardingStateFactory::set(
@@ -139,6 +147,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
         _serviceContext,
         std::make_unique<repl::ReplicationCoordinatorMock>(_serviceContext, repl::ReplSettings()));
 
+    auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
     _serviceContext->getStorageEngine()->notifyStartupComplete(opCtx.get());
 }
 

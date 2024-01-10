@@ -66,10 +66,8 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-
 namespace mongo {
+namespace {
 
 class LockerImplTest : public ServiceContextTest {
 public:
@@ -1309,4 +1307,5 @@ DEATH_TEST_F(LockerImplTest, SaveAndRestoreGlobalRecursivelyIsFatal, "7033800") 
     locker.saveLockStateAndUnlock(&lockInfo);
 }
 
+}  // namespace
 }  // namespace mongo

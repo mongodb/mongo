@@ -527,12 +527,14 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/dbcheck_command',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
-        '$BUILD_DIR/mongo/db/op_observer/op_observer',
-        '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/unittest/unittest',
         'dbcheck',
         'storage_interface',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/op_observer/op_observer',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
     ],
 )
 
@@ -1689,6 +1691,7 @@ env.Library(
         'wait_for_majority_service',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
         '$BUILD_DIR/mongo/db/op_observer/operation_logger_impl',
         'repl_coordinator_interface',
@@ -1755,6 +1758,7 @@ if wiredtiger:
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/client/replica_set_monitor_protocol_test_util',
+            '$BUILD_DIR/mongo/db/op_observer/op_observer',
             '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
             '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
             '$BUILD_DIR/mongo/unittest/unittest',
@@ -1845,6 +1849,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/index_build_entry_helpers',
             '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
             '$BUILD_DIR/mongo/db/multitenancy',
+            '$BUILD_DIR/mongo/db/op_observer/op_observer',
             '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
             '$BUILD_DIR/mongo/db/op_observer/operation_logger_impl',
             '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
@@ -2205,6 +2210,7 @@ env.Benchmark(
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/catalog_impl',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
         '$BUILD_DIR/mongo/db/op_observer/operation_logger_impl',
         '$BUILD_DIR/mongo/db/server_base',

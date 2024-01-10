@@ -82,8 +82,7 @@ class WiredTigerRecoveryUnitHarnessHelper final : public RecoveryUnitHarnessHelp
 public:
     WiredTigerRecoveryUnitHarnessHelper()
         : _dbpath("wt_test"),
-          _engine(Client::getCurrent()->makeOperationContext().get(),
-                  kWiredTigerEngineName,  // .canonicalName
+          _engine(kWiredTigerEngineName,  // .canonicalName
                   _dbpath.path(),         // .path
                   &_cs,                   // .cs
                   "",                     // .extraOpenOptions
@@ -100,7 +99,8 @@ public:
         repl::ReplicationCoordinator::set(getGlobalServiceContext(),
                                           std::make_unique<repl::ReplicationCoordinatorMock>(
                                               getGlobalServiceContext(), replSettings));
-        _engine.notifyStartupComplete(Client::getCurrent()->makeOperationContext().get());
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+        _engine.notifyStartupComplete(opCtx.get());
     }
 
     ~WiredTigerRecoveryUnitHarnessHelper() {}

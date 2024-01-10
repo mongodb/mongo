@@ -52,6 +52,7 @@
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/dbtests/framework_options.h"
@@ -111,8 +112,12 @@ int runDbTests(int argc, char** argv) {
     serviceContext->setPeriodicRunner(std::move(runner));
 
     {
-        auto opCtx = serviceContext->makeOperationContext(&cc());
-        initializeStorageEngine(opCtx.get(), StorageEngineInitFlags{});
+        auto initializeStorageEngineOpCtx = serviceContext->makeOperationContext(&cc());
+        shard_role_details::setRecoveryUnit(initializeStorageEngineOpCtx.get(),
+                                            std::make_unique<RecoveryUnitNoop>(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+
+        initializeStorageEngine(initializeStorageEngineOpCtx.get(), StorageEngineInitFlags{});
     }
 
     StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);

@@ -246,11 +246,11 @@ static const char* resourceGlobalIdName(ResourceGlobalId id) {
  * Uniquely identifies a lockable resource.
  */
 class ResourceId {
+public:
     // We only use 4 bits for the resource type in the ResourceId hash
     enum { resourceTypeBits = 4 };
     MONGO_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
 
-public:
     ResourceId() : _fullHash(0) {}
     ResourceId(ResourceType type, const NamespaceString& nss)
         : _fullHash(fullHash(type, hashStringData(nss.toStringForResourceId()))) {
@@ -304,7 +304,6 @@ public:
 
 private:
     friend class ResourceCatalog;
-    friend class ResourceIdTest;
 
     ResourceId(uint64_t fullHash) : _fullHash(fullHash) {}
 

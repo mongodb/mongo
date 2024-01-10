@@ -40,9 +40,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -53,8 +54,6 @@ namespace {
 using index_key_validate::validateIdIndexSpec;
 using index_key_validate::validateIndexSpec;
 using index_key_validate::validateIndexSpecCollation;
-
-constexpr OperationContext* kDefaultOpCtx = nullptr;
 
 /**
  * Helper function used to return the fields of a BSONObj in a consistent order.
@@ -68,55 +67,71 @@ BSONObj sorted(const BSONObj& obj) {
     return bob.obj();
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsNotAnObject) {
+namespace index_spec_validate_test {
+
+class IndexSpecValidateTest : public ServiceContextMongoDTest {};
+
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsNotAnObject) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << 1 << "name"
                                            << "indexName")));
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key"
                                      << "not an object"
                                      << "name"
                                      << "indexName")));
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSONArray() << "name"
                                            << "indexName")));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfFieldRepeatedInKeyPattern) {
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfFieldRepeatedInKeyPattern) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::BadValue,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1 << "field" << 1) << "name"
                                            << "indexName")));
     ASSERT_EQ(ErrorCodes::BadValue,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1 << "otherField" << -1 << "field"
                                                            << "2dsphere")
                                            << "name"
                                            << "indexName")));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsNotPresent) {
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsNotPresent) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::FailedToParse,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("name"
                                      << "indexName")));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfNameIsNotAString) {
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfNameIsNotAString) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(kDefaultOpCtx, BSON("key" << BSON("field" << 1) << "name" << 1)));
+              validateIndexSpec(opCtx.get(), BSON("key" << BSON("field" << 1) << "name" << 1)));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfNameIsNotPresent) {
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfNameIsNotPresent) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::FailedToParse,
-              validateIndexSpec(kDefaultOpCtx, BSON("key" << BSON("field" << 1))));
+              validateIndexSpec(opCtx.get(), BSON("key" << BSON("field" << 1))));
 }
 
-TEST(IndexSpecValidateTest, ReturnsIndexSpecUnchangedIfVersionIsPresent) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecValidateTest, ReturnsIndexSpecUnchangedIfVersionIsPresent) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"
                                                << "v" << 1));
@@ -129,54 +144,62 @@ TEST(IndexSpecValidateTest, ReturnsIndexSpecUnchangedIfVersionIsPresent) {
                       sorted(result.getValue()));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsNotANumber) {
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsNotANumber) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "v"
                                            << "not a number")));
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "v" << BSONObj())));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsNotRepresentableAsInt) {
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsNotRepresentableAsInt) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::BadValue,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "v" << 2.2)));
     ASSERT_EQ(ErrorCodes::BadValue,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "v" << std::nan("1"))));
     ASSERT_EQ(ErrorCodes::BadValue,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "v" << std::numeric_limits<double>::infinity())));
     ASSERT_EQ(ErrorCodes::BadValue,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "v" << std::numeric_limits<long long>::max())));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsV0) {
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsV0) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "v" << 0)));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsUnsupported) {
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsUnsupported) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "v" << 3 << "collation"
@@ -184,14 +207,16 @@ TEST(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsUnsupported) {
                                                    << "en"))));
 
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "v" << -3LL)));
 }
 
-TEST(IndexSpecValidateTest, AcceptsIndexVersionsThatAreAllowedForCreation) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecValidateTest, AcceptsIndexVersionsThatAreAllowedForCreation) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"
                                                << "v" << 1));
@@ -203,7 +228,7 @@ TEST(IndexSpecValidateTest, AcceptsIndexVersionsThatAreAllowedForCreation) {
                                         << "v" << 1)),
                       sorted(result.getValue()));
 
-    result = validateIndexSpec(kDefaultOpCtx,
+    result = validateIndexSpec(opCtx.get(),
                                BSON("key" << BSON("field" << 1) << "name"
                                           << "indexName"
                                           << "v" << 2LL));
@@ -216,8 +241,10 @@ TEST(IndexSpecValidateTest, AcceptsIndexVersionsThatAreAllowedForCreation) {
                       sorted(result.getValue()));
 }
 
-TEST(IndexSpecValidateTest, DefaultIndexVersionIsV2) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecValidateTest, DefaultIndexVersionIsV2) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"));
     ASSERT_OK(result.getStatus());
@@ -229,11 +256,13 @@ TEST(IndexSpecValidateTest, DefaultIndexVersionIsV2) {
                       sorted(result.getValue()));
 
     // Verify that the index specification we returned is still considered valid.
-    ASSERT_OK(validateIndexSpec(kDefaultOpCtx, result.getValue()));
+    ASSERT_OK(validateIndexSpec(opCtx.get(), result.getValue()));
 }
 
-TEST(IndexSpecValidateTest, AcceptsIndexVersionV1) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecValidateTest, AcceptsIndexVersionV1) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"
                                                << "v" << 1));
@@ -246,36 +275,42 @@ TEST(IndexSpecValidateTest, AcceptsIndexVersionV1) {
                       sorted(result.getValue()));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfCollationIsNotAnObject) {
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfCollationIsNotAnObject) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "collation" << 1)));
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "collation"
                                            << "not an object")));
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "collation" << BSONArray())));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfCollationIsEmpty) {
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfCollationIsEmpty) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::BadValue,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "collation" << BSONObj())));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfCollationIsPresentAndVersionIsLessThanV2) {
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfCollationIsPresentAndVersionIsLessThanV2) {
+    auto opCtx = makeOperationContext();
+
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
-              validateIndexSpec(kDefaultOpCtx,
+              validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("field" << 1) << "name"
                                            << "indexName"
                                            << "collation"
@@ -284,8 +319,10 @@ TEST(IndexSpecValidateTest, ReturnsAnErrorIfCollationIsPresentAndVersionIsLessTh
                                            << "v" << 1)));
 }
 
-TEST(IndexSpecValidateTest, AcceptsAnyNonEmptyObjectValueForCollation) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecValidateTest, AcceptsAnyNonEmptyObjectValueForCollation) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"
                                                << "v" << 2 << "collation"
@@ -301,7 +338,7 @@ TEST(IndexSpecValidateTest, AcceptsAnyNonEmptyObjectValueForCollation) {
                                                 << "simple"))),
                       sorted(result.getValue()));
 
-    result = validateIndexSpec(kDefaultOpCtx,
+    result = validateIndexSpec(opCtx.get(),
                                BSON("key" << BSON("field" << 1) << "name"
                                           << "indexName"
                                           << "v" << 2 << "collation"
@@ -316,8 +353,10 @@ TEST(IndexSpecValidateTest, AcceptsAnyNonEmptyObjectValueForCollation) {
         sorted(result.getValue()));
 }
 
-TEST(IndexSpecValidateTest, AcceptsIndexSpecIfCollationIsPresentAndVersionIsEqualToV2) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecValidateTest, AcceptsIndexSpecIfCollationIsPresentAndVersionIsEqualToV2) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"
                                                << "v" << 2 << "collation"
@@ -334,31 +373,43 @@ TEST(IndexSpecValidateTest, AcceptsIndexSpecIfCollationIsPresentAndVersionIsEqua
                       sorted(result.getValue()));
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfUnknownFieldIsPresentInSpecV2) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfUnknownFieldIsPresentInSpecV2) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"
                                                << "v" << 2 << "unknownField" << 1));
     ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption, result);
 }
 
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfUnknownFieldIsPresentInSpecV1) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecValidateTest, ReturnsAnErrorIfUnknownFieldIsPresentInSpecV1) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"
                                                << "v" << 1 << "unknownField" << 1));
     ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption, result);
 }
 
-TEST(IndexSpecValidateTest, DisallowSpecifyingBothUniqueAndPrepareUnique) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecValidateTest, DisallowSpecifyingBothUniqueAndPrepareUnique) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("a" << 1) << "name"
                                                << "indexName"
                                                << "unique" << true << "prepareUnique" << true));
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::CannotCreateIndex);
 }
 
-TEST(IdIndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsIncorrectForIdIndex) {
+}  // namespace index_spec_validate_test
+
+namespace id_index_spec_validate_test {
+
+class IdIndexSpecValidateTest : public ServiceContextMongoDTest {};
+
+TEST_F(IdIndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsIncorrectForIdIndex) {
     ASSERT_EQ(ErrorCodes::BadValue,
               validateIdIndexSpec(BSON("key" << BSON("_id" << -1) << "name"
                                              << "_id_"
@@ -369,13 +420,13 @@ TEST(IdIndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsIncorrectForIdIndex) {
                                              << "v" << 2)));
 }
 
-TEST(IdIndexSpecValidateTest, ReturnsOKStatusIfKeyPatternCorrectForIdIndex) {
+TEST_F(IdIndexSpecValidateTest, ReturnsOKStatusIfKeyPatternCorrectForIdIndex) {
     ASSERT_OK(validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
                                              << "anyname"
                                              << "v" << 2)));
 }
 
-TEST(IdIndexSpecValidateTest, ReturnsAnErrorIfFieldNotAllowedForIdIndex) {
+TEST_F(IdIndexSpecValidateTest, ReturnsAnErrorIfFieldNotAllowedForIdIndex) {
     ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption,
               validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
                                              << "_id_"
@@ -403,7 +454,7 @@ TEST(IdIndexSpecValidateTest, ReturnsAnErrorIfFieldNotAllowedForIdIndex) {
                                              << "v" << 2 << "storageEngine" << BSONObj())));
 }
 
-TEST(IdIndexSpecValidateTest, ReturnsOKStatusIfAllFieldsAllowedForIdIndex) {
+TEST_F(IdIndexSpecValidateTest, ReturnsOKStatusIfAllFieldsAllowedForIdIndex) {
     ASSERT_OK(validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
                                              << "_id_"
                                              << "v" << 2 << "collation"
@@ -411,9 +462,19 @@ TEST(IdIndexSpecValidateTest, ReturnsOKStatusIfAllFieldsAllowedForIdIndex) {
                                                      << "simple"))));
 }
 
-TEST(IndexSpecCollationValidateTest, FillsInFullCollationSpec) {
-    QueryTestServiceContext serviceContext;
-    auto opCtx = serviceContext.makeOperationContext();
+}  // namespace id_index_spec_validate_test
+
+namespace index_spec_collation_validate_test {
+
+class IndexSpecCollationValidateTest : public ServiceContextMongoDTest {
+protected:
+    IndexSpecCollationValidateTest() {
+        CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());
+    }
+};
+
+TEST_F(IndexSpecCollationValidateTest, FillsInFullCollationSpec) {
+    auto opCtx = makeOperationContext();
 
     const CollatorInterface* defaultCollator = nullptr;
 
@@ -444,9 +505,8 @@ TEST(IndexSpecCollationValidateTest, FillsInFullCollationSpec) {
         sorted(result.getValue()));
 }
 
-TEST(IndexSpecCollationValidateTest, RemovesCollationFieldIfSimple) {
-    QueryTestServiceContext serviceContext;
-    auto opCtx = serviceContext.makeOperationContext();
+TEST_F(IndexSpecCollationValidateTest, RemovesCollationFieldIfSimple) {
+    auto opCtx = makeOperationContext();
 
     const CollatorInterface* defaultCollator = nullptr;
 
@@ -466,9 +526,8 @@ TEST(IndexSpecCollationValidateTest, RemovesCollationFieldIfSimple) {
                       sorted(result.getValue()));
 }
 
-TEST(IndexSpecCollationValidateTest, FillsInCollationFieldWithCollectionDefaultIfNotPresent) {
-    QueryTestServiceContext serviceContext;
-    auto opCtx = serviceContext.makeOperationContext();
+TEST_F(IndexSpecCollationValidateTest, FillsInCollationFieldWithCollectionDefaultIfNotPresent) {
+    auto opCtx = makeOperationContext();
 
     const CollatorInterfaceMock defaultCollator(CollatorInterfaceMock::MockType::kReverseString);
 
@@ -497,16 +556,26 @@ TEST(IndexSpecCollationValidateTest, FillsInCollationFieldWithCollectionDefaultI
         sorted(result.getValue()));
 }
 
-TEST(IndexSpecPartialFilterTest, FailsIfPartialFilterIsNotAnObject) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+}  // namespace index_spec_collation_validate_test
+
+namespace index_spec_partial_filter_test {
+
+class IndexSpecPartialFilterTest : public ServiceContextMongoDTest {};
+
+TEST_F(IndexSpecPartialFilterTest, FailsIfPartialFilterIsNotAnObject) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"
                                                << "partialFilterExpression" << 1));
     ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
 }
 
-TEST(IndexSpecPartialFilterTest, FailsIfPartialFilterContainsBannedFeature) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecPartialFilterTest, FailsIfPartialFilterContainsBannedFeature) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"
                                                << "partialFilterExpression"
@@ -514,34 +583,48 @@ TEST(IndexSpecPartialFilterTest, FailsIfPartialFilterContainsBannedFeature) {
     ASSERT_EQ(result.getStatus(), ErrorCodes::QueryFeatureNotAllowed);
 }
 
-TEST(IndexSpecPartialFilterTest, AcceptsValidPartialFilterExpression) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecPartialFilterTest, AcceptsValidPartialFilterExpression) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"
                                                << "partialFilterExpression" << BSON("a" << 1)));
     ASSERT_OK(result.getStatus());
 }
 
-TEST(IndexSpecWildcard, SucceedsWithInclusion) {
+}  // namespace index_spec_partial_filter_test
+
+namespace index_spec_wildcard_test {
+
+class IndexSpecWildcardTest : public ServiceContextMongoDTest {};
+
+TEST_F(IndexSpecWildcardTest, SucceedsWithInclusion) {
+    auto opCtx = makeOperationContext();
+
     auto result =
-        validateIndexSpec(kDefaultOpCtx,
+        validateIndexSpec(opCtx.get(),
                           BSON("key" << BSON("$**" << 1) << "name"
                                      << "indexName"
                                      << "wildcardProjection" << BSON("a" << 1 << "b" << 1)));
     ASSERT_OK(result.getStatus());
 }
 
-TEST(IndexSpecWildcard, SucceedsWithExclusion) {
+TEST_F(IndexSpecWildcardTest, SucceedsWithExclusion) {
+    auto opCtx = makeOperationContext();
+
     auto result =
-        validateIndexSpec(kDefaultOpCtx,
+        validateIndexSpec(opCtx.get(),
                           BSON("key" << BSON("$**" << 1) << "name"
                                      << "indexName"
                                      << "wildcardProjection" << BSON("a" << 0 << "b" << 0)));
     ASSERT_OK(result.getStatus());
 }
 
-TEST(IndexSpecWildcard, SucceedsWithExclusionIncludingId) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecWildcardTest, SucceedsWithExclusionIncludingId) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
                                                << "wildcardProjection"
@@ -549,8 +632,10 @@ TEST(IndexSpecWildcard, SucceedsWithExclusionIncludingId) {
     ASSERT_OK(result.getStatus());
 }
 
-TEST(IndexSpecWildcard, SucceedsWithInclusionExcludingId) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecWildcardTest, SucceedsWithInclusionExcludingId) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
                                                << "wildcardProjection"
@@ -558,8 +643,10 @@ TEST(IndexSpecWildcard, SucceedsWithInclusionExcludingId) {
     ASSERT_OK(result.getStatus());
 }
 
-TEST(IndexSpecWildcard, FailsWithInclusionExcludingIdSubfield) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecWildcardTest, FailsWithInclusionExcludingIdSubfield) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
                                                << "wildcardProjection"
@@ -567,8 +654,10 @@ TEST(IndexSpecWildcard, FailsWithInclusionExcludingIdSubfield) {
     ASSERT_EQ(result.getStatus().code(), 31253);
 }
 
-TEST(IndexSpecWildcard, FailsWithExclusionIncludingIdSubfield) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecWildcardTest, FailsWithExclusionIncludingIdSubfield) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
                                                << "wildcardProjection"
@@ -576,17 +665,21 @@ TEST(IndexSpecWildcard, FailsWithExclusionIncludingIdSubfield) {
     ASSERT_EQ(result.getStatus().code(), 31254);
 }
 
-TEST(IndexSpecWildcard, FailsWithMixedProjection) {
+TEST_F(IndexSpecWildcardTest, FailsWithMixedProjection) {
+    auto opCtx = makeOperationContext();
+
     auto result =
-        validateIndexSpec(kDefaultOpCtx,
+        validateIndexSpec(opCtx.get(),
                           BSON("key" << BSON("$**" << 1) << "name"
                                      << "indexName"
                                      << "wildcardProjection" << BSON("a" << 1 << "b" << 0)));
     ASSERT_EQ(result.getStatus().code(), 31254);
 }
 
-TEST(IndexSpecWildcard, FailsWithComputedFieldsInProjection) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecWildcardTest, FailsWithComputedFieldsInProjection) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
                                                << "wildcardProjection"
@@ -595,49 +688,67 @@ TEST(IndexSpecWildcard, FailsWithComputedFieldsInProjection) {
     ASSERT_EQ(result.getStatus().code(), 51271);
 }
 
-TEST(IndexSpecWildcard, FailsWhenProjectionPluginNotWildcard) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecWildcardTest, FailsWhenProjectionPluginNotWildcard) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("a" << 1) << "name"
                                                << "indexName"
                                                << "wildcardProjection" << BSON("a" << 1)));
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
 }
 
-TEST(IndexSpecWildcard, FailsWhenProjectionIsNotAnObject) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecWildcardTest, FailsWhenProjectionIsNotAnObject) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
                                                << "wildcardProjection" << 4));
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
 }
 
-TEST(IndexSpecWildcard, FailsWithEmptyProjection) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecWildcardTest, FailsWithEmptyProjection) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
                                                << "wildcardProjection" << BSONObj()));
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
 }
 
-TEST(IndexSpecWildcard, FailsWhenInclusionWithSubpath) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecWildcardTest, FailsWhenInclusionWithSubpath) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("a.$**" << 1) << "name"
                                                << "indexName"
                                                << "wildcardProjection" << BSON("a" << 1)));
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
 }
 
-TEST(IndexSpecWildcard, FailsWhenExclusionWithSubpath) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecWildcardTest, FailsWhenExclusionWithSubpath) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("a.$**" << 1) << "name"
                                                << "indexName"
                                                << "wildcardProjection" << BSON("b" << 0)));
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
 }
 
-TEST(IndexSpecColumnStore, SucceedsWithInclusion) {
+}  // namespace index_spec_wildcard_test
+
+namespace index_spec_column_store_test {
+
+class IndexSpecColumnStoreTest : public ServiceContextMongoDTest {};
+
+TEST_F(IndexSpecColumnStoreTest, SucceedsWithInclusion) {
+    auto opCtx = makeOperationContext();
+
     auto result =
-        validateIndexSpec(kDefaultOpCtx,
+        validateIndexSpec(opCtx.get(),
                           BSON("key" << BSON("$**"
                                              << "columnstore")
                                      << "name"
@@ -646,9 +757,11 @@ TEST(IndexSpecColumnStore, SucceedsWithInclusion) {
     ASSERT_OK(result.getStatus());
 }
 
-TEST(IndexSpecColumnStore, SucceedsWithExclusion) {
+TEST_F(IndexSpecColumnStoreTest, SucceedsWithExclusion) {
+    auto opCtx = makeOperationContext();
+
     auto result =
-        validateIndexSpec(kDefaultOpCtx,
+        validateIndexSpec(opCtx.get(),
                           BSON("key" << BSON("$**"
                                              << "columnstore")
                                      << "name"
@@ -657,8 +770,10 @@ TEST(IndexSpecColumnStore, SucceedsWithExclusion) {
     ASSERT_OK(result.getStatus());
 }
 
-TEST(IndexSpecColumnStore, SucceedsWithExclusionIncludingId) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, SucceedsWithExclusionIncludingId) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**"
                                                        << "columnstore")
                                                << "name"
@@ -668,8 +783,10 @@ TEST(IndexSpecColumnStore, SucceedsWithExclusionIncludingId) {
     ASSERT_OK(result.getStatus());
 }
 
-TEST(IndexSpecColumnStore, SucceedsWithInclusionExcludingId) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, SucceedsWithInclusionExcludingId) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**"
                                                        << "columnstore")
                                                << "name"
@@ -679,8 +796,10 @@ TEST(IndexSpecColumnStore, SucceedsWithInclusionExcludingId) {
     ASSERT_OK(result.getStatus());
 }
 
-TEST(IndexSpecColumnStore, FailsWithInclusionExcludingIdSubfield) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, FailsWithInclusionExcludingIdSubfield) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**"
                                                        << "columnstore")
                                                << "name"
@@ -690,8 +809,10 @@ TEST(IndexSpecColumnStore, FailsWithInclusionExcludingIdSubfield) {
     ASSERT_EQ(result.getStatus().code(), 31253);
 }
 
-TEST(IndexSpecColumnStore, FailsWithExclusionIncludingIdSubfield) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, FailsWithExclusionIncludingIdSubfield) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**"
                                                        << "columnstore")
                                                << "name"
@@ -701,9 +822,11 @@ TEST(IndexSpecColumnStore, FailsWithExclusionIncludingIdSubfield) {
     ASSERT_EQ(result.getStatus().code(), 31254);
 }
 
-TEST(IndexSpecColumnStore, FailsWithMixedProjection) {
+TEST_F(IndexSpecColumnStoreTest, FailsWithMixedProjection) {
+    auto opCtx = makeOperationContext();
+
     auto result =
-        validateIndexSpec(kDefaultOpCtx,
+        validateIndexSpec(opCtx.get(),
                           BSON("key" << BSON("$**"
                                              << "columnstore")
                                      << "name"
@@ -712,8 +835,10 @@ TEST(IndexSpecColumnStore, FailsWithMixedProjection) {
     ASSERT_EQ(result.getStatus().code(), 31254);
 }
 
-TEST(IndexSpecColumnStore, FailsWithComputedFieldsInProjection) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, FailsWithComputedFieldsInProjection) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**"
                                                        << "columnstore")
                                                << "name"
@@ -724,8 +849,10 @@ TEST(IndexSpecColumnStore, FailsWithComputedFieldsInProjection) {
     ASSERT_EQ(result.getStatus().code(), 51271);
 }
 
-TEST(IndexSpecColumnStore, FailsWhenProjectionPluginNotColumnStore) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, FailsWhenProjectionPluginNotColumnStore) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("a"
                                                        << "columnstore")
                                                << "name"
@@ -734,8 +861,10 @@ TEST(IndexSpecColumnStore, FailsWhenProjectionPluginNotColumnStore) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::CannotCreateIndex);
 }
 
-TEST(IndexSpecColumnStore, FailsWhenProjectionIsNotAnObject) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, FailsWhenProjectionIsNotAnObject) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**"
                                                        << "columnstore")
                                                << "name"
@@ -744,8 +873,10 @@ TEST(IndexSpecColumnStore, FailsWhenProjectionIsNotAnObject) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
 }
 
-TEST(IndexSpecColumnStore, FailsWithEmptyProjection) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, FailsWithEmptyProjection) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**"
                                                        << "columnstore")
                                                << "name"
@@ -754,8 +885,10 @@ TEST(IndexSpecColumnStore, FailsWithEmptyProjection) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
 }
 
-TEST(IndexSpecColumnStore, FailsWhenInclusionWithSubpath) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, FailsWhenInclusionWithSubpath) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("a.$**"
                                                        << "columnstore")
                                                << "name"
@@ -764,8 +897,10 @@ TEST(IndexSpecColumnStore, FailsWhenInclusionWithSubpath) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
 }
 
-TEST(IndexSpecColumnStore, FailsWhenExclusionWithSubpath) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, FailsWhenExclusionWithSubpath) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("a.$**"
                                                        << "columnstore")
                                                << "name"
@@ -774,8 +909,10 @@ TEST(IndexSpecColumnStore, FailsWhenExclusionWithSubpath) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
 }
 
-TEST(IndexSpecColumnStore, SucceedsWithCompressor) {
-    ASSERT_OK(validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, SucceedsWithCompressor) {
+    auto opCtx = makeOperationContext();
+
+    ASSERT_OK(validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("$**"
                                                    << "columnstore")
                                            << "name"
@@ -783,7 +920,7 @@ TEST(IndexSpecColumnStore, SucceedsWithCompressor) {
                                            << "columnstoreCompressor"
                                            << "none")));
 
-    ASSERT_OK(validateIndexSpec(kDefaultOpCtx,
+    ASSERT_OK(validateIndexSpec(opCtx.get(),
                                 BSON("key" << BSON("$**"
                                                    << "columnstore")
                                            << "name"
@@ -792,8 +929,10 @@ TEST(IndexSpecColumnStore, SucceedsWithCompressor) {
                                            << "zstd")));
 }
 
-TEST(IndexSpecColumnStore, FailsWhenCompressorIsANumber) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, FailsWhenCompressorIsANumber) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**"
                                                        << "columnstore")
                                                << "name"
@@ -802,8 +941,10 @@ TEST(IndexSpecColumnStore, FailsWhenCompressorIsANumber) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
 }
 
-TEST(IndexSpecColumnStore, FailsWhenCompressorIsAnObject) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, FailsWhenCompressorIsAnObject) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**"
                                                        << "columnstore")
                                                << "name"
@@ -814,8 +955,10 @@ TEST(IndexSpecColumnStore, FailsWhenCompressorIsAnObject) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
 }
 
-TEST(IndexSpecColumnStore, FailsWhenCompressorIsFictional) {
-    auto result = validateIndexSpec(kDefaultOpCtx,
+TEST_F(IndexSpecColumnStoreTest, FailsWhenCompressorIsFictional) {
+    auto opCtx = makeOperationContext();
+
+    auto result = validateIndexSpec(opCtx.get(),
                                     BSON("key" << BSON("$**"
                                                        << "columnstore")
                                                << "name"
@@ -824,6 +967,8 @@ TEST(IndexSpecColumnStore, FailsWhenCompressorIsFictional) {
                                                << "middleout"));
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::InvalidIndexSpecificationOption);
 }
+
+}  // namespace index_spec_column_store_test
 
 }  // namespace
 }  // namespace mongo

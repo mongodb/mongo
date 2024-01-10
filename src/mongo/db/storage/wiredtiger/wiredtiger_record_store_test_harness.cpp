@@ -68,8 +68,7 @@ std::string _testLoggingSettings(std::string extraStrings) {
 
 WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData extraStrings)
     : _dbpath("wt_test"),
-      _engine(Client::getCurrent()->makeOperationContext().get(),
-              kWiredTigerEngineName,
+      _engine(kWiredTigerEngineName,
               _dbpath.path(),
               &_cs,
               _testLoggingSettings(extraStrings.toString()),
@@ -83,7 +82,8 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
             ? std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext())
             : std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext(),
                                                                  repl::ReplSettings()));
-    _engine.notifyStartupComplete(Client::getCurrent()->makeOperationContext().get());
+    auto opCtx = Client::getCurrent()->makeOperationContext();
+    _engine.notifyStartupComplete(opCtx.get());
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(

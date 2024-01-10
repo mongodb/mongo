@@ -27,48 +27,12 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <memory>
-#include <vector>
-
-#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 
 namespace mongo {
 
-class OperationContext;
+RecoveryUnitNoop::RecoveryUnitNoop() = default;
 
-class RecoveryUnitNoop : public RecoveryUnit {
-public:
-    RecoveryUnitNoop();
-    ~RecoveryUnitNoop() override;
-
-    bool isNoop() const final {
-        return true;
-    }
-
-    bool waitUntilDurable(OperationContext* opCtx) final {
-        return true;
-    }
-
-    void setOrderedCommit(bool orderedCommit) final {}
-
-    void validateInUnitOfWork() const final {}
-
-    void doBeginUnitOfWork() final {}
-
-    void doAbandonSnapshot() override {}
-
-    void doCommitUnitOfWork() final {
-        _executeCommitHandlers(boost::none);
-    }
-
-    void doAbortUnitOfWork() final {
-        _executeRollbackHandlers();
-    }
-
-private:
-    std::vector<std::unique_ptr<Change>> _changes;
-};
+RecoveryUnitNoop::~RecoveryUnitNoop() = default;
 
 }  // namespace mongo

@@ -85,6 +85,7 @@
 #include "mongo/db/session/sessions_collection_standalone.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
@@ -305,12 +306,20 @@ ServiceContext* initialize(const char* yaml_config) {
 
     // Creating the operation context before initializing the storage engine allows the storage
     // engine initialization to make use of the lock manager.
-    auto startupOpCtx = serviceContext->makeOperationContext(&cc());
+    auto lastShutdownState = [&] {
+        auto initializeStorageEngineOpCtx = serviceContext->makeOperationContext(&cc());
+        shard_role_details::setRecoveryUnit(initializeStorageEngineOpCtx.get(),
+                                            std::make_unique<RecoveryUnitNoop>(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
-    auto lastShutdownState =
-        initializeStorageEngine(startupOpCtx.get(), StorageEngineInitFlags::kAllowNoLockFile);
-    invariant(StorageEngine::LastShutdownState::kClean == lastShutdownState);
-    StorageControl::startStorageControls(serviceContext);
+        auto lastShutdownState = initializeStorageEngine(initializeStorageEngineOpCtx.get(),
+                                                         StorageEngineInitFlags::kAllowNoLockFile);
+        invariant(StorageEngine::LastShutdownState::kClean == lastShutdownState);
+        StorageControl::startStorageControls(serviceContext);
+        return lastShutdownState;
+    }();
+
+    auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
     // Warn if we detect configurations for multiple registered storage engines in the same
     // configuration file/environment.

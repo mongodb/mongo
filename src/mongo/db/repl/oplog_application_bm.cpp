@@ -183,10 +183,18 @@ public:
         // Disable fast shutdown so that WT can free memory.
         globalFailPointRegistry().find("WTDisableFastShutDown")->setMode(FailPoint::alwaysOn);
 
-        auto startupOpCtx = _svcCtx->makeOperationContext(&cc());
-        initializeStorageEngine(startupOpCtx.get(),
-                                StorageEngineInitFlags::kAllowNoLockFile |
-                                    StorageEngineInitFlags::kSkipMetadataFile);
+        {
+            auto initializeStorageEngineOpCtx = _svcCtx->makeOperationContext(&cc());
+            shard_role_details::setRecoveryUnit(
+                initializeStorageEngineOpCtx.get(),
+                std::make_unique<RecoveryUnitNoop>(),
+                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+
+            initializeStorageEngine(initializeStorageEngineOpCtx.get(),
+                                    StorageEngineInitFlags::kAllowNoLockFile |
+                                        StorageEngineInitFlags::kSkipMetadataFile);
+        }
+
         DatabaseHolder::set(_svcCtx, std::make_unique<DatabaseHolderImpl>());
         repl::StorageInterface::set(_svcCtx, std::make_unique<repl::StorageInterfaceImpl>());
         auto storageInterface = repl::StorageInterface::get(_svcCtx);
@@ -267,11 +275,12 @@ public:
         storageGlobalParams.dbpath = _tempDir->path();
         storageGlobalParams.ephemeral = false;
 
-        auto uniqueOpCtx = _svcCtx->makeOperationContext(&cc());
-        shard_role_details::setRecoveryUnit(uniqueOpCtx.get(),
+        auto initializeStorageEngineOpCtx = _svcCtx->makeOperationContext(&cc());
+        shard_role_details::setRecoveryUnit(initializeStorageEngineOpCtx.get(),
                                             std::make_unique<RecoveryUnitNoop>(),
                                             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-        initializeStorageEngine(uniqueOpCtx.get(),
+
+        initializeStorageEngine(initializeStorageEngineOpCtx.get(),
                                 StorageEngineInitFlags::kAllowNoLockFile |
                                     StorageEngineInitFlags::kSkipMetadataFile |
                                     StorageEngineInitFlags::kForRestart);

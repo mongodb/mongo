@@ -54,11 +54,11 @@ env.Library(
     target='recovery_unit_base',
     source=[
         'recovery_unit.cpp',
+        'recovery_unit_noop.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/fail_point',
-        'storage_options',
     ],
 )
 

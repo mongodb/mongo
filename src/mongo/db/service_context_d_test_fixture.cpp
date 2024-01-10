@@ -52,6 +52,7 @@
 #include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
@@ -158,8 +159,14 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
 
     // Since unit tests start in their own directories, by default skip lock file and metadata file
     // for faster startup.
-    auto opCtx = serviceContext->makeOperationContext(getClient());
-    initializeStorageEngine(opCtx.get(), options._initFlags);
+    {
+        auto initializeStorageEngineOpCtx = serviceContext->makeOperationContext(&cc());
+        shard_role_details::setRecoveryUnit(initializeStorageEngineOpCtx.get(),
+                                            std::make_unique<RecoveryUnitNoop>(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+
+        initializeStorageEngine(initializeStorageEngineOpCtx.get(), options._initFlags);
+    }
 
     StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
 
@@ -169,6 +176,8 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     ShardingState::create_forTest_DO_NOT_USE(serviceContext);
     CollectionShardingStateFactory::set(
         serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
+
+    auto opCtx = serviceContext->makeOperationContext(getClient());
     serviceContext->getStorageEngine()->notifyStartupComplete(opCtx.get());
 
     if (_journalListener) {

@@ -48,8 +48,6 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
@@ -66,56 +64,27 @@
 namespace mongo {
 namespace repl {
 
-namespace {
-
-class RecoveryUnitMock : public RecoveryUnitNoop {
-public:
-    void setTimestampReadSource(RecoveryUnit::ReadSource source,
-                                boost::optional<Timestamp> provided = boost::none) override {
-        _source = source;
-        _timestamp = provided;
-    }
-    RecoveryUnit::ReadSource getTimestampReadSource() const override {
-        return _source;
-    };
-    boost::optional<Timestamp> getPointInTimeReadTimestamp(OperationContext* opCtx) override {
-        return _timestamp;
-    }
-
-private:
-    ReadSource _source = ReadSource::kNoTimestamp;
-    boost::optional<Timestamp> _timestamp;
-};
-
-}  // namespace
-
 class TenantMigrationRecipientAccessBlockerTest : public ServiceContextMongoDTest {
 public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         auto serviceContext = getServiceContext();
-        TenantMigrationAccessBlockerRegistry::get(cc().getServiceContext()).startup();
+        TenantMigrationAccessBlockerRegistry::get(serviceContext).startup();
 
-        {
-            _opCtx = cc().makeOperationContext();
-            shard_role_details::setRecoveryUnit(
-                _opCtx.get(),
-                std::make_unique<RecoveryUnitMock>(),
-                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        _opCtx = makeOperationContext();
 
-            StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
+        StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
 
-            auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
-            ASSERT_OK(replCoord->updateTerm(opCtx(), 1));
-            replCoord->setMyLastAppliedOpTimeAndWallTimeForward(
-                OpTimeAndWallTime(OpTime(Timestamp(1, 1), 1), Date_t()));
-            ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
-            ReplicationCoordinator::set(serviceContext, std::move(replCoord));
-        }
+        auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
+        ASSERT_OK(replCoord->updateTerm(opCtx(), 1));
+        replCoord->setMyLastAppliedOpTimeAndWallTimeForward(
+            OpTimeAndWallTime(OpTime(Timestamp(1, 1), 1), Date_t()));
+        ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+        ReplicationCoordinator::set(serviceContext, std::move(replCoord));
     }
 
     void tearDown() override {
-        TenantMigrationAccessBlockerRegistry::get(cc().getServiceContext()).shutDown();
+        TenantMigrationAccessBlockerRegistry::get(getServiceContext()).shutDown();
         ServiceContextMongoDTest::tearDown();
     }
 

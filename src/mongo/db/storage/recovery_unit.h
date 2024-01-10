@@ -159,7 +159,7 @@ public:
 
     void commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp);
     void abortRegisteredChanges();
-    virtual ~RecoveryUnit() {}
+    virtual ~RecoveryUnit();
 
     /**
      * Marks the beginning of a unit of work. Each call must be matched with exactly one call to

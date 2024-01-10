@@ -66,6 +66,8 @@ SnapshotId getNextSnapshotId() {
 
 RecoveryUnit::RecoveryUnit() : _snapshot(getNextSnapshotId()) {}
 
+RecoveryUnit::~RecoveryUnit() = default;
+
 RecoveryUnit::Snapshot& RecoveryUnit::getSnapshot() {
     return _snapshot.get();
 }

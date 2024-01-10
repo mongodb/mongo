@@ -59,10 +59,7 @@ namespace {
 std::unique_ptr<WiredTigerKVEngine> makeKVEngine(ServiceContext* serviceContext,
                                                  const std::string& path,
                                                  ClockSource* clockSource) {
-    auto client = serviceContext->getService()->makeClient("myClient");
-    auto opCtx = serviceContext->makeOperationContext(client.get());
     return std::make_unique<WiredTigerKVEngine>(
-        opCtx.get(),
         /*canonicalName=*/"",
         path,
         clockSource,

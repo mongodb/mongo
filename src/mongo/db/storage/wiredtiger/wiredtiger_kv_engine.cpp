@@ -335,8 +335,7 @@ std::string toString(const StorageEngine::OldestActiveTransactionTimestampResult
 
 StringData WiredTigerKVEngine::kTableUriPrefix = "table:"_sd;
 
-WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
-                                       const std::string& canonicalName,
+WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        const std::string& path,
                                        ClockSource* cs,
                                        const std::string& extraOpenOptions,
@@ -599,7 +598,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
     if (repair && _hasUri(session.getSession(), _sizeStorerUri)) {
         LOGV2(22316, "Repairing size cache");
 
-        auto status = _salvageIfNeeded(opCtx, _sizeStorerUri.c_str());
+        auto status = _salvageIfNeeded(_sizeStorerUri.c_str());
         if (status.code() != ErrorCodes::DataModifiedByRepair)
             fassertNoTrace(28577, status);
     }
@@ -837,10 +836,10 @@ Status WiredTigerKVEngine::repairIdent(OperationContext* opCtx, StringData ident
         return Status::OK();
     }
     _ensureIdentPath(ident);
-    return _salvageIfNeeded(opCtx, uri.c_str());
+    return _salvageIfNeeded(uri.c_str());
 }
 
-Status WiredTigerKVEngine::_salvageIfNeeded(OperationContext* opCtx, const char* uri) {
+Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
     // Using a side session to avoid transactional issues
     WiredTigerSession sessionWrapper(_conn);
     WT_SESSION* session = sessionWrapper.getSession();
@@ -864,7 +863,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(OperationContext* opCtx, const char*
                       "Data file is missing. Attempting to drop and re-create the collection.",
                       "uri"_attr = uri);
 
-        return _rebuildIdent(opCtx, session, uri);
+        return _rebuildIdent(session, uri);
     }
 
     LOGV2(22328, "Verify failed. Running a salvage operation.", "uri"_attr = uri);
@@ -886,12 +885,10 @@ Status WiredTigerKVEngine::_salvageIfNeeded(OperationContext* opCtx, const char*
                   "error"_attr = status);
 
     //  If the data is unsalvageable, we should completely rebuild the ident.
-    return _rebuildIdent(opCtx, session, uri);
+    return _rebuildIdent(session, uri);
 }
 
-Status WiredTigerKVEngine::_rebuildIdent(OperationContext* opCtx,
-                                         WT_SESSION* session,
-                                         const char* uri) {
+Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
     invariant(_inRepairMode);
 
     invariant(std::string(uri).find(kTableUriPrefix.rawData()) == 0);
@@ -1581,7 +1578,7 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
                   "error"_attr = status.reason());
 
     //  If the data is unsalvageable, we should completely rebuild the ident.
-    return _rebuildIdent(opCtx, session, _uri(ident).c_str());
+    return _rebuildIdent(session, _uri(ident).c_str());
 #endif
 }
 
