@@ -956,6 +956,7 @@ struct __wt_connection_stats {
     int64_t thread_fsync_active;
     int64_t thread_read_active;
     int64_t thread_write_active;
+    int64_t application_evict_snapshot_refreshed;
     int64_t application_evict_time;
     int64_t application_cache_time;
     int64_t txn_release_blocked;

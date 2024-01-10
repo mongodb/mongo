@@ -99,14 +99,15 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
     txn = session->txn;
 
     if (n > 1)
-        __snapsort(txn->snapshot, n);
+        __snapsort(txn->snapshot_data.snapshot, n);
 
-    txn->snapshot_count = n;
-    txn->snap_max = snap_max;
-    txn->snap_min =
-      (n > 0 && WT_TXNID_LE(txn->snapshot[0], snap_max)) ? txn->snapshot[0] : snap_max;
+    txn->snapshot_data.snapshot_count = n;
+    txn->snapshot_data.snap_max = snap_max;
+    txn->snapshot_data.snap_min = (n > 0 && WT_TXNID_LE(txn->snapshot_data.snapshot[0], snap_max)) ?
+      txn->snapshot_data.snapshot[0] :
+      snap_max;
     F_SET(txn, WT_TXN_HAS_SNAPSHOT);
-    WT_ASSERT(session, n == 0 || txn->snap_min != WT_TXN_NONE);
+    WT_ASSERT(session, n == 0 || txn->snapshot_data.snap_min != WT_TXN_NONE);
 }
 
 /*
@@ -130,6 +131,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
       "A transactions pinned id cannot become globally visible before its snapshot is released");
 
     txn_shared->metadata_pinned = txn_shared->pinned_id = WT_TXN_NONE;
+    F_CLR(txn, WT_TXN_REFRESH_SNAPSHOT);
     F_CLR(txn, WT_TXN_HAS_SNAPSHOT);
 
     /* Clear a checkpoint's pinned ID and timestamp. */
@@ -228,7 +230,7 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool publish)
      */
     if ((id = txn_global->checkpoint_txn_shared.id) != WT_TXN_NONE) {
         if (txn->id != id)
-            txn->snapshot[n++] = id;
+            txn->snapshot_data.snapshot[n++] = id;
         if (publish)
             txn_shared->metadata_pinned = id;
     }
@@ -276,7 +278,7 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool publish)
                  */
                 WT_READ_BARRIER();
                 if (id == s->id) {
-                    txn->snapshot[n++] = id;
+                    txn->snapshot_data.snapshot[n++] = id;
                     if (WT_TXNID_LT(id, pinned_id))
                         pinned_id = id;
                     break;
@@ -316,6 +318,71 @@ void
 __wt_txn_bump_snapshot(WT_SESSION_IMPL *session)
 {
     __txn_get_snapshot_int(session, false);
+}
+
+/*
+ * __wt_txn_snapshot_save_and_refresh --
+ *     Save the existing snapshot and allocate a new snapshot.
+ */
+int
+__wt_txn_snapshot_save_and_refresh(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+    WT_TXN *txn;
+
+    txn = session->txn;
+
+    WT_RET(__wt_calloc_def(session, sizeof(WT_TXN_SNAPSHOT), &txn->backup_snapshot_data));
+
+    txn->backup_snapshot_data->snap_max = txn->snapshot_data.snap_max;
+    txn->backup_snapshot_data->snap_min = txn->snapshot_data.snap_min;
+    txn->backup_snapshot_data->snapshot_count = txn->snapshot_data.snapshot_count;
+
+    WT_ERR(__wt_calloc_def(session, sizeof(uint64_t) * S2C(session)->session_array.size,
+      &txn->backup_snapshot_data->snapshot));
+
+    /* Swap the snapshot pointers. */
+    __txn_swap_snapshot(&txn->snapshot_data.snapshot, &txn->backup_snapshot_data->snapshot);
+
+    /*
+     * __txn_get_snapshot_int will return without getting the new snapshot if the transaction
+     * already has a snapshot so clear the flag WT_TXN_HAS_SNAPSHOT.
+     */
+    F_CLR(txn, WT_TXN_HAS_SNAPSHOT);
+
+    /* Get the snapshot without publishing the shared ids. */
+    __wt_txn_bump_snapshot(session);
+
+err:
+    /* Free the backup_snapshot_data if the memory allocation of the underlying snapshot has failed.
+     */
+    if (ret != 0)
+        __wt_free(session, txn->backup_snapshot_data);
+
+    return (ret);
+}
+
+/*
+ * __wt_txn_snapshot_release_and_restore --
+ *     Switch back to the original snapshot.
+ */
+void
+__wt_txn_snapshot_release_and_restore(WT_SESSION_IMPL *session)
+{
+    WT_TXN *txn;
+    WT_TXN_SNAPSHOT *snapshot_backup;
+
+    txn = session->txn;
+    snapshot_backup = txn->backup_snapshot_data;
+
+    txn->snapshot_data.snap_max = snapshot_backup->snap_max;
+    txn->snapshot_data.snap_min = snapshot_backup->snap_min;
+    txn->snapshot_data.snapshot_count = snapshot_backup->snapshot_count;
+
+    /* Swap the snapshot pointers. */
+    __txn_swap_snapshot(&snapshot_backup->snapshot, &txn->snapshot_data.snapshot);
+    __wt_free(session, snapshot_backup->snapshot);
+    __wt_free(session, snapshot_backup);
 }
 
 /*
@@ -493,7 +560,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
           current_id - oldest_id > (10 * WT_THOUSAND) && oldest_session != NULL) {
             __wt_verbose(session, WT_VERB_TRANSACTION,
               "old snapshot %" PRIu64 " pinned in session %" PRIu32 " [%s] with snap_min %" PRIu64,
-              oldest_id, oldest_session->id, oldest_session->lastop, oldest_session->txn->snap_min);
+              oldest_id, oldest_session->id, oldest_session->lastop,
+              oldest_session->txn->snapshot_data.snap_min);
         }
     }
 
@@ -2173,10 +2241,10 @@ __wt_txn_init(WT_SESSION_IMPL *session, WT_SESSION_IMPL *session_ret)
 
     /* Allocate the WT_TXN structure, including a variable length array of snapshot information. */
     WT_RET(__wt_calloc(session, 1,
-      sizeof(WT_TXN) + sizeof(txn->snapshot[0]) * S2C(session)->session_array.size,
+      sizeof(WT_TXN) + sizeof(txn->snapshot_data.snapshot[0]) * S2C(session)->session_array.size,
       &session_ret->txn));
     txn = session_ret->txn;
-    txn->snapshot = txn->__snapshot;
+    txn->snapshot_data.snapshot = txn->__snapshot;
     txn->id = WT_TXN_NONE;
 
     WT_ASSERT(session,
@@ -2224,10 +2292,10 @@ __wt_txn_init_checkpoint_cursor(
     txn->isolation = WT_ISO_SNAPSHOT;
 
     /* Save the snapshot data. */
-    txn->snap_min = snapinfo->snapshot_min;
-    txn->snap_max = snapinfo->snapshot_max;
-    txn->snapshot = snapinfo->snapshot_txns;
-    txn->snapshot_count = snapinfo->snapshot_count;
+    txn->snapshot_data.snap_min = snapinfo->snapshot_min;
+    txn->snapshot_data.snap_max = snapinfo->snapshot_max;
+    txn->snapshot_data.snapshot = snapinfo->snapshot_txns;
+    txn->snapshot_data.snapshot_count = snapinfo->snapshot_count;
 
     /*
      * At this point we have taken charge of the snapshot's transaction list; it has been moved to
@@ -2284,8 +2352,8 @@ __wt_txn_close_checkpoint_cursor(WT_SESSION_IMPL *session, WT_TXN **txn_arg)
     *txn_arg = NULL;
 
     /* The snapshot list isn't at the end of the transaction structure here; free it explicitly. */
-    WT_ASSERT(session, txn->snapshot != txn->__snapshot);
-    __wt_free(session, txn->snapshot);
+    WT_ASSERT(session, txn->snapshot_data.snapshot != txn->__snapshot);
+    __wt_free(session, txn->snapshot_data.snapshot);
 
     __wt_free(session, txn);
 }
@@ -2647,7 +2715,8 @@ __wt_verbose_dump_txn_one(
         ", full checkpoint: %s"
         ", rollback reason: %s"
         ", flags: 0x%08" PRIx32 ", isolation: %s",
-        txn->id, txn->mod_count, txn->snap_min, txn->snap_max, txn->snapshot_count,
+        txn->id, txn->mod_count, txn->snapshot_data.snap_min, txn->snapshot_data.snap_max,
+        txn->snapshot_data.snapshot_count,
         __wt_timestamp_to_string(txn->commit_timestamp, ts_string[0]),
         __wt_timestamp_to_string(txn->durable_timestamp, ts_string[1]),
         __wt_timestamp_to_string(txn->first_commit_timestamp, ts_string[2]),

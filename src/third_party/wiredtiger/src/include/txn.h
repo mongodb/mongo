@@ -243,6 +243,22 @@ struct __wt_txn_op {
     uint32_t flags;
 };
 
+/*
+ * WT_TXN_SNAPSHOT --
+ *	A structure to store the transactions snapshot details.
+ */
+struct __wt_txn_snapshot {
+    /*
+     * Snapshot data:
+     *	txn_ids >= snap_max are invisible,
+     *	txn_ids < snap_min are visible,
+     *	everything else is visible unless it is in the snapshot.
+     */
+    uint64_t snap_max, snap_min;
+    uint64_t *snapshot;
+    uint32_t snapshot_count;
+};
+
 #define WT_TS_VERBOSE_PREFIX "unexpected timestamp usage: "
 
 /*
@@ -256,16 +272,13 @@ struct __wt_txn {
 
     uint32_t forced_iso; /* Isolation is currently forced. */
 
-    /*
-     * Snapshot data:
-     *	ids >= snap_max are invisible,
-     *	ids < snap_min are visible,
-     *	everything else is visible unless it is in the snapshot.
-     */
-    uint64_t snap_min, snap_max;
-    uint64_t *snapshot;
-    uint32_t snapshot_count;
     uint32_t txn_logsync; /* Log sync configuration */
+
+    /* Snapshot data. */
+    WT_TXN_SNAPSHOT snapshot_data;
+
+    /* Backup snapshot data. */
+    WT_TXN_SNAPSHOT *backup_snapshot_data;
 
     /*
      * Timestamp copied into updates created by this transaction.
@@ -334,26 +347,27 @@ struct __wt_txn {
  */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_TXN_AUTOCOMMIT 0x00001u
-#define WT_TXN_ERROR 0x00002u
-#define WT_TXN_HAS_ID 0x00004u
-#define WT_TXN_HAS_SNAPSHOT 0x00008u
-#define WT_TXN_HAS_TS_COMMIT 0x00010u
-#define WT_TXN_HAS_TS_DURABLE 0x00020u
-#define WT_TXN_HAS_TS_PREPARE 0x00040u
-#define WT_TXN_IGNORE_PREPARE 0x00080u
-#define WT_TXN_IS_CHECKPOINT 0x00100u
-#define WT_TXN_PREPARE 0x00200u
-#define WT_TXN_PREPARE_IGNORE_API_CHECK 0x00400u
-#define WT_TXN_READONLY 0x00800u
-#define WT_TXN_RUNNING 0x01000u
-#define WT_TXN_SHARED_TS_DURABLE 0x02000u
-#define WT_TXN_SHARED_TS_READ 0x04000u
-#define WT_TXN_SYNC_SET 0x08000u
-#define WT_TXN_TS_NOT_SET 0x10000u
-#define WT_TXN_TS_ROUND_PREPARED 0x20000u
-#define WT_TXN_TS_ROUND_READ 0x40000u
-#define WT_TXN_UPDATE 0x80000u
+#define WT_TXN_AUTOCOMMIT 0x000001u
+#define WT_TXN_ERROR 0x000002u
+#define WT_TXN_HAS_ID 0x000004u
+#define WT_TXN_HAS_SNAPSHOT 0x000008u
+#define WT_TXN_HAS_TS_COMMIT 0x000010u
+#define WT_TXN_HAS_TS_DURABLE 0x000020u
+#define WT_TXN_HAS_TS_PREPARE 0x000040u
+#define WT_TXN_IGNORE_PREPARE 0x000080u
+#define WT_TXN_IS_CHECKPOINT 0x000100u
+#define WT_TXN_PREPARE 0x000200u
+#define WT_TXN_PREPARE_IGNORE_API_CHECK 0x000400u
+#define WT_TXN_READONLY 0x000800u
+#define WT_TXN_REFRESH_SNAPSHOT 0x001000u
+#define WT_TXN_RUNNING 0x002000u
+#define WT_TXN_SHARED_TS_DURABLE 0x004000u
+#define WT_TXN_SHARED_TS_READ 0x008000u
+#define WT_TXN_SYNC_SET 0x010000u
+#define WT_TXN_TS_NOT_SET 0x020000u
+#define WT_TXN_TS_ROUND_PREPARED 0x040000u
+#define WT_TXN_TS_ROUND_READ 0x080000u
+#define WT_TXN_UPDATE 0x100000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags;
 
