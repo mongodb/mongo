@@ -166,6 +166,20 @@ use_wiredtiger = rule(
 )
 
 # =========
+# glibcxx-debug
+# =========
+
+use_glibcxx_debug_provider = provider(
+    doc = """Enable the glibc++ debug implementations of the C++ standard libary""",
+    fields = ["enabled"],
+)
+
+use_glibcxx_debug = rule(
+    implementation = lambda ctx: use_glibcxx_debug_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # libc++
 # =========
 

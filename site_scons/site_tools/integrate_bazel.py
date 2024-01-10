@@ -429,6 +429,7 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--//bazel/config:use_ocsp_stapling={True if env.GetOption("ocsp-stapling") == "on" else False}',
             f'--//bazel/config:use_disable_ref_track={False if env.GetOption("disable-ref-track") is None else True}',
             f'--//bazel/config:use_wiredtiger={True if env.GetOption("wiredtiger") == "on" else False}',
+            f'--//bazel/config:use_glibcxx_debug={env.GetOption("use-glibcxx-debug") is not None}',
             f'--//bazel/config:build_grpc={True if env["ENABLE_GRPC_BUILD"] else False}',
             f'--//bazel/config:use_libcxx={env.GetOption("libc++") is not None}',
             f'--dynamic_mode={"off" if static_link else "fully"}',

@@ -195,7 +195,21 @@ TCMALLOC_DEPS = select({
     "//conditions:default": [],
 })
 
-MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES
+#TODO SERVER-84714 add message about using the toolchain version of C++ libs
+GLIBCXX_DEBUG_ERROR_MESSAGE = (
+    "\nError:\n" +
+    "    glibcxx_debug requires these configurations:\n"+
+    "    --//bazel/config:build_mode=dbg\n"+
+    "    --//bazel/config:use_libcxx=False"
+)
+
+GLIBCXX_DEBUG_DEFINES = select({
+    ("//bazel/config:use_glibcxx_debug_required_settings"): ["_GLIBCXX_DEBUG"],
+    ("//bazel/config:use_glibcxx_debug_disabled"): [],
+}, no_match_error = GLIBCXX_DEBUG_ERROR_MESSAGE)
+
+MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES \
+                       + GLIBCXX_DEBUG_DEFINES
 
 MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS \
                     + MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS

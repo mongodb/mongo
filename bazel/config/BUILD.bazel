@@ -17,6 +17,7 @@ load(
     "tsan",
     "ubsan",
     "use_wiredtiger",
+    "use_glibcxx_debug",
     "use_libcxx",
     "build_grpc",
     "separate_debug",
@@ -435,6 +436,41 @@ config_setting(
         "//bazel/config:use_wiredtiger": "True",
     },
 )
+
+# --------------------------------------
+# glibcxx debug options
+# --------------------------------------
+
+use_glibcxx_debug(
+    name = "use_glibcxx_debug",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_glibcxx_debug_enabled",
+    flag_values = {
+        "//bazel/config:use_glibcxx_debug": "True",
+    },
+)
+
+config_setting(
+    name = "use_glibcxx_debug_disabled",
+    flag_values = {
+        "//bazel/config:use_glibcxx_debug": "False",
+    },
+)
+
+# --------------------------------------------
+# ------- computed glibcxx debug flags -------
+
+# If we are using a modern libstdc++ and this is a debug build and we control all C++
+# dependencies, then turn on the debugging features in libstdc++.
+selects.config_setting_group(
+    name = "use_glibcxx_debug_required_settings",
+    #TODO SERVER-84714 add check to ensure we are using the toolchain version of C++ libs
+    match_all = [":use_glibcxx_debug_enabled", ":dbg", ":use_libcxx_disabled"],
+)
+
 
 # --------------------------------------
 # libc++ options
