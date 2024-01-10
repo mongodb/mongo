@@ -74,3 +74,17 @@ buildvariants:
   tasks:
     - name: scons_compile_smoke_test_TG
     - name: ninja_compile_smoke_test_TG
+
+# Note that this task is currently optional;
+# This will eventually become suggested, then required.
+- name: &amazon-linux-2023-arm64-bazel-compile amazon-linux-2023-arm64-bazel-compile
+  display_name: "Amazon Linux 2023 arm64 Bazel Compile"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
+  run_on:
+  - amazon2023.0-arm64-small
+  stepback: false
+  expansions:
+    compile_variant: *amazon-linux-2023-arm64-bazel-compile
+  tasks:
+    - name: compile_bazel_TG
