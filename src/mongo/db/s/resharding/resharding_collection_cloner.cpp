@@ -352,7 +352,10 @@ public:
                     .thenRunOn(_executor)
                     .then([this, cb, i] {
                         auto opCtx = _factory.makeOperationContext(&cc());
-                        opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx.get()));
+                        {
+                            stdx::lock_guard lk(*opCtx->getClient());
+                            opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx.get()));
+                        }
                         TxnNumber txnNumber(0);
                         // This loop will end by interrupt when the producer end closes.
                         while (true) {
