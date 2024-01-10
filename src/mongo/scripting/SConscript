@@ -131,6 +131,7 @@ if jsEngine:
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/client/clientdriver_network',
+            '$BUILD_DIR/mongo/db/auth/security_token_auth',
             '$BUILD_DIR/mongo/db/service_context',
             '$BUILD_DIR/mongo/util/concurrency/spin_lock',
             '$BUILD_DIR/third_party/mozjs/mozjs',

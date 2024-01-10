@@ -213,7 +213,6 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::parseToken(Client* client,
     auto sigraw = base64url::decode(parsed.signature);
     auto signature = SHA256Block::fromBuffer(reinterpret_cast<const std::uint8_t*>(sigraw.data()),
                                              sigraw.size());
-
     uassert(ErrorCodes::Unauthorized, "Token signature invalid", computed == signature);
 
     auto jwt = crypto::JWT::parse(ctxt, decodeJSON(parsed.body));
@@ -287,6 +286,78 @@ boost::optional<ValidatedTenancyScope> ValidatedTenancyScopeFactory::parse(
     } else {
         return boost::none;
     }
+}
+
+ValidatedTenancyScope ValidatedTenancyScopeFactory::create(
+    const UserName& userName,
+    StringData secret,
+    ValidatedTenancyScope::TenantProtocol protocol,
+    TokenForTestingTag) {
+
+    invariant(!secret.empty());
+    Date_t expiration = Date_t::now() + kDefaultExpiration;
+
+    crypto::JWSHeader header;
+    header.setType("JWT"_sd);
+    header.setAlgorithm("HS256"_sd);
+    header.setKeyId(kTestOnlyKeyId);
+
+    crypto::JWT body;
+    body.setIssuer(kTestOnlyIssuer);
+    body.setSubject(userName.getUnambiguousName());
+    body.setAudience(kTestOnlyAudience.toString());
+    body.setTenantId(userName.getTenant());
+    body.setExpiration(std::move(expiration));
+    body.setExpectPrefix(protocol == ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
+
+    std::string payload = "{}.{}"_format(base64url::encode(tojson(header.toBSON())),
+                                         base64url::encode(tojson(body.toBSON())));
+
+    auto computed =
+        SHA256Block::computeHmac(reinterpret_cast<const std::uint8_t*>(secret.rawData()),
+                                 secret.size(),
+                                 reinterpret_cast<const std::uint8_t*>(payload.data()),
+                                 payload.size());
+
+    const std::string originalToken =
+        "{}.{}"_format(payload,
+                       base64url::encode(StringData(reinterpret_cast<const char*>(computed.data()),
+                                                    computed.size())));
+
+    if (gTestOnlyValidatedTenancyScopeKey == secret) {
+        return ValidatedTenancyScope(userName, originalToken, body.getExpiration(), protocol);
+    }
+    return ValidatedTenancyScope(originalToken, protocol);
+}
+
+
+ValidatedTenancyScope ValidatedTenancyScopeFactory::create(
+    TenantId tenant, ValidatedTenancyScope::TenantProtocol protocol, TenantForTestingTag) {
+    crypto::JWSHeader header;
+    header.setType("JWT"_sd);
+    header.setAlgorithm("none"_sd);
+    header.setKeyId("none"_sd);
+
+    crypto::JWT body;
+    body.setIssuer("mongodb://testing.localhost"_sd);
+    body.setSubject(".");
+    body.setAudience(std::string{"mongod-testing"});
+    body.setTenantId(tenant);
+    body.setExpiration(Date_t::max());
+    body.setExpectPrefix(protocol == ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
+
+    const std::string originalToken = "{}.{}."_format(base64url::encode(tojson(header.toBSON())),
+                                                      base64url::encode(tojson(body.toBSON())));
+    return ValidatedTenancyScope(originalToken, std::move(tenant), protocol);
+}
+
+ValidatedTenancyScope ValidatedTenancyScopeFactory::create(std::string token, InitForShellTag) {
+    return ValidatedTenancyScope(std::move(token));
+}
+
+ValidatedTenancyScope ValidatedTenancyScopeFactory::create(TenantId tenant,
+                                                           TrustedForInnerOpMsgRequestTag) {
+    return ValidatedTenancyScope(std::move(tenant));
 }
 
 }  // namespace mongo::auth

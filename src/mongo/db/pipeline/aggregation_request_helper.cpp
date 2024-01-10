@@ -132,8 +132,8 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
     // BSONObj&)
     const auto tenantId = nss.tenantId();
     const auto vts = tenantId
-        ? boost::make_optional(auth::ValidatedTenancyScope(
-              *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+        ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
+              *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
         : boost::none;
     request = AggregateCommandRequest::parse(
         IDLParserContext("aggregate", apiStrict, vts, tenantId, serializationContext),

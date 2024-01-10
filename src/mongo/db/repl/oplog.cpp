@@ -1025,8 +1025,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           auto opMsg = OpMsgRequestBuilder::create(entry.getNss().dbName(), cmd);
           const auto tenantId = entry.getNss().tenantId();
           const auto vts = tenantId
-              ? boost::make_optional(auth::ValidatedTenancyScope(
-                    *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+              ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
+                    *tenantId,
+                    auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
               : boost::none;
           auto collModCmd =
               CollMod::parse(IDLParserContext("collModOplogEntry",
@@ -1137,8 +1138,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& entry = *op;
           const auto tenantId = entry.getNss().tenantId();
           const auto vts = tenantId
-              ? boost::make_optional(auth::ValidatedTenancyScope(
-                    *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+              ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
+                    *tenantId,
+                    auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
               : boost::none;
           auto importEntry = mongo::ImportCollectionOplogEntry::parse(
               IDLParserContext("importCollectionOplogEntry", false /* apiStrict */, vts, tenantId),

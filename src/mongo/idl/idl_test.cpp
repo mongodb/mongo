@@ -2547,8 +2547,10 @@ OpMsgRequest makeOMRWithTenant(BSONObj obj, TenantId tenant) {
     request.body = obj;
 
     using VTS = auth::ValidatedTenancyScope;
-    request.validatedTenancyScope =
-        VTS(std::move(tenant), VTS::TenantProtocol::kDefault, VTS::TenantForTestingTag{});
+    request.validatedTenancyScope = auth::ValidatedTenancyScopeFactory::create(
+        std::move(tenant),
+        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+        auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     return request;
 }
 
@@ -4387,10 +4389,10 @@ TEST(IDLParserContext, TestConstructorWithPredecessorAndDifferentTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     const auto tenantId = TenantId(OID::gen());
-    const auto vts =
-        auth::ValidatedTenancyScope(tenantId,
-                                    auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-                                    auth::ValidatedTenancyScope::TenantForTestingTag{});
+    const auto vts = auth::ValidatedTenancyScopeFactory::create(
+        tenantId,
+        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+        auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     IDLParserContext ctxt("root", false, vts, tenantId);
 
     auto nsInfoStructBSON = [&](const char* ns) {
@@ -4498,10 +4500,10 @@ TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_Parse) {
             boost::optional<TenantId> tenantId = boost::none;
             if (multitenancySupport) {
                 tenantId = boost::make_optional(TenantId(OID::gen()));
-                vts = auth::ValidatedTenancyScope(
+                vts = auth::ValidatedTenancyScopeFactory::create(
                     *tenantId,
                     auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-                    auth::ValidatedTenancyScope::TenantForTestingTag{});
+                    auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
             }
             IDLParserContext ctxt("root", false, vts, tenantId);
 
@@ -4561,10 +4563,10 @@ TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_Parse) {
             boost::optional<TenantId> tenantId = boost::none;
             if (multitenancySupport) {
                 tenantId = TenantId(OID::gen());
-                vts = auth::ValidatedTenancyScope(
+                vts = auth::ValidatedTenancyScopeFactory::create(
                     *tenantId,
                     auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-                    auth::ValidatedTenancyScope::TenantForTestingTag{});
+                    auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
             }
             IDLParserContext ctxt("root", false, vts, tenantId);
 

@@ -64,9 +64,6 @@ public:
      */
     static std::string serialize(const DatabaseName& dbName, const SerializationContext& context);
 
-    static std::string serialize(const DatabaseName& dbName,
-                                 const auth::ValidatedTenancyScope& vts);
-
     /**
      * To be used only for durable catalog. We always include the tenantId as prefixed in a
      * databasename for the catalog.

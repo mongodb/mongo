@@ -53,6 +53,41 @@ public:
                                                         BSONObj body,
                                                         StringData securityToken);
 
+    /**
+     * Creates an HS256 signed token based on a pre-shared symmetric key.
+     * Tokens using this signing algorithm are NOT suitable for production use, and both this
+     * method, and the setParameter controlling the validation of this type of token are
+     * intentionally restricted to test-only environments.
+     */
+    struct TokenForTestingTag {};
+    static constexpr Minutes kDefaultExpiration{15};
+    static ValidatedTenancyScope create(const UserName& username,
+                                        StringData secret,
+                                        ValidatedTenancyScope::TenantProtocol protocol,
+                                        TokenForTestingTag);
+
+    /**
+     * Setup a validated tenant for test, do not use outside of test code.
+     */
+    struct TenantForTestingTag {};
+    static ValidatedTenancyScope create(TenantId tenant,
+                                        ValidatedTenancyScope::TenantProtocol protocol,
+                                        TenantForTestingTag);
+
+    /**
+     * Initializes a VTS object with original BSON only.
+     * Used by shell to prepare outgoing OpMsg requests.
+     */
+    struct InitForShellTag {};
+    static ValidatedTenancyScope create(std::string token, InitForShellTag);
+
+    /**
+     * Backdoor API to setup a validated tenant. For use only when a security context is not
+     * available.
+     */
+    struct TrustedForInnerOpMsgRequestTag {};
+    static ValidatedTenancyScope create(TenantId tenant, TrustedForInnerOpMsgRequestTag);
+
 private:
     /**
      * Transitional token mode used to convey TenantId and Protocol ONLY.

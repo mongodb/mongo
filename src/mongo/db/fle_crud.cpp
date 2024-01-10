@@ -57,7 +57,7 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fle2_get_count_info_command_gen.h"
@@ -563,8 +563,8 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
         // `ownedRequest` is OpMsgRequest type which will parse the tenantId from ValidatedTenantId.
         // Before parsing we should ensure that validatedTenancyScope is set in order not to lose
         // the tenantId after the parsing.
-        ownedRequest.validatedTenancyScope =
-            VTS(tenantId.get(), VTS::TrustedForInnerOpMsgRequestTag{});
+        ownedRequest.validatedTenancyScope = auth::ValidatedTenancyScopeFactory::create(
+            tenantId.get(), auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{});
     }
 
     auto ownedDeleteRequest =
@@ -664,8 +664,8 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
     auto ownedRequest = updateRequest.serialize({});
     const auto tenantId = updateRequest.getDbName().tenantId();
     if (tenantId && gMultitenancySupport) {
-        ownedRequest.validatedTenancyScope =
-            VTS(tenantId.get(), VTS::TrustedForInnerOpMsgRequestTag{});
+        ownedRequest.validatedTenancyScope = auth::ValidatedTenancyScopeFactory::create(
+            tenantId.get(), auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{});
     }
     auto ownedUpdateRequest =
         write_ops::UpdateCommandRequest::parse(IDLParserContext("update"), ownedRequest);
@@ -933,8 +933,8 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     auto ownedRequest = findAndModifyRequest.serialize({});
     const auto tenantId = findAndModifyRequest.getDbName().tenantId();
     if (tenantId && gMultitenancySupport) {
-        ownedRequest.validatedTenancyScope =
-            VTS(tenantId.get(), VTS::TrustedForInnerOpMsgRequestTag{});
+        ownedRequest.validatedTenancyScope = auth::ValidatedTenancyScopeFactory::create(
+            tenantId.get(), auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{});
     }
     auto ownedFindAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
         IDLParserContext("findAndModify"), ownedRequest);

@@ -62,7 +62,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/client/sasl_oidc_client_conversation.h"
-#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
@@ -376,9 +376,9 @@ void doRunCommand(JSContext* cx, JS::CallArgs args, MakeRequest makeRequest) {
 
     auto request = makeRequest(database, arg);
     if (auto tokenArg = args.get(3); tokenArg.isString()) {
-        using VTS = auth::ValidatedTenancyScope;
         if (auto token = ValueWriter(cx, tokenArg).toString(); !token.empty()) {
-            request.validatedTenancyScope = VTS(token, VTS::InitForShellTag{});
+            request.validatedTenancyScope = auth::ValidatedTenancyScopeFactory::create(
+                token, auth::ValidatedTenancyScopeFactory::InitForShellTag{});
         }
     } else {
         uassert(ErrorCodes::BadValue,

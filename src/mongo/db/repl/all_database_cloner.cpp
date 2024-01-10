@@ -252,9 +252,9 @@ void AllDatabaseCloner::postStage() {
                 gFeatureFlagRequireTenantID.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                 dbName.tenantId()) {
-                vts = auth::ValidatedTenancyScope(
+                vts = auth::ValidatedTenancyScopeFactory::create(
                     dbName.tenantId().get(),
-                    auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{});
+                    auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{});
             }
 
             BSONObj res;

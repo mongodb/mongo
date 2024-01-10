@@ -113,8 +113,8 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(
     } else {
         const auto tenantId = defaultDb.tenantId();
         const auto vts = tenantId
-            ? boost::make_optional(auth::ValidatedTenancyScope(
-                  *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+            ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
+                  *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
             : boost::none;
         mergeSpec = DocumentSourceMergeSpec::parse(
             IDLParserContext(kStageName, false /* apiStrict */, vts, tenantId, sc),

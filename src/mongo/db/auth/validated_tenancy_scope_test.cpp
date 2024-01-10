@@ -103,8 +103,11 @@ protected:
     std::string makeSecurityToken(const UserName& userName,
                                   ValidatedTenancyScope::TenantProtocol protocol =
                                       ValidatedTenancyScope::TenantProtocol::kDefault) {
-        using VTS = auth::ValidatedTenancyScope;
-        return VTS(userName, "secret"_sd, protocol, VTS::TokenForTestingTag{})
+        return auth::ValidatedTenancyScopeFactory::create(
+                   userName,
+                   "secret"_sd,
+                   protocol,
+                   auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
             .getOriginalToken()
             .toString();
     }

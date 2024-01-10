@@ -103,9 +103,10 @@ ApplyOpsCommandInfo::ApplyOpsCommandInfo(const BSONObj& applyOpCmd)
     if (applyOpCmd.hasElement("tid")) {
         tid = TenantId::parseFromBSON(applyOpCmd["tid"]);
     }
-    const auto vts = tid ? boost::make_optional(auth::ValidatedTenancyScope(
-                               *tid, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
-                         : boost::none;
+    const auto vts = tid
+        ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
+              *tid, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
+        : boost::none;
     parseProtected(IDLParserContext("applyOps", false, vts, tid), applyOpCmd);
 
     uassert(6711600,
@@ -148,8 +149,8 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
             tid = TenantId::parseFromBSON(operationDoc["tid"]);
         }
         const auto vts = tid
-            ? boost::make_optional(auth::ValidatedTenancyScope(
-                  *tid, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+            ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
+                  *tid, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
             : boost::none;
         ReplOperation::parse(IDLParserContext("extractOperations", false, vts, tid), operationDoc);
 

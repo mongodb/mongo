@@ -45,7 +45,7 @@
 #include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
@@ -127,11 +127,13 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         // we must use a potentially different dbname.
         return [&] {
             try {
-                using VTS = auth::ValidatedTenancyScope;
-                boost::optional<VTS> vts = dbNameForAuthCheck.tenantId()
-                    ? boost::optional<VTS>(VTS(dbNameForAuthCheck.tenantId().value(),
-                                               VTS::TrustedForInnerOpMsgRequestTag{}))
-                    : boost::none;
+                boost::optional<auth::ValidatedTenancyScope> vts;
+                if (dbNameForAuthCheck.tenantId()) {
+                    vts = boost::optional<auth::ValidatedTenancyScope>(
+                        auth::ValidatedTenancyScopeFactory::create(
+                            dbNameForAuthCheck.tenantId().value(),
+                            auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}));
+                }
 
                 auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
                     dbNameForAuthCheck, vts, o);

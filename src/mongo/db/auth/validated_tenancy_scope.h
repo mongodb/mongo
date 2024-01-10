@@ -34,9 +34,7 @@
 #include <utility>
 #include <variant>
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/time_support.h"
 
@@ -99,43 +97,6 @@ public:
     static const boost::optional<ValidatedTenancyScope>& get(OperationContext* opCtx);
     static void set(OperationContext* opCtx, boost::optional<ValidatedTenancyScope> token);
 
-    /**
-     * Transitional token generator, do not use outside of test code.
-     */
-    struct TokenForTestingTag {};
-    static constexpr Minutes kDefaultExpiration{15};
-    explicit ValidatedTenancyScope(const UserName& username,
-                                   StringData secret,
-                                   TenantProtocol protocol,
-                                   TokenForTestingTag);
-    explicit ValidatedTenancyScope(const UserName& username,
-                                   StringData secret,
-                                   Date_t expiration,
-                                   TenantProtocol protocol,
-                                   TokenForTestingTag);
-
-    /**
-     * Setup a validated tenant for test, do not use outside of test code.
-     */
-    struct TenantForTestingTag {};
-    explicit ValidatedTenancyScope(TenantId tenant, TenantProtocol protocol, TenantForTestingTag);
-
-    /**
-     * Initializes a VTS object with original BSON only.
-     * Used by shell to prepare outgoing OpMsg requests.
-     */
-    struct InitForShellTag {};
-    explicit ValidatedTenancyScope(std::string token, InitForShellTag)
-        : _originalToken(std::move(token)) {}
-
-    /**
-     * Backdoor API to setup a validated tenant. For use only when a security context is not
-     * available.
-     */
-    struct TrustedForInnerOpMsgRequestTag {};
-    explicit ValidatedTenancyScope(TenantId tenant, TrustedForInnerOpMsgRequestTag)
-        : _tenantOrUser(std::move(tenant)) {}
-
 private:
     friend class ValidatedTenancyScopeFactory;
 
@@ -160,6 +121,34 @@ private:
      * ValidatedTenancyScope.
      */
     explicit ValidatedTenancyScope(TenantId tenant) : _tenantOrUser(std::move(tenant)) {}
+
+    /**
+     * The constructors below are for specific cases and should remain private and only used through
+     * the ValidatedTenancyScopeFactory::create calls.
+     */
+    explicit ValidatedTenancyScope(const UserName& userName,
+                                   const std::string& token,
+                                   Date_t expiration,
+                                   TenantProtocol protocol)
+        : _originalToken(token),
+          _expiration(expiration),
+          _tenantOrUser(userName),
+          _tenantProtocol(protocol) {}
+
+    /**
+     * The constructors below are private and to be used through the ValidatedTenancyScopeFactory
+     * only in specific cases such as testing, shell or OpMsgRequests when a security context is not
+     * available. See ValidatedTenancyScopeFactory for  more details.
+     */
+    explicit ValidatedTenancyScope(const std::string& token, TenantProtocol protocol)
+        : _originalToken(token), _tenantProtocol(protocol) {}
+
+    explicit ValidatedTenancyScope(const std::string& token,
+                                   TenantId tenant,
+                                   TenantProtocol protocol)
+        : _originalToken(token), _tenantOrUser(std::move(tenant)), _tenantProtocol(protocol) {}
+
+    explicit ValidatedTenancyScope(std::string token) : _originalToken(std::move(token)) {}
 
     // Preserve original token for serializing from MongoQ.
     std::string _originalToken;

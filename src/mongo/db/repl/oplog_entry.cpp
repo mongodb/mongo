@@ -364,8 +364,8 @@ StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {
     try {
         MutableOplogEntry oplogEntry;
         const auto vts = tid
-            ? boost::make_optional(auth::ValidatedTenancyScope(
-                  *tid, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+            ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
+                  *tid, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
             : boost::none;
         oplogEntry.parseProtected(
             IDLParserContext("OplogEntryBase", false /* apiStrict */, vts, tid), object);
@@ -425,9 +425,10 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
     if (_raw.hasElement("tid"))
         tid = TenantId::parseFromBSON(_raw["tid"]);
 
-    const auto vts = tid ? boost::make_optional(auth::ValidatedTenancyScope(
-                               *tid, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
-                         : boost::none;
+    const auto vts = tid
+        ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
+              *tid, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
+        : boost::none;
     parseProtected(IDLParserContext("OplogEntryBase", false /* apiStrict */, vts, tid), _raw);
 
     // Parse command type from 'o' and 'o2' fields.

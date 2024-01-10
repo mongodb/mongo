@@ -1633,7 +1633,6 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
 
     // Tests authorization flow from unauthenticated to active (via token) to unauthenticated to
     // active (via stateful connection) to unauthenticated.
-    using VTS = auth::ValidatedTenancyScope;
 
     // Create and authorize a security token user.
     ASSERT_OK(createUser(kTenant1UserTest, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
@@ -1641,20 +1640,24 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
     ASSERT_OK(createUser(kTenant2UserTest, {{"readWriteAnyDatabase", "admin"}}));
 
     {
-        VTS validatedTenancyScope(
-            kTenant1UserTest, kVTSKey, VTS::TenantProtocol::kDefault, VTS::TokenForTestingTag{});
+        auth::ValidatedTenancyScope validatedTenancyScope =
+            auth::ValidatedTenancyScopeFactory::create(
+                kTenant1UserTest,
+                kVTSKey,
+                auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
         // Actual expiration used by AuthorizationSession will be the minimum of
         // the token's known expiraiton time and the expiration time passed in.
         const auto checkExpiration = [&](const boost::optional<Date_t>& expire,
                                          const Date_t& expect) {
-            VTS::set(_opCtx.get(), validatedTenancyScope);
+            auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
             ASSERT_OK(
                 authzSession->addAndAuthorizeUser(_opCtx.get(), kTenant1UserTestRequest, expire));
             ASSERT_EQ(authzSession->getExpiration(), expect);
 
             // Reset for next test.
-            VTS::set(_opCtx.get(), boost::none);
+            auth::ValidatedTenancyScope::set(_opCtx.get(), boost::none);
             authzSession->startRequest(_opCtx.get());
             assertLogout(testTenant1FooCollResource, ActionType::insert);
         };
@@ -1665,11 +1668,15 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
     }
 
     {
-        VTS validatedTenancyScope(
-            kTenant1UserTest, kVTSKey, VTS::TenantProtocol::kDefault, VTS::TokenForTestingTag{});
+        auth::ValidatedTenancyScope validatedTenancyScope =
+            auth::ValidatedTenancyScopeFactory::create(
+                kTenant1UserTest,
+                kVTSKey,
+                auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
         // Perform authentication checks.
-        VTS::set(_opCtx.get(), validatedTenancyScope);
+        auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
         ASSERT_OK(
             authzSession->addAndAuthorizeUser(_opCtx.get(), kTenant1UserTestRequest, boost::none));
 
@@ -1686,7 +1693,7 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
 
         // Check that starting a new request without the security token decoration results in token
         // user logout.
-        VTS::set(_opCtx.get(), boost::none);
+        auth::ValidatedTenancyScope::set(_opCtx.get(), boost::none);
         authzSession->startRequest(_opCtx.get());
         assertLogout(testTenant1FooCollResource, ActionType::insert);
 
@@ -1707,9 +1714,14 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
 
     // Create a new validated tenancy scope for the readWriteAny tenant user.
     {
-        VTS validatedTenancyScope(
-            kTenant2UserTest, kVTSKey, VTS::TenantProtocol::kDefault, VTS::TokenForTestingTag{});
-        VTS::set(_opCtx.get(), validatedTenancyScope);
+        auth::ValidatedTenancyScope validatedTenancyScope =
+            auth::ValidatedTenancyScopeFactory::create(
+                kTenant2UserTest,
+                kVTSKey,
+                auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
+        auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
+        auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
 
         ASSERT_OK(
             authzSession->addAndAuthorizeUser(_opCtx.get(), kTenant2UserTestRequest, boost::none));
@@ -1723,7 +1735,7 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
 
         // Check that starting a new request without the security token decoration results in token
         // user logout.
-        VTS::set(_opCtx.get(), boost::none);
+        auth::ValidatedTenancyScope::set(_opCtx.get(), boost::none);
         authzSession->startRequest(_opCtx.get());
         assertLogout(testTenant2FooCollResource, ActionType::insert);
     }

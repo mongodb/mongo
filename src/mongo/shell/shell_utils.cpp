@@ -71,7 +71,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/hasher.h"
 #include "mongo/platform/decimal128.h"
@@ -469,11 +469,11 @@ BSONObj _createSecurityToken(const BSONObj& args, void* data) {
             (argv.size() == 2) && (argv[0].type() == Object) && (argv[1].type() == String) &&
                 !argv[1].valueStringData().empty());
 
-    using VTS = auth::ValidatedTenancyScope;
-    auto token = VTS(UserName::parseFromBSON(argv[0]),
-                     argv[1].valueStringData(),
-                     VTS::TenantProtocol::kDefault,
-                     VTS::TokenForTestingTag{});
+    auto token = auth::ValidatedTenancyScopeFactory::create(
+        UserName::parseFromBSON(argv[0]),
+        argv[1].valueStringData(),
+        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+        auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
     return BSON("" << token.getOriginalToken());
 }
 
@@ -492,11 +492,11 @@ BSONObj _createTenantToken(const BSONObj& args, void* data) {
             obj.hasField("tenant"_sd) && obj["tenant"_sd].type() == jstOID);
     const auto tenant = TenantId::parseFromBSON(obj["tenant"_sd]);
     const auto expectPrefix = obj["expectPrefix"].booleanSafe();
-    using VTS = auth::ValidatedTenancyScope;
-    const auto token =
-        VTS(tenant,
-            (expectPrefix ? VTS::TenantProtocol::kAtlasProxy : VTS::TenantProtocol::kDefault),
-            VTS::TenantForTestingTag{});
+    const auto token = auth::ValidatedTenancyScopeFactory::create(
+        tenant,
+        (expectPrefix ? auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy
+                      : auth::ValidatedTenancyScope::TenantProtocol::kDefault),
+        auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     return BSON("" << token.getOriginalToken());
 }
 

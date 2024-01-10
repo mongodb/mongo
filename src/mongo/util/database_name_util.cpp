@@ -70,14 +70,6 @@ std::string DatabaseNameUtil::serialize(const DatabaseName& dbName,
     }
 }
 
-std::string DatabaseNameUtil::serialize(const DatabaseName& dbName,
-                                        const auth::ValidatedTenancyScope& vts) {
-
-    // TODO SERVER-83797 - Implement logic here.
-    MONGO_UNREACHABLE;
-    return "";
-}
-
 std::string DatabaseNameUtil::serializeForAuthPrevalidated(const DatabaseName& dbName,
                                                            const SerializationContext& context) {
     // We want everything in the DatabaseName (tenantId, db) to be present in the serialized output
@@ -182,14 +174,6 @@ DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId,
         default:
             MONGO_UNREACHABLE;
     }
-}
-
-DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId,
-                                           StringData db,
-                                           const auth::ValidatedTenancyScope& vts) {
-    // TODO SERVER-83797 - Implement logic here.
-    MONGO_UNREACHABLE;
-    return DatabaseName();
 }
 
 DatabaseName DatabaseNameUtil::deserializeForAuthPrevalidated(boost::optional<TenantId> tenantId,

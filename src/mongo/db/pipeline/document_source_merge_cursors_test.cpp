@@ -497,8 +497,10 @@ TEST_F(DocumentSourceMergeCursorsMultiTenancyTest, ShouldBeAbleToParseSerialized
     // Make sure the serialized version can be parsed into an identical AsyncResultsMergerParams.
     const auto newSpec = serializationArray[0].getDocument().toBson();
     ASSERT(newSpec["$mergeCursors"].type() == BSONType::Object);
-    using VTS = auth::ValidatedTenancyScope;
-    const auto vts = VTS(tenantId, VTS::TenantProtocol::kDefault, VTS::TenantForTestingTag{});
+    const auto vts = auth::ValidatedTenancyScopeFactory::create(
+        tenantId,
+        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+        auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     const auto newParams = AsyncResultsMergerParams::parse(
         IDLParserContext("$mergeCursors test", false, vts, tenantId),
         newSpec["$mergeCursors"].Obj());
@@ -554,8 +556,10 @@ TEST_F(DocumentSourceMergeCursorsMultiTenancyAndFeatureFlagTest,
     // Make sure the serialized version can be parsed into an identical AsyncResultsMergerParams.
     const auto newSpec = serializationArray[0].getDocument().toBson();
     ASSERT(newSpec["$mergeCursors"].type() == BSONType::Object);
-    using VTS = auth::ValidatedTenancyScope;
-    const auto vts = VTS(tenantId, VTS::TenantProtocol::kDefault, VTS::TenantForTestingTag{});
+    const auto vts = auth::ValidatedTenancyScopeFactory::create(
+        tenantId,
+        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+        auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     const auto newParams = AsyncResultsMergerParams::parse(
         IDLParserContext("$mergeCursors test", false, vts, tenantId),
         newSpec["$mergeCursors"].Obj());

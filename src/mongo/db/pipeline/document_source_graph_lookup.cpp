@@ -108,8 +108,8 @@ NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
     // Valdate the db and coll names.
     const auto tenantId = defaultDb.tenantId();
     const auto vts = tenantId
-        ? boost::make_optional(auth::ValidatedTenancyScope(
-              *tenantId, auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{}))
+        ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
+              *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
         : boost::none;
     auto spec = NamespaceSpec::parse(
         IDLParserContext{elem.fieldNameStringData(), false /* apiStrict */, vts, tenantId},

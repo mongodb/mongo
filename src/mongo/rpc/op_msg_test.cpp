@@ -844,12 +844,12 @@ TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromSecurityToken) {
     RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
                                                           "secret");
 
-    using VTS = auth::ValidatedTenancyScope;
     const auto kTenantId = TenantId(OID::gen());
-    const auto token = VTS(UserName("user", "admin", kTenantId),
+    const auto token = auth::ValidatedTenancyScopeFactory::create(
+                           UserName("user", "admin", kTenantId),
                            "secret"_sd,
-                           VTS::TenantProtocol::kDefault,
-                           VTS::TokenForTestingTag{})
+                           auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                           auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
                            .getOriginalToken()
                            .toString();
     auto msg =
@@ -881,10 +881,12 @@ TEST_F(OpMsgWithAuth, ValidatedTenancyScopeShouldNotBeSerialized) {
     RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
 
-    using VTS = auth::ValidatedTenancyScope;
     const auto kTenantId = TenantId(OID::gen());
 
-    const auto token = VTS(kTenantId, VTS::TenantProtocol::kAtlasProxy, VTS::TenantForTestingTag{})
+    const auto token = auth::ValidatedTenancyScopeFactory::create(
+                           kTenantId,
+                           auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy,
+                           auth::ValidatedTenancyScopeFactory::TenantForTestingTag{})
                            .getOriginalToken()
                            .toString();
 
@@ -968,12 +970,12 @@ TEST(OpMsgRequestBuilder, WithVTS) {
     RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
                                                           "secret");
 
-    using VTS = auth::ValidatedTenancyScope;
     const TenantId tenantId(OID::gen());
-    const auto vts = VTS(UserName("user", "admin", tenantId),
-                         "secret"_sd,
-                         VTS::TenantProtocol::kDefault,
-                         VTS::TokenForTestingTag{});
+    const auto vts = auth::ValidatedTenancyScopeFactory::create(
+        UserName("user", "admin", tenantId),
+        "secret"_sd,
+        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+        auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
     const StringData dbString = "testDb";
     auto const body = fromjson("{ping: 1}");
@@ -996,13 +998,13 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
     const std::string dbStringWithTid = str::stream() << tenantId.toString() << "_" << dbString;
     auto const body = fromjson("{ping: 1}");
 
-    using VTS = auth::ValidatedTenancyScope;
     using Prefix = SerializationContext::Prefix;
 
-    VTS vts = VTS(UserName("user", "admin", tenantId),
-                  "secret"_sd,
-                  VTS::TenantProtocol::kDefault,
-                  VTS::TokenForTestingTag{});
+    auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
+        UserName("user", "admin", tenantId),
+        "secret"_sd,
+        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+        auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
     OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
         DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body);
@@ -1015,13 +1017,14 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
 }
 
 void CheckVtsSetsPrefix(Client* client, bool simulateAtlasProxyTenantProtocol) {
-    using VTS = auth::ValidatedTenancyScope;
     const auto kTenantId = TenantId(OID::gen());
-    const auto token = VTS(UserName("user", "admin", kTenantId),
+    const auto token = auth::ValidatedTenancyScopeFactory::create(
+                           UserName("user", "admin", kTenantId),
                            "secret"_sd,
-                           simulateAtlasProxyTenantProtocol ? VTS::TenantProtocol::kAtlasProxy
-                                                            : VTS::TenantProtocol::kDefault,
-                           VTS::TokenForTestingTag{})
+                           simulateAtlasProxyTenantProtocol
+                               ? auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy
+                               : auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                           auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
                            .getOriginalToken()
                            .toString();
     auto msg =
@@ -1041,7 +1044,7 @@ void CheckVtsSetsPrefix(Client* client, bool simulateAtlasProxyTenantProtocol) {
             token,
         }
             .parse(client);
-    VTS vts = msg.validatedTenancyScope.value();
+    auth::ValidatedTenancyScope vts = msg.validatedTenancyScope.value();
     ASSERT_TRUE(vts.isFromAtlasProxy() == simulateAtlasProxyTenantProtocol);
 
     auto serializedMsg = msg.serialize();
@@ -1082,11 +1085,11 @@ void CheckCommandMsgIdlParsingForOpMsgRequest(bool simulateAtlasProxyTenantProto
                     << "$db" << dbString << "documents" << BSON_ARRAY(BSONObj()));
     OpMsgRequest msg;
     msg.body = cmd;
-    using VTS = auth::ValidatedTenancyScope;
-    VTS vts = VTS(tenantId,
-                  simulateAtlasProxyTenantProtocol ? VTS::TenantProtocol::kAtlasProxy
-                                                   : VTS::TenantProtocol::kDefault,
-                  VTS::TenantForTestingTag{});
+    auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
+        tenantId,
+        simulateAtlasProxyTenantProtocol ? auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy
+                                         : auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+        auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     msg.validatedTenancyScope = vts;
     auto op = InsertOp::parse(msg);
     ASSERT_EQ(op.getSerializationContext().getPrefix(),
@@ -1123,13 +1126,13 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
     const std::string dbStringWithTid = str::stream() << tenantId.toString() << "_" << dbString;
     auto const body = fromjson("{ping: 1}");
 
-    using VTS = auth::ValidatedTenancyScope;
     using Prefix = SerializationContext::Prefix;
 
-    VTS vts = VTS(UserName("user", "admin", tenantId),
-                  "secret"_sd,
-                  VTS::TenantProtocol::kDefault,
-                  VTS::TokenForTestingTag{});
+    auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
+        UserName("user", "admin", tenantId),
+        "secret"_sd,
+        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+        auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
     OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
         DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body);
@@ -1149,13 +1152,13 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
     const std::string dbStringWithTid = str::stream() << tenantId.toString() << "_" << dbString;
     auto const body = fromjson("{ping: 1}");
 
-    using VTS = auth::ValidatedTenancyScope;
     using Prefix = SerializationContext::Prefix;
 
-    VTS vts = VTS(UserName("user", "admin", tenantId),
-                  "secret"_sd,
-                  VTS::TenantProtocol::kAtlasProxy,
-                  VTS::TokenForTestingTag{});
+    auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
+        UserName("user", "admin", tenantId),
+        "secret"_sd,
+        auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy,
+        auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
     OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
         DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body);
@@ -1180,11 +1183,11 @@ TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
 
     const TenantId tenantId(OID::gen());
 
-    using VTS = auth::ValidatedTenancyScope;
-    VTS vts = VTS(UserName("user", "admin", tenantId),
-                  "secret"_sd,
-                  VTS::TenantProtocol::kDefault,
-                  VTS::TokenForTestingTag{});
+    auth::ValidatedTenancyScope vts = auth::ValidatedTenancyScopeFactory::create(
+        UserName("user", "admin", tenantId),
+        "secret"_sd,
+        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+        auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
     auto body = fromjson("{ping: 1}");
     const void* const bodyPtr = body.objdata();

@@ -166,9 +166,9 @@ void CollectionCloner::preStage() {
         gFeatureFlagRequireTenantID.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         _sourceNss.tenantId()) {
-        vts = auth::ValidatedTenancyScope(
+        vts = auth::ValidatedTenancyScopeFactory::create(
             _sourceNss.tenantId().get(),
-            auth::ValidatedTenancyScope::TrustedForInnerOpMsgRequestTag{});
+            auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{});
     }
 
     BSONObj res;
