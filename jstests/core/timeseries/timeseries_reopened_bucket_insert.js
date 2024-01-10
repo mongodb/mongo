@@ -187,6 +187,18 @@ const checkIfBucketReopened = function(
 })();
 
 (function expectToReopenArchivedBuckets() {
+    // If the timeseriesAlwaysUseCompressedBuckets feature flag is enabled, when searching through
+    // candidate buckets useBucket also checks if the time range for the measurement that we are
+    // trying to insert matches the candidate bucket - if it does not, we do not return it. Because
+    // of this extra check, we do not attempt to insert a measurement into a bucket with an
+    // incompatible time range, which prevents that bucket from being rolled over. Because
+    // the bucket will not be rolled over in this case, it will not be a candidate for reopening.
+    // TODO SERVER-79481: Revisit this once we define an upper bound for the number of
+    // multiple open buckets per metadata, at which point buckets will rollover once again.
+    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+        return;
+    }
+
     jsTestLog("Entering expectToReopenArchivedBuckets...");
     resetCollection();
 
@@ -210,48 +222,6 @@ const checkIfBucketReopened = function(
     checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
 
     jsTestLog("Exiting expectToReopenArchivedBuckets.");
-})();
-
-(function expectToReopenCompressedBuckets() {
-    if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        return;
-    }
-
-    jsTestLog("Entering expectToReopenCompressedBuckets...");
-    resetCollection();
-
-    let initialMeasurements = [];
-    const timestamp = ISODate("2022-08-26T19:19:00Z");
-    for (let i = 0; i < 5; ++i) {
-        initialMeasurements.push({
-            [timeField]: timestamp,
-            [metaField]: "ReopenedBucket1",
-        });
-    }
-    const forward = {
-        [timeField]: ISODate("2022-08-27T19:19:00Z"),
-        [metaField]: "ReopenedBucket1",
-    };
-    const backward = {
-        [timeField]: timestamp,
-        [metaField]: "ReopenedBucket1",
-    };
-
-    for (let i = 0; i < initialMeasurements.length; ++i) {
-        checkIfBucketReopened(
-            initialMeasurements[i], /* willCreateBucket= */ i == 0, /* willReopenBucket= */ false);
-    }
-    // Time forwards will open a new bucket, and close and compress the old one.
-    checkIfBucketReopened(forward, /* willCreateBucket */ true, /* willReopenBucket */ false);
-    assert.eq(2,
-              bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressed})
-                  .toArray()
-                  .length);
-
-    // We expect to reopen the compressed bucket with time backwards.
-    checkIfBucketReopened(backward, /* willCreateBucket= */ false, /* willReopenBucket= */ true);
-
-    jsTestLog("Exiting expectToReopenCompressedBuckets.");
 })();
 
 (function failToReopenNonSuitableBuckets() {

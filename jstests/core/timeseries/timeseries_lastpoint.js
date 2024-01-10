@@ -36,10 +36,23 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getEngine, getPlanStage, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 
 const coll = db.timeseries_lastpoint;
 const bucketsColl = db.system.buckets.timeseries_lastpoint;
+
+// If the timeseriesAlwaysUseCompressedBuckets feature flag is enabled, when searching through
+// candidate buckets useBucket also checks if the time range for the measurement that we are
+// trying to insert matches the candidate bucket - if it does not, we do not return it. Because
+// of this extra check, we do not attempt to insert a measurement into a bucket with an
+// incompatible time range, which prevents that bucket from being rolled over. The set up for
+// this test relies on rolling over buckets due to the earlier time rolloverReason.
+// TODO SERVER-79481: Revisit this once we define an upper bound for the number of
+// multiple open buckets per metadata, at which point buckets will rollover once again.
+if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+    quit();
+}
 
 // The lastpoint optimization attempt to pick a bucket that would contain the event with max time
 // and then only unpack that bucket. This function creates a collection with three buckets that

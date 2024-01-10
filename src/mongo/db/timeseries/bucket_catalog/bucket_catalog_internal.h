@@ -151,7 +151,9 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
 
 /**
  * Retrieve the open bucket for write use if one exists. If none exists and 'mode' is set to kYes,
- * then we will create a new bucket.
+ * then we will create a new bucket. If the feature flag for alwaysUseCompressedBuckets is enabled,
+ * then we check both that the candidate bucket is open and that its time range accomadates the
+ * time value of the measurement we are attempting to write.
  */
 Bucket* useBucket(Stripe& stripe,
                   WithLock stripeLock,
@@ -162,7 +164,10 @@ Bucket* useBucket(Stripe& stripe,
  * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers buckets
  * that are pending closure or archival but which are still eligible to recieve new measurements.
  */
-Bucket* useAlternateBucket(Stripe& stripe, WithLock stripeLock, const CreationInfo& info);
+Bucket* useAlternateBucket(BucketCatalog& catalog,
+                           Stripe& stripe,
+                           WithLock stripeLock,
+                           const CreationInfo& info);
 
 /**
  * Given a bucket to reopen, performs validation and constructs the in-memory representation of the
@@ -448,5 +453,13 @@ void closeArchivedBucket(BucketCatalog& catalog,
 void runPostCommitDebugChecks(OperationContext* opCtx,
                               const Bucket& bucket,
                               const WriteBatch& batch);
+
+/**
+ * Returns false if a document's time is not within the time range of the bucket - i.e, that it is
+ * either earlier than the minTime of the bucket, or that it is later than the minTime + the
+ * maximum time span of the bucket. Returns true if neither of these are true and the document is
+ * within the time range for the bucket.
+ */
+bool isDocumentWithinTimeRangeForBucket(Bucket* potentialBucket, const CreationInfo& info);
 
 }  // namespace mongo::timeseries::bucket_catalog::internal

@@ -2406,5 +2406,177 @@ TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSizeRespectsAbsoluteMin) {
     ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMinSize.load());
 }
 
+// Tests whether performing a simple insert works as expected when there is more than one open
+// bucket for a particular bucket metadata. Multiple open buckets per metadata is currently hidden
+// behind a feature flag.
+TEST_F(BucketCatalogTest, InsertWithMultipleOpenBucketsPerMetadata) {
+    // Simplify test by restricting to a single stripe.
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
+    // Turn on Feature Flag.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
+    // Acquire our collection.
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    // Store the current time.
+    auto currentTime = Date_t::now();
+    // Initialize the document that we will be inserting.
+    auto doc = BSON(_metaField << 42 << _timeField << currentTime);
+    // Initialize the values with which we will create our two buckets.
+    auto& stripe = _bucketCatalog->stripes[0];
+    ClosedBuckets closedBuckets;
+    auto options = _getTimeseriesOptions(_ns1);
+    auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, _ns1);
+    auto statusWithKeyAndTime =
+        internal::extractBucketingParameters(_ns1, autoColl->getDefaultCollator(), options, doc);
+    ASSERT_OK(statusWithKeyAndTime);
+    auto key = statusWithKeyAndTime.getValue().first;
+
+    // We create two buckets with the same metadata and different time ranges.
+    internal::CreationInfo infoOne{key, 0, currentTime + Hours{5}, options, stats, &closedBuckets};
+    internal::CreationInfo infoTwo{key, 0, currentTime, options, stats, &closedBuckets};
+
+    // Allocate our two buckets. Check that before adding our buckets there were no open buckets,
+    // and that after it there are two.
+    ASSERT_EQ(stripe.openBucketsByKey.size(), 0);
+    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), infoOne);
+    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), infoTwo);
+
+    // There should be one key in our openBucketsByKey map, and two buckets mapped to, by that same
+    // key.
+    ASSERT_EQ(stripe.openBucketsByKey.size(), 1);
+    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 2);
+    auto& openBucketsForThisMetadata = stripe.openBucketsByKey.find(key)->second;
+
+    // Check that both buckets are open, and that they have no measurements.
+    for (Bucket* bucket : openBucketsForThisMetadata) {
+        ASSERT_EQ(bucket->rolloverAction, RolloverAction::kNone);
+        ASSERT_EQ(bucket->numMeasurements, 0);
+    }
+
+    // Insert a measurement into one of these buckets. At some point in the insert write path we
+    // will call useBucket, which will iterate through the set of open buckets with metadata
+    // corresponding to the document we are trying to insert. There are two open buckets for this
+    // metadata that it could choose from. When the feature flag is enabled it should choose the
+    // first bucket that it finds that also has a time range suitable for the document we are
+    // inserting.
+    auto result = internal::insert(_opCtx,
+                                   *_bucketCatalog,
+                                   _ns1,
+                                   autoColl->getDefaultCollator(),
+                                   autoColl->getTimeseriesOptions().get(),
+                                   doc,
+                                   CombineWithInsertsFromOtherClients::kAllow,
+                                   internal::AllowBucketCreation::kNo);
+
+    // Assert that the insert was successful, and that whichever bucket has the smaller
+    // minTime is the one that received the measurement. This makes the test more resilient
+    // than relying on a particular order for the buckets.
+    ASSERT(result.isOK());
+    ASSERT_EQ(openBucketsForThisMetadata.size(), 2);
+    auto firstBucket = *(openBucketsForThisMetadata.begin());
+    auto secondBucket = *(openBucketsForThisMetadata.rbegin());
+    if (firstBucket->minTime < secondBucket->minTime) {
+        ASSERT_EQ(firstBucket->numMeasurements, 1);
+        ASSERT_EQ(secondBucket->numMeasurements, 0);
+    } else {
+        ASSERT_EQ(firstBucket->numMeasurements, 0);
+        ASSERT_EQ(secondBucket->numMeasurements, 1);
+    }
+}
+
+// This will test, when the timeSeriesAlwaysUseCompressedBuckets feature flag is on,
+// whether reopening a bucket will no longer check for existing open buckets with the same metadata
+// and close them.
+TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeatureFlagOn) {
+    // Simplify test by restricting to a single stripe.
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
+    // Turn on Feature Flag.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    // Store the current time as a variable.
+    auto currentTime = Date_t::now();
+
+    // Initialize the values with which we will create our bucket.
+    auto& stripe = _bucketCatalog->stripes[0];
+    auto options = _getTimeseriesOptions(_ns1);
+    ClosedBuckets closedBuckets;
+    auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, _ns1);
+    // Extract a bucket key.
+    auto tempDoc = BSON(_metaField << 42 << _timeField << currentTime);
+    auto statusWithKeyAndTime = internal::extractBucketingParameters(
+        _ns1, autoColl->getDefaultCollator(), options, tempDoc);
+    ASSERT_OK(statusWithKeyAndTime);
+    auto key = statusWithKeyAndTime.getValue().first;
+    internal::CreationInfo info{key, 0, currentTime, options, stats, &closedBuckets};
+
+    // Allocate our bucket on the bucket catalog.
+    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
+    // Check that we only have one bucket allocated for this key - the one we just created.
+    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 1);
+
+    // Now create a bucket that we will reopen. Reopening should succeed without removing the other
+    // open bucket for this metadata.
+    BSONObj bucketToReopen = ::mongo::fromjson(R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+                                   "meta":42,
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), bucketToReopen));
+    // There should still be two open buckets for this key.
+    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 2);
+}
+
+// This will test, when the timeSeriesAlwaysUseCompressedBuckets feature flag is off,
+// whether reopening a bucket does indeed check for existing open buckets with the same metadata
+// and close them if any are found.
+TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeatureFlagOff) {
+    // Simplify test by restricting to a single stripe.
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    // Store the current time as a variable.
+    auto currentTime = Date_t::now();
+
+    // Initialize the values with which we will create our bucket.
+    auto& stripe = _bucketCatalog->stripes[0];
+    auto options = _getTimeseriesOptions(_ns1);
+    ClosedBuckets closedBuckets;
+    auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, _ns1);
+    // Extract a bucket key.
+    auto tempDoc = BSON(_metaField << 42 << _timeField << currentTime);
+    auto statusWithKeyAndTime = internal::extractBucketingParameters(
+        _ns1, autoColl->getDefaultCollator(), options, tempDoc);
+    ASSERT_OK(statusWithKeyAndTime);
+    auto key = statusWithKeyAndTime.getValue().first;
+    internal::CreationInfo info{key, 0, currentTime, options, stats, &closedBuckets};
+
+    // Allocate our bucket on the bucket catalog.
+    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
+    // Check that we only have one bucket allocated for this key - the one we just created.
+    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 1);
+    // Now create a bucket that we will reopen. Reopening should succeed and remove the other
+    // open bucket with the same metadata on this stripe.
+    BSONObj bucketToReopen = ::mongo::fromjson(R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+                                   "meta":42,
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), bucketToReopen));
+    // There should only be one open bucket for this key. Check also that it is the bucket that we
+    // reopened, not the one that we allocated earlier.
+    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 1);
+    auto bucket = *(stripe.openBucketsByKey[key].begin());
+    ASSERT_EQ(bucket->bucketId.oid.compare(OID("629e1e680958e279dc29a517")), 0);
+}
+
+
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

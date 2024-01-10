@@ -317,6 +317,11 @@ Bucket* useBucket(OperationContext* opCtx,
     Bucket* bucket = nullptr;
     for (Bucket* potentialBucket : openSet) {
         if (potentialBucket->rolloverAction == RolloverAction::kNone) {
+            if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+                !isDocumentWithinTimeRangeForBucket(potentialBucket, info)) {
+                continue;
+            }
             bucket = potentialBucket;
             break;
         }
@@ -345,6 +350,12 @@ Bucket* useBucket(OperationContext* opCtx,
         : nullptr;
 }
 
+bool isDocumentWithinTimeRangeForBucket(Bucket* potentialBucket, const CreationInfo& info) {
+    auto bucketTime = potentialBucket->minTime;
+    return !(info.time - bucketTime >= Seconds(*info.options.getBucketMaxSpanSeconds()) ||
+             info.time < bucketTime);
+}
+
 Bucket* useAlternateBucket(BucketCatalog& catalog,
                            Stripe& stripe,
                            WithLock stripeLock,
@@ -367,9 +378,7 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
             continue;
         }
 
-        auto bucketTime = potentialBucket->minTime;
-        if (info.time - bucketTime >= Seconds(*info.options.getBucketMaxSpanSeconds()) ||
-            info.time < bucketTime) {
+        if (!isDocumentWithinTimeRangeForBucket(potentialBucket, info)) {
             continue;
         }
 
@@ -561,7 +570,14 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
     Bucket* unownedBucket = insertedIt->second.get();
 
     // If we already have an open bucket for this key, we need to close it.
-    if (auto it = stripe.openBucketsByKey.find(key); it != stripe.openBucketsByKey.end()) {
+    // If the feature flag for TimeseriesAlwaysUseCompressedBuckets is enabled, we do
+    // not close the existing bucket for this key because having multiple open buckets for
+    // the same key/metadata will be supported. TODO: SERVER-79481 - Once the upper bound
+    // for the number of open buckets per metadata is defined, revisit this to ensure that
+    // we close open buckets for this metadata when we are over the bound.
+    if (auto it = stripe.openBucketsByKey.find(key); it != stripe.openBucketsByKey.end() &&
+        !feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         auto& openSet = it->second;
         for (Bucket* existingBucket : openSet) {
             if (existingBucket->rolloverAction == RolloverAction::kNone) {

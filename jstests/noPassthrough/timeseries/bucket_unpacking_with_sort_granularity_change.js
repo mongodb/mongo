@@ -58,6 +58,33 @@ const aggregateOptimized = `
 	  const results = testColl.aggregate([{$sort: {t: -1}}], {hint: {$natural: -1}}).toArray();
 	  assert.eq(results.length, 2, results);
 	`;
+
+// At this point in time we have inserted three documents, two going into one bucket A, and another
+// into another bucket B. With Bucket Unpacking Sorting enabled, which happens in the
+// aggregateOptimized command but not the aggregateNaive command, if a bucket that we are unpacking
+// has had its granularity change while we are unpacking (which we induce in this test by hanging on
+// a failpoint, changing the granularity, and then turning off the hang point), we do not return the
+// measurements within it as part of our query results to avoid potentially returning results out of
+// order. Without the feature flag enabled, after inserting our third measurement we would have
+// caused bucket A to rollover due to timeForward, meaning that our fourth insertion, which happens
+// after we change the granularity, could only go into bucket B. The check for granularity is done
+// by taking the difference in time between the bucket's min and max time and checking whether this
+// difference is greater than its bucketMaxSpan.
+//
+// However, with the feature flag enabled, both A and B will be open and eligible for the insert. If
+// the measurement is inserted into B, as used to always be the case, the number of measurements
+// returned and checked for in aggregateOptimized will be 2 - the total 4, minus the 2 in B, whose
+// measurements would be omitted. If instead the measurement is inserted into bucket A, the total
+// number returned will be 1 - the total 4, minus the 3 in bucket A. TODO: SERVER-79480 - Re-enable
+// this test once we have determined criteria for selecting the best open bucket for a measurement,
+// when there are multiple open ones, to make which bucket gets selected deterministic.
+if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(adminDB)) {
+    // Turn off the hang and stop the mongod runner.
+    setAggHang(off);
+    MongoRunner.stopMongod(conn);
+    quit();
+}
+
 const mergeShellNaive = startParallelShell(aggregateNaive, db.getMongo().port);
 const mergeShellExplain = startParallelShell(aggregateExpOptimized, db.getMongo().port);
 const mergeShellOptimized = startParallelShell(aggregateOptimized, db.getMongo().port);
