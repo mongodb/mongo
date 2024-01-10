@@ -10,6 +10,8 @@
 //   # The config fuzzer may run logical session cache refreshes in the background, which interferes
 //   # with this test.
 //   does_not_support_config_fuzzer,
+//   # $listSession is not supported in serverless.
+//   command_not_supported_in_serverless,
 // ]
 
 // Basic tests for the $listSessions aggregation stage.

@@ -7,6 +7,8 @@
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
 //   no_selinux,
+//   # $listSession is not supported in serverless.
+//   command_not_supported_in_serverless,
 // ]
 
 // Basic tests for the $listSessions {allUsers:true} aggregation stage.
