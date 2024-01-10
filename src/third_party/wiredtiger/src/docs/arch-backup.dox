@@ -16,11 +16,16 @@ The following page describes how backup works inside the WiredTiger. Please refe
 # Full database #
 
 When the application opens the backup cursor, internally WiredTiger generates a list of all
-files in the database that are necessary for the backup. WiredTiger takes both the checkpoint
-and schema locks to block database file modifications while generating the list files. There
-is a contract that all files that exist at the time the backup starts exist for the entire time
-the backup cursor is open. This contract applies to all files in the database, not just files
-that are included in the generated list.
+files in the database that are necessary for the backup and creates a file which contains the
+snapshot of the metadata called WiredTiger.backup. WiredTiger takes both the checkpoint and schema
+locks to block database file modifications to generate a list of files required for backup and is
+released once generated. There is a contract that all files that exist at the
+time the backup starts exist for the entire time the backup cursor is open. This contract
+applies to all files in the database, not just files that are included in the generated list. The
+WiredTiger.backup file is also included in the backup list and is used upon the startup of a backup, to
+create the WiredTiger.wt metadata file. After WiredTiger.wt is created the WiredTiger.backup file
+is removed. Note that we do not use the WiredTiger.wt as the metadata source and it is not included
+in the backup list, because the metadata can be modified after the list has been generated.
 
 WiredTiger log files are also part of the generated file list for backup. There is a contract
 that the log files do not contain or make visible operations that are added to the log after
