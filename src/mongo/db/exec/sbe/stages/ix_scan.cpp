@@ -103,6 +103,7 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
                           << _coll.getCollName()->toStringForErrorMsg() << "'",
             indexDesc);
 
+    _uniqueIndex = indexDesc->unique();
     _entry = indexCatalog->getEntry(indexDesc);
     tassert(4938503,
             str::stream() << "expected IndexCatalogEntry for index named: " << _indexName,
@@ -563,6 +564,9 @@ void SimpleIndexScanStage::open(bool reOpen) {
                 tagHi == value::TypeTags::ksValue);
 
         _seekKeyHighHolder.reset(ownedHi, tagHi, valHi);
+
+        // It is a point bound if the lowKey and highKey are same except discriminator.
+        _pointBound = getSeekKeyLow().compareWithoutDiscriminator(*getSeekKeyHigh()) == 0;
     } else if (_seekKeyLow) {
         auto [ownedLow, tagLow, valLow] = _bytecode.run(_seekKeyLowCode.get());
         const auto msgTagLow = tagLow;
@@ -647,6 +651,12 @@ bool SimpleIndexScanStage::validateKey(const boost::optional<KeyStringEntry>& ke
     if (!key) {
         _scanState = ScanState::kFinished;
         return false;
+    }
+
+    if (_pointBound && _uniqueIndex) {
+        // For point bound on unique index, there's only one possible key.
+        _scanState = ScanState::kFinished;
+        return true;
     }
 
     if (auto seekKeyHigh = getSeekKeyHigh(); seekKeyHigh) {
