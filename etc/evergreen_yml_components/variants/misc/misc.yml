@@ -1,3 +1,5 @@
+# Miscellaneous build variants
+
 buildvariants:
 - name: run-all-affected-jstests
   display_name: "! Run All Affected JStests"
@@ -29,3 +31,15 @@ buildvariants:
     omit_generated_tasks: true
   tasks:
   - name: burn_in_tags_gen
+
+- name: &copybara-sync-between-repos copybara-sync-between-repos
+  modules:
+  - enterprise
+  display_name: "* Copybara Sync Between Repos"
+  activate: true
+  run_on:
+  - ubuntu2204-small
+  stepback: false
+  tasks:
+  - name: sync_repo_with_copybara
+    priority: 50

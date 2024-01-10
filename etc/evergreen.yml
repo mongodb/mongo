@@ -64,12 +64,8 @@ include:
 - filename: etc/evergreen_yml_components/tasks/components/security/resmoke_tasks.yml
 
 - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
-- filename: etc/evergreen_yml_components/variants/misc/stm_daily_cron.yml
-- filename: etc/evergreen_yml_components/variants/misc/tooling_metrics.yml
-- filename: etc/evergreen_yml_components/variants/misc/burn_in_tags_generation.yml
-- filename: etc/evergreen_yml_components/variants/misc/scons_cache_pruning.yml
-- filename: etc/evergreen_yml_components/variants/misc/copybara.yml
-- filename: etc/evergreen_yml_components/variants/misc/build_metrics.yml
+- filename: etc/evergreen_yml_components/variants/misc/misc.yml
+- filename: etc/evergreen_yml_components/variants/misc/misc_exclude_while_branching.yml
 
 - filename: etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
 - filename: etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
