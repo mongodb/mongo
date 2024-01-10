@@ -2769,33 +2769,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Builds a stage to create a result object out of a group-by slot and gathered accumulator
     // result slots if the parent node requests so.
     if (reqs.has(kResult) || !additionalFields.empty()) {
-        auto resultSlot = _slotIdGenerator.generate();
-        outputs.set(kResult, resultSlot);
-        // This mkbson stage combines 'finalSlots' into a bsonObject result slot which has
-        // 'fieldNames' fields.
-        if (groupNode->shouldProduceBson) {
-            outStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(outStage),
-                                                         resultSlot,   // objSlot
-                                                         boost::none,  // rootSlot
-                                                         boost::none,  // fieldBehavior
-                                                         std::vector<std::string>{},  // fields
-                                                         std::move(fieldNames),  // projectFields
-                                                         std::move(finalSlots),  // projectVars
-                                                         true,                   // forceNewObject
-                                                         false,                  // returnOldObject
-                                                         nodeId);
-        } else {
-            outStage = sbe::makeS<sbe::MakeObjStage>(std::move(outStage),
-                                                     resultSlot,                  // objSlot
-                                                     boost::none,                 // rootSlot
-                                                     boost::none,                 // fieldBehavior
-                                                     std::vector<std::string>{},  // fields
-                                                     std::move(fieldNames),       // projectFields
-                                                     std::move(finalSlots),       // projectVars
-                                                     true,                        // forceNewObject
-                                                     false,                       // returnOldObject
-                                                     nodeId);
+        sbe::EExpression::Vector funcArgs;
+        for (size_t i = 0; i < fieldNames.size(); ++i) {
+            funcArgs.emplace_back(makeConstant(fieldNames[i]));
+            funcArgs.emplace_back(makeVariable(finalSlots[i]));
         }
+
+        StringData newObjFn = groupNode->shouldProduceBson ? "newBsonObj"_sd : "newObj"_sd;
+        auto outputExpr = sbe::makeE<sbe::EFunction>(newObjFn, std::move(funcArgs));
+
+        auto resultSlot = _slotIdGenerator.generate();
+        outStage = makeProjectStage(std::move(outStage), nodeId, resultSlot, std::move(outputExpr));
+
+        outputs.set(kResult, resultSlot);
     }
 
     return {std::move(outStage), std::move(outputs)};
