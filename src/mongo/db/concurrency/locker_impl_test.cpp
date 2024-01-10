@@ -149,30 +149,6 @@ TEST_F(LockerImplTest, ConflictWithTimeout) {
     ASSERT(locker2.unlockGlobal());
 }
 
-TEST_F(LockerImplTest, ConflictUpgradeWithTimeout) {
-    auto opCtx = makeOperationContext();
-
-    const ResourceId resId(
-        RESOURCE_COLLECTION,
-        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
-
-    LockerImpl locker1(opCtx->getServiceContext());
-    locker1.lockGlobal(opCtx.get(), MODE_IS);
-    locker1.lock(opCtx.get(), resId, MODE_S);
-
-    LockerImpl locker2(opCtx->getServiceContext());
-    locker2.lockGlobal(opCtx.get(), MODE_IS);
-    locker2.lock(opCtx.get(), resId, MODE_S);
-
-    // Try upgrading locker 1, which should block and timeout
-    ASSERT_THROWS_CODE(locker1.lock(opCtx.get(), resId, MODE_X, Date_t::now() + Milliseconds(1)),
-                       AssertionException,
-                       ErrorCodes::LockTimeout);
-
-    locker1.unlockGlobal();
-    locker2.unlockGlobal();
-}
-
 TEST_F(LockerImplTest, FailPointInLockFailsGlobalNonIntentLocksIfTheyCannotBeImmediatelyGranted) {
     transport::TransportLayerMock transportLayer;
     std::shared_ptr<transport::Session> session = transportLayer.createSession();
@@ -1263,87 +1239,6 @@ TEST_F(LockerImplTest, AcquireLockPendingUnlockWithCoveredMode) {
     locker.endWriteUnitOfWork();
 
     ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IX));
-
-    locker.unlockGlobal();
-}
-
-TEST_F(LockerImplTest, ConvertLockPendingUnlock) {
-    auto opCtx = makeOperationContext();
-
-    const ResourceId resId(
-        RESOURCE_COLLECTION,
-        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
-
-    LockerImpl locker(opCtx->getServiceContext());
-    locker.lockGlobal(opCtx.get(), MODE_IS);
-
-    locker.lock(opCtx.get(), resId, MODE_IX);
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IX));
-
-    locker.beginWriteUnitOfWork();
-
-    ASSERT_FALSE(locker.unlock(resId));
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IX));
-    ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 1);
-
-    // Convert lock pending unlock.
-    locker.lock(opCtx.get(), resId, MODE_X);
-    ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 2);
-
-    locker.endWriteUnitOfWork();
-
-    ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 0);
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 0);
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_X));
-
-    locker.unlockGlobal();
-}
-
-TEST_F(LockerImplTest, ConvertLockPendingUnlockAndUnlock) {
-    auto opCtx = makeOperationContext();
-
-    const ResourceId resId(
-        RESOURCE_COLLECTION,
-        NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
-
-    LockerImpl locker(opCtx->getServiceContext());
-    locker.lockGlobal(opCtx.get(), MODE_IS);
-
-    locker.lock(opCtx.get(), resId, MODE_IX);
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IX));
-
-    locker.beginWriteUnitOfWork();
-
-    ASSERT_FALSE(locker.unlock(resId));
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IX));
-    ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 1);
-
-    // Convert lock pending unlock.
-    locker.lock(opCtx.get(), resId, MODE_X);
-    ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 2);
-
-    // Unlock the lock conversion.
-    ASSERT_FALSE(locker.unlock(resId));
-    ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
-    // Make sure we still hold X lock and unlock the weaker mode to decrement recursiveCount instead
-    // of incrementing unlockPending.
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_X));
-    ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 1);
-
-    locker.endWriteUnitOfWork();
-
-    ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 0);
-    ASSERT(locker.getRequestsForTest().find(resId).finished());
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_NONE));
 
     locker.unlockGlobal();
 }

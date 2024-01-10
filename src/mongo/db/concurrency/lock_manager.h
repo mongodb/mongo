@@ -102,7 +102,6 @@ public:
      * @return See comments for LockResult.
      */
     LockResult lock(ResourceId resId, LockRequest* request, LockMode mode);
-    LockResult convert(ResourceId resId, LockRequest* request, LockMode newMode);
 
     /**
      * Decrements the reference count of a previously locked request and if the reference count

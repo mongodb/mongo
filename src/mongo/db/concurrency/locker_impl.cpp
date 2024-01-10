@@ -908,7 +908,6 @@ LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, Loc
     }
 
     LockRequest* request;
-    bool isNew = true;
 
     LockRequestsMap::Iterator it = _requests.find(resId);
     if (!it) {
@@ -919,18 +918,20 @@ LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, Loc
         request = itNew.objAddr();
     } else {
         request = it.objAddr();
-        isNew = false;
-    }
+        invariant(isModeCovered(mode, request->mode), "Lock upgrade is disallowed");
 
-    // If unlockPending is nonzero, that means a LockRequest already exists for this resource but
-    // is planned to be released at the end of this WUOW due to two-phase locking. Rather than
-    // unlocking the existing request, we can reuse it if the existing mode matches the new mode.
-    if (request->unlockPending && isModeCovered(mode, request->mode)) {
-        request->unlockPending--;
-        if (!request->unlockPending) {
-            _numResourcesToUnlockAtEndUnitOfWork--;
+        // If unlockPending is nonzero, that means a LockRequest already exists for this resource
+        // but is planned to be released at the end of this WUOW due to two-phase locking. Rather
+        // than unlocking the existing request, we can reuse it.
+        if (request->unlockPending) {
+            request->unlockPending--;
+            if (!request->unlockPending) {
+                _numResourcesToUnlockAtEndUnitOfWork--;
+            }
+            return LOCK_OK;
+        } else {
+            ++request->recursiveCount;
         }
-        return LOCK_OK;
     }
 
     // Making this call here will record lock re-acquisitions and conversions as well.
@@ -959,8 +960,7 @@ LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, Loc
     // otherwise we might reset state if the lock becomes granted very fast.
     _notify.clear();
 
-    LockResult result = isNew ? _lockManager->lock(resId, request, mode)
-                              : _lockManager->convert(resId, request, mode);
+    auto result = request->recursiveCount == 1 ? _lockManager->lock(resId, request, mode) : LOCK_OK;
 
     if (result == LOCK_WAITING) {
         globalStats.recordWait(_id, resId, mode);
