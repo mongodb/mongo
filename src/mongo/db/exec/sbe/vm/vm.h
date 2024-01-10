@@ -481,6 +481,7 @@ enum class Builtin : uint16_t {
     keepFields,
     newArrayFromRange,
     newObj,      // create a new object from 'arity' alternating field names and values on the stack
+    newBsonObj,  // same as 'newObj', except it creates a BSON object
     ksToString,  // KeyString to string
     newKs,       // new KeyString
     collNewKs,   // new KeyString (with collation)
@@ -1666,6 +1667,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinNewArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinNewArrayFromRange(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinNewObj(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinNewBsonObj(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinKeyStringToString(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinNewKeyString(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollNewKeyString(ArityType arity);

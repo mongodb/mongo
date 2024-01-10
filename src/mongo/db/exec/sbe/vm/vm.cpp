@@ -2304,6 +2304,25 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewObj(ArityType
     return {true, tag, val};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewBsonObj(ArityType arity) {
+    UniqueBSONObjBuilder bob;
+
+    for (ArityType idx = 0; idx < arity; idx += 2) {
+        auto [_, nameTag, nameVal] = getFromStack(idx);
+        auto [__, fieldTag, fieldVal] = getFromStack(idx + 1);
+        if (!value::isString(nameTag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        auto name = value::getStringView(nameTag, nameVal);
+        bson::appendValueToBsonObj(bob, name, fieldTag, fieldVal);
+    }
+
+    bob.doneFast();
+    char* data = bob.bb().release().release();
+    return {true, value::TypeTags::bsonObject, value::bitcastFrom<char*>(data)};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinKeyStringToString(ArityType arity) {
     auto [owned, tagInKey, valInKey] = getFromStack(0);
 
@@ -9077,6 +9096,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinNewArrayFromRange(arity);
         case Builtin::newObj:
             return builtinNewObj(arity);
+        case Builtin::newBsonObj:
+            return builtinNewBsonObj(arity);
         case Builtin::ksToString:
             return builtinKeyStringToString(arity);
         case Builtin::newKs:
@@ -9563,6 +9584,8 @@ std::string builtinToString(Builtin b) {
             return "newArrayFromRange";
         case Builtin::newObj:
             return "newObj";
+        case Builtin::newBsonObj:
+            return "newBsonObj";
         case Builtin::ksToString:
             return "ksToString";
         case Builtin::newKs:

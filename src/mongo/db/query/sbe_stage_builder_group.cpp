@@ -807,6 +807,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     SbStage groupByStage;
     SbExpr idFinalExpr;
 
+    SbExprBuilder b(_state);
+
     // If we have an object as group id, let's stop block processing immediately and build
     // the required projection to create it. If we have a single expression, we can try to
     // vectorize it.
@@ -821,7 +823,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         if (hasBlockOutput(childOutputs)) {
             // The group-by field may end up being 'Nothing' and in that case _id: null will be
             // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
-            SbExprBuilder b(_state);
             auto groupByBlockExpr = buildVectorizedExpr(
                 b.makeFillEmptyNull(generateExpression(
                     _state, idExpr.get(), childOutputs.getResultObjIfExists(), &childOutputs)),
@@ -872,6 +873,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                                     childOutputs,
                                                                     std::move(groupByStage),
                                                                     groupBySlots);
+    auto stage = std::move(outStage);
 
     tassert(5851605,
             "The number of final slots must be as 1 (the final group-by slot) + the number of acc "
@@ -899,35 +901,21 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Builds a stage to create a result object out of a group-by slot and gathered accumulator
     // result slots if the parent node requests so.
     if (reqs.hasResult() || !additionalFields.empty()) {
-        auto resultSlot = _slotIdGenerator.generate();
-        outputs.setResultObj(TypedSlot{resultSlot, TypeSignature::kObjectType});
-        // This mkbson stage combines 'finalSlots' into a bsonObject result slot which has
-        // 'fieldNames' fields.
-        if (groupNode->shouldProduceBson) {
-            outStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(outStage),
-                                                         resultSlot,   // objSlot
-                                                         boost::none,  // rootSlot
-                                                         boost::none,  // fieldBehavior
-                                                         std::vector<std::string>{},  // fields
-                                                         std::move(fieldNames),  // projectFields
-                                                         std::move(finalSlots),  // projectVars
-                                                         true,                   // forceNewObject
-                                                         false,                  // returnOldObject
-                                                         nodeId);
-        } else {
-            outStage = sbe::makeS<sbe::MakeObjStage>(std::move(outStage),
-                                                     resultSlot,                  // objSlot
-                                                     boost::none,                 // rootSlot
-                                                     boost::none,                 // fieldBehavior
-                                                     std::vector<std::string>{},  // fields
-                                                     std::move(fieldNames),       // projectFields
-                                                     std::move(finalSlots),       // projectVars
-                                                     true,                        // forceNewObject
-                                                     false,                       // returnOldObject
-                                                     nodeId);
+        SbExpr::Vector funcArgs;
+        for (size_t i = 0; i < fieldNames.size(); ++i) {
+            funcArgs.emplace_back(b.makeStrConstant(fieldNames[i]));
+            funcArgs.emplace_back(SbVar{finalSlots[i]});
         }
+
+        StringData newObjFn = groupNode->shouldProduceBson ? "newBsonObj"_sd : "newObj"_sd;
+        auto outputExpr = b.makeFunction(newObjFn, std::move(funcArgs));
+
+        auto slot = _slotIdGenerator.generate();
+        stage = makeProject(std::move(stage), nodeId, slot, outputExpr.extractExpr(_state).expr);
+
+        outputs.setResultObj(TypedSlot{slot, TypeSignature::kObjectType});
     }
 
-    return {std::move(outStage), std::move(outputs)};
+    return {std::move(stage), std::move(outputs)};
 }
 }  // namespace mongo::stage_builder
