@@ -216,11 +216,14 @@ void fillOKInsertReplies(BulkWriteReplyInfo& replyInfo, int size) {
 
 BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
                                       const BulkWriteCRUDOp::OpType& firstOpType,
+                                      bool errorsOnly,
                                       const BatchedCommandResponse& response) {
     BulkWriteReplyInfo replyInfo;
     if (response.toStatus().isOK()) {
         if (firstOpType == BulkWriteCRUDOp::kInsert) {
-            fillOKInsertReplies(replyInfo, response.getN());
+            if (!errorsOnly) {
+                fillOKInsertReplies(replyInfo, response.getN());
+            }
             replyInfo.summaryFields.nInserted += response.getN();
         } else {
             BulkWriteReplyItem reply;
@@ -244,19 +247,33 @@ BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
             }
             reply.setOk(1);
             reply.setIdx(0);
-            replyInfo.replyItems.push_back(reply);
+            if (!errorsOnly) {
+                replyInfo.replyItems.push_back(reply);
+            }
         }
     } else {
         if (response.isErrDetailsSet()) {
             const auto& errDetails = response.getErrDetails();
             if (firstOpType == BulkWriteCRUDOp::kInsert) {
                 replyInfo.summaryFields.nInserted += response.getN();
-                fillOKInsertReplies(replyInfo, response.getN() + errDetails.size());
-                for (const auto& err : errDetails) {
-                    int32_t idx = err.getIndex();
-                    replyInfo.replyItems[idx].setN(0);
-                    replyInfo.replyItems[idx].setOk(0);
-                    replyInfo.replyItems[idx].setStatus(err.getStatus());
+                if (!errorsOnly) {
+                    fillOKInsertReplies(replyInfo, response.getN() + errDetails.size());
+                    for (const auto& err : errDetails) {
+                        int32_t idx = err.getIndex();
+                        replyInfo.replyItems[idx].setN(0);
+                        replyInfo.replyItems[idx].setOk(0);
+                        replyInfo.replyItems[idx].setStatus(err.getStatus());
+                    }
+                } else {
+                    // For errorsOnly the errors are the only things we store in replyItems.
+                    for (const auto& err : errDetails) {
+                        BulkWriteReplyItem item;
+                        item.setOk(0);
+                        item.setN(0);
+                        item.setStatus(err.getStatus());
+                        item.setIdx(err.getIndex());
+                        replyInfo.replyItems.push_back(item);
+                    }
                 }
             } else {
                 invariant(errDetails.size() == 1 && response.getN() == 0);
@@ -411,7 +428,8 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
             return {FLEBatchResult::kNotProcessed, BulkWriteReplyInfo()};
         }
 
-        BulkWriteReplyInfo replyInfo = processFLEResponse(fleRequest, firstOpType, response);
+        BulkWriteReplyInfo replyInfo =
+            processFLEResponse(fleRequest, firstOpType, clientRequest.getErrorsOnly(), response);
         return {FLEBatchResult::kProcessed, std::move(replyInfo)};
     } catch (const DBException& ex) {
         LOGV2_WARNING(7749700,
@@ -481,20 +499,36 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
             0,  // cursorId
             std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0, responseStatus)},
             NamespaceString::makeBulkWriteNSS(boost::none)));
+        bulkWriteResponse.setNErrors(1);
+        bulkWriteResponse.setNInserted(0);
+        bulkWriteResponse.setNMatched(0);
+        bulkWriteResponse.setNModified(0);
+        bulkWriteResponse.setNUpserted(0);
+        bulkWriteResponse.setNDeleted(0);
     }
 
-    // We should get back just one reply item for the single update we are running.
+    // We should only get back one reply item for the single update, unless we are in errorsOnly
+    // mode then we can get 0.
     const auto& replyItems = bulkWriteResponse.getCursor().getFirstBatch();
-    tassert(7934203, "unexpected reply for retryable timeseries update", replyItems.size() == 1);
+    tassert(7934203,
+            "unexpected reply for retryable timeseries update",
+            replyItems.size() == 1 || replyItems.size() == 0);
+    boost::optional<BulkWriteReplyItem> replyItem = boost::none;
+    if (replyItems.size() == 1) {
+        replyItem = replyItems[0];
+    }
+
     LOGV2_DEBUG(7934204,
                 4,
                 "Processing bulk write response for retryable timeseries update",
                 "opIdx"_attr = opIdx,
                 "singleUpdateRequest"_attr = redact(singleUpdateRequest.toBSON({})),
-                "replyItem"_attr = replyItems[0],
+                "replyItem"_attr = replyItem,
                 "wcError"_attr = wcError.toString());
+
     bulkWriteOp.noteWriteOpFinalResponse(opIdx,
-                                         replyItems[0],
+                                         replyItem,
+                                         bulkWriteResponse,
                                          ShardWCError(childBatches.begin()->first, wcError),
                                          bulkWriteResponse.getRetriedStmtIds());
 }
@@ -568,11 +602,22 @@ void executeWriteWithoutShardKey(
             std::string errMsg;
             if (swRes.getValue().getResponse().isEmpty()) {
                 // When we get an empty response, it means that the predicate didn't match anything
-                // and no write was done. So we can just set a trivial ok response.
-                bulkWriteResponse.setCursor(BulkWriteCommandResponseCursor(
-                    0,  // cursorId
-                    std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0)},
-                    NamespaceString::makeBulkWriteNSS(boost::none)));
+                // and no write was done. So we can just set a trivial ok response. Unless we are
+                // running errors only in which case we set an empty vector.
+                auto items = std::vector<mongo::BulkWriteReplyItem>{};
+                if (!bulkWriteOp.getClientRequest().getErrorsOnly()) {
+                    items.push_back(BulkWriteReplyItem(0));
+                }
+                bulkWriteResponse.setCursor(
+                    BulkWriteCommandResponseCursor(0,  // cursorId
+                                                   items,
+                                                   NamespaceString::makeBulkWriteNSS(boost::none)));
+                bulkWriteResponse.setNErrors(0);
+                bulkWriteResponse.setNInserted(0);
+                bulkWriteResponse.setNMatched(0);
+                bulkWriteResponse.setNModified(0);
+                bulkWriteResponse.setNUpserted(0);
+                bulkWriteResponse.setNDeleted(0);
             } else {
                 try {
                     bulkWriteResponse = BulkWriteCommandReply::parse(
@@ -591,21 +636,34 @@ void executeWriteWithoutShardKey(
                 0,  // cursorId
                 std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0, responseStatus)},
                 NamespaceString::makeBulkWriteNSS(boost::none)));
+            bulkWriteResponse.setNErrors(1);
+            bulkWriteResponse.setNInserted(0);
+            bulkWriteResponse.setNMatched(0);
+            bulkWriteResponse.setNModified(0);
+            bulkWriteResponse.setNUpserted(0);
+            bulkWriteResponse.setNDeleted(0);
         }
 
         // We should get back just one reply item for the single update we are running.
         const auto& replyItems = bulkWriteResponse.getCursor().getFirstBatch();
         tassert(7298301,
                 "unexpected bulkWrite reply for writes without shard key",
-                replyItems.size() == 1);
+                replyItems.size() == 1 || replyItems.size() == 0);
+        boost::optional<BulkWriteReplyItem> replyItem = boost::none;
+        if (replyItems.size() == 1) {
+            replyItem = replyItems[0];
+        }
+
         LOGV2_DEBUG(7298302,
                     4,
                     "Processing bulk write response for writes without shard key",
                     "opIdx"_attr = opIdx,
-                    "replyItem"_attr = replyItems[0],
+                    "replyItem"_attr = replyItem,
                     "wcError"_attr = wcError.toString());
+
         bulkWriteOp.noteWriteOpFinalResponse(opIdx,
-                                             replyItems[0],
+                                             replyItem,
+                                             bulkWriteResponse,
                                              ShardWCError(childBatches.begin()->first, wcError),
                                              bulkWriteResponse.getRetriedStmtIds());
     }
@@ -1306,7 +1364,8 @@ void BulkWriteOp::noteChildBatchError(const TargetedWriteBatch& targetedBatch,
 
 void BulkWriteOp::noteWriteOpFinalResponse(
     size_t opIdx,
-    const BulkWriteReplyItem& reply,
+    const boost::optional<BulkWriteReplyItem>& reply,
+    const BulkWriteCommandReply& response,
     const ShardWCError& shardWCError,
     const boost::optional<std::vector<StmtId>>& retriedStmtIds) {
     WriteOp& writeOp = _writeOps[opIdx];
@@ -1318,21 +1377,21 @@ void BulkWriteOp::noteWriteOpFinalResponse(
         saveWriteConcernError(shardWCError);
     }
 
-    if (reply.getStatus().isOK()) {
+    if (response.getNErrors() == 0) {
         if (writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Insert) {
-            _nInserted += reply.getN().value_or(0);
+            _nInserted += response.getNInserted();
         } else if (writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Delete) {
-            _nDeleted += reply.getN().value_or(0);
+            _nDeleted += response.getNDeleted();
         } else {
-            _nModified += reply.getNModified().value_or(0);
-            _nMatched += reply.getUpserted() ? 0 : reply.getN().value_or(0);
-            _nUpserted += reply.getUpserted() ? 1 : 0;
+            _nModified += response.getNModified();
+            _nMatched += response.getNMatched();
+            _nUpserted += response.getNUpserted();
         }
         writeOp.setOpComplete(reply);
     } else {
-        auto writeError = write_ops::WriteError(opIdx, reply.getStatus());
+        auto writeError = write_ops::WriteError(opIdx, reply->getStatus());
         writeOp.setOpError(writeError);
-        abortIfNeeded(reply.getStatus());
+        abortIfNeeded(reply->getStatus());
     }
 
     if (retriedStmtIds && !retriedStmtIds->empty()) {

@@ -392,9 +392,11 @@ void WriteOp::noteWriteWithoutShardKeyWithIdResponse(
 void WriteOp::setOpComplete(boost::optional<BulkWriteReplyItem> bulkWriteReplyItem) {
     dassert(_state == WriteOpState_Ready);
     _bulkWriteReplyItem = std::move(bulkWriteReplyItem);
-    // The reply item will currently have the index for the batch it was sent to a shard with,
-    // rather than its index in the client request, so we need to correct it.
-    _bulkWriteReplyItem->setIdx(getWriteItem().getItemIndex());
+    if (_bulkWriteReplyItem) {
+        // The reply item will currently have the index for the batch it was sent to a shard with,
+        // rather than its index in the client request, so we need to correct it.
+        _bulkWriteReplyItem->setIdx(getWriteItem().getItemIndex());
+    }
     _state = WriteOpState_Completed;
     // No need to updateOpState, set directly
 }

@@ -184,6 +184,7 @@ function flushBatch(originalRunCommand, makeRunCommandArgs) {
                                                   bulkSessionId,
                                                   originalRunCommand,
                                                   makeRunCommandArgs,
+                                                  true /* isMultiOp */,
                                                   {"errorsOnly": errorsOnly});
 
         validateClusterConsistency(originalRunCommand, makeRunCommandArgs);

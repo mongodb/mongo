@@ -6,6 +6,10 @@
 import {BulkWriteUtils} from "jstests/libs/crud_ops_to_bulk_write_lib.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
+const errorsOnly = Math.random() < 0.5;
+
+jsTestLog("Running single op bulkWrite override with `errorsOnly:" + errorsOnly + "`");
+
 function getAdditionalParameters(cmdObj) {
     // Deep copy of original command to modify.
     let cmdCopy = {};
@@ -41,11 +45,13 @@ function runCommandSingleOpBulkWriteOverride(
         BulkWriteUtils.processCRUDOp(dbName, cmdNameLower, cmdObj);
         let additionalParameters = getAdditionalParameters(cmdObj);
         try {
-            let response = BulkWriteUtils.flushCurrentBulkWriteBatch(conn,
-                                                                     null /* lsid */,
-                                                                     originalRunCommand,
-                                                                     makeRunCommandArgs,
-                                                                     additionalParameters);
+            let response = BulkWriteUtils.flushCurrentBulkWriteBatch(
+                conn,
+                null /* lsid */,
+                originalRunCommand,
+                makeRunCommandArgs,
+                false /* isMultiOp */,
+                {...{"errorsOnly": errorsOnly}, ...additionalParameters});
             assert.eq(response.length, 1);
             BulkWriteUtils.resetBulkWriteBatch();
             return response[0];

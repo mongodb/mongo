@@ -321,6 +321,7 @@ BulkWriteCommandRequest makeSingleOpBulkWriteCommandRequest(
     singleOpRequest.setLet(bulkWriteReq.getLet());
     singleOpRequest.setStmtId(bulk_write_common::getStatementId(bulkWriteReq, opIdx));
     singleOpRequest.setDbName(DatabaseName::kAdmin);
+    singleOpRequest.setErrorsOnly(bulkWriteReq.getErrorsOnly());
     return singleOpRequest;
 }
 

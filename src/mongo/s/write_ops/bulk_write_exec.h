@@ -115,6 +115,7 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
  */
 BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
                                       const BulkWriteCRUDOp::OpType& firstOpType,
+                                      bool errorsOnly,
                                       const BatchedCommandResponse& response);
 
 /**
@@ -287,7 +288,8 @@ public:
      * those operations are processed individually with the use of internal transactions.
      */
     void noteWriteOpFinalResponse(size_t opIdx,
-                                  const BulkWriteReplyItem& reply,
+                                  const boost::optional<BulkWriteReplyItem>& reply,
+                                  const BulkWriteCommandReply& response,
                                   const ShardWCError& shardWCError,
                                   const boost::optional<std::vector<StmtId>>& retriedStmtIds);
 

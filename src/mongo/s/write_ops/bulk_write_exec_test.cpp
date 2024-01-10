@@ -1426,8 +1426,11 @@ TEST_F(BulkWriteOpTest, NoteResponseRetriedStmtIds) {
     ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 1u);
 
     // Test BulkWriteOp::noteWriteOpFinalResponse with retriedStmtIds.
+    auto response = BulkWriteCommandReply();
+    response.setNErrors(0);
     bulkWriteOp.noteWriteOpFinalResponse(2,
                                          BulkWriteReplyItem(2),
+                                         response,
                                          ShardWCError(shardIdB, WriteConcernErrorDetail()),
                                          std::vector<StmtId>{4});
 
@@ -1455,7 +1458,10 @@ TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_WriteConcernError) {
     WriteConcernErrorDetail wce;
     wce.setStatus(Status(ErrorCodes::UnsatisfiableWriteConcern, "Dummy WCE!"));
 
-    bulkWriteOp.noteWriteOpFinalResponse(0, reply, ShardWCError(shardIdA, wce), boost::none);
+    auto response = BulkWriteCommandReply();
+    response.setNErrors(0);
+    bulkWriteOp.noteWriteOpFinalResponse(
+        0, reply, response, ShardWCError(shardIdA, wce), boost::none);
 
     ASSERT_EQUALS(bulkWriteOp.getWriteConcernErrors().size(), 1);
     ASSERT_EQUALS(bulkWriteOp.getWriteConcernErrors()[0].error.toStatus().code(),
@@ -1484,10 +1490,12 @@ DEATH_TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_ShutdownError, "8100600")
     shutdownNoTerminate();
 
     BulkWriteReplyItem reply(0, Status(ErrorCodes::CallbackCanceled, "shutting down"));
+    auto response = BulkWriteCommandReply();
+    response.setNErrors(1);
 
     ASSERT_THROWS_CODE(
         bulkWriteOp.noteWriteOpFinalResponse(
-            0, reply, ShardWCError(shardIdA, WriteConcernErrorDetail()), boost::none),
+            0, reply, response, ShardWCError(shardIdA, WriteConcernErrorDetail()), boost::none),
         DBException,
         ErrorCodes::CallbackCanceled);
 
@@ -1515,9 +1523,12 @@ TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_TransientTransactionError) {
     BulkWriteOp bulkWriteOp(_opCtx, request);
     BulkWriteReplyItem reply(0, Status(ErrorCodes::NetworkTimeout, "network timeout"));
 
+    auto response = BulkWriteCommandReply();
+    response.setNErrors(1);
+
     ASSERT_THROWS_CODE(
         bulkWriteOp.noteWriteOpFinalResponse(
-            0, reply, ShardWCError(shardIdA, WriteConcernErrorDetail()), boost::none),
+            0, reply, response, ShardWCError(shardIdA, WriteConcernErrorDetail()), boost::none),
         DBException,
         ErrorCodes::NetworkTimeout);
 
@@ -1542,8 +1553,11 @@ TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_NonTransientTransactionError) {
 
     BulkWriteReplyItem reply(0, Status(ErrorCodes::Interrupted, "interrupted"));
 
+    auto response = BulkWriteCommandReply();
+    response.setNErrors(1);
+
     bulkWriteOp.noteWriteOpFinalResponse(
-        0, reply, ShardWCError(shardIdA, WriteConcernErrorDetail()), boost::none);
+        0, reply, response, ShardWCError(shardIdA, WriteConcernErrorDetail()), boost::none);
 
     // Since we are in a txn and we saw an error, the command should be considered finished.
     ASSERT(bulkWriteOp.isFinished());
@@ -4037,23 +4051,39 @@ TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponseUpdatesSummaryFields) {
 
     BulkWriteOp bulkWriteOp(_opCtx, request);
 
+    auto response = BulkWriteCommandReply();
+    response.setNErrors(0);
+    response.setNInserted(1);
+
     auto insertReply = BulkWriteReplyItem(0);
     insertReply.setN(1); /* nInserted=1 */
-    bulkWriteOp.noteWriteOpFinalResponse(0, insertReply, emptyWCError, {});
+    bulkWriteOp.noteWriteOpFinalResponse(0, insertReply, response, emptyWCError, {});
+
+    response.setNInserted(0);
+    response.setNDeleted(1);
 
     auto deleteReply = BulkWriteReplyItem(0);
     deleteReply.setN(1); /* nDeleted=1 */
-    bulkWriteOp.noteWriteOpFinalResponse(1, deleteReply, emptyWCError, {});
+    bulkWriteOp.noteWriteOpFinalResponse(1, deleteReply, response, emptyWCError, {});
+
+    response.setNDeleted(0);
+    response.setNMatched(1);
+    response.setNModified(1);
+    response.setNUpserted(0);
 
     auto updateReply = BulkWriteReplyItem(0);
     updateReply.setN(1);         /* nMatched=1 */
     updateReply.setNModified(1); /* nModified=1 */
-    bulkWriteOp.noteWriteOpFinalResponse(2, updateReply, emptyWCError, {});
+    bulkWriteOp.noteWriteOpFinalResponse(2, updateReply, response, emptyWCError, {});
+
+    response.setNMatched(0);
+    response.setNModified(0);
+    response.setNUpserted(1);
 
     auto upsertReply = BulkWriteReplyItem(0);
     upsertReply.setN(1); /* nUpserted=1 */
     upsertReply.setUpserted(IDLAnyTypeOwned{BSON_ARRAY("_id" << 1)[0]});
-    bulkWriteOp.noteWriteOpFinalResponse(3, upsertReply, emptyWCError, {});
+    bulkWriteOp.noteWriteOpFinalResponse(3, upsertReply, response, emptyWCError, {});
 
     ASSERT(bulkWriteOp.isFinished());
     auto replyInfo = bulkWriteOp.generateReplyInfo();
@@ -4062,6 +4092,50 @@ TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponseUpdatesSummaryFields) {
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 1);
     ASSERT_EQ(replyInfo.summaryFields.nModified, 1);
     ASSERT_EQ(replyInfo.summaryFields.nUpserted, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nDeleted, 1);
+}
+
+// Test that noteWriteOpFinalResponse correctly updates summary fields for errorsOnly.
+TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponseUpdatesSummaryFieldsErrorsOnly) {
+    ShardId shardIdA("shardA");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1)),
+                                     BulkWriteDeleteOp(0, BSON("x" << 1)),
+                                     BulkWriteUpdateOp(0, BSON("x" << 1), BSON("y" << 1))},
+                                    {NamespaceInfoEntry(nss)});
+
+    auto emptyWCError = ShardWCError(shardIdA, WriteConcernErrorDetail());
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    auto response = BulkWriteCommandReply();
+    response.setNErrors(0);
+    response.setNInserted(1);
+    // nInserted
+    bulkWriteOp.noteWriteOpFinalResponse(0, boost::none, response, emptyWCError, {});
+
+    response.setNInserted(0);
+    response.setNDeleted(1);
+
+    // nDeleted
+    bulkWriteOp.noteWriteOpFinalResponse(1, boost::none, response, emptyWCError, {});
+
+    response.setNDeleted(0);
+    response.setNMatched(1);
+    response.setNModified(1);
+    response.setNUpserted(0);
+
+    // nMatched and nModified
+    bulkWriteOp.noteWriteOpFinalResponse(2, boost::none, response, emptyWCError, {});
+
+    ASSERT(bulkWriteOp.isFinished());
+    auto replyInfo = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
+    ASSERT_EQ(replyInfo.summaryFields.nInserted, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nMatched, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nModified, 1);
+    ASSERT_EQ(replyInfo.summaryFields.nUpserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nDeleted, 1);
 }
 
@@ -4074,8 +4148,8 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     auto insertReply = BatchedCommandResponse();
     insertReply.setStatus(Status::OK());
     insertReply.setN(2); /* nInserted=2 */
-    auto replyInfo =
-        bulk_write_exec::processFLEResponse(request, BulkWriteCRUDOp::kInsert, insertReply);
+    auto replyInfo = bulk_write_exec::processFLEResponse(
+        request, BulkWriteCRUDOp::kInsert, true /* errorsOnly */, insertReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 2);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -4083,13 +4157,16 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     ASSERT_EQ(replyInfo.summaryFields.nUpserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nDeleted, 0);
 
+    // Make sure we don't populate replyItems in errorsOnly mode.
+    ASSERT_EQ(replyInfo.replyItems.size(), 0);
+
     auto insertReplyWithError = BatchedCommandResponse();
     insertReplyWithError.setStatus(Status::OK());
     insertReplyWithError.setN(1); /* nInserted=1 */
     insertReplyWithError.addToErrDetails(
         write_ops::WriteError(1, Status(ErrorCodes::BadValue, "Dummy BadValue"))); /* nErrors=1 */
     replyInfo = bulk_write_exec::processFLEResponse(
-        request, BulkWriteCRUDOp::kInsert, insertReplyWithError);
+        request, BulkWriteCRUDOp::kInsert, true /* errorsOnly */, insertReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 1);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -4097,11 +4174,16 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     ASSERT_EQ(replyInfo.summaryFields.nUpserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nDeleted, 0);
 
+    // Make sure we don't populate replyItems with non-error replies in errorsOnly mode.
+    ASSERT_EQ(replyInfo.replyItems.size(), 1);
+    ASSERT_EQ(replyInfo.replyItems[0].getIdx(), 1);
+
     request = BatchedCommandRequest(write_ops::DeleteCommandRequest{nss});
     auto deleteReply = BatchedCommandResponse();
     deleteReply.setStatus(Status::OK());
     deleteReply.setN(1); /* nDeleted=1 */
-    replyInfo = bulk_write_exec::processFLEResponse(request, BulkWriteCRUDOp::kDelete, deleteReply);
+    replyInfo = bulk_write_exec::processFLEResponse(
+        request, BulkWriteCRUDOp::kDelete, false /* errorsOnly */, deleteReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -4109,12 +4191,15 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     ASSERT_EQ(replyInfo.summaryFields.nUpserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nDeleted, 1);
 
+    // Make sure we populate replyItems in errorsOnly=false.
+    ASSERT_EQ(replyInfo.replyItems.size(), 1);
+
     auto singleReplyWithError = BatchedCommandResponse();
     singleReplyWithError.setStatus(Status::OK());
     singleReplyWithError.addToErrDetails(
         write_ops::WriteError(0, Status(ErrorCodes::BadValue, "Dummy BadValue"))); /* nErrors=1 */
     replyInfo = bulk_write_exec::processFLEResponse(
-        request, BulkWriteCRUDOp::kDelete, singleReplyWithError);
+        request, BulkWriteCRUDOp::kDelete, false /* errorsOnly */, singleReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -4131,7 +4216,8 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     updateReply.setStatus(Status::OK());
     updateReply.setN(1);         /* nMatched=1 */
     updateReply.setNModified(1); /* nModified=1 */
-    replyInfo = bulk_write_exec::processFLEResponse(request, BulkWriteCRUDOp::kUpdate, updateReply);
+    replyInfo = bulk_write_exec::processFLEResponse(
+        request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, updateReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 1);
@@ -4141,7 +4227,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
 
     // Reuse the single error reply from delete above.
     replyInfo = bulk_write_exec::processFLEResponse(
-        request, BulkWriteCRUDOp::kUpdate, singleReplyWithError);
+        request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, singleReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -4157,7 +4243,8 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     upsertDetails->setIndex(0);
     upsertDetails->setUpsertedID(BSON("_id" << 1));
     upsertReply.addToUpsertDetails(upsertDetails.release()); /* nUpserted=1 */
-    replyInfo = bulk_write_exec::processFLEResponse(request, BulkWriteCRUDOp::kUpdate, upsertReply);
+    replyInfo = bulk_write_exec::processFLEResponse(
+        request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, upsertReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);

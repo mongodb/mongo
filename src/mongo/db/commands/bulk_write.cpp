@@ -1412,14 +1412,22 @@ public:
 
             if (replies.size() == 0 || bulk_write_common::isUnacknowledgedBulkWrite(opCtx)) {
                 // Skip cursor creation and return the simplest reply.
-                return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
-                                                 0 /* cursorId */, {} /* firstBatch */, cursorNss),
-                                             summaryFields.nErrors,
-                                             summaryFields.nInserted,
-                                             summaryFields.nMatched,
-                                             summaryFields.nModified,
-                                             summaryFields.nUpserted,
-                                             summaryFields.nDeleted);
+                auto reply =
+                    BulkWriteCommandReply(BulkWriteCommandResponseCursor(
+                                              0 /* cursorId */, {} /* firstBatch */, cursorNss),
+                                          summaryFields.nErrors,
+                                          summaryFields.nInserted,
+                                          summaryFields.nMatched,
+                                          summaryFields.nModified,
+                                          summaryFields.nUpserted,
+                                          summaryFields.nDeleted);
+
+                if (!retriedStmtIds.empty()) {
+                    reply.setRetriedStmtIds(std::move(retriedStmtIds));
+                }
+
+                _setElectionIdAndOpTime(opCtx, reply);
+                return reply;
             }
 
             // Try and fit all replies into the firstBatch.

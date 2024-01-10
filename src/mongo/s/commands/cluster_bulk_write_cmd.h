@@ -494,7 +494,10 @@ public:
                     response.summaryFields.nModified = 1;
                 }
 
-                response.replyItems[0] = successReply;
+                response.replyItems.clear();
+                if (!request.getErrorsOnly()) {
+                    response.replyItems.push_back(successReply);
+                }
             }
 
             return updatedShardKey;

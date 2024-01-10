@@ -12,6 +12,7 @@ export const BulkWriteUtils = (function() {
     let wc = null;
     let ordered = true;
     let bypassDocumentValidation = null;
+    let hasUpsert = false;
 
     function canProcessAsBulkWrite(cmdName) {
         return commandsToBulkWriteOverride.has(cmdName);
@@ -25,6 +26,7 @@ export const BulkWriteUtils = (function() {
         wc = null;
         bypassDocumentValidation = null;
         ordered = true;
+        hasUpsert = false;
     }
 
     function getCurrentBatchSize() {
@@ -55,7 +57,7 @@ export const BulkWriteUtils = (function() {
     }
 
     function flushCurrentBulkWriteBatch(
-        conn, lsid, originalRunCommand, makeRunCommandArgs, additionalParameters = {}) {
+        conn, lsid, originalRunCommand, makeRunCommandArgs, isMultiOp, additionalParameters = {}) {
         // Should not be possible to reach if bypassDocumentValidation is not set.
         assert(bypassDocumentValidation != null);
 
@@ -82,9 +84,13 @@ export const BulkWriteUtils = (function() {
         // Add in additional parameters to the bulkWrite command.
         bulkWriteCmd = {...bulkWriteCmd, ...additionalParameters};
 
+        if (!isMultiOp && !canBeErrorsOnlySingleCrudOp()) {
+            bulkWriteCmd["errorsOnly"] = false;
+        }
+
         let resp = originalRunCommand.apply(conn, makeRunCommandArgs(bulkWriteCmd, "admin"));
 
-        let response = convertBulkWriteResponse(bulkWriteCmd, resp);
+        let response = convertBulkWriteResponse(bulkWriteCmd, isMultiOp, resp);
         let finalResponse = response;
 
         let expectedResponseLength = numOpsPerResponse.length;
@@ -118,7 +124,7 @@ export const BulkWriteUtils = (function() {
 
                 bulkWriteCmd.ops = bufferedOps;
                 resp = originalRunCommand.apply(conn, makeRunCommandArgs(bulkWriteCmd, "admin"));
-                response = convertBulkWriteResponse(bulkWriteCmd, resp);
+                response = convertBulkWriteResponse(bulkWriteCmd, isMultiOp, resp);
                 finalResponse = finalResponse.concat(response);
             }
         } else {
@@ -136,7 +142,7 @@ export const BulkWriteUtils = (function() {
                 }
                 bulkWriteCmd.ops = bufferedOps;
                 resp = originalRunCommand.apply(conn, makeRunCommandArgs(bulkWriteCmd, "admin"));
-                response = convertBulkWriteResponse(bulkWriteCmd, resp);
+                response = convertBulkWriteResponse(bulkWriteCmd, isMultiOp, resp);
                 finalResponse = finalResponse.concat(response);
             }
         }
@@ -152,6 +158,83 @@ export const BulkWriteUtils = (function() {
         return {"n": 0, "ok": 1};
     }
 
+    function canBeErrorsOnlySingleCrudOp() {
+        // The conditions we need to meet are as follows:
+        // An updateOne, deleteOne, insertOne, or insertMany command
+
+        // Multiple crud ops make up this batch.
+        if (numOpsPerResponse.length != 1) {
+            assert.eq(0, numOpsPerResponse.length);
+            return false;
+        }
+
+        if (hasUpsert) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function processErrorsOnlySingleCrudOpResponse(cmd, bulkWriteResponse) {
+        // Need to construct the original command response based on the summary fields.
+        let response = initializeResponse(cmd.ops[0]);
+
+        if (cmd.ops[0].hasOwnProperty("insert")) {
+            response.n += bulkWriteResponse.nInserted;
+        } else if (cmd.ops[0].hasOwnProperty("update")) {
+            response.n += bulkWriteResponse.nMatched;
+            response.nModified += bulkWriteResponse.nModified;
+        } else if (cmd.ops[0].hasOwnProperty("delete")) {
+            response.n += bulkWriteResponse.nDeleted;
+        } else {
+            throw new Error("Invalid bulkWrite op type. " + cmd.ops[0]);
+        }
+
+        ["writeConcernError",
+         "retriedStmtIds",
+         "opTime",
+         "$clusterTime",
+         "electionId",
+         "operationTime",
+         "errorLabels",
+         "_mongo"]
+            .forEach(property => {
+                if (bulkWriteResponse.hasOwnProperty(property)) {
+                    response[property] = bulkWriteResponse[property];
+                }
+            });
+
+        // Need to loop through any errors now.
+        if (bulkWriteResponse.cursor.firstBatch.length != 0) {
+            let cursorIdx = 0;
+            while (cursorIdx < bulkWriteResponse.cursor.firstBatch.length) {
+                let current = bulkWriteResponse.cursor.firstBatch[cursorIdx];
+                // For errorsOnly every cursor element must be an error.
+                assert.eq(0,
+                          current.ok,
+                          "command: " + tojson(cmd) + " : response: " + tojson(bulkWriteResponse));
+
+                if (!response.hasOwnProperty("writeErrors")) {
+                    response["writeErrors"] = [];
+                }
+                let writeError = {index: current.idx, code: current.code, errmsg: current.errmsg};
+
+                // Include optional error fields if they exist.
+                ["errInfo", "db", "collectionUUID", "expectedCollection", "actualCollection"]
+                    .forEach(property => {
+                        if (current.hasOwnProperty(property)) {
+                            writeError[property] = current[property];
+                        }
+                    });
+
+                response["writeErrors"].push(writeError);
+                cursorIdx++;
+            }
+        }
+
+        return response;
+    }
+
     /**
      * The purpose of this function is to take a server response from a bulkWrite command and to
      * transform it to an array of responses for the corresponding CRUD commands that make up the
@@ -160,11 +243,18 @@ export const BulkWriteUtils = (function() {
      * 'cmd' is the bulkWrite that was executed to generate the response
      * 'orig' is the bulkWrite command response
      */
-    function convertBulkWriteResponse(cmd, bulkWriteResponse) {
+    function convertBulkWriteResponse(cmd, isMultiOp, bulkWriteResponse) {
         // a w0 write concern bulkWrite can result in just {ok: 1}, so if a response does not have
         // 'cursor' field then just return the response as is
         if (!bulkWriteResponse.cursor) {
             return [bulkWriteResponse];
+        }
+
+        // Handle processing response for single CRUD op with errors only.
+        // The multi op code can sometimes take this path but we don't care about the response
+        // conversion for that so it is okay.
+        if (cmd.errorsOnly == true && !isMultiOp && canBeErrorsOnlySingleCrudOp()) {
+            return [processErrorsOnlySingleCrudOpResponse(cmd, bulkWriteResponse)];
         }
 
         let responses = [];
@@ -291,6 +381,10 @@ export const BulkWriteUtils = (function() {
 
         if (cmdObj.hasOwnProperty("let")) {
             letObj = cmdObj.let;
+        }
+
+        if (op.upsert == true) {
+            hasUpsert = true;
         }
 
         return op;
