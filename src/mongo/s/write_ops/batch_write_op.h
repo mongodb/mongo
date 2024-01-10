@@ -207,6 +207,13 @@ public:
      */
     WriteOp& getWriteOp(int index);
 
+    /**
+     * This method is used for writes of type WriteWithoutShardKeyWithId to clear the deferred WCEs
+     * if a retry of the broadcast is needed. Otherwise they are added to _wcErrors.
+     * See _deferredWCErrors for more details.
+     */
+    void handleDeferredWriteConcernErrors();
+
 private:
     /**
      * Maintains the batch execution statistics when a response is received.
@@ -226,6 +233,19 @@ private:
 
     // Write concern responses from all write batches so far
     std::vector<ShardWCError> _wcErrors;
+
+    // Optionally stores a vector of write concern errors from all shards encountered during
+    // the current round of execution. This is used only in the specific case where we are
+    // processing a write of type WriteType::WriteWithoutShardKeyWithId, and is necessary because
+    // if we see a staleness error we restart the broadcasting protocol and do not care about
+    // results or WC errors from previous rounds of the protocol. Thus we temporarily save the
+    // errors here, and at the end of each round of execution we check if the operation specified
+    // by the opIdx has reached a terminal state. If so, these errors are final and will be moved
+    // to _wcErrors. If the op is not in a terminal state, we must be restarting the protocol and
+    // therefore we discard the errors.
+    // We always process WriteWithoutShardKeyWithId writes in their own round and thus there is
+    // only ever a single op in consideration here.
+    boost::optional<std::pair<int /* opIdx */, std::vector<ShardWCError>>> _deferredWCErrors;
 
     // Upserted ids for the whole write batch
     std::vector<std::unique_ptr<BatchedUpsertDetail>> _upsertedIds;

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -2859,5 +2860,73 @@ TEST_F(WriteWithoutShardKeyWithIdFixture,
     _scopedSession.reset();
 }
 
+TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateRetriedAfterWCError) {
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithIdWithoutShardKey", true};
+
+    BatchedCommandRequest updateRequest([&] {
+        write_ops::UpdateCommandRequest updateOp(kNss);
+        // Op style update.
+        updateOp.setUpdates({buildUpdate(BSON("_id" << 1), BSON("$inc" << BSON("a" << 1)), false)});
+        return updateOp;
+    }());
+
+    makeCollectionRoutingInfo(kNss, _shardKeyPattern, nullptr, false, {BSON("x" << 0)}, {});
+    _criTargeter = CollectionRoutingInfoTargeter(getOpCtx(), kNss);
+
+    BatchWriteOp batchOp(getOpCtx(), updateRequest);
+
+    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+    auto status = batchOp.targetBatch(getCollectionRoutingInfoTargeter(), false, &targeted);
+    ASSERT_OK(status);
+    ASSERT_EQ(status.getValue(), WriteType::WithoutShardKeyWithId);
+    ASSERT_EQUALS(targeted.size(), 2);
+
+    BatchedCommandResponse firstShardResp;
+    addWCError(&firstShardResp);
+    firstShardResp.setStatus(Status::OK());
+
+    auto iterator = targeted.begin();
+
+    // Respond to first targeted batch.
+    batchOp.noteBatchResponse(*iterator->second, firstShardResp, nullptr);
+    ASSERT(!batchOp.isFinished());
+    iterator++;
+
+    const static OID epoch = OID::gen();
+    const static Timestamp timestamp{2};
+
+    BatchedCommandResponse secondShardResp;
+    secondShardResp.setStatus(Status::OK());
+    secondShardResp.addToErrDetails(write_ops::WriteError(
+        0,
+        Status(StaleConfigInfo(
+                   kNss,
+                   ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0}),
+                                             boost::optional<CollectionIndexes>(boost::none)),
+                   ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0}),
+                                             boost::optional<CollectionIndexes>(boost::none)),
+                   ShardId("TestShard")),
+               "Stale error")));
+
+    // Respond to second targeted batch.
+    TrackedErrors trackedErrors;
+    trackedErrors.startTracking(ErrorCodes::StaleConfig);
+    batchOp.noteBatchResponse(*iterator->second, secondShardResp, &trackedErrors);
+
+    // Since this batch would be retried the WCError must be cleared.
+    batchOp.handleDeferredWriteConcernErrors();
+
+    ASSERT(!batchOp.isFinished());
+
+    BulkWriteReplyItem bwItem;
+    batchOp.getWriteOp(0).setOpComplete(bwItem);
+
+    BatchedCommandResponse clientResponse;
+    batchOp.buildClientResponse(&clientResponse);
+    ASSERT(clientResponse.getOk());
+    ASSERT_EQUALS(clientResponse.getN(), 0);
+    ASSERT_FALSE(clientResponse.isWriteConcernErrorSet());
+}
 }  // namespace
 }  // namespace mongo

@@ -724,10 +724,22 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 
     // Special handling for write concern errors, save for later
     if (response.isWriteConcernErrorSet()) {
-        // For BatchWriteOp, all writes in the batch should share the same endpoint since they
-        // target the same shard and namespace. So we just use the endpoint from the first write.
-        _wcErrors.emplace_back(targetedBatch.getWrites()[0]->endpoint.shardName,
-                               *response.getWriteConcernError());
+        auto opIdx = targetedBatch.getWrites().front()->writeOpRef.first;
+        auto wce = *response.getWriteConcernError();
+        auto shardId = targetedBatch.getWrites()[0]->endpoint.shardName;
+        if (_writeOps[opIdx].getWriteType() == WriteType::WithoutShardKeyWithId) {
+            if (!_deferredWCErrors) {
+                _deferredWCErrors = std::make_pair(opIdx, std::vector{ShardWCError(shardId, wce)});
+            } else {
+                invariant(_deferredWCErrors->first == opIdx);
+                _deferredWCErrors->second.push_back(ShardWCError(shardId, wce));
+            }
+        } else {
+            // For BatchWriteOp, all writes in the batch should share the same endpoint since they
+            // target the same shard and namespace. So we just use the endpoint from the first
+            // write.
+            _wcErrors.emplace_back(shardId, wce);
+        }
     }
 
     std::vector<write_ops::WriteError> itemErrors;
@@ -1000,6 +1012,18 @@ void BatchWriteOp::_incBatchStats(const BatchedCommandResponse& response) {
 
     if (auto retriedStmtIds = response.getRetriedStmtIds(); !retriedStmtIds.empty()) {
         _retriedStmtIds.insert(_retriedStmtIds.end(), retriedStmtIds.begin(), retriedStmtIds.end());
+    }
+}
+
+void BatchWriteOp::handleDeferredWriteConcernErrors() {
+    if (_deferredWCErrors) {
+        auto& [opIdx, wcErrors] = _deferredWCErrors.value();
+        auto& op = _writeOps[opIdx];
+        invariant(op.getWriteType() == WriteType::WithoutShardKeyWithId);
+        if (op.getWriteState() >= WriteOpState_Completed) {
+            _wcErrors.insert(_wcErrors.end(), wcErrors.begin(), wcErrors.end());
+        }
+        _deferredWCErrors = boost::none;
     }
 }
 

@@ -636,6 +636,8 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
     TargetedBatchMap& childBatches,
     BatchWriteExecStats* stats,
     const BatchedCommandRequest& clientRequest) {
+    auto& writeOp =
+        batchOp.getWriteOp(childBatches.begin()->second->getWrites().front()->writeOpRef.first);
     TargetedBatchMap pendingBatches;
     auto requests = constructARSRequestsToSend(
         opCtx, targeter, childBatches, pendingBatches, stats, batchOp, boost::optional<bool>());
@@ -684,8 +686,6 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
                                        ? batchedCommandResponse.getElectionId()
                                        : OID());
             }
-            auto& targetedWrite = batch->getWrites().front();
-            auto& writeOp = batchOp.getWriteOp(targetedWrite->writeOpRef.first);
             // The write op is complete if we receive ok:1 n:1 shard response and we can return
             // early. Any pending child write ops would be marked NoOp.
             if (writeOp.getWriteState() == WriteOpState_Completed) {
@@ -699,6 +699,7 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
             dassert(abortBatch == false);
         }
     }
+    batchOp.handleDeferredWriteConcernErrors();
 }
 
 void executeNonOrdinaryWriteChildBatches(OperationContext* opCtx,
