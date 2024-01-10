@@ -3,15 +3,17 @@ function activate_venv {
   if [ -d "${workdir}/venv" ]; then
     # It's possible for activate to fail without stderr; as a result the cat operation (below) could fail.
     # To mitigate this, create an empty error log.
-    touch /tmp/activate_error.log
+    # We're relying on the evergreen provided tmp directory here because Amazon Linux 2023 has an issue
+    # writing to /tmp/ on startup.
+    touch $TMPDIR/activate_error.log
     if [ "Windows_NT" = "$OS" ]; then
       # Need to quote the path on Windows to preserve the separator.
-      . "${workdir}/venv/Scripts/activate" 2> /tmp/activate_error.log
+      . "${workdir}/venv/Scripts/activate" 2> $TMPDIR/activate_error.log
     else
-      . ${workdir}/venv/bin/activate 2> /tmp/activate_error.log
+      . ${workdir}/venv/bin/activate 2> $TMPDIR/activate_error.log
     fi
     if [ $? -ne 0 ]; then
-      echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
+      echo "Failed to activate virtualenv: $(cat $TMPDIR/activate_error.log)"
       exit 1
     fi
     python=python
