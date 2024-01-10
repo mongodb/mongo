@@ -7,13 +7,6 @@ export function runTest(mongod) {
     admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
     assert(admin.auth('admin', 'pass'));
 
-    // Skip this test if the BulkWriteCommand feature flag is not enabled.
-    if (!FeatureFlagUtil.isEnabled(admin, "BulkWriteCommand")) {
-        jsTestLog('Skipping test because the BulkWriteCommand feature flag is disabled.');
-        admin.logout();
-        return;
-    }
-
     // Establish test and test1
     mongod.getDB("test").coll.insert({x: "y"});
     mongod.getDB("test1").coll1.insert({x: "y"});
