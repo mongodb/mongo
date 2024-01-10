@@ -502,18 +502,6 @@ bool isIndexBuildResumable(OperationContext* opCtx,
         }
     }
 
-    // Ensure that this node is a voting member in the replica set config.
-    auto hap = replCoord->getMyHostAndPort();
-    if (auto memberConfig = replCoord->findConfigMemberByHostAndPort_deprecated(hap)) {
-        if (!memberConfig->isVoter()) {
-            return false;
-        }
-    } else {
-        // We cannot determine our member config, so skip the majority wait and leave this index
-        // build as non-resumable.
-        return false;
-    }
-
     return true;
 }
 

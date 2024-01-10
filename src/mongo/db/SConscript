@@ -1321,7 +1321,6 @@ env.Library(
         'index_build_entry_helpers',
         'repl/cloner_utils',
         'repl/repl_coordinator_interface',
-        'repl/replica_set_messages',
         'repl/tenant_migration_access_blocker',
         'repl/timestamp_block',
         'resumable_index_builds_idl',
