@@ -81,7 +81,7 @@ static void buildBatchedWritesWithPolicy(size_t batchedWriteMaxSizeBytes,
         // Ensure size compliance with policy before batching next element.
         size_t precomputedNextSize = curBatchSizeBytes + static_cast<size_t>(element.objsize());
         if ((precomputedNextSize <= batchedWriteMaxSizeBytes) ||
-            (count == 0 && element.objsize() < BSONObjMaxUserSize)) {
+            (count == 0 && element.objsize() <= BSONObjMaxUserSize)) {
             curBatchSizeBytes += static_cast<size_t>(element.objsize());
             stmts.push_back(InsertStatement(element));
             record = getNextRecord();

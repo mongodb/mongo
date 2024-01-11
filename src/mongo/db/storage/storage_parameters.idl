@@ -143,14 +143,18 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gMaxNumberOfInsertsBatchInsertsForRenameAcrossDatabases
         default: 500
+        validator: { gte: 1, lte: 16777216 }
 
     maxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes:
         description: >-
             Maximum size (bytes) of each batched applyOps oplog entry for cross-db collection renames.
+            If any one document exceeds this limit, falls back to a plain insert oplog entry for that doc.
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gMaxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes
-        default: 16776216 # BSONObjMaxUserSize - 1000
+        default: 4194304 # 4 MB, an arbitrary but conservative fraction of the 16 MB BSON limit. Similar
+                         # in spirit to batchedDeletesTargetStagedDocBytes.
+        validator: { gte: 1, lte: 16777216 }
 
     collectionSamplingLogIntervalSeconds:
         description: 'The approximate interval between log messages indicating collection sampling progress. Once interval seconds have elapsed since the last log message, a progress message will be logged after the current sample is completed. A value of zero will disable this logging.'
