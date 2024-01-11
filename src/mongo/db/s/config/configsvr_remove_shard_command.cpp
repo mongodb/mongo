@@ -60,6 +60,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/remove_shard_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/scopeguard.h"
@@ -73,9 +74,12 @@ namespace {
 /**
  * Internal sharding command run on config servers to remove a shard from the cluster.
  */
-class ConfigSvrRemoveShardCommand : public BasicCommand {
+class ConfigSvrRemoveShardCommand final
+    : public BasicCommandWithRequestParser<ConfigSvrRemoveShardCommand> {
 public:
-    ConfigSvrRemoveShardCommand() : BasicCommand("_configsvrRemoveShard") {}
+    using Request = ConfigSvrRemoveShard;
+
+    ConfigSvrRemoveShardCommand() : BasicCommandWithRequestParser() {}
 
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
@@ -111,10 +115,11 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
+    bool runWithRequestParser(OperationContext* opCtx,
+                              const DatabaseName&,
+                              const BSONObj& cmdObj,
+                              const RequestParser& requestParser,
+                              BSONObjBuilder& result) override {
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrRemoveShard can only be run on config servers",
                 serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
@@ -133,9 +138,11 @@ public:
         repl::ReadConcernArgs::get(opCtx) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
+        const auto& request = requestParser.request();
+
         const auto shardId = [&] {
-            const auto shardIdOrUrl(cmdObj.firstElement().String());
-            auto shard =
+            const auto shardIdOrUrl = request.getCommandParameter();
+            const auto shard =
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdOrUrl));
             return shard->getId();
         }();
@@ -165,6 +172,8 @@ public:
 
         return true;
     }
+
+    void validateResult(const BSONObj& resultObj) override final {}
 };
 MONGO_REGISTER_COMMAND(ConfigSvrRemoveShardCommand).forShard();
 

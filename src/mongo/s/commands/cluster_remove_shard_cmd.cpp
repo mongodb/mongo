@@ -49,7 +49,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/remove_shard_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -59,9 +61,11 @@
 namespace mongo {
 namespace {
 
-class RemoveShardCmd : public BasicCommand {
+class RemoveShardCmd final : public BasicCommandWithRequestParser<RemoveShardCmd> {
 public:
-    RemoveShardCmd() : BasicCommand("removeShard", "removeshard") {}
+    using Request = RemoveShard;
+
+    RemoveShardCmd() : BasicCommandWithRequestParser() {}
 
     std::string help() const override {
         return "remove a shard from the system.";
@@ -91,15 +95,22 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        uassert(ErrorCodes::TypeMismatch,
-                str::stream() << "Field '" << cmdObj.firstElement().fieldName()
-                              << "' must be of type string",
-                cmdObj.firstElement().type() == BSONType::String);
-        const std::string target = cmdObj.firstElement().str();
+    bool runWithRequestParser(OperationContext* opCtx,
+                              const DatabaseName&,
+                              const BSONObj& cmdObj,
+                              const RequestParser& requestParser,
+                              BSONObjBuilder& result) override final {
+        const auto& request = requestParser.request();
+        const ShardId target = request.getCommandParameter();
+
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << Request::kCommandName
+                              << " command should be run on admin database",
+                request.getDbName().isAdminDB());
+
+        ConfigSvrRemoveShard configsvrRequest{target};
+        configsvrRequest.setRemoveShardRequestBase(request.getRemoveShardRequestBase());
+        configsvrRequest.setDbName(request.getDbName());
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto cmdResponseStatus = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
@@ -107,8 +118,7 @@ public:
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             DatabaseName::kAdmin,
             CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendGenericCommandArgs(cmdObj,
-                                                         BSON("_configsvrRemoveShard" << target)),
+                CommandHelpers::appendGenericCommandArgs(cmdObj, configsvrRequest.toBSON({})),
                 opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);
@@ -117,6 +127,8 @@ public:
 
         return true;
     }
+
+    void validateResult(const BSONObj& resultObj) override final {}
 };
 MONGO_REGISTER_COMMAND(RemoveShardCmd).forRouter();
 

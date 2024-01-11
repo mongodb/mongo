@@ -254,6 +254,7 @@ env.Library(
         'request_types/move_primary.idl',
         'request_types/move_range_request.idl',
         'request_types/placement_history_commands.idl',
+        'request_types/remove_shard.idl',
         'request_types/remove_shard_from_zone_request_type.cpp',
         'request_types/reshard_collection.idl',
         'request_types/resharding_operation_time.idl',
