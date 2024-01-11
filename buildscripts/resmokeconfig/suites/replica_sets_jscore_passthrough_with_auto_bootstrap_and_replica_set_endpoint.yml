@@ -94,9 +94,6 @@ selector:
     # is bootstrapped as a sharded cluster.
     - jstests/core/collation.js
     - jstests/core/ddl/capped_convertToCapped1.js
-    # TODO (SERVER-84263): ServiceEntryPointCommon may try to verify contract for a command before
-    # clearing access and privilege checks from the previous command in the same auth session.
-    - jstests/core/txns/commands_banning_txnnumber_outside_transactions.js
     # TODO (SERVER-84243): Separate Shard-Role Catalog Cache and Loader.
     - jstests/core/txns/speculative_snapshot_includes_all_writes.js
     # TODO (SERVER-84329): renameCollection command against a collection with invalid views fails on

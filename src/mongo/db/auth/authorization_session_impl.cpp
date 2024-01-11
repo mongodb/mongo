@@ -1035,6 +1035,11 @@ void AuthorizationSessionImpl::verifyContract(const AuthorizationContract* contr
     tempContract.addPrivilege(
         Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useTenant));
 
+
+    // makeLogicalSessionId checks for impersonate privileges
+    tempContract.addPrivilege(
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::impersonate));
+
     // Needed for internal sessions started by the server.
     tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(boost::none),
                                         ActionType::issueDirectShardOperations));

@@ -1520,6 +1520,10 @@ void ExecCommandDatabase::_initiateCommand() {
 
     Client* client = opCtx->getClient();
 
+    // Start authz contract tracking before we evaluate failpoints
+    auto authzSession = AuthorizationSession::get(client);
+    authzSession->startContractTracking();
+
     if (auto scope = request.validatedTenancyScope; scope && scope->hasAuthenticatedUser()) {
         uassert(ErrorCodes::Unauthorized,
                 str::stream() << "Command " << command->getName()
@@ -1552,10 +1556,6 @@ void ExecCommandDatabase::_initiateCommand() {
                                                      command->requiresAuth(),
                                                      command->attachLogicalSessionsToOpCtx(),
                                                      replCoord->getSettings().isReplSet());
-
-    // Start authz contract tracking before we evaluate failpoints
-    auto authzSession = AuthorizationSession::get(client);
-    authzSession->startContractTracking();
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, _invocation.get());
 
