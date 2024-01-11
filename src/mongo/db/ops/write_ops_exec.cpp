@@ -1312,8 +1312,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         curOp.debug().execStats = std::move(stats);
     }
 
-    if (source != OperationSource::kTimeseriesInsert &&
-        source != OperationSource::kTimeseriesUpdate) {
+    if (source != OperationSource::kTimeseriesInsert) {
         recordUpdateResultInOpDebug(updateResult, &curOp.debug());
     }
     curOp.debug().setPlanSummaryMetrics(summary);
