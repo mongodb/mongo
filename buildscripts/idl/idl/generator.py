@@ -1127,8 +1127,16 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 header_list.append('mongo/util/options_parser/environment.h')
 
         if spec.server_parameters:
-            if [param for param in spec.server_parameters if param.feature_flag]:
+            if [
+                    param for param in spec.server_parameters
+                    if param.feature_flag or (param.condition and param.condition.feature_flag)
+            ]:
                 header_list.append('mongo/db/feature_flag.h')
+            if [
+                    param for param in spec.server_parameters
+                    if param.condition and param.condition.min_fcv
+            ]:
+                header_list.append('mongo/db/feature_compatibility_version_parser.h')
             header_list.append('mongo/db/server_parameter.h')
             header_list.append('mongo/db/server_parameter_with_storage.h')
 
