@@ -379,6 +379,23 @@ void BulkWriteExecStats::noteNumShardsOwningChunks(size_t nsIdx, int nShardsOwni
     _numShardsOwningChunks[nsIdx] = nShardsOwningChunks;
 }
 
+void BulkWriteExecStats::noteTwoPhaseWriteProtocol(const BulkWriteCommandRequest& clientRequest,
+                                                   const TargetedWriteBatch& targetedBatch,
+                                                   size_t nsIdx,
+                                                   int nShardsOwningChunks) {
+    for (const auto& write : targetedBatch.getWrites()) {
+        BulkWriteCRUDOp bulkWriteOp(clientRequest.getOps().at(write->writeOpRef.first));
+        auto nsIdx = bulkWriteOp.getNsInfoIdx();
+        auto batchType = convertOpType(bulkWriteOp.getType());
+        // In this case, we aren't really targetting targetedBatch.getShardId, so only create the
+        // batchType entry in the map. updateHostsTargetedMetrics reports kManyShards in the case no
+        // shards is targeted overall.
+        _targetedShardsPerNsAndBatchType[nsIdx][batchType];
+    }
+
+    noteNumShardsOwningChunks(nsIdx, nShardsOwningChunks);
+}
+
 void BulkWriteExecStats::updateMetrics(OperationContext* opCtx,
                                        const std::vector<std::unique_ptr<NSTargeter>>& targeters,
                                        bool updatedShardKey) {
@@ -392,13 +409,16 @@ void BulkWriteExecStats::updateMetrics(OperationContext* opCtx,
         }
         auto nShardsOwningChunks = getNumShardsOwningChunks(nsIdx);
         for (const auto& [batchType, shards] : it->second) {
-            if (shards.size() > 0) {
-                int nShards = shards.size() + (updatedShardKey ? 1 : 0);
+            int nShards = shards.size();
 
-                if (nShardsOwningChunks.has_value()) {
-                    updateHostsTargetedMetrics(
-                        opCtx, batchType, nShardsOwningChunks.value(), nShards);
-                }
+            // If we have no information on the shards targeted, ignore updatedShardKey,
+            // updateHostsTargetedMetrics will report this as TargetType::kManyShards.
+            if (nShards != 0 && updatedShardKey) {
+                nShards += 1;
+            }
+
+            if (nShardsOwningChunks.has_value()) {
+                updateHostsTargetedMetrics(opCtx, batchType, nShardsOwningChunks.value(), nShards);
             }
         }
     }
@@ -585,6 +605,9 @@ void executeWriteWithoutShardKey(
             }
             return childBatches.begin()->second.get();
         }();
+
+        bulkWriteOp.noteTwoPhaseWriteProtocol(
+            *targetedWriteBatch, nsIdx, targeter->getNShardsOwningChunks());
 
         auto cmdObj = bulkWriteOp
                           .buildBulkCommandRequest(targeters,
@@ -1679,6 +1702,12 @@ void BulkWriteOp::noteTargetedShard(const TargetedWriteBatch& targetedBatch) {
 
 void BulkWriteOp::noteNumShardsOwningChunks(size_t nsIdx, int nShardsOwningChunks) {
     _stats.noteNumShardsOwningChunks(nsIdx, nShardsOwningChunks);
+}
+
+void BulkWriteOp::noteTwoPhaseWriteProtocol(const TargetedWriteBatch& targetedBatch,
+                                            size_t nsIdx,
+                                            int nShardsOwningChunks) {
+    _stats.noteTwoPhaseWriteProtocol(_clientRequest, targetedBatch, nsIdx, nShardsOwningChunks);
 }
 
 void addIdsForInserts(BulkWriteCommandRequest& origCmdRequest) {

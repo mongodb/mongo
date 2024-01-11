@@ -39,7 +39,15 @@ const checkEqual = function(before, expectedDiff, after, errorMessage) {
 
 // Helper class for the bulkwrite_metrics tests.
 export class BulkWriteMetricChecker {
-    constructor(testDB, namespace, bulkWrite, isMongos, fle, errorsOnly, retryCount = 3) {
+    constructor(testDB,
+                namespace,
+                bulkWrite,
+                isMongos,
+                fle,
+                errorsOnly,
+                retryCount = 3,
+                timeseries = false,
+                defaultTimestamp = undefined) {
         this.testDB = testDB;
         this.namespace = namespace;
         this.bulkWrite = bulkWrite;
@@ -47,6 +55,8 @@ export class BulkWriteMetricChecker {
         this.fle = fle;
         this.retryCount = retryCount;
         this.errorsOnly = errorsOnly;
+        this.timeseries = timeseries;
+        this.defaultTimestamp = defaultTimestamp;
     }
 
     // Metrics corresponding to
@@ -87,8 +97,14 @@ export class BulkWriteMetricChecker {
     }
 
     // Metrics corresponding to ServerWriteConcernMetrics
-    _checkWriteConcernMetrics(
-        status0, status1, inserted, actualInserts, updated, fleSafeContentUpdates, deleted) {
+    _checkWriteConcernMetrics(status0,
+                              status1,
+                              inserted,
+                              actualInserts,
+                              updated,
+                              fleSafeContentUpdates,
+                              deleted,
+                              retryCount) {
         const wC0 = status0.opWriteConcernCounters;
         const wC1 = status1.opWriteConcernCounters;
 
@@ -104,16 +120,21 @@ export class BulkWriteMetricChecker {
             checkEqual(wC0.delete.none, deleted, wC1.delete.none, "delete.none mismatch");
             checkEqual(wC0.insert.none, actualInserts, wC1.insert.none, "insert.none mismatch");
         } else {
+            // All calls are done with {writeConcern: {w: "majority"}} so "none" count should be
+            // unchanged, except for timeseries.
+            // TODO SERVER-84799 timeseries condition below and comment above.
+            const [uNone, uMaj] = (this.timeseries && retryCount > 1) ? [updated, 0] : [0, updated];
             checkEqual(
-                wC0.update.wmajority, updated, wC1.update.wmajority, "update.wmajority mismatch");
+                wC0.update.wmajority, uMaj, wC1.update.wmajority, "update.wmajority mismatch");
             checkEqual(
                 wC0.delete.wmajority, deleted, wC1.delete.wmajority, "delete.wmajority mismatch");
-            checkEqual(
-                wC0.insert.wmajority, inserted, wC1.insert.wmajority, "insert.wmajority mismatch");
+            // TODO SERVER-84737 timeseries opWriteConcernCounters.insert.
+            checkEqual(wC0.insert.wmajority,
+                       (this.timeseries ? 0 : inserted),
+                       wC1.insert.wmajority,
+                       "insert.wmajority mismatch");
 
-            // All calls are done with {writeConcern: {w: "majority"}} so "none" count should be
-            // unchanged.
-            checkEqual(wC0.update.none, 0, wC1.update.none, "update.none mismatch");
+            checkEqual(wC0.update.none, uNone, wC1.update.none, "update.none mismatch");
             checkEqual(wC0.delete.none, 0, wC1.delete.none, "delete.none mismatch");
             checkEqual(wC0.insert.none, 0, wC1.insert.none, "insert.none mismatch");
         }
@@ -164,7 +185,10 @@ export class BulkWriteMetricChecker {
         let opInserted = actualInserts;
 
         if (this.isMongos) {
-            opInserted *= retryCount;
+            // TODO SERVER-84798 timeseries should increase by retryCount too.
+            if (!this.timeseries) {
+                opInserted *= retryCount;
+            }
             opDeleted *= retryCount;
             opUpdated *= retryCount;
             if (this.fle) {
@@ -199,7 +223,8 @@ export class BulkWriteMetricChecker {
                             retriedCommandsCount,
                             retriedStatementsCount,
                             fleSafeContentUpdates,
-                            actualInserts) {
+                            actualInserts,
+                            retryCount) {
         this._checkAdditiveMetrics(
             status0, status1, actualInserts, updated, fleSafeContentUpdates, deleted);
 
@@ -210,8 +235,14 @@ export class BulkWriteMetricChecker {
 
         this._checkTopMetrics(top0, top1, inserted, retriedInsert, updated, deleted);
 
-        this._checkWriteConcernMetrics(
-            status0, status1, inserted, actualInserts, updated, fleSafeContentUpdates, deleted);
+        this._checkWriteConcernMetrics(status0,
+                                       status1,
+                                       inserted,
+                                       actualInserts,
+                                       updated,
+                                       fleSafeContentUpdates,
+                                       deleted,
+                                       retryCount);
 
         // Metrics corresponding to
         // RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount and
@@ -238,6 +269,7 @@ export class BulkWriteMetricChecker {
                             singleInsertForBulkWrite,
                             insertShardField,
                             updateShardField,
+                            deleteShardField,
                             fleSafeContentUpdates,
                             retryCount,
                             actualInserts) {
@@ -263,7 +295,11 @@ export class BulkWriteMetricChecker {
             unshardedInsert = 2 * (inserted + updated) * (eqIndexedEncryptedFields > 0 ? 1 : 0);
             unshardedInsert *= retryCount;
         }
-        targetedInsert *= retryCount;
+
+        // TODO SERVER-84798 timeseries should increase by retryCount too.
+        if (!this.timeseries) {
+            targetedInsert *= retryCount;
+        }
 
         if (this.bulkWrite) {
             if (singleUpdateForBulkWrite) {
@@ -290,10 +326,10 @@ export class BulkWriteMetricChecker {
                    targeted1.update[updateShardField],
                    `update.${updateShardField} mismatch`);
 
-        checkEqual(targeted0.delete.allShards,
+        checkEqual(targeted0.delete[deleteShardField],
                    deleted,
-                   targeted1.delete.allShards,
-                   "delete.allShards mismatch");
+                   targeted1.delete[deleteShardField],
+                   `delete.${deleteShardField} mismatch`);
     }
 
     // eqIndexedEncryptedFields is per insert/update in the command.
@@ -308,7 +344,8 @@ export class BulkWriteMetricChecker {
         singleUpdateForBulkWrite = false,
         singleInsertForBulkWrite = false,
         insertShardField = "oneShard",
-        updateShardField = "allShards",
+        updateShardField = this.timeseries ? "manyShards" : "allShards",
+        deleteShardField = this.timeseries ? "oneShard" : "allShards",
         retryCount = 0
     }) {
         const status1 = this.testDB.serverStatus();
@@ -316,6 +353,13 @@ export class BulkWriteMetricChecker {
         // An FLE update causes one findAndModify followed by an optional (absent if
         // eqIndexedEncryptedFields == 0) update.
         let fleSafeContentUpdates = (updated > 0 && eqIndexedEncryptedFields > 0) ? 1 : 0;
+
+        if (this.timeseries) {
+            if (retriedInsert != 0) {
+                inserted = this.retryCount;
+                retriedInsert = 0;
+            }
+        }
 
         // FLE2 has 2 side collection inserts per indexedEncryptedField touched by each
         // insert/update.
@@ -332,6 +376,7 @@ export class BulkWriteMetricChecker {
                                          singleInsertForBulkWrite,
                                          insertShardField,
                                          updateShardField,
+                                         deleteShardField,
                                          fleSafeContentUpdates,
                                          retryCount,
                                          actualInserts);
@@ -353,7 +398,8 @@ export class BulkWriteMetricChecker {
                                          retriedCommandsCount,
                                          retriedStatementsCount,
                                          fleSafeContentUpdates,
-                                         actualInserts);
+                                         actualInserts,
+                                         retryCount);
         }
 
         this._checkOpCounters(status0.opcounters,
@@ -367,15 +413,62 @@ export class BulkWriteMetricChecker {
         this._checkUpdateMetrics(status0, status1, updateArrayFilters, updatePipeline);
     }
 
+    // Add the writeConcern. If this.timeseries is true, add a timestamp field if missing.
+    executeCommand(command) {
+        if (this.timeseries) {
+            if (command.hasOwnProperty("documents")) {
+                for (let document of command.documents) {
+                    if (!document.hasOwnProperty("timestamp")) {
+                        document.timestamp = this.defaultTimestamp;
+                    }
+                }
+            } else if (command.hasOwnProperty("updates")) {
+                for (let document of command.updates) {
+                    if (!document.q.hasOwnProperty("timestamp")) {
+                        document.q.timestamp = this.defaultTimestamp;
+                    }
+                }
+            } else {
+                for (let document of command.deletes) {
+                    if (!document.q.hasOwnProperty("timestamp")) {
+                        document.q.timestamp = this.defaultTimestamp;
+                    }
+                }
+            }
+        }
+        command.writeConcern = {w: "majority"};
+        return assert.commandWorked(this.testDB.runCommand(command));
+    }
+
+    // Adds a timestamp field if missing. Called when this.timeseries is true.
+    _addTimestamp(bulkWriteOps) {
+        for (let op of bulkWriteOps) {
+            if (op.hasOwnProperty("document")) {
+                if (!op.document.hasOwnProperty("timestamp")) {
+                    op.document.timestamp = this.defaultTimestamp;
+                }
+            } else {
+                if (!op.filter.hasOwnProperty("timestamp")) {
+                    op.filter.timestamp = this.defaultTimestamp;
+                }
+            }
+        }
+    }
+
     checkMetrics(testcaseName, bulkWriteOps, normalCommands, expectedMetrics) {
         print(`Testcase: ${testcaseName} (on a ${
-            this.isMongos ? "ShardingTest" : "ReplSetTest"} with bulkWrite = ${
-            this.bulkWrite} and errorsOnly = ${this.errorsOnly}).`);
+            this.isMongos ? "ShardingTest"
+                          : "ReplSetTest"} with bulkWrite = ${this.bulkWrite}, errorsOnly = ${
+            this.errorsOnly} and timeseries = ${this.timeseries}).`);
         const statusBefore = this.testDB.serverStatus();
         const topBefore =
             this.isMongos ? undefined : this.testDB.adminCommand({top: 1}).totals[this.namespace];
 
         if (this.bulkWrite) {
+            if (this.timeseries) {
+                this._addTimestamp(bulkWriteOps);
+            }
+
             assert.commandWorked(this.testDB.adminCommand({
                 bulkWrite: 1,
                 ops: bulkWriteOps,
@@ -385,8 +478,7 @@ export class BulkWriteMetricChecker {
             }));
         } else {
             for (let command of normalCommands) {
-                command.writeConcern = {w: "majority"};
-                assert.commandWorked(this.testDB.runCommand(command));
+                this.executeCommand(command);
             }
         }
         expectedMetrics.retryCount = 1;
@@ -395,12 +487,20 @@ export class BulkWriteMetricChecker {
 
     checkMetricsWithRetries(
         testcaseName, bulkWriteOps, normalCommand, expectedMetrics, lsid, txnNumber) {
-        print(`Testcase: ${testcaseName}`);
+        print(`Testcase: ${testcaseName} (on a ${
+            this.isMongos ? "ShardingTest"
+                          : "ReplSetTest"} with bulkWrite = ${this.bulkWrite}, errorsOnly = ${
+            this.errorsOnly} and timeseries = ${this.timeseries}).`);
+
         let statusBefore = this.testDB.serverStatus();
         let topBefore =
             this.isMongos ? undefined : this.testDB.adminCommand({top: 1}).totals[this.namespace];
 
         if (this.bulkWrite) {
+            if (this.timeseries) {
+                this._addTimestamp(bulkWriteOps);
+            }
+
             for (let i = 0; i < this.retryCount; ++i) {
                 assert.commandWorked(this.testDB.adminCommand({
                     bulkWrite: 1,
@@ -417,7 +517,7 @@ export class BulkWriteMetricChecker {
             normalCommand.txnNumber = txnNumber;
 
             for (let i = 0; i < this.retryCount; ++i) {
-                assert.commandWorked(this.testDB.runCommand(normalCommand));
+                this.executeCommand(normalCommand);
             }
         }
         expectedMetrics.retryCount = this.retryCount;

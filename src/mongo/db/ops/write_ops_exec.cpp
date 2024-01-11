@@ -851,7 +851,9 @@ UpdateResult performUpdate(OperationContext* opCtx,
             .notifyOfQuery(opCtx, collection.getCollectionPtr(), summaryStats);
     }
     auto updateResult = exec->getUpdateResult();
+
     write_ops_exec::recordUpdateResultInOpDebug(updateResult, &curOp->debug());
+
     curOp->debug().setPlanSummaryMetrics(summaryStats);
 
     if (updateResult.containsDotsAndDollarsField) {

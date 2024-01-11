@@ -60,6 +60,10 @@ public:
     void noteTargetedShard(const BulkWriteCommandRequest& clientRequest,
                            const TargetedWriteBatch& targetedBatch);
     void noteNumShardsOwningChunks(size_t nsIdx, int nShardsOwningChunks);
+    void noteTwoPhaseWriteProtocol(const BulkWriteCommandRequest& clientRequest,
+                                   const TargetedWriteBatch& targetedBatch,
+                                   size_t nsIdx,
+                                   int nShardsOwningChunks);
 
     boost::optional<int> getNumShardsOwningChunks(size_t nsIdx) const;
 
@@ -343,6 +347,9 @@ public:
 
     void noteTargetedShard(const TargetedWriteBatch& targetedBatch);
     void noteNumShardsOwningChunks(size_t nsIdx, int nShardsOwningChunks);
+    void noteTwoPhaseWriteProtocol(const TargetedWriteBatch& targetedBatch,
+                                   size_t nsIdx,
+                                   int nShardsOwningChunks);
 
 private:
     // The OperationContext the client bulkWrite request is run on.
