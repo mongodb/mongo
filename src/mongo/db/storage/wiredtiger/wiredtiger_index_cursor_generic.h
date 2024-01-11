@@ -40,7 +40,9 @@ namespace mongo {
 class WiredTigerIndexCursorGeneric {
 public:
     WiredTigerIndexCursorGeneric(OperationContext* opCtx, bool forward)
-        : _opCtx(opCtx), _forward(forward) {}
+        : _opCtx(opCtx),
+          _forward(forward),
+          _metrics(&ResourceConsumption::MetricsCollector::get(opCtx)) {}
     virtual ~WiredTigerIndexCursorGeneric() = default;
 
     void resetCursor() {
@@ -52,6 +54,7 @@ public:
 
     void detachFromOperationContext() {
         _opCtx = nullptr;
+        _metrics = nullptr;
 
         if (!_saveStorageCursorOnDetachFromOperationContext) {
             _cursor = boost::none;
@@ -60,6 +63,7 @@ public:
 
     void reattachToOperationContext(OperationContext* opCtx) {
         _opCtx = opCtx;
+        _metrics = &ResourceConsumption::MetricsCollector::get(opCtx);
         // _cursor recreated in restore() to avoid risk of WT_ROLLBACK issues.
     }
 
@@ -89,19 +93,18 @@ protected:
     void getKey(WT_CURSOR* cursor, WT_ITEM* key) {
         invariantWTOK(cursor->get_key(cursor, key), cursor->session);
 
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneIdxEntryRead(cursor->internal_uri, key->size);
+        _metrics->incrementOneIdxEntryRead(cursor->internal_uri, key->size);
     }
 
     void getKeyValue(WT_CURSOR* cursor, WT_ITEM* key, WT_ITEM* value) {
         invariantWTOK(cursor->get_raw_key_value(cursor, key, value), cursor->session);
 
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneIdxEntryRead(cursor->internal_uri, key->size);
+        _metrics->incrementOneIdxEntryRead(cursor->internal_uri, key->size);
     }
 
     OperationContext* _opCtx;
     const bool _forward;
+    ResourceConsumption::MetricsCollector* _metrics;
 
     boost::optional<WiredTigerCursor> _cursor;
 

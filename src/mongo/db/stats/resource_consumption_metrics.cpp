@@ -242,101 +242,88 @@ void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* 
     appendNonZeroMetric(builder, kTotalUnitsWritten, writeMetrics.totalWritten.units());
 }
 
-template <typename Func>
-inline void ResourceConsumption::MetricsCollector::_doIfCollecting(Func&& func) {
-    if (!isCollecting()) {
-        return;
-    }
-    func();
+void ResourceConsumption::MetricsCollector::_incrementOneDocRead(StringData uri,
+                                                                 size_t docBytesRead) {
+    _metrics.readMetrics.docsRead.observeOne(docBytesRead);
+    LOGV2_DEBUG(6523900,
+                2,
+                "ResourceConsumption::MetricsCollector::incrementOneDocRead",
+                "uri"_attr = uri,
+                "bytes"_attr = docBytesRead);
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneDocRead(StringData uri,
-                                                                size_t docBytesRead) {
-    _doIfCollecting([&]() {
-        LOGV2_DEBUG(6523900,
-                    1,
-                    "ResourceConsumption::MetricsCollector::incrementOneDocRead",
-                    "uri"_attr = uri,
-                    "bytes"_attr = docBytesRead);
-        _metrics.readMetrics.docsRead.observeOne(docBytesRead);
-    });
+void ResourceConsumption::MetricsCollector::_incrementOneIdxEntryRead(StringData uri,
+                                                                      size_t bytesRead) {
+    _metrics.readMetrics.idxEntriesRead.observeOne(bytesRead);
+
+    LOGV2_DEBUG(6523901,
+                2,
+                "ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead",
+                "uri"_attr = uri,
+                "bytes"_attr = bytesRead);
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead(StringData uri,
-                                                                     size_t bytesRead) {
-    _doIfCollecting([&]() {
-        LOGV2_DEBUG(6523901,
-                    1,
-                    "ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead",
-                    "uri"_attr = uri,
-                    "bytes"_attr = bytesRead);
-        _metrics.readMetrics.idxEntriesRead.observeOne(bytesRead);
-    });
+void ResourceConsumption::MetricsCollector::_incrementKeysSorted(size_t keysSorted) {
+    _metrics.readMetrics.keysSorted += keysSorted;
+    LOGV2_DEBUG(6523902,
+                2,
+                "ResourceConsumption::MetricsCollector::incrementKeysSorted",
+                "keysSorted"_attr = keysSorted);
 }
 
-void ResourceConsumption::MetricsCollector::incrementKeysSorted(size_t keysSorted) {
-    _doIfCollecting([&]() {
-        LOGV2_DEBUG(6523902,
-                    1,
-                    "ResourceConsumption::MetricsCollector::incrementKeysSorted",
-                    "keysSorted"_attr = keysSorted);
-        _metrics.readMetrics.keysSorted += keysSorted;
-    });
+void ResourceConsumption::MetricsCollector::_incrementSorterSpills(size_t spills) {
+    _metrics.readMetrics.sorterSpills += spills;
+    LOGV2_DEBUG(6523903,
+                2,
+                "ResourceConsumption::MetricsCollector::incrementSorterSpills",
+                "spills"_attr = spills);
 }
 
-void ResourceConsumption::MetricsCollector::incrementSorterSpills(size_t spills) {
-    _doIfCollecting([&]() {
-        LOGV2_DEBUG(6523903,
-                    1,
-                    "ResourceConsumption::MetricsCollector::incrementSorterSpills",
-                    "spills"_attr = spills);
-        _metrics.readMetrics.sorterSpills += spills;
-    });
-}
-
-void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(
+void ResourceConsumption::MetricsCollector::_incrementDocUnitsReturned(
     StringData ns, DocumentUnitCounter docUnits) {
-    _doIfCollecting([&]() {
-        LOGV2_DEBUG(6523904,
-                    1,
-                    "ResourceConsumption::MetricsCollector::incrementDocUnitsReturned",
-                    "ns"_attr = ns,
-                    "docUnits"_attr = docUnits.units());
-        _metrics.readMetrics.docsReturned += docUnits;
-    });
+    _metrics.readMetrics.docsReturned += docUnits;
+    LOGV2_DEBUG(6523904,
+                2,
+                "ResourceConsumption::MetricsCollector::incrementDocUnitsReturned",
+                "ns"_attr = ns,
+                "docUnits"_attr = docUnits.units());
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneDocWritten(StringData uri,
-                                                                   size_t bytesWritten) {
-    _doIfCollecting([&] {
-        LOGV2_DEBUG(6523905,
-                    1,
-                    "ResourceConsumption::MetricsCollector::incrementOneDocWritten",
-                    "uri"_attr = uri,
-                    "bytesWritten"_attr = bytesWritten);
-        _metrics.writeMetrics.docsWritten.observeOne(bytesWritten);
-        _metrics.writeMetrics.totalWritten.observeOneDocument(bytesWritten);
-    });
+void ResourceConsumption::MetricsCollector::_incrementOneDocWritten(StringData uri,
+                                                                    size_t bytesWritten) {
+    _metrics.writeMetrics.docsWritten.observeOne(bytesWritten);
+    _metrics.writeMetrics.totalWritten.observeOneDocument(bytesWritten);
+    LOGV2_DEBUG(6523905,
+                2,
+                "ResourceConsumption::MetricsCollector::incrementOneDocWritten",
+                "uri"_attr = uri,
+                "bytesWritten"_attr = bytesWritten);
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten(StringData uri,
-                                                                        size_t bytesWritten) {
-    _doIfCollecting([&] {
-        LOGV2_DEBUG(6523906,
-                    1,
-                    "ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten",
-                    "uri"_attr = uri,
-                    "bytesWritten"_attr = bytesWritten);
-        _metrics.writeMetrics.idxEntriesWritten.observeOne(bytesWritten);
-        _metrics.writeMetrics.totalWritten.observeOneIndexEntry(bytesWritten);
-    });
+void ResourceConsumption::MetricsCollector::_incrementOneIdxEntryWritten(StringData uri,
+                                                                         size_t bytesWritten) {
+    _metrics.writeMetrics.idxEntriesWritten.observeOne(bytesWritten);
+    _metrics.writeMetrics.totalWritten.observeOneIndexEntry(bytesWritten);
+    LOGV2_DEBUG(6523906,
+                2,
+                "ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten",
+                "uri"_attr = uri,
+                "bytesWritten"_attr = bytesWritten);
+}
+
+void ResourceConsumption::MetricsCollector::_incrementOneCursorSeek(StringData uri) {
+    _metrics.readMetrics.cursorSeeks++;
+    LOGV2_DEBUG(6523907,
+                2,
+                "ResourceConsumption::MetricsCollector::incrementOneCursorSeek",
+                "uri"_attr = uri);
 }
 
 void ResourceConsumption::MetricsCollector::beginScopedCollecting(OperationContext* opCtx,
                                                                   const DatabaseName& dbName) {
     invariant(!isInScope());
     _dbName = dbName;
-    _collecting = ScopedCollectionState::kInScopeCollecting;
+    _collecting |= (ScopedCollectionState::kInScope | ScopedCollectionState::kCollecting);
     _hasCollectedMetrics = true;
 
     // We must clear the metrics here to ensure we do not accumulate metrics from previous scoped
@@ -356,18 +343,8 @@ bool ResourceConsumption::MetricsCollector::endScopedCollecting() {
     if (wasCollecting && _metrics.cpuTimer) {
         _metrics.cpuTimer->stop();
     }
-    _collecting = ScopedCollectionState::kInactive;
+    _collecting &= ~(ScopedCollectionState::kInScope | ScopedCollectionState::kCollecting);
     return wasCollecting;
-}
-
-void ResourceConsumption::MetricsCollector::incrementOneCursorSeek(StringData uri) {
-    _doIfCollecting([&] {
-        LOGV2_DEBUG(6523907,
-                    1,
-                    "ResourceConsumption::MetricsCollector::incrementOneCursorSeek",
-                    "uri"_attr = uri);
-        _metrics.readMetrics.cursorSeeks++;
-    });
 }
 
 ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationContext* opCtx,

@@ -54,6 +54,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
@@ -457,6 +458,7 @@ protected:
     const uint64_t _tableId;
     RecordId _lastReturnedId;  // If null, need to seek to first/last record.
     OperationContext* _opCtx;
+    ResourceConsumption::MetricsCollector* _metrics;
     const std::string _uri;
     const std::string _ident;
     boost::optional<WiredTigerCursor> _cursor;

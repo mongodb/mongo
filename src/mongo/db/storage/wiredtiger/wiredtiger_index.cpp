@@ -786,6 +786,7 @@ public:
     BulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx)
         : _ordering(idx->_ordering),
           _opCtx(opCtx),
+          _metrics(ResourceConsumption::MetricsCollector::get(opCtx)),
           _cursor(*WiredTigerRecoveryUnit::get(_opCtx), idx->uri()) {}
 
 protected:
@@ -795,6 +796,7 @@ protected:
 
     const Ordering _ordering;
     OperationContext* const _opCtx;
+    ResourceConsumption::MetricsCollector& _metrics;
     WiredTigerBulkLoadCursor _cursor;
 };
 
@@ -824,8 +826,7 @@ public:
         invariantWTOK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(_opCtx), _cursor.get()),
                       _cursor->session);
 
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneIdxEntryWritten(_cursor->uri, item.size);
+        _metrics.incrementOneIdxEntryWritten(_cursor->uri, item.size);
 
         return Status::OK();
     }
@@ -891,8 +892,7 @@ public:
         invariantWTOK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(_opCtx), _cursor.get()),
                       _cursor->session);
 
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneIdxEntryWritten(_cursor->uri, keyItem.size);
+        _metrics.incrementOneIdxEntryWritten(_cursor->uri, keyItem.size);
 
         // Don't copy the key again if dups are allowed.
         if (!_dupsAllowed)
@@ -944,8 +944,7 @@ public:
         invariantWTOK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(_opCtx), _cursor.get()),
                       _cursor->session);
 
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneIdxEntryWritten(_cursor->uri, keyItem.size);
+        _metrics.incrementOneIdxEntryWritten(_cursor->uri, keyItem.size);
 
         _previousKeyString.resetFromBuffer(newKeyString.getBuffer(), newKeyString.getSize());
         return Status::OK();
@@ -1212,8 +1211,7 @@ protected:
         }
         invariantWTOK(ret, c->session);
 
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneCursorSeek(c->uri);
+        _metrics->incrementOneCursorSeek(c->uri);
 
         _cursorAtEof = false;
 
