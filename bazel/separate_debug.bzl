@@ -90,6 +90,7 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib):
                     static_library = static_lib
                 ),
             ]),
+            user_link_flags = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags
         )
 
         linker_input_deps = []

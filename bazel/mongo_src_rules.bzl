@@ -324,6 +324,18 @@ def mongo_cc_library(
     if name != "tcmalloc_minimal":
         all_deps += TCMALLOC_DEPS
 
+    linux_rpath_flags = ['-Wl,-z,origin', '-Wl,--enable-new-dtags', '-Wl,-rpath,\\$$ORIGIN/../lib', "-Wl,-h,lib" + name + ".so"]
+    macos_rpath_flags = ['-Wl,-rpath,\\$$ORIGIN/../lib', "-Wl,-install_name,@rpath/lib" + name + ".so"]
+    rpath_flags = select({
+        "//bazel/config:linux_aarch64": linux_rpath_flags,
+        "//bazel/config:linux_x86_64": linux_rpath_flags,
+        "//bazel/config:linux_ppc64le":linux_rpath_flags,
+        "//bazel/config:linux_s390x": linux_rpath_flags,
+        "//bazel/config:windows_x86_64": [],
+        "//bazel/config:macos_x86_64": macos_rpath_flags,
+        "//bazel/config:macos_aarch64": macos_rpath_flags,
+    })
+
     native.cc_library(
         name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs,
@@ -334,7 +346,7 @@ def mongo_cc_library(
         copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
         data = data,
         tags = tags,
-        linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
+        linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts + rpath_flags,
         linkstatic = select({
             "@platforms//os:windows": True,
             "//conditions:default": linkstatic,

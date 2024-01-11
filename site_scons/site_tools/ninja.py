@@ -645,12 +645,16 @@ class NinjaState:
         }
 
         if self.env.get('BAZEL_BUILD_ENABLED'):
+
+            command = (
+                f"{sys.executable} site_scons/mongo/ninja_bazel_build.py " +
+                f"--ninja-file={self.env.get('NINJA_PREFIX')}.{self.env.get('NINJA_SUFFIX')} ")
+            if self.env.get('BAZEL_INTEGRATION_DEBUG'):
+                command += "--debug"
+
             self.rules.update({
                 "RUN_BAZEL_BUILD": {
-                    "command": (
-                        f"{sys.executable} " + "site_scons/mongo/ninja_bazel_build.py " +
-                        f"--ninja-file={self.env.get('NINJA_PREFIX')}.{self.env.get('NINJA_SUFFIX')} "
-                        + "--debug" if self.env.get('BAZEL_INTEGRATION_DEBUG') else ""),
+                    "command": command,
                     "description": "Running bazel build",
                     "pool": "console",
                     "restat": 1,
