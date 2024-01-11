@@ -15,6 +15,9 @@ build --nobuild_runfile_links
 # toolchain_suite elsewhere.
 build:linux --crosstool_top=@mongo_toolchain//:toolchain_suite
 
+# Dynamic linking on Windows (DLL generation) is currently not supported.
+build:windows --//bazel/config:linkstatic=True
+
 # remote execution is the default, but only mongodb employees will be able to access
 # the engflow cluster. External builders should use the local option below
 # remote execution configs

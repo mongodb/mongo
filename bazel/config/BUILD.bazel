@@ -21,6 +21,7 @@ load(
     "use_libcxx",
     "build_grpc",
     "separate_debug",
+    "linkstatic",
 )
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
@@ -115,6 +116,11 @@ config_setting(
         "@platforms//os:macos",
         "@platforms//cpu:aarch64",
     ],
+)
+
+selects.config_setting_group(
+    name = "not_windows",
+    match_any = ["@platforms//os:macos", "@platforms//os:linux"],
 )
 
 # ==========
@@ -708,4 +714,32 @@ config_setting(
     flag_values = {
         "//bazel/config:separate_debug": "True",
     },
+)
+
+# --------------------------------------
+# linkstatic options
+# --------------------------------------
+
+linkstatic(
+    name = "linkstatic",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "linkstatic_enabled",
+    flag_values = {
+        "//bazel/config:linkstatic": "True",
+    },
+)
+
+config_setting(
+    name = "linkstatic_disabled",
+    flag_values = {
+        "//bazel/config:linkstatic": "False",
+    },
+)
+
+selects.config_setting_group(
+    name = "linkdynamic_required_settings",
+    match_all = [":linkstatic_disabled", ":not_windows"],
 )

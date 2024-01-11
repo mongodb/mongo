@@ -182,6 +182,15 @@ FUZZER_SANITIZER_LINKFLAGS = select({
 }
 , no_match_error = GENERIC_SANITIZER_ERROR_MESSAGE + "fuzzer")
 
+REQUIRED_SETTINGS_DYNAMIC_LINK_ERROR_MESSAGE = (
+    "\nError:\n" +
+    "    linking mongo dynamically is not currently supported on Windows"
+)
+
+LINKSTATIC_ENABLED = select({
+    "//bazel/config:linkstatic_enabled": True,
+    "//bazel/config:linkdynamic_required_settings": False,
+}, no_match_error = REQUIRED_SETTINGS_DYNAMIC_LINK_ERROR_MESSAGE)
 
 SEPARATE_DEBUG_ENABLED = select({
     "//bazel/config:separate_debug_enabled": True,
@@ -308,9 +317,15 @@ def mongo_cc_library(
       copts: Any extra compiler options to pass in.
       linkopts: Any extra link options to pass in.
       linkstatic: Whether or not linkstatic should be passed to the native bazel cc_test rule. This argument
-        is ignored on windows since linking into DLLs is not currently supported.
+        is currently not supported. The mongo build must link entirely statically or entirely dynamically. This can be
+        configured via //config/bazel:linkstatic.
       local_defines: macro definitions passed to all source and header files.
     """
+
+    if linkstatic == True:
+        fail("""Linking specific targets statically is not supported.
+        The mongo build must link entirely statically or entirely dynamically. 
+        This can be configured via //config/bazel:linkstatic.""")
 
     # Avoid injecting into unwind/libunwind_asm to avoid a circular dependency.
     if name not in ["unwind", "tcmalloc_minimal"]:
@@ -347,10 +362,7 @@ def mongo_cc_library(
         data = data,
         tags = tags,
         linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts + rpath_flags,
-        linkstatic = select({
-            "@platforms//os:windows": True,
-            "//conditions:default": linkstatic,
-        }),
+        linkstatic = LINKSTATIC_ENABLED,
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         includes = [],
     )
@@ -388,9 +400,15 @@ def mongo_cc_binary(
       copts: Any extra compiler options to pass in.
       linkopts: Any extra link options to pass in.
       linkstatic: Whether or not linkstatic should be passed to the native bazel cc_test rule. This argument
-        is ignored on windows since linking into DLLs is not currently supported.
+        is currently not supported. The mongo build must link entirely statically or entirely dynamically. This can be
+        configured via //config/bazel:linkstatic.
       local_defines: macro definitions passed to all source and header files.
     """
+
+    if linkstatic == True:
+        fail("""Linking specific targets statically is not supported.
+        The mongo build must link entirely statically or entirely dynamically. 
+        This can be configured via //config/bazel:linkstatic.""")
 
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
@@ -407,10 +425,7 @@ def mongo_cc_binary(
         data = data,
         tags = tags,
         linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
-        linkstatic = select({
-            "@platforms//os:windows": True,
-            "//conditions:default": linkstatic,
-        }),
+        linkstatic = LINKSTATIC_ENABLED,
         local_defines = MONGO_GLOBAL_DEFINES + LIBUNWIND_DEFINES + local_defines,
         includes = [],
     )

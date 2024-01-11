@@ -403,7 +403,7 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         # === Build settings ===
 
-        static_link = env.GetOption("link-model") in ["auto", "static"]
+        linkstatic = env.GetOption("link-model") in ["auto", "static"]
 
         if env.GetOption("release") is not None:
             build_mode = "release"
@@ -432,7 +432,7 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--//bazel/config:use_glibcxx_debug={env.GetOption("use-glibcxx-debug") is not None}',
             f'--//bazel/config:build_grpc={True if env["ENABLE_GRPC_BUILD"] else False}',
             f'--//bazel/config:use_libcxx={env.GetOption("libc++") is not None}',
-            f'--dynamic_mode={"off" if static_link else "fully"}',
+            f'--//bazel/config:linkstatic={linkstatic}',
             f'--platforms=//bazel/platforms:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
             f'--host_platform=//bazel/platforms:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g

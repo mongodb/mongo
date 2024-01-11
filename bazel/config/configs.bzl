@@ -257,3 +257,17 @@ separate_debug = rule(
     implementation = lambda ctx: separate_debug_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# linkstatic
+# =========
+
+linkstatic_provider = provider(
+    doc = "Configures the entire build to link statically. Disabling this on windows is not supported.",
+    fields = ["enabled"],
+)
+
+linkstatic = rule(
+    implementation = lambda ctx: linkstatic_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
