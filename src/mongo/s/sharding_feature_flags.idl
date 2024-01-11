@@ -114,3 +114,13 @@ feature_flags:
     default: true
     version: 7.3
     shouldBeFCVGated: true
+  # TODO (SERVER-83704): Remove once 8.0 becomes last LTS.
+  featureFlagPlacementHistoryPostFCV73 :
+    description: "Feature flag that marks a version change in the logic that generates config.placementHistory;
+                  it causes such a collection to be reinitialized on FCV upgrade and placement history queries
+                  to be redirected to config.shards prior to the reinitialization."
+    cpp_varname: feature_flags::gPlacementHistoryPostFCV3
+    default: true
+    version: 7.3
+    shouldBeFCVGated: true
+

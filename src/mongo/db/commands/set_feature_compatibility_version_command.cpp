@@ -748,6 +748,7 @@ private:
             _setShardedClusterCardinalityParameter(opCtx, requestedVersion);
             // TODO (SERVER-83264): Remove once 8.0 becomes last LTS.
             _upgradeConfigSettingsSchema(opCtx, requestedVersion);
+            _initializePlacementHistory(opCtx, requestedVersion);
         }
 
         // TODO SERVER-80490: Remove this once 8.0 is released.
@@ -762,6 +763,17 @@ private:
             LOGV2(8260900, "Updating schema on config.settings");
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->upgradeDowngradeConfigSettings(opCtx));
+        }
+    }
+
+    // TODO (SERVER-83704): Remove this function once 8.0 becomes last LTS.
+    void _initializePlacementHistory(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        const auto& [originalVersion, _] = getTransitionFCVFromAndTo(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion());
+        if (feature_flags::gPlacementHistoryPostFCV3.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+                requestedVersion, originalVersion)) {
+            ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
         }
     }
 
