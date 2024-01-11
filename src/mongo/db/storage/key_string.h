@@ -415,11 +415,6 @@ public:
     template <class T>
     int compareWithoutRecordIdStr(const T& other) const;
 
-    /**
-     * Compare with another key_string::Value, ignoring the Discriminator byte of both.
-     */
-    int compareWithoutDiscriminator(const Value& other) const;
-
     // Returns the size of the stored KeyString.
     size_t getSize() const {
         return _ksSize;
@@ -1101,11 +1096,6 @@ size_t sizeWithoutRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize);
  * the RecordId.
  */
 size_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize);
-
-/**
- * Given a KeyString, returns the length of the section without the discriminator.
- */
-size_t sizeWithoutDiscriminatorAtEnd(const void* bufferRaw, size_t bufSize);
 
 /**
  * Decodes a RecordId, consuming all bytes needed from reader.
