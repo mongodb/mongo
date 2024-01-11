@@ -2,8 +2,6 @@
  * Tests boolean expression simplifer produces expected results.
  * @tags: [
  * requires_fcv_72,
- * # TODO SERVER-76509: Enable Boolean expression simplification in Bonsai.
- * cqf_incompatible,
  * # explain command, used by the test, does not support majority read concern.
  *  assumes_read_concern_local,
  * ]

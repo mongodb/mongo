@@ -24,8 +24,6 @@ for (let i = 0; i < 100; i++) {
         [
             {key: 'internalCascadesOptimizerExplainVersion', value: "v2"},
             {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true},
-            // TODO SERVER-76509: Enable simplification for filter node expressions.
-            {key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}
         ],
         () => t.explain("executionStats").find({$and: [{a: 1}, {a: 1}]}).finish());
     assert.eq(1, res.executionStats.nReturned);
@@ -35,11 +33,11 @@ for (let i = 0; i < 100; i++) {
         `Root [{scan_0}]
 Filter []
 |   EvalFilter []
-|   |   Variable [evalTemp_2]
+|   |   Variable [evalTemp_0]
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [1]
-PhysicalScan [{'<root>': scan_0, 'a': evalTemp_2}, cqf_redundant_condition_]
+PhysicalScan [{'<root>': scan_0, 'a': evalTemp_0}, cqf_redundant_condition_]
 `;
     const actualStr = removeUUIDsFromExplain(db, res);
     assert.eq(expectedStr, actualStr);

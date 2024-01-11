@@ -1,5 +1,7 @@
 import {getAggPlanStage, getQueryPlanner, isAggregationPlan} from "jstests/libs/analyze_plan.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 /**
  * Utility for checking if the Cascades optimizer code path is enabled (checks framework control).
@@ -385,6 +387,10 @@ export function runWithFastPathsDisabled(fn) {
     return runWithParams(disableFastPath, fn);
 }
 
+// TODO SERVER-84743: Consolidate the following two functions.
+/**
+ * This is meant to be used by standalone passthrough tests, no need to pass in the db variable.
+ */
 export function runWithParams(keyValPairs, fn) {
     let prevVals = [];
 
@@ -416,6 +422,38 @@ export function runWithParams(keyValPairs, fn) {
             setParamObj[flag] = prevVals[i];
 
             assert.commandWorked(db.adminCommand(setParamObj));
+        }
+    }
+}
+
+/**
+ * This can be used for both standalone and sharded cases.
+ */
+export function runWithParamsAllNodes(db, keyValPairs, fn) {
+    let prevVals = [];
+
+    try {
+        for (let i = 0; i < keyValPairs.length; i++) {
+            const flag = keyValPairs[i].key;
+            const valIn = keyValPairs[i].value;
+            const val = (typeof valIn === 'object') ? JSON.stringify(valIn) : valIn;
+
+            let getParamObj = {};
+            getParamObj["getParameter"] = 1;
+            getParamObj[flag] = 1;
+            const prevVal = db.adminCommand(getParamObj);
+            prevVals.push(prevVal[flag]);
+
+            setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), flag, val);
+        }
+
+        return fn();
+    } finally {
+        for (let i = 0; i < keyValPairs.length; i++) {
+            const flag = keyValPairs[i].key;
+
+            setParameterOnAllHosts(
+                DiscoverTopology.findNonConfigNodes(db.getMongo()), flag, prevVals[i]);
         }
     }
 }

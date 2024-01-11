@@ -11,7 +11,7 @@ import {
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {
     leftmostLeafStage,
-    runWithParams,
+    runWithParamsAllNodes,
     usedBonsaiOptimizer
 } from "jstests/libs/optimizer_utils.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
@@ -200,32 +200,48 @@ function analyzeExplain(
     }
 }
 
-function analyzeFindExplain(coll,
+function analyzeFindExplain(db,
+                            coll,
                             expectedStandaloneStages,
                             expectedShardedStages,
                             expectedDir,
                             isSharded,
                             query,
                             projection = {},
-                            hint = {}) {
-    let explain = coll.find(query, projection).hint(hint).explain();
+                            hint = {},
+                            disableSargableRewrites = true) {
+    let explain =
+        runWithParamsAllNodes(db,
+                              [{
+                                  key: "internalCascadesOptimizerDisableSargableWhenNoIndexes",
+                                  value: disableSargableRewrites
+                              }],
+                              () => coll.explain().find(query, projection).hint(hint).finish());
     analyzeExplain(
         explain, expectedStandaloneStages, expectedShardedStages, expectedDir, isSharded);
 }
 
-function analyzeAggExplain(coll,
+function analyzeAggExplain(db,
+                           coll,
                            expectedStandaloneStages,
                            expectedShardedStages,
                            expectedDir,
                            isSharded,
                            pipeline,
-                           hint = {}) {
+                           hint = {},
+                           disableSargableRewrites = true) {
     let cmd = {aggregate: coll.getName(), pipeline: pipeline, explain: true};
     if (Object.keys(hint).length > 0) {
         cmd.hint = hint;
     }
 
-    let explain = assert.commandWorked(coll.runCommand(cmd));
+    let explain =
+        runWithParamsAllNodes(db,
+                              [{
+                                  key: "internalCascadesOptimizerDisableSargableWhenNoIndexes",
+                                  value: disableSargableRewrites
+                              }],
+                              () => coll.runCommand(cmd));
     analyzeExplain(
         explain, expectedStandaloneStages, expectedShardedStages, expectedDir, isSharded);
 }
@@ -236,7 +252,8 @@ function runTest(db, coll, isSharded) {
     const emptyColl = db.empty_coll;
     emptyColl.drop();
     // Empty collection should have EOF as explain, find.
-    analyzeFindExplain(emptyColl,
+    analyzeFindExplain(db,
+                       emptyColl,
                        ["EOF"] /* expectedStandaloneStages */,
                        ["EOF"] /* expectedShardedStages */,
                        null /* expectedDir, shouldn't be checked for this case */,
@@ -246,7 +263,8 @@ function runTest(db, coll, isSharded) {
                        {} /* hint */);
 
     // Empty collection should have EOF as explain, agg.
-    analyzeAggExplain(emptyColl,
+    analyzeAggExplain(db,
+                      emptyColl,
                       ["EOF"] /* expectedStandaloneStages */,
                       ["EOF"] /* expectedShardedStages */,
                       null /* expectedDir, shouldn't be checked for this case */,
@@ -258,31 +276,38 @@ function runTest(db, coll, isSharded) {
     contradictionColl.drop();
     // The queries below against this collection will hint a collection scan, so they will go
     // through Bonsai. The index metadata information will tell us that a is non-multikey so the
-    // query is a contradiction and will therefore result in an EOF plan.
+    // query is a contradiction and will therefore result in an EOF plan. Note that we need to
+    // explicitly allow the query to go through saragable rewrites since by default M2 queries do
+    // not go through them.
     contradictionColl.insert({a: 10});
     contradictionColl.createIndex({a: 1});
 
     // Contradiction plan results in EOF plan, find.
-    analyzeFindExplain(contradictionColl,
+    analyzeFindExplain(db,
+                       contradictionColl,
                        ["EOF"] /* expectedStandaloneStages */,
                        ["EOF"] /* expectedShardedStages */,
                        null /* expectedDir */,
                        isSharded,
                        {$and: [{a: 2}, {a: 3}]} /* query */,
                        {} /* projection */,
-                       {$natural: 1} /* hint */);
+                       {$natural: 1} /* hint */,
+                       false /* disableSargableRewrites */);
 
     // Contradiction plan results in EOF plan, agg.
-    analyzeAggExplain(contradictionColl,
+    analyzeAggExplain(db,
+                      contradictionColl,
                       ["EOF"] /* expectedStandaloneStages */,
                       ["EOF"] /* expectedShardedStages */,
                       null /* expectedDir */,
                       isSharded,
                       [{$match: {$and: [{a: 2}, {a: 3}]}}] /* pipeline */,
-                      {$natural: 1} /* hint */);
+                      {$natural: 1} /* hint */,
+                      false /* disableSargableRewrites */);
 
     // Hinted forward scan, find.
-    analyzeFindExplain(coll,
+    analyzeFindExplain(db,
+                       coll,
                        ["ROOT", "COLLSCAN"] /* expectedStandaloneStages */,
                        ["ROOT", "FILTER", "COLLSCAN"] /* expectedShardedStages */,
                        kForwardDir /* expectedDir */,
@@ -292,7 +317,8 @@ function runTest(db, coll, isSharded) {
                        {$natural: 1} /* hint */);
 
     // Hinted foward scan, agg.
-    analyzeAggExplain(coll,
+    analyzeAggExplain(db,
+                      coll,
                       ["ROOT", "COLLSCAN"] /* expectedStandaloneStages */,
                       ["ROOT", "FILTER", "COLLSCAN"] /* expectedShardedStages */,
                       kForwardDir /* expectedDir */,
@@ -301,7 +327,8 @@ function runTest(db, coll, isSharded) {
                       {$natural: 1} /* hint */);
 
     // Hinted backward scan, find.
-    analyzeFindExplain(coll,
+    analyzeFindExplain(db,
+                       coll,
                        ["ROOT", "COLLSCAN"] /* expectedStandaloneStages */,
                        ["ROOT", "FILTER", "COLLSCAN"] /* expectedShardedStages */,
                        kBackwardDir /* expectedDir */,
@@ -311,7 +338,8 @@ function runTest(db, coll, isSharded) {
                        {$natural: -1} /* hint */);
 
     // Hinted backward scan, agg.
-    analyzeAggExplain(coll,
+    analyzeAggExplain(db,
+                      coll,
                       ["ROOT", "COLLSCAN"] /* expectedStandaloneStages */,
                       ["ROOT", "FILTER", "COLLSCAN"] /* expectedShardedStages */,
                       kBackwardDir /* expectedDir */,
@@ -321,6 +349,7 @@ function runTest(db, coll, isSharded) {
 
     // Query that should have more interesting stages in the explain output, find.
     analyzeFindExplain(
+        db,
         coll,
         ["ROOT", "EVALUATION", "FILTER", "COLLSCAN"] /* expectedStandaloneStages */,
         ["ROOT", "EVALUATION", "FILTER", "FILTER", "COLLSCAN"] /* expectedShardedStages */,
@@ -332,6 +361,7 @@ function runTest(db, coll, isSharded) {
 
     // Query that should have more interesting stages in the explain output, agg.
     analyzeAggExplain(
+        db,
         coll,
         ["ROOT", "EVALUATION", "FILTER", "COLLSCAN"] /* expectedStandaloneStages */,
         ["ROOT", "EVALUATION", "FILTER", "FILTER", "COLLSCAN"] /* expectedShardedStages */,
@@ -342,8 +372,13 @@ function runTest(db, coll, isSharded) {
 
     // Test that the maxPSRCountReached field is populated as expected: false for the first query
     // where there is only one predicate and true for the second where there are 11 (the current
-    // limit is 10).
-    let explain = coll.find({$or: [{a: {$lt: 100}}]}).explain();
+    // limit is 10). Note that we need to explicitly allow the queries to go through saragable
+    // rewrites since by default M2 queries do not go through them.
+
+    let explain = runWithParamsAllNodes(
+        db,
+        [{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}],
+        () => coll.explain().find({$or: [{a: {$lt: 100}}]}).finish());
     analyzeTopLevelExplain(explain, isSharded, false /* expectedMaxPSRCountReached */, {
         "filter": {"a": {"$lt": 100}}
     } /* expectedParsedQuery */);
@@ -351,7 +386,11 @@ function runTest(db, coll, isSharded) {
     // We create an index and use a $natural hint to ensure that the rewrite during which this case
     // could be reached happens.
     assert.commandWorked(coll.createIndex({a: 1}));
-    explain = coll.find({
+    explain = runWithParamsAllNodes(
+        db,
+        [{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}],
+        () => coll.explain()
+                  .find({
                       $or: [
                           {a: {$lt: 100}},
                           {b: {$gt: 0}},
@@ -367,7 +406,7 @@ function runTest(db, coll, isSharded) {
                       ]
                   })
                   .hint({$natural: 1})
-                  .explain();
+                  .finish());
     analyzeTopLevelExplain(explain, isSharded, true /* expectedMaxPSRCountReached */, {
         "filter": {
             "$or": [
@@ -451,9 +490,6 @@ let conn = MongoRunner.runMongod({
     setParameter: {
         featureFlagCommonQueryFramework: true,
         "failpoint.enableExplainInBonsai": tojson({mode: "alwaysOn"}),
-        // TODO SERVER-76509: Remove once we are simplifying expressions without Filter -> Sargable
-        // rewrite.
-        internalCascadesOptimizerDisableSargableWhenNoIndexes: false
     }
 });
 assert.neq(null, conn, "mongod was unable to start up");
@@ -471,17 +507,11 @@ let shardingConn = new ShardingTest({
             setParameter: {
                 "failpoint.enableExplainInBonsai": tojson({mode: "alwaysOn"}),
                 featureFlagCommonQueryFramework: true,
-                // TODO SERVER-76509: Remove once we are simplifying expressions without Filter ->
-                // Sargable rewrite.
-                internalCascadesOptimizerDisableSargableWhenNoIndexes: false
             }
         },
         mongosOptions: {
             setParameter: {
                 featureFlagCommonQueryFramework: true,
-                // TODO SERVER-76509: Remove once we are simplifying expressions without Filter ->
-                // Sargable rewrite.
-                internalCascadesOptimizerDisableSargableWhenNoIndexes: false
             }
         },
     }

@@ -75,21 +75,6 @@ boost::optional<size_t> loadMaxMatchExpressionParams() {
     return boost::none;
 }
 
-bool isBonsaiEnabled(QueryFrameworkControlEnum frameworkControl) {
-    switch (frameworkControl) {
-        case QueryFrameworkControlEnum::kForceClassicEngine:
-        case QueryFrameworkControlEnum::kTrySbeEngine:
-        case QueryFrameworkControlEnum::kTrySbeRestricted:
-            return false;
-        case QueryFrameworkControlEnum::kTryBonsai:
-        case QueryFrameworkControlEnum::kTryBonsaiExperimental:
-        case QueryFrameworkControlEnum::kForceBonsai:
-            return true;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
 }  // namespace
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx,
@@ -196,10 +181,9 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     _forceClassicEngine = frameworkControl == QueryFrameworkControlEnum::kForceClassicEngine;
 
     if (optimizeMatchExpression) {
-        // TODO SERVER-76509: Enable Boolean expression simplification in Bonsai.
-        _primaryMatchExpression = MatchExpression::normalize(
-            std::move(parsedFind->filter),
-            /* enableSimplification*/ !_expCtx->inLookup && !isBonsaiEnabled(frameworkControl));
+        _primaryMatchExpression =
+            MatchExpression::normalize(std::move(parsedFind->filter),
+                                       /* enableSimplification*/ !_expCtx->inLookup);
     } else {
         _primaryMatchExpression = std::move(parsedFind->filter);
     }
