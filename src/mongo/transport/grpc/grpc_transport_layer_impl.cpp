@@ -36,6 +36,7 @@
 #include "mongo/transport/grpc/service.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/net/ssl_options.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -140,7 +141,7 @@ Status GRPCTransportLayerImpl::setup() {
             _server = std::make_unique<Server>(std::move(services), serverOptions);
         }
         if (_options.enableEgress) {
-            GRPCClient::Options clientOptions;
+            GRPCClient::Options clientOptions{};
 
             if (!sslGlobalParams.sslCAFile.empty()) {
                 clientOptions.tlsCAFile = sslGlobalParams.sslCAFile;
@@ -148,6 +149,8 @@ Status GRPCTransportLayerImpl::setup() {
             if (!sslGlobalParams.sslPEMKeyFile.empty()) {
                 clientOptions.tlsCertificateKeyFile = sslGlobalParams.sslPEMKeyFile;
             }
+            clientOptions.tlsAllowInvalidHostnames = sslGlobalParams.sslAllowInvalidHostnames;
+            clientOptions.tlsAllowInvalidCertificates = sslGlobalParams.sslAllowInvalidCertificates;
             iassert(ErrorCodes::InvalidOptions,
                     "gRPC egress networking enabled but no client metadata document was provided",
                     _options.clientMetadata.has_value());

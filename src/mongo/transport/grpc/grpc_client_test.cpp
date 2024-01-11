@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/grpc/mock_client.h"
@@ -48,6 +49,8 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 namespace mongo::transport::grpc {
 
 class GRPCClientTest : public ServiceContextTest {
@@ -60,6 +63,103 @@ public:
         GRPCClient::Options options = CommandServiceTestFixtures::makeClientOptions()) {
         return std::make_shared<GRPCClient>(
             nullptr /* transport layer */, makeClientMetadataDocument(), std::move(options));
+    }
+
+    /**
+     * Tests that a client with the given options validates different server certificate
+     * configurations as expected.
+     *
+     *  - validServerCertSucceeds determines whether we should expect the client to successfully
+     *    connect to a server with a valid TLS certificate.
+     *
+     *  - mismatchedServerNameSucceeds determines whether we should expect the client to
+     *    successfully connect to a server with a hostname not included in its certificate.
+     *
+     *  - differentCAServerCertSucceeds determines whether we should expect the client to
+     *    successfully connect to a server whose certificate is signed by a separate CA.
+     *
+     *  - bothSucceeds determines whether we should expect the client to successfully connect to a
+     *    server whose certificate does not include its hostname and is signed by a different CA.
+     */
+    void runCertificateValidationTest(GRPCClient::Options options,
+                                      bool validServerCertSucceeds,
+                                      bool mismatchedServerNameSucceeds,
+                                      bool differentCAServerCertSucceeds,
+                                      bool bothSucceeds) {
+        struct CertificateValidationTestCase {
+            StringData description;
+            Server::Options serverOptions;
+            bool shouldSucceed;
+        };
+
+        std::vector<CertificateValidationTestCase> cases = {
+            {"Valid server certificate",
+             CommandServiceTestFixtures::makeServerOptions(),
+             validServerCertSucceeds},
+            {
+                "Mismatched server name",
+                []() {
+                    auto options = CommandServiceTestFixtures::makeServerOptions();
+                    options.tlsCertificateKeyFile = "jstests/libs/server.pem";
+                    // ::1 is not included as a server name in server.pem.
+                    options.addresses = {HostAndPort("::1", test::kLetKernelChoosePort)};
+                    return options;
+                }(),
+                mismatchedServerNameSucceeds,
+            },
+            {
+                "Different CAs",
+                []() {
+                    auto options = CommandServiceTestFixtures::makeServerOptions();
+                    // The client uses jstests/libs/ca.pem by default.
+                    options.tlsCAFile = "jstests/libs/ecdsa-ca.pem";
+                    options.tlsCertificateKeyFile = "jstests/libs/ecdsa-server.pem";
+                    return options;
+                }(),
+                differentCAServerCertSucceeds,
+            },
+            {
+                "Mismatched server name and different CAs",
+                []() {
+                    auto options = CommandServiceTestFixtures::makeServerOptions();
+                    options.tlsCertificateKeyFile = "jstests/libs/ecdsa-server.pem";
+                    options.tlsCAFile = "jstests/libs/ecdsa-ca.pem";
+                    options.addresses = {HostAndPort("::1", test::kLetKernelChoosePort)};
+                    return options;
+                }(),
+                bothSucceeds,
+            }};
+
+
+        auto makeClientThreadBody = [&](bool shouldSucceed) {
+            return [&, shouldSucceed](auto& server, auto& monitor) {
+                auto client = makeClient(options);
+                client->start(getServiceContext());
+
+                auto makeSession = [&](Milliseconds timeout) {
+                    auto session =
+                        client->connect(server.getListeningAddresses().at(0), timeout, {});
+                    ASSERT_OK(session->finish());
+                };
+
+                if (shouldSucceed) {
+                    ASSERT_DOES_NOT_THROW(
+                        makeSession(CommandServiceTestFixtures::kDefaultConnectTimeout));
+                } else {
+                    // Use a shorter timeout for connections that are intended to fail.
+                    ASSERT_THROWS(makeSession(Milliseconds(50)), DBException);
+                }
+            };
+        };
+
+        for (auto& testCase : cases) {
+            LOGV2(8471201,
+                  "Running certificate validation test case",
+                  "description"_attr = testCase.description);
+            testCase.serverOptions.tlsAllowConnectionsWithoutCertificates = true;
+            CommandServiceTestFixtures::runWithServer(
+                [](auto) {}, makeClientThreadBody(testCase.shouldSucceed), testCase.serverOptions);
+        }
     }
 };
 
@@ -124,16 +224,47 @@ TEST_F(GRPCClientTest, GRPCClientConnectNoClientCertificate) {
         auto session = client->connect(server.getListeningAddresses().at(0),
                                        CommandServiceTestFixtures::kDefaultConnectTimeout,
                                        {});
-        auto msg = makeUniqueMessage();
-        ASSERT_OK(session->sinkMessage(msg));
-        auto swMsgReceived = session->sourceMessage();
-        ASSERT_OK(swMsgReceived);
-        ASSERT_EQ_MSG(swMsgReceived.getValue(), msg);
+        assertEchoSucceeds(*session);
         ASSERT_OK(session->finish());
     };
 
     CommandServiceTestFixtures::runWithServer(
         CommandServiceTestFixtures::makeEchoHandler(), clientThreadBody, std::move(options));
+}
+
+TEST_F(GRPCClientTest, CertificateValidationDefault) {
+    GRPCClient::Options options{};
+    options.tlsCAFile = CommandServiceTestFixtures::kCAFile;
+
+    runCertificateValidationTest(options,
+                                 /* validServerCertSucceeds= */ true,
+                                 /* mismatchedServerNameSucceeds= */ false,
+                                 /* differentCAServerCertSucceeds= */ false,
+                                 /* bothSucceeds= */ false);
+}
+
+TEST_F(GRPCClientTest, CertificateValidationAllowInvalidCertificates) {
+    GRPCClient::Options options{};
+    options.tlsCAFile = CommandServiceTestFixtures::kCAFile;
+    options.tlsAllowInvalidCertificates = true;
+
+    runCertificateValidationTest(options,
+                                 /* validServerCertSucceeds= */ true,
+                                 /* mismatchedServerNameSucceeds= */ true,
+                                 /* differentCAServerCertSucceeds= */ true,
+                                 /* bothSucceeds= */ true);
+}
+
+TEST_F(GRPCClientTest, CertificateValidationAllowInvalidHostnames) {
+    GRPCClient::Options options{};
+    options.tlsCAFile = CommandServiceTestFixtures::kCAFile;
+    options.tlsAllowInvalidHostnames = true;
+
+    runCertificateValidationTest(options,
+                                 /* validServerCertSucceeds= */ true,
+                                 /* mismatchedServerNameSucceeds= */ true,
+                                 /* differentCAServerCertSucceeds= */ false,
+                                 /* bothSucceeds= */ false);
 }
 
 TEST_F(GRPCClientTest, GRPCClientConnectAuthToken) {

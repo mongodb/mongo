@@ -239,7 +239,7 @@ public:
     }
 
     static GRPCClient::Options makeClientOptions() {
-        GRPCClient::Options options;
+        GRPCClient::Options options{};
         options.tlsCAFile = kCAFile;
         options.tlsCertificateKeyFile = kClientCertificateKeyFile;
         return options;
@@ -324,7 +324,8 @@ public:
                 }
             });
 
-            auto clientThread = monitor.spawn([&] { clientThreadBody(servers, monitor); });
+            auto clientThread =
+                monitor.spawn([&] { ASSERT_DOES_NOT_THROW(clientThreadBody(servers, monitor)); });
             clientThread.join();
         });
     }

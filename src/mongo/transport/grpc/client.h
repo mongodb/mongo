@@ -129,6 +129,8 @@ public:
     struct Options {
         boost::optional<StringData> tlsCAFile;
         boost::optional<StringData> tlsCertificateKeyFile;
+        bool tlsAllowInvalidCertificates = false;
+        bool tlsAllowInvalidHostnames = false;
     };
 
     GRPCClient(TransportLayer* tl, const BSONObj& clientMetadata, Options options);
