@@ -204,6 +204,18 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
             kwargs["serverSelectionTimeoutMS"] = timeout_millis
             kwargs["connect"] = True
 
+        if self.config.TLS_MODE == "requireTLS":
+            # When server is in 'tlsMode == requireTLS`,
+            # the client would be unable to connect
+            # without local TLS being explicitly turned on.
+            # Other modes, such as 'allowTLS' permit both tls and non-tls clients.
+            kwargs["tls"] = True
+            kwargs["tlsAllowInvalidHostnames"] = True
+            if self.config.TLS_CA_FILE:
+                kwargs["tlsCAFile"] = self.config.TLS_CA_FILE
+            if self.config.SHELL_TLS_CERTIFICATE_KEY_FILE:
+                kwargs["tlsCertificateKeyFile"] = self.config.SHELL_TLS_CERTIFICATE_KEY_FILE
+
         return pymongo.MongoClient(host=self.get_driver_connection_url(),
                                    read_preference=read_preference, **kwargs)
 

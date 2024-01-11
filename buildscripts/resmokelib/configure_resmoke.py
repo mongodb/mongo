@@ -147,6 +147,20 @@ def _validate_config(parser):
         if not os.access(resolved_path, os.X_OK):
             parser.error(f"Found '{resolved_path}', but it is not an executable file")
 
+    if not _config.TLS_MODE or _config.TLS_MODE == "disabled":
+        if _config.SHELL_TLS_ENABLED:
+            parser.error("--shellTls requires server TLS to be enabled")
+        if _config.TLS_CA_FILE:
+            parser.error("--tlsCAFile requires server TLS to be enabled")
+        if _config.MONGOD_TLS_CERTIFICATE_KEY_FILE:
+            parser.error("--mongodTlsCertificateKeyFile requires server TLS to be enabled")
+        if _config.MONGOS_TLS_CERTIFICATE_KEY_FILE:
+            parser.error("--mongosTlsCertificateKeyFile requires server TLS to be enabled")
+
+    if not _config.SHELL_TLS_ENABLED:
+        if _config.SHELL_TLS_CERTIFICATE_KEY_FILE:
+            parser.error("--shellTlsCertificateKeyFile requires --shellTls")
+
 
 def _find_resmoke_wrappers():
     # This is technically incorrect. PREFIX_BINDIR defaults to $PREFIX/bin, so
@@ -405,6 +419,12 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("num_clients_per_fixture")
     _config.USE_TENANT_CLIENT = config.pop("use_tenant_client")
     _config.NUM_REPLSET_NODES = config.pop("num_replset_nodes")
+    _config.TLS_MODE = config.pop("tls_mode")
+    _config.TLS_CA_FILE = config.pop("tls_ca_file")
+    _config.SHELL_TLS_ENABLED = config.pop("shell_tls_enabled")
+    _config.SHELL_TLS_CERTIFICATE_KEY_FILE = config.pop("shell_tls_certificate_key_file")
+    _config.MONGOD_TLS_CERTIFICATE_KEY_FILE = config.pop("mongod_tls_certificate_key_file")
+    _config.MONGOS_TLS_CERTIFICATE_KEY_FILE = config.pop("mongos_tls_certificate_key_file")
     _config.NUM_SHARDS = config.pop("num_shards")
     _config.CONFIG_SHARD = utils.pick_catalog_shard_node(
         config.pop("config_shard"), _config.NUM_SHARDS)

@@ -41,6 +41,20 @@ export function mergeOptions(obj1, obj2) {
 //
 export var getCmdLineOptsBaseMongod;
 
+function _containsNestedKey(obj, ...path) {
+    if (!obj) {
+        return false;
+    }
+    let travel = obj;
+    for (let key of path) {
+        if (!travel.hasOwnProperty(key)) {
+            return false;
+        }
+        travel = travel[key];
+    }
+    return true;
+}
+
 export function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
     // Get the options object returned by "getCmdLineOpts" when we spawn a mongod using our test
     // framework without passing any additional options.  We need this because the framework adds
@@ -62,27 +76,6 @@ export function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
         getCmdLineOptsBaseMongod = getBaseOptsObject();
     }
 
-    // Get base command line opts.  Needed because the framework adds its own options
-    var getCmdLineOptsExpected = getCmdLineOptsBaseMongod;
-
-    // Delete port and dbPath if we are not explicitly setting them, since they will change on
-    // multiple runs of the test framework and cause false failures.
-    if (typeof expectedResult.parsed === "undefined" ||
-        typeof expectedResult.parsed.net === "undefined" ||
-        typeof expectedResult.parsed.net.port === "undefined") {
-        delete getCmdLineOptsExpected.parsed.net.port;
-    }
-    if (typeof expectedResult.parsed === "undefined" ||
-        typeof expectedResult.parsed.storage === "undefined" ||
-        typeof expectedResult.parsed.storage.dbPath === "undefined") {
-        delete getCmdLineOptsExpected.parsed.storage.dbPath;
-    }
-    // Delete backtraceLogFile parameter, since we are generating unique value every time
-    delete getCmdLineOptsExpected.parsed.setParameter.backtraceLogFile;
-
-    // Merge with the result that we expect
-    expectedResult = mergeOptions(getCmdLineOptsExpected, expectedResult);
-
     // Start mongod with options
     var mongod = MongoRunner.runMongod(mongoRunnerConfig);
 
@@ -96,23 +89,35 @@ export function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
     } catch (ex) {
     }
 
+    // Get base command line opts.  Needed because the framework adds its own options
+    var getCmdLineOptsExpected = getCmdLineOptsBaseMongod;
     // Get the parsed options
     var getCmdLineOptsResult = mongod.adminCommand("getCmdLineOpts");
 
     // Delete port and dbPath if we are not explicitly setting them, since they will change on
     // multiple runs of the test framework and cause false failures.
-    if (typeof expectedResult.parsed === "undefined" ||
-        typeof expectedResult.parsed.net === "undefined" ||
-        typeof expectedResult.parsed.net.port === "undefined") {
+    if (!_containsNestedKey(expectedResult, "parsed", "net", "port")) {
+        delete getCmdLineOptsExpected.parsed.net.port;
         delete getCmdLineOptsResult.parsed.net.port;
     }
-    if (typeof expectedResult.parsed === "undefined" ||
-        typeof expectedResult.parsed.storage === "undefined" ||
-        typeof expectedResult.parsed.storage.dbPath === "undefined") {
+    if (!_containsNestedKey(expectedResult, "parsed", "net", "grpc", "port")) {
+        if (_containsNestedKey(getCmdLineOptsExpected, "parsed", "net", "grpc", "port")) {
+            delete getCmdLineOptsExpected.parsed.net.grpc.port;
+        }
+        if (_containsNestedKey(getCmdLineOptsResult, "parsed", "net", "grpc", "port")) {
+            delete getCmdLineOptsResult.parsed.net.grpc.port;
+        }
+    }
+    if (!_containsNestedKey(expectedResult, "parsed", "storage", "dbPath")) {
+        delete getCmdLineOptsExpected.parsed.storage.dbPath;
         delete getCmdLineOptsResult.parsed.storage.dbPath;
     }
     // Delete backtraceLogFile parameter, since we are generating unique value every time
+    delete getCmdLineOptsExpected.parsed.setParameter.backtraceLogFile;
     delete getCmdLineOptsResult.parsed.setParameter.backtraceLogFile;
+
+    // Merge with the result that we expect
+    expectedResult = mergeOptions(getCmdLineOptsExpected, expectedResult);
 
     // Make sure the options are equal to what we expect
     assert.docEq(expectedResult.parsed, getCmdLineOptsResult.parsed);
@@ -182,28 +187,26 @@ export function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
 
     // Get base command line opts.  Needed because the framework adds its own options
     var getCmdLineOptsExpected = getCmdLineOptsBaseMongos;
-
-    // Delete port if we are not explicitly setting it, since it will change on multiple runs of the
-    // test framework and cause false failures.
-    if (typeof expectedResult.parsed === "undefined" ||
-        typeof expectedResult.parsed.net === "undefined" ||
-        typeof expectedResult.parsed.net.port === "undefined") {
-        delete getCmdLineOptsExpected.parsed.net.port;
-    }
-
-    // Merge with the result that we expect
-    expectedResult = mergeOptions(getCmdLineOptsExpected, expectedResult);
-
     // Get the parsed options
     var getCmdLineOptsResult = getCmdLineOptsFromMongos(mongoRunnerConfig);
 
     // Delete port if we are not explicitly setting it, since it will change on multiple runs of the
     // test framework and cause false failures.
-    if (typeof expectedResult.parsed === "undefined" ||
-        typeof expectedResult.parsed.net === "undefined" ||
-        typeof expectedResult.parsed.net.port === "undefined") {
+    if (!_containsNestedKey(expectedResult, "parsed", "net", "port")) {
         delete getCmdLineOptsResult.parsed.net.port;
+        delete getCmdLineOptsExpected.parsed.net.port;
     }
+    if (!_containsNestedKey(expectedResult, "parsed", "net", "grpc", "port")) {
+        if (_containsNestedKey(getCmdLineOptsResult, "parsed", "net", "grpc", "port")) {
+            delete getCmdLineOptsResult.parsed.net.grpc.port;
+        }
+        if (_containsNestedKey(getCmdLineOptsExpected, "parsed", "net", "grpc", "port")) {
+            delete getCmdLineOptsExpected.parsed.net.grpc.port;
+        }
+    }
+
+    // Merge with the result that we expect
+    expectedResult = mergeOptions(getCmdLineOptsExpected, expectedResult);
 
     // Make sure the options are equal to what we expect
     assert.docEq(expectedResult.parsed, getCmdLineOptsResult.parsed);

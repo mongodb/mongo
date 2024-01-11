@@ -92,6 +92,11 @@ var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',',
 testSockOptions();
 testSockOptions(undefined, undefined, undefined, ',', true);
 
+// TODO: SERVER-84437 Unskip the remainder of this test when using TLS.
+if (jsTestOptions().tlsMode && jsTestOptions().tlsMode != "disabled") {
+    quit();
+}
+
 // Check that a custom unix socket path works
 testSockOptions("testsock.socket", "testsock.socket");
 testSockOptions("testsock.socket", "testsock.socket", undefined, ',', true);

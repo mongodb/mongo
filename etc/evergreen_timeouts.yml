@@ -62,6 +62,10 @@ overrides:
   - task: sharding
     exec_timeout: 180  # 3 hours
 
+  enterprise-windows-all-feature-flags-required:
+  - task: buildscripts_test
+    exec_timeout: 15
+
   macos:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours

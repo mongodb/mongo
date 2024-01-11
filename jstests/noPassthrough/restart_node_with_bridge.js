@@ -5,6 +5,7 @@
  * @tags: [
  *   requires_persistence,
  *   requires_replication,
+ *   requires_mongobridge,
  * ]
  */
 import {reconnect} from "jstests/replsets/rslib.js";

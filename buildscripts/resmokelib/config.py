@@ -120,6 +120,12 @@ DEFAULTS = {
     "num_replset_nodes": None,
     "num_shards": None,
     "export_mongod_config": "off",
+    "tls_mode": None,
+    "tls_ca_file": None,
+    "shell_tls_enabled": False,
+    "shell_tls_certificate_key_file": None,
+    "mongos_tls_certificate_key_file": None,
+    "mongod_tls_certificate_key_file": None,
 
     # Internal testing options.
     "internal_params": [],
@@ -520,6 +526,22 @@ MIXED_BIN_VERSIONS = None
 
 # Specifies the binary version of last-lts or last-continous when multiversion enabled
 MULTIVERSION_BIN_VERSION = None
+
+# Specifies what tlsMode the server(s) should be started with.
+TLS_MODE = None
+
+# Specifies the CA file that all servers and shell instances should use.
+TLS_CA_FILE = None
+
+# Shell TLS options.
+SHELL_TLS_ENABLED = None
+SHELL_TLS_CERTIFICATE_KEY_FILE = None
+
+# Specifies the TLS certicicate that all mongods in the cluster should use.
+MONGOD_TLS_CERTIFICATE_KEY_FILE = None
+
+# Specifies the TLS certicicate that all mongoses in the cluster should use.
+MONGOS_TLS_CERTIFICATE_KEY_FILE = None
 
 # Specifies the number of replica set members in a ReplicaSetFixture.
 NUM_REPLSET_NODES = None

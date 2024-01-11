@@ -144,7 +144,7 @@ export function configExpandSuccess(config, test = null, opts = {}) {
     }
 
     if (!_isWindows()) {
-        assert.eq(0, runMongoProgram("chmod", chmod.toString(8), configFile));
+        assert.eq(0, runNonMongoProgram("chmod", chmod.toString(8), configFile));
     }
 
     const mongod = MongoRunner.runMongod(Object.assign({
@@ -173,7 +173,7 @@ export function configExpandFailure(config, test = null, opts = {}) {
     }
 
     if (!_isWindows()) {
-        assert.eq(0, runMongoProgram("chmod", chmod.toString(8), configFile));
+        assert.eq(0, runNonMongoProgram("chmod", chmod.toString(8), configFile));
     }
 
     const options = Object.assign({

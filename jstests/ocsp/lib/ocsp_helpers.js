@@ -31,13 +31,13 @@ export const OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM =
 export var clearOCSPCache = function() {
     let provider = determineSSLProvider();
     if (provider === "apple") {
-        runMongoProgram("find",
-                        "/private/var/folders/cl/",
-                        "-regex",
-                        "'.*\/C\/com.apple.trustd\/ocspcache.sqlite.*'",
-                        "-delete");
+        runNonMongoProgram("find",
+                           "/private/var/folders/cl/",
+                           "-regex",
+                           "'.*\/C\/com.apple.trustd\/ocspcache.sqlite.*'",
+                           "-delete");
     } else if (provider === "windows") {
-        runMongoProgram("certutil", "-urlcache", "*", "delete");
+        runNonMongoProgram("certutil", "-urlcache", "*", "delete");
     }
 };
 

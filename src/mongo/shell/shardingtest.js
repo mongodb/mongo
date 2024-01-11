@@ -1300,6 +1300,12 @@ var ShardingTest = function ShardingTest(params) {
     this._rsObjects = [];
 
     this._useBridge = otherParams.useBridge;
+    if (this._useBridge) {
+        assert(
+            !jsTestOptions().tlsMode,
+            'useBridge cannot be true when using TLS. Add the requires_mongobridge tag to the test to ensure it will be skipped on variants that use TLS.')
+    }
+
     this._unbridgedMongos = [];
     let _allocatePortForMongos;
     let _allocatePortForBridgeForMongos;

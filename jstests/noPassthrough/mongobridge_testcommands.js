@@ -7,6 +7,7 @@
  *   requires_sharding,
  *   # Tests running with experimental CQF behavior require test commands to be enabled.
  *   cqf_experimental_incompatible,
+ *   requires_mongobridge,
  * ]
  */
 

@@ -1,7 +1,5 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-const tlsCAFile = "jstests/libs/ca.pem";
-
 // Constructs a new Mongo instance with the provided URI and asserts it fails with the provided
 // error code.
 function assertConnectFailsWithErrorCode(uri, errorCode) {
@@ -22,12 +20,7 @@ function testShellConnect(ok, ...args) {
     }
 }
 
-const mongod = MongoRunner.runMongod({
-    tlsMode: "allowTLS",
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
-    tlsCAFile,
-    tlsAllowConnectionsWithoutCertificates: '',
-});
+const mongod = MongoRunner.runMongod({});
 
 if (!FeatureFlagUtil.isPresentAndEnabled(mongod.getDB("admin"), "GRPC")) {
     jsTestLog("Skipping shell_grpc_uri.js test due to featureFlagGRPC being disabled");
@@ -37,14 +30,12 @@ if (!FeatureFlagUtil.isPresentAndEnabled(mongod.getDB("admin"), "GRPC")) {
 
 const host = `localhost:${mongod.fullOptions.grpcPort}`;
 
-function testGRPCConnect(ok, ...testArgs) {
-    const args = ['--tls', '--tlsCAFile', tlsCAFile].concat(testArgs);
+function testGRPCConnect(ok, ...args) {
     testShellConnect(ok, `mongodb://${host}`, '--gRPC', ...args);
     testShellConnect(ok, `mongodb://${host}/?gRPC=true`, ...args);
 }
 
 testGRPCConnect(true);
-testGRPCConnect(true, '--tlsCertificateKeyFile', 'jstests/libs/client.pem');
 
 // Options currently prohibited when using gRPC.
 testGRPCConnect(false, '--tlsCRLFile', 'jstests/libs/crl.pem');

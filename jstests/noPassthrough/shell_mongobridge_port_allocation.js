@@ -6,6 +6,7 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
+ *   requires_mongobridge,
  * ]
  */
 function checkBridgeOffset(node, processType) {

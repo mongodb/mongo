@@ -3,6 +3,7 @@
  * @tags: [
  *   requires_replication,
  *   requires_wiredtiger,
+ *   requires_mongobridge,
  * ]
  */
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";

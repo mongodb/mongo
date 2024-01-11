@@ -3731,6 +3731,12 @@ var ReplSetTest = function ReplSetTest(opts) {
         rst.isRouterServer = opts.isRouterServer || false;
 
         rst._useBridge = opts.useBridge || false;
+        if (rst._useBridge) {
+            assert(
+                !jsTestOptions().tlsMode,
+                'useBridge cannot be true when using TLS. Add the requires_mongobridge tag to the test to ensure it will be skipped on variants that use TLS.')
+        }
+
         rst._bridgeOptions = opts.bridgeOptions || {};
 
         rst._causalConsistency = opts.causallyConsistent || false;

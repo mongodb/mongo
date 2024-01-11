@@ -3,6 +3,7 @@
  * @tags: [
  *   requires_persistence,
  *   requires_replication,
+ *   requires_mongobridge,
  * ]
  */
 TestData.rollbackShutdowns = true;

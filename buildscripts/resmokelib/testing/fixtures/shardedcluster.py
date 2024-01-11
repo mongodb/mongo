@@ -592,6 +592,8 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         self.mongos = None
         self.port = fixturelib.get_next_port(job_num)
         self.mongos_options["port"] = self.port
+        if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS:
+            self.mongos_options["grpcPort"] = fixturelib.get_next_port(job_num)
 
         self._dbpath_prefix = dbpath_prefix
 

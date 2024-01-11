@@ -1,9 +1,6 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-const kTLSCAFile = 'jstests/libs/ca.pem';
-const kTLSCertificateKeyFile = 'jstests/libs/server.pem';
-
 // For each shell invocation, we perform 4 + N operations.
 // {hello:...}, {whatsmyuri:...}, {buildInfo:...}
 // Then what ever operations are in the --eval body
@@ -12,11 +9,11 @@ const kShellPrefixOperations = 3;
 const kShellSuffixOperations = 1;
 
 function evalCmd(uri, evalstr, ok = true, asyncCb = null) {
-    const args = ['mongo', uri, '--tls', '--tlsCAFile', kTLSCAFile, '--eval', evalstr];
+    const args = ['mongo', uri, '--eval', evalstr];
 
     let exitCode = undefined;
     if (asyncCb) {
-        const pid = _startMongoProgram(...args);
+        const pid = startMongoProgramNoConnect(...args);
         asyncCb(pid);
         exitCode = waitProgram(pid);
     } else {
@@ -133,12 +130,7 @@ function runTest(conn) {
     checkGRPCStats(conn, expect);
 }
 
-const mongod = MongoRunner.runMongod({
-    tlsMode: "allowTLS",
-    tlsCertificateKeyFile: kTLSCertificateKeyFile,
-    tlsCAFile: kTLSCAFile,
-    tlsAllowConnectionsWithoutCertificates: '',
-});
+const mongod = MongoRunner.runMongod({});
 
 if (!FeatureFlagUtil.isPresentAndEnabled(mongod.getDB("admin"), "GRPC")) {
     jsTestLog("Skipping grpc_metrics.js test due to featureFlagGRPC being disabled");

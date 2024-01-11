@@ -56,6 +56,8 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.port = port or fixturelib.get_next_port(job_num)
         self.mongod_options["port"] = self.port
         self.router_port = mongod_options.get("routerPort", None)
+        if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS:
+            self.mongod_options["grpcPort"] = fixturelib.get_next_port(job_num)
 
         # Always log backtraces to a file in the dbpath in our testing.
         backtrace_log_file_name = os.path.join(self.get_dbpath_prefix(),

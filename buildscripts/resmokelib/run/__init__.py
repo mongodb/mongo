@@ -965,6 +965,13 @@ class RunPlugin(PluginInterface):
             " existing MongoDB cluster with the URL mongodb://localhost:[PORT]."
             " This is useful for connecting to a server running in a debugger.")
 
+        parser.add_argument("--shellTls", dest="shell_tls_enabled", action="store_true",
+                            help="Whether to use TLS when connecting.")
+
+        parser.add_argument("--shellTlsCertificateKeyFile", dest="shell_tls_certificate_key_file",
+                            metavar="SHELL_TLS_CERTIFICATE_KEY_FILE",
+                            help="The TLS certificate to use when connecting.")
+
         parser.add_argument("--repeat", "--repeatSuites", type=int, dest="repeat_suites",
                             metavar="N",
                             help="Repeats the given suite(s) N times, or until one fails.")
@@ -1133,6 +1140,25 @@ class RunPlugin(PluginInterface):
             "--storageEngineCacheSizeGB", dest="storage_engine_cache_size_gb", metavar="CONFIG",
             help="Sets the storage engine cache size configuration"
             " setting for all mongod's.")
+
+        mongodb_server_options.add_argument(
+            "--tlsMode", dest="tls_mode", metavar="TLS_MODE", help="Indicates what TLS mode mongod "
+            "and mongos servers should be started with. See also: https://www.mongodb.com"
+            "/docs/manual/reference/configuration-options/#mongodb-setting-net.tls.mode")
+
+        mongodb_server_options.add_argument(
+            "--tlsCAFile", dest="tls_ca_file", metavar="TLS_CA_FILE",
+            help="Path to the CA certificate file to be used by all clients and servers.")
+
+        mongodb_server_options.add_argument(
+            "--mongodTlsCertificateKeyFile", dest="mongod_tls_certificate_key_file",
+            metavar="MONGOD_TLS_CERTIFICATE_KEY_FILE",
+            help="Path to the TLS certificate to be used by all mongods.")
+
+        mongodb_server_options.add_argument(
+            "--mongosTlsCertificateKeyFile", dest="mongos_tls_certificate_key_file",
+            metavar="MONGOS_TLS_CERTIFICATE_KEY_FILE",
+            help="Path to the TLS certificate to be used by all mongoses.")
 
         mongodb_server_options.add_argument(
             "--numReplSetNodes", type=int, dest="num_replset_nodes", metavar="N",
