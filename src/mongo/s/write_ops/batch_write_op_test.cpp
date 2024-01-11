@@ -32,6 +32,7 @@
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
@@ -99,6 +100,14 @@ void buildErrResponse(int code, const std::string& message, BatchedCommandRespon
 void addError(int code, const std::string& message, int index, BatchedCommandResponse* response) {
     std::unique_ptr<WriteErrorDetail> error(new WriteErrorDetail);
     error->setStatus({ErrorCodes::Error(code), message});
+    error->setIndex(index);
+
+    response->addToErrDetails(error.release());
+}
+
+void addError(Status status, int index, BatchedCommandResponse* response) {
+    std::unique_ptr<WriteErrorDetail> error(new WriteErrorDetail);
+    error->setStatus(std::move(status));
     error->setIndex(index);
 
     response->addToErrDetails(error.release());
@@ -302,12 +311,22 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
+    // Respond with a ShardCannotRefreshDueToLocksHeld error; the batch should still be retriable.
+    targetedOwned.clear();
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
+    buildResponse(0, &response);
+    addError(
+        Status(ShardCannotRefreshDueToLocksHeldInfo(nss), "mock cache busy error"), 0, &response);
+
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
+    ASSERT(!batchOp.isFinished());
+
+    // Respond with an 'ok' response
     targetedOwned.clear();
     ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     buildResponse(1, &response);
 
-    // Respond with an 'ok' response
     batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 

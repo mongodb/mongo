@@ -40,6 +40,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
@@ -156,6 +157,43 @@ BSONObj expectInsertsReturnStaleDbVersionErrorsBase(const NamespaceString& nss,
     return staleResponse.obj();
 }
 
+BSONObj expectInsertsReturnCannotRefreshErrorsBase(const NamespaceString& nss,
+                                                   const std::vector<BSONObj>& expected,
+                                                   const executor::RemoteCommandRequest& request) {
+    ASSERT_EQUALS(nss.db(), request.dbname);
+
+    const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+    const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
+    ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
+
+    const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
+    ASSERT_EQUALS(expected.size(), inserted.size());
+
+    auto itInserted = inserted.begin();
+    auto itExpected = expected.begin();
+
+    for (; itInserted != inserted.end(); itInserted++, itExpected++) {
+        ASSERT_BSONOBJ_EQ(*itExpected, *itInserted);
+    }
+
+    BatchedCommandResponse cannotRefreshResponse;
+    cannotRefreshResponse.setStatus(Status::OK());
+    cannotRefreshResponse.setN(0);
+
+    // Report a ShardCannotRefreshDueToLocksHeld error for each write in the batch.
+    int i = 0;
+    for (itInserted = inserted.begin(); itInserted != inserted.end(); ++itInserted) {
+        WriteErrorDetail* error = new WriteErrorDetail;
+        error->setStatus(Status(ShardCannotRefreshDueToLocksHeldInfo(nss), ""));
+        error->setIndex(i);
+
+        cannotRefreshResponse.addToErrDetails(error);
+        ++i;
+    }
+
+    return cannotRefreshResponse.toBSON();
+}
+
 /**
  * Mimics a single shard backend for a particular collection which can be initialized with a
  * set of write command results to return.
@@ -244,6 +282,12 @@ public:
     void expectInsertsReturnStaleDbVersionErrors(const std::vector<BSONObj>& expected) {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             return expectInsertsReturnStaleDbVersionErrorsBase(nss, expected, request);
+        });
+    }
+
+    void expectInsertsReturnCannotRefreshErrors(const std::vector<BSONObj>& expected) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            return expectInsertsReturnCannotRefreshErrorsBase(nss, expected, request);
         });
     }
 
@@ -719,6 +763,44 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
     auto response = future.default_timed_get();
     ASSERT_OK(response.getTopLevelStatus());
     ASSERT_EQ(3, response.getNModified());
+}
+
+TEST_F(BatchWriteExecTest, MultiOpLargeUnorderedWithCannotRefreshError) {
+    const int kNumDocsToInsert = 100'000;
+
+    std::vector<BSONObj> docsToInsert;
+    docsToInsert.reserve(kNumDocsToInsert);
+    for (int i = 0; i < kNumDocsToInsert; i++) {
+        docsToInsert.push_back(BSON("_id" << i));
+    }
+
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments(docsToInsert);
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+
+        ASSERT(response.getOk());
+        ASSERT_EQ(kNumDocsToInsert, response.getN());
+    });
+
+    expectInsertsReturnCannotRefreshErrors({docsToInsert.begin(), docsToInsert.begin() + 63791});
+    expectInsertsReturnSuccess({docsToInsert.begin(), docsToInsert.begin() + 63791});
+    expectInsertsReturnSuccess({docsToInsert.begin() + 63791, docsToInsert.end()});
+
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest,
@@ -1461,6 +1543,75 @@ TEST_F(BatchWriteExecTest, TooManyStaleDbOp) {
     future.default_timed_get();
 }
 
+TEST_F(BatchWriteExecTest, MultiCannotRefreshShardOp) {
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+        ASSERT(response.getOk());
+    });
+
+    const std::vector<BSONObj> expected{BSON("x" << 1)};
+
+    // Return multiple ShardCannotRefreshDueToLocksHeld errors, but less than the give-up number
+    for (int i = 0; i < 3; i++) {
+        expectInsertsReturnCannotRefreshErrors(expected);
+    }
+
+    expectInsertsReturnSuccess(expected);
+
+    future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTest, TooManyCannotRefreshShardOp) {
+    // Retry op in exec too many times b/c of busy catalog cache (the error is not expected to
+    // trigger a refresh on any implementation of NSTargeter). We should report a no progress error
+    // for everything in the batch.
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+        ASSERT(response.getOk());
+        ASSERT_EQ(0, response.getN());
+        ASSERT(response.isErrDetailsSet());
+        ASSERT_EQUALS(response.getErrDetailsAt(0)->toStatus().code(), ErrorCodes::NoProgressMade);
+        ASSERT_EQUALS(response.getErrDetailsAt(1)->toStatus().code(), ErrorCodes::NoProgressMade);
+    });
+
+    // Return multiple StaleShardVersion errors
+    for (int i = 0; i < (1 + kMaxRoundsWithoutProgress); i++) {
+        expectInsertsReturnCannotRefreshErrors({BSON("x" << 1), BSON("x" << 2)});
+    }
+
+    future.default_timed_get();
+}
+
 TEST_F(BatchWriteExecTest, RetryableWritesLargeBatch) {
     // A retryable error without a txnNumber is not retried.
 
@@ -2155,6 +2306,22 @@ public:
         });
     }
 
+    void expectInsertsReturnCannotRefreshErrors(const std::vector<BSONObj>& expected) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            BSONObjBuilder bob;
+
+            bob.appendElementsUnique(
+                expectInsertsReturnCannotRefreshErrorsBase(nss, expected, request));
+
+            // Because this is the transaction-specific fixture, return transaction metadata in
+            // the response.
+            TxnResponseMetadata txnResponseMetadata(false /* readOnly */);
+            txnResponseMetadata.serialize(&bob);
+
+            return bob.obj();
+        });
+    }
+
     void expectInsertsReturnTransientTxnErrors(const std::vector<BSONObj>& expected) {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQUALS(nss.db(), request.dbname);
@@ -2281,6 +2448,66 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteErrorOrdered) {
 
     // Any write error works, using SSV for convenience.
     expectInsertsReturnStaleVersionErrors({BSON("x" << 1), BSON("x" << 2)});
+
+    future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteErrorFromBusyCache) {
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+
+        ASSERT(response.isErrDetailsSet());
+        ASSERT_GT(response.sizeErrDetails(), 0u);
+        ASSERT_EQ(ErrorCodes::ShardCannotRefreshDueToLocksHeld,
+                  response.getErrDetailsAt(0)->toStatus().code());
+    });
+
+    expectInsertsReturnCannotRefreshErrors({BSON("x" << 1), BSON("x" << 2)});
+
+    future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteErrorOrderedFromBusyCache) {
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+
+        ASSERT(response.isErrDetailsSet());
+        ASSERT_GT(response.sizeErrDetails(), 0u);
+        ASSERT_EQ(ErrorCodes::ShardCannotRefreshDueToLocksHeld,
+                  response.getErrDetailsAt(0)->toStatus().code());
+    });
+
+    expectInsertsReturnCannotRefreshErrors({BSON("x" << 1), BSON("x" << 2)});
 
     future.default_timed_get();
 }

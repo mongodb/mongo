@@ -298,6 +298,11 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 }
 
                 if (responseStatus.isOK()) {
+                    // Stale routing info errors need to be tracked in order to trigger a refresh of
+                    // the targeter. On the other hand, errors caused by the catalog cache being
+                    // temporarily unavailable (such as ShardCannotRefreshDueToLocksHeld) are
+                    // ignored in this context, since no deduction can be made around possible
+                    // placement changes.
                     TrackedErrors trackedErrors;
                     trackedErrors.startTracking(ErrorCodes::StaleShardVersion);
                     trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
