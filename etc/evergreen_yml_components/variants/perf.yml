@@ -1904,7 +1904,7 @@ buildvariants:
 
 - <<: *linux-mongo-perf-standalone-arm
   name: perf-mongo-perf-standalone.arm.aws.2023-11
-  display_name: PERF Monogo-Perf Standalone inMemory ARM AWS 2023-11
+  display_name: PERF Mongo-Perf Standalone inMemory ARM AWS 2023-11
   modules: *perf_modules
   expansions: *standalone-arm-expansions
   cron: *linux-mongo-perf-cron
