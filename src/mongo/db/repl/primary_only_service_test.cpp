@@ -106,7 +106,7 @@ public:
     }
 
     NamespaceString getStateDocumentsNS() const override {
-        return NamespaceString::createNamespaceString_forTest("admin", "test_service");
+        return NamespaceString::createNamespaceString_forTest("config", "test_service");
     }
 
     ThreadPool::Limits getThreadPoolLimits() const override {
@@ -286,10 +286,10 @@ public:
                 DBDirectClient client(opCtx.get());
                 if (targetState == State::kDone) {
                     client.remove(
-                        NamespaceString::createNamespaceString_forTest("admin.test_service"), _id);
+                        NamespaceString::createNamespaceString_forTest("config.test_service"), _id);
                 } else {
                     client.update(
-                        NamespaceString::createNamespaceString_forTest("admin.test_service"),
+                        NamespaceString::createNamespaceString_forTest("config.test_service"),
                         _id,
                         newStateDoc,
                         true /*upsert*/);
@@ -354,7 +354,7 @@ public:
         _service = _registry->lookupServiceByName("TestService");
         ASSERT(_service);
         auto serviceByNamespace = _registry->lookupServiceByNamespace(
-            NamespaceString::createNamespaceString_forTest("admin.test_service"));
+            NamespaceString::createNamespaceString_forTest("config.test_service"));
         ASSERT_EQ(_service, serviceByNamespace);
 
         _testExecutor = makeTestExecutor();

@@ -227,7 +227,8 @@ public:
 
     /**
      * Returns the collection where state documents corresponding to instances of this service are
-     * persisted.
+     * persisted. MUST be in the config database, due to the PrimaryOnlyServiceOpObserver's
+     * NamespaceFilter.
      */
     virtual NamespaceString getStateDocumentsNS() const = 0;
 

@@ -160,6 +160,9 @@ PrimaryOnlyServiceRegistry* PrimaryOnlyServiceRegistry::get(ServiceContext* serv
 
 void PrimaryOnlyServiceRegistry::registerService(std::unique_ptr<PrimaryOnlyService> service) {
     auto ns = service->getStateDocumentsNS();
+    invariant(
+        ns.isConfigDB(),
+        "PrimaryOnlyServices can only register a state documents namespace in the 'config' db");
     auto name = service->getServiceName();
     auto servicePtr = service.get();
 
