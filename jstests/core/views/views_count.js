@@ -9,9 +9,9 @@
 // ]
 
 import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
-const sbeEnabled = checkSBEEnabled(db);
+const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 var viewsDB = db.getSiblingDB("views_count");
 assert.commandWorked(viewsDB.dropDatabase());

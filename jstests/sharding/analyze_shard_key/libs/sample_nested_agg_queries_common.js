@@ -2,7 +2,7 @@
  * Utilities for testing basic support for sampling nested aggregate queries (i.e. ones inside
  * $lookup, $graphLookup, $unionWith) on a sharded cluster.
  */
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
@@ -35,7 +35,8 @@ export const outerAggTestCases =
                 // When SBE is used, the shard will not create a separate pipeline to execute the
                 // inner side of a $lookup stage so there is no nested aggregate query to route,
                 // because SBE does $lookup pushdown whereas Classic does not.
-                const isEligibleForSBELookupPushdown = !isShardedColl && checkSBEEnabled(db);
+                const isEligibleForSBELookupPushdown =
+                    !isShardedColl && checkSbeRestrictedOrFullyEnabled(db);
                 return !isEligibleForSBELookupPushdown;
             }
         },

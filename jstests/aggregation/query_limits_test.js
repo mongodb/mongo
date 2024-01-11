@@ -11,7 +11,6 @@
  */
 
 import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 (function() {
 "use strict";
@@ -27,7 +26,6 @@ if (debugBuild || !_optimizationsEnabled() || _isAddressSanitizerActive() ||
 }
 
 const isBonsaiEnabled = checkCascadesOptimizerEnabled(db);
-const isSBEEnabled = checkSBEEnabled(db);
 
 const coll = db.query_limits_test;
 coll.drop();

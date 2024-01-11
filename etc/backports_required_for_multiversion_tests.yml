@@ -515,6 +515,26 @@ last-continuous:
     ticket: SERVER-83777
   - test_file: jstests/core/txns/out_not_blocked_by_txn.js
     ticket: SERVER-72703
+  - test_file: jstests/core/command_let_variables.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/index/wildcard/wildcard_index_cached_plans.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/expr/expr_index_use.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_list_plans.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_list_shapes.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_stats_shard_and_host.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/query/plan_cache/plan_cache_shell_helpers.js
+    ticket: SERVER-83685
+  - test_file: jstests/core/views/views_aggregation.js
+    ticket: SERVER-83685
+  - test_file: jstests/noPassthroughWithMongod/lookup_with_limit.js
+    ticket: SERVER-83685
   suites: null
 last-lts:
   all:

@@ -9,20 +9,20 @@
 //   assumes_no_implicit_index_creation,
 // ]
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 let coll = db.explain_limit;
 
 const kCollSize = 105;
 const kLimit = 10;
-const isSBEEnabled = checkSBEEnabled(db);
+const isSbeFullyEnabled = checkSbeFullyEnabled(db);
 
 // Return whether or explain() was successful and contained the appropriate fields given the
 // requested verbosity. Checks that the number of documents examined and returned are correct given
 // the value of the limit.
 function checkResults({results, verbosity}) {
     const [cursorSubdocs, limitAmount] = (() => {
-        if (verbosity != "queryPlanner" && isSBEEnabled) {
+        if (verbosity != "queryPlanner" && isSbeFullyEnabled) {
             // We cannot use the "executionStats" section for SBE plans without some pre-processing,
             // since it has different explain format. To find execution stats for the LIMIT stages
             // from the "queryPlanner" section (there could be multiple of such stages if we're in a

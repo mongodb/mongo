@@ -18,7 +18,7 @@ import "jstests/libs/sbe_assert_error_override.js";
 import {arrayEq, assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.spill_to_disk;
 coll.drop();
@@ -53,7 +53,7 @@ const sharded = FixtureHelpers.isSharded(coll);
 
 const memoryLimitMB = sharded ? 200 : 100;
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeGroupLookupPushdownEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 const bigStr = Array(1024 * 1024 + 1).toString();  // 1MB of ','
 for (let i = 0; i < memoryLimitMB + 1; i++)
@@ -76,7 +76,7 @@ function test({pipeline, expectedCodes, canSpillToDisk}) {
         assert.eq(new DBCommandCursor(coll.getDB(), res).itcount(),
                   coll.count());  // all tests output one doc per input doc
 
-        if (isSbeEnabled) {
+        if (isSbeGroupLookupPushdownEnabled) {
             const explain = db.runCommand({
                 explain:
                     {aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: true}
@@ -270,7 +270,7 @@ function testAccumulator({accumulator, sortInputBy, expectedOutput, ignoreArrayO
         assert.eq(results, expectedOutput);
     }
 
-    if (isSbeEnabled) {
+    if (isSbeGroupLookupPushdownEnabled) {
         const explain = coll.explain("executionStats").aggregate(pipeline);
         const groupStages = getSbePlanStages(explain, "group");
         assert.eq(groupStages.length, 1, groupStages);
@@ -444,7 +444,7 @@ function runTest_MultipleLocalForeignRecords({
     const results = localColl.aggregate(pipeline, {allowDiskUse: true}).toArray();
     const explain = localColl.explain('executionStats').aggregate(pipeline, {allowDiskUse: true});
     // If sharding is enabled, '$lookup' is not pushed down to SBE.
-    if (isSbeEnabled && !sharded) {
+    if (isSbeGroupLookupPushdownEnabled && !sharded) {
         const hLookups = getSbePlanStages(explain, 'hash_lookup');
         assert.eq(hLookups.length, 1, explain);
         const hLookup = hLookups[0];

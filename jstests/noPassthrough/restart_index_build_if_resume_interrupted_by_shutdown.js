@@ -10,7 +10,6 @@
  * ]
  */
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = "test";
@@ -21,9 +20,7 @@ rst.startSet();
 rst.initiate();
 
 let primary = rst.getPrimary();
-const columnstoreEnabled =
-    checkSBEEnabled(primary.getDB(dbName), ["featureFlagColumnstoreIndexes"], true) &&
-    setUpServerForColumnStoreIndexTest(primary.getDB(dbName));
+const columnstoreEnabled = setUpServerForColumnStoreIndexTest(primary.getDB(dbName));
 
 ResumableIndexBuildTest.runResumeInterruptedByShutdown(
     rst,

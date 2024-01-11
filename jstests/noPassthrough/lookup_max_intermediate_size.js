@@ -5,7 +5,7 @@
 // ]
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 // Used by testPipeline to sort result documents. All _ids must be primitives.
 function compareId(a, b) {
@@ -89,7 +89,8 @@ const standalone = MongoRunner.runMongod(
 const db = standalone.getDB("test");
 
 db.lookUp.drop();
-const expectedErrorCode = checkSBEEnabled(db) ? ErrorCodes.ExceededMemoryLimit : 4568;
+const expectedErrorCode =
+    checkSbeRestrictedOrFullyEnabled(db) ? ErrorCodes.ExceededMemoryLimit : 4568;
 runTest(db.lookUp, db.from, expectedErrorCode);
 
 MongoRunner.stopMongod(standalone);

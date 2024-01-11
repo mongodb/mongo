@@ -28,9 +28,8 @@ import {
     getWinningPlan,
 } from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.wildcard_cached_plans;
 
@@ -51,7 +50,7 @@ function getCacheEntryForQuery(query) {
     return null;
 }
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 
 for (const indexSpec of wildcardIndexes) {
     coll.drop();

@@ -21,14 +21,6 @@ import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
-const columnstoreEnabled =
-    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */);
-if (!columnstoreEnabled) {
-    jsTestLog("Skipping columnstore index test since the feature flag is not enabled.");
-    quit();
-}
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();

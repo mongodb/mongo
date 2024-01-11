@@ -4,7 +4,7 @@
  * @tags: [requires_replication, requires_majority_read_concern, requires_persistence]
  */
 import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const kNumNodes = 3;
 const replTest = new ReplSetTest({
@@ -36,7 +36,7 @@ const readColl = secondary.getDB("test").foo;
  * Test spilling of $group, when explicitly run on a secondary.
  */
 (function testGroupSpilling() {
-    if (!checkSBEEnabled(secondary.getDB("test"))) {
+    if (!checkSbeRestrictedOrFullyEnabled(secondary.getDB("test"))) {
         jsTestLog("Skipping test for HashAgg stage: $group lowering into SBE isn't enabled");
         return;
     }
@@ -104,7 +104,7 @@ const readColl = secondary.getDB("test").foo;
  * Test spilling of $lookup when explicitly run on a secondary.
  */
 (function testLookupSpillingInSbe() {
-    if (!checkSBEEnabled(secondary.getDB("test"))) {
+    if (!checkSbeRestrictedOrFullyEnabled(secondary.getDB("test"))) {
         jsTestLog("Skipping test for HashLookup stage: $lookup lowering into SBE isn't enabled");
         return;
     }

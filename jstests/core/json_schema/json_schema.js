@@ -8,9 +8,9 @@
  * Tests for JSON Schema document validation.
  */
 import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSbeFullyEnabled(db);
 
 let coll = db.jstests_json_schema;
 coll.drop();

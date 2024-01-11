@@ -17,9 +17,9 @@
 // ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 var coll = db.jstests_plan_cache_shell_helpers;
 coll.drop();
 

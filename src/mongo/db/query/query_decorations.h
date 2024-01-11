@@ -44,6 +44,11 @@ public:
     bool getSbeDisableTimeSeriesForOp();
     size_t getPlanEvaluationMaxResultsForOp();
     size_t getMaxScansToExplodeForOp();
+    /**
+     * Returns whether we can push down fully compatible stages to sbe. This is only true when the
+     * query knob is 'trySbeEngine'.
+     */
+    bool canPushDownFullyCompatibleStages();
 
 private:
     void _tryToSetAllValues();

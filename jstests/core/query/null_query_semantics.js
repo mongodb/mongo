@@ -13,7 +13,6 @@
 //
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 function extractAValues(results) {
     return results.map(function(res) {
@@ -787,9 +786,7 @@ const keyPatterns = [
 ];
 
 // Include Columnstore Index only if FF is enabled and collection is not clustered.
-const columnstoreEnabled =
-    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */);
-if (columnstoreEnabled && setUpServerForColumnStoreIndexTest(db)) {
+if (setUpServerForColumnStoreIndexTest(db)) {
     keyPatterns.push({keyPattern: {"$**": "columnstore"}});
 }
 

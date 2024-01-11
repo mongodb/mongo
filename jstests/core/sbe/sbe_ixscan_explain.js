@@ -5,16 +5,10 @@
 //   assumes_against_mongod_not_mongos,
 //   # The SBE plan cache was first enabled in 6.3.
 //   requires_fcv_63,
+//   featureFlagSbeFull,
 // ]
 
 import {getPlanStages, getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
-const isSBEEnabled = checkSBEEnabled(db);
-if (!isSBEEnabled) {
-    jsTestLog("Skipping test because SBE is disabled");
-    quit();
-}
 
 function assertStageContainsIndexName(stage) {
     assert(stage.hasOwnProperty("indexName"));

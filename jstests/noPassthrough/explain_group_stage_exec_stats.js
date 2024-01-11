@@ -3,14 +3,14 @@
  * verbosities "executionStats" and "allPlansExecution".
  */
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB('test');
 const coll = testDB.explain_group_stage_exec_stats;
 coll.drop();
 
-if (checkSBEEnabled(testDB)) {
+if (checkSbeRestrictedOrFullyEnabled(testDB)) {
     // When the SBE $group pushdown feature is enabled, a $group alone is pushed down and the
     // memory usage tracking isn't on a per-accumulator basis so this test is exercising
     // spilling behavior of the classic DocumentSourceGroup stage.

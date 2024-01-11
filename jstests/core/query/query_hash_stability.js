@@ -18,7 +18,7 @@
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const collName = "query_hash_stability";
 const coll = db[collName];
@@ -117,7 +117,7 @@ assertPlanCacheField({
 
 // SBE's planCacheKey encoding encodes "collection version" which will be increased after dropping
 // an index.
-if (!checkSBEEnabled(db)) {
+if (!checkSbeFullyEnabled(db)) {
     // The 'planCacheKey' should be the same as what it was before we dropped the index.
     assertPlanCacheField({
         firstExplain: initialExplain,

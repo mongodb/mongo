@@ -6,7 +6,6 @@ import {
     seedWithTickerData,
     testAccumAgainstGroup
 } from "jstests/aggregation/extras/window_function_helpers.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db[jsTestName()];
 coll.drop();

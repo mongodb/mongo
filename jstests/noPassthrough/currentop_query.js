@@ -10,7 +10,7 @@ import {
     checkCascadesOptimizerEnabled,
     checkExperimentalCascadesOptimizerEnabled
 } from "jstests/libs/optimizer_utils.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
@@ -80,7 +80,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
     const isLocalMongosCurOp = (FixtureHelpers.isMongos(testDB) && localOps);
     const isRemoteShardCurOp = (FixtureHelpers.isMongos(testDB) && !localOps);
 
-    const sbeEnabled = checkSBEEnabled(testDB);
+    const sbeEnabled = checkSbeFullyEnabled(testDB);
     const cqfEnabled = checkCascadesOptimizerEnabled(testDB);
     const cqfExperimentalEnabled = checkExperimentalCascadesOptimizerEnabled(testDB);
 

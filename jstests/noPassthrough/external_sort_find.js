@@ -2,7 +2,7 @@
  * Test that the find command can spill to disk while executing a blocking sort.
  */
 import {getAggPlanStage, getPlanStage} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 // Only allow blocking sort execution to use 100 kB of memory.
 const kMaxMemoryUsageBytes = 100 * 1024;
@@ -18,7 +18,7 @@ assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(o
 
 const testDb = conn.getDB("test");
 const collection = testDb.external_sort_find;
-const isSBEEnabled = checkSBEEnabled(testDb);
+const isSBEEnabled = checkSbeFullyEnabled(testDb);
 
 // Construct a document that is just over 1 kB.
 const charToRepeat = "-";

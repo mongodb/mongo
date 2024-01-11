@@ -9,11 +9,13 @@
  * ]
  */
 import {getAggPlanStages, getEngine, getPlanStage} from "jstests/libs/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.timeseries_match_pushdown_with_project;
 const timeField = 'time';
 const metaField = 'm';
 const aTime = ISODate('2022-01-01T00:00:00');
+const sbeEnabledForUnpackPushdown = checkSbeRestrictedOrFullyEnabled(db);
 
 /**
  * Runs a 'pipeline', asserts the bucket unpacking 'behaviour' (either include or exclude) is
@@ -33,10 +35,13 @@ const runTest = function({docs, pipeline, behaviour, expectedResult}) {
                   unpackStages.length,
                   "Should only have a single $_internalUnpackBucket stage: " + tojson(explain));
         unpackStage = unpackStages[0].$_internalUnpackBucket;
-    } else {
-        // In SBE $_internalUnpackBucket is expected to be lowered into the plan layer (at least,
-        // for all of the tests in this file).
-        unpackStage = getPlanStage(explain, "UNPACK_TS_BUCKET");
+    } else if (sbeEnabledForUnpackPushdown) {
+        // In the case when only unpack is pushed down to SBE, the explain has it in agg stages.
+        const unpackStages = getAggPlanStages(explain, "UNPACK_TS_BUCKET");
+        assert.eq(1,
+                  unpackStages.length,
+                  "Should only have a single UNPACK_TS_BUCKET stage: " + tojson(explain));
+        unpackStage = unpackStages[0];
     }
     assert(unpackStage, `Should have unpack stage in ${tojson(explain)}`);
 

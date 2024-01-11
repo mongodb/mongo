@@ -7,7 +7,7 @@
  *   cqf_incompatible,
  * ]
  */
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB("plan_cache_hits_and_misses_metrics");
@@ -21,7 +21,7 @@ assert.commandWorked(db.createCollection(collCapped.getName(), {capped: true, si
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(collCapped.insert({a: 1}));
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 
 /**
  * Retrieves the "hits" and "misses" serverStatus metrics for the given 'planCacheType' (sbe or

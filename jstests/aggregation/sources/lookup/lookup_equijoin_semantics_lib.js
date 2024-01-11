@@ -16,7 +16,7 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 export const JoinAlgorithm = {
     HJ: {name: "HJ", strategy: "HashJoin"},
@@ -47,7 +47,7 @@ export function setupCollections(testConfig, localRecords, foreignRecords, forei
 export function checkJoinConfiguration(testConfig, explain) {
     const {currentJoinAlgorithm} = testConfig;
     const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
-    if (checkSBEEnabled(db)) {
+    if (checkSbeRestrictedOrFullyEnabled(db)) {
         if (eqLookupNodes.length > 0) {
             // The $lookup stage has been lowered. Check that it's using the expected join strategy.
             assert.eq(currentJoinAlgorithm.strategy, eqLookupNodes[0].strategy, "Join strategy");
@@ -264,7 +264,9 @@ export function runTests(testConfig) {
             {_id: 11, a: [[null, 1], 2]},
         ];
 
-        if (checkSBEEnabled(db)) {
+        // $lookup is allowed to run with sbe when internalQueryFrameworkControl is set to
+        // 'trySbeRestricted'.
+        if (checkSbeRestrictedOrFullyEnabled(db)) {
             // When lowered to SBE, "undefined" should only match "undefined".
             runTest_SingleForeignRecord(testConfig, {
                 testDescription: "Undefined in foreign, top-level field in local",

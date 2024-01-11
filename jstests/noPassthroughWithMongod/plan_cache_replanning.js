@@ -5,9 +5,9 @@
  */
 import {getCachedPlan, getPlanCacheKeyFromShape, getPlanStage} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
-const isSbeEnabled = checkSBEEnabled(db);
+const isSbeEnabled = checkSbeFullyEnabled(db);
 
 let coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
 

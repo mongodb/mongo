@@ -23,7 +23,7 @@
 // ]
 
 import {getAggPlanStage, getPlanStages} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 var colName = "jstests_index_stats";
 var col = db[colName];
@@ -239,7 +239,7 @@ assert.eq(2,
                  ])
                   .itcount());
 assert.eq(1, getUsageCount("_id_", col), "Expected aggregation to use _id index");
-if (!checkSBEEnabled(db)) {
+if (!checkSbeRestrictedOrFullyEnabled(db)) {
     assert.eq(2,
               getUsageCount("_id_", foreignCollection),
               "Expected each lookup to be tracked as an index use");
@@ -277,7 +277,7 @@ const pipeline = [
 ];
 assert.eq(2, col.aggregate(pipeline).itcount());
 assert.eq(1, getUsageCount("_id_", col), "Expected aggregation to use _id index");
-if (!checkSBEEnabled(db)) {
+if (!checkSbeRestrictedOrFullyEnabled(db)) {
     assert.eq(2,
               getUsageCount("_id_", foreignCollection),
               "Expected each lookup to be tracked as an index use");
