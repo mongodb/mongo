@@ -52,14 +52,14 @@ function getSampleSize(conn) {
  * enabled.
  */
 function testQuerySampling(conn, sampleConn, dbName, collNameNotSampled, collNameSampled) {
-    const samplesPerSecond = 5;
+    const samplesPerSecond = 4;
     const durationSecs = 30;
 
     assert.commandWorked(
         conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}));
     sleep(queryAnalysisSamplerConfigurationRefreshSecs * 1000);
 
-    const targetNumBulkWriteDeletePerSec = 40;
+    const targetNumBulkWriteDeletePerSec = 25;
     const bulkWriteThread = new Thread(runBulkWriteDeleteCmdsOnRepeat,
                                        conn.host,
                                        dbName,
