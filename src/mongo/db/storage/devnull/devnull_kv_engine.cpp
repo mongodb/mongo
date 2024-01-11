@@ -313,8 +313,7 @@ DevNullKVEngine::DevNullKVEngine() {
     _mockBackupBlocks.push_back(BackupBlock(/*opCtx=*/nullptr,
                                             /*nss=*/boost::none,
                                             /*uuid=*/boost::none,
-                                            "filename.wt",
-                                            /*checkpointTimestamp=*/boost::none));
+                                            "filename.wt"));
 }
 
 DevNullKVEngine::~DevNullKVEngine() = default;
@@ -396,9 +395,7 @@ private:
 }  // namespace
 
 StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> DevNullKVEngine::beginNonBlockingBackup(
-    OperationContext* opCtx,
-    boost::optional<Timestamp> checkpointTimestamp,
-    const StorageEngine::BackupOptions& options) {
+    OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
     return std::make_unique<StreamingCursorImpl>(options, _mockBackupBlocks);
 }
 

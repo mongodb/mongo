@@ -334,9 +334,7 @@ public:
     };
 
     virtual StatusWith<std::unique_ptr<StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx,
-        boost::optional<Timestamp> checkpointTimestamp,
-        const BackupOptions& options) = 0;
+        OperationContext* opCtx, const BackupOptions& options) = 0;
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) = 0;
 

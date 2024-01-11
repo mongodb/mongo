@@ -53,7 +53,6 @@ BackupBlock::BackupBlock(OperationContext* opCtx,
                          boost::optional<NamespaceString> nss,
                          boost::optional<UUID> uuid,
                          std::string filePath,
-                         boost::optional<Timestamp> checkpointTimestamp,
                          std::uint64_t offset,
                          std::uint64_t length,
                          std::uint64_t fileSize)

@@ -1005,9 +1005,8 @@ Status StorageEngineImpl::disableIncrementalBackup(OperationContext* opCtx) {
 
 StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>>
 StorageEngineImpl::beginNonBlockingBackup(OperationContext* opCtx,
-                                          boost::optional<Timestamp> checkpointTimestamp,
                                           const StorageEngine::BackupOptions& options) {
-    return _engine->beginNonBlockingBackup(opCtx, checkpointTimestamp, options);
+    return _engine->beginNonBlockingBackup(opCtx, options);
 }
 
 void StorageEngineImpl::endNonBlockingBackup(OperationContext* opCtx) {

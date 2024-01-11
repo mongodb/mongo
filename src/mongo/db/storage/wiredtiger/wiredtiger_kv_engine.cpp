@@ -1070,13 +1070,11 @@ public:
     StreamingCursorImpl() = delete;
     explicit StreamingCursorImpl(WT_SESSION* session,
                                  std::string path,
-                                 boost::optional<Timestamp> checkpointTimestamp,
                                  StorageEngine::BackupOptions options,
                                  WiredTigerBackup* wtBackup)
         : StorageEngine::StreamingCursor(options),
           _session(session),
           _path(path),
-          _checkpointTimestamp(checkpointTimestamp),
           _wtBackup(wtBackup){};
 
     ~StreamingCursorImpl() = default;
@@ -1152,7 +1150,6 @@ public:
                                                    nsAndUUID.first,
                                                    nsAndUUID.second,
                                                    filePath.string(),
-                                                   _checkpointTimestamp,
                                                    0 /* offset */,
                                                    length,
                                                    fileSize));
@@ -1223,7 +1220,6 @@ private:
                                                 nsAndUUID.first,
                                                 nsAndUUID.second,
                                                 filePath.string(),
-                                                _checkpointTimestamp,
                                                 offset,
                                                 size,
                                                 fileSize));
@@ -1237,7 +1233,6 @@ private:
                                                 nsAndUUID.first,
                                                 nsAndUUID.second,
                                                 filePath.string(),
-                                                _checkpointTimestamp,
                                                 0 /* offset */,
                                                 0 /* length */,
                                                 fileSize));
@@ -1260,7 +1255,6 @@ private:
     WT_SESSION* _session;
     std::string _path;
     stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>> _identsToNsAndUUID;
-    boost::optional<Timestamp> _checkpointTimestamp;
     WiredTigerBackup* _wtBackup;  // '_wtBackup' is an out parameter.
 };
 
@@ -1268,7 +1262,6 @@ private:
 
 StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>>
 WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
-                                           boost::optional<Timestamp> checkpointTimestamp,
                                            const StorageEngine::BackupOptions& options) {
     uassert(51034, "Cannot open backup cursor with in-memory mode.", !isEphemeral());
 
@@ -1320,8 +1313,8 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
     invariant(_wtBackup.logFilePathsSeenByExtendBackupCursor.empty());
     invariant(_wtBackup.logFilePathsSeenByGetNextBatch.empty());
 
-    auto streamingCursor = std::make_unique<StreamingCursorImpl>(
-        session, _path, checkpointTimestamp, options, &_wtBackup);
+    auto streamingCursor =
+        std::make_unique<StreamingCursorImpl>(session, _path, options, &_wtBackup);
 
     pinOplogGuard.dismiss();
     _backupSession = std::move(sessionRaii);

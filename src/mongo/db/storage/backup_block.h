@@ -60,7 +60,6 @@ public:
                          boost::optional<NamespaceString> nss,
                          boost::optional<UUID> uuid,
                          std::string filePath,
-                         boost::optional<Timestamp> checkpointTimestamp,
                          std::uint64_t offset = 0,
                          std::uint64_t length = 0,
                          std::uint64_t fileSize = 0);

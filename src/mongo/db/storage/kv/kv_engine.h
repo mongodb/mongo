@@ -237,9 +237,7 @@ public:
     }
 
     virtual StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx,
-        boost::optional<Timestamp> checkpointTimestamp,
-        const StorageEngine::BackupOptions& options) {
+        OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
