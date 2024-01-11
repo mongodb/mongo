@@ -352,7 +352,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
             cq, indexBoundsInfo, env.runtimeEnv, &indexBoundsEvaluationCache);
     }
 
-    if (preparingFromCache && data->staticData->doSbeClusteredCollectionScan) {
+    if (preparingFromCache && data->staticData->doClusteredCollectionScanSbe) {
         input_params::bindClusteredCollectionBounds(cq, root, data, env.runtimeEnv);
     }
 
@@ -785,15 +785,15 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
     if (node) {
         auto csn = static_cast<const CollectionScanNode*>(node);
 
-        bool doSbeClusteredCollectionScan = csn->doSbeClusteredCollectionScan();
+        bool doClusteredCollectionScanSbe = csn->doClusteredCollectionScanSbe();
 
         _data->shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
         _data->shouldTrackResumeToken = csn->requestResumeToken;
         _data->shouldUseTailableScan = csn->tailable;
         _data->direction = csn->direction;
-        _data->doSbeClusteredCollectionScan = doSbeClusteredCollectionScan;
+        _data->doClusteredCollectionScanSbe = doClusteredCollectionScanSbe;
 
-        if (doSbeClusteredCollectionScan) {
+        if (doClusteredCollectionScanSbe) {
             _data->clusterKeyFieldName =
                 clustered_util::getClusterKeyFieldName(*(csn->clusteredIndex)).toString();
 

@@ -550,7 +550,7 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     }
 
     // Tells whether this scan will be performed as a clustered collection scan in SBE.
-    bool doSbeClusteredCollectionScan() const {
+    bool doClusteredCollectionScanSbe() const {
         return (isClustered && !isOplog && (minRecord || maxRecord || resumeAfterRecordId));
     }
 
@@ -562,6 +562,8 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     void markNotEligibleForPlanCache() {
         eligibleForPlanCache = false;
     }
+
+    IndexBounds getIndexBounds() const;
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
 

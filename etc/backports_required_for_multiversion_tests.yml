@@ -553,6 +553,12 @@ last-continuous:
     ticket: SERVER-84130
   - test_file: jstests/noPassthrough/disallow_new_transactions_at_shutdown_on_mongos.js
     ticket: SERVER-77667
+  - test_file: jstests/core/notablescan.js
+    ticket: SERVER-83119
+  - test_file: jstests/sharding/clustered_coll_scan.js
+    ticket: SERVER-83119
+  - test_file: jstests/sharding/eof_plan.js
+    ticket: SERVER-83119
   suites: null
 last-lts:
   all:
@@ -1164,4 +1170,10 @@ last-lts:
     ticket: SERVER-84130
   - test_file: jstests/noPassthrough/disallow_new_transactions_at_shutdown_on_mongos.js
     ticket: SERVER-77667
+  - test_file: jstests/core/notablescan.js
+    ticket: SERVER-83119
+  - test_file: jstests/sharding/clustered_coll_scan.js
+    ticket: SERVER-83119
+  - test_file: jstests/sharding/eof_plan.js
+    ticket: SERVER-83119
   suites: null

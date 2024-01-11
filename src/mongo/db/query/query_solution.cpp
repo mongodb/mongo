@@ -393,9 +393,33 @@ void CollectionScanNode::computeProperties() {
     }
 }
 
+/*
+ * IndexBounds exist when this collection scan is a ClusteredIndexScan. Since we need the index
+ * bounds very seldomly it is built adHoc instead of precomputed.
+ */
+IndexBounds CollectionScanNode::getIndexBounds() const {
+    tassert(
+        8311900,
+        "Requesting index bounds on a non ClusteredIndexScan (hidden in a collection scan node)",
+        !(doClusteredCollectionScanClassic() || doClusteredCollectionScanSbe()));
+
+    IndexBounds clusteredIdxScanBounds;
+    BSONObjBuilder maxRecordBson;
+    maxRecord->appendToBSONAs(&maxRecordBson, clusteredIndex->getName().value());
+    BSONObjBuilder minRecordBson;
+    minRecord->appendToBSONAs(&minRecordBson, clusteredIndex->getName().value());
+    clusteredIdxScanBounds.endKey = maxRecordBson.obj();
+    clusteredIdxScanBounds.startKey = minRecordBson.obj();
+    return clusteredIdxScanBounds;
+}
+
 void CollectionScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
-    *ss << "COLLSCAN\n";
+    if (doClusteredCollectionScanClassic() || doClusteredCollectionScanSbe()) {
+        *ss << "CLUSTERED_IDXSCAN\n";
+    } else {
+        *ss << "COLLSCAN\n";
+    }
     addIndent(ss, indent + 1);
     *ss << "ns = " << toStringForLogging(nss) << '\n';
     if (nullptr != filter) {
@@ -413,6 +437,9 @@ std::unique_ptr<QuerySolutionNode> CollectionScanNode::clone() const {
     copy->tailable = this->tailable;
     copy->direction = this->direction;
     copy->isClustered = this->isClustered;
+    copy->minRecord = this->minRecord;
+    copy->maxRecord = this->maxRecord;
+    copy->clusteredIndex = this->clusteredIndex;
     copy->isOplog = this->isOplog;
     copy->shouldTrackLatestOplogTimestamp = this->shouldTrackLatestOplogTimestamp;
     copy->assertTsHasNotFallenOff = this->assertTsHasNotFallenOff;

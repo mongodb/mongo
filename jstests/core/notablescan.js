@@ -16,44 +16,69 @@
 //   tenant_migration_incompatible,
 // ]
 
-let t = db.test_notablescan;
-t.drop();
+import {isClusteredIxscan} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
-try {
-    assert.commandWorked(db._adminCommand({setParameter: 1, notablescan: true}));
-    // commented lines are SERVER-2222
-    if (0) {  // SERVER-2222
-        assert.throws(function() {
-            t.find({a: 1}).toArray();
-        });
-    }
-    t.save({a: 1});
-    assert.throws(function() {
-        t.count({a: 1});
-    });
+function checkError(err) {
+    assert.includes(err.toString(), "'notablescan'");
+}
+
+const colName = jsTestName();
+let coll = db.getCollection(colName);
+coll.drop();
+
+assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
+
+{
     if (0) {
+        // TODO: SERVER-2222 This should actually throw an error as it performs a collection
+        // scan.
         assert.throws(function() {
-            t.find({}).toArray();
+            coll.find({a: 1}).toArray();
         });
     }
-    assert.eq(1, t.find({}).itcount());  // SERVER-274
 
+    coll.insert({a: 1});
     let err = assert.throws(function() {
-        t.find({a: 1}).toArray();
+        coll.count({a: 1});
     });
-    assert.includes(err.toString(), "No indexed plans available, and running with 'notablescan'");
+    checkError(err);
+
+    // TODO: SERVER-2222 This should actually throw an error as it performs a collection scan.
+    assert.eq(1, coll.find({}).itcount());
 
     err = assert.throws(function() {
-        t.find({a: 1}).hint({$natural: 1}).toArray();
+        coll.find({a: 1}).toArray();
+    });
+    checkError(err);
+
+    err = assert.throws(function() {
+        coll.find({a: 1}).hint({$natural: 1}).toArray();
     });
     assert.includes(err.toString(), "$natural");
-    assert.includes(err.toString(), "notablescan");
+    checkError(err);
 
-    t.createIndex({a: 1});
-    assert.eq(0, t.find({a: 1, b: 1}).itcount());
-    assert.eq(1, t.find({a: 1, b: null}).itcount());
-} finally {
-    // We assume notablescan was false before this test started and restore that
-    // expected value.
-    assert.commandWorked(db._adminCommand({setParameter: 1, notablescan: false}));
+    coll.createIndex({a: 1});
+    assert.eq(0, coll.find({a: 1, b: 1}).itcount());
+    assert.eq(1, coll.find({a: 1, b: null}).itcount());
 }
+
+{  // Run the testcase with a clustered index.
+    assertDropAndRecreateCollection(db, colName, {clusteredIndex: {key: {_id: 1}, unique: true}})
+    coll = db.getCollection(colName);
+    assert.commandWorked(coll.insert({_id: 22}));
+    assert.eq(1, coll.find({_id: 22}).itcount());
+    let plan = coll.find({_id: 22}).explain();
+    // Make sure the plan has a clustered index scan.
+    assert(isClusteredIxscan(db, plan));
+
+    // Make sure the same works with an aggregate.
+    assert.eq(1, coll.aggregate([{$match: {_id: 22}}]).itcount());
+    plan = coll.explain().aggregate([{$match: {_id: 22}}]);
+    // Make sure the plan has a clustered index scan.
+    assert(isClusteredIxscan(db, plan));
+    assert.commandWorked(
+        db.runCommand({aggregate: colName, pipeline: [{$match: {_id: 22}}], cursor: {}}));
+}
+// Set it back to the original value.
+assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: false}));

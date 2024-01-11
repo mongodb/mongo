@@ -107,8 +107,8 @@ void statsToBSON(const QuerySolutionNode* node,
 
     StageType nodeType = node->getType();
     if ((nodeType == STAGE_COLLSCAN) &&
-        static_cast<const CollectionScanNode*>(node)->doSbeClusteredCollectionScan()) {
-        bob->append("stage", sbeClusteredCollectionScanToString());
+        static_cast<const CollectionScanNode*>(node)->doClusteredCollectionScanSbe()) {
+        bob->append("stage", clusteredCollectionScanSbeToString());
     } else {
         bob->append("stage", stageTypeToString(node->getType()));
     }

@@ -204,7 +204,7 @@ struct PlanStageStaticData {
     int direction{1};
 
     // True iff this plan does an SBE clustered collection scan.
-    bool doSbeClusteredCollectionScan{false};
+    bool doClusteredCollectionScanSbe{false};
 
     // Iff 'doSbeClusteredCollectionScan', this holds the cluster key field name.
     std::string clusterKeyFieldName;

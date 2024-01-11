@@ -160,6 +160,11 @@ struct QueryPlannerParams {
         // applied per-column. This is off by default, since the execution side doesn't support it
         // yet.
         GENERATE_PER_COLUMN_FILTERS = 1 << 11,
+
+        // This is an extension to the NO_TABLE_SCAN parameter. This more stricter option will also
+        // avoid a CLUSTEREDIDX_SCAN which comes built into a collection scan when the collection is
+        // clustered.
+        STRICT_NO_TABLE_SCAN = 1 << 12,
     };
 
     // See Options enum above.

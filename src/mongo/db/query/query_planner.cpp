@@ -649,6 +649,9 @@ string optionString(size_t options) {
             case QueryPlannerParams::GENERATE_PER_COLUMN_FILTERS:
                 ss << "GENERATE_PER_COLUMN_FILTERS ";
                 break;
+            case QueryPlannerParams::STRICT_NO_TABLE_SCAN:
+                ss << "STRICT_NO_TABLE_SCAN ";
+                break;
             case QueryPlannerParams::DEFAULT:
                 MONGO_UNREACHABLE;
                 break;
@@ -1082,13 +1085,42 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> singleSolution(
     return {std::move(out)};
 }
 
-bool canTableScan(const QueryPlannerParams& params) {
-    return !(params.options & QueryPlannerParams::NO_TABLE_SCAN);
+// If no table scan option is set the planner may not return any plan containing a collection scan.
+// Yet clusteredIdxScans are still allowed as they are not a full collection scan but a bounded
+// collection scan.
+bool noTableScan(const QueryPlannerParams& params) {
+    return (params.options & QueryPlannerParams::NO_TABLE_SCAN);
+}
+
+// Used internally if the planner should also avoid retruning a plan containing a clusteredIDX scan.
+bool noTableAndClusteredIDXScan(const QueryPlannerParams& params) {
+    return (params.options & QueryPlannerParams::STRICT_NO_TABLE_SCAN);
+}
+
+bool isClusteredScan(QuerySolutionNode* node) {
+    if (node->getType() == STAGE_COLLSCAN) {
+        auto collectionScanSolnNode = dynamic_cast<CollectionScanNode*>(node);
+        return (collectionScanSolnNode->doClusteredCollectionScanClassic() ||
+                collectionScanSolnNode->doClusteredCollectionScanSbe());
+    }
+    return false;
+}
+
+// Check if this is a real coll scan or a hidden ClusteredIDX scan.
+bool isColusteredIDXScanSoln(QuerySolution* collscanSoln) {
+    if (collscanSoln->root()->getType() == STAGE_SHARDING_FILTER) {
+        auto child = collscanSoln->root()->children.begin();
+        return isClusteredScan(child->get());
+    }
+    if (collscanSoln->root()->getType() == STAGE_COLLSCAN) {
+        return isClusteredScan(collscanSoln->root());
+    }
+    return false;
 }
 
 StatusWith<std::vector<std::unique_ptr<QuerySolution>>> attemptCollectionScan(
     const CanonicalQuery& query, bool isTailable, const QueryPlannerParams& params) {
-    if (!canTableScan(params)) {
+    if (noTableScan(params)) {
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "not allowed to output a collection scan because 'notablescan' is enabled");
     }
@@ -1689,9 +1721,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     // No indexed plans?  We must provide a collscan if possible or else we can't run the query.
     bool collScanRequired = 0 == out.size();
-    if (collScanRequired && !canTableScan(params)) {
+    if (collScanRequired && noTableAndClusteredIDXScan(params)) {
         return Status(ErrorCodes::NoQueryExecutionPlans,
-                      "No indexed plans available, and running with 'notablescan'");
+                      "No indexed plans available, and running with 'notablescan' 1");
     }
 
     bool clusteredCollection = params.clusteredInfo.has_value();
@@ -1706,6 +1738,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         return Status(ErrorCodes::NoQueryExecutionPlans, "No query solutions");
     }
 
+    bool isClusteredIDXScan = false;
     if (possibleToCollscan && (collscanRequested || collScanRequired || clusteredCollection)) {
         boost::optional<int> clusteredScanDirection =
             QueryPlannerCommon::determineClusteredScanDirection(query, params);
@@ -1715,7 +1748,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "Failed to build collection scan soln");
         }
-
+        isClusteredIDXScan = isColusteredIDXScanSoln(collscanSoln.get());
         // We consider collection scan in the following cases:
         // 1. collScanRequested - specifically requested by caller.
         // 2. collScanRequired - there are no other possible plans, so we fallback to full scan.
@@ -1736,8 +1769,15 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             out.push_back(std::move(collscanSoln));
         }
     }
+    // Make sure to respect the notablescan option. A clustered IDX scan is allowed even under a
+    // NOTABLE option. Only in the case of a strict NOTABLE scan option a clustered IDX scan is not
+    // allowed. This option is used in mongoS for shardPruning.
+    invariant(out.size() > 0);
+    if (collScanRequired && noTableScan(params) && !isClusteredIDXScan) {
+        return Status(ErrorCodes::NoQueryExecutionPlans,
+                      "No indexed plans available, and running with 'notablescan' 2");
+    }
 
-    invariant(!out.empty());
     return {std::move(out)};
 }  // QueryPlanner::plan
 
